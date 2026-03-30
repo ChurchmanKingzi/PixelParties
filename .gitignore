@@ -1,0 +1,8 @@
+node_modules/
+data/pixel-parties.db
+uploads/avatars/*
+uploads/cardbacks/*
+!uploads/avatars/.gitkeep
+!uploads/cardbacks/.gitkeep
+!cards/.gitkeep
+.env
