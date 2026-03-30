@@ -62,12 +62,17 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_decks_user ON decks(user_id);
 `);
 
+// Add new columns if they don't exist yet (safe migration)
+try { db.exec(`ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN wins INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN losses INTEGER DEFAULT 0`); } catch {}
+
 // Prepared statements
 const stmts = {
   getUserByUsername: db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE'),
   getUserById: db.prepare('SELECT * FROM users WHERE id = ?'),
   createUser: db.prepare('INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)'),
-  updateProfile: db.prepare('UPDATE users SET color = ?, avatar = ?, cardback = ? WHERE id = ?'),
+  updateProfile: db.prepare('UPDATE users SET color = ?, avatar = ?, cardback = ?, bio = ? WHERE id = ?'),
   updateElo: db.prepare('UPDATE users SET elo = ? WHERE id = ?'),
   getDecks: db.prepare('SELECT * FROM decks WHERE user_id = ? ORDER BY created_at'),
   getDeck: db.prepare('SELECT * FROM decks WHERE id = ? AND user_id = ?'),
@@ -143,13 +148,13 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
 });
 
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: u.avatar, cardback: u.cardback };
+  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: u.avatar, cardback: u.cardback, bio: u.bio || '', wins: u.wins || 0, losses: u.losses || 0, created_at: u.created_at };
 }
 
 // ===== PROFILE ROUTES =====
 app.put('/api/profile', authMiddleware, (req, res) => {
-  const { color, avatar, cardback } = req.body;
-  stmts.updateProfile.run(color || '#00f0ff', avatar || null, cardback || null, req.user.userId);
+  const { color, avatar, cardback, bio } = req.body;
+  stmts.updateProfile.run(color || '#00f0ff', avatar || null, cardback || null, (bio || '').slice(0, 200), req.user.userId);
   const user = stmts.getUserById.get(req.user.userId);
   res.json({ user: sanitizeUser(user) });
 });
@@ -167,7 +172,7 @@ const avatarUpload = multer({
 const cardbackUpload = multer({
   storage: multer.diskStorage({
     destination: path.join(__dirname, 'uploads', 'cardbacks'),
-    filename: (req, file, cb) => cb(null, req.user.userId + path.extname(file.originalname))
+    filename: (req, file, cb) => cb(null, req.user.userId + '_' + Date.now() + path.extname(file.originalname))
   }),
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype))
@@ -186,8 +191,59 @@ app.post('/api/profile/avatar', authMiddleware, avatarUpload.single('avatar'), (
 app.post('/api/profile/cardback', authMiddleware, cardbackUpload.single('cardback'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   const cbUrl = '/uploads/cardbacks/' + req.file.filename;
-  db.prepare('UPDATE users SET cardback = ? WHERE id = ?').run(cbUrl, req.user.userId);
+  // Don't auto-set as active — user picks from gallery, saves via profile
   res.json({ cardback: cbUrl });
+});
+
+// List all cardbacks uploaded by this user
+app.get('/api/profile/cardbacks', authMiddleware, (req, res) => {
+  const dir = path.join(__dirname, 'uploads', 'cardbacks');
+  try {
+    const files = fs.readdirSync(dir);
+    const userFiles = files
+      .filter(f => f.startsWith(req.user.userId + '_') || f.startsWith(req.user.userId + '.'))
+      .map(f => '/uploads/cardbacks/' + f);
+    res.json({ cardbacks: userFiles });
+  } catch {
+    res.json({ cardbacks: [] });
+  }
+});
+
+// ===== CHANGE PASSWORD =====
+app.post('/api/profile/password', authMiddleware, (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  if (!oldPassword || !newPassword) return res.status(400).json({ error: 'Both old and new password required' });
+  if (newPassword.length < 3) return res.status(400).json({ error: 'New password must be 3+ characters' });
+  const user = stmts.getUserById.get(req.user.userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (!bcrypt.compareSync(oldPassword, user.password_hash)) {
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
+  const hash = bcrypt.hashSync(newPassword, 10);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, user.id);
+  res.json({ success: true });
+});
+
+// ===== PROFILE DECK STATS =====
+app.get('/api/profile/deck-stats', authMiddleware, (req, res) => {
+  const decks = stmts.getDecks.all(req.user.userId);
+  let legalCount = 0;
+  const deckWall = decks.map(d => {
+    const main = JSON.parse(d.main_deck || '[]');
+    const heroes = JSON.parse(d.heroes || '[]').filter(h => h && h.hero);
+    const potions = JSON.parse(d.potion_deck || '[]');
+    const pc = potions.length;
+    const mainOk = main.length === 60;
+    const heroOk = heroes.length === 3;
+    const potionOk = pc === 0 || (pc >= 5 && pc <= 15);
+    const legal = mainOk && heroOk && potionOk;
+    if (legal) legalCount++;
+    // Pick a random card from the deck to represent it
+    const allCards = [...main, ...heroes.map(h => h.hero), ...potions];
+    const repCard = allCards.length > 0 ? allCards[Math.floor(Math.random() * allCards.length)] : null;
+    return { id: d.id, name: d.name, legal, isDefault: !!d.is_default, repCard, cardCount: main.length };
+  });
+  res.json({ total: decks.length, legal: legalCount, decks: deckWall });
 });
 
 // ===== AVAILABLE CARDS (based on ./cards folder) =====

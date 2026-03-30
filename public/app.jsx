@@ -170,12 +170,22 @@ function Notification({ message, type, onClose }) {
 }
 
 // ===== CARD MINI COMPONENT =====
-const TOOLTIP_W = 870;
+// (tooltip dimensions defined inside CardMini)
 let activeDragData = null; // module-level drag tracker for within-section reordering
 let _persistedUnsaved = {}; // persists unsaved deck changes across screen switches
 let _persistedSectionHist = {}; // persists per-section undo history across screen switches
 
-// Compute negative animation-delay to sync all foil overlays to a common timeline
+// Shine band gradient palettes
+const BAND_GRADIENTS = [
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.06) 8%, rgba(255,80,200,.4) 18%, rgba(80,160,255,.5) 28%, rgba(255,255,60,.4) 38%, rgba(60,255,160,.5) 48%, rgba(200,80,255,.45) 58%, rgba(255,160,60,.35) 68%, rgba(255,255,255,.06) 82%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.04) 10%, rgba(255,120,60,.35) 25%, rgba(255,60,180,.4) 40%, rgba(255,200,60,.35) 55%, rgba(255,80,80,.3) 70%, rgba(255,255,255,.04) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 12%, rgba(60,200,255,.35) 25%, rgba(60,255,200,.35) 40%, rgba(160,80,255,.3) 55%, rgba(80,180,255,.3) 70%, rgba(255,255,255,.05) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, transparent 20%, rgba(255,255,255,.5) 45%, rgba(255,255,255,.65) 50%, rgba(255,255,255,.5) 55%, transparent 80%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(255,200,100,.05) 10%, rgba(255,215,0,.35) 25%, rgba(255,180,60,.4) 40%, rgba(255,255,100,.3) 55%, rgba(255,200,60,.25) 70%, rgba(255,200,100,.05) 85%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(200,100,255,.05) 10%, rgba(160,60,255,.3) 25%, rgba(255,60,255,.35) 40%, rgba(100,60,255,.3) 55%, rgba(180,100,255,.25) 70%, rgba(200,100,255,.05) 85%, transparent 100%)',
+];
+
+// Sparkle positions
 const SPARKLE_POSITIONS = [
   { x: 15, y: 20, color: '#ffe080', dur: 2.2, delay: 0 },
   { x: 75, y: 12, color: '#80d0ff', dur: 2.5, delay: 0.4 },
@@ -191,56 +201,83 @@ const SPARKLE_POSITIONS = [
   { x: 20, y: 40, color: '#ffe0a0', dur: 2.3, delay: 1.9 },
 ];
 
-function foilSyncStyle() {
-  const t = performance.now();
-  return {
-    '--foil-sync-s1': `${-(t % 1500)}ms`,
-    '--foil-sync-s2': `${-(t % 1100)}ms`,
-    '--foil-sync-s3': `${-(t % 1800)}ms`,
-    '--foil-sync-s4': `${-(t % 900)}ms`,
-    '--foil-sync-shimmer': `${-(t % 5000)}ms`,
-  };
+// Hook: spawns random shine bands at random intervals
+function useFoilBands(enabled) {
+  const [bands, setBands] = useState([]);
+  const nextId = useRef(0);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const spawn = () => {
+      const id = nextId.current++;
+      const dur = 0.7 + Math.random() * 1.6;
+      const w = 12 + Math.random() * 38;
+      const grad = Math.floor(Math.random() * BAND_GRADIENTS.length);
+      const o = 0.25 + Math.random() * 0.45;
+
+      setBands(prev => [...prev, { id, dur, w, grad, o }]);
+      setTimeout(() => setBands(prev => prev.filter(b => b.id !== id)), dur * 1000 + 50);
+      timerRef.current = setTimeout(spawn, 150 + Math.random() * 700);
+    };
+    timerRef.current = setTimeout(spawn, Math.random() * 400);
+    return () => clearTimeout(timerRef.current);
+  }, [enabled]);
+
+  return bands;
 }
 
-function FoilOverlay({ syncStyle }) {
+// Pure foil overlay renderer — receives bands from parent
+function FoilOverlay({ bands, shimmerOffset, sparkleDelays }) {
   return (
-    <div className="foil-shine-overlay" style={syncStyle}>
-      <div className="foil-sweep-1" />
-      <div className="foil-sweep-2" />
-      <div className="foil-sweep-3" />
-      <div className="foil-sweep-4" />
-      <div className="foil-iridescent" />
+    <div className="foil-shine-overlay">
+      {bands.map(b => (
+        <div key={b.id} className="foil-band" style={{
+          '--band-dur': b.dur + 's',
+          '--band-w': b.w + '%',
+          '--band-o': b.o,
+          backgroundImage: BAND_GRADIENTS[b.grad],
+        }} />
+      ))}
+      <div className="foil-iridescent" style={{ '--shimmer-offset': shimmerOffset }} />
       {SPARKLE_POSITIONS.map((sp, i) => (
         <div key={i} className="foil-sparkle"
           style={{
             left: sp.x + '%', top: sp.y + '%', color: sp.color,
             '--sp-dur': sp.dur + 's',
-            '--sp-delay': `calc(${sp.delay}s + var(--foil-sync-s1, 0s))`,
+            '--sp-delay': sparkleDelays[i] + 's',
           }} />
       ))}
     </div>
   );
 }
-function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style, dragData }) {
+
+// Gallery panel dimensions
+const GALLERY_W = 400;
+const TOP_BAR_H = 41; // top bar approximate height
+
+function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style, dragData, inGallery }) {
   const [tt, setTT] = useState(null);
   const imgUrl = cardImageUrl(card.name);
   const isFoil = card.foil === 'secret_rare';
-  const foilSync = useRef(isFoil ? foilSyncStyle() : null);
+  const foilBands = useFoilBands(isFoil);
+  const foilMeta = useRef(isFoil ? {
+    shimmerOffset: `${-Math.random() * 5000}ms`,
+    sparkleDelays: SPARKLE_POSITIONS.map(sp => sp.delay + Math.random() * 2),
+  } : null);
+
   const show = (e) => {
-    const goLeft = e.clientX > window.innerWidth / 2;
-    const tx = goLeft
-      ? Math.max(4, e.clientX - TOOLTIP_W - 80)
-      : Math.min(e.clientX + 80, window.innerWidth - TOOLTIP_W - 10);
-    setTT({ x: tx, y: Math.max(8, Math.min(e.clientY - 220, window.innerHeight - 460)) });
+    if (activeDragData) return;
+    setTT(true);
   };
-  const hide = () => setTT(null);
+  const hide = () => setTT(false);
   const onDragStart = (e) => {
     if (dragData) {
       e.dataTransfer.setData('application/json', JSON.stringify(dragData));
       e.dataTransfer.effectAllowed = 'move';
       activeDragData = dragData;
     } else e.preventDefault();
-    setTT(null);
+    setTT(false);
   };
   const onDragEnd = () => { activeDragData = null; };
   return (
@@ -252,8 +289,8 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
         onDragEnd={onDragEnd}
         onClick={onClick}
         onContextMenu={(e) => { e.preventDefault(); onRightClick && onRightClick(); }}
-        onMouseEnter={show} onMouseLeave={hide} onMouseMove={show}>
-        {isFoil && <FoilOverlay syncStyle={foilSync.current} />}
+        onMouseEnter={show} onMouseLeave={hide}>
+        {isFoil && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} />}
         {imgUrl ? (
           <img src={imgUrl} alt={card.name}
             style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', borderRadius:1 }}
@@ -282,30 +319,37 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
         )}
       </div>
       {tt && (
-        <div className="tooltip" style={{ left: tt.x, top: tt.y, width: TOOLTIP_W, display: 'flex', gap: 18 }}>
+        <div className="tooltip" style={{
+          right: inGallery ? GALLERY_W : 0, top: TOP_BAR_H, width: GALLERY_W,
+          height: 'calc(100vh - ' + TOP_BAR_H + 'px)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}>
           {imgUrl && (
-            <div style={{ position: 'relative', flexShrink: 0, width: 280, height: 392 }}>
-              <img src={imgUrl} alt="" style={{ width: 280, height: 392, objectFit: 'cover', border: isFoil ? '2px solid rgba(255,215,0,.5)' : '1px solid var(--bg4)' }} />
-              {isFoil && <FoilOverlay syncStyle={foilSync.current} />}
+            <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
+              <img src={imgUrl} alt="" style={{
+                width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
+                border: isFoil ? '2px solid rgba(255,215,0,.5)' : '1px solid var(--bg4)'
+              }} />
+              {isFoil && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} />}
             </div>
           )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, marginBottom: 8, color: typeColor(card.cardType), fontSize: 26 }}>{card.name}</div>
-            <div style={{ fontSize: 20, color: 'var(--text2)', marginBottom: 10 }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
+            <div style={{ fontWeight: 700, marginBottom: 5, color: typeColor(card.cardType), fontSize: 18 }}>{card.name}</div>
+            <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>
               {card.cardType}{card.subtype ? ' · ' + card.subtype : ''}{card.archetype ? ' · ' + card.archetype : ''}
             </div>
-            {card.level != null && <div style={{ fontSize: 22 }}>Level: {card.level}</div>}
-            <div style={{ display: 'flex', gap: 16, fontSize: 22, marginBottom: 10 }}>
+            {card.level != null && <div style={{ fontSize: 15 }}>Level: {card.level}</div>}
+            <div style={{ display: 'flex', gap: 12, fontSize: 15, marginBottom: 8 }}>
               {card.hp != null && <span>HP: {card.hp}</span>}
               {card.atk != null && <span>ATK: {card.atk}</span>}
               {card.cost != null && <span>Cost: {card.cost}</span>}
             </div>
             {(card.spellSchool1 || card.spellSchool2) &&
-              <div style={{ fontSize: 20, color: '#aa88ff', marginBottom: 6 }}>Schools: {[card.spellSchool1, card.spellSchool2].filter(Boolean).join(', ')}</div>}
+              <div style={{ fontSize: 14, color: '#aa88ff', marginBottom: 4 }}>Schools: {[card.spellSchool1, card.spellSchool2].filter(Boolean).join(', ')}</div>}
             {(card.startingAbility1 || card.startingAbility2) &&
-              <div style={{ fontSize: 20, color: '#ffcc44', marginBottom: 6 }}>Abilities: {[card.startingAbility1, card.startingAbility2].filter(Boolean).join(', ')}</div>}
+              <div style={{ fontSize: 14, color: '#ffcc44', marginBottom: 4 }}>Abilities: {[card.startingAbility1, card.startingAbility2].filter(Boolean).join(', ')}</div>}
             {card.effect &&
-              <div style={{ fontSize: 20, marginTop: 8, lineHeight: 1.45, maxHeight: 260, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
+              <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
           </div>
         </div>
       )}
@@ -398,11 +442,86 @@ function MainMenu() {
 // ═══════════════════════════════════════════
 //  PROFILE SCREEN
 // ═══════════════════════════════════════════
+
+const RANK_TIERS = [
+  { name: 'BRONZE',       min: 0,    color: '#cd7f32', glow: 'rgba(205,127,50,.5)',  icon: '⬡' },
+  { name: 'SILVER',       min: 1200, color: '#c0c0c0', glow: 'rgba(192,192,192,.5)', icon: '⬡' },
+  { name: 'GOLD',         min: 1400, color: '#ffd700', glow: 'rgba(255,215,0,.5)',    icon: '⬡' },
+  { name: 'PLATINUM',     min: 1600, color: '#a8e8f0', glow: 'rgba(168,232,240,.5)', icon: '◈' },
+  { name: 'DIAMOND',      min: 1800, color: '#b9f2ff', glow: 'rgba(185,242,255,.6)', icon: '◆' },
+  { name: 'MASTER',       min: 2000, color: '#ff44cc', glow: 'rgba(255,68,204,.5)',   icon: '✦' },
+  { name: 'GRANDMASTER',  min: 2200, color: '#ff8800', glow: 'rgba(255,136,0,.6)',    icon: '♛' },
+];
+
+function getRank(elo) {
+  for (let i = RANK_TIERS.length - 1; i >= 0; i--) {
+    if (elo >= RANK_TIERS[i].min) return RANK_TIERS[i];
+  }
+  return RANK_TIERS[0];
+}
+
 function ProfileScreen() {
   const { user, setUser, setScreen, notify } = useContext(AppContext);
   const [color, setColor] = useState(user.color || '#00f0ff');
   const [avatar, setAvatar] = useState(user.avatar);
   const [cardback, setCardback] = useState(user.cardback);
+  const [bio, setBio] = useState(user.bio || '');
+  const [deckStats, setDeckStats] = useState({ total: 0, legal: 0, decks: [] });
+  const [saving, setSaving] = useState(false);
+
+  // Password change
+  const [oldPw, setOldPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
+
+  // Cardback gallery
+  const [showCbGallery, setShowCbGallery] = useState(false);
+  const [uploadedCardbacks, setUploadedCardbacks] = useState([]);
+
+  // Dirty tracking — compare against original user values
+  const isDirty = color !== (user.color || '#00f0ff')
+    || avatar !== user.avatar
+    || cardback !== user.cardback
+    || bio !== (user.bio || '');
+
+  const rank = getRank(user.elo || 1000);
+  const wins = user.wins || 0;
+  const losses = user.losses || 0;
+  const gamesPlayed = wins + losses;
+  const winRate = gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 100) : 0;
+  const memberSince = user.created_at ? new Date(user.created_at * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '—';
+
+  // Next rank progress
+  const nextRank = RANK_TIERS.find(r => r.min > (user.elo || 1000));
+  const prevMin = rank.min;
+  const nextMin = nextRank ? nextRank.min : rank.min;
+  const eloProgress = nextRank ? Math.min(100, Math.round(((user.elo - prevMin) / (nextMin - prevMin)) * 100)) : 100;
+
+  useEffect(() => {
+    api('/profile/deck-stats').then(setDeckStats).catch(() => {});
+    loadCardbackGallery();
+  }, []);
+
+  // Intercept Escape to close gallery modal before the global handler navigates away
+  useEffect(() => {
+    if (!showCbGallery) return;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        setShowCbGallery(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc, true); // capture phase
+    return () => window.removeEventListener('keydown', handleEsc, true);
+  }, [showCbGallery]);
+
+  const loadCardbackGallery = async () => {
+    try {
+      const data = await api('/profile/cardbacks');
+      setUploadedCardbacks(data.cardbacks || []);
+    } catch {}
+  };
 
   const handleAvatar = async (e) => {
     const file = e.target.files[0]; if (!file) return;
@@ -417,7 +536,7 @@ function ProfileScreen() {
     } catch (e) { notify(e.message, 'error'); }
   };
 
-  const handleCardback = (e) => {
+  const handleCardbackUpload = (e) => {
     const file = e.target.files[0]; if (!file) return;
     const img = new Image();
     const reader = new FileReader();
@@ -436,7 +555,11 @@ function ProfileScreen() {
             headers: AUTH_TOKEN ? { 'x-auth-token': AUTH_TOKEN } : {}
           });
           const data = await res.json();
-          if (data.cardback) { setCardback(data.cardback); notify('Cardback uploaded!', 'success'); }
+          if (data.cardback) {
+            setUploadedCardbacks(prev => [...prev, data.cardback]);
+            setCardback(data.cardback);
+            notify('Cardback uploaded!', 'success');
+          }
         } catch (err) { notify(err.message, 'error'); }
       };
       img.src = ev.target.result;
@@ -445,60 +568,289 @@ function ProfileScreen() {
   };
 
   const save = async () => {
+    setSaving(true);
     try {
-      const data = await api('/profile', { method: 'PUT', body: JSON.stringify({ color, avatar, cardback }) });
+      const data = await api('/profile', { method: 'PUT', body: JSON.stringify({ color, avatar, cardback, bio }) });
       setUser(data.user);
       notify('Profile saved!', 'success');
     } catch (e) { notify(e.message, 'error'); }
+    setSaving(false);
   };
 
+  const changePassword = async () => {
+    if (!oldPw || !newPw) { notify('Fill in all password fields', 'error'); return; }
+    if (newPw !== confirmPw) { notify('New passwords do not match', 'error'); return; }
+    if (newPw.length < 3) { notify('New password must be 3+ characters', 'error'); return; }
+    setPwSaving(true);
+    try {
+      await api('/profile/password', { method: 'POST', body: JSON.stringify({ oldPassword: oldPw, newPassword: newPw }) });
+      notify('Password changed!', 'success');
+      setOldPw(''); setNewPw(''); setConfirmPw('');
+    } catch (e) { notify(e.message, 'error'); }
+    setPwSaving(false);
+  };
+
+  // Build card image URL for deck wall
+  const getCardImage = (cardName) => {
+    if (!cardName || !AVAILABLE_MAP[cardName]) return null;
+    return '/cards/' + AVAILABLE_MAP[cardName];
+  };
+
+  // Display URL for current cardback (show default if none selected)
+  const displayCardback = cardback || '/cardback.png';
+
   return (
-    <div className="screen-full">
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)' }}>
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 16, color: 'var(--accent)' }}>PLAYER PROFILE</h2>
+        <div style={{ flex: 1 }} />
+        <div style={{ fontSize: 10, color: 'var(--text2)' }}>Member since {memberSince}</div>
       </div>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="animate-in">
-        <div className="panel" style={{ width: 500, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ width: 100, height: 100, border: '2px solid var(--bg4)', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 8 }}>
-                {avatar ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 40 }}>👤</span>}
-              </div>
-              <label className="btn" style={{ padding: '4px 8px', fontSize: 9, display: 'block', textAlign: 'center', cursor: 'pointer' }}>
-                UPLOAD<input type="file" accept="image/*" onChange={handleAvatar} style={{ display: 'none' }} />
-              </label>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div className="orbit-font" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>USERNAME</div>
-              <div className="orbit-font" style={{ fontSize: 22, fontWeight: 700, color }}>{user.username}</div>
-              <div style={{ marginTop: 12 }}>
-                <span className="badge" style={{ background: 'rgba(170,255,0,.12)', color: 'var(--accent3)', fontSize: 14, padding: '4px 10px' }}>ELO {user.elo}</span>
-              </div>
-            </div>
-          </div>
-          <div>
-            <div className="orbit-font" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>NAME COLOR</div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input type="color" value={color} onChange={e => setColor(e.target.value)} style={{ width: 40, height: 30, border: 'none', cursor: 'pointer', background: 'none' }} />
-              <span style={{ color, fontWeight: 700 }}>{user.username}</span>
-            </div>
-          </div>
-          <div>
-            <div className="orbit-font" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>CARD BACK</div>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-              <div style={{ width: 75, height: 105, border: '2px solid var(--bg4)', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                {cardback ? <img src={cardback} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 10, color: 'var(--text2)' }}>Default</span>}
-              </div>
-              <div>
-                <label className="btn" style={{ padding: '4px 8px', fontSize: 9, cursor: 'pointer' }}>
-                  UPLOAD (750×1050)<input type="file" accept="image/*" onChange={handleCardback} style={{ display: 'none' }} />
+
+      <div className="profile-layout animate-in" style={{ '--rank-color': rank.color, '--rank-glow': rank.glow }}>
+
+        {/* ═══ LEFT COLUMN — PLAYER IDENTITY ═══ */}
+        <div className="profile-identity-col">
+          <div className="profile-identity-panel">
+
+            {/* Avatar frame */}
+            <div className="profile-hero-area">
+              <div className="profile-avatar-frame" style={{ borderColor: rank.color, boxShadow: `0 0 20px ${rank.glow}, 0 0 40px ${rank.glow}, inset 0 0 15px ${rank.glow}` }}>
+                <div className="profile-avatar-inner">
+                  {avatar
+                    ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <span style={{ fontSize: 56, opacity: 0.5 }}>👤</span>}
+                </div>
+                <label className="profile-avatar-upload-overlay">
+                  <span>✎</span>
+                  <input type="file" accept="image/*" onChange={handleAvatar} style={{ display: 'none' }} />
                 </label>
-                {cardback && <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: 9, marginLeft: 8 }} onClick={() => setCardback(null)}>REMOVE</button>}
+              </div>
+
+              {/* Rank badge */}
+              <div className="profile-rank-badge" style={{ background: rank.color, color: '#000' }}>
+                <span style={{ fontSize: 12 }}>{rank.icon}</span>
+                <span className="orbit-font" style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>{rank.name}</span>
+              </div>
+            </div>
+
+            {/* Username */}
+            <div className="orbit-font" style={{ fontSize: 30, fontWeight: 800, color, letterSpacing: 1, textShadow: `0 0 25px ${color}44`, textAlign: 'center', marginTop: 10 }}>
+              {user.username}
+            </div>
+
+            {/* ELO display */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 6 }}>
+              <span className="orbit-font" style={{ fontSize: 22, fontWeight: 700, color: rank.color }}>{user.elo || 1000}</span>
+              <span style={{ fontSize: 12, color: 'var(--text2)' }}>ELO</span>
+            </div>
+
+            {/* ELO progress bar */}
+            {nextRank && (
+              <div style={{ margin: '10px 0 0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text2)', marginBottom: 3 }}>
+                  <span>{rank.name}</span>
+                  <span>{nextRank.name} ({nextMin})</span>
+                </div>
+                <div className="profile-elo-bar">
+                  <div className="profile-elo-fill" style={{ width: eloProgress + '%', background: `linear-gradient(90deg, ${rank.color}, ${nextRank.color})` }} />
+                </div>
+              </div>
+            )}
+
+            {/* Divider */}
+            <div style={{ borderTop: '1px solid var(--bg4)', margin: '16px 0' }} />
+
+            {/* Bio */}
+            <div>
+              <div className="profile-section-label">MOTTO</div>
+              <textarea
+                className="profile-bio-input"
+                value={bio}
+                onChange={e => setBio(e.target.value.slice(0, 200))}
+                placeholder="Write something memorable..."
+                rows={3}
+                maxLength={200}
+              />
+              <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text2)', marginTop: 2 }}>{bio.length}/200</div>
+            </div>
+
+            {/* Save button at bottom of identity panel */}
+            <div style={{ marginTop: 'auto', paddingTop: 16 }}>
+              <button className="btn btn-success" style={{ width: '100%', padding: '12px 0', fontSize: 14 }} onClick={save} disabled={saving || !isDirty}>
+                {saving ? '...' : isDirty ? 'SAVE PROFILE' : 'NO CHANGES'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        {/* ═══ RIGHT COLUMN — STATS & CUSTOMIZATION ═══ */}
+        <div className="profile-right-col">
+
+          {/* Combined: Card Back + Battle Record + Name Color */}
+          <div className="profile-section profile-section-wide" style={{ flex: 'none' }}>
+            <div style={{ display: 'flex', gap: 28, alignItems: 'stretch' }}>
+
+              {/* Card Back — large preview */}
+              <div className="profile-cardback-preview profile-cardback-xl profile-cardback-clickable" onClick={() => setShowCbGallery(true)}>
+                <img src={displayCardback} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div className="profile-cardback-hover-overlay">CHANGE</div>
+              </div>
+
+              {/* Right side: stacked info */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
+
+                {/* Battle Record */}
+                <div style={{ paddingBottom: 14, borderBottom: '1px solid var(--bg4)' }}>
+                  <div className="profile-section-label">BATTLE RECORD</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ color: 'var(--success)', fontWeight: 700, fontSize: 15 }}>{wins}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text2)' }}>W</span>
+                    <span style={{ color: 'var(--text2)', fontSize: 10 }}>/</span>
+                    <span style={{ color: 'var(--danger)', fontWeight: 700, fontSize: 15 }}>{losses}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text2)' }}>L</span>
+                    <span style={{ color: 'var(--bg4)', margin: '0 4px' }}>│</span>
+                    <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 15 }}>{winRate}%</span>
+                    <span style={{ fontSize: 10, color: 'var(--text2)' }}>Win Rate</span>
+                    <span style={{ color: 'var(--bg4)', margin: '0 4px' }}>│</span>
+                    <span style={{ fontWeight: 700, fontSize: 15 }}>{gamesPlayed}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text2)' }}>Games</span>
+                  </div>
+                </div>
+
+                {/* Name Color */}
+                <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid var(--bg4)' }}>
+                  <div className="profile-section-label">NAME COLOR</div>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <input type="color" value={color} onChange={e => setColor(e.target.value)}
+                      style={{ width: 44, height: 34, border: '1px solid var(--bg4)', cursor: 'pointer', background: 'none', padding: 0 }} />
+                    <span style={{ color, fontWeight: 700, fontSize: 18 }}>{user.username}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text2)', marginLeft: 4 }}>Preview</span>
+                  </div>
+                </div>
+
+                {/* Card Back info */}
+                <div style={{ paddingTop: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div className="profile-section-label">CARD BACK</div>
+                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>
+                    {cardback ? 'Custom Card Back' : 'Default Card Back'}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.5 }}>
+                    Your opponent sees this design whenever your cards are face-down. Click the preview or the button below to choose from your gallery.
+                  </div>
+                  <button className="btn" style={{ padding: '8px 20px', fontSize: 12, marginTop: 4, alignSelf: 'flex-start' }}
+                    onClick={() => setShowCbGallery(true)}>
+                    OPEN GALLERY
+                  </button>
+                </div>
+
               </div>
             </div>
           </div>
-          <button className="btn btn-success btn-big" onClick={save}>SAVE PROFILE</button>
+
+          {/* Cardback Gallery Modal */}
+          {showCbGallery && (
+            <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowCbGallery(false); }}>
+              <div className="modal" style={{ maxWidth: 620, width: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+                  <h3 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', flex: 1 }}>SELECT CARD BACK</h3>
+                  <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setShowCbGallery(false)}>✕ CLOSE</button>
+                </div>
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                  <div className="profile-cb-gallery">
+                    {/* Default cardback */}
+                    <div className={'profile-cb-gallery-item' + (!cardback ? ' active' : '')} onClick={() => { setCardback(null); setShowCbGallery(false); }}>
+                      <div className="profile-cb-gallery-card">
+                        <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                      <div className="profile-cb-gallery-label">Default</div>
+                    </div>
+                    {/* Uploaded cardbacks */}
+                    {uploadedCardbacks.map((cb, i) => (
+                      <div key={i} className={'profile-cb-gallery-item' + (cardback === cb ? ' active' : '')} onClick={() => { setCardback(cb); setShowCbGallery(false); }}>
+                        <div className="profile-cb-gallery-card">
+                          <img src={cb} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        <div className="profile-cb-gallery-label">Custom {i + 1}</div>
+                      </div>
+                    ))}
+                    {/* Upload new */}
+                    <label className="profile-cb-gallery-item profile-cb-gallery-upload">
+                      <div className="profile-cb-gallery-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 4 }}>
+                        <span style={{ fontSize: 28, color: 'var(--accent)', opacity: 0.6 }}>+</span>
+                        <span style={{ fontSize: 9, color: 'var(--text2)' }}>Upload New</span>
+                        <span style={{ fontSize: 8, color: 'var(--text2)' }}>750×1050</span>
+                      </div>
+                      <input type="file" accept="image/*" onChange={handleCardbackUpload} style={{ display: 'none' }} />
+                      <div className="profile-cb-gallery-label">Upload</div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Change Password */}
+          <div className="profile-section profile-section-wide">
+            <div className="profile-section-label">CHANGE PASSWORD</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <input className="input" type="password" placeholder="Current password" value={oldPw}
+                onChange={e => setOldPw(e.target.value)} style={{ flex: 1 }} />
+              <input className="input" type="password" placeholder="New password" value={newPw}
+                onChange={e => setNewPw(e.target.value)} style={{ flex: 1 }} />
+              <input className="input" type="password" placeholder="Repeat new password" value={confirmPw}
+                onChange={e => setConfirmPw(e.target.value)} style={{ flex: 1 }}
+                onKeyDown={e => e.key === 'Enter' && changePassword()} />
+              <button className="btn" style={{ padding: '8px 18px', fontSize: 11, whiteSpace: 'nowrap' }}
+                onClick={changePassword} disabled={pwSaving}>
+                {pwSaving ? '...' : 'CHANGE'}
+              </button>
+            </div>
+          </div>
+
+          {/* ═══ DECK COLLECTION + WALL ═══ */}
+          <div className="profile-section profile-section-wide" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div className="profile-section-label" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <span>DECK COLLECTION</span>
+              <div style={{ display: 'flex', gap: 12, marginLeft: 'auto', fontSize: 9, borderBottom: 'none', paddingBottom: 0, marginBottom: 0 }}>
+                <span style={{ color: 'var(--text)' }}>{deckStats.total} <span style={{ color: 'var(--text2)' }}>TOTAL</span></span>
+                <span style={{ color: 'var(--success)' }}>{deckStats.legal} <span style={{ color: 'var(--text2)' }}>LEGAL</span></span>
+                <span style={{ color: deckStats.total - deckStats.legal > 0 ? 'var(--danger)' : 'var(--text2)' }}>
+                  {deckStats.total - deckStats.legal} <span style={{ color: 'var(--text2)' }}>ILLEGAL</span>
+                </span>
+              </div>
+            </div>
+            {(deckStats.decks || []).length === 0 ? (
+              <div style={{ color: 'var(--text2)', fontSize: 13, padding: '20px 0', textAlign: 'center' }}>
+                No decks yet — head to the Deck Builder to create one!
+              </div>
+            ) : (
+              <div className="profile-deck-wall">
+                {(deckStats.decks || []).map(d => {
+                  const img = getCardImage(d.repCard);
+                  return (
+                    <div key={d.id} className="profile-deck-tile" onClick={() => setScreen('deckbuilder')}>
+                      <div className="profile-deck-tile-card">
+                        {img
+                          ? <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                          : <div style={{ width: '100%', height: '100%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--text2)' }}>?</div>
+                        }
+                        {d.isDefault && <div className="profile-deck-tile-star" title="Default deck">★</div>}
+                        <div className="profile-deck-tile-status" style={{ color: d.legal ? 'var(--success)' : 'var(--danger)' }}>
+                          {d.legal ? '✓' : '✗'}
+                        </div>
+                      </div>
+                      <div className="profile-deck-tile-name" title={d.name}>{d.name}</div>
+                      <div className="profile-deck-tile-count">{d.cardCount}/60</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
     </div>
@@ -1194,6 +1546,7 @@ function DeckBuilder() {
                     onClick={(e) => showAddMenu(card.name, e)}
                     onRightClick={() => autoAdd(card.name)}
                     dragData={{ cardName: card.name, fromSection: null }}
+                    inGallery
                     style={{ width: '100%', height: 120 }} />
                 );
               })}
