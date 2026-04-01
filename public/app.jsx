@@ -562,15 +562,19 @@ function ProfileScreen() {
 
   const handleAvatar = async (e) => {
     const file = e.target.files[0]; if (!file) return;
-    const fd = new FormData(); fd.append('avatar', file);
-    try {
-      const res = await fetch('/api/profile/avatar', {
-        method: 'POST', body: fd,
-        headers: AUTH_TOKEN ? { 'x-auth-token': AUTH_TOKEN } : {}
-      });
-      const data = await res.json();
-      if (data.avatar) { setAvatar(data.avatar); notify('Avatar uploaded!', 'success'); }
-    } catch (e) { notify(e.message, 'error'); }
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target.result;
+      try {
+        const res = await fetch('/api/profile/avatar', {
+          method: 'POST', body: JSON.stringify({ avatar: dataUrl }),
+          headers: { 'Content-Type': 'application/json', ...(AUTH_TOKEN ? { 'x-auth-token': AUTH_TOKEN } : {}) }
+        });
+        const data = await res.json();
+        if (data.avatar) { setAvatar(data.avatar); setUser(u => ({ ...u, avatar: data.avatar })); notify('Avatar uploaded!', 'success'); }
+      } catch (e) { notify(e.message, 'error'); }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleCardbackUpload = (e) => {
@@ -578,6 +582,7 @@ function ProfileScreen() {
     const img = new Image();
     const reader = new FileReader();
     reader.onload = (ev) => {
+      const dataUrl = ev.target.result;
       img.onload = async () => {
         const ratio = img.width / img.height;
         const target = 750 / 1050;
@@ -585,21 +590,21 @@ function ProfileScreen() {
           notify('Cardback must have a 750×1050 ratio!', 'error');
           return;
         }
-        const fd = new FormData(); fd.append('cardback', file);
         try {
           const res = await fetch('/api/profile/cardback', {
-            method: 'POST', body: fd,
-            headers: AUTH_TOKEN ? { 'x-auth-token': AUTH_TOKEN } : {}
+            method: 'POST', body: JSON.stringify({ cardback: dataUrl }),
+            headers: { 'Content-Type': 'application/json', ...(AUTH_TOKEN ? { 'x-auth-token': AUTH_TOKEN } : {}) }
           });
           const data = await res.json();
           if (data.cardback) {
             setUploadedCardbacks(prev => [...prev, data.cardback]);
             setCardback(data.cardback);
+            setUser(u => ({ ...u, cardback: data.cardback }));
             notify('Cardback uploaded!', 'success');
           }
         } catch (err) { notify(err.message, 'error'); }
       };
-      img.src = ev.target.result;
+      img.src = dataUrl;
     };
     reader.readAsDataURL(file);
   };
@@ -711,6 +716,15 @@ function ProfileScreen() {
                 maxLength={200}
               />
               <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text2)', marginTop: 2 }}>{bio.length}/200</div>
+            </div>
+
+            {/* Profile Backup */}
+            <div style={{ borderTop: '1px solid var(--bg4)', margin: '12px 0', paddingTop: 12 }}>
+              <div className="profile-section-label">PROFILE BACKUP</div>
+              {/* Export/Import buttons hidden — profile data now persists via Turso DB */}
+              <div style={{ fontSize: 9, color: 'var(--text2)', marginTop: 6, textAlign: 'center' }}>
+                Profile data is stored in the cloud and persists across updates.
+              </div>
             </div>
 
             {/* Save button at bottom of identity panel */}
@@ -1260,10 +1274,25 @@ function DeckBuilder() {
     if (!canAddCard(currentDeck, cardName, section)) return false;
     const keyMap = { main: 'mainDeck', potion: 'potionDeck', side: 'sideDeck' };
     const key = keyMap[section];
-    if (!key) return addCardTo(cardName, section); // hero falls through
+    if (!key) return addCardTo(cardName, section);
     const arr = [...(currentDeck[key] || [])];
     arr.splice(Math.min(idx, arr.length), 0, cardName);
     updateSections({ [section]: arr });
+    return true;
+  }, [currentDeck, unsaved, decks, activeIdx]);
+
+  // Add hero to a specific slot (or first free), with swap if occupied
+  const addCardToHeroSlot = useCallback((cardName, targetSlot) => {
+    if (!currentDeck) return false;
+    const card = CARDS_BY_NAME[cardName];
+    if (!card || card.cardType !== 'Hero') return false;
+    const heroes = [...(currentDeck.heroes || [{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null }])].map(h => ({ ...h }));
+    // Check if this hero is already in the deck
+    if (heroes.some(h => h && h.hero === cardName)) return false;
+    let slot = targetSlot != null ? targetSlot : heroes.findIndex(h => !h || !h.hero);
+    if (slot < 0 || slot > 2) return false;
+    heroes[slot] = { hero: cardName, ability1: card.startingAbility1 || null, ability2: card.startingAbility2 || null };
+    updateSections({ heroes });
     return true;
   }, [currentDeck, unsaved, decks, activeIdx]);
 
@@ -1329,20 +1358,36 @@ function DeckBuilder() {
   // Cross-section drop
   const handleDrop = useCallback((targetSection, dragData, mouseX, mouseY) => {
     if (!dragData || !dragData.cardName || !currentDeck) return;
-    const { cardName, fromSection, fromIndex } = dragData;
-    if (fromSection === targetSection) return;
+    const { cardName, fromSection, fromIndex, targetSlot } = dragData;
+    if (fromSection === targetSection && targetSection !== 'hero') return;
+
+    // Determine positional index from mouse if available
+    let posIdx = null;
+    if (mouseX != null && mouseY != null && targetSection !== 'hero') {
+      const dropTarget = findDropTarget(mouseX, mouseY, null, -1);
+      if (dropTarget && dropTarget.section === targetSection) posIdx = dropTarget.idx;
+    }
+
+    // Gallery drop (no fromSection)
     if (!fromSection) {
-      // Gallery drop — insert at position if mouse coords available
-      if (mouseX != null && mouseY != null && targetSection !== 'hero') {
-        const dropTarget = findDropTarget(mouseX, mouseY, null, -1);
-        if (dropTarget && dropTarget.section === targetSection) {
-          addCardAt(cardName, targetSection, dropTarget.idx);
-          return;
-        }
+      if (targetSection === 'hero') {
+        addCardToHeroSlot(cardName, targetSlot != null ? targetSlot : null);
+      } else if (posIdx != null) {
+        addCardAt(cardName, targetSection, posIdx);
+      } else {
+        addCardTo(cardName, targetSection);
       }
-      addCardTo(cardName, targetSection);
       return;
     }
+
+    // Hero→Hero swap/move
+    if (fromSection === 'hero' && targetSection === 'hero') {
+      if (targetSlot != null && fromIndex != null) {
+        swapHeroes(fromIndex, targetSlot);
+      }
+      return;
+    }
+
     // Atomic cross-section move
     const tempDeck = {
       mainDeck: [...(currentDeck.mainDeck || [])],
@@ -1354,17 +1399,26 @@ function DeckBuilder() {
     else if (fromSection === 'potion') { const idx = fromIndex != null ? fromIndex : tempDeck.potionDeck.indexOf(cardName); if (idx >= 0) tempDeck.potionDeck.splice(idx, 1); }
     else if (fromSection === 'side') { const idx = fromIndex != null ? fromIndex : tempDeck.sideDeck.indexOf(cardName); if (idx >= 0) tempDeck.sideDeck.splice(idx, 1); }
     else if (fromSection === 'hero') { const s = tempDeck.heroes.findIndex(h => h && h.hero === cardName); if (s >= 0) tempDeck.heroes[s] = { hero: null, ability1: null, ability2: null }; }
-    if (!canAddCard(tempDeck, cardName, targetSection)) return;
-    const card = CARDS_BY_NAME[cardName];
-    if (targetSection === 'main') tempDeck.mainDeck.push(cardName);
-    else if (targetSection === 'potion') tempDeck.potionDeck.push(cardName);
-    else if (targetSection === 'side') tempDeck.sideDeck.push(cardName);
-    else if (targetSection === 'hero') {
-      const es = tempDeck.heroes.findIndex(h => !h || !h.hero);
-      if (es < 0) return;
-      tempDeck.heroes[es] = { hero: cardName, ability1: card?.startingAbility1 || null, ability2: card?.startingAbility2 || null };
+
+    if (targetSection === 'hero') {
+      if (!canAddCard(tempDeck, cardName, 'hero')) return;
+      const card = CARDS_BY_NAME[cardName];
+      const slot = targetSlot != null ? targetSlot : tempDeck.heroes.findIndex(h => !h || !h.hero);
+      if (slot < 0) return;
+      tempDeck.heroes[slot] = { hero: cardName, ability1: card?.startingAbility1 || null, ability2: card?.startingAbility2 || null };
+    } else {
+      if (!canAddCard(tempDeck, cardName, targetSection)) return;
+      const key = { main: 'mainDeck', potion: 'potionDeck', side: 'sideDeck' }[targetSection];
+      if (posIdx != null) {
+        // Adjust index: if we removed from same array earlier, shift down
+        let adj = posIdx;
+        if (fromSection === targetSection && fromIndex != null && fromIndex < posIdx) adj--;
+        tempDeck[key].splice(Math.min(adj, tempDeck[key].length), 0, cardName);
+      } else {
+        tempDeck[key].push(cardName);
+      }
     }
-    // Push to both sections' histories
+
     const changes = {};
     if (fromSection === 'main' || targetSection === 'main') changes.main = tempDeck.mainDeck;
     if (fromSection === 'heroes' || targetSection === 'heroes' || fromSection === 'hero' || targetSection === 'hero') changes.heroes = tempDeck.heroes;
@@ -1460,14 +1514,18 @@ function DeckBuilder() {
       // Find which section body the mouse is over
       const dropTarget = findDropTarget(me2.clientX, me2.clientY, section, fromIdx);
       if (dropTarget) {
-        if (dropTarget.section === section) {
+        if (dropTarget.section === section && section !== 'hero') {
           // Same section reorder
           reorderInSection(section, fromIdx, dropTarget.idx);
         } else if (dropTarget.section === 'hero' && section === 'hero') {
+          // Hero→Hero: swap slots
           swapHeroes(fromIdx, dropTarget.idx);
+        } else if (dropTarget.section === 'hero') {
+          // Other→Hero: move to specific slot
+          handleDrop('hero', { cardName, fromSection: section, fromIndex: fromIdx, targetSlot: dropTarget.idx });
         } else {
-          // Cross-section move
-          handleDrop(dropTarget.section, { cardName, fromSection: section, fromIndex: fromIdx });
+          // Cross-section move with position
+          handleDrop(dropTarget.section, { cardName, fromSection: section, fromIndex: fromIdx }, me2.clientX, me2.clientY);
         }
       } else {
         // Dropped outside any section — remove from deck
@@ -1482,13 +1540,21 @@ function DeckBuilder() {
   }, [currentDeck, reorderInSection, swapHeroes, handleDrop, removeFrom]);
 
   const findDropTarget = (mouseX, mouseY, fromSection, fromIdx) => {
+    // Check hero slots first
+    const heroSlots = document.querySelectorAll('[data-hero-slot]');
+    for (const slotEl of heroSlots) {
+      const rect = slotEl.getBoundingClientRect();
+      if (mouseX >= rect.left && mouseX <= rect.right && mouseY >= rect.top && mouseY <= rect.bottom) {
+        return { section: 'hero', idx: parseInt(slotEl.dataset.heroSlot, 10) };
+      }
+    }
     // Check each section body for the drop target
     const sections = document.querySelectorAll('[data-deck-section]');
     for (const secEl of sections) {
       const rect = secEl.getBoundingClientRect();
       if (mouseX >= rect.left && mouseX <= rect.right && mouseY >= rect.top && mouseY <= rect.bottom) {
         const targetSection = secEl.dataset.deckSection;
-        // Find which card slot the mouse is nearest
+        if (targetSection === 'hero') continue; // Handled above by individual hero slots
         const slots = secEl.querySelectorAll('.deck-drag-slot');
         let targetIdx = slots.length;
         for (let i = 0; i < slots.length; i++) {
@@ -1502,30 +1568,55 @@ function DeckBuilder() {
     return null;
   };
 
-  // Compute display array for a section during drag (remove dragged card, insert gap)
+  // Compute display array for a section — always returns exactly `capacity` items
+  const SECTION_CAP = { main: 60, potion: 15, side: 15 };
+  const padToCapacity = (items, capacity) => {
+    while (items.length < capacity) items.push({ card: null, origIdx: -1, isGap: false, isEmpty: true });
+    return items.slice(0, capacity);
+  };
   const buildDeckDisplay = (section, cards) => {
-    // Gallery drag — show gap without removing any card
-    if (galleryDragOver && galleryDragOver.section === section && !deckDrag) {
+    const cap = SECTION_CAP[section] || 60;
+    const baseItems = () => padToCapacity(
+      cards.map((c, i) => ({ card: c, origIdx: i, isGap: false, isEmpty: false })), cap
+    );
+
+    // Gallery HTML5 drag — show gap without removing any card
+    if (galleryDragOver && !deckDrag) {
+      if (galleryDragOver.section !== section) return baseItems();
       const dropTarget = findDropTarget(galleryDragOver.mouseX, galleryDragOver.mouseY, null, -1);
-      const items = cards.map((c, i) => ({ card: c, origIdx: i, isGap: false }));
+      const filled = cards.map((c, i) => ({ card: c, origIdx: i, isGap: false, isEmpty: false }));
       if (dropTarget && dropTarget.section === section) {
-        items.splice(Math.min(dropTarget.idx, items.length), 0, { card: null, origIdx: -1, isGap: true });
+        filled.splice(Math.min(dropTarget.idx, filled.length), 0, { card: null, origIdx: -1, isGap: true, isEmpty: false });
       }
-      return items;
+      return padToCapacity(filled, cap);
     }
-    // Internal deck drag — remove dragged card and insert gap
-    if (!deckDrag || deckDrag.section !== section) return cards.map((c, i) => ({ card: c, origIdx: i, isGap: false }));
-    const dropTarget = findDropTarget(deckDrag.mouseX, deckDrag.mouseY, deckDrag.section, deckDrag.fromIdx);
-    const items = [];
-    for (let i = 0; i < cards.length; i++) {
-      if (i === deckDrag.fromIdx) continue;
-      items.push({ card: cards[i], origIdx: i, isGap: false });
+
+    if (!deckDrag) return baseItems();
+
+    // Source section — remove dragged card and insert gap at cursor
+    if (deckDrag.section === section) {
+      const dropTarget = findDropTarget(deckDrag.mouseX, deckDrag.mouseY, deckDrag.section, deckDrag.fromIdx);
+      const filled = [];
+      for (let i = 0; i < cards.length; i++) {
+        if (i === deckDrag.fromIdx) continue;
+        filled.push({ card: cards[i], origIdx: i, isGap: false, isEmpty: false });
+      }
+      if (dropTarget && dropTarget.section === section) {
+        const insertAt = Math.min(dropTarget.idx > deckDrag.fromIdx ? dropTarget.idx - 1 : dropTarget.idx, filled.length);
+        filled.splice(insertAt, 0, { card: null, origIdx: -1, isGap: true, isEmpty: false });
+      }
+      return padToCapacity(filled, cap);
     }
+
+    // Target section (cross-section drag) — show gap without removing any card
+    const dropTarget = findDropTarget(deckDrag.mouseX, deckDrag.mouseY, null, -1);
     if (dropTarget && dropTarget.section === section) {
-      const insertAt = Math.min(dropTarget.idx > deckDrag.fromIdx ? dropTarget.idx - 1 : dropTarget.idx, items.length);
-      items.splice(insertAt, 0, { card: null, origIdx: -1, isGap: true });
+      const filled = cards.map((c, i) => ({ card: c, origIdx: i, isGap: false, isEmpty: false }));
+      filled.splice(Math.min(dropTarget.idx, filled.length), 0, { card: null, origIdx: -1, isGap: true, isEmpty: false });
+      return padToCapacity(filled, cap);
     }
-    return items;
+
+    return baseItems();
   };
 
   // ── Export deck to .txt ──
@@ -1716,12 +1807,25 @@ function DeckBuilder() {
           <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
 
             {/* ── HEROES ── */}
-            <DropSection sectionId="hero" onDrop={(d, mx, my) => handleDrop('hero', d, mx, my)} onDragPos={onGalleryDragPos} className="deck-section">
+            <DropSection sectionId="hero" onDrop={(d, mx, my) => {
+              const dt = findDropTarget(mx, my, null, -1);
+              const slot = dt && dt.section === 'hero' ? dt.idx : null;
+              handleDrop('hero', { ...d, targetSlot: slot }, mx, my);
+            }} onDragPos={onGalleryDragPos} className="deck-section">
               <SecHeader sec="heroes" color="#bb77ff" icon="👑" label="HEROES" count={heroes.filter(h=>h&&h.hero).length} max={3} />
-              <div className="deck-section-body" style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-evenly', gap: 40, padding: 12 }}>
-                {heroes.map((h, i) => (
+              <div className="deck-section-body" data-deck-section="hero" style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-evenly', gap: 40, padding: 12 }}>
+                {heroes.map((h, i) => {
+                  const isDropTarget = (() => {
+                    if (galleryDragOver && galleryDragOver.section === 'hero') return true;
+                    if (deckDrag) {
+                      const dt = findDropTarget(deckDrag.mouseX, deckDrag.mouseY, null, -1);
+                      return dt && dt.section === 'hero' && dt.idx === i;
+                    }
+                    return false;
+                  })();
+                  return (
                   <HeroSlot key={i} slotIndex={i} onSwap={swapHeroes}>
-                    <div style={{ display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                    <div data-hero-slot={i} style={{ display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', outline: isDropTarget ? '2px solid var(--accent)' : 'none', borderRadius: 4, padding: 4 }}>
                       {/* Hero card first (166×230) */}
                       {h && h.hero && CARDS_BY_NAME[h.hero] ? (
                         <div style={{ position: 'relative' }}
@@ -1750,7 +1854,8 @@ function DeckBuilder() {
                       </div>
                     </div>
                   </HeroSlot>
-                ))}
+                  );
+                })}
               </div>
             </DropSection>
 
@@ -1759,9 +1864,9 @@ function DeckBuilder() {
               <SecHeader sec="main" color="#44aaff" icon="📋" label="MAIN DECK" count={(currentDeck?.mainDeck||[]).length} max={60}
                 extra={<><TipBtn tip="Shuffle" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={shuffleMain}>🔀</TipBtn><TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('main')}>↕</TipBtn></>} />
               <div className="deck-section-body" data-deck-section="main">
-                {(currentDeck?.mainDeck || []).length === 0 && <div className="deck-empty-msg" style={{ color:'var(--text2)', fontSize:11, padding:10, textAlign:'center' }}>Right-click cards in the database to add. Left-click for options.</div>}
                 {buildDeckDisplay('main', currentDeck?.mainDeck || []).map((item, idx) => {
-                  if (item.isGap) return <div key="gap" className="deck-drag-gap" />;
+                  if (item.isGap) return <div key={'gap-'+idx} className="deck-drag-gap" />;
+                  if (item.isEmpty) return <div key={'empty-'+idx} className="deck-drag-slot deck-empty-slot"><div className="card-slot" style={{ width: '100%', height: '100%', fontSize: 9 }} /></div>;
                   const card = CARDS_BY_NAME[item.card]; if (!card) return null;
                   const isDragging = deckDrag && deckDrag.section === 'main' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'m-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
@@ -1777,9 +1882,9 @@ function DeckBuilder() {
               <SecHeader sec="potion" color="#c8a060" icon="🧪" label="POTION DECK" count={(currentDeck?.potionDeck||[]).length} max={15} note="(0 or 5–15)"
                 extra={<TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('potion')}>↕</TipBtn>} />
               <div className="deck-section-body" data-deck-section="potion">
-                {(currentDeck?.potionDeck || []).length === 0 && <div className="deck-empty-msg" style={{ color:'var(--text2)', fontSize:11, padding:10, textAlign:'center' }}>Empty — add 0 or 5–15 Potion cards</div>}
                 {buildDeckDisplay('potion', currentDeck?.potionDeck || []).map((item, idx) => {
-                  if (item.isGap) return <div key="gap" className="deck-drag-gap" />;
+                  if (item.isGap) return <div key={'gap-'+idx} className="deck-drag-gap" />;
+                  if (item.isEmpty) return <div key={'empty-'+idx} className="deck-drag-slot deck-empty-slot"><div className="card-slot" style={{ width: '100%', height: '100%', fontSize: 9 }} /></div>;
                   const card = CARDS_BY_NAME[item.card]; if (!card) return null;
                   const isDragging = deckDrag && deckDrag.section === 'potion' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'p-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
@@ -1795,9 +1900,9 @@ function DeckBuilder() {
               <SecHeader sec="side" color="#888" icon="📦" label="SIDE DECK" count={(currentDeck?.sideDeck||[]).length} max={15}
                 extra={<TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('side')}>↕</TipBtn>} />
               <div className="deck-section-body" data-deck-section="side">
-                {(currentDeck?.sideDeck || []).length === 0 && <div className="deck-empty-msg" style={{ color:'var(--text2)', fontSize:11, padding:10, textAlign:'center' }}>Empty — up to 15 cards of any type</div>}
                 {buildDeckDisplay('side', currentDeck?.sideDeck || []).map((item, idx) => {
-                  if (item.isGap) return <div key="gap" className="deck-drag-gap" />;
+                  if (item.isGap) return <div key={'gap-'+idx} className="deck-drag-gap" />;
+                  if (item.isEmpty) return <div key={'empty-'+idx} className="deck-drag-slot deck-empty-slot"><div className="card-slot" style={{ width: '100%', height: '100%', fontSize: 9 }} /></div>;
                   const card = CARDS_BY_NAME[item.card]; if (!card) return null;
                   const isDragging = deckDrag && deckDrag.section === 'side' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'s-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
@@ -2082,12 +2187,13 @@ function FrozenOverlay() {
   );
 }
 
-// Immune status icon with instant custom tooltip
-function ImmuneIcon({ heroName }) {
+// Immune/Shielded status icon with instant custom tooltip
+function ImmuneIcon({ heroName, statusType }) {
+  const tooltipKey = statusType === 'shielded' ? 'shielded' : 'immune';
   return (
-    <div className="status-immune-icon"
-      onMouseEnter={() => { window._immuneTooltip = heroName; window.dispatchEvent(new Event('immuneHover')); }}
-      onMouseLeave={() => { window._immuneTooltip = null; window.dispatchEvent(new Event('immuneHover')); }}>
+    <div className={'status-immune-icon' + (statusType === 'shielded' ? ' status-shielded-icon' : '')}
+      onMouseEnter={() => { window._immuneTooltip = heroName; window._immuneTooltipType = tooltipKey; window.dispatchEvent(new Event('immuneHover')); }}
+      onMouseLeave={() => { window._immuneTooltip = null; window._immuneTooltipType = null; window.dispatchEvent(new Event('immuneHover')); }}>
       🛡️
     </div>
   );
@@ -2212,10 +2318,143 @@ function ThawEffect({ x, y }) {
   );
 }
 
+// Electric strike — small lightning bolts from all directions converging on target
+function ElectricStrikeEffect({ x, y }) {
+  const bolts = useMemo(() => Array.from({ length: 16 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 55 + Math.random() * 45;
+    return {
+      startX: Math.cos(angle) * dist,
+      startY: Math.sin(angle) * dist,
+      size: 8 + Math.random() * 10,
+      delay: Math.random() * 200,
+      dur: 150 + Math.random() * 150,
+      rotation: (angle * 180 / Math.PI) + 180, // Point toward center
+    };
+  }), []);
+  const sparks = useMemo(() => Array.from({ length: 14 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 12 + Math.random() * 30;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 5,
+      color: ['#ffe033','#fff','#ffcc00','#ffffaa','#ffd700'][Math.floor(Math.random() * 5)],
+      delay: 250 + Math.random() * 150,
+      dur: 250 + Math.random() * 250,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-electric-flash" />
+      {bolts.map((b, i) => (
+        <div key={'eb'+i} className="anim-electric-bolt" style={{
+          '--startX': b.startX + 'px', '--startY': b.startY + 'px', '--size': b.size + 'px',
+          '--rotation': b.rotation + 'deg',
+          animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+        }}>⚡</div>
+      ))}
+      {sparks.map((s, i) => (
+        <div key={'es'+i} className="anim-explosion-particle" style={{
+          '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+          '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Negated overlay — persistent small electricity sparks on the hero
+function NegatedOverlay() {
+  const sparks = useMemo(() => Array.from({ length: 10 }, () => ({
+    x: 8 + Math.random() * 84,
+    y: 8 + Math.random() * 84,
+    size: 7 + Math.random() * 6,
+    delay: Math.random() * 2,
+    dur: 0.4 + Math.random() * 0.6,
+  })), []);
+  return (
+    <div className="status-negated-overlay">
+      {sparks.map((s, i) => (
+        <span key={i} className="negated-spark" style={{
+          left: s.x + '%', top: s.y + '%', fontSize: s.size,
+          animationDelay: s.delay + 's', animationDuration: s.dur + 's',
+        }}>⚡</span>
+      ))}
+    </div>
+  );
+}
+
+// Flame strike — fire converging from all directions onto target
+function FlameStrikeEffect({ x, y }) {
+  const flames = useMemo(() => Array.from({ length: 18 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 55 + Math.random() * 45;
+    return {
+      startX: Math.cos(angle) * dist,
+      startY: Math.sin(angle) * dist,
+      size: 10 + Math.random() * 12,
+      delay: Math.random() * 180,
+      dur: 200 + Math.random() * 150,
+      char: ['🔥','🔥','🔥','✦','·'][Math.floor(Math.random() * 5)],
+    };
+  }), []);
+  const sparks = useMemo(() => Array.from({ length: 12 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 15 + Math.random() * 30;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 5,
+      color: ['#ff4400','#ff8800','#ffcc00','#ff2200','#ffaa00'][Math.floor(Math.random() * 5)],
+      delay: 300 + Math.random() * 150,
+      dur: 300 + Math.random() * 250,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-flame-flash" />
+      {flames.map((f, i) => (
+        <div key={'fl'+i} className="anim-flame-shard" style={{
+          '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
+          animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
+        }}>{f.char}</div>
+      ))}
+      {sparks.map((s, i) => (
+        <div key={'fs'+i} className="anim-explosion-particle" style={{
+          '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+          '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Burned overlay — persistent small flame particles on the hero
+function BurnedOverlay({ ticking }) {
+  const flames = useMemo(() => Array.from({ length: 10 }, () => ({
+    x: 8 + Math.random() * 84,
+    y: 15 + Math.random() * 70,
+    size: 8 + Math.random() * 6,
+    delay: Math.random() * 2,
+    dur: 0.6 + Math.random() * 0.6,
+  })), []);
+  return (
+    <div className={'status-burned-overlay' + (ticking ? ' burn-ticking' : '')}>
+      {flames.map((f, i) => (
+        <span key={i} className="burned-particle" style={{
+          left: f.x + '%', top: f.y + '%', fontSize: f.size,
+          animationDelay: f.delay + 's', animationDuration: f.dur + 's',
+        }}>🔥</span>
+      ))}
+    </div>
+  );
+}
+
 const ANIM_REGISTRY = {
   explosion: ExplosionEffect,
   freeze: FreezeEffect,
   ice_encase: IceEncaseEffect,
+  electric_strike: ElectricStrikeEffect,
+  flame_strike: FlameStrikeEffect,
   thaw: ThawEffect,
 };
 
@@ -2362,6 +2601,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
           });
           if (!hasTarget) return true;
         }
+        // Gray out targeting artifacts/potions with no valid targets
+        if ((gameState.unactivatableArtifacts || []).includes(cardName)) return true;
+      }
+      // Gray out Potions with no valid targets
+      if (card.cardType === 'Potion') {
+        if ((gameState.unactivatableArtifacts || []).includes(cardName)) return true;
       }
       return false;
     } else if (currentPhase === 3) {
@@ -2697,10 +2942,14 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const [pileViewer, setPileViewer] = useState(null); // { title, cards } | null
   const [hoveredPileCard, setHoveredPileCard] = useState(null); // card name for pile tooltip
   const [immuneTooltip, setImmuneTooltip] = useState(null); // hero name for immune tooltip
+  const [immuneTooltipType, setImmuneTooltipType] = useState(null); // 'immune' or 'shielded'
 
   // Listen for immune icon hover (uses window event to escape component boundaries)
   useEffect(() => {
-    const onHover = () => setImmuneTooltip(window._immuneTooltip || null);
+    const onHover = () => {
+      setImmuneTooltip(window._immuneTooltip || null);
+      setImmuneTooltipType(window._immuneTooltipType || null);
+    };
     window.addEventListener('immuneHover', onHover);
     return () => window.removeEventListener('immuneHover', onHover);
   }, []);
@@ -2710,6 +2959,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const [cardReveal, setCardReveal] = useState(null); // Card name being revealed
   const [summonGlow, setSummonGlow] = useState(null); // { owner, heroIdx, zoneSlot }
   const [oppTargetHighlight, setOppTargetHighlight] = useState([]); // Target IDs highlighted on opponent's screen
+  const [burnTickingHeroes, setBurnTickingHeroes] = useState([]); // Hero keys ('pi-hi') currently showing burn escalation
 
   // Listen for opponent card reveal
   useEffect(() => {
@@ -2718,9 +2968,15 @@ function GameBoard({ gameState, lobby, onLeave }) {
       setSummonGlow({ owner, heroIdx, zoneSlot });
       setTimeout(() => setSummonGlow(null), 1200);
     };
+    const onBurnTick = ({ heroes }) => {
+      const keys = heroes.map(h => `${h.owner}-${h.heroIdx}`);
+      setBurnTickingHeroes(keys);
+      setTimeout(() => setBurnTickingHeroes([]), 1500);
+    };
     socket.on('card_reveal', onReveal);
     socket.on('summon_effect', onSummon);
-    return () => { socket.off('card_reveal', onReveal); socket.off('summon_effect', onSummon); };
+    socket.on('burn_tick', onBurnTick);
+    return () => { socket.off('card_reveal', onReveal); socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick); };
   }, []);
 
   /** Play a visual animation at a DOM element's position. */
@@ -2901,10 +3157,27 @@ function GameBoard({ gameState, lobby, onLeave }) {
           const animType = cur.frozen?.animationType || cur.stunned?.animationType || 'freeze';
           setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);
         }
+        // Gained negated → electric strike animation
+        if (cur.negated && !prev.negated) {
+          const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
+          const animType = cur.negated?.animationType || 'electric_strike';
+          setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);
+        }
         // Lost frozen or stunned → thaw animation
         if ((!cur.frozen && prev.frozen) || (!cur.stunned && prev.stunned)) {
           const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
           setTimeout(() => playAnimation('thaw', sel, { duration: 900 }), 50);
+        }
+        // Lost negated → thaw animation
+        if (!cur.negated && prev.negated) {
+          const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
+          setTimeout(() => playAnimation('thaw', sel, { duration: 900 }), 50);
+        }
+        // Gained burned → flame strike animation
+        if (cur.burned && !prev.burned) {
+          const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
+          const animType = cur.burned?.animationType || 'flame_strike';
+          setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);
         }
       }
     }
@@ -2998,6 +3271,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
           const isFrozen = hero?.statuses?.frozen;
           const isStunned = hero?.statuses?.stunned;
           const isImmune = hero?.statuses?.immune;
+          const isNegated = hero?.statuses?.negated;
+          const isBurned = hero?.statuses?.burned;
+          const isShielded = hero?.statuses?.shielded;
           return (
             <div key={i} className="board-hero-group">
               {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxLeft }).map((_, s) => (
@@ -3015,7 +3291,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 )}
                 {hero?.name && isFrozen && <FrozenOverlay />}
                 {hero?.name && isStunned && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
-                {hero?.name && isImmune && <ImmuneIcon heroName={hero.name} />}
+                {hero?.name && isNegated && <NegatedOverlay />}
+                {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
+                {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
+                {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
               </div>
               <BoardZone type="surprise" cards={surZones[i] || []} label="Surprise" />
               {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxRight }).map((_, s) => (
@@ -3032,7 +3311,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         {[0, 1, 2].map(i => {
           const hero = heroes[i];
           const isDead = hero && hero.hp !== undefined && hero.hp <= 0;
-          const isFrozenOrStunned = hero?.statuses?.frozen || hero?.statuses?.stunned;
+          const isFrozenOrStunned = hero?.statuses?.frozen || hero?.statuses?.stunned || hero?.statuses?.negated;
           const heroIneligible = !isOpp && abilityDrag && !canHeroReceiveAbility(p, i, abilityDrag.cardName);
           return (
             <div key={i} className="board-hero-group">
@@ -3305,7 +3584,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         const el = document.querySelector(`[data-hero-name="${CSS.escape(immuneTooltip)}"] .status-immune-icon`);
         if (!el) return null;
         const r = el.getBoundingClientRect();
-        return <div className="immune-tooltip" style={{ position: 'fixed', left: r.right + 8, top: r.top - 4 }}>Cannot be Frozen or Stunned again this turn!</div>;
+        return <div className="immune-tooltip" style={{ position: 'fixed', left: r.right + 8, top: r.top - 4 }}>{immuneTooltipType === 'shielded' ? 'Immune to anything during your first turn!' : 'Cannot be Frozen, Stunned or otherwise incapacitated this turn.'}</div>;
       })()}
 
       {/* Pile hover tooltip (rendered at top level to escape overflow clipping) */}

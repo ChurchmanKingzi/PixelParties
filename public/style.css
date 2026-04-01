@@ -1037,6 +1037,12 @@ body {
 .deck-section-body .deck-drag-gap {
   width: 100%;
 }
+.deck-empty-slot {
+  opacity: .3;
+}
+.deck-empty-slot .card-slot {
+  border-style: dashed;
+}
 
 .hand-floating-card {
   position: fixed;
@@ -1205,6 +1211,105 @@ body {
 @keyframes immunePulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.15); }
+}
+
+/* Shielded (first-turn protection) — golden shield, more prominent */
+.status-shielded-icon {
+  font-size: 20px !important;
+  filter: drop-shadow(0 0 6px rgba(255,220,50,.8)) drop-shadow(0 0 12px rgba(255,200,0,.4)) !important;
+  animation: shieldedPulse 1.5s ease-in-out infinite !important;
+}
+@keyframes shieldedPulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(255,220,50,.8)) drop-shadow(0 0 12px rgba(255,200,0,.4)); }
+  50% { transform: scale(1.25); filter: drop-shadow(0 0 10px rgba(255,220,50,1)) drop-shadow(0 0 18px rgba(255,200,0,.6)); }
+}
+
+/* Negated — persistent small electricity sparks */
+.status-negated-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255,230,50,.12) 0%,
+    rgba(255,200,0,.08) 50%,
+    rgba(255,230,50,.14) 100%
+  );
+  border: 2px solid rgba(255,220,50,.45);
+  box-shadow: inset 0 0 10px rgba(255,220,50,.15), 0 0 6px rgba(255,220,50,.2);
+  animation: negatedShimmer 2s ease-in-out infinite;
+  overflow: hidden;
+}
+@keyframes negatedShimmer {
+  0%, 100% { box-shadow: inset 0 0 10px rgba(255,220,50,.15), 0 0 6px rgba(255,220,50,.2); }
+  50% { box-shadow: inset 0 0 18px rgba(255,220,50,.3), 0 0 12px rgba(255,220,50,.35); }
+}
+.negated-spark {
+  position: absolute;
+  color: rgba(255,230,80,.85);
+  pointer-events: none;
+  filter: drop-shadow(0 0 3px rgba(255,220,50,.9));
+  animation: negatedSparkFlicker ease-in-out infinite alternate;
+}
+@keyframes negatedSparkFlicker {
+  0% { transform: scale(0.6) rotate(-15deg); opacity: 0; }
+  30% { opacity: 1; transform: scale(1.1) rotate(5deg); }
+  60% { opacity: .3; transform: scale(0.5) rotate(10deg); }
+  100% { transform: scale(0.9) rotate(-10deg); opacity: 0; }
+}
+
+/* Burned — persistent flame particles */
+.status-burned-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: linear-gradient(
+    0deg,
+    rgba(255,80,0,.2) 0%,
+    rgba(255,120,0,.1) 40%,
+    rgba(255,60,0,.06) 100%
+  );
+  border: 2px solid rgba(255,100,20,.45);
+  box-shadow: inset 0 0 10px rgba(255,80,0,.15), 0 0 6px rgba(255,60,0,.2);
+  animation: burnedShimmer 1.5s ease-in-out infinite;
+  overflow: hidden;
+  transition: all .3s ease;
+}
+@keyframes burnedShimmer {
+  0%, 100% { box-shadow: inset 0 0 10px rgba(255,80,0,.15), 0 0 6px rgba(255,60,0,.2); }
+  50% { box-shadow: inset 0 0 16px rgba(255,100,0,.25), 0 0 10px rgba(255,80,0,.3); }
+}
+.burned-particle {
+  position: absolute;
+  pointer-events: none;
+  filter: drop-shadow(0 0 2px rgba(255,80,0,.8));
+  animation: burnedFlameFlicker ease-in-out infinite alternate;
+  transition: transform .3s ease, filter .3s ease;
+}
+@keyframes burnedFlameFlicker {
+  0% { transform: translateY(0) scale(0.7); opacity: .2; }
+  40% { opacity: 1; transform: translateY(-3px) scale(1); }
+  70% { opacity: .5; transform: translateY(-1px) scale(0.8); }
+  100% { transform: translateY(-5px) scale(0.6); opacity: 0; }
+}
+
+/* Burn tick escalation — flames intensify when burn damage triggers */
+.status-burned-overlay.burn-ticking {
+  background: linear-gradient(
+    0deg,
+    rgba(255,50,0,.45) 0%,
+    rgba(255,100,0,.3) 40%,
+    rgba(255,60,0,.15) 100%
+  );
+  border-color: rgba(255,80,0,.8);
+  box-shadow: inset 0 0 25px rgba(255,60,0,.5), 0 0 20px rgba(255,40,0,.5);
+}
+.status-burned-overlay.burn-ticking .burned-particle {
+  transform: scale(1.8) !important;
+  filter: drop-shadow(0 0 6px rgba(255,50,0,1)) brightness(1.3);
+  animation-duration: .25s !important;
 }
 
 /* Deck viewer modal */
@@ -1438,7 +1543,7 @@ body {
 .creature-level {
   position: absolute;
   right: 2px;
-  top: 38%;
+  top: 45%;
   font-family: 'Pixel Intv', 'Press Start 2P', monospace;
   font-size: 9px;
   color: #88ddff;
@@ -1605,43 +1710,117 @@ body {
   100% { transform: translateY(var(--speed)) scaleY(1.5); opacity: 0; }
 }
 
+/* Electric strike animation — lightning bolts converging from all sides */
+.anim-electric-flash {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  left: -35px;
+  top: -35px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,240,100,.8) 0%, rgba(255,220,50,.4) 40%, transparent 70%);
+  animation: animElectricFlash .5s ease-out forwards;
+  animation-delay: 200ms;
+  opacity: 0;
+}
+@keyframes animElectricFlash {
+  0% { transform: scale(0.3); opacity: 1; }
+  50% { transform: scale(1.4); opacity: .7; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+.anim-electric-bolt {
+  position: absolute;
+  font-size: var(--size);
+  color: rgba(255,230,50,.95);
+  filter: drop-shadow(0 0 5px rgba(255,220,50,.9));
+  animation: animElectricBolt ease-in forwards;
+  opacity: 0;
+  left: var(--startX);
+  top: var(--startY);
+  transform: rotate(var(--rotation));
+}
+@keyframes animElectricBolt {
+  0% { transform: translate(0, 0) rotate(var(--rotation)) scale(1.3); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(calc(var(--startX) * -1), calc(var(--startY) * -1)) rotate(var(--rotation)) scale(0.3); opacity: 0; }
+}
+
+/* Flame strike animation — fire converging from all sides */
+.anim-flame-flash {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  left: -35px;
+  top: -35px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,120,0,.8) 0%, rgba(255,60,0,.4) 40%, transparent 70%);
+  animation: animFlameFlash .6s ease-out forwards;
+  animation-delay: 250ms;
+  opacity: 0;
+}
+@keyframes animFlameFlash {
+  0% { transform: scale(0.3); opacity: 1; }
+  50% { transform: scale(1.5); opacity: .7; }
+  100% { transform: scale(2); opacity: 0; }
+}
+.anim-flame-shard {
+  position: absolute;
+  font-size: var(--size);
+  filter: drop-shadow(0 0 4px rgba(255,80,0,.9));
+  animation: animFlameShard ease-in forwards;
+  opacity: 0;
+  left: var(--startX);
+  top: var(--startY);
+}
+@keyframes animFlameShard {
+  0% { transform: translate(0, 0) scale(1.2); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(calc(var(--startX) * -1), calc(var(--startY) * -1)) scale(0.3); opacity: 0; }
+}
+
 /* Potion targeting */
 .potion-target-valid {
-  box-shadow: 0 0 8px rgba(255,100,50,.5), inset 0 0 4px rgba(255,100,50,.2);
-  border-color: rgba(255,100,50,.6) !important;
+  box-shadow: 0 0 16px rgba(255,180,50,.8), 0 0 30px rgba(255,140,0,.4), inset 0 0 8px rgba(255,180,50,.3);
+  border-color: rgba(255,180,50,.9) !important;
+  animation: targetValidPulse 1s ease-in-out infinite;
+}
+@keyframes targetValidPulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(255,180,50,.8), 0 0 30px rgba(255,140,0,.4), inset 0 0 8px rgba(255,180,50,.3); }
+  50% { box-shadow: 0 0 24px rgba(255,180,50,1), 0 0 45px rgba(255,140,0,.6), inset 0 0 14px rgba(255,180,50,.5); }
 }
 .potion-target-selected {
-  box-shadow: 0 0 14px rgba(255,50,50,.8), inset 0 0 8px rgba(255,50,50,.3) !important;
-  border-color: #ff4444 !important;
-  animation: potionPulse 1s ease-in-out infinite;
+  box-shadow: 0 0 20px rgba(255,50,50,.9), 0 0 40px rgba(255,30,30,.5), inset 0 0 12px rgba(255,50,50,.4) !important;
+  border-color: #ff3333 !important;
+  animation: potionPulse .8s ease-in-out infinite;
 }
 @keyframes potionPulse {
-  0%, 100% { box-shadow: 0 0 14px rgba(255,50,50,.8), inset 0 0 8px rgba(255,50,50,.3); }
-  50% { box-shadow: 0 0 20px rgba(255,50,50,1), inset 0 0 12px rgba(255,50,50,.5); }
+  0%, 100% { box-shadow: 0 0 20px rgba(255,50,50,.9), 0 0 40px rgba(255,30,30,.5), inset 0 0 12px rgba(255,50,50,.4); }
+  50% { box-shadow: 0 0 30px rgba(255,50,50,1), 0 0 55px rgba(255,30,30,.7), inset 0 0 18px rgba(255,50,50,.6); }
 }
 
 /* Summon effect glow */
 @keyframes summonGlow {
   0% { box-shadow: 0 0 0 transparent; }
-  15% { box-shadow: 0 0 30px rgba(255,255,100,.9), inset 0 0 15px rgba(255,255,100,.4); border-color: rgba(255,255,100,.8); }
-  50% { box-shadow: 0 0 20px rgba(255,255,100,.5), inset 0 0 10px rgba(255,255,100,.2); }
+  10% { box-shadow: 0 0 40px rgba(255,255,100,1), 0 0 80px rgba(255,220,50,.6), inset 0 0 20px rgba(255,255,100,.5); border-color: rgba(255,255,100,.9); }
+  30% { box-shadow: 0 0 50px rgba(255,255,100,.9), 0 0 100px rgba(255,220,50,.5), inset 0 0 25px rgba(255,255,100,.4); }
+  60% { box-shadow: 0 0 30px rgba(255,255,100,.5), inset 0 0 12px rgba(255,255,100,.2); }
   100% { box-shadow: 0 0 0 transparent; }
 }
 .zone-summon-glow {
-  animation: summonGlow 1.2s ease-out forwards !important;
+  animation: summonGlow 1.4s ease-out forwards !important;
   z-index: 20;
   position: relative;
 }
 
 /* Opponent targeting highlight — red glow on cards opponent is selecting */
 .opp-target-highlight {
-  box-shadow: 0 0 14px rgba(255,50,50,.7), inset 0 0 8px rgba(255,50,50,.25) !important;
-  border-color: rgba(255,60,60,.7) !important;
-  animation: oppTargetPulse 1s ease-in-out infinite !important;
+  box-shadow: 0 0 20px rgba(255,50,50,.8), 0 0 40px rgba(255,30,30,.4), inset 0 0 10px rgba(255,50,50,.3) !important;
+  border-color: rgba(255,60,60,.8) !important;
+  animation: oppTargetPulse .8s ease-in-out infinite !important;
 }
 @keyframes oppTargetPulse {
-  0%, 100% { box-shadow: 0 0 14px rgba(255,50,50,.7), inset 0 0 8px rgba(255,50,50,.25); }
-  50% { box-shadow: 0 0 22px rgba(255,50,50,.9), inset 0 0 12px rgba(255,50,50,.4); }
+  0%, 100% { box-shadow: 0 0 20px rgba(255,50,50,.8), 0 0 40px rgba(255,30,30,.4), inset 0 0 10px rgba(255,50,50,.3); }
+  50% { box-shadow: 0 0 30px rgba(255,50,50,1), 0 0 55px rgba(255,30,30,.6), inset 0 0 16px rgba(255,50,50,.5); }
 }
 
 /* Explosion animation on destroyed cards */

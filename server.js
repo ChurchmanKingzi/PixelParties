@@ -1,42 +1,34 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const Database = require('better-sqlite3');
+const db = require('./db');
 const bcrypt = require('bcryptjs');
-const multer = require('multer');
+// const multer = require('multer'); // Replaced by base64 uploads
 const cookieParser = require('cookie-parser');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { GameEngine } = require('./cards/effects/_engine');
 const { loadCardEffect } = require('./cards/effects/_loader');
 
 // ===== CONFIG =====
 const PORT = process.env.PORT || 3000;
+const PROFILE_SECRET = process.env.PROFILE_SECRET || 'pxlParties_s3cret_k3y_2025!';
+const profileImportUsed = new Set();
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/data', express.static(path.join(__dirname, 'data')));
 app.use('/cards', express.static(path.join(__dirname, 'cards')));
 
-// Ensure required dirs exist
-['uploads/avatars', 'uploads/cardbacks', 'cards'].forEach(d => {
-  const p = path.join(__dirname, d);
-  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
-});
-
-// ===== DATABASE =====
-const dbPath = path.join(__dirname, 'data', 'pixel-parties.db');
-const db = new Database(dbPath);
-db.pragma('journal_mode = WAL');
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
+// Database initialization (async — called at startup)
+async function initDatabase() {
+  await db.execute(`CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT UNIQUE NOT NULL COLLATE NOCASE,
     password_hash TEXT NOT NULL,
@@ -45,9 +37,9 @@ db.exec(`
     avatar TEXT DEFAULT NULL,
     cardback TEXT DEFAULT NULL,
     created_at INTEGER DEFAULT (unixepoch())
-  );
+  )`);
 
-  CREATE TABLE IF NOT EXISTS decks (
+  await db.execute(`CREATE TABLE IF NOT EXISTS decks (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -59,28 +51,25 @@ db.exec(`
     created_at INTEGER DEFAULT (unixepoch()),
     updated_at INTEGER DEFAULT (unixepoch()),
     FOREIGN KEY (user_id) REFERENCES users(id)
-  );
+  )`);
 
-  CREATE INDEX IF NOT EXISTS idx_decks_user ON decks(user_id);
-`);
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_decks_user ON decks(user_id)');
 
-// Add new columns if they don't exist yet (safe migration)
-try { db.exec(`ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''`); } catch {}
-try { db.exec(`ALTER TABLE users ADD COLUMN wins INTEGER DEFAULT 0`); } catch {}
-try { db.exec(`ALTER TABLE users ADD COLUMN losses INTEGER DEFAULT 0`); } catch {}
+  // Safe column migrations
+  try { await db.execute("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''"); } catch {}
+  try { await db.execute('ALTER TABLE users ADD COLUMN wins INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute('ALTER TABLE users ADD COLUMN losses INTEGER DEFAULT 0'); } catch {}
 
-// Hero usage tracking per game
-db.exec(`
-  CREATE TABLE IF NOT EXISTS hero_stats (
+  await db.execute(`CREATE TABLE IF NOT EXISTS hero_stats (
     user_id TEXT NOT NULL,
     hero_name TEXT NOT NULL,
     wins INTEGER DEFAULT 0,
     losses INTEGER DEFAULT 0,
     PRIMARY KEY (user_id, hero_name),
     FOREIGN KEY (user_id) REFERENCES users(id)
-  );
+  )`);
 
-  CREATE TABLE IF NOT EXISTS game_history (
+  await db.execute(`CREATE TABLE IF NOT EXISTS game_history (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     hero1 TEXT,
@@ -90,30 +79,23 @@ db.exec(`
     opponent_id TEXT,
     created_at INTEGER DEFAULT (unixepoch()),
     FOREIGN KEY (user_id) REFERENCES users(id)
-  );
+  )`);
 
-  CREATE INDEX IF NOT EXISTS idx_hero_stats_user ON hero_stats(user_id);
-  CREATE INDEX IF NOT EXISTS idx_game_history_user ON game_history(user_id);
-`);
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_hero_stats_user ON hero_stats(user_id)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_game_history_user ON game_history(user_id)');
 
-// Prepared statements
-const stmts = {
-  getUserByUsername: db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE'),
-  getUserById: db.prepare('SELECT * FROM users WHERE id = ?'),
-  createUser: db.prepare('INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)'),
-  updateProfile: db.prepare('UPDATE users SET color = ?, avatar = ?, cardback = ?, bio = ? WHERE id = ?'),
-  updateElo: db.prepare('UPDATE users SET elo = ? WHERE id = ?'),
-  getDecks: db.prepare('SELECT * FROM decks WHERE user_id = ? ORDER BY created_at'),
-  getDeck: db.prepare('SELECT * FROM decks WHERE id = ? AND user_id = ?'),
-  createDeck: db.prepare('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)'),
-  updateDeck: db.prepare('UPDATE decks SET name=?, main_deck=?, heroes=?, potion_deck=?, side_deck=?, is_default=?, updated_at=unixepoch() WHERE id=? AND user_id=?'),
-  deleteDeck: db.prepare('DELETE FROM decks WHERE id = ? AND user_id = ?'),
-  clearDefaults: db.prepare('UPDATE decks SET is_default = 0 WHERE user_id = ?'),
-  upsertHeroStat: db.prepare(`INSERT INTO hero_stats (user_id, hero_name, wins, losses) VALUES (?, ?, ?, ?)
-    ON CONFLICT(user_id, hero_name) DO UPDATE SET wins = wins + excluded.wins, losses = losses + excluded.losses`),
-  getHeroStats: db.prepare('SELECT hero_name, wins, losses FROM hero_stats WHERE user_id = ? ORDER BY (CAST(wins AS REAL) / MAX(wins + losses, 1)) DESC, (wins + losses) DESC'),
-  insertGameHistory: db.prepare('INSERT INTO game_history (id, user_id, hero1, hero2, hero3, won, opponent_id) VALUES (?, ?, ?, ?, ?, ?, ?)'),
-};
+  // Cardback storage table (replaces filesystem storage)
+  await db.execute(`CREATE TABLE IF NOT EXISTS user_cardbacks (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    data TEXT NOT NULL,
+    created_at INTEGER DEFAULT (unixepoch()),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`);
+
+  console.log('[DB] Tables initialized');
+}
 
 // ===== AUTH MIDDLEWARE =====
 // Simple token-based auth using cookies
@@ -130,34 +112,34 @@ function authMiddleware(req, res, next) {
 }
 
 // ===== AUTH ROUTES =====
-app.post('/api/auth/signup', (req, res) => {
+app.post('/api/auth/signup', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
   if (username.trim().length < 3) return res.status(400).json({ error: 'Username must be 3+ characters' });
   if (password.length < 3) return res.status(400).json({ error: 'Password must be 3+ characters' });
 
-  const existing = stmts.getUserByUsername.get(username.trim());
+  const existing = await db.get('SELECT * FROM users WHERE username = ? COLLATE NOCASE', [username.trim()]);
   if (existing) return res.status(409).json({ error: 'Username already taken' });
 
   const id = uuidv4();
   const hash = bcrypt.hashSync(password, 10);
-  stmts.createUser.run(id, username.trim(), hash);
+  await db.run('INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)', [id, username.trim(), hash]);
 
   // Create default deck
-  stmts.createDeck.run(uuidv4(), id, 'My First Deck');
+  await db.run('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)', [uuidv4(), id, 'My First Deck']);
 
   const token = uuidv4();
   sessions.set(token, { userId: id, username: username.trim() });
   res.cookie('pp_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
-  const user = stmts.getUserById.get(id);
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
   res.json({ token, user: sanitizeUser(user) });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
 
-  const user = stmts.getUserByUsername.get(username.trim());
+  const user = await db.get('SELECT * FROM users WHERE username = ? COLLATE NOCASE', [username.trim()]);
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
@@ -168,15 +150,15 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ token, user: sanitizeUser(user) });
 });
 
-app.post('/api/auth/logout', (req, res) => {
+app.post('/api/auth/logout', async (req, res) => {
   const token = req.cookies?.pp_token;
   if (token) sessions.delete(token);
   res.clearCookie('pp_token');
   res.json({ ok: true });
 });
 
-app.get('/api/auth/me', authMiddleware, (req, res) => {
-  const user = stmts.getUserById.get(req.user.userId);
+app.get('/api/auth/me', authMiddleware, async (req, res) => {
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({ user: sanitizeUser(user), token: req.authToken });
 });
@@ -186,78 +168,192 @@ function sanitizeUser(u) {
 }
 
 // ===== PROFILE ROUTES =====
-app.put('/api/profile', authMiddleware, (req, res) => {
+app.put('/api/profile', authMiddleware, async (req, res) => {
   const { color, avatar, cardback, bio } = req.body;
-  stmts.updateProfile.run(color || '#00f0ff', avatar || null, cardback || null, (bio || '').slice(0, 200), req.user.userId);
-  const user = stmts.getUserById.get(req.user.userId);
+  await db.run('UPDATE users SET color = ?, avatar = ?, cardback = ?, bio = ? WHERE id = ?', [color || '#00f0ff', avatar || null, cardback || null, (bio || '').slice(0, 200), req.user.userId]);
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ user: sanitizeUser(user) });
 });
 
-// File uploads for avatar and cardback
-const avatarUpload = multer({
-  storage: multer.diskStorage({
-    destination: path.join(__dirname, 'uploads', 'avatars'),
-    filename: (req, file, cb) => cb(null, req.user.userId + path.extname(file.originalname))
-  }),
-  limits: { fileSize: 2 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype))
+// Avatar upload — accepts base64 data URL in JSON body
+app.post('/api/profile/avatar', authMiddleware, async (req, res) => {
+  const { avatar } = req.body;
+  if (!avatar || !avatar.startsWith('data:image/')) return res.status(400).json({ error: 'Invalid image data' });
+  // Limit ~2MB base64
+  if (avatar.length > 3 * 1024 * 1024) return res.status(400).json({ error: 'Image too large (max 2MB)' });
+  await db.run('UPDATE users SET avatar = ? WHERE id = ?', [avatar, req.user.userId]);
+  res.json({ avatar });
 });
 
-const cardbackUpload = multer({
-  storage: multer.diskStorage({
-    destination: path.join(__dirname, 'uploads', 'cardbacks'),
-    filename: (req, file, cb) => cb(null, req.user.userId + '_' + Date.now() + path.extname(file.originalname))
-  }),
-  limits: { fileSize: 2 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype))
+// Cardback upload — accepts base64 data URL, stores in DB
+app.post('/api/profile/cardback', authMiddleware, async (req, res) => {
+  const { cardback } = req.body;
+  if (!cardback || !cardback.startsWith('data:image/')) return res.status(400).json({ error: 'Invalid image data' });
+  if (cardback.length > 3 * 1024 * 1024) return res.status(400).json({ error: 'Image too large (max 2MB)' });
+  const id = uuidv4();
+  const filename = req.user.userId + '_' + Date.now() + '.png';
+  await db.run('INSERT INTO user_cardbacks (id, user_id, filename, data) VALUES (?, ?, ?, ?)', [id, req.user.userId, filename, cardback]);
+  res.json({ cardback });
 });
 
-app.post('/api/profile/avatar', authMiddleware, avatarUpload.single('avatar'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  const avatarUrl = '/uploads/avatars/' + req.file.filename;
-  db.prepare('UPDATE users SET avatar = ? WHERE id = ?').run(avatarUrl, req.user.userId);
-  res.json({ avatar: avatarUrl });
+// List all cardbacks uploaded by this user (from DB)
+app.get('/api/profile/cardbacks', authMiddleware, async (req, res) => {
+  const rows = await db.all('SELECT data FROM user_cardbacks WHERE user_id = ? ORDER BY created_at', [req.user.userId]);
+  res.json({ cardbacks: rows.map(r => r.data) });
 });
 
-app.post('/api/profile/cardback', authMiddleware, cardbackUpload.single('cardback'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  const cbUrl = '/uploads/cardbacks/' + req.file.filename;
-  // Don't auto-set as active — user picks from gallery, saves via profile
-  res.json({ cardback: cbUrl });
-});
+// ===== PROFILE EXPORT / IMPORT =====
+function encryptProfile(data) {
+  const key = crypto.scryptSync(PROFILE_SECRET, 'pixelparties', 32);
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  let enc = cipher.update(JSON.stringify(data), 'utf8', 'base64');
+  enc += cipher.final('base64');
+  const tag = cipher.getAuthTag().toString('base64');
+  return JSON.stringify({ v: 1, iv: iv.toString('base64'), tag, data: enc });
+}
 
-// List all cardbacks uploaded by this user
-app.get('/api/profile/cardbacks', authMiddleware, (req, res) => {
-  const dir = path.join(__dirname, 'uploads', 'cardbacks');
+function decryptProfile(blob) {
   try {
-    const files = fs.readdirSync(dir);
-    const userFiles = files
-      .filter(f => f.startsWith(req.user.userId + '_') || f.startsWith(req.user.userId + '.'))
-      .map(f => '/uploads/cardbacks/' + f);
-    res.json({ cardbacks: userFiles });
-  } catch {
-    res.json({ cardbacks: [] });
+    const { v, iv, tag, data } = JSON.parse(blob);
+    if (v !== 1) throw new Error('Unknown format version');
+    const key = crypto.scryptSync(PROFILE_SECRET, 'pixelparties', 32);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64'));
+    decipher.setAuthTag(Buffer.from(tag, 'base64'));
+    let dec = decipher.update(data, 'base64', 'utf8');
+    dec += decipher.final('utf8');
+    return JSON.parse(dec);
+  } catch (e) {
+    return null;
   }
+}
+
+app.get('/api/profile/export', authMiddleware, async (req, res) => {
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  // Gather decks
+  const decks = await db.all('SELECT * FROM decks WHERE user_id = ?', [req.user.userId]);
+
+  // Gather hero stats
+  const heroStats = await db.all('SELECT * FROM hero_stats WHERE user_id = ?', [req.user.userId]);
+
+  // Gather game history
+  const gameHistory = await db.all('SELECT * FROM game_history WHERE user_id = ?', [req.user.userId]);
+
+  // Avatar is stored as data URL in DB — just include it directly
+  const avatarData = user.avatar || null;
+
+  // Read cardback data from DB
+  const cardbackRows = await db.all('SELECT filename, data FROM user_cardbacks WHERE user_id = ?', [req.user.userId]);
+  const cardbackFiles = cardbackRows.map(r => ({ name: r.filename, data: r.data }));
+
+  const payload = {
+    username: user.username,
+    elo: user.elo,
+    color: user.color,
+    bio: user.bio || '',
+    wins: user.wins || 0,
+    losses: user.losses || 0,
+    cardback: user.cardback,
+    avatar: avatarData,
+    cardbacks: cardbackFiles,
+    decks: decks.map(d => ({ name: d.name, main_deck: d.main_deck, heroes: d.heroes, potion_deck: d.potion_deck, side_deck: d.side_deck, is_default: d.is_default })),
+    heroStats,
+    gameHistory: gameHistory.map(g => ({ hero1: g.hero1, hero2: g.hero2, hero3: g.hero3, won: g.won, opponent_id: g.opponent_id, created_at: g.created_at })),
+    exportedAt: Date.now(),
+  };
+
+  const encrypted = encryptProfile(payload);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', `attachment; filename="${user.username}_profile.ppb"`);
+  res.send(encrypted);
+});
+
+app.post('/api/profile/import', authMiddleware, express.text({ limit: '20mb' }), async (req, res) => {
+  if (profileImportUsed.has(req.user.userId)) {
+    return res.status(403).json({ error: 'You cannot import your profile again until the next update!' });
+  }
+
+  const data = decryptProfile(req.body);
+  if (!data) return res.status(400).json({ error: 'Invalid or corrupted backup file.' });
+
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  // Username must match (case-insensitive)
+  if (data.username.toLowerCase() !== user.username.toLowerCase()) {
+    return res.status(403).json({ error: `This backup belongs to "${data.username}", but you are "${user.username}". You can only import your own profile.` });
+  }
+
+  // Restore user fields
+  await db.run('UPDATE users SET elo = ?, color = ?, bio = ?, wins = ?, losses = ?, cardback = ? WHERE id = ?',
+    [data.elo || 1000, data.color || '#00f0ff', (data.bio || '').slice(0, 200), data.wins || 0, data.losses || 0, data.cardback || null, req.user.userId]);
+
+  // Restore avatar (may be data URL or old-format base64 object)
+  if (data.avatar) {
+    let avatarUrl = data.avatar;
+    if (typeof data.avatar === 'object' && data.avatar.data) {
+      // Legacy format: convert base64 to data URL
+      const ext = (data.avatar.ext || '.png').replace('.', '');
+      avatarUrl = 'data:image/' + ext + ';base64,' + data.avatar.data;
+    }
+    await db.run('UPDATE users SET avatar = ? WHERE id = ?', [avatarUrl, req.user.userId]);
+  }
+
+  // Restore cardbacks to DB
+  if (data.cardbacks && data.cardbacks.length) {
+    await db.run('DELETE FROM user_cardbacks WHERE user_id = ?', [req.user.userId]);
+    for (const cb of data.cardbacks) {
+      const cbData = typeof cb.data === 'string' && cb.data.startsWith('data:') ? cb.data : 'data:image/png;base64,' + cb.data;
+      await db.run('INSERT INTO user_cardbacks (id, user_id, filename, data) VALUES (?, ?, ?, ?)', [uuidv4(), req.user.userId, cb.name || 'cardback.png', cbData]);
+    }
+  }
+
+  // Restore decks — delete existing, insert from backup
+  await db.run('DELETE FROM decks WHERE user_id = ?', [req.user.userId]);
+  for (const d of (data.decks || [])) {
+    await db.run('INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [uuidv4(), req.user.userId, d.name, d.main_deck, d.heroes, d.potion_deck, d.side_deck, d.is_default ? 1 : 0, Math.floor(Date.now()/1000), Math.floor(Date.now()/1000)]);
+  }
+
+  // Restore hero stats
+  await db.run('DELETE FROM hero_stats WHERE user_id = ?', [req.user.userId]);
+  for (const hs of (data.heroStats || [])) {
+    await db.run('INSERT OR REPLACE INTO hero_stats (user_id, hero_name, wins, losses) VALUES (?, ?, ?, ?)',
+      [req.user.userId, hs.hero_name, hs.wins || 0, hs.losses || 0]);
+  }
+
+  // Restore game history
+  await db.run('DELETE FROM game_history WHERE user_id = ?', [req.user.userId]);
+  for (const g of (data.gameHistory || [])) {
+    await db.run('INSERT INTO game_history (id, user_id, hero1, hero2, hero3, won, opponent_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [uuidv4(), req.user.userId, g.hero1, g.hero2, g.hero3, g.won, g.opponent_id, g.created_at]);
+  }
+
+  const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
+  profileImportUsed.add(req.user.userId);
+  res.json({ success: true, user: sanitizeUser(updated) });
 });
 
 // ===== CHANGE PASSWORD =====
-app.post('/api/profile/password', authMiddleware, (req, res) => {
+app.post('/api/profile/password', authMiddleware, async (req, res) => {
   const { oldPassword, newPassword } = req.body;
   if (!oldPassword || !newPassword) return res.status(400).json({ error: 'Both old and new password required' });
   if (newPassword.length < 3) return res.status(400).json({ error: 'New password must be 3+ characters' });
-  const user = stmts.getUserById.get(req.user.userId);
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   if (!user) return res.status(404).json({ error: 'User not found' });
   if (!bcrypt.compareSync(oldPassword, user.password_hash)) {
     return res.status(401).json({ error: 'Current password is incorrect' });
   }
   const hash = bcrypt.hashSync(newPassword, 10);
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, user.id);
+  await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [hash, user.id]);
   res.json({ success: true });
 });
 
 // ===== PROFILE DECK STATS =====
-app.get('/api/profile/deck-stats', authMiddleware, (req, res) => {
-  const decks = stmts.getDecks.all(req.user.userId);
+app.get('/api/profile/deck-stats', authMiddleware, async (req, res) => {
+  const decks = await db.all('SELECT * FROM decks WHERE user_id = ? ORDER BY created_at', [req.user.userId]);
   let legalCount = 0;
   const deckWall = decks.map(d => {
     const main = JSON.parse(d.main_deck || '[]');
@@ -279,7 +375,7 @@ app.get('/api/profile/deck-stats', authMiddleware, (req, res) => {
 
 // ===== GAME RESULT RECORDING =====
 // Called when a game ends — records win/loss for the player and their 3 heroes
-app.post('/api/game/result', authMiddleware, (req, res) => {
+app.post('/api/game/result', authMiddleware, async (req, res) => {
   const { won, heroes, opponentId } = req.body;
   if (typeof won !== 'boolean') return res.status(400).json({ error: 'won must be boolean' });
   if (!Array.isArray(heroes) || heroes.length !== 3) return res.status(400).json({ error: 'heroes must be array of 3 names' });
@@ -288,28 +384,28 @@ app.post('/api/game/result', authMiddleware, (req, res) => {
 
   // Update user wins/losses
   if (won) {
-    db.prepare('UPDATE users SET wins = wins + 1 WHERE id = ?').run(userId);
+    await db.run('UPDATE users SET wins = wins + 1 WHERE id = ?', [userId]);
   } else {
-    db.prepare('UPDATE users SET losses = losses + 1 WHERE id = ?').run(userId);
+    await db.run('UPDATE users SET losses = losses + 1 WHERE id = ?', [userId]);
   }
 
   // Update hero stats (aggregate)
   for (const heroName of heroes) {
     if (heroName) {
-      stmts.upsertHeroStat.run(userId, heroName, won ? 1 : 0, won ? 0 : 1);
+      await db.run('INSERT INTO hero_stats (user_id, hero_name, wins, losses) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, hero_name) DO UPDATE SET wins = wins + excluded.wins, losses = losses + excluded.losses', [userId, heroName, won ? 1 : 0, won ? 0 : 1]);
     }
   }
 
   // Record in game history
-  stmts.insertGameHistory.run(uuidv4(), userId, heroes[0] || null, heroes[1] || null, heroes[2] || null, won ? 1 : 0, opponentId || null);
+  await db.run('INSERT INTO game_history (id, user_id, hero1, hero2, hero3, won, opponent_id) VALUES (?, ?, ?, ?, ?, ?, ?)', [uuidv4(), userId, heroes[0] || null, heroes[1] || null, heroes[2] || null, won ? 1 : 0, opponentId || null]);
 
-  const user = stmts.getUserById.get(userId);
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
   res.json({ success: true, user: sanitizeUser(user) });
 });
 
 // ===== HERO STATS =====
-app.get('/api/profile/hero-stats', authMiddleware, (req, res) => {
-  const rows = stmts.getHeroStats.all(req.user.userId);
+app.get('/api/profile/hero-stats', authMiddleware, async (req, res) => {
+  const rows = await db.all('SELECT hero_name, wins, losses FROM hero_stats WHERE user_id = ? ORDER BY (CAST(wins AS REAL) / MAX(wins + losses, 1)) DESC, (wins + losses) DESC', [req.user.userId]);
   // Return top 3 by win rate (already sorted by the query)
   const top = rows.slice(0, 3).map(r => ({
     name: r.hero_name,
@@ -329,7 +425,7 @@ const cardsJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards
 const nameByStripped = {};
 cardsJson.forEach(c => { nameByStripped[c.name.replace(/,/g, '')] = c.name; });
 
-app.get('/api/cards/available', (req, res) => {
+app.get('/api/cards/available', async (req, res) => {
   const cardsDir = path.join(__dirname, 'cards');
   try {
     const files = fs.readdirSync(cardsDir);
@@ -349,27 +445,27 @@ app.get('/api/cards/available', (req, res) => {
 });
 
 // ===== DECK ROUTES =====
-app.get('/api/decks', authMiddleware, (req, res) => {
-  const decks = stmts.getDecks.all(req.user.userId);
+app.get('/api/decks', authMiddleware, async (req, res) => {
+  const decks = await db.all('SELECT * FROM decks WHERE user_id = ? ORDER BY created_at', [req.user.userId]);
   res.json({ decks: decks.map(parseDeck) });
 });
 
-app.post('/api/decks', authMiddleware, (req, res) => {
+app.post('/api/decks', authMiddleware, async (req, res) => {
   const { name } = req.body;
   const id = uuidv4();
-  stmts.createDeck.run(id, req.user.userId, name || 'New Deck');
-  const deck = stmts.getDeck.get(id, req.user.userId);
+  await db.run('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)', [id, req.user.userId, name || 'New Deck']);
+  const deck = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [id, req.user.userId]);
   res.json({ deck: parseDeck(deck) });
 });
 
-app.put('/api/decks/:id', authMiddleware, (req, res) => {
+app.put('/api/decks/:id', authMiddleware, async (req, res) => {
   const { name, mainDeck, heroes, potionDeck, sideDeck, isDefault } = req.body;
-  const deckRow = stmts.getDeck.get(req.params.id, req.user.userId);
+  const deckRow = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
   if (!deckRow) return res.status(404).json({ error: 'Deck not found' });
 
-  if (isDefault) stmts.clearDefaults.run(req.user.userId);
+  if (isDefault) await db.run('UPDATE decks SET is_default = 0 WHERE user_id = ?', [req.user.userId]);
 
-  stmts.updateDeck.run(
+  await db.run('UPDATE decks SET name=?, main_deck=?, heroes=?, potion_deck=?, side_deck=?, is_default=?, updated_at=unixepoch() WHERE id=? AND user_id=?', [
     name || deckRow.name,
     JSON.stringify(mainDeck || JSON.parse(deckRow.main_deck)),
     JSON.stringify(heroes || JSON.parse(deckRow.heroes)),
@@ -377,31 +473,31 @@ app.put('/api/decks/:id', authMiddleware, (req, res) => {
     JSON.stringify(sideDeck || JSON.parse(deckRow.side_deck)),
     isDefault ? 1 : (isDefault === false ? 0 : deckRow.is_default),
     req.params.id, req.user.userId
-  );
+  ]);
 
-  const updated = stmts.getDeck.get(req.params.id, req.user.userId);
+  const updated = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
   res.json({ deck: parseDeck(updated) });
 });
 
-app.post('/api/decks/:id/saveas', authMiddleware, (req, res) => {
+app.post('/api/decks/:id/saveas', authMiddleware, async (req, res) => {
   const { name } = req.body;
-  const original = stmts.getDeck.get(req.params.id, req.user.userId);
+  const original = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
   if (!original) return res.status(404).json({ error: 'Deck not found' });
 
   const newId = uuidv4();
-  stmts.createDeck.run(newId, req.user.userId, name || original.name + ' (Copy)');
-  stmts.updateDeck.run(
+  await db.run('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)', [newId, req.user.userId, name || original.name + ' (Copy)']);
+  await db.run('UPDATE decks SET name=?, main_deck=?, heroes=?, potion_deck=?, side_deck=?, is_default=?, updated_at=unixepoch() WHERE id=? AND user_id=?', [
     name || original.name + ' (Copy)',
     original.main_deck, original.heroes, original.potion_deck, original.side_deck, 0,
     newId, req.user.userId
-  );
+  ]);
 
-  const newDeck = stmts.getDeck.get(newId, req.user.userId);
+  const newDeck = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [newId, req.user.userId]);
   res.json({ deck: parseDeck(newDeck) });
 });
 
-app.delete('/api/decks/:id', authMiddleware, (req, res) => {
-  stmts.deleteDeck.run(req.params.id, req.user.userId);
+app.delete('/api/decks/:id', authMiddleware, async (req, res) => {
+  await db.run('DELETE FROM decks WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
   res.json({ ok: true });
 });
 
@@ -462,15 +558,15 @@ function sendGameState(room, playerIdx, extra) {
   io.to(p.socketId).emit('game_state', state);
 }
 
-function endGame(room, winnerIdx, reason) {
+async function endGame(room, winnerIdx, reason) {
   const gs = room.gameState;
   if (!gs || gs.result) return;
   const isRanked = room.type === 'ranked';
   const loserIdx = winnerIdx === 0 ? 1 : 0;
   const winner = gs.players[winnerIdx];
   const loser = gs.players[loserIdx];
-  const wUser = stmts.getUserById.get(winner.userId);
-  const lUser = stmts.getUserById.get(loser.userId);
+  const wUser = await db.get('SELECT * FROM users WHERE id = ?', [winner.userId]);
+  const lUser = await db.get('SELECT * FROM users WHERE id = ?', [loser.userId]);
   const wElo = wUser?.elo || 1000; const lElo = lUser?.elo || 1000;
   let newWElo = wElo, newLElo = lElo;
 
@@ -479,19 +575,19 @@ function endGame(room, winnerIdx, reason) {
     const expectedW = 1 / (1 + Math.pow(10, (lElo - wElo) / 400));
     newWElo = Math.round(wElo + K * (1 - expectedW));
     newLElo = Math.max(0, Math.round(lElo + K * (0 - (1 - expectedW))));
-    stmts.updateElo.run(newWElo, winner.userId);
-    stmts.updateElo.run(newLElo, loser.userId);
+    await db.run('UPDATE users SET elo = ? WHERE id = ?', [newWElo, winner.userId]);
+    await db.run('UPDATE users SET elo = ? WHERE id = ?', [newLElo, loser.userId]);
   }
 
   // Always track wins/losses and hero stats
-  db.prepare('UPDATE users SET wins = wins + 1 WHERE id = ?').run(winner.userId);
-  db.prepare('UPDATE users SET losses = losses + 1 WHERE id = ?').run(loser.userId);
+  await db.run('UPDATE users SET wins = wins + 1 WHERE id = ?', [winner.userId]);
+  await db.run('UPDATE users SET losses = losses + 1 WHERE id = ?', [loser.userId]);
   for (const ps of [winner, loser]) {
     const won = ps === winner;
     for (const h of ps.heroes) {
-      if (h.name) stmts.upsertHeroStat.run(ps.userId, h.name, won ? 1 : 0, won ? 0 : 1);
+      if (h.name) await db.run('INSERT INTO hero_stats (user_id, hero_name, wins, losses) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, hero_name) DO UPDATE SET wins = wins + excluded.wins, losses = losses + excluded.losses', [ps.userId, h.name, won ? 1 : 0, won ? 0 : 1]);
     }
-    stmts.insertGameHistory.run(uuidv4(), ps.userId, ps.heroes[0]?.name||null, ps.heroes[1]?.name||null, ps.heroes[2]?.name||null, won?1:0, (won?loser:winner).userId);
+    await db.run('INSERT INTO game_history (id, user_id, hero1, hero2, hero3, won, opponent_id) VALUES (?, ?, ?, ?, ?, ?, ?)', [uuidv4(), ps.userId, ps.heroes[0]?.name||null, ps.heroes[1]?.name||null, ps.heroes[2]?.name||null, won?1:0, (won?loser:winner).userId]);
   }
   gs.result = { winnerIdx, reason, winnerName: winner.username, loserName: loser.username, isRanked,
     eloChanges: isRanked ? [{ username: winner.username, oldElo: wElo, newElo: newWElo }, { username: loser.username, oldElo: lElo, newElo: newLElo }] : null };
@@ -607,7 +703,7 @@ io.on('connection', (socket) => {
     io.emit('rooms', getRoomList());
   });
 
-  socket.on('start_game', ({ roomId }) => {
+  socket.on('start_game', async ({ roomId }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || room.hostId !== currentUser.userId || room.players.length < 2) return;
@@ -617,15 +713,16 @@ io.on('connection', (socket) => {
   });
 
   /** Set up fresh game state: decks, hands, heroes — but don't start the engine or turns. */
-  function setupGameState(room) {
+  async function setupGameState(room) {
     const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
     const cardsByName = {}; allCards.forEach(c => { cardsByName[c.name] = c; });
     const shuffle = (arr) => { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
 
-    const playerStates = room.players.map(p => {
-      const deckRow = p.deckId ? stmts.getDeck.get(p.deckId, p.userId) : null;
+    const playerStates = [];
+    for (const p of room.players) {
+      const deckRow = p.deckId ? await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [p.deckId, p.userId]) : null;
       const deck = deckRow ? parseDeck(deckRow) : null;
-      const usr = stmts.getUserById.get(p.userId);
+      const usr = await db.get('SELECT * FROM users WHERE id = ?', [p.userId]);
       const heroes = (deck?.heroes||[]).map(h => {
         const c = h.hero ? cardsByName[h.hero] : null;
         return { name:h.hero, hp:c?.hp||0, maxHp:c?.hp||0, ability1:h.ability1||null, ability2:h.ability2||null, statuses:{} };
@@ -639,12 +736,12 @@ io.on('connection', (socket) => {
       const mainDeck = shuffle(deck?.mainDeck||[]);
       const potionDeck = shuffle(deck?.potionDeck||[]);
       const hand = mainDeck.splice(0, 5);
-      return { userId:p.userId, username:p.username, socketId:p.socketId,
+      playerStates.push({ userId:p.userId, username:p.username, socketId:p.socketId,
         color:usr?.color||'#00f0ff', avatar:usr?.avatar||null,
         heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
         hand, mainDeck, potionDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
-        abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0] };
-    });
+        abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0] });
+    }
     room.gameState = { players:playerStates, areaZones:[[],[]], turn:0, activePlayer:0, currentPhase:0, result:null, rematchRequests:[], awaitingFirstChoice:true };
     room.status = 'playing';
     room.players.forEach(p => activeGames.set(p.userId, room.id));
@@ -654,9 +751,9 @@ io.on('connection', (socket) => {
       playerStates[pi].hand.push('Performance');
       playerStates[pi].hand.push('Performance');
       playerStates[pi].hand.push('Flying Island in the Sky');
-      playerStates[pi].hand.push('Snow Cannon');
+      playerStates[pi].hand.push('Fiery Slime');
       playerStates[pi].hand.push('Fire Bomb');
-      playerStates[pi].hand.push('Icy Slime');
+      playerStates[pi].hand.push('Sparky Slime');
     }
     const debugHeroPlayer = Math.floor(Math.random() * 2);
     const debugHeroIdx = Math.floor(Math.random() * 3);
@@ -679,7 +776,7 @@ io.on('connection', (socket) => {
     io.emit('rooms', getRoomList());
   }
 
-  socket.on('leave_game', ({ roomId }) => {
+  socket.on('leave_game', async ({ roomId }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId); if (!room) return;
     const hadResult = !!room.gameState?.result;
@@ -687,7 +784,7 @@ io.on('connection', (socket) => {
     // If game is active and no result yet, surrendering ends the game
     if (room.gameState && !hadResult && room.status === 'playing') {
       const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
-      if (pi >= 0) endGame(room, pi===0?1:0, 'surrender');
+      if (pi >= 0) await endGame(room, pi===0?1:0, 'surrender');
       // Don't mark as left — both players should see Rematch/Leave
       return;
     }
@@ -875,12 +972,10 @@ io.on('connection', (socket) => {
     // Track card instance in engine
     const inst = room.engine._trackCard(cardName, pi, 'support', heroIdx, zoneSlot);
 
-    // If creature has onPlay hook, emit summon effect highlight to both players
-    if (inst.getHook && inst.getHook('onPlay')) {
-      for (let i = 0; i < 2; i++) {
-        const sid = gs.players[i]?.socketId;
-        if (sid) io.to(sid).emit('summon_effect', { owner: pi, heroIdx, zoneSlot, cardName });
-      }
+    // Emit summon effect highlight to both players for every creature
+    for (let i = 0; i < 2; i++) {
+      const sid = gs.players[i]?.socketId;
+      if (sid) io.to(sid).emit('summon_effect', { owner: pi, heroIdx, zoneSlot, cardName });
     }
 
     // Fire hooks, wait for resolution, then advance phase and sync
@@ -1128,7 +1223,7 @@ io.on('connection', (socket) => {
     for (let i = 0; i < 2; i++) sendGameState(room, i);
   });
 
-  socket.on('request_rematch', ({ roomId }) => {
+  socket.on('request_rematch', async ({ roomId }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState?.result) return;
@@ -1137,7 +1232,7 @@ io.on('connection', (socket) => {
     if (room.gameState.rematchRequests.length >= 2) {
       const loserIdx = room.gameState.result.winnerIdx === 0 ? 1 : 0;
       // Set up fresh game state FIRST so both players see their new hands
-      setupGameState(room);
+      await setupGameState(room);
       for(let i=0;i<2;i++) sendGameState(room, i);
       // Now ask the loser who goes first — no time limit
       const loserPs = room.gameState.players[loserIdx];
@@ -1191,7 +1286,7 @@ io.on('connection', (socket) => {
           sendGameState(room, oi);
           const timer = setTimeout(() => {
             disconnectTimers.delete(currentUser.userId);
-            if (room.gameState && !room.gameState.result) endGame(room, oi, 'disconnect_timeout');
+            if (room.gameState && !room.gameState.result) endGame(room, oi, 'disconnect_timeout').catch(e => console.error('[endGame] error:', e.message));
             activeGames.delete(currentUser.userId);
           }, 60000);
           disconnectTimers.set(currentUser.userId, timer);
@@ -1248,11 +1343,16 @@ function sanitizeRoom(room, forUser) {
 }
 
 // ===== CATCH-ALL (SPA) =====
-app.get('*', (req, res) => {
+app.get('*', async (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ===== START =====
-server.listen(PORT, () => {
-  console.log(`Pixel Parties TCG running on http://localhost:${PORT}`);
+initDatabase().then(() => {
+  server.listen(PORT, () => {
+    console.log(`Pixel Parties TCG running on http://localhost:${PORT}`);
+  });
+}).catch(err => {
+  console.error('[DB] Failed to initialize database:', err);
+  process.exit(1);
 });

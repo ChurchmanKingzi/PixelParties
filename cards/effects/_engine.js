@@ -202,11 +202,13 @@ class GameEngine {
       if (!c.isActiveIn(c.zone)) return false;
       // Dead heroes and their abilities/supports don't fire hooks
       // Frozen/Stunned heroes' abilities and effects are also negated
+      // Negated heroes' hero + ability effects are silenced, but support/creature effects still work
       if ((c.zone === 'hero' || c.zone === 'ability' || c.zone === 'support') && c.heroIdx >= 0) {
         const hero = this.gs.players[c.owner]?.heroes?.[c.heroIdx];
         if (!hero || !hero.name) return false; // Empty hero slot
         if (hero.hp <= 0) return false;
         if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
+        if (hero.statuses?.negated && (c.zone === 'hero' || c.zone === 'ability')) return false;
       }
       return true;
     });
@@ -332,6 +334,14 @@ class GameEngine {
       },
       async confirm(message) {
         return engine.promptConfirm(cardInstance.controller, message);
+      },
+
+      // ── Hard Once Per Turn (HOPT) ──
+      // Returns true if this is the first use of effectId this turn for this player.
+      // Returns false if already used — the effect should fizzle.
+      // Automatically marks as used when returning true.
+      hardOncePerTurn(effectId) {
+        return engine.claimHOPT(effectId, cardInstance.controller);
       },
 
       // ── Queries ──
@@ -634,6 +644,16 @@ class GameEngine {
     await this.runHooks(HOOKS.BEFORE_DAMAGE, hookCtx);
     if (hookCtx.cancelled) return { dealt: 0, cancelled: true };
 
+    // Shielded heroes (first-turn protection) are immune to ALL damage
+    if (this.gs.firstTurnProtectedPlayer != null && target && target.hp !== undefined) {
+      const protectedIdx = this.gs.firstTurnProtectedPlayer;
+      const ps = this.gs.players[protectedIdx];
+      if (ps && (ps.heroes || []).includes(target)) {
+        this.log('damage_blocked', { target: this._heroLabel(target), reason: 'shielded' });
+        return { dealt: 0, cancelled: true };
+      }
+    }
+
     const actualAmount = Math.max(0, hookCtx.amount);
     if (target && target.hp !== undefined) {
       target.hp = Math.max(0, target.hp - actualAmount);
@@ -719,6 +739,11 @@ class GameEngine {
   }
 
   async actionDiscardCards(playerIdx, count) {
+    // First-turn protection blocks forced discard
+    if (this.gs.firstTurnProtectedPlayer === playerIdx) {
+      this.log('discard_blocked', { player: this.gs.players[playerIdx]?.username, reason: 'shielded' });
+      return;
+    }
     // For now, discard from end of hand. Later: prompt player to choose.
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
@@ -756,6 +781,19 @@ class GameEngine {
    * Start the game's first turn. Call once after init().
    */
   async startGame() {
+    // First turn rule: opponent of the starting player is fully shielded
+    // (blocks ALL damage, ALL status effects, discard, mill — everything)
+    const oppIdx = this.gs.activePlayer === 0 ? 1 : 0;
+    this.gs.firstTurnProtectedPlayer = oppIdx;
+    const oppPs = this.gs.players[oppIdx];
+    if (oppPs) {
+      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
+        const hero = oppPs.heroes[hi];
+        if (hero?.name) {
+          await this.addHeroStatus(oppIdx, hi, 'shielded', {});
+        }
+      }
+    }
     await this.runHooks(HOOKS.ON_GAME_START, {});
     await this.startTurn();
   }
@@ -769,6 +807,7 @@ class GameEngine {
     const activePs = this.gs.players[this.gs.activePlayer];
     if (activePs) activePs.abilityGivenThisTurn = [false, false, false];
     this.log('turn_start', { turn: this.gs.turn, activePlayer: this.gs.activePlayer, username: activePs?.username });
+    await this.runHooks(HOOKS.ON_TURN_START, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
     this.sync();
     await this.runPhase(PHASES.START);
   }
@@ -785,8 +824,9 @@ class GameEngine {
 
     switch (phase) {
       case PHASES.START:
-        // Automatic phase — process status expiry, hooks, then advance
+        // Automatic phase — process status expiry, burn damage, hooks, then advance
         await this.processStatusExpiry('START');
+        await this.processBurnDamage();
         await this.runHooks(HOOKS.ON_PHASE_END, { phase: phaseName, phaseIndex: phase });
         await this._delay(250);
         await this.runPhase(PHASES.RESOURCE);
@@ -811,6 +851,8 @@ class GameEngine {
       case PHASES.MAIN2:
         // Compute which ability cards have custom placement
         this.gs.customPlacementCards = this.getCustomPlacementCards(this.gs.activePlayer);
+        // Compute which targeting artifacts/potions have no valid targets
+        this.gs.unactivatableArtifacts = this.getUnactivatableArtifacts(this.gs.activePlayer);
         // Player-controlled phase — wait for manual advance
         this.sync();
         break;
@@ -903,6 +945,10 @@ class GameEngine {
    */
   async switchTurn() {
     await this.runHooks(HOOKS.ON_TURN_END, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
+    // Clear first-turn full protection after the starting player's turn ends
+    if (this.gs.firstTurnProtectedPlayer != null) {
+      delete this.gs.firstTurnProtectedPlayer;
+    }
     this.gs.activePlayer = this.gs.activePlayer === 0 ? 1 : 0;
     this.gs.turn++;
     await this.startTurn();
@@ -946,6 +992,26 @@ class GameEngine {
         } catch (err) {
           console.error(`[Engine] canSummon check failed for "${cardName}":`, err.message);
         }
+      }
+    }
+    return blocked;
+  }
+
+  /**
+   * Check which targeting artifacts in the player's hand have no valid targets.
+   * Returns array of card names that can't be activated.
+   */
+  getUnactivatableArtifacts(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+    const blocked = [];
+    const seen = new Set();
+    for (const cardName of (ps.hand || [])) {
+      if (seen.has(cardName)) continue;
+      seen.add(cardName);
+      const script = loadCardEffect(cardName);
+      if (script?.canActivate && (script.isTargetingArtifact || script.isPotion)) {
+        if (!script.canActivate(this.gs, playerIdx)) blocked.push(cardName);
       }
     }
     return blocked;
@@ -1016,10 +1082,42 @@ class GameEngine {
     return true;
   }
 
+  // ─── HARD ONCE PER TURN (HOPT) ────────────
+  /**
+   * Claim a "hard once per turn" slot for the given key and player.
+   * Returns true if this is the first claim this turn (effect proceeds).
+   * Returns false if already claimed this turn (effect should be skipped).
+   * No manual reset needed — automatically resets each turn via turn counter.
+   *
+   * Usage in card scripts:
+   *   if (!engine.claimHOPT('icy-slime', ctx.cardOwner)) return;
+   */
+  claimHOPT(key, playerIdx) {
+    if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
+    const hoptKey = `${key}:${playerIdx}`;
+    if (this.gs.hoptUsed[hoptKey] === this.gs.turn) return false;
+    this.gs.hoptUsed[hoptKey] = this.gs.turn;
+    return true;
+  }
+
   async addHeroStatus(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero || !hero.name) return;
     if (!hero.statuses) hero.statuses = {};
+
+    // Shielded (first-turn protection) blocks ALL status effects — no exceptions
+    if (hero.statuses.shielded && statusName !== 'shielded') {
+      this.log('status_blocked', { target: hero.name, status: statusName, reason: 'shielded' });
+      return;
+    }
+
+    // Regular Immune (post-CC) only blocks CC effects: frozen, stunned, negated
+    const CC_STATUSES = ['frozen', 'stunned', 'negated'];
+    if (hero.statuses.immune && CC_STATUSES.includes(statusName)) {
+      this.log('status_blocked', { target: hero.name, status: statusName, reason: 'immune' });
+      return;
+    }
+
     hero.statuses[statusName] = { appliedTurn: this.gs.turn, appliedBy: opts.appliedBy ?? -1, ...opts };
     this.log('status_add', { target: hero.name, status: statusName, owner: playerIdx });
     await this.runHooks(HOOKS.ON_STATUS_APPLIED, { target: hero, heroOwner: playerIdx, heroIdx, statusName });
@@ -1051,14 +1149,49 @@ class GameEngine {
         let clearedCC = false;
         if (hero.statuses.frozen) { await this.removeHeroStatus(ap, hi, 'frozen'); clearedCC = true; }
         if (hero.statuses.stunned) { await this.removeHeroStatus(ap, hi, 'stunned'); clearedCC = true; }
+        if (hero.statuses.negated) { await this.removeHeroStatus(ap, hi, 'negated'); clearedCC = true; }
         if (clearedCC) await this.addHeroStatus(ap, hi, 'immune', {});
       }
     } else if (phaseName === 'START') {
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
-        if (!hero?.name || !hero.statuses?.immune) continue;
-        await this.removeHeroStatus(ap, hi, 'immune');
+        if (!hero?.name || !hero.statuses) continue;
+        if (hero.statuses.shielded) await this.removeHeroStatus(ap, hi, 'shielded');
+        if (hero.statuses.immune) await this.removeHeroStatus(ap, hi, 'immune');
       }
+    }
+  }
+
+  /**
+   * Process burn damage at the start of a player's turn.
+   * All Burned heroes the active player controls take 60 damage each.
+   * Broadcasts 'burn_tick' to frontend for visual escalation.
+   */
+  async processBurnDamage() {
+    const ap = this.gs.activePlayer;
+    const ps = this.gs.players[ap];
+    if (!ps) return;
+
+    const burnedHeroes = [];
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0 || !hero.statuses?.burned) continue;
+      burnedHeroes.push({ owner: ap, heroIdx: hi, heroName: hero.name });
+    }
+
+    if (burnedHeroes.length === 0) return;
+
+    // Broadcast burn tick for visual escalation BEFORE dealing damage
+    this._broadcastEvent('burn_tick', { heroes: burnedHeroes });
+    await this._delay(300); // Let the escalation animation start
+
+    for (const { owner, heroIdx, heroName } of burnedHeroes) {
+      const hero = ps.heroes[heroIdx];
+      if (!hero || hero.hp <= 0) continue; // May have died from a previous burn this loop
+      this.log('burn_damage', { target: heroName, amount: 60, owner });
+      await this.actionDealDamage({ name: 'Burn' }, hero, 60, 'fire');
+      this.sync();
+      await this._delay(200);
     }
   }
 
@@ -1071,6 +1204,12 @@ class GameEngine {
    */
   async handleHeroDeathCleanup(hero) {
     if (!hero || !hero.name) return;
+
+    // Clear ALL statuses from dead hero
+    if (hero.statuses) {
+      hero.statuses = {};
+    }
+
     for (let pi = 0; pi < 2; pi++) {
       const ps = this.gs.players[pi];
       const hi = ps.heroes.findIndex(h => h === hero);

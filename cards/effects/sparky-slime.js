@@ -1,8 +1,10 @@
 // ═══════════════════════════════════════════
-//  CARD EFFECT: "Icy Slime"
+//  CARD EFFECT: "Sparky Slime"
 //  Creature — On summon, choose any target
-//  that is not Frozen or Immune and Freeze it.
+//  that is not Immune and Negate it.
 //  At the start of owner's turn, gain 1 level.
+//  Negated = hero + ability effects silenced,
+//  but support/creature effects still active.
 // ═══════════════════════════════════════════
 
 module.exports = {
@@ -10,21 +12,19 @@ module.exports = {
 
   hooks: {
     onPlay: async (ctx) => {
-      // Hard Once Per Turn — only one Icy Slime summon effect per turn
-      if (!ctx.hardOncePerTurn('icy-slime-summon')) return;
+      // Hard Once Per Turn — only one Sparky Slime summon effect per turn
+      if (!ctx.hardOncePerTurn('sparky-slime-summon')) return;
 
       const engine = ctx._engine;
-      const gs = ctx.players;
-      const oppIdx = ctx.cardOwner === 0 ? 1 : 0;
 
-      // Compute valid targets: all heroes (both players) that aren't dead, frozen, or immune
+      // Valid targets: all living heroes that aren't immune or already negated
       const targets = [];
       for (let pi = 0; pi < 2; pi++) {
         const ps = ctx.players[pi];
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
           const hero = ps.heroes[hi];
           if (!hero?.name || hero.hp <= 0) continue;
-          if (hero.statuses?.frozen || hero.statuses?.immune || hero.statuses?.shielded) continue;
+          if (hero.statuses?.immune || hero.statuses?.negated || hero.statuses?.shielded) continue;
           targets.push({
             id: `hero-${pi}-${hi}`,
             type: 'hero',
@@ -37,12 +37,11 @@ module.exports = {
 
       if (targets.length === 0) return; // Fizzles
 
-      // Uncancellable target picker
       const selectedIds = await ctx.promptTarget(targets, {
-        title: 'Icy Slime',
-        description: 'Select a target to Freeze.',
-        confirmLabel: 'Freeze!',
-        confirmClass: 'btn-info',
+        title: 'Sparky Slime',
+        description: 'Select a target to Negate.',
+        confirmLabel: 'Negate!',
+        confirmClass: 'btn-warning',
         cancellable: false,
         exclusiveTypes: false,
         maxPerType: { hero: 1 },
@@ -52,8 +51,11 @@ module.exports = {
       const target = targets.find(t => t.id === selectedIds[0]);
       if (!target) return;
 
-      await engine.addHeroStatus(target.owner, target.heroIdx, 'frozen', { appliedBy: ctx.cardOwner, animationType: 'ice_encase' });
-      engine.log('freeze', { target: target.cardName, by: 'Icy Slime' });
+      await engine.addHeroStatus(target.owner, target.heroIdx, 'negated', {
+        appliedBy: ctx.cardOwner,
+        animationType: 'electric_strike',
+      });
+      engine.log('negate', { target: target.cardName, by: 'Sparky Slime' });
     },
 
     onTurnStart: (ctx) => {
