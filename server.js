@@ -544,6 +544,7 @@ function sendGameState(room, playerIdx, extra) {
     customPlacementCards: gs.customPlacementCards || [],
     awaitingFirstChoice: gs.awaitingFirstChoice || false,
     potionTargeting: gs.potionTargeting || null,
+    effectPrompt: gs.effectPrompt || null,
     creatureCounters: room.engine ? (() => {
       const cc = {};
       for (const inst of room.engine.cardInstances) {
@@ -708,7 +709,7 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room || room.hostId !== currentUser.userId || room.players.length < 2) return;
     const activePlayer = Math.random() < 0.5 ? 0 : 1;
-    setupGameState(room);
+    await setupGameState(room);
     startGameEngine(room, roomId, activePlayer);
   });
 
@@ -1221,6 +1222,16 @@ io.on('connection', (socket) => {
     if (pi !== room.gameState.potionTargeting.ownerIdx) return;
     room.gameState.potionTargeting = null;
     for (let i = 0; i < 2; i++) sendGameState(room, i);
+  });
+
+  // General-purpose effect prompt response (confirm, card gallery, zone pick)
+  socket.on('effect_prompt_response', ({ roomId, response }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.engine || !room.gameState?.effectPrompt) return;
+    const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi !== room.gameState.effectPrompt.ownerIdx) return;
+    room.engine.resolveGenericPrompt(response);
   });
 
   socket.on('request_rematch', async ({ roomId }) => {

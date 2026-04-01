@@ -231,7 +231,17 @@ class GameEngine {
       try {
         await Promise.race([
           Promise.resolve(hookFn(ctx)),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('Hook timeout')), EFFECT_TIMEOUT_MS)),
+          new Promise((_, rej) => {
+            const check = () => {
+              // Don't timeout while an interactive prompt is pending
+              if (this._pendingGenericPrompt || this._pendingPrompt) {
+                setTimeout(check, EFFECT_TIMEOUT_MS);
+              } else {
+                rej(new Error('Hook timeout'));
+              }
+            };
+            setTimeout(check, EFFECT_TIMEOUT_MS);
+          }),
         ]);
       } catch (err) {
         console.error(`[Engine] Hook "${hookName}" on card "${card.name}" (${card.id}) failed:`, err.message);
@@ -342,6 +352,47 @@ class GameEngine {
       // Automatically marks as used when returning true.
       hardOncePerTurn(effectId) {
         return engine.claimHOPT(effectId, cardInstance.controller);
+      },
+
+      // ── General-purpose prompts (async — pauses game) ──
+
+      /**
+       * Show a yes/no confirmation dialog. Returns true if confirmed, false if declined.
+       * @param {object} config - { title, message }
+       */
+      async promptConfirmEffect(config) {
+        const result = await engine.promptGeneric(cardInstance.controller, {
+          type: 'confirm', title: config.title || cardInstance.name, message: config.message,
+        });
+        return result?.confirmed === true;
+      },
+
+      /**
+       * Show a card gallery picker. Returns { cardName, source } or null if cancelled.
+       * @param {Array} cards - [{ name, source ('hand'|'deck'), ...extraDisplayData }]
+       * @param {object} config - { title, description, cancellable }
+       */
+      async promptCardGallery(cards, config = {}) {
+        return engine.promptGeneric(cardInstance.controller, {
+          type: 'cardGallery', cards,
+          title: config.title || cardInstance.name,
+          description: config.description || 'Select a card.',
+          cancellable: config.cancellable !== false,
+        });
+      },
+
+      /**
+       * Show a zone picker (highlights zones on the board). Returns { heroIdx, slotIdx } or null if cancelled.
+       * @param {Array} zones - [{ heroIdx, slotIdx, label }]
+       * @param {object} config - { title, description, cancellable }
+       */
+      async promptZonePick(zones, config = {}) {
+        return engine.promptGeneric(cardInstance.controller, {
+          type: 'zonePick', zones,
+          title: config.title || cardInstance.name,
+          description: config.description || 'Select a zone.',
+          cancellable: config.cancellable !== false,
+        });
       },
 
       // ── Queries ──
@@ -1079,6 +1130,42 @@ class GameEngine {
     this._pendingPrompt = null;
     this.gs.potionTargeting = null;
     resolve(selectedIds || []);
+    return true;
+  }
+
+  // ─── GENERAL-PURPOSE PROMPT SYSTEM ─────────
+  // Uses gs.effectPrompt for state sync (survives reconnects).
+  // Types: 'confirm', 'cardGallery', 'zonePick'
+
+  /**
+   * Show a generic prompt to a player. Returns a Promise that resolves
+   * when the player responds (or null/false if cancelled).
+   * @param {number} playerIdx
+   * @param {object} promptData - { type, title, ...typeSpecificData }
+   */
+  async promptGeneric(playerIdx, promptData) {
+    return new Promise((resolve) => {
+      this._pendingGenericPrompt = { resolve };
+      this.gs.effectPrompt = { ...promptData, ownerIdx: playerIdx };
+      this.sync();
+    });
+  }
+
+  /**
+   * Resolve a pending generic prompt. Called by server socket handler.
+   * @param {object} response - { cancelled, ...typeSpecificData }
+   */
+  resolveGenericPrompt(response) {
+    if (!this._pendingGenericPrompt) return false;
+    const { resolve } = this._pendingGenericPrompt;
+    this._pendingGenericPrompt = null;
+    this.gs.effectPrompt = null;
+    if (response?.cancelled) {
+      resolve(null);
+    } else {
+      resolve(response);
+    }
+    this.sync();
     return true;
   }
 

@@ -3040,14 +3040,16 @@ function GameBoard({ gameState, lobby, onLeave }) {
     socket.emit('request_rematch', { roomId: gameState.roomId });
   };
 
-  // Escape closes surrender dialog, deck viewer, or cancels potion targeting
+  // Escape closes surrender dialog, deck viewer, cancels potion targeting, or cancels effect prompts
   useEffect(() => {
-    if (!showSurrender && !deckViewer && !pileViewer && !gameState.potionTargeting) return;
+    if (!showSurrender && !deckViewer && !pileViewer && !gameState.potionTargeting && !gameState.effectPrompt) return;
     const handleEsc = (e) => {
       if (e.key === 'Escape') {
         e.stopImmediatePropagation();
-        if (gameState.potionTargeting && gameState.potionTargeting.ownerIdx === myIdx) {
-          if (gameState.potionTargeting.config?.cancellable === false) return; // Can't cancel
+        if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx && gameState.effectPrompt.cancellable !== false) {
+          socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
+        } else if (gameState.potionTargeting && gameState.potionTargeting.ownerIdx === myIdx) {
+          if (gameState.potionTargeting.config?.cancellable === false) return;
           socket.emit('cancel_potion', { roomId: gameState.roomId });
           setPotionSelection([]);
         } else if (pileViewer) setPileViewer(null);
@@ -3057,7 +3059,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
     };
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
-  }, [showSurrender, deckViewer, pileViewer, gameState.potionTargeting]);
+  }, [showSurrender, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt]);
 
   // Listen for opponent's target selections
   useEffect(() => {
@@ -3227,6 +3229,19 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
   const canConfirmPotion = potionSelection.length > 0;
 
+  // ── Effect prompt helpers (confirm, card gallery, zone picker) ──
+  const ep = gameState.effectPrompt;
+  const isMyEffectPrompt = ep && ep.ownerIdx === myIdx;
+  const zonePickSet = new Set();
+  if (isMyEffectPrompt && ep.type === 'zonePick') {
+    for (const z of (ep.zones || [])) {
+      zonePickSet.add(`${myIdx}-${z.heroIdx}-${z.slotIdx}`);
+    }
+  }
+  const respondToPrompt = (response) => {
+    socket.emit('effect_prompt_response', { roomId: gameState.roomId, response });
+  };
+
   // Compute per-column max support zone count AND left/right island padding across both players
   const columnLayout = [0, 1, 2].map(hi => {
     const counts = [0, 1].map(pi => {
@@ -3391,11 +3406,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
               const isSelectedEquipTarget = equipTargetIds.some(id => selectedSet.has(id));
               const isEquipExploding = equipTargetIds.some(id => explosions.includes(id));
               const isSummonGlow = summonGlow && summonGlow.owner === pi && summonGlow.heroIdx === i && summonGlow.zoneSlot === z;
+              const isZonePickTarget = !isOpp && zonePickSet.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'}
-                  onClick={isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
-                  style={isValidEquipTarget ? { cursor: 'pointer' } : undefined}>
+                  onClick={isZonePickTarget ? () => respondToPrompt({ heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
+                  style={(isValidEquipTarget || isZonePickTarget) ? { cursor: 'pointer' } : undefined}>
                   {(isPlayTarget || isAutoTarget) && playDrag.card ? (
                     <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
                   ) : cards.length > 0 ? (
@@ -3696,6 +3712,76 @@ function GameBoard({ gameState, lobby, onLeave }) {
           </div>
         );
       })()}
+
+      {/* ── Effect Prompt: Confirm Dialog ── */}
+      {isMyEffectPrompt && ep.type === 'confirm' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Confirm'}</div>
+          <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{ep.message}</div>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button className="btn btn-success" style={{ padding: '10px 24px', fontSize: 13 }}
+              onClick={() => respondToPrompt({ confirmed: true })}>
+              Yes
+            </button>
+            <button className="btn" style={{ padding: '10px 24px', fontSize: 13, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+              onClick={() => respondToPrompt({ confirmed: false })}>
+              No
+            </button>
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Effect Prompt: Card Gallery Picker ── */}
+      {isMyEffectPrompt && ep.type === 'cardGallery' && (() => {
+        const cards = ep.cards || [];
+        return (
+          <div className="modal-overlay" onClick={ep.cancellable !== false ? () => respondToPrompt({ cancelled: true }) : undefined}>
+            <div className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
+                  {ep.title || 'Select a Card'}
+                </span>
+                {ep.cancellable !== false && (
+                  <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }}
+                    onClick={() => respondToPrompt({ cancelled: true })}>✕ CANCEL</button>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+              <div className="deck-viewer-grid">
+                {cards.map((entry, i) => {
+                  const card = CARDS_BY_NAME[entry.name];
+                  if (!card) return null;
+                  return (
+                    <div key={entry.name + '-' + entry.source + '-' + i} style={{ position: 'relative' }}>
+                      <CardMini card={card}
+                        onClick={() => respondToPrompt({ cardName: entry.name, source: entry.source })}
+                        style={{ width: '100%', height: 120, cursor: 'pointer' }} />
+                      <div className="gallery-source-badge" style={{
+                        background: entry.source === 'hand' ? 'rgba(80,200,120,.85)' : 'rgba(80,140,220,.85)',
+                      }}>
+                        {entry.source === 'hand' ? 'HAND' : 'DECK'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Effect Prompt: Zone Picker Panel ── */}
+      {isMyEffectPrompt && ep.type === 'zonePick' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Select a Zone'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7 }}>Click a highlighted zone on the board.</div>
+          {ep.cancellable !== false && (
+            <button className="btn" style={{ marginTop: 10, padding: '6px 16px', fontSize: 11 }}
+              onClick={() => respondToPrompt({ cancelled: true })}>← Back</button>
+          )}
+        </DraggablePanel>
+      )}
 
       {/* Rematch first-choice dialog (loser only) — floating panel so hand is visible */}
       {showFirstChoice && (

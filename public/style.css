@@ -61,7 +61,7 @@ body {
   100% { background-position: 0 4px; }
 }
 
-.animate-in { animation: slideIn .3s ease-out; }
+.animate-in { animation: fadeIn .3s ease-out; }
 .animate-fade { animation: fadeIn .3s ease-out; }
 .glow-border { animation: glow 2s ease-in-out infinite; }
 
@@ -1810,6 +1810,35 @@ body {
   animation: summonGlow 1.4s ease-out forwards !important;
   z-index: 20;
   position: relative;
+}
+
+/* Zone picker — highlighted zones during effect zone selection */
+.zone-pick-target {
+  box-shadow: 0 0 18px rgba(100,255,100,.7), 0 0 35px rgba(80,220,80,.4), inset 0 0 8px rgba(100,255,100,.3) !important;
+  border-color: rgba(100,255,100,.8) !important;
+  animation: zonePickPulse .9s ease-in-out infinite !important;
+  cursor: pointer !important;
+}
+@keyframes zonePickPulse {
+  0%, 100% { box-shadow: 0 0 18px rgba(100,255,100,.7), 0 0 35px rgba(80,220,80,.4), inset 0 0 8px rgba(100,255,100,.3); }
+  50% { box-shadow: 0 0 28px rgba(100,255,100,1), 0 0 50px rgba(80,220,80,.6), inset 0 0 14px rgba(100,255,100,.5); }
+}
+
+/* Card gallery source badge (HAND / DECK) */
+.gallery-source-badge {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 3px;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0,0,0,.6);
+  z-index: 5;
 }
 
 /* Opponent targeting highlight — red glow on cards opponent is selecting */
