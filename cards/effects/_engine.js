@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const { v4: uuidv4 } = require('uuid');
-const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES } = require('./_hooks');
+const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
 const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
@@ -91,6 +91,9 @@ class GameEngine {
     // Action log (sent to clients for animations/history)
     this.actionLog = [];
     this.eventId = 0; // Unique ID per event for trigger deduplication
+
+    // Additional Actions registry — type ID → { label, actionType, filter(cardData) → bool }
+    this._additionalActionTypes = {};
 
     // Socket listeners per player (for prompts)
     this._promptResolvers = {};
@@ -253,6 +256,11 @@ class GameEngine {
       }
     }
 
+    // After hooks resolve, check for reaction cards (unless suppressed)
+    if (!this._inReactionCheck && !hookCtx._skipReactionCheck && !hookCtx._isReaction) {
+      await this._checkReactionCards(hookName, hookCtx);
+    }
+
     return hookCtx;
   }
 
@@ -328,6 +336,15 @@ class GameEngine {
       async removeStatus(target, statusName) {
         return engine.actionRemoveStatus(target, statusName);
       },
+      /**
+       * Change a creature's level by delta. Fires BEFORE/AFTER_LEVEL_CHANGE hooks.
+       * If no target specified, changes THIS card's level.
+       * @param {number} delta - Amount to change (positive or negative)
+       * @param {CardInstance} [target] - Target card (defaults to this card)
+       */
+      async changeLevel(delta, target) {
+        return engine.actionChangeLevel(target || cardInstance, delta);
+      },
 
       // ── Player input (async — pauses until client responds) ──
       async promptTarget(validTargets, config) {
@@ -352,6 +369,52 @@ class GameEngine {
       // Automatically marks as used when returning true.
       hardOncePerTurn(effectId) {
         return engine.claimHOPT(effectId, cardInstance.controller);
+      },
+
+      /**
+       * Lock summons for the card's controller for the rest of this turn.
+       * Prevents all creature summoning (hand play + effect placement).
+       */
+      lockSummons() {
+        const ps = gs.players[cardInstance.controller];
+        if (ps) ps.summonLocked = true;
+        engine.sync();
+      },
+
+      /**
+       * Check if the card's controller has summons locked this turn.
+       */
+      isSummonLocked() {
+        return !!gs.players[cardInstance.controller]?.summonLocked;
+      },
+
+      /**
+       * Register an additional action type (call once from card script init/play).
+       */
+      registerAdditionalActionType(typeId, config) {
+        engine.registerAdditionalActionType(typeId, config);
+      },
+
+      /**
+       * Grant an additional action from THIS card.
+       * @param {string} typeId - The registered type ID
+       */
+      grantAdditionalAction(typeId) {
+        engine.grantAdditionalAction(cardInstance, typeId);
+      },
+
+      /**
+       * Expire THIS card's additional action.
+       */
+      expireAdditionalAction() {
+        engine.expireAdditionalAction(cardInstance);
+      },
+
+      /**
+       * Expire ALL additional actions of a type for this card's controller.
+       */
+      expireAllAdditionalActions(typeId) {
+        engine.expireAllAdditionalActions(cardInstance.controller, typeId);
       },
 
       // ── General-purpose prompts (async — pauses game) ──
@@ -391,6 +454,25 @@ class GameEngine {
           type: 'zonePick', zones,
           title: config.title || cardInstance.name,
           description: config.description || 'Select a zone.',
+          cancellable: config.cancellable !== false,
+        });
+      },
+
+      /**
+       * Show a status effect selection prompt (for Beer, etc.)
+       * @param {string} targetName - Name of the target (hero/creature)
+       * @param {Array} statuses - [{key, label, icon}] of removable statuses
+       * @param {object} config - { title, description, cancellable, confirmLabel }
+       * @returns {Promise<{selectedStatuses: string[]}|null>}
+       */
+      async promptStatusSelect(targetName, statuses, config = {}) {
+        return engine.promptGeneric(cardInstance.controller, {
+          type: 'statusSelect',
+          targetName,
+          statuses,
+          title: config.title || cardInstance.name,
+          description: config.description || `Choose status effects to remove from ${targetName}.`,
+          confirmLabel: config.confirmLabel || 'Confirm',
           cancellable: config.cancellable !== false,
         });
       },
@@ -826,6 +908,37 @@ class GameEngine {
     await this.runHooks(HOOKS.ON_STATUS_REMOVED, { target, status: statusName });
   }
 
+  /**
+   * Change a creature's level. Fires BEFORE_LEVEL_CHANGE (can modify delta) and AFTER_LEVEL_CHANGE.
+   * Broadcasts 'level_change' for frontend popup animation.
+   * @param {CardInstance} card - The card whose level to change
+   * @param {number} delta - Amount to change (positive or negative)
+   */
+  async actionChangeLevel(card, delta) {
+    if (!card || delta === 0) return;
+
+    // Fire BEFORE hook — allows modification of delta (e.g. Slime Rancher adds +1)
+    const hookCtx = { targetCard: card, delta, targetCardName: card.name, targetOwner: card.owner, cancelled: false };
+    await this.runHooks(HOOKS.BEFORE_LEVEL_CHANGE, hookCtx);
+    if (hookCtx.cancelled) return;
+
+    const finalDelta = hookCtx.delta || delta;
+    const oldLevel = card.counters.level || 0;
+    card.counters.level = oldLevel + finalDelta;
+
+    this.log('level_change', { card: card.name, owner: card.owner, delta: finalDelta, newLevel: card.counters.level });
+
+    // Broadcast for frontend popup
+    this._broadcastEvent('level_change', {
+      cardName: card.name, owner: card.owner,
+      heroIdx: card.heroIdx, zoneSlot: card.zoneSlot,
+      delta: finalDelta, newLevel: card.counters.level,
+    });
+
+    await this.runHooks(HOOKS.AFTER_LEVEL_CHANGE, { targetCard: card, delta: finalDelta, newLevel: card.counters.level });
+    this.sync();
+  }
+
   // ─── TURN / PHASE MANAGEMENT ───────────────
 
   /**
@@ -857,7 +970,17 @@ class GameEngine {
     // Reset per-turn flags
     const activePs = this.gs.players[this.gs.activePlayer];
     if (activePs) activePs.abilityGivenThisTurn = [false, false, false];
+    // Clear summon lock for both players (it's a per-turn restriction)
+    for (const ps of this.gs.players) { if (ps) ps.summonLocked = false; }
     this.log('turn_start', { turn: this.gs.turn, activePlayer: this.gs.activePlayer, username: activePs?.username });
+
+    // Process status effects FIRST — before any card hooks fire
+    // This ensures burn damage only hits burns from previous turns,
+    // not burns applied during this turn's ON_TURN_START (e.g. Barker → Fiery Slime)
+    await this.processStatusExpiry('START');
+    await this.processBurnDamage();
+
+    // Now fire turn-start hooks (Barker, Slime level-ups, Rancher restore, etc.)
     await this.runHooks(HOOKS.ON_TURN_START, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
     this.sync();
     await this.runPhase(PHASES.START);
@@ -875,9 +998,7 @@ class GameEngine {
 
     switch (phase) {
       case PHASES.START:
-        // Automatic phase — process status expiry, burn damage, hooks, then advance
-        await this.processStatusExpiry('START');
-        await this.processBurnDamage();
+        // Status expiry + burn damage already processed in startTurn() before hooks
         await this.runHooks(HOOKS.ON_PHASE_END, { phase: phaseName, phaseIndex: phase });
         await this._delay(250);
         await this.runPhase(PHASES.RESOURCE);
@@ -1064,6 +1185,10 @@ class GameEngine {
       if (script?.canActivate && (script.isTargetingArtifact || script.isPotion)) {
         if (!script.canActivate(this.gs, playerIdx)) blocked.push(cardName);
       }
+      // Reaction cards: check reactionCondition
+      if (script?.isReaction && script.reactionCondition) {
+        if (!script.reactionCondition(this.gs, playerIdx, this)) blocked.push(cardName);
+      }
     }
     return blocked;
   }
@@ -1187,6 +1312,246 @@ class GameEngine {
     return true;
   }
 
+  // ─── REACTION CARDS ─────────────────────────
+
+  /** Human-readable descriptions for hook events (for reaction prompts) */
+  static HOOK_DESCRIPTIONS = {
+    onTurnStart: 'The turn has just started',
+    onPhaseEnd: 'The phase has ended',
+    onCardLeaveZone: 'A card left the field',
+    onAttackDeclare: 'An attack was declared',
+    afterDamage: 'Damage was just dealt',
+    onHeroKO: 'A hero was knocked out',
+    onResourceGain: 'Resources were gained',
+    onStatusApplied: 'A status effect was applied',
+    onStatusRemoved: 'A status effect was removed',
+    afterLevelChange: 'A level was changed',
+    onDiscard: 'A card was discarded',
+    onCreatureSummoned: 'A creature was just summoned',
+  };
+
+  /** Hooks that should NOT trigger reaction checks */
+  static REACTION_SKIP_HOOKS = new Set([
+    'onPlay', 'onCardEnterZone', 'onPhaseStart', 'onGameStart',
+    'onChainStart', 'onChainResolve', 'onEffectNegated',
+    'beforeDamage', 'beforeLevelChange',
+    'onResourceSpend',
+  ]);
+
+  /**
+   * Check if any player has activatable reaction cards in hand.
+   * Non-turn player is prompted first. Loops for chains.
+   */
+  async _checkReactionCards(hookName, hookCtx) {
+    // Skip hooks that shouldn't trigger reactions
+    if (GameEngine.REACTION_SKIP_HOOKS.has(hookName)) return;
+    if (!GameEngine.HOOK_DESCRIPTIONS[hookName]) return; // Unknown hooks don't trigger
+
+    this._inReactionCheck = true;
+    try {
+      const eventDesc = GameEngine.HOOK_DESCRIPTIONS[hookName];
+      const ap = this.gs.activePlayer;
+      const nonAp = ap === 0 ? 1 : 0;
+
+      // Check order: non-turn player first, then turn player
+      const checkOrder = [nonAp, ap];
+      let chainContinue = true;
+
+      while (chainContinue) {
+        chainContinue = false;
+        for (const pi of checkOrder) {
+          const ps = this.gs.players[pi];
+          if (!ps) continue;
+
+          // Find reaction cards in hand
+          for (let hi = 0; hi < ps.hand.length; hi++) {
+            const cardName = ps.hand[hi];
+            const script = loadCardEffect(cardName);
+            if (!script?.isReaction) continue;
+
+            // Check gold cost
+            const allCards = this._getCardDB();
+            const cardData = allCards[cardName];
+            const cost = cardData?.cost || 0;
+            if ((ps.gold || 0) < cost) continue;
+
+            // Check activation condition
+            if (script.reactionCondition && !script.reactionCondition(this.gs, pi, this)) continue;
+
+            // Prompt the player
+            const confirmed = await this.promptGeneric(pi, {
+              type: 'confirm',
+              title: cardName,
+              message: `${eventDesc}. Activate ${cardName}?`,
+              confirmLabel: 'Activate!',
+              cancelLabel: 'No',
+              cancellable: true,
+            });
+
+            if (!confirmed) continue; // Player said No (or Escape)
+
+            // Activate the reaction card!
+            // Deduct gold
+            if (cost > 0) ps.gold -= cost;
+
+            // Remove from hand
+            ps.hand.splice(hi, 1);
+
+            // Resolve the effect
+            this.log('reaction_activated', { card: cardName, player: ps.username, trigger: hookName });
+
+            // Reveal to opponent
+            const oi = pi === 0 ? 1 : 0;
+            const oppSid = this.gs.players[oi]?.socketId;
+            if (oppSid && this.io) this.io.to(oppSid).emit('card_reveal', { cardName });
+
+            let resolved = false;
+            if (script.resolve) {
+              const result = await script.resolve(this, pi);
+              resolved = result !== false; // false = fizzled
+            }
+
+            // Discard the card (artifacts go to discard)
+            ps.discardPile.push(cardName);
+            this.sync();
+
+            // Chain: restart the check loop for more reactions
+            chainContinue = true;
+            break; // Restart the outer loop
+          }
+          if (chainContinue) break; // Restart check order
+        }
+      }
+    } finally {
+      this._inReactionCheck = false;
+    }
+  }
+
+  // ─── ADDITIONAL ACTIONS ────────────────────
+  /**
+   * Register an additional action type. Call from card scripts.
+   * @param {string} typeId - Unique ID (e.g., 'summon_slime_not_rancher')
+   * @param {object} config - { label, actionType ('Creature'|'Spell'|'Attack'), filter(cardData) → bool }
+   */
+  registerAdditionalActionType(typeId, config) {
+    this._additionalActionTypes[typeId] = config;
+  }
+
+  /**
+   * Grant an additional action from a specific card instance.
+   * Sets counters on the card to track availability.
+   */
+  grantAdditionalAction(cardInstance, typeId) {
+    cardInstance.counters.additionalActionType = typeId;
+    cardInstance.counters.additionalActionAvail = 1;
+  }
+
+  /**
+   * Expire (remove) the additional action from a specific card instance.
+   */
+  expireAdditionalAction(cardInstance) {
+    cardInstance.counters.additionalActionAvail = 0;
+  }
+
+  /**
+   * Expire ALL additional actions of a given type for a player.
+   */
+  expireAllAdditionalActions(playerIdx, typeId) {
+    for (const inst of this.cardInstances) {
+      if (inst.owner === playerIdx && inst.counters.additionalActionType === typeId && inst.counters.additionalActionAvail) {
+        inst.counters.additionalActionAvail = 0;
+      }
+    }
+  }
+
+  /**
+   * Get all available additional actions for a player.
+   * Returns array of { typeId, label, actionType, providers: [{cardId, cardName, heroIdx, zoneSlot}], eligibleHandCards: [cardName] }
+   */
+  getAdditionalActions(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+
+    // Group providers by typeId
+    const byType = {};
+    for (const inst of this.cardInstances) {
+      if (inst.owner !== playerIdx) continue;
+      if (!inst.counters.additionalActionType || !inst.counters.additionalActionAvail) continue;
+      const typeId = inst.counters.additionalActionType;
+      const config = this._additionalActionTypes[typeId];
+      if (!config) continue;
+      if (!byType[typeId]) byType[typeId] = { typeId, label: config.label, actionType: config.actionType, providers: [], eligibleHandCards: [] };
+      byType[typeId].providers.push({ cardId: inst.id, cardName: inst.name, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
+    }
+
+    // For each type, compute eligible hand cards
+    const allCards = this._getCardDB();
+    for (const [typeId, entry] of Object.entries(byType)) {
+      const config = this._additionalActionTypes[typeId];
+      if (!config?.filter) continue;
+      const seen = new Set();
+      for (const cardName of (ps.hand || [])) {
+        if (seen.has(cardName)) continue;
+        const cardData = allCards[cardName];
+        if (cardData && config.filter(cardData)) {
+          seen.add(cardName);
+          entry.eligibleHandCards.push(cardName);
+        }
+      }
+    }
+
+    return Object.values(byType);
+  }
+
+  /**
+   * Consume one additional action of the given type for a player.
+   * If providerCardId is specified, consume that specific provider.
+   * Otherwise, consume the first available.
+   * Returns the consumed provider's card instance, or null.
+   */
+  consumeAdditionalAction(playerIdx, typeId, providerCardId) {
+    for (const inst of this.cardInstances) {
+      if (inst.owner !== playerIdx) continue;
+      if (inst.counters.additionalActionType !== typeId) continue;
+      if (!inst.counters.additionalActionAvail) continue;
+      if (providerCardId && inst.id !== providerCardId) continue;
+      inst.counters.additionalActionAvail = 0;
+      this.log('additional_action_used', { typeId, provider: inst.name, player: this.gs.players[playerIdx]?.username });
+      return inst;
+    }
+    return null;
+  }
+
+  /**
+   * Check if a hand card can be played via any additional action.
+   * Returns the matching typeId or null.
+   */
+  findAdditionalActionForCard(playerIdx, cardName) {
+    const allCards = this._getCardDB();
+    const cardData = allCards[cardName];
+    if (!cardData) return null;
+
+    for (const inst of this.cardInstances) {
+      if (inst.owner !== playerIdx) continue;
+      if (!inst.counters.additionalActionType || !inst.counters.additionalActionAvail) continue;
+      const typeId = inst.counters.additionalActionType;
+      const config = this._additionalActionTypes[typeId];
+      if (!config?.filter) continue;
+      if (config.filter(cardData)) return typeId;
+    }
+    return null;
+  }
+
+  /** Lazy-load card database (cached) */
+  _getCardDB() {
+    if (!this._cardDB) {
+      const allCards = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '../../data/cards.json'), 'utf-8'));
+      this._cardDB = {};
+      allCards.forEach(c => { this._cardDB[c.name] = c; });
+    }
+    return this._cardDB;
+  }
+
   async addHeroStatus(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero || !hero.name) return;
@@ -1266,17 +1631,58 @@ class GameEngine {
       burnedHeroes.push({ owner: ap, heroIdx: hi, heroName: hero.name });
     }
 
-    if (burnedHeroes.length === 0) return;
+    // Also find burned creatures
+    const burnedCreatures = [];
+    for (const inst of this.cardInstances) {
+      if (inst.owner !== ap || inst.zone !== 'support') continue;
+      if (!inst.counters.burned) continue;
+      burnedCreatures.push(inst);
+    }
+
+    if (burnedHeroes.length === 0 && burnedCreatures.length === 0) return;
 
     // Broadcast burn tick for visual escalation BEFORE dealing damage
-    this._broadcastEvent('burn_tick', { heroes: burnedHeroes });
-    await this._delay(300); // Let the escalation animation start
+    if (burnedHeroes.length > 0) {
+      this._broadcastEvent('burn_tick', { heroes: burnedHeroes });
+      await this._delay(300); // Let the escalation animation start
+    }
 
     for (const { owner, heroIdx, heroName } of burnedHeroes) {
       const hero = ps.heroes[heroIdx];
       if (!hero || hero.hp <= 0) continue; // May have died from a previous burn this loop
       this.log('burn_damage', { target: heroName, amount: 60, owner });
       await this.actionDealDamage({ name: 'Burn' }, hero, 60, 'fire');
+      this.sync();
+      await this._delay(200);
+    }
+
+    // Process creature burn damage
+    for (const inst of burnedCreatures) {
+      const cardDB = this._getCardDB();
+      const cardData = cardDB[inst.name];
+      if (!cardData) continue;
+      const maxHp = cardData.hp || 0;
+      if (!inst.counters.currentHp) inst.counters.currentHp = maxHp;
+
+      // Play burn animation on the creature zone
+      this._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: ap, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
+      await this._delay(300);
+
+      inst.counters.currentHp -= 60;
+      this.log('burn_damage', { target: inst.name, amount: 60, owner: ap, type: 'creature' });
+
+      if (inst.counters.currentHp <= 0) {
+        // Creature dies from burn — discard it
+        this.log('creature_destroyed', { card: inst.name, by: 'Burn', owner: ap, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
+        const supSlot = ps.supportZones[inst.heroIdx]?.[inst.zoneSlot];
+        if (supSlot) {
+          const idx = supSlot.indexOf(inst.name);
+          if (idx >= 0) supSlot.splice(idx, 1);
+        }
+        ps.discardPile.push(inst.name);
+        this._untrackCard(inst.id);
+        await this.runHooks('onCardLeaveZone', { enteringCard: inst, fromZone: 'support', fromHeroIdx: inst.heroIdx });
+      }
       this.sync();
       await this._delay(200);
     }
@@ -1646,4 +2052,4 @@ class GameEngine {
   }
 }
 
-module.exports = { GameEngine, CardInstance, SPEED };
+module.exports = { GameEngine, CardInstance, SPEED, STATUS_EFFECTS, getNegativeStatuses };

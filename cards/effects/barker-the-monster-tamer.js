@@ -21,6 +21,9 @@ module.exports = {
       const gs = ctx.players;
       const pi = ctx.cardOwner;
       const ps = gs[pi];
+
+      // Can't summon if summon-locked
+      if (ps.summonLocked) return;
       const heroIdx = ctx.cardHeroIdx;
 
       // Load card database for creature data
@@ -118,7 +121,7 @@ module.exports = {
 
         // Fire on-summon hooks (creature's own onPlay effects)
         await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: zone.slotIdx });
-        await engine.runHooks('onCardEnterZone', { card: inst, toZone: 'support', toHeroIdx: heroIdx });
+        await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
 
         engine.sync();
         break; // Done!

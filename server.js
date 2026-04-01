@@ -537,6 +537,7 @@ function sendGameState(room, playerIdx, extra) {
       disconnected: ps.disconnected || false, left: ps.left || false,
       gold: ps.gold || 0,
       abilityGivenThisTurn: ps.abilityGivenThisTurn || [false,false,false],
+      summonLocked: ps.summonLocked || false,
     })),
     areaZones: gs.areaZones, turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
@@ -554,6 +555,8 @@ function sendGameState(room, playerIdx, extra) {
       }
       return cc;
     })() : {},
+    additionalActions: room.engine ? room.engine.getAdditionalActions(playerIdx) : [],
+    unactivatableArtifacts: room.engine ? room.engine.getUnactivatableArtifacts(playerIdx) : [],
     ...extra,
   };
   io.to(p.socketId).emit('game_state', state);
@@ -750,11 +753,13 @@ io.on('connection', (socket) => {
     // ── DEBUG: Add Performance + Flying Island to both hands, set a random hero to 10 HP ──
     for (let pi = 0; pi < 2; pi++) {
       playerStates[pi].hand.push('Performance');
-      playerStates[pi].hand.push('Performance');
-      playerStates[pi].hand.push('Flying Island in the Sky');
-      playerStates[pi].hand.push('Fiery Slime');
-      playerStates[pi].hand.push('Fire Bomb');
+      playerStates[pi].hand.push('Beer');
+      playerStates[pi].hand.push('Juice');
+      playerStates[pi].hand.push('Slime Rancher');
+      playerStates[pi].hand.push('Cloudy Slime');
       playerStates[pi].hand.push('Sparky Slime');
+      playerStates[pi].hand.push('Splashy Slime');
+      playerStates[pi].discardPile.push('Splashy Slime'); // DEBUG: for testing Shadowy Slime
     }
     const debugHeroPlayer = Math.floor(Math.random() * 2);
     const debugHeroIdx = Math.floor(Math.random() * 3);
@@ -914,7 +919,7 @@ io.on('connection', (socket) => {
     (async () => {
       try {
         await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'ability', heroIdx });
-        await room.engine.runHooks('onCardEnterZone', { card: inst, toZone: 'ability', toHeroIdx: heroIdx });
+        await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'ability', toHeroIdx: heroIdx });
       } catch (err) {
         console.error('[Engine] play_ability hooks error:', err.message);
       }
@@ -923,16 +928,29 @@ io.on('connection', (socket) => {
   });
 
   // Play a creature from hand to support zone
-  socket.on('play_creature', ({ roomId, cardName, handIndex, heroIdx, zoneSlot }) => {
+  socket.on('play_creature', ({ roomId, cardName, handIndex, heroIdx, zoneSlot, additionalActionProvider }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine || !room.gameState) return;
     const gs = room.gameState;
     const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0 || pi !== gs.activePlayer) return;
-    if (gs.currentPhase !== 3) return; // Must be Action Phase
+
+    const isActionPhase = gs.currentPhase === 3;
+    const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
+
+    // Must be Action Phase or Main Phase (with additional action)
+    if (!isActionPhase && !isMainPhase) return;
+
+    // Check for additional action coverage
+    const additionalTypeId = room.engine.findAdditionalActionForCard(pi, cardName);
+    const usingAdditional = !!additionalTypeId;
+
+    // In Main Phase, MUST have additional action to play a creature
+    if (isMainPhase && !usingAdditional) return;
 
     const ps = gs.players[pi];
+    if (ps.summonLocked) return; // Summon lock active — can't summon creatures
     // Validate card is in hand
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
 
@@ -966,6 +984,12 @@ io.on('connection', (socket) => {
     if (zoneSlot < 0 || zoneSlot >= totalZones) return;
     if ((ps.supportZones[heroIdx][zoneSlot] || []).length > 0) return;
 
+    // Consume additional action if applicable
+    if (usingAdditional) {
+      const consumed = room.engine.consumeAdditionalAction(pi, additionalTypeId, additionalActionProvider || null);
+      if (!consumed) return; // Failed to consume — shouldn't happen
+    }
+
     // Execute: remove from hand, add to support zone
     ps.hand.splice(handIndex, 1);
     ps.supportZones[heroIdx][zoneSlot] = [cardName];
@@ -979,12 +1003,17 @@ io.on('connection', (socket) => {
       if (sid) io.to(sid).emit('summon_effect', { owner: pi, heroIdx, zoneSlot, cardName });
     }
 
-    // Fire hooks, wait for resolution, then advance phase and sync
+    // Fire hooks, wait for resolution, then advance phase (only if NOT using additional action)
     (async () => {
       try {
         await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot });
-        await room.engine.runHooks('onCardEnterZone', { card: inst, toZone: 'support', toHeroIdx: heroIdx });
-        await room.engine.advanceToPhase(pi, 4);
+        await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
+        // Trigger reaction check for creature summon
+        await room.engine._checkReactionCards('onCreatureSummoned', {});
+        // Only advance phase if this was a "real" action (not additional) during Action Phase
+        if (isActionPhase && !usingAdditional) {
+          await room.engine.advanceToPhase(pi, 4);
+        }
       } catch (err) {
         console.error('[Engine] play_creature hooks error:', err.message);
       }
@@ -1041,7 +1070,7 @@ io.on('connection', (socket) => {
       (async () => {
         try {
           await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: finalSlot });
-          await room.engine.runHooks('onCardEnterZone', { card: inst, toZone: 'support', toHeroIdx: heroIdx });
+          await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
         } catch (err) {
           console.error('[Engine] play_artifact hooks error:', err.message);
         }
@@ -1129,7 +1158,14 @@ io.on('connection', (socket) => {
     if (script.canActivate && !script.canActivate(gs, pi)) return;
 
     if (script.getValidTargets && script.targetingConfig) {
-      const validTargets = script.getValidTargets(gs, pi);
+      const validTargets = script.getValidTargets(gs, pi, room.engine);
+      const config = typeof script.targetingConfig === 'function'
+        ? script.targetingConfig(gs, pi, cost)
+        : { ...script.targetingConfig };
+      // Compute dynamic maxTotal if not set (for cards like Beer where cost scales with targets)
+      if (script.manualGoldCost && !config.maxTotal) {
+        config.maxTotal = cost > 0 ? Math.floor((ps.gold || 0) / cost) : 99;
+      }
       gs.potionTargeting = {
         potionName: cardName,
         handIndex,
@@ -1137,7 +1173,7 @@ io.on('connection', (socket) => {
         cardType: 'Artifact',
         goldCost: cost,
         validTargets,
-        config: script.targetingConfig,
+        config,
       };
       for (let i = 0; i < 2; i++) sendGameState(room, i);
     }
@@ -1169,15 +1205,34 @@ io.on('connection', (socket) => {
 
     const ps = gs.players[pi];
 
-    // Deduct gold for artifacts
-    if (cardType === 'Artifact' && goldCost > 0) {
+    // Deduct gold for artifacts (unless script handles gold manually)
+    if (cardType === 'Artifact' && goldCost > 0 && !script.manualGoldCost) {
       if ((ps.gold || 0) < goldCost) return;
       ps.gold -= goldCost;
     }
 
     (async () => {
-      // Resolve the effect
-      if (script.resolve) await script.resolve(room.engine, pi, selectedIds, validTargets);
+      // Resolve the effect — may return {aborted: true} to re-enter targeting
+      let result;
+      if (script.resolve) result = await script.resolve(room.engine, pi, selectedIds, validTargets);
+
+      if (result?.aborted) {
+        // Re-enter targeting mode (player pressed Back from status select)
+        const freshTargets = script.getValidTargets ? script.getValidTargets(gs, pi, room.engine) : validTargets;
+        const config = typeof script.targetingConfig === 'function'
+          ? script.targetingConfig(gs, pi, goldCost)
+          : { ...script.targetingConfig };
+        if (script.manualGoldCost && !config.maxTotal) {
+          config.maxTotal = goldCost > 0 ? Math.floor((ps.gold || 0) / goldCost) : 99;
+        }
+        gs.potionTargeting = {
+          potionName, handIndex, ownerIdx: pi, cardType, goldCost,
+          validTargets: freshTargets, config,
+        };
+        for (let i = 0; i < 2; i++) sendGameState(room, i);
+        return;
+      }
+
       // Remove from hand and move to appropriate pile
       const hi = ps.hand.indexOf(potionName);
       if (hi >= 0) ps.hand.splice(hi, 1);
@@ -1211,6 +1266,28 @@ io.on('connection', (socket) => {
     const oi = pi === 0 ? 1 : 0;
     const oppSid = room.gameState.players[oi]?.socketId;
     if (oppSid) io.to(oppSid).emit('opponent_targeting', { selectedIds });
+  });
+
+  // Relay pending creature placement (for additional action selection visual)
+  socket.on('pending_placement', ({ roomId, heroIdx, zoneSlot, cardName }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.gameState) return;
+    const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+    const oi = pi === 0 ? 1 : 0;
+    const oppSid = room.gameState.players[oi]?.socketId;
+    if (oppSid) io.to(oppSid).emit('opponent_pending_placement', { owner: pi, heroIdx, zoneSlot, cardName });
+  });
+  socket.on('pending_placement_clear', ({ roomId }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.gameState) return;
+    const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+    const oi = pi === 0 ? 1 : 0;
+    const oppSid = room.gameState.players[oi]?.socketId;
+    if (oppSid) io.to(oppSid).emit('opponent_pending_placement', null);
   });
 
   // Cancel potion targeting

@@ -2123,6 +2123,69 @@ function GoldGainNumber({ amount, playerIdx, isMe }) {
   );
 }
 
+// Floating level change number above a creature
+function LevelChangeNumber({ delta, owner, heroIdx, zoneSlot, myIdx }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const ownerLabel = owner === myIdx ? 'me' : 'opp';
+    const el = document.querySelector(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top });
+    }
+  }, [owner, heroIdx, zoneSlot]);
+
+  if (!pos) return null;
+  return (
+    <div className={delta > 0 ? 'level-change-number' : 'level-change-number level-change-negative'} style={{ left: pos.x, top: pos.y }}>
+      {delta > 0 ? '+' : ''}{delta}
+    </div>
+  );
+}
+
+// Floating card that animates from deck position to hand slot position
+function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
+  const [endPos, setEndPos] = useState(null);
+
+  useEffect(() => {
+    // Wait one frame for the invisible hand slot to be laid out
+    requestAnimationFrame(() => {
+      const targetSlot = document.querySelector(`.game-hand-me .hand-slot[data-hand-idx="${origIdx}"]`);
+      if (targetSlot) {
+        const r = targetSlot.getBoundingClientRect();
+        setEndPos({ x: r.left, y: r.top });
+      }
+    });
+  }, [origIdx]);
+
+  // Before we know the end position, render at deck position (hidden)
+  if (!endPos) return null;
+
+  const dx = endPos.x - startX;
+  const dy = endPos.y - startY;
+
+  return (
+    <div className={'draw-anim-card' + (dimmed ? ' hand-card-dimmed' : '')}
+      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px' }}>
+      <BoardCard cardName={cardName} />
+    </div>
+  );
+}
+
+// Opponent draw animation — face-down card flies from opp deck to opp hand
+function OppDrawAnimCard({ id, startX, startY, endX, endY }) {
+  const dx = endX - startX;
+  const dy = endY - startY;
+  return (
+    <div className="draw-anim-card"
+      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px' }}>
+      <div className="board-card face-down" style={{ width: '100%', height: '100%' }}>
+        <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════
 //  MODULAR GAME ANIMATION SYSTEM
 //  Add new animation types by adding to ANIM_REGISTRY.
@@ -2449,12 +2512,158 @@ function BurnedOverlay({ ticking }) {
   );
 }
 
+// Wind swirl — gentle wind particles spiraling around target
+function WindEffect({ x, y }) {
+  const particles = useMemo(() => Array.from({ length: 14 }, (_, i) => {
+    const angle = (i / 14) * Math.PI * 2;
+    const radius = 20 + Math.random() * 30;
+    return {
+      startAngle: angle,
+      radius,
+      size: 6 + Math.random() * 8,
+      delay: i * 40 + Math.random() * 60,
+      dur: 500 + Math.random() * 300,
+      char: ['~','≈','∿','⌇','·'][Math.floor(Math.random() * 5)],
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-wind-flash" />
+      {particles.map((p, i) => (
+        <div key={'wp'+i} className="anim-wind-particle" style={{
+          '--startAngle': p.startAngle + 'rad', '--radius': p.radius + 'px', '--size': p.size + 'px',
+          animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+        }}>{p.char}</div>
+      ))}
+    </div>
+  );
+}
+
+// Shadow summon effect — dark tendrils rising from below
+function ShadowSummonEffect({ x, y }) {
+  const tendrils = useMemo(() => Array.from({ length: 16 }, () => {
+    const xOff = -30 + Math.random() * 60;
+    return {
+      xOff,
+      size: 6 + Math.random() * 10,
+      delay: Math.random() * 200,
+      dur: 400 + Math.random() * 400,
+      char: ['▓','░','▒','◆','●'][Math.floor(Math.random() * 5)],
+    };
+  }), []);
+  const wisps = useMemo(() => Array.from({ length: 10 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 10 + Math.random() * 25;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 4,
+      color: ['#6633aa','#442288','#553399','#221144','#7744bb'][Math.floor(Math.random() * 5)],
+      delay: 300 + Math.random() * 200,
+      dur: 300 + Math.random() * 300,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-shadow-flash" />
+      {tendrils.map((t, i) => (
+        <div key={'st'+i} className="anim-shadow-tendril" style={{
+          '--xOff': t.xOff + 'px', '--size': t.size + 'px',
+          animationDelay: t.delay + 'ms', animationDuration: t.dur + 'ms',
+        }}>{t.char}</div>
+      ))}
+      {wisps.map((w, i) => (
+        <div key={'sw'+i} className="anim-explosion-particle" style={{
+          '--dx': w.dx + 'px', '--dy': w.dy + 'px', '--size': w.size + 'px',
+          '--color': w.color, animationDelay: w.delay + 'ms', animationDuration: w.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Gold sparkle — particles burst from the gold counter
+function GoldSparkleEffect({ x, y }) {
+  const sparkles = useMemo(() => Array.from({ length: 12 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 12 + Math.random() * 25;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 3 + Math.random() * 5,
+      color: ['#ffd700','#ffcc00','#ffee55','#fff','#ffaa00'][Math.floor(Math.random() * 5)],
+      delay: Math.random() * 150,
+      dur: 400 + Math.random() * 400,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-gold-flash" />
+      {sparkles.map((s, i) => (
+        <div key={'gs'+i} className="anim-explosion-particle" style={{
+          '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+          '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Beer bubbles — yellow bubbles and foam rising upward
+function BeerBubblesEffect({ x, y }) {
+  const bubbles = useMemo(() => Array.from({ length: 18 }, () => ({
+    xOff: -25 + Math.random() * 50,
+    size: 4 + Math.random() * 8,
+    delay: Math.random() * 300,
+    dur: 500 + Math.random() * 500,
+    color: ['#ffd700','#ffcc33','#fff8dc','#ffe680','#fff'][Math.floor(Math.random() * 5)],
+    wobble: -8 + Math.random() * 16,
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-gold-flash" />
+      {bubbles.map((b, i) => (
+        <div key={'bb'+i} className="anim-beer-bubble" style={{
+          '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
+          '--color': b.color, animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
 const ANIM_REGISTRY = {
   explosion: ExplosionEffect,
   freeze: FreezeEffect,
   ice_encase: IceEncaseEffect,
   electric_strike: ElectricStrikeEffect,
   flame_strike: FlameStrikeEffect,
+  wind: WindEffect,
+  shadow_summon: ShadowSummonEffect,
+  gold_sparkle: GoldSparkleEffect,
+  beer_bubbles: BeerBubblesEffect,
+  juice_bubbles: (() => {
+    // Orange juice bubbles — same as beer but orange palette
+    return function JuiceBubblesEffect({ x, y }) {
+      const bubbles = useMemo(() => Array.from({ length: 18 }, () => ({
+        xOff: -25 + Math.random() * 50,
+        size: 4 + Math.random() * 8,
+        delay: Math.random() * 300,
+        dur: 500 + Math.random() * 500,
+        color: ['#ff8c00','#ffa033','#ffcc66','#ff6600','#ffe0b0'][Math.floor(Math.random() * 5)],
+        wobble: -8 + Math.random() * 16,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(255,140,0,.8) 0%, rgba(255,100,0,.3) 40%, transparent 70%)' }} />
+          {bubbles.map((b, i) => (
+            <div key={'jb'+i} className="anim-beer-bubble" style={{
+              '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
+              '--color': b.color, animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
   thaw: ThawEffect,
 };
 
@@ -2538,6 +2747,44 @@ function AbilityStack({ cards }) {
   );
 }
 
+// Status select prompt component (for Beer, etc.) — must be a proper component for hooks
+function StatusSelectPrompt({ ep, onRespond }) {
+  const [localSelected, setLocalSelected] = useState(() => (ep.statuses || []).map(s => s.key));
+  const toggleStatus = (key) => {
+    setLocalSelected(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  };
+  return (
+    <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#33dd55', minWidth: 260 }}>
+      <div className="orbit-font" style={{ fontSize: 13, color: '#33dd55', marginBottom: 4 }}>{ep.title}</div>
+      <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+        {(ep.statuses || []).map(s => (
+          <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 8px', borderRadius: 4,
+            background: localSelected.includes(s.key) ? 'rgba(50,220,80,.15)' : 'rgba(255,255,255,.03)',
+            border: localSelected.includes(s.key) ? '1px solid rgba(50,220,80,.5)' : '1px solid rgba(255,255,255,.08)',
+          }} onClick={() => toggleStatus(s.key)}>
+            <span style={{ fontSize: 16 }}>{s.icon}</span>
+            <span style={{ fontSize: 12, color: localSelected.includes(s.key) ? '#88ffaa' : 'var(--text2)' }}>{s.label}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: localSelected.includes(s.key) ? '#33dd55' : 'var(--text2)', opacity: .6 }}>
+              {localSelected.includes(s.key) ? '✓' : '○'}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+        <button className="btn btn-success" style={{ padding: '6px 20px', fontSize: 11 }}
+          onClick={() => onRespond({ selectedStatuses: localSelected })}>
+          {ep.confirmLabel || 'Confirm'}
+        </button>
+        {ep.cancellable !== false && (
+          <button className="btn" style={{ padding: '6px 16px', fontSize: 11 }}
+            onClick={() => onRespond({ cancelled: true })}>← Back</button>
+        )}
+      </div>
+    </DraggablePanel>
+  );
+}
+
 function GameBoard({ gameState, lobby, onLeave }) {
   const { user, notify } = useContext(AppContext);
   const myIdx = gameState.myIndex;
@@ -2553,13 +2800,78 @@ function GameBoard({ gameState, lobby, onLeave }) {
   // Local hand state for reordering
   const [hand, setHand] = useState(me.hand || []);
   const handKeyRef = useRef(JSON.stringify(me.hand || []));
+  const [drawAnimCards, setDrawAnimCards] = useState([]); // [{id, cardName, origIdx}]
+  const prevHandLenRef = useRef((me.hand || []).length);
   useEffect(() => {
     const newKey = JSON.stringify(me.hand || []);
     if (newKey !== handKeyRef.current) {
+      const newHand = me.hand || [];
+      const prevLen = prevHandLenRef.current;
       handKeyRef.current = newKey;
-      setHand(me.hand || []);
+      setHand(newHand);
+      // Detect newly drawn cards (added at end of hand)
+      if (newHand.length > prevLen) {
+        const deckEl = document.querySelector('[data-my-deck]');
+        const deckRect = deckEl?.getBoundingClientRect();
+        if (deckRect) {
+          const newAnims = [];
+          for (let i = prevLen; i < newHand.length; i++) {
+            newAnims.push({
+              id: Date.now() + Math.random() + i,
+              cardName: newHand[i],
+              origIdx: i,
+              startX: deckRect.left + deckRect.width / 2 - 32,
+              startY: deckRect.top + deckRect.height / 2 - 45,
+            });
+          }
+          setDrawAnimCards(prev => [...prev, ...newAnims]);
+          setTimeout(() => {
+            setDrawAnimCards(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
+          }, 500);
+        }
+      }
+      prevHandLenRef.current = newHand.length;
     }
   }, [me.hand]);
+
+  // Opponent draw animation tracking
+  const [oppDrawAnims, setOppDrawAnims] = useState([]);
+  const prevOppHandCountRef = useRef(opp.handCount || 0);
+  useEffect(() => {
+    const newCount = opp.handCount || 0;
+    const prevCount = prevOppHandCountRef.current;
+    if (newCount > prevCount) {
+      // Wait one frame for DOM to update with new hand cards
+      requestAnimationFrame(() => {
+        const deckEl = document.querySelector('[data-opp-deck]');
+        const handCards = document.querySelectorAll('.game-hand-opp .game-hand-cards .hand-card');
+        const deckRect = deckEl?.getBoundingClientRect();
+        if (deckRect && handCards.length > 0) {
+          const newAnims = [];
+          for (let i = 0; i < newCount - prevCount; i++) {
+            // Target the last card(s) in the hand — new cards appear at the end
+            const targetCard = handCards[handCards.length - 1 - (newCount - prevCount - 1 - i)];
+            const targetRect = targetCard?.getBoundingClientRect();
+            if (!targetRect) continue;
+            newAnims.push({
+              id: Date.now() + Math.random() + i,
+              startX: deckRect.left + deckRect.width / 2 - 32,
+              startY: deckRect.top + deckRect.height / 2 - 45,
+              endX: targetRect.left,
+              endY: targetRect.top,
+            });
+          }
+          if (newAnims.length > 0) {
+            setOppDrawAnims(prev => [...prev, ...newAnims]);
+            setTimeout(() => {
+              setOppDrawAnims(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
+            }, 500);
+          }
+        }
+      });
+    }
+    prevOppHandCountRef.current = newCount;
+  }, [opp.handCount]);
 
   // Phase helpers
   const currentPhase = gameState.currentPhase || 0;
@@ -2570,6 +2882,21 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
   // Card graying logic based on phase
   const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
+
+  // Check if a creature can be played on ANY hero (level/spell school reqs + free zone)
+  const canCreatureBePlayed = (card) => {
+    if (!card || card.cardType !== 'Creature') return false;
+    return [0,1,2].some(hi => canHeroPlayCard(me, hi, card) && findFreeSupportSlot(me, hi) >= 0);
+  };
+
+  // Check if a Spell or Attack can be used by ANY hero (level/spell school reqs, no zone needed)
+  const canActionCardBePlayed = (card) => {
+    if (!card) return false;
+    if (card.cardType === 'Creature') return canCreatureBePlayed(card);
+    // Spells and Attacks: just need a hero that meets spell school requirements
+    return [0,1,2].some(hi => canHeroPlayCard(me, hi, card));
+  };
+
   const getCardDimmed = (cardName) => {
     if (gameState.awaitingFirstChoice) return false; // Let player see hand clearly
     if (gameState.potionTargeting) return true; // All cards dimmed during targeting
@@ -2578,8 +2905,18 @@ function GameBoard({ gameState, lobby, onLeave }) {
     if (!card) return false;
     const isActionType = ACTION_TYPES.includes(card.cardType);
     if (currentPhase === 2 || currentPhase === 4) {
-      // Main Phase 1 or 2: gray out action types
-      if (isActionType) return true;
+      // Main Phase 1 or 2: gray out action types UNLESS they have Additional Action coverage
+      if (isActionType) {
+        // Check if any Additional Action covers this card
+        const additionalActions = gameState.additionalActions || [];
+        const hasAdditional = additionalActions.some(aa => aa.eligibleHandCards.includes(cardName));
+        if (!hasAdditional) return true;
+        // Has additional action — check summonLocked for creatures
+        if (card.cardType === 'Creature' && me.summonLocked) return true;
+        // Check if the card can actually be played on any hero
+        if (!canActionCardBePlayed(card)) return true;
+        return false; // Un-gray: playable via Additional Action
+      }
       // Gray out Abilities that can't be played on any hero
       if (card.cardType === 'Ability') {
         const canPlaySomewhere = [0,1,2].some(hi => canHeroReceiveAbility(me, hi, cardName));
@@ -2610,9 +2947,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
       }
       return false;
     } else if (currentPhase === 3) {
-      // Action Phase: gray out non-action types, and summon-blocked creatures
+      // Action Phase: gray out non-action types, and check playability
       if (!isActionType) return true;
       if (card.cardType === 'Creature' && (gameState.summonBlocked || []).includes(cardName)) return true;
+      if (card.cardType === 'Creature' && me.summonLocked) return true;
+      if (!canActionCardBePlayed(card)) return true;
       return false;
     }
     return true; // Start, Resource, End phases: all dimmed
@@ -2627,6 +2966,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
   // Ability drag state (Main Phases — dragging ability to hero/zone)
   const [abilityDrag, setAbilityDrag] = useState(null); // { idx, cardName, card, mouseX, mouseY, targetHero, targetZone }
+
+  // Additional Action provider selection state
+  const [pendingAdditionalPlay, setPendingAdditionalPlay] = useState(null); // { cardName, handIndex, heroIdx, zoneSlot, providers: [{cardId, cardName, heroIdx, zoneSlot}] }
 
   // Check if a hero can receive a specific ability
   const canHeroReceiveAbility = (playerData, heroIdx, abilityName) => {
@@ -2712,8 +3054,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
     e.preventDefault();
     const card = CARDS_BY_NAME[cardName];
-    const isPlayable = isMyTurn && currentPhase === 3 && card && ACTION_TYPES.includes(card.cardType)
-      && !(card.cardType === 'Creature' && (gameState.summonBlocked || []).includes(cardName));
+    const isPlayable = isMyTurn && card && ACTION_TYPES.includes(card.cardType)
+      && !(card.cardType === 'Creature' && (gameState.summonBlocked || []).includes(cardName))
+      && (currentPhase === 3 || ((currentPhase === 2 || currentPhase === 4) && (gameState.additionalActions || []).some(aa => aa.eligibleHandCards.includes(cardName))));
     const isAbilityPlayable = isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Ability';
     const isEquipPlayable = isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Artifact'
       && (card.subtype || '').toLowerCase() === 'equipment' && (me.gold || 0) >= (card.cost || 0);
@@ -2867,13 +3210,38 @@ function GameBoard({ gameState, lobby, onLeave }) {
       } else if (isPlayable && card.cardType === 'Creature') {
         setPlayDrag(prev => {
           if (!prev || prev.targetHero < 0 || prev.targetSlot < 0) return null;
-          socket.emit('play_creature', {
-            roomId: gameState.roomId,
-            cardName: prev.cardName,
-            handIndex: prev.idx,
-            heroIdx: prev.targetHero,
-            zoneSlot: prev.targetSlot,
-          });
+          // Check if this play uses an additional action
+          const additionalActions = gameState.additionalActions || [];
+          const matchingAAs = additionalActions.filter(aa => aa.eligibleHandCards.includes(prev.cardName));
+          const isMainPhase = currentPhase === 2 || currentPhase === 4;
+          const needsAdditional = isMainPhase || matchingAAs.length > 0; // Main Phase always; Action Phase if available
+
+          if (needsAdditional && matchingAAs.length > 0) {
+            // Gather all providers across matching AA types
+            const allProviders = matchingAAs.flatMap(aa => aa.providers);
+            if (allProviders.length > 1) {
+              // Multiple providers — enter selection mode
+              setPendingAdditionalPlay({
+                cardName: prev.cardName, handIndex: prev.idx,
+                heroIdx: prev.targetHero, zoneSlot: prev.targetSlot,
+                providers: allProviders,
+              });
+              socket.emit('pending_placement', { roomId: gameState.roomId, heroIdx: prev.targetHero, zoneSlot: prev.targetSlot, cardName: prev.cardName });
+              return null;
+            }
+            // Single provider — auto-consume
+            socket.emit('play_creature', {
+              roomId: gameState.roomId, cardName: prev.cardName,
+              handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetSlot,
+              additionalActionProvider: allProviders[0].cardId,
+            });
+          } else {
+            // Normal action phase play — no additional action
+            socket.emit('play_creature', {
+              roomId: gameState.roomId, cardName: prev.cardName,
+              handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetSlot,
+            });
+          }
           return null;
         });
       } else if (isEquipPlayable) {
@@ -2888,6 +3256,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
           });
           return null;
         });
+      } else if (isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && !getCardDimmed(cardName)
+        && card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment') {
+        // Non-equip artifact dragged — activate it (same as click)
+        socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx });
+        setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
       } else {
         setHandDrag(prev => {
           if (!prev) return null;
@@ -2953,13 +3326,29 @@ function GameBoard({ gameState, lobby, onLeave }) {
     window.addEventListener('immuneHover', onHover);
     return () => window.removeEventListener('immuneHover', onHover);
   }, []);
+
+  // Listen for additional action icon hover
+  const [aaTooltipKey, setAaTooltipKey] = useState(null);
+  useEffect(() => {
+    const onHover = () => setAaTooltipKey(window._aaTooltipKey || null);
+    window.addEventListener('aaHover', onHover);
+    return () => window.removeEventListener('aaHover', onHover);
+  }, []);
+
   const [potionSelection, setPotionSelection] = useState([]); // Selected target IDs during potion targeting
+  const [oppPendingPlacement, setOppPendingPlacement] = useState(null); // { owner, heroIdx, zoneSlot, cardName }
+  useEffect(() => {
+    const onOppPending = (data) => setOppPendingPlacement(data);
+    socket.on('opponent_pending_placement', onOppPending);
+    return () => socket.off('opponent_pending_placement', onOppPending);
+  }, []);
   const [explosions, setExplosions] = useState([]); // Target IDs currently showing explosion
   const [gameAnims, setGameAnims] = useState([]); // Active particle animations
   const [cardReveal, setCardReveal] = useState(null); // Card name being revealed
   const [summonGlow, setSummonGlow] = useState(null); // { owner, heroIdx, zoneSlot }
   const [oppTargetHighlight, setOppTargetHighlight] = useState([]); // Target IDs highlighted on opponent's screen
   const [burnTickingHeroes, setBurnTickingHeroes] = useState([]); // Hero keys ('pi-hi') currently showing burn escalation
+  const [levelChanges, setLevelChanges] = useState([]); // [{id, delta, owner, heroIdx, zoneSlot}]
 
   // Listen for opponent card reveal
   useEffect(() => {
@@ -2973,10 +3362,24 @@ function GameBoard({ gameState, lobby, onLeave }) {
       setBurnTickingHeroes(keys);
       setTimeout(() => setBurnTickingHeroes([]), 1500);
     };
+    const onZoneAnim = ({ type, owner, heroIdx, zoneSlot }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const sel = zoneSlot >= 0
+        ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
+        : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
+      setTimeout(() => playAnimation(type, sel, { duration: 1000 }), 100);
+    };
+    const onLevelChange = ({ delta, owner, heroIdx, zoneSlot }) => {
+      const entry = { id: Date.now() + Math.random(), delta, owner, heroIdx, zoneSlot };
+      setLevelChanges(prev => [...prev, entry]);
+      setTimeout(() => setLevelChanges(prev => prev.filter(e => e.id !== entry.id)), 1600);
+    };
     socket.on('card_reveal', onReveal);
     socket.on('summon_effect', onSummon);
     socket.on('burn_tick', onBurnTick);
-    return () => { socket.off('card_reveal', onReveal); socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick); };
+    socket.on('play_zone_animation', onZoneAnim);
+    socket.on('level_change', onLevelChange);
+    return () => { socket.off('card_reveal', onReveal); socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick); socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange); };
   }, []);
 
   /** Play a visual animation at a DOM element's position. */
@@ -3053,13 +3456,14 @@ function GameBoard({ gameState, lobby, onLeave }) {
           socket.emit('cancel_potion', { roomId: gameState.roomId });
           setPotionSelection([]);
         } else if (pileViewer) setPileViewer(null);
+        else if (pendingAdditionalPlay) { setPendingAdditionalPlay(null); socket.emit('pending_placement_clear', { roomId: gameState.roomId }); }
         else if (deckViewer) setDeckViewer(null);
         else if (showSurrender) setShowSurrender(false);
       }
     };
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
-  }, [showSurrender, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt]);
+  }, [showSurrender, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay]);
 
   // Listen for opponent's target selections
   useEffect(() => {
@@ -3133,6 +3537,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
         setTimeout(() => {
           setGoldGains(prev => prev.filter(g => !newGoldGains.some(n => n.id === g.id)));
         }, 1800);
+        // Trigger gold sparkle animation on the gold counter
+        for (const g of newGoldGains) {
+          const sel = `[data-gold-player="${g.playerIdx}"]`;
+          setTimeout(() => playAnimation('gold_sparkle', sel, { duration: 1200 }), 50);
+        }
       }
     }
     prevGoldRef.current = currentGold;
@@ -3223,11 +3632,14 @@ function GameBoard({ gameState, lobby, onLeave }) {
         const without = prev.filter(id => !sameType.includes(id));
         return [...without, targetId];
       }
+      // Check global max total
+      const maxTotal = config.maxTotal ?? Infinity;
+      if (prev.length >= maxTotal) return prev; // At global limit — can't add more
       return [...prev, targetId];
     });
   };
 
-  const canConfirmPotion = potionSelection.length > 0;
+  const canConfirmPotion = (pt?.config?.alwaysConfirmable) || potionSelection.length > 0;
 
   // ── Effect prompt helpers (confirm, card gallery, zone picker) ──
   const ep = gameState.effectPrompt;
@@ -3277,6 +3689,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
             for (let z = 0; z < 3; z++) { if ((supZ[z] || []).length === 0) return false; }
             return true;
           })();
+          const creatureIneligible = !isOpp && playDrag && playDrag.card?.cardType === 'Creature' && !playDrag.isEquip && (() => {
+            if (!canHeroPlayCard(p, i, playDrag.card)) return true;
+            if (findFreeSupportSlot(p, i) < 0) return true;
+            return false;
+          })();
+          const spellAttackIneligible = !isOpp && playDrag && !playDrag.isEquip && (playDrag.card?.cardType === 'Spell' || playDrag.card?.cardType === 'Attack') && !canHeroPlayCard(p, i, playDrag.card);
           const abilityTarget = !isOpp && abilityDrag && abilityDrag.targetHero === i && abilityDrag.targetZone < 0;
           const equipTarget = !isOpp && playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1;
           const pi = isOpp ? oppIdx : myIdx;
@@ -3295,7 +3713,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '')}
+              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={isValidHeroTarget ? () => togglePotionTarget(heroTargetId) : undefined}
                 style={isValidHeroTarget ? { cursor: 'pointer' } : undefined}>
@@ -3407,13 +3825,35 @@ function GameBoard({ gameState, lobby, onLeave }) {
               const isEquipExploding = equipTargetIds.some(id => explosions.includes(id));
               const isSummonGlow = summonGlow && summonGlow.owner === pi && summonGlow.heroIdx === i && summonGlow.zoneSlot === z;
               const isZonePickTarget = !isOpp && zonePickSet.has(`${pi}-${i}-${z}`);
+              // During creature drag: highlight valid zones, dim invalid ones
+              const isDraggingCreature = !isOpp && playDrag && playDrag.card?.cardType === 'Creature' && !playDrag.isEquip;
+              const isDragValidZone = isDraggingCreature && cards.length === 0 && canHeroPlayCard(me, i, playDrag.card) && z < ((me.supportZones[i] || []).length || 3);
+              const isDragInvalidZone = isDraggingCreature && !isDragValidZone;
+              // Additional Action provider selection highlight
+              const isProviderZone = !isOpp && pendingAdditionalPlay && pendingAdditionalPlay.providers.some(p => p.heroIdx === i && p.zoneSlot === z);
+              const isProviderSelectionActive = !isOpp && !!pendingAdditionalPlay;
               return (
-                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'}
-                  onClick={isZonePickTarget ? () => respondToPrompt({ heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
-                  style={(isValidEquipTarget || isZonePickTarget) ? { cursor: 'pointer' } : undefined}>
+                  onClick={isProviderZone ? () => {
+                    const provider = pendingAdditionalPlay.providers.find(p => p.heroIdx === i && p.zoneSlot === z);
+                    if (provider) {
+                      socket.emit('play_creature', {
+                        roomId: gameState.roomId, cardName: pendingAdditionalPlay.cardName,
+                        handIndex: pendingAdditionalPlay.handIndex, heroIdx: pendingAdditionalPlay.heroIdx,
+                        zoneSlot: pendingAdditionalPlay.zoneSlot, additionalActionProvider: provider.cardId,
+                      });
+                      setPendingAdditionalPlay(null);
+                      socket.emit('pending_placement_clear', { roomId: gameState.roomId });
+                    }
+                  } : isZonePickTarget ? () => respondToPrompt({ heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
+                  style={(isValidEquipTarget || isZonePickTarget || isProviderZone) ? { cursor: 'pointer' } : undefined}>
                   {(isPlayTarget || isAutoTarget) && playDrag.card ? (
                     <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
+                  ) : (!isOpp && pendingAdditionalPlay && pendingAdditionalPlay.heroIdx === i && pendingAdditionalPlay.zoneSlot === z) ? (
+                    <BoardCard cardName={pendingAdditionalPlay.cardName} hp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} maxHp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
+                  ) : (isOpp && oppPendingPlacement && oppPendingPlacement.heroIdx === i && oppPendingPlacement.zoneSlot === z) ? (
+                    <BoardCard cardName={oppPendingPlacement.cardName} hp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} maxHp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
                   ) : cards.length > 0 ? (
                     <>
                     {cards.length === 1 ? (
@@ -3424,6 +3864,13 @@ function GameBoard({ gameState, lobby, onLeave }) {
                       </div>
                     )}
                     {(() => { const cKey = `${pi}-${i}-${z}`; const lvl = (gameState.creatureCounters || {})[cKey]?.level; return lvl ? <div className="creature-level">Lv{lvl}</div> : null; })()}
+                    {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.additionalActionAvail ? <div className="additional-action-icon"
+                      onMouseEnter={() => { window._aaTooltipKey = cKey; window.dispatchEvent(new Event('aaHover')); }}
+                      onMouseLeave={() => { window._aaTooltipKey = null; window.dispatchEvent(new Event('aaHover')); }}
+                    >⚡</div> : null; })()}
+                    {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.burned ? <BurnedOverlay /> : null; })()}
+                    {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.frozen ? <FrozenOverlay /> : null; })()}
+                    {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.negated ? <NegatedOverlay /> : null; })()}
                     </>
                   ) : (
                     <div className="board-zone-empty">{isIsland ? 'Island' : 'Support'}</div>
@@ -3464,7 +3911,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
           </div>
           <div className="game-hand-cards">
             {Array.from({ length: opp.handCount || 0 }).map((_, i) => (
-              <div key={i} className="board-card face-down hand-card flipped">
+              <div key={i} className="board-card face-down hand-card">
                 <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
               </div>
             ))}
@@ -3475,16 +3922,19 @@ function GameBoard({ gameState, lobby, onLeave }) {
           </div>
         </div>
         {/* Board */}
-        <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '')}>
+        <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '')}>
           <div className="board-util board-util-left">
-            <BoardZone type="discard" cards={opp.discardPile} label="Discard" flipped onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile })} onHoverCard={setHoveredPileCard} />
-            <BoardZone type="deleted" cards={opp.deletedPile} label="Deleted" flipped onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile })} onHoverCard={setHoveredPileCard} />
+            <BoardZone type="discard" cards={opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile })} onHoverCard={setHoveredPileCard} />
+            <BoardZone type="deleted" cards={opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile })} onHoverCard={setHoveredPileCard} />
             <BoardZone type="area" cards={gameState.areaZones[0]} label="Area" />
             <BoardZone type="deleted" cards={me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile })} onHoverCard={setHoveredPileCard} />
             <BoardZone type="discard" cards={me.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile })} onHoverCard={setHoveredPileCard} />
           </div>
 
-          <div className="board-center">
+          <div className="board-center" style={{ position: 'relative' }}>
+            {me.summonLocked && <div className="summon-lock-warning">You cannot summon any more Creatures this turn!</div>}
+            {opp.summonLocked && <div className="summon-lock-warning" style={{ color: '#cc8800' }}>{opp.username} cannot summon any more Creatures this turn!</div>}
+            {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
             <div className="board-mid-row">
               <div className="board-phase-tracker">
@@ -3514,11 +3964,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
           </div>
 
           <div className="board-util board-util-right">
-            <BoardZone type="deck" label="Deck" faceDown flipped>
-              <div className="board-card face-down flipped"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.deckCount}</div></div>
+            <BoardZone type="deck" label="Deck" faceDown>
+              <div className="board-card face-down" data-opp-deck="1"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.deckCount}</div></div>
             </BoardZone>
-            <BoardZone type="potion" label="Potions" faceDown flipped>
-              {opp.potionDeckCount > 0 && <div className="board-card face-down flipped"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>}
+            <BoardZone type="potion" label="Potions" faceDown>
+              {opp.potionDeckCount > 0 && <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>}
             </BoardZone>
             <BoardZone type="area" cards={gameState.areaZones[1]} label="Area" />
             <div onClick={() => me.potionDeckCount > 0 && setDeckViewer('potion')} style={{ cursor: me.potionDeckCount > 0 ? 'pointer' : 'default' }}>
@@ -3526,7 +3976,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
               {me.potionDeckCount > 0 && <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.potionDeckCount}</div></div>}
             </BoardZone>
             </div>
-            <div onClick={() => me.deckCount > 0 && setDeckViewer('deck')} style={{ cursor: me.deckCount > 0 ? 'pointer' : 'default' }}>
+            <div onClick={() => me.deckCount > 0 && setDeckViewer('deck')} style={{ cursor: me.deckCount > 0 ? 'pointer' : 'default' }} data-my-deck="1">
             <BoardZone type="deck" label="Deck" faceDown>
               <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.deckCount}</div></div>
             </BoardZone>
@@ -3541,8 +3991,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
               if (item.isGap) return <div key="gap" className="hand-drop-gap" />;
               const isBeingDragged = handDrag && handDrag.idx === item.origIdx;
               const dimmed = getCardDimmed(item.card);
+              const isDrawAnim = drawAnimCards.some(a => a.origIdx === item.origIdx);
+              const isPendingPlay = pendingAdditionalPlay && pendingAdditionalPlay.handIndex === item.origIdx;
               return (
-                <div key={'h-' + item.origIdx} className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '')}
+                <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx}
+                  className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '')}
+                  style={(isDrawAnim || isPendingPlay) ? { visibility: 'hidden' } : undefined}
                   onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}>
                   <BoardCard cardName={item.card} />
                 </div>
@@ -3557,6 +4011,16 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
         </div>
       {/* end game-layout */}
+
+      {/* Floating draw animation cards (outside game-layout to avoid overflow clip) */}
+      {drawAnimCards.map(anim => (
+        <DrawAnimCard key={anim.id} cardName={anim.cardName} origIdx={anim.origIdx}
+          startX={anim.startX} startY={anim.startY} dimmed={getCardDimmed(anim.cardName)} />
+      ))}
+      {oppDrawAnims.map(anim => (
+        <OppDrawAnimCard key={anim.id} startX={anim.startX} startY={anim.startY}
+          endX={anim.endX} endY={anim.endY} />
+      ))}
 
       {/* Floating drag card (outside game-layout to avoid overflow clip) */}
       {handDrag && (
@@ -3585,6 +4049,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <GoldGainNumber key={g.id} amount={g.amount} playerIdx={g.playerIdx} isMe={g.playerIdx === myIdx} />
       ))}
 
+      {/* Level change numbers */}
+      {levelChanges.map(lc => (
+        <LevelChangeNumber key={lc.id} delta={lc.delta} owner={lc.owner} heroIdx={lc.heroIdx} zoneSlot={lc.zoneSlot} myIdx={myIdx} />
+      ))}
+
       {/* Modular game animations (explosions, etc.) */}
       {gameAnims.map(a => (
         <GameAnimationRenderer key={a.id} {...a} />
@@ -3601,6 +4070,16 @@ function GameBoard({ gameState, lobby, onLeave }) {
         if (!el) return null;
         const r = el.getBoundingClientRect();
         return <div className="immune-tooltip" style={{ position: 'fixed', left: r.right + 8, top: r.top - 4 }}>{immuneTooltipType === 'shielded' ? 'Immune to anything during your first turn!' : 'Cannot be Frozen, Stunned or otherwise incapacitated this turn.'}</div>;
+      })()}
+
+      {/* Additional Action icon tooltip */}
+      {aaTooltipKey && (() => {
+        const [ow, hi, sl] = aaTooltipKey.split('-');
+        const ownerLabel = parseInt(ow) === myIdx ? 'me' : 'opp';
+        const el = document.querySelector(`[data-support-owner="${ownerLabel}"][data-support-hero="${hi}"][data-support-slot="${sl}"] .additional-action-icon`);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return <div className="immune-tooltip" style={{ position: 'fixed', left: r.right + 8, top: r.top - 4, borderColor: 'rgba(255,200,0,.4)', color: '#ffdd88' }}>Provides an additional Action.</div>;
       })()}
 
       {/* Pile hover tooltip (rendered at top level to escape overflow clipping) */}
@@ -3721,11 +4200,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
             <button className="btn btn-success" style={{ padding: '10px 24px', fontSize: 13 }}
               onClick={() => respondToPrompt({ confirmed: true })}>
-              Yes
+              {ep.confirmLabel || 'Yes'}
             </button>
             <button className="btn" style={{ padding: '10px 24px', fontSize: 13, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-              onClick={() => respondToPrompt({ confirmed: false })}>
-              No
+              onClick={() => respondToPrompt({ cancelled: true })}>
+              {ep.cancelLabel || 'No'}
             </button>
           </div>
         </DraggablePanel>
@@ -3757,9 +4236,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
                         onClick={() => respondToPrompt({ cardName: entry.name, source: entry.source })}
                         style={{ width: '100%', height: 120, cursor: 'pointer' }} />
                       <div className="gallery-source-badge" style={{
-                        background: entry.source === 'hand' ? 'rgba(80,200,120,.85)' : 'rgba(80,140,220,.85)',
+                        background: entry.source === 'hand' ? 'rgba(80,200,120,.85)' : entry.source === 'discard' ? 'rgba(180,80,200,.85)' : 'rgba(80,140,220,.85)',
                       }}>
-                        {entry.source === 'hand' ? 'HAND' : 'DECK'}
+                        {entry.source === 'hand' ? 'HAND' : entry.source === 'discard' ? 'DISCARD' : 'DECK'}
                       </div>
                     </div>
                   );
@@ -3783,6 +4262,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
         </DraggablePanel>
       )}
 
+      {/* ── Effect Prompt: Status Select (Beer, etc.) ── */}
+      {isMyEffectPrompt && ep.type === 'statusSelect' && (
+        <StatusSelectPrompt key={ep.title} ep={ep} onRespond={respondToPrompt} />
+      )}
+
       {/* Rematch first-choice dialog (loser only) — floating panel so hand is visible */}
       {showFirstChoice && (
         <DraggablePanel className="first-choice-panel animate-in">
@@ -3802,15 +4286,16 @@ function GameBoard({ gameState, lobby, onLeave }) {
       )}
 
       {/* Potion/Artifact targeting panel */}
-      {isTargeting && pt && (
+      {isTargeting && pt && !gameState.effectPrompt && (
         <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out' }}>
-          <div className="pixel-font" style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
+          <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
             <button className={'btn ' + (pt.config?.confirmClass || 'btn-success')} style={{ padding: '8px 24px', fontSize: 12 }}
               disabled={!canConfirmPotion}
               onClick={() => { socket.emit('confirm_potion', { roomId: gameState.roomId, selectedIds: potionSelection }); }}>
               {pt.config?.confirmLabel || 'Confirm'}
+              {pt.config?.dynamicCostPerTarget > 0 && ` (${pt.config.dynamicCostPerTarget * potionSelection.length} Gold)`}
             </button>
             {pt.config?.cancellable !== false && (
               <button className="btn" style={{ padding: '8px 24px', fontSize: 12 }}

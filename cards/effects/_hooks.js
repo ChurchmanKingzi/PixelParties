@@ -42,6 +42,10 @@ const HOOKS = {
   ON_RESOURCE_GAIN:  'onResourceGain',
   ON_RESOURCE_SPEND: 'onResourceSpend',
 
+  // ── Level ──
+  BEFORE_LEVEL_CHANGE: 'beforeLevelChange',
+  AFTER_LEVEL_CHANGE:  'afterLevelChange',
+
   // ── Status ──
   ON_STATUS_APPLIED:  'onStatusApplied',
   ON_STATUS_REMOVED:  'onStatusRemoved',
@@ -78,4 +82,22 @@ const ZONES = {
   HERO:     'hero',
 };
 
-module.exports = { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES };
+// ═══════════════════════════════════════════
+//  STATUS EFFECT REGISTRY
+//  Categorizes status effects for cards like Beer.
+//  Add new statuses here to auto-integrate.
+// ═══════════════════════════════════════════
+const STATUS_EFFECTS = {
+  frozen:  { negative: true, label: 'Frozen',  icon: '❄️' },
+  stunned: { negative: true, label: 'Stunned', icon: '💫' },
+  negated: { negative: true, label: 'Negated', icon: '⚡' },
+  burned:  { negative: true, label: 'Burned',  icon: '🔥' },
+  immune:  { negative: false, label: 'Immune',  icon: '🛡️' },
+  shielded:{ negative: false, label: 'Shielded', icon: '✨' },
+};
+
+function getNegativeStatuses() {
+  return Object.entries(STATUS_EFFECTS).filter(([, v]) => v.negative).map(([k]) => k);
+}
+
+module.exports = { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses };
