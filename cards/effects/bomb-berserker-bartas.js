@@ -82,6 +82,11 @@ module.exports = {
       }
       if (!hasOtherTarget) return;
 
+      // Re-verify Bartas is still alive and capable right before prompting
+      // (covers edge cases where hero state changed during spell resolution)
+      if (!hero?.name || hero.hp <= 0) return;
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
+
       // Prompt: "Hit a second target with [Spell name]?"
       const confirmed = await ctx.promptConfirmEffect({
         title: 'Bomb Berserker Bartas',

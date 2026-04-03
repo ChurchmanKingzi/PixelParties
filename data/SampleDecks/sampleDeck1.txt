@@ -1,0 +1,32 @@
+=== PIXEL PARTIES DECK ===
+Name: Sample Deck: Slimy Infestation
+
+== HEROES ==
+Diamond, the Keeper of Peace
+Alice, the Puppeteer Girl
+Barker, the Monster Tamer
+
+== MAIN DECK ==
+8x Alchemy
+4x Cloudy Slime
+4x Cute Camera
+4x Cute Cheese
+4x Cuteness Sensor
+4x Fiery Slime
+3x Icy Slime
+4x Magnetic Glove
+4x Rain of Arrows
+4x Shadowy Slime
+4x Shiny Slime
+2x Slime Rancher
+3x Sparky Slime
+4x Splashy Slime
+4x Wheels
+
+== POTION DECK ==
+2x Elixir of Quickness
+2x Magic Lamp
+2x Magnetic Potion
+1x Resuscitation Potion
+
+== SIDE DECK ==

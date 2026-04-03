@@ -87,16 +87,12 @@ module.exports = {
       engine._broadcastEvent('play_permanent_animation', { owner: pi, permId: perm.id, type: 'holy_revival' });
       await engine._delay(1000);
 
-      // Revive hero: 50% max HP (rounded up), clear statuses
+      // Revive hero: 50% max HP (rounded up)
       const reviveHp = Math.ceil((hero.maxHp || 400) / 2);
-      hero.hp = reviveHp;
-      hero.statuses = {};
-      engine.log('hero_revived', { hero: hero.name, player: ps.username, hp: reviveHp, by: 'Elixir of Immortality' });
-
-      // Revival animation on hero
-      engine._broadcastEvent('play_zone_animation', { type: 'holy_revival', owner: pi, heroIdx, zoneSlot: -1 });
-      engine.sync();
-      await engine._delay(800);
+      await engine.actionReviveHero(pi, heroIdx, reviveHp, {
+        source: 'Elixir of Immortality',
+        animDelay: 800,
+      });
 
       // Delete Elixir
       await removeElixir(engine, pi, perm);

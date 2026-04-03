@@ -37,6 +37,7 @@ const HOOKS = {
   BEFORE_DAMAGE:     'beforeDamage',
   AFTER_DAMAGE:      'afterDamage',
   ON_HERO_KO:        'onHeroKO',
+  ON_HERO_REVIVE:    'onHeroRevive',
   ON_CREATURE_DEATH: 'onCreatureDeath',
 
   // ── Resources ──
@@ -112,4 +113,14 @@ function getNegativeStatuses() {
   return Object.entries(STATUS_EFFECTS).filter(([, v]) => v.negative).map(([k]) => k);
 }
 
-module.exports = { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses };
+// ═══════════════════════════════════════════
+//  BUFF EFFECT REGISTRY
+//  Positive effects displayed as buff icons.
+//  Add new buffs here to auto-integrate with
+//  the buff display column and damage modifiers.
+// ═══════════════════════════════════════════
+const BUFF_EFFECTS = {
+  cloudy: { label: 'Cloudy', icon: '☁️', tooltip: 'Takes half damage from all sources!', damageMultiplier: 0.5 },
+};
+
+module.exports = { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS };

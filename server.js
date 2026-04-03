@@ -59,6 +59,9 @@ async function initDatabase() {
   try { await db.execute("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''"); } catch {}
   try { await db.execute('ALTER TABLE users ADD COLUMN wins INTEGER DEFAULT 0'); } catch {}
   try { await db.execute('ALTER TABLE users ADD COLUMN losses INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute("ALTER TABLE decks ADD COLUMN cover_card TEXT DEFAULT ''"); } catch {}
+  try { await db.execute("ALTER TABLE decks ADD COLUMN skins TEXT DEFAULT '{}'"); } catch {}
+  try { await db.execute('ALTER TABLE users ADD COLUMN sc INTEGER DEFAULT 0'); } catch {}
 
   await db.execute(`CREATE TABLE IF NOT EXISTS hero_stats (
     user_id TEXT NOT NULL,
@@ -93,6 +96,20 @@ async function initDatabase() {
     created_at INTEGER DEFAULT (unixepoch()),
     FOREIGN KEY (user_id) REFERENCES users(id)
   )`);
+
+  // SC reward log table
+  await db.execute(`CREATE TABLE IF NOT EXISTS sc_log (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    reward_id TEXT NOT NULL,
+    opponent_id TEXT,
+    opponent_ip TEXT,
+    amount INTEGER NOT NULL,
+    created_at INTEGER DEFAULT (unixepoch()),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`);
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_sc_log_user ON sc_log(user_id)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_sc_log_user_date ON sc_log(user_id, created_at)');
 
   console.log('[DB] Tables initialized');
 }
@@ -164,7 +181,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: u.avatar, cardback: u.cardback, bio: u.bio || '', wins: u.wins || 0, losses: u.losses || 0, created_at: u.created_at };
+  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: u.avatar, cardback: u.cardback, bio: u.bio || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at };
 }
 
 // ===== PROFILE ROUTES =====
@@ -365,10 +382,13 @@ app.get('/api/profile/deck-stats', authMiddleware, async (req, res) => {
     const potionOk = pc === 0 || (pc >= 5 && pc <= 15);
     const legal = mainOk && heroOk && potionOk;
     if (legal) legalCount++;
-    // Pick a random card from the deck to represent it
+    // Use cover card if set, otherwise pick a random card
     const allCards = [...main, ...heroes.map(h => h.hero), ...potions];
-    const repCard = allCards.length > 0 ? allCards[Math.floor(Math.random() * allCards.length)] : null;
-    return { id: d.id, name: d.name, legal, isDefault: !!d.is_default, repCard, cardCount: main.length };
+    const repCard = d.cover_card || (allCards.length > 0 ? allCards[Math.floor(Math.random() * allCards.length)] : null);
+    let deckSkins = {};
+    try { deckSkins = JSON.parse(d.skins || '{}'); } catch {}
+    const repSkin = repCard && deckSkins[repCard] ? deckSkins[repCard] : null;
+    return { id: d.id, name: d.name, legal, isDefault: !!d.is_default, repCard, repSkin, cardCount: main.length };
   });
   res.json({ total: decks.length, legal: legalCount, decks: deckWall });
 });
@@ -459,19 +479,21 @@ app.post('/api/decks', authMiddleware, async (req, res) => {
 });
 
 app.put('/api/decks/:id', authMiddleware, async (req, res) => {
-  const { name, mainDeck, heroes, potionDeck, sideDeck, isDefault } = req.body;
+  const { name, mainDeck, heroes, potionDeck, sideDeck, isDefault, coverCard, skins } = req.body;
   const deckRow = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
   if (!deckRow) return res.status(404).json({ error: 'Deck not found' });
 
   if (isDefault) await db.run('UPDATE decks SET is_default = 0 WHERE user_id = ?', [req.user.userId]);
 
-  await db.run('UPDATE decks SET name=?, main_deck=?, heroes=?, potion_deck=?, side_deck=?, is_default=?, updated_at=unixepoch() WHERE id=? AND user_id=?', [
+  await db.run('UPDATE decks SET name=?, main_deck=?, heroes=?, potion_deck=?, side_deck=?, is_default=?, cover_card=?, skins=?, updated_at=unixepoch() WHERE id=? AND user_id=?', [
     name || deckRow.name,
     JSON.stringify(mainDeck || JSON.parse(deckRow.main_deck)),
     JSON.stringify(heroes || JSON.parse(deckRow.heroes)),
     JSON.stringify(potionDeck || JSON.parse(deckRow.potion_deck)),
     JSON.stringify(sideDeck || JSON.parse(deckRow.side_deck)),
     isDefault ? 1 : (isDefault === false ? 0 : deckRow.is_default),
+    coverCard !== undefined ? (coverCard || '') : (deckRow.cover_card || ''),
+    skins !== undefined ? JSON.stringify(skins) : (deckRow.skins || '{}'),
     req.params.id, req.user.userId
   ]);
 
@@ -501,7 +523,86 @@ app.delete('/api/decks/:id', authMiddleware, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ===== SAMPLE DECKS =====
+function loadSampleDecks() {
+  const dir = path.join(__dirname, 'data', 'SampleDecks');
+  if (!fs.existsSync(dir)) return [];
+
+  const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
+  const cardsByName = {}; allCards.forEach(c => { cardsByName[c.name] = c; });
+
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.txt')).sort();
+  const decks = [];
+
+  for (let fi = 0; fi < files.length; fi++) {
+    try {
+      const text = fs.readFileSync(path.join(dir, files[fi]), 'utf-8');
+      const lines = text.split(/\r?\n/);
+      if (!lines[0] || !lines[0].includes('PIXEL PARTIES DECK')) continue;
+
+      let deckName = files[fi].replace('.txt', '');
+      let section = null;
+      const heroNames = [];
+      const mainCards = [];
+      const potionCards = [];
+      const sideCards = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        if (line.startsWith('Name:')) { deckName = line.slice(5).trim(); continue; }
+        if (line.startsWith('===')) continue;
+        if (line === '== HEROES ==') { section = 'heroes'; continue; }
+        if (line === '== MAIN DECK ==') { section = 'main'; continue; }
+        if (line === '== POTION DECK ==') { section = 'potion'; continue; }
+        if (line === '== SIDE DECK ==') { section = 'side'; continue; }
+
+        if (section === 'heroes') {
+          heroNames.push(line === '(empty)' ? null : line);
+        } else if (section) {
+          const m = line.match(/^(\d+)x\s+(.+)$/);
+          if (!m) continue;
+          const count = parseInt(m[1], 10);
+          const name = m[2].trim();
+          const arr = section === 'main' ? mainCards : section === 'potion' ? potionCards : sideCards;
+          for (let j = 0; j < count; j++) arr.push(name);
+        }
+      }
+
+      const heroes = [0, 1, 2].map(i => {
+        const name = heroNames[i] || null;
+        if (!name) return { hero: null, ability1: null, ability2: null };
+        const card = cardsByName[name];
+        return { hero: name, ability1: card?.startingAbility1 || null, ability2: card?.startingAbility2 || null };
+      });
+
+      decks.push({
+        id: 'sample-' + fi,
+        name: deckName,
+        heroes,
+        mainDeck: mainCards,
+        potionDeck: potionCards,
+        sideDeck: sideCards,
+        isDefault: false,
+        isSample: true,
+      });
+    } catch (err) { console.error('[SampleDecks] Error reading', files[fi], err.message); }
+  }
+  return decks;
+}
+
+app.get('/api/sample-decks', (req, res) => {
+  res.json({ decks: loadSampleDecks() });
+});
+
+// ===== SKINS =====
+let SKINS_DATA = {};
+try { SKINS_DATA = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'skins.json'), 'utf-8')); } catch {}
+app.get('/api/skins', (req, res) => res.json({ skins: SKINS_DATA }));
+
 function parseDeck(row) {
+  let skins = {};
+  try { skins = JSON.parse(row.skins || '{}'); } catch {}
   return {
     id: row.id,
     name: row.name,
@@ -510,7 +611,229 @@ function parseDeck(row) {
     potionDeck: JSON.parse(row.potion_deck),
     sideDeck: JSON.parse(row.side_deck),
     isDefault: !!row.is_default,
+    coverCard: row.cover_card || '',
+    skins,
   };
+}
+
+// ===== SMUG COINS (SC) SYSTEM =====
+const SC_REWARDS = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'sc-rewards.json'), 'utf-8'));
+const SC_DAILY_CAP_PER_OPPONENT = 15;
+const SC_MIN_GAME_DURATION_MS = 3 * 60 * 1000; // 3 minutes
+const SC_MIN_TURNS = 4; // at least turn 4 (each player took 2 turns)
+const SC_MIN_CARDS_PLAYED = 3; // each player must play at least 3 cards
+
+function getSocketIP(socket) {
+  return socket?.handshake?.headers?.['x-forwarded-for']?.split(',')[0]?.trim()
+    || socket?.handshake?.address
+    || 'unknown';
+}
+
+async function evaluateSCRewards(room, winnerIdx, reason) {
+  const gs = room.gameState;
+  if (!gs) return {};
+  const loserIdx = winnerIdx === 0 ? 1 : 0;
+  const tracking = gs._scTracking || [{}, {}];
+  const startTime = gs._gameStartTime || Date.now();
+  const gameDuration = Date.now() - startTime;
+  const turn = gs.turn || 0;
+  const isRanked = room.type === 'ranked';
+
+  // ── Safeguard checks ──
+  // Same IP → no SC for anyone
+  const ip0 = gs._playerIPs?.[0] || 'unknown';
+  const ip1 = gs._playerIPs?.[1] || 'unknown';
+  if (ip0 !== 'unknown' && ip0 === ip1) return {};
+
+  // Min game duration
+  if (gameDuration < SC_MIN_GAME_DURATION_MS) return {};
+
+  // Min turns
+  if (turn < SC_MIN_TURNS) return {};
+
+  // Min cards played from hand
+  if ((tracking[0].cardsPlayedFromHand || 0) < SC_MIN_CARDS_PLAYED) return {};
+  if ((tracking[1].cardsPlayedFromHand || 0) < SC_MIN_CARDS_PLAYED) return {};
+
+  // Surrender before any hero takes damage → no SC
+  if (reason === 'surrender') {
+    const anyDamage = gs.players.some(ps =>
+      (ps.heroes || []).some(h => h.name && h.hp < h.maxHp)
+    );
+    if (!anyDamage) return {};
+  }
+
+  // Disconnect wins only get "Player" reward
+  const isDisconnectWin = reason === 'disconnect_timeout';
+
+  const todayStart = Math.floor(Date.now() / 1000) - (Math.floor(Date.now() / 1000) % 86400);
+  const results = {}; // { [playerIdx]: { rewards: [{id,title,amount}], total: N } }
+
+  for (let pi = 0; pi < 2; pi++) {
+    const ps = gs.players[pi];
+    const opp = gs.players[pi === 0 ? 1 : 0];
+    const isWinner = pi === winnerIdx;
+    const oppIp = pi === 0 ? ip1 : ip0;
+    const t = tracking[pi] || {};
+    const earned = [];
+
+    for (const reward of SC_REWARDS) {
+      // Disconnect winners only get "player" reward
+      if (isDisconnectWin && reward.id !== 'player') continue;
+
+      // Check if this reward's condition is met
+      let met = false;
+      switch (reward.requires) {
+        case 'play':
+          met = true; // Playing a game
+          break;
+        case 'win':
+          met = isWinner;
+          break;
+        case 'win_ranked':
+          met = isWinner && isRanked;
+          break;
+        case 'win_all_heroes_alive':
+          met = isWinner && (ps.heroes || []).filter(h => h.name).every(h => h.hp > 0);
+          break;
+        case 'win_last_hero_low':
+          if (isWinner) {
+            const alive = (ps.heroes || []).filter(h => h.name && h.hp > 0);
+            met = alive.length === 1 && alive[0].hp < alive[0].maxHp * 0.5;
+          }
+          break;
+        case 'win_deck_out':
+          met = isWinner && reason === 'deck_out';
+          break;
+        case 'win_support_full':
+          met = isWinner && t.allSupportFull;
+          break;
+        case 'damage_instance_400':
+          met = (t.maxDamageInstance || 0) >= 400;
+          break;
+        case 'gold_earned_99':
+          met = (t.totalGoldEarned || 0) >= 99;
+          break;
+        case 'win_comeback':
+          met = isWinner && t.wasFirstToOneHero;
+          break;
+        case 'win_flawless':
+          met = isWinner && !t.heroEverBelow50;
+          break;
+        case 'creature_overkill':
+          met = t.creatureOverkill;
+          break;
+        case 'all_abilities_filled':
+          met = t.allAbilitiesFilled;
+          break;
+        case 'all_abilities_level3':
+          met = t.allAbilitiesLevel3;
+          break;
+        case 'win_turn_30':
+          met = isWinner && turn >= 30;
+          break;
+        case 'win_speedrun':
+          met = isWinner && turn <= 6 && reason !== 'surrender';
+          break;
+        case 'unique_opponents_5': {
+          // Count unique opponent IPs today (including this game)
+          const uniqueToday = await db.get(
+            `SELECT COUNT(DISTINCT opponent_ip) as cnt FROM sc_log WHERE user_id = ? AND reward_id = 'player' AND created_at >= ?`,
+            [ps.userId, todayStart]
+          );
+          // +1 for current game if this is a new IP
+          const prevPlayed = await db.get(
+            `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id = 'player' AND opponent_ip = ? AND created_at >= ?`,
+            [ps.userId, oppIp, todayStart]
+          );
+          const totalUnique = (uniqueToday?.cnt || 0) + (prevPlayed?.cnt === 0 ? 1 : 0);
+          met = totalUnique >= 5;
+          break;
+        }
+        case 'first_win':
+          if (isWinner) {
+            const prevWins = await db.get(
+              `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id = 'first_blood'`,
+              [ps.userId]
+            );
+            met = (prevWins?.cnt || 0) === 0;
+          }
+          break;
+        case 'good_game':
+          met = turn >= 7
+            && gameDuration >= 5 * 60 * 1000
+            && (tracking[0].totalHpLost || 0) >= 400
+            && (tracking[1].totalHpLost || 0) >= 400;
+          break;
+        default:
+          break;
+      }
+
+      if (!met) continue;
+
+      // Check limit
+      let allowed = true;
+      switch (reward.limit) {
+        case 'daily_per_opponent_ip': {
+          const prev = await db.get(
+            `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id = ? AND opponent_ip = ? AND created_at >= ?`,
+            [ps.userId, reward.id, oppIp, todayStart]
+          );
+          allowed = (prev?.cnt || 0) === 0;
+          break;
+        }
+        case 'daily': {
+          const prev = await db.get(
+            `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id = ? AND created_at >= ?`,
+            [ps.userId, reward.id, todayStart]
+          );
+          allowed = (prev?.cnt || 0) === 0;
+          break;
+        }
+        case 'once': {
+          const prev = await db.get(
+            `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id = ?`,
+            [ps.userId, reward.id]
+          );
+          allowed = (prev?.cnt || 0) === 0;
+          break;
+        }
+        case 'unlimited':
+          allowed = true;
+          break;
+      }
+
+      if (!allowed) continue;
+
+      // Check daily cap per opponent
+      if (reward.limit !== 'once') {
+        const dailyFromOpp = await db.get(
+          `SELECT COALESCE(SUM(amount), 0) as total FROM sc_log WHERE user_id = ? AND opponent_ip = ? AND created_at >= ?`,
+          [ps.userId, oppIp, todayStart]
+        );
+        const alreadyEarned = dailyFromOpp?.total || 0;
+        if (alreadyEarned >= SC_DAILY_CAP_PER_OPPONENT) continue;
+      }
+
+      earned.push({ id: reward.id, title: reward.title, amount: reward.amount, description: reward.description });
+    }
+
+    // Record SC earnings
+    if (earned.length > 0) {
+      let total = 0;
+      for (const r of earned) {
+        await db.run(
+          'INSERT INTO sc_log (id, user_id, reward_id, opponent_id, opponent_ip, amount) VALUES (?, ?, ?, ?, ?, ?)',
+          [uuidv4(), ps.userId, r.id, opp.userId, oppIp, r.amount]
+        );
+        total += r.amount;
+      }
+      await db.run('UPDATE users SET sc = sc + ? WHERE id = ?', [total, ps.userId]);
+      results[pi] = { rewards: earned, total };
+    }
+  }
+
+  return results;
 }
 
 // ===== GAME ROOMS (Socket.io) =====
@@ -543,19 +866,22 @@ function sendGameState(room, playerIdx, extra) {
       potionLocked: ps.potionLocked || false,
       permanents: ps.permanents || [],
       divineGiftUsed: ps.divineGiftUsed || false,
+      deckSkins: ps.deckSkins || {},
     })),
     areaZones: gs.areaZones, turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
+    setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     customPlacementCards: gs.customPlacementCards || [],
     awaitingFirstChoice: gs.awaitingFirstChoice || false,
+    mulliganPending: gs.mulliganPending || false,
     potionTargeting: gs.potionTargeting || null,
     effectPrompt: gs.effectPrompt || null,
     creatureCounters: room.engine ? (() => {
       const cc = {};
       for (const inst of room.engine.cardInstances) {
         if (inst.zone === 'support' && Object.keys(inst.counters).length > 0) {
-          cc[`${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`] = { ...inst.counters };
+          cc[`${inst.controller}-${inst.heroIdx}-${inst.zoneSlot}`] = { ...inst.counters };
         }
       }
       return cc;
@@ -589,6 +915,88 @@ function sendGameState(room, playerIdx, extra) {
   io.to(p.socketId).emit('game_state', state);
 }
 
+function sendToSpectators(room, event, data) {
+  if (!room.spectators) return;
+  for (const spec of room.spectators) {
+    if (spec.socketId) io.to(spec.socketId).emit(event, data);
+  }
+}
+
+function sendSpectatorGameState(room) {
+  if (!room.spectators || room.spectators.length === 0) return;
+  const gs = room.gameState;
+  if (!gs) return;
+
+  // Determine who is choosing first (for awaiting first choice overlay)
+  let choosingPlayerName = null;
+  if (gs.awaitingFirstChoice && room._pendingRematch) {
+    const loserPs = gs.players[room._pendingRematch.loserIdx];
+    if (loserPs) choosingPlayerName = loserPs.username;
+  }
+
+  const state = {
+    isSpectator: true,
+    myIndex: 0, // Player 0 at bottom, Player 1 at top (host = bottom)
+    roomId: room.id,
+    players: gs.players.map((ps) => ({
+      username: ps.username, color: ps.color, avatar: ps.avatar,
+      heroes: ps.heroes, abilityZones: ps.abilityZones,
+      surpriseZones: ps.surpriseZones, supportZones: ps.supportZones,
+      islandZoneCount: ps.islandZoneCount || [0, 0, 0],
+      hand: [], handCount: ps.hand.length,
+      mainDeckCards: [], deckCount: ps.mainDeck.length,
+      potionDeckCards: [], potionDeckCount: ps.potionDeck.length,
+      discardPile: ps.discardPile, deletedPile: ps.deletedPile,
+      disconnected: ps.disconnected || false, left: ps.left || false,
+      gold: ps.gold || 0,
+      abilityGivenThisTurn: ps.abilityGivenThisTurn || [false, false, false],
+      summonLocked: ps.summonLocked || false,
+      damageLocked: ps.damageLocked || false,
+      dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
+      potionLocked: ps.potionLocked || false,
+      permanents: ps.permanents || [],
+      divineGiftUsed: ps.divineGiftUsed || false,
+      deckSkins: ps.deckSkins || {},
+    })),
+    areaZones: gs.areaZones, turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
+    result: gs.result || null, rematchRequests: gs.rematchRequests || [],
+    setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
+    summonBlocked: gs.summonBlocked || [],
+    customPlacementCards: [],
+    awaitingFirstChoice: gs.awaitingFirstChoice || false,
+    choosingPlayerName,
+    mulliganPending: gs.mulliganPending || false,
+    potionTargeting: gs.potionTargeting ? {
+      potionName: gs.potionTargeting.potionName,
+      ownerIdx: gs.potionTargeting.ownerIdx,
+      cardType: gs.potionTargeting.cardType,
+      config: gs.potionTargeting.config,
+      validTargets: gs.potionTargeting.validTargets,
+    } : null,
+    effectPrompt: gs.effectPrompt || null,
+    creatureCounters: room.engine ? (() => {
+      const cc = {};
+      for (const inst of room.engine.cardInstances) {
+        if (inst.zone === 'support' && Object.keys(inst.counters).length > 0) {
+          cc[`${inst.controller}-${inst.heroIdx}-${inst.zoneSlot}`] = { ...inst.counters };
+        }
+      }
+      return cc;
+    })() : {},
+    additionalActions: [],
+    inherentActionCards: [],
+    unactivatableArtifacts: [],
+    blockedSpells: [],
+    activatableAbilities: [],
+    freeActivatableAbilities: [],
+    activeHeroEffects: [],
+  };
+
+  for (const spec of room.spectators) {
+    if (spec.socketId) io.to(spec.socketId).emit('game_state', state);
+  }
+}
+
 async function endGame(room, winnerIdx, reason) {
   const gs = room.gameState;
   if (!gs || gs.result) return;
@@ -596,21 +1004,27 @@ async function endGame(room, winnerIdx, reason) {
   const loserIdx = winnerIdx === 0 ? 1 : 0;
   const winner = gs.players[winnerIdx];
   const loser = gs.players[loserIdx];
-  const wUser = await db.get('SELECT * FROM users WHERE id = ?', [winner.userId]);
-  const lUser = await db.get('SELECT * FROM users WHERE id = ?', [loser.userId]);
-  const wElo = wUser?.elo || 1000; const lElo = lUser?.elo || 1000;
-  let newWElo = wElo, newLElo = lElo;
 
-  if (isRanked) {
+  // Update set score
+  room.setScore[winnerIdx]++;
+  const setOver = room.setScore[winnerIdx] >= room.winsNeeded;
+
+  // Elo only changes when the full set is decided
+  let eloChanges = null;
+  if (setOver && isRanked) {
+    const wUser = await db.get('SELECT * FROM users WHERE id = ?', [winner.userId]);
+    const lUser = await db.get('SELECT * FROM users WHERE id = ?', [loser.userId]);
+    const wElo = wUser?.elo || 1000; const lElo = lUser?.elo || 1000;
     const K = 32;
     const expectedW = 1 / (1 + Math.pow(10, (lElo - wElo) / 400));
-    newWElo = Math.round(wElo + K * (1 - expectedW));
-    newLElo = Math.max(0, Math.round(lElo + K * (0 - (1 - expectedW))));
+    const newWElo = Math.round(wElo + K * (1 - expectedW));
+    const newLElo = Math.max(0, Math.round(lElo + K * (0 - (1 - expectedW))));
     await db.run('UPDATE users SET elo = ? WHERE id = ?', [newWElo, winner.userId]);
     await db.run('UPDATE users SET elo = ? WHERE id = ?', [newLElo, loser.userId]);
+    eloChanges = [{ username: winner.username, oldElo: wElo, newElo: newWElo }, { username: loser.username, oldElo: lElo, newElo: newLElo }];
   }
 
-  // Always track wins/losses and hero stats
+  // Always track wins/losses and hero stats per round
   await db.run('UPDATE users SET wins = wins + 1 WHERE id = ?', [winner.userId]);
   await db.run('UPDATE users SET losses = losses + 1 WHERE id = ?', [loser.userId]);
   for (const ps of [winner, loser]) {
@@ -620,12 +1034,51 @@ async function endGame(room, winnerIdx, reason) {
     }
     await db.run('INSERT INTO game_history (id, user_id, hero1, hero2, hero3, won, opponent_id) VALUES (?, ?, ?, ?, ?, ?, ?)', [uuidv4(), ps.userId, ps.heroes[0]?.name||null, ps.heroes[1]?.name||null, ps.heroes[2]?.name||null, won?1:0, (won?loser:winner).userId]);
   }
-  gs.result = { winnerIdx, reason, winnerName: winner.username, loserName: loser.username, isRanked,
-    eloChanges: isRanked ? [{ username: winner.username, oldElo: wElo, newElo: newWElo }, { username: loser.username, oldElo: lElo, newElo: newLElo }] : null };
+
+  gs.result = {
+    winnerIdx, reason, winnerName: winner.username, loserName: loser.username, isRanked,
+    eloChanges,
+    setScore: [...room.setScore], setOver, format: room.format,
+  };
   gs.rematchRequests = [];
-  room.status = 'finished';
-  for (let i = 0; i < 2; i++) sendGameState(room, i);
+  if (setOver) room.status = 'finished';
+  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   io.emit('rooms', getRoomList());
+
+  // ── SC reward evaluation ──
+  try {
+    const scResults = await evaluateSCRewards(room, winnerIdx, reason);
+    for (let pi = 0; pi < 2; pi++) {
+      if (scResults[pi] && scResults[pi].total > 0) {
+        const sid = gs.players[pi]?.socketId;
+        if (sid) io.to(sid).emit('sc_earned', scResults[pi]);
+      }
+    }
+    // Also tell spectators about SC earnings
+    if (Object.keys(scResults).length > 0) {
+      sendToSpectators(room, 'sc_earned_spectator', scResults);
+    }
+  } catch (err) {
+    console.error('[SC] Error evaluating rewards:', err.message);
+  }
+
+  // Auto-advance to next round after 4 seconds (if set not over)
+  if (!setOver) {
+    room._setAdvanceTimer = setTimeout(async () => {
+      delete room._setAdvanceTimer;
+      // Set up fresh game state
+      await setupGameState(room);
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      // Ask loser who goes first
+      const loserPs = room.gameState.players[loserIdx];
+      if (loserPs?.socketId) {
+        room._pendingRematch = { roomId: room.id, loserIdx };
+        io.to(loserPs.socketId).emit('rematch_choose_first', {});
+      } else {
+        startGameEngine(room, room.id, loserIdx);
+      }
+    }, 4000);
+  }
 }
 
 function cleanupRoom(roomId) {
@@ -640,13 +1093,96 @@ function cleanupRoom(roomId) {
   io.emit('rooms', getRoomList());
 }
 
+/** Set up fresh game state: decks, hands, heroes — but don't start the engine or turns. */
+async function setupGameState(room) {
+  const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
+  const cardsByName = {}; allCards.forEach(c => { cardsByName[c.name] = c; });
+  const shuffle = (arr) => { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+
+  const playerStates = [];
+  for (const p of room.players) {
+    let deck = null;
+
+    // Check if the selected deck is a sample deck
+    if (p.deckId && p.deckId.startsWith('sample-')) {
+      const samples = loadSampleDecks();
+      deck = samples.find(s => s.id === p.deckId) || null;
+    }
+
+    if (!deck) {
+      let deckRow = p.deckId ? await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [p.deckId, p.userId]) : null;
+      if (!deckRow) deckRow = await db.get('SELECT * FROM decks WHERE user_id = ? AND is_default = 1', [p.userId]);
+      if (!deckRow) deckRow = await db.get('SELECT * FROM decks WHERE user_id = ? ORDER BY created_at LIMIT 1', [p.userId]);
+      deck = deckRow ? parseDeck(deckRow) : null;
+    }
+
+    if (!deck || (!deck.mainDeck.length && !deck.heroes.some(h => h.hero))) {
+      const samples = loadSampleDecks();
+      if (samples.length > 0) {
+        const hash = [...p.userId].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0);
+        deck = samples[Math.abs(hash) % samples.length];
+      }
+    }
+    const usr = await db.get('SELECT * FROM users WHERE id = ?', [p.userId]);
+    const heroes = (deck?.heroes||[]).map(h => {
+      const c = h.hero ? cardsByName[h.hero] : null;
+      return { name:h.hero, hp:c?.hp||0, maxHp:c?.hp||0, atk:c?.atk||0, baseAtk:c?.atk||0, ability1:h.ability1||null, ability2:h.ability2||null, statuses:{} };
+    });
+    const abilityZones = heroes.map(h => {
+      const z=[[],[],[]];
+      if(h.ability1&&h.ability2&&h.ability1===h.ability2){z[0]=[h.ability1,h.ability2];}
+      else{if(h.ability1)z[0]=[h.ability1];if(h.ability2)z[1]=[h.ability2];}
+      return z;
+    });
+    const mainDeck = shuffle(deck?.mainDeck||[]);
+    const potionDeck = shuffle(deck?.potionDeck||[]);
+    const hand = mainDeck.splice(0, 5);
+    playerStates.push({ userId:p.userId, username:p.username, socketId:p.socketId,
+      color:usr?.color||'#00f0ff', avatar:usr?.avatar||null,
+      heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
+      hand, mainDeck, potionDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
+      abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0],
+      damageLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
+      permanents:[], divineGiftUsed:false, deckSkins: deck?.skins || {} });
+  }
+  room.gameState = { players:playerStates, areaZones:[[],[]], turn:0, activePlayer:0, currentPhase:0, result:null, rematchRequests:[], awaitingFirstChoice:true,
+    _gameStartTime: Date.now(),
+    _playerIPs: room.players.map(p => {
+      const sock = io.sockets.sockets.get(p.socketId);
+      return sock ? getSocketIP(sock) : 'unknown';
+    }),
+  };
+  room.status = 'playing';
+  room.players.forEach(p => activeGames.set(p.userId, room.id));
+
+  // ── DEBUG ──
+  for (let pi = 0; pi < 2; pi++) {
+    
+  }
+  // ── END DEBUG ──
+}
+
+function startGameEngine(room, roomId, activePlayer) {
+  room.gameState.activePlayer = activePlayer;
+  room.gameState.turn = 1;
+  room.gameState.awaitingFirstChoice = false;
+  room.gameState.mulliganPending = true;
+  room.gameState.mulliganDecisions = [null, null];
+  room.engine = new GameEngine(room, io, sendGameState, endGame, sendSpectatorGameState);
+  room.engine.init();
+  for(let i=0;i<2;i++) sendGameState(room, i); sendSpectatorGameState(room);
+  io.to('room:' + room.id).emit('game_started', sanitizeRoom(room));
+  io.emit('rooms', getRoomList());
+}
+
 io.on('connection', (socket) => {
   let currentUser = null;
+  const socketIP = getSocketIP(socket);
 
   socket.on('auth', (token) => {
     const session = sessions.get(token);
     if (session) {
-      currentUser = session;
+      currentUser = { ...session, ip: socketIP };
       socket.emit('auth_ok', session);
       // Reconnect to active game
       const activeRoomId = activeGames.get(session.userId);
@@ -657,13 +1193,14 @@ io.on('connection', (socket) => {
           if (t) { clearTimeout(t); disconnectTimers.delete(session.userId); }
           const pi = room.gameState.players.findIndex(ps => ps.userId === session.userId);
           if (pi >= 0) {
-            room.players[pi].socketId = socket.id;
+            if (room.players[pi]) room.players[pi].socketId = socket.id;
             room.gameState.players[pi].socketId = socket.id;
             room.gameState.players[pi].disconnected = false;
             socket.join('room:' + activeRoomId);
             sendGameState(room, pi, { reconnected: true });
             const oi = pi === 0 ? 1 : 0;
             sendGameState(room, oi);
+            sendSpectatorGameState(room);
           }
         }
       }
@@ -672,11 +1209,13 @@ io.on('connection', (socket) => {
 
   socket.on('get_rooms', () => socket.emit('rooms', getRoomList()));
 
-  socket.on('create_room', ({ type, playerPw, specPw, deckId }) => {
+  socket.on('create_room', ({ type, playerPw, specPw, deckId, format }) => {
     if (!currentUser) return;
+    const fmt = [1, 3, 5].includes(format) ? format : 1;
     const roomId = uuidv4().substring(0, 8);
     const room = { id: roomId, host: currentUser.username, hostId: currentUser.userId,
-      type: type||'unranked', playerPw: playerPw||null, specPw: specPw||null,
+      type: type||'unranked', format: fmt, winsNeeded: Math.ceil(fmt / 2), setScore: [0, 0],
+      playerPw: playerPw||null, specPw: specPw||null,
       players: [{ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: deckId||null }],
       spectators: [], status: 'waiting', created: Date.now(), gameState: null };
     rooms.set(roomId, room);
@@ -691,7 +1230,18 @@ io.on('connection', (socket) => {
     if (!room) return socket.emit('join_error', 'Room not found');
     const isPlayer = room.players.some(p => p.username === currentUser.username);
     const isSpec = room.spectators.some(s => s.username === currentUser.username);
-    if (isPlayer || isSpec) { socket.join('room:' + roomId); return socket.emit('room_joined', sanitizeRoom(room, currentUser.username)); }
+    if (isPlayer || isSpec) {
+      socket.join('room:' + roomId);
+      socket.emit('room_joined', sanitizeRoom(room, currentUser.username));
+      // If spectator re-joins during a game, send them the current game state
+      if (isSpec && room.status === 'playing' && room.gameState) {
+        // Update the spectator's socketId (they may have reconnected)
+        const specEntry = room.spectators.find(s => s.username === currentUser.username);
+        if (specEntry) specEntry.socketId = socket.id;
+        sendSpectatorGameState(room);
+      }
+      return;
+    }
     if (asSpectator) {
       if (room.specPw && password !== room.specPw) return socket.emit('join_error', 'Wrong spectator password');
       room.spectators.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id });
@@ -710,6 +1260,10 @@ io.on('connection', (socket) => {
     socket.emit('room_joined', sanitizeRoom(room, currentUser.username));
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
     io.emit('rooms', getRoomList());
+    // If the game is already playing, send initial game state to the new spectator
+    if (room.status === 'playing' && room.gameState && room.spectators.some(s => s.userId === currentUser.userId)) {
+      sendSpectatorGameState(room);
+    }
   });
 
   socket.on('swap_to_spectator', ({ roomId }) => {
@@ -743,66 +1297,62 @@ io.on('connection', (socket) => {
     startGameEngine(room, roomId, activePlayer);
   });
 
-  /** Set up fresh game state: decks, hands, heroes — but don't start the engine or turns. */
-  async function setupGameState(room) {
-    const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
-    const cardsByName = {}; allCards.forEach(c => { cardsByName[c.name] = c; });
-    const shuffle = (arr) => { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+  // ── MULLIGAN ──
+  socket.on('mulligan_decision', ({ roomId, accept }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.gameState?.mulliganPending) return;
+    const gs = room.gameState;
+    const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0 || gs.mulliganDecisions[pi] !== null) return; // Already decided
 
-    const playerStates = [];
-    for (const p of room.players) {
-      const deckRow = p.deckId ? await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [p.deckId, p.userId]) : null;
-      const deck = deckRow ? parseDeck(deckRow) : null;
-      const usr = await db.get('SELECT * FROM users WHERE id = ?', [p.userId]);
-      const heroes = (deck?.heroes||[]).map(h => {
-        const c = h.hero ? cardsByName[h.hero] : null;
-        return { name:h.hero, hp:c?.hp||0, maxHp:c?.hp||0, atk:c?.atk||0, baseAtk:c?.atk||0, ability1:h.ability1||null, ability2:h.ability2||null, statuses:{} };
-      });
-      const abilityZones = heroes.map(h => {
-        const z=[[],[],[]];
-        if(h.ability1&&h.ability2&&h.ability1===h.ability2){z[0]=[h.ability1,h.ability2];}
-        else{if(h.ability1)z[0]=[h.ability1];if(h.ability2)z[1]=[h.ability2];}
-        return z;
-      });
-      const mainDeck = shuffle(deck?.mainDeck||[]);
-      const potionDeck = shuffle(deck?.potionDeck||[]);
-      const hand = mainDeck.splice(0, 5);
-      playerStates.push({ userId:p.userId, username:p.username, socketId:p.socketId,
-        color:usr?.color||'#00f0ff', avatar:usr?.avatar||null,
-        heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
-        hand, mainDeck, potionDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
-        abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0],
-        damageLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
-        permanents:[], divineGiftUsed:false });
-    }
-    room.gameState = { players:playerStates, areaZones:[[],[]], turn:0, activePlayer:0, currentPhase:0, result:null, rematchRequests:[], awaitingFirstChoice:true };
-    room.status = 'playing';
-    room.players.forEach(p => activeGames.set(p.userId, room.id));
+    const shuffle = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } };
 
-    // ── DEBUG: Add Performance + Flying Island to both hands, set a random hero to 10 HP ──
-    for (let pi = 0; pi < 2; pi++) {
-      
-    }
-    const debugHeroPlayer = Math.floor(Math.random() * 2);
-    const debugHeroIdx = Math.floor(Math.random() * 3);
-    if (playerStates[debugHeroPlayer].heroes[debugHeroIdx]) {
-      playerStates[debugHeroPlayer].heroes[debugHeroIdx].hp = 10;
-    }
-    // ── END DEBUG ──
-  }
+    const checkBothReady = () => {
+      if (!gs.mulliganDecisions) return; // Already processed
+      if (gs.mulliganDecisions[0] !== null && gs.mulliganDecisions[1] !== null) {
+        gs.mulliganPending = false;
+        delete gs.mulliganDecisions;
+        for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+        room.engine.startGame().catch(err => console.error('[Engine] startGame error:', err.message));
+      }
+    };
 
-  /** Start the engine and first turn with a chosen active player. */
-  function startGameEngine(room, roomId, activePlayer) {
-    room.gameState.activePlayer = activePlayer;
-    room.gameState.turn = 1;
-    room.gameState.awaitingFirstChoice = false;
-    room.engine = new GameEngine(room, io, sendGameState, endGame);
-    room.engine.init();
-    for(let i=0;i<2;i++) sendGameState(room, i);
-    room.engine.startGame().catch(err => console.error('[Engine] startGame error:', err.message));
-    io.to('room:' + room.id).emit('game_started', sanitizeRoom(room));
-    io.emit('rooms', getRoomList());
-  }
+    gs.mulliganDecisions[pi] = accept;
+
+    if (accept) {
+      const ps = gs.players[pi];
+      (async () => {
+        // Return cards to deck one by one (reverse draw animation)
+        const handSize = ps.hand.length;
+        for (let i = 0; i < handSize; i++) {
+          const card = ps.hand.shift();
+          ps.mainDeck.push(card);
+          sendGameState(room, pi);
+          sendSpectatorGameState(room);
+          await new Promise(r => setTimeout(r, 180));
+        }
+        // Wait 1 second
+        await new Promise(r => setTimeout(r, 1000));
+        // Shuffle deck
+        shuffle(ps.mainDeck);
+        // Draw 5 new cards one by one
+        for (let i = 0; i < 5; i++) {
+          if (ps.mainDeck.length === 0) break;
+          const card = ps.mainDeck.shift();
+          ps.hand.push(card);
+          sendGameState(room, pi);
+          sendSpectatorGameState(room);
+          await new Promise(r => setTimeout(r, 200));
+        }
+        checkBothReady();
+      })();
+    } else {
+      sendGameState(room, pi);
+      sendSpectatorGameState(room);
+      checkBothReady();
+    }
+  });
 
   socket.on('leave_game', async ({ roomId }) => {
     if (!currentUser) return;
@@ -826,6 +1376,7 @@ io.on('connection', (socket) => {
       room.gameState.rematchRequests = room.gameState.rematchRequests.filter(u => u !== currentUser.userId);
       const oi = room.gameState.players.findIndex(ps => ps.userId !== currentUser.userId);
       if (oi >= 0) sendGameState(room, oi);
+      sendSpectatorGameState(room);
       if (room.gameState.players.every(ps => ps.left)) cleanupRoom(roomId);
     } else {
       socket.leave('room:' + roomId);
@@ -931,6 +1482,7 @@ io.on('connection', (socket) => {
     // Update state
     ps.abilityZones[heroIdx] = abZones;
     ps.hand.splice(handIndex, 1);
+    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
     ps.abilityGivenThisTurn[heroIdx] = true;
 
     // Track in engine — find which zone the card ended up in
@@ -945,7 +1497,7 @@ io.on('connection', (socket) => {
       } catch (err) {
         console.error('[Engine] play_ability hooks error:', err.message);
       }
-      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     })();
   });
 
@@ -999,6 +1551,7 @@ io.on('connection', (socket) => {
           const sid = gs.players[i]?.socketId;
           if (sid) io.to(sid).emit('ability_activated', { owner: pi, heroIdx, zoneIdx, abilityName });
         }
+        sendToSpectators(room, 'ability_activated', { owner: pi, heroIdx, zoneIdx, abilityName });
 
         // Run the activation
         await script.onActivate(ctx, level);
@@ -1021,7 +1574,7 @@ io.on('connection', (socket) => {
       } catch (err) {
         console.error('[Engine] activate_ability error:', err.message, err.stack);
       }
-      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     })();
   });
 
@@ -1086,7 +1639,7 @@ io.on('connection', (socket) => {
       } catch (err) {
         console.error('[Engine] activate_free_ability error:', err.message, err.stack);
       }
-      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     })();
   });
 
@@ -1138,7 +1691,7 @@ io.on('connection', (socket) => {
       } catch (err) {
         console.error('[Engine] activate_hero_effect error:', err.message, err.stack);
       }
-      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     })();
   });
 
@@ -1177,6 +1730,7 @@ io.on('connection', (socket) => {
     // Validate hero
     const hero = ps.heroes[heroIdx];
     if (!hero || !hero.name || hero.hp <= 0) return;
+    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
     // Validate spell school / level
     const level = cardData.level || 0;
@@ -1209,6 +1763,7 @@ io.on('connection', (socket) => {
 
     // Execute: remove from hand, add to support zone
     ps.hand.splice(handIndex, 1);
+    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
     ps.supportZones[heroIdx][zoneSlot] = [cardName];
 
     // Track card instance in engine
@@ -1219,6 +1774,7 @@ io.on('connection', (socket) => {
       const sid = gs.players[i]?.socketId;
       if (sid) io.to(sid).emit('summon_effect', { owner: pi, heroIdx, zoneSlot, cardName });
     }
+    sendToSpectators(room, 'summon_effect', { owner: pi, heroIdx, zoneSlot, cardName });
 
     // Fire hooks, wait for resolution, then advance phase (only if NOT using additional action)
     (async () => {
@@ -1236,7 +1792,7 @@ io.on('connection', (socket) => {
       } catch (err) {
         console.error('[Engine] play_creature hooks error:', err.message);
       }
-      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     })();
   });
 
@@ -1263,7 +1819,7 @@ io.on('connection', (socket) => {
     // Validate hero can cast this spell (spell school / level)
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return;
-    if (hero.statuses?.frozen || hero.statuses?.stunned) return;
+    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
     const level = cardData.level || 0;
     if (level > 0 || cardData.spellSchool1) {
       const abZones = ps.abilityZones[heroIdx] || [];
@@ -1298,6 +1854,7 @@ io.on('connection', (socket) => {
 
     // Remove from hand
     ps.hand.splice(handIndex, 1);
+    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
 
     (async () => {
       try {
@@ -1305,6 +1862,7 @@ io.on('connection', (socket) => {
         const oi = pi === 0 ? 1 : 0;
         const oppSid = gs.players[oi]?.socketId;
         if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
+        sendToSpectators(room, 'card_reveal', { cardName });
         await new Promise(r => setTimeout(r, 100));
 
         // Track card instance with heroIdx so onPlay knows which hero cast it
@@ -1329,7 +1887,7 @@ io.on('connection', (socket) => {
           if (additionalConsumed && consumedInst) {
             consumedInst.counters.additionalActionAvail = 1;
           }
-          for (let i = 0; i < 2; i++) sendGameState(room, i);
+          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
           return;
         }
         delete gs._spellCancelled;
@@ -1378,7 +1936,7 @@ io.on('connection', (socket) => {
       } catch (err) {
         console.error('[Engine] play_spell error:', err.message, err.stack);
       }
-      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     })();
   });
 
@@ -1424,6 +1982,7 @@ io.on('connection', (socket) => {
       // Execute: deduct gold, remove from hand, place
       ps.gold -= cost;
       ps.hand.splice(handIndex, 1);
+    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
       ps.supportZones[heroIdx][finalSlot] = [cardName];
 
       const inst = room.engine._trackCard(cardName, pi, 'support', heroIdx, finalSlot);
@@ -1435,7 +1994,7 @@ io.on('connection', (socket) => {
         } catch (err) {
           console.error('[Engine] play_artifact hooks error:', err.message);
         }
-        for (let i = 0; i < 2; i++) sendGameState(room, i);
+        for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       })();
     }
   });
@@ -1477,7 +2036,7 @@ io.on('connection', (socket) => {
         validTargets,
         config: script.targetingConfig,
       };
-      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     } else {
       // No targeting needed — execute with reaction window
       (async () => {
@@ -1486,6 +2045,7 @@ io.on('connection', (socket) => {
         const oppSid = gs.players[oi]?.socketId;
         if (!script.deferBroadcast) {
           if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
+          sendToSpectators(room, 'card_reveal', { cardName });
           await new Promise(r => setTimeout(r, 100));
         }
 
@@ -1502,12 +2062,12 @@ io.on('connection', (socket) => {
         await new Promise(r => setTimeout(r, 100));
         // If the effect was cancelled (player backed out), don't consume the card
         if (chainResult.resolveResult?.cancelled) {
-          for (let i = 0; i < 2; i++) sendGameState(room, i);
+          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
           return;
         }
         // Use indexOf to find card (handIndex may be stale if resolve modified hand)
         const currentIdx = ps.hand.indexOf(cardName);
-        if (currentIdx >= 0) ps.hand.splice(currentIdx, 1);
+        if (currentIdx >= 0) { ps.hand.splice(currentIdx, 1); if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++; }
         if (chainResult.negated) {
           ps.discardPile.push(cardName); // Negated → discard
         } else if (chainResult.resolveResult?.placed) {
@@ -1528,7 +2088,7 @@ io.on('connection', (socket) => {
             if (hasNicolas) ps.potionLocked = true;
           }
         }
-        for (let i = 0; i < 2; i++) sendGameState(room, i);
+        for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       })();
     }
   });
@@ -1577,7 +2137,7 @@ io.on('connection', (socket) => {
         validTargets,
         config,
       };
-      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     }
   });
 
@@ -1594,7 +2154,7 @@ io.on('connection', (socket) => {
     // Effect prompt (from card hooks like Icy Slime) — resolve engine promise
     if (gs.potionTargeting.isEffectPrompt) {
       room.engine.resolveEffectPrompt(selectedIds);
-      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       return;
     }
 
@@ -1621,6 +2181,7 @@ io.on('connection', (socket) => {
       const oi = pi === 0 ? 1 : 0;
       const oppSid = gs.players[oi]?.socketId;
       if (oppSid) io.to(oppSid).emit('card_reveal', { cardName: potionName });
+      sendToSpectators(room, 'card_reveal', { cardName: potionName });
       await new Promise(r => setTimeout(r, 100));
 
       // Execute with reaction window — defers resolve until chain resolves (if chain forms)
@@ -1652,7 +2213,7 @@ io.on('connection', (socket) => {
           potionName, handIndex, ownerIdx: pi, cardType, goldCost,
           validTargets: freshTargets, config,
         };
-        for (let i = 0; i < 2; i++) sendGameState(room, i);
+        for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
         return;
       }
 
@@ -1661,7 +2222,7 @@ io.on('connection', (socket) => {
 
       // Remove from hand and move to appropriate pile
       const hi = ps.hand.indexOf(potionName);
-      if (hi >= 0) ps.hand.splice(hi, 1);
+      if (hi >= 0) { ps.hand.splice(hi, 1); if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++; }
       if (chainResult.negated) {
         ps.discardPile.push(potionName); // Negated → always discard
       } else if (cardType === 'Potion') {
@@ -1682,8 +2243,9 @@ io.on('connection', (socket) => {
           const sid = gs.players[i]?.socketId;
           if (sid) io.to(sid).emit('potion_resolved', { destroyedIds: selectedIds, animationType: script.animationType || 'explosion' });
         }
+        sendToSpectators(room, 'potion_resolved', { destroyedIds: selectedIds, animationType: script.animationType || 'explosion' });
       }
-      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     })();
   });
 
@@ -1697,6 +2259,7 @@ io.on('connection', (socket) => {
     const oi = pi === 0 ? 1 : 0;
     const oppSid = room.gameState.players[oi]?.socketId;
     if (oppSid) io.to(oppSid).emit('opponent_targeting', { selectedIds });
+    sendToSpectators(room, 'opponent_targeting', { selectedIds });
   });
 
   // Relay pending creature placement (for additional action selection visual)
@@ -1709,6 +2272,7 @@ io.on('connection', (socket) => {
     const oi = pi === 0 ? 1 : 0;
     const oppSid = room.gameState.players[oi]?.socketId;
     if (oppSid) io.to(oppSid).emit('opponent_pending_placement', { owner: pi, heroIdx, zoneSlot, cardName });
+    sendToSpectators(room, 'opponent_pending_placement', { owner: pi, heroIdx, zoneSlot, cardName });
   });
   socket.on('pending_placement_clear', ({ roomId }) => {
     if (!currentUser) return;
@@ -1719,6 +2283,7 @@ io.on('connection', (socket) => {
     const oi = pi === 0 ? 1 : 0;
     const oppSid = room.gameState.players[oi]?.socketId;
     if (oppSid) io.to(oppSid).emit('opponent_pending_placement', null);
+    sendToSpectators(room, 'opponent_pending_placement', null);
   });
 
   // Cancel potion targeting
@@ -1729,7 +2294,7 @@ io.on('connection', (socket) => {
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi !== room.gameState.potionTargeting.ownerIdx) return;
     room.gameState.potionTargeting = null;
-    for (let i = 0; i < 2; i++) sendGameState(room, i);
+    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   });
 
   // General-purpose effect prompt response (confirm, card gallery, zone pick)
@@ -1752,7 +2317,7 @@ io.on('connection', (socket) => {
       const loserIdx = room.gameState.result.winnerIdx === 0 ? 1 : 0;
       // Set up fresh game state FIRST so both players see their new hands
       await setupGameState(room);
-      for(let i=0;i<2;i++) sendGameState(room, i);
+      for(let i=0;i<2;i++) sendGameState(room, i); sendSpectatorGameState(room);
       // Now ask the loser who goes first — no time limit
       const loserPs = room.gameState.players[loserIdx];
       if (loserPs?.socketId) {
@@ -1789,7 +2354,7 @@ io.on('connection', (socket) => {
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
     room.gameState.players[pi].hand.push(cardName);
-    for (let i = 0; i < 2; i++) sendGameState(room, i);
+    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   });
 
   socket.on('disconnect', () => {
@@ -1803,6 +2368,7 @@ io.on('connection', (socket) => {
           room.gameState.players[pi].disconnected = true;
           const oi = pi===0?1:0;
           sendGameState(room, oi);
+          sendSpectatorGameState(room);
           const timer = setTimeout(() => {
             disconnectTimers.delete(currentUser.userId);
             if (room.gameState && !room.gameState.result) endGame(room, oi, 'disconnect_timeout').catch(e => console.error('[endGame] error:', e.message));
@@ -1841,7 +2407,7 @@ function handleLeaveRoom(socket, roomId, user) {
 
 function getRoomList() {
   return Array.from(rooms.values()).map(r => ({
-    id: r.id, host: r.host, type: r.type,
+    id: r.id, host: r.host, type: r.type, format: r.format || 1,
     hasPlayerPw: !!r.playerPw, hasSpecPw: !!r.specPw,
     playerCount: r.players.length,
     spectatorCount: r.spectators.length,
@@ -1852,7 +2418,7 @@ function getRoomList() {
 
 function sanitizeRoom(room, forUser) {
   return {
-    id: room.id, host: room.host, type: room.type,
+    id: room.id, host: room.host, type: room.type, format: room.format || 1,
     hasPlayerPw: !!room.playerPw, hasSpecPw: !!room.specPw,
     players: room.players.map(p => p.username),
     spectators: room.spectators.map(s => s.username),

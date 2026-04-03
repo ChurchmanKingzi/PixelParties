@@ -24,7 +24,7 @@ module.exports = {
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
           const hero = ps.heroes[hi];
           if (!hero?.name || hero.hp <= 0) continue;
-          if (hero.statuses?.burned || hero.statuses?.shielded) continue; // Can't double-burn, can't burn shielded
+          if (hero.statuses?.burned) continue; // Can't double-burn
           targets.push({
             id: `hero-${pi}-${hi}`,
             type: 'hero',

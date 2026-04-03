@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const { v4: uuidv4 } = require('uuid');
-const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses } = require('./_hooks');
+const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
 const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
@@ -72,11 +72,12 @@ class GameEngine {
    * @param {object} io - Socket.io server instance
    * @param {function} sendGameStateFn - Function to sync state to clients
    */
-  constructor(room, io, sendGameStateFn, onGameOverFn) {
+  constructor(room, io, sendGameStateFn, onGameOverFn, sendSpectatorGameStateFn) {
     this.room = room;
     this.io = io;
     this.sendGameState = sendGameStateFn;
     this.onGameOver = onGameOverFn || null;
+    this.sendSpectatorGameState = sendSpectatorGameStateFn || null;
     this.gs = room.gameState;
 
     // Card instance tracking
@@ -107,6 +108,14 @@ class GameEngine {
    */
   init() {
     this.cardInstances = [];
+
+    // ── SC reward tracking (per player) ──
+    if (!this.gs._scTracking) {
+      this.gs._scTracking = [
+        { totalGoldEarned: 0, maxDamageInstance: 0, cardsPlayedFromHand: 0, creatureOverkill: false, heroEverBelow50: false, allAbilitiesFilled: false, allAbilitiesLevel3: false, allSupportFull: false, wasFirstToOneHero: false, totalHpLost: 0 },
+        { totalGoldEarned: 0, maxDamageInstance: 0, cardsPlayedFromHand: 0, creatureOverkill: false, heroEverBelow50: false, allAbilitiesFilled: false, allAbilitiesLevel3: false, allSupportFull: false, wasFirstToOneHero: false, totalHpLost: 0 },
+      ];
+    }
 
     for (let pi = 0; pi < 2; pi++) {
       const ps = this.gs.players[pi];
@@ -204,13 +213,13 @@ class GameEngine {
       if (!hookFn) return false;
       if (!c.isActiveIn(c.zone)) return false;
       // Dead heroes and their abilities/supports don't fire hooks
-      // Frozen/Stunned heroes' abilities and effects are also negated
+      // Frozen/Stunned heroes' hero and ability effects are negated (but creature effects still work)
       // Negated heroes' hero + ability effects are silenced, but support/creature effects still work
       if ((c.zone === 'hero' || c.zone === 'ability' || c.zone === 'support') && c.heroIdx >= 0) {
-        const hero = this.gs.players[c.owner]?.heroes?.[c.heroIdx];
+        const hero = this.gs.players[c.controller ?? c.owner]?.heroes?.[c.heroIdx];
         if (!hero || !hero.name) return false; // Empty hero slot
         if (hero.hp <= 0) return false;
-        if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
+        if ((hero.statuses?.frozen || hero.statuses?.stunned) && (c.zone === 'hero' || c.zone === 'ability')) return false;
         if (hero.statuses?.negated && (c.zone === 'hero' || c.zone === 'ability')) return false;
       }
       return true;
@@ -318,6 +327,9 @@ class GameEngine {
       async healHero(target, amount) {
         return engine.actionHealHero(cardInstance, target, amount);
       },
+      async reviveHero(playerIdx, heroIdx, hp, opts) {
+        return engine.actionReviveHero(playerIdx, heroIdx, hp, opts);
+      },
       increaseMaxHp(target, amount, opts) {
         return engine.increaseMaxHp(target, amount, opts);
       },
@@ -341,6 +353,22 @@ class GameEngine {
       },
       async removeStatus(target, statusName) {
         return engine.actionRemoveStatus(target, statusName);
+      },
+      /** Add a buff to a hero. */
+      async addBuff(hero, playerIdx, heroIdx, buffName, opts) {
+        return engine.actionAddBuff(hero, playerIdx, heroIdx, buffName, opts);
+      },
+      /** Add a buff to a creature (card instance). */
+      async addCreatureBuff(inst, buffName, opts) {
+        return engine.actionAddCreatureBuff(inst, buffName, opts);
+      },
+      /** Remove a buff from a hero. */
+      async removeBuff(hero, playerIdx, heroIdx, buffName, opts) {
+        return engine.actionRemoveBuff(hero, playerIdx, heroIdx, buffName, opts);
+      },
+      /** Remove a buff from a creature (card instance). */
+      async removeCreatureBuff(inst, buffName, opts) {
+        return engine.actionRemoveCreatureBuff(inst, buffName, opts);
       },
       /**
        * Change a creature's level by delta. Fires BEFORE/AFTER_LEVEL_CHANGE hooks.
@@ -985,6 +1013,15 @@ class GameEngine {
     await this.runHooks(HOOKS.BEFORE_DAMAGE, hookCtx);
     if (hookCtx.cancelled) return { dealt: 0, cancelled: true };
 
+    // Apply buff damage modifiers (Cloudy, etc.) — skipped for un-reducible damage (Ida)
+    if (!hookCtx.cannotBeNegated && target?.buffs) {
+      for (const [, buffData] of Object.entries(target.buffs)) {
+        if (buffData.damageMultiplier != null) {
+          hookCtx.amount = Math.ceil(hookCtx.amount * buffData.damageMultiplier);
+        }
+      }
+    }
+
     // Shielded heroes (first-turn protection) are immune to ALL damage
     if (this.gs.firstTurnProtectedPlayer != null && target && target.hp !== undefined) {
       const protectedIdx = this.gs.firstTurnProtectedPlayer;
@@ -1016,6 +1053,39 @@ class GameEngine {
     this.log('damage', { source: source?.name, target: this._heroLabel(target), amount: actualAmount, type });
     await this.runHooks(HOOKS.AFTER_DAMAGE, { source, target, amount: actualAmount, type });
 
+    // ── SC tracking ──
+    if (actualAmount > 0 && this.gs._scTracking) {
+      const srcOwner2 = source?.owner ?? source?.controller ?? -1;
+      if (srcOwner2 >= 0 && srcOwner2 < 2) {
+        const t = this.gs._scTracking[srcOwner2];
+        if (actualAmount > t.maxDamageInstance) t.maxDamageInstance = actualAmount;
+      }
+      // Check creature overkill (damage >= 2x creature max HP)
+      if (target && target.zone === 'support') {
+        // target is a card instance — check counters for HP tracking
+        // Not applicable here — creatures don't have hp on the target object in this path
+      }
+      // Track hero HP dropping below 50%
+      if (target && target.hp !== undefined && target.maxHp) {
+        const targetOwner = this._findHeroOwner(target);
+        if (targetOwner >= 0 && targetOwner < 2) {
+          if (target.hp < target.maxHp * 0.5) {
+            this.gs._scTracking[targetOwner].heroEverBelow50 = true;
+          }
+          // Track total HP lost by this player's heroes
+          this.gs._scTracking[targetOwner].totalHpLost += actualAmount;
+        }
+      }
+      // Track first player to be down to 1 hero
+      for (let pi = 0; pi < 2; pi++) {
+        const ps = this.gs.players[pi];
+        const alive = (ps.heroes || []).filter(h => h.name && h.hp > 0).length;
+        if (alive <= 1 && !this.gs._scTracking[0].wasFirstToOneHero && !this.gs._scTracking[1].wasFirstToOneHero) {
+          this.gs._scTracking[pi].wasFirstToOneHero = true;
+        }
+      }
+    }
+
     // Track: this player dealt damage to opponent's targets this turn
     if (actualAmount > 0 && srcOwner >= 0) {
       for (let pi = 0; pi < 2; pi++) {
@@ -1045,6 +1115,50 @@ class GameEngine {
     const healed = Math.min(amount, (target.maxHp || target.hp) - target.hp);
     target.hp = Math.min(target.maxHp || target.hp + amount, target.hp + amount);
     this.log('heal', { source: source?.name, target: this._heroLabel(target), amount: healed });
+  }
+
+  /**
+   * Revive a defeated hero. Generic handler used by Resuscitation Potion,
+   * Elixir of Immortality, Golden Ankh, and future revival effects.
+   * @param {number} playerIdx - Owning player
+   * @param {number} heroIdx - Hero index
+   * @param {number} hp - HP to revive with (clamped to maxHp)
+   * @param {object} [opts]
+   * @param {number} [opts.maxHpCap] - If set, cap maxHp at this value
+   * @param {boolean} [opts.forceKillAtTurnEnd] - If true, hero dies at end of this turn (un-negatable)
+   * @param {string} [opts.animationType] - Animation type (default 'holy_revival')
+   * @param {number} [opts.animDelay] - Delay after animation (default 1200)
+   * @param {string} [opts.source] - Source card name for logging
+   * @returns {boolean} true if revived
+   */
+  async actionReviveHero(playerIdx, heroIdx, hp, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    const hero = ps?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    if (hero.hp > 0) return false;
+
+    const maxHp = hero.maxHp || 400;
+    const reviveHp = Math.min(hp, maxHp);
+    hero.hp = reviveHp;
+    hero.statuses = {};
+
+    if (opts.maxHpCap != null) {
+      hero.maxHp = opts.maxHpCap;
+      hero.maxHpCapped = opts.maxHpCap;
+    }
+    if (opts.forceKillAtTurnEnd) {
+      hero._forceKillAtTurnEnd = this.gs.turn;
+    }
+
+    this.log('hero_revived', { hero: hero.name, player: ps.username, hp: reviveHp, by: opts.source || 'unknown' });
+
+    const animType = opts.animationType || 'holy_revival';
+    this._broadcastEvent('play_zone_animation', { type: animType, owner: playerIdx, heroIdx, zoneSlot: -1 });
+    this.sync();
+    await this._delay(opts.animDelay != null ? opts.animDelay : 1200);
+
+    await this.runHooks(HOOKS.ON_HERO_REVIVE, { playerIdx, heroIdx, hero, hp: reviveHp, source: opts.source });
+    return true;
   }
 
   /**
@@ -1188,7 +1302,7 @@ class GameEngine {
 
   /**
    * Enforce the maximum hand size.
-   * Base limit is 10, reduced by handLimitReduction counters on support zone cards
+   * Base limit is 7, reduced by handLimitReduction counters on support zone cards
    * (e.g. Pollution Tokens), with a minimum of 1.
    *
    * @param {number} playerIdx
@@ -1204,7 +1318,7 @@ class GameEngine {
     // Compute effective max hand size
     let maxSize = opts.maxSize;
     if (maxSize === undefined) {
-      maxSize = 10;
+      maxSize = 7;
       for (const inst of this.cardInstances) {
         if (inst.owner === playerIdx && inst.zone === ZONES.SUPPORT) {
           maxSize -= inst.counters.handLimitReduction || 0;
@@ -1281,7 +1395,7 @@ class GameEngine {
       }
     }
     if (reduction === 0) return;
-    const maxSize = Math.max(1, 10 - reduction);
+    const maxSize = Math.max(1, 7 - reduction);
     if (ps.hand.length > maxSize) {
       await this.enforceHandLimit(playerIdx, { maxSize, deleteMode: true, title: 'Pollution' });
     }
@@ -1330,6 +1444,128 @@ class GameEngine {
     delete target.statuses[statusName];
     this.log('status_remove', { target: target.name || this._heroLabel(target), status: statusName });
     await this.runHooks(HOOKS.ON_STATUS_REMOVED, { target, status: statusName });
+  }
+
+  // ─── BUFF SYSTEM ──────────────────────────
+
+  /**
+   * Add a buff to a hero. Buffs are positive effects displayed in the buff column.
+   * @param {object} hero - The hero object
+   * @param {number} playerIdx - Owning player
+   * @param {number} heroIdx - Hero index
+   * @param {string} buffName - Key from BUFF_EFFECTS registry
+   * @param {object} [opts] - { expiresAtTurn, expiresForPlayer, source, addAnim, removeAnim, ... }
+   */
+  async actionAddBuff(hero, playerIdx, heroIdx, buffName, opts = {}) {
+    if (!hero?.name || hero.hp <= 0) return false;
+    if (!hero.buffs) hero.buffs = {};
+    const buffDef = BUFF_EFFECTS[buffName] || {};
+    hero.buffs[buffName] = {
+      ...opts,
+      damageMultiplier: buffDef.damageMultiplier ?? opts.damageMultiplier,
+      appliedTurn: this.gs.turn,
+    };
+    this.log('buff_add', { hero: hero.name, buff: buffName, player: this.gs.players[playerIdx]?.username });
+    if (opts.addAnim) {
+      this._broadcastEvent('play_zone_animation', { type: opts.addAnim, owner: playerIdx, heroIdx, zoneSlot: -1 });
+    }
+    this.sync();
+    return true;
+  }
+
+  /**
+   * Add a buff to a creature (card instance in support zone).
+   * Stored in inst.counters.buffs object.
+   */
+  async actionAddCreatureBuff(inst, buffName, opts = {}) {
+    if (!inst || inst.zone !== ZONES.SUPPORT) return false;
+    if (!inst.counters.buffs) inst.counters.buffs = {};
+    const buffDef = BUFF_EFFECTS[buffName] || {};
+    inst.counters.buffs[buffName] = {
+      ...opts,
+      damageMultiplier: buffDef.damageMultiplier ?? opts.damageMultiplier,
+      appliedTurn: this.gs.turn,
+    };
+    this.log('buff_add', { creature: inst.name, buff: buffName, owner: inst.owner });
+    if (opts.addAnim) {
+      this._broadcastEvent('play_zone_animation', { type: opts.addAnim, owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
+    }
+    this.sync();
+    return true;
+  }
+
+  /**
+   * Remove a buff from a hero.
+   */
+  async actionRemoveBuff(hero, playerIdx, heroIdx, buffName, opts = {}) {
+    if (!hero?.buffs?.[buffName]) return;
+    const buffData = hero.buffs[buffName];
+    delete hero.buffs[buffName];
+    this.log('buff_remove', { hero: hero.name, buff: buffName });
+    if (buffData.removeAnim || opts.removeAnim) {
+      this._broadcastEvent('play_zone_animation', { type: opts.removeAnim || buffData.removeAnim, owner: playerIdx, heroIdx, zoneSlot: -1 });
+    }
+    this.sync();
+  }
+
+  /**
+   * Remove a buff from a creature.
+   */
+  async actionRemoveCreatureBuff(inst, buffName, opts = {}) {
+    if (!inst?.counters?.buffs?.[buffName]) return;
+    const buffData = inst.counters.buffs[buffName];
+    // Clear associated counters on expiry (e.g. dark_gear_negated clears negated)
+    if (buffData.clearCountersOnExpire) {
+      for (const key of buffData.clearCountersOnExpire) {
+        delete inst.counters[key];
+      }
+    }
+    delete inst.counters.buffs[buffName];
+    this.log('buff_remove', { creature: inst.name, buff: buffName });
+    if (buffData.removeAnim || opts.removeAnim) {
+      this._broadcastEvent('play_zone_animation', { type: opts.removeAnim || buffData.removeAnim, owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
+    }
+    this.sync();
+  }
+
+  /**
+   * Process buff expiry at the start of a turn.
+   * Removes buffs whose expiresAtTurn matches the current turn
+   * and expiresForPlayer matches the active player.
+   * Called after burn/poison so buffs still protect during those.
+   */
+  async _processBuffExpiry() {
+    const currentTurn = this.gs.turn;
+    const activePlayer = this.gs.activePlayer;
+    let expired = false;
+
+    // Hero buffs
+    for (let pi = 0; pi < 2; pi++) {
+      const ps = this.gs.players[pi];
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        const hero = ps.heroes[hi];
+        if (!hero?.buffs) continue;
+        for (const [buffName, buffData] of Object.entries(hero.buffs)) {
+          if (buffData.expiresAtTurn === currentTurn && buffData.expiresForPlayer === activePlayer) {
+            await this.actionRemoveBuff(hero, pi, hi, buffName);
+            expired = true;
+          }
+        }
+      }
+    }
+
+    // Creature buffs
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || !inst.counters?.buffs) continue;
+      for (const [buffName, buffData] of Object.entries(inst.counters.buffs)) {
+        if (buffData.expiresAtTurn === currentTurn && buffData.expiresForPlayer === activePlayer) {
+          await this.actionRemoveCreatureBuff(inst, buffName);
+          expired = true;
+        }
+      }
+    }
+
+    if (expired) this.sync();
   }
 
   /**
@@ -1585,6 +1821,9 @@ class GameEngine {
     await this.processBurnDamage();
     await this.processPoisonDamage();
 
+    // Process buff expiry (Cloudy, etc.) — after burn/poison so buffs protect during those
+    await this._processBuffExpiry();
+
     // Now fire turn-start hooks (Barker, Slime level-ups, Rancher restore, etc.)
     await this.runHooks(HOOKS.ON_TURN_START, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
     this.sync();
@@ -1645,6 +1884,8 @@ class GameEngine {
         // Automatic phase — process status expiry, hooks, then switch turn
         await this.processStatusExpiry('END');
         await this.runHooks(HOOKS.ON_PHASE_END, { phase: phaseName, phaseIndex: phase });
+        // Process forced kills (Golden Ankh, etc.) — un-negatable
+        await this._processForceKills();
         await this._delay(300);
         // Enforce hand size limit — discard down to 10 if over
         await this.enforceHandLimit(this.gs.activePlayer);
@@ -1656,6 +1897,36 @@ class GameEngine {
   /** Async delay helper for pacing phase transitions. */
   _delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Process forced hero kills at end of turn (Golden Ankh, etc.).
+   * Heroes marked with _forceKillAtTurnEnd === currentTurn are
+   * killed unconditionally — bypasses all protection and hooks.
+   */
+  async _processForceKills() {
+    let killed = false;
+    for (let pi = 0; pi < 2; pi++) {
+      const ps = this.gs.players[pi];
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        const hero = ps.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero._forceKillAtTurnEnd !== this.gs.turn) continue;
+        // Un-negatable kill — set HP to 0, run cleanup
+        hero.hp = 0;
+        delete hero._forceKillAtTurnEnd;
+        this.log('force_kill', { hero: hero.name, player: ps.username, reason: 'ankh_expiry' });
+        this._broadcastEvent('play_zone_animation', { type: 'explosion', owner: pi, heroIdx: hi, zoneSlot: -1 });
+        await this.runHooks(HOOKS.ON_HERO_KO, { hero, source: { name: 'Golden Ankh' } });
+        await this.handleHeroDeathCleanup(hero);
+        killed = true;
+      }
+    }
+    if (killed) {
+      this.sync();
+      await this._delay(400);
+      await this.checkAllHeroesDead();
+    }
   }
 
   /**
@@ -1843,6 +2114,10 @@ class GameEngine {
     if (hookCtx.cancelled) return;
     const gained = Math.max(0, hookCtx.amount);
     ps.gold = (ps.gold || 0) + gained;
+    // ── SC tracking: cumulative gold earned ──
+    if (gained > 0 && this.gs._scTracking && playerIdx >= 0 && playerIdx < 2) {
+      this.gs._scTracking[playerIdx].totalGoldEarned += gained;
+    }
     this.log('gold_gain', { player: ps.username, amount: gained, total: ps.gold });
     this.sync();
   }
@@ -2804,6 +3079,14 @@ class GameEngine {
     // ALL damage to opponent's creatures becomes 0 (ABSOLUTE — overrides everything)
     for (const e of entries) {
       if (e.cancelled) continue;
+      // Apply buff damage modifiers (Cloudy, etc.) — skipped for un-reducible damage
+      if (e.canBeNegated !== false && e.inst.counters?.buffs) {
+        for (const [, bd] of Object.entries(e.inst.counters.buffs)) {
+          if (bd.damageMultiplier != null) {
+            e.amount = Math.ceil(e.amount * bd.damageMultiplier);
+          }
+        }
+      }
       if (e.sourceOwner >= 0 && this.gs.players[e.sourceOwner]?.damageLocked) {
         if (e.inst.owner !== e.sourceOwner) {
           e.amount = 0;
@@ -2831,6 +3114,15 @@ class GameEngine {
 
       e.inst.counters.currentHp -= actualAmount;
       this.log('creature_damage', { source: e.source?.name || e.source, target: e.inst.name, amount: actualAmount, type: e.type, owner: e.inst.owner });
+
+      // ── SC tracking: creature overkill ──
+      if (this.gs._scTracking && e.sourceOwner >= 0 && e.sourceOwner < 2) {
+        const cd = cardDB[e.inst.name];
+        const creatureMaxHp = cd?.hp || 0;
+        if (creatureMaxHp > 0 && actualAmount >= creatureMaxHp * 2) {
+          this.gs._scTracking[e.sourceOwner].creatureOverkill = true;
+        }
+      }
 
       if (e.inst.counters.currentHp <= 0) {
         const ps = this.gs.players[e.inst.owner];
@@ -3327,12 +3619,24 @@ class GameEngine {
       const sid = this.gs.players[i]?.socketId;
       if (sid) this.io.to(sid).emit('chain_update', { chain: chainData });
     }
+    // Also send to spectators
+    if (this.room.spectators) {
+      for (const spec of this.room.spectators) {
+        if (spec.socketId) this.io.to(spec.socketId).emit('chain_update', { chain: chainData });
+      }
+    }
   }
 
   _broadcastEvent(event, data) {
     for (let i = 0; i < 2; i++) {
       const sid = this.gs.players[i]?.socketId;
       if (sid) this.io.to(sid).emit(event, data);
+    }
+    // Also send to spectators
+    if (this.room.spectators) {
+      for (const spec of this.room.spectators) {
+        if (spec.socketId) this.io.to(spec.socketId).emit(event, data);
+      }
     }
   }
 
@@ -3352,11 +3656,54 @@ class GameEngine {
   // ─── SYNC STATE TO CLIENTS ────────────────
 
   sync() {
+    // ── SC tracking: check ability/support zone states ──
+    if (this.gs._scTracking) {
+      for (let pi = 0; pi < 2; pi++) {
+        const ps = this.gs.players[pi];
+        const t = this.gs._scTracking[pi];
+        const aliveHeroes = (ps.heroes || []).filter(h => h.name && h.hp > 0);
+        if (aliveHeroes.length > 0) {
+          // Check all ability zones filled (all living heroes, all 3 slots non-empty)
+          let allAbFilled = true, allAbLevel3 = true;
+          for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+            const hero = ps.heroes[hi];
+            if (!hero?.name || hero.hp <= 0) continue;
+            const abZ = ps.abilityZones?.[hi] || [];
+            for (let z = 0; z < 3; z++) {
+              const slot = abZ[z] || [];
+              if (slot.length === 0) { allAbFilled = false; allAbLevel3 = false; }
+              else if (slot.length < 3) { allAbLevel3 = false; }
+            }
+          }
+          if (allAbFilled) t.allAbilitiesFilled = true;
+          if (allAbLevel3) t.allAbilitiesLevel3 = true;
+          // Check all 9 support zones full (3 heroes × 3 base slots)
+          let fullSupports = 0;
+          for (let hi = 0; hi < 3; hi++) {
+            for (let z = 0; z < 3; z++) {
+              if (((ps.supportZones?.[hi] || [])[z] || []).length > 0) fullSupports++;
+            }
+          }
+          if (fullSupports >= 9) t.allSupportFull = true;
+        }
+      }
+    }
     if (this.sendGameState) {
       for (let i = 0; i < 2; i++) {
         this.sendGameState(this.room, i);
       }
     }
+    if (this.sendSpectatorGameState) {
+      this.sendSpectatorGameState(this.room);
+    }
+  }
+
+  /** Find which player owns a hero object. */
+  _findHeroOwner(hero) {
+    for (let pi = 0; pi < 2; pi++) {
+      if ((this.gs.players[pi]?.heroes || []).includes(hero)) return pi;
+    }
+    return -1;
   }
 }
 

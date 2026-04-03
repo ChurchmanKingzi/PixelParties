@@ -1,0 +1,34 @@
+=== PIXEL PARTIES DECK ===
+Name: Sample Deck: Suicide Bombers
+
+== HEROES ==
+Bomb Berserker Bartas
+Ida, the Adept of Destruction
+Treasure Huntress Semi
+
+== MAIN DECK ==
+8x Alchemy
+2x Beer
+3x Cloud Pillow
+2x Dark Gear
+10x Destruction Magic
+1x Divine Gift of Fire
+2x Fire Bolts
+2x Flame Avalanche
+4x Golden Ankh
+4x Icebolt
+2x Magic Hammer
+4x Magnetic Glove
+4x Phoenix Tackle
+2x Pyroblast
+2x Snow Cannon
+4x Victory Phoenix Cannon
+4x Wheels
+
+== POTION DECK ==
+1x Elixir of Immortality
+2x Elixir of Quickness
+2x Magnetic Potion
+1x Resuscitation Potion
+
+== SIDE DECK ==

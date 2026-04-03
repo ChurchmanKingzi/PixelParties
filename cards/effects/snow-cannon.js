@@ -23,7 +23,6 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.immune) continue;
       if (hero.statuses?.frozen) continue;
-      if (hero.statuses?.shielded) continue;
       targets.push({
         id: `hero-${oppIdx}-${hi}`,
         type: 'hero',

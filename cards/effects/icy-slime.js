@@ -21,7 +21,7 @@ module.exports = {
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
           const hero = ps.heroes[hi];
           if (!hero?.name || hero.hp <= 0) continue;
-          if (hero.statuses?.frozen || hero.statuses?.immune || hero.statuses?.shielded) continue;
+          if (hero.statuses?.frozen || hero.statuses?.immune) continue;
           targets.push({
             id: `hero-${pi}-${hi}`,
             type: 'hero',

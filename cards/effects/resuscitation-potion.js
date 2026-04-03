@@ -65,18 +65,11 @@ module.exports = {
     if (!engine.gs.hoptUsed) engine.gs.hoptUsed = {};
     engine.gs.hoptUsed[`resuscitation-potion:${pi}`] = -1; // -1 = permanent
 
-    // Revive: set HP and cap max HP
-    hero.hp = 50;
-    hero.maxHp = 50;
-    hero.maxHpCapped = 50; // Flag: max HP cannot be increased beyond this value
-    hero.statuses = {}; // Clear any lingering statuses
-
-    engine.log('hero_revived', { hero: hero.name, player: ps.username, hp: 50 });
-
-    // Play revival animation
-    engine._broadcastEvent('play_zone_animation', { type: 'holy_revival', owner: pi, heroIdx: target.heroIdx, zoneSlot: -1 });
-    engine.sync();
-    await engine._delay(1200);
+    // Revive with 50 HP, cap max HP at 50
+    await engine.actionReviveHero(pi, target.heroIdx, 50, {
+      maxHpCap: 50,
+      source: 'Resuscitation Potion',
+    });
 
     return true;
   },

@@ -1,0 +1,154 @@
+[
+  {
+    "id": "player",
+    "title": "Player",
+    "description": "Play a game",
+    "amount": 1,
+    "limit": "daily_per_opponent_ip",
+    "requires": "play"
+  },
+  {
+    "id": "winner",
+    "title": "Winner",
+    "description": "Win a game",
+    "amount": 1,
+    "limit": "daily_per_opponent_ip",
+    "requires": "win"
+  },
+  {
+    "id": "pro",
+    "title": "Pro",
+    "description": "Win a ranked game",
+    "amount": 2,
+    "limit": "daily_per_opponent_ip",
+    "requires": "win_ranked"
+  },
+  {
+    "id": "untouched",
+    "title": "Untouched",
+    "description": "Win with all 3 Heroes still alive",
+    "amount": 1,
+    "limit": "daily",
+    "requires": "win_all_heroes_alive"
+  },
+  {
+    "id": "survivor",
+    "title": "Survivor",
+    "description": "Win with only 1 Hero alive and under 50% HP",
+    "amount": 1,
+    "limit": "daily",
+    "requires": "win_last_hero_low"
+  },
+  {
+    "id": "millstone",
+    "title": "Millstone",
+    "description": "Win by decking out the opponent",
+    "amount": 1,
+    "limit": "daily",
+    "requires": "win_deck_out"
+  },
+  {
+    "id": "spammer",
+    "title": "Spammer",
+    "description": "Win with 9+ full Support Zones",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "win_support_full"
+  },
+  {
+    "id": "brutal",
+    "title": "Brutal",
+    "description": "Deal 400+ damage in a single hit",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "damage_instance_400"
+  },
+  {
+    "id": "rich",
+    "title": "Rich",
+    "description": "Earn 99+ Gold in a single game",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "gold_earned_99"
+  },
+  {
+    "id": "comeback",
+    "title": "Comeback",
+    "description": "Win after being the first player down to 1 Hero",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "win_comeback"
+  },
+  {
+    "id": "flawless",
+    "title": "Flawless",
+    "description": "Win without any Hero taking 50%+ damage",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "win_flawless"
+  },
+  {
+    "id": "overkill",
+    "title": "Overkill",
+    "description": "Deal damage to a Creature equal to 2x its max HP in one hit",
+    "amount": 1,
+    "limit": "daily",
+    "requires": "creature_overkill"
+  },
+  {
+    "id": "super_skilled",
+    "title": "Super-Skilled",
+    "description": "Fill all Ability Zones on all Heroes",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "all_abilities_filled"
+  },
+  {
+    "id": "over_skilled",
+    "title": "Over-Skilled",
+    "description": "Fill all Ability Zones at level 3 on all Heroes",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "all_abilities_level3"
+  },
+  {
+    "id": "marathon",
+    "title": "Marathon",
+    "description": "Win a game that reaches turn 30",
+    "amount": 2,
+    "limit": "unlimited",
+    "requires": "win_turn_30"
+  },
+  {
+    "id": "speedrun",
+    "title": "Speedrun",
+    "description": "Win by turn 6 without a surrender",
+    "amount": 1,
+    "limit": "daily",
+    "requires": "win_speedrun"
+  },
+  {
+    "id": "socialite",
+    "title": "Socialite",
+    "description": "Play vs 5 unique opponents in one day",
+    "amount": 2,
+    "limit": "daily",
+    "requires": "unique_opponents_5"
+  },
+  {
+    "id": "first_blood",
+    "title": "First Blood",
+    "description": "Achieve your first ever victory",
+    "amount": 10,
+    "limit": "once",
+    "requires": "first_win"
+  },
+  {
+    "id": "good_game",
+    "title": "Good Game",
+    "description": "Play a hard-fought game (7+ turns, 400+ HP lost each, 5+ min)",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "good_game"
+  }
+]

@@ -29,6 +29,7 @@ let SUBTYPES = [];
 let SPELL_SCHOOLS = [];
 let STARTING_ABILITIES = [];
 let ARCHETYPES = [];
+let SKINS_DB = {}; // cardName → [skinName, ...]
 
 async function loadCardDB() {
   // Load full card database (needed for rule lookups on existing decks)
@@ -66,11 +67,26 @@ async function loadCardDB() {
   SPELL_SCHOOLS = [...ssSet].sort();
   STARTING_ABILITIES = [...saSet].sort();
   ARCHETYPES = [...arSet].sort();
+
+  // Load skins registry
+  try {
+    const skRes = await fetch('/api/skins');
+    const skData = await skRes.json();
+    SKINS_DB = skData.skins || {};
+  } catch { SKINS_DB = {}; }
 }
 
-function cardImageUrl(cardName) {
+function cardImageUrl(cardName, skinOverrides) {
+  // If a skin is selected for this card, use the skin image
+  if (skinOverrides && skinOverrides[cardName]) {
+    return '/cards/skins/' + encodeURIComponent(skinOverrides[cardName]) + '.png';
+  }
   const file = AVAILABLE_MAP[cardName];
   return file ? '/cards/' + encodeURIComponent(file) : null;
+}
+
+function skinImageUrl(skinName) {
+  return '/cards/skins/' + encodeURIComponent(skinName) + '.png';
 }
 
 // ===== DECK HELPERS =====
@@ -300,9 +316,9 @@ function FoilOverlay({ bands, shimmerOffset, sparkleDelays, foilType }) {
 const GALLERY_W = 400;
 const TOP_BAR_H = 41; // top bar approximate height
 
-function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style, dragData, inGallery }) {
+function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style, dragData, inGallery, isCover, skins }) {
   const [tt, setTT] = useState(null);
-  const imgUrl = cardImageUrl(card.name);
+  const imgUrl = cardImageUrl(card.name, skins);
   const foilType = card.foil; // 'secret_rare' | 'diamond_rare' | null
   const isFoil = foilType === 'secret_rare' || foilType === 'diamond_rare';
   const foilClass = foilType === 'diamond_rare' ? 'foil-diamond-rare' : foilType === 'secret_rare' ? 'foil-secret-rare' : '';
@@ -335,7 +351,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
   const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : '1px solid var(--bg4)';
   return (
     <>
-      <div className={'card-mini ' + typeClass(card.cardType) + (dimmed ? ' dimmed' : '') + (foilClass ? ' ' + foilClass : '')}
+      <div className={'card-mini ' + typeClass(card.cardType) + (dimmed ? ' dimmed' : '') + (foilClass ? ' ' + foilClass : '') + (isCover ? ' card-mini-cover' : '')}
         style={style}
         draggable={!!dragData}
         onDragStart={onDragStart}
@@ -486,6 +502,9 @@ function MainMenu() {
       <div style={{ marginTop: 30, display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ color: user.color || 'var(--accent)', fontWeight: 700 }} className="orbit-font">{user.username}</span>
         <span className="badge" style={{ background: 'rgba(170,255,0,.12)', color: 'var(--accent3)' }}>ELO {user.elo}</span>
+        <span className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <img src="/data/sc.png" style={{ width: 14, height: 14, imageRendering: 'pixelated' }} /> {user.sc || 0}
+        </span>
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={logout}>LOGOUT</button>
       </div>
     </div>
@@ -702,10 +721,23 @@ function ProfileScreen() {
               {user.username}
             </div>
 
-            {/* ELO display */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 6 }}>
-              <span className="orbit-font" style={{ fontSize: 22, fontWeight: 700, color: rank.color }}>{user.elo || 1000}</span>
-              <span style={{ fontSize: 12, color: 'var(--text2)' }}>ELO</span>
+            {/* ELO + SC display */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="orbit-font" style={{ fontSize: 22, fontWeight: 700, color: rank.color }}>{user.elo || 1000}</span>
+                <span style={{ fontSize: 12, color: 'var(--text2)' }}>ELO</span>
+              </div>
+              <span style={{ color: 'var(--bg4)', fontSize: 20 }}>│</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }} className="sc-icon-hover-parent">
+                <div style={{ position: 'relative', cursor: 'pointer' }} className="sc-icon-wrapper">
+                  <img src="/data/sc.png" style={{ width: 20, height: 20, imageRendering: 'pixelated' }} />
+                  <div className="sc-icon-tooltip">
+                    <img src="/data/sc.png" style={{ width: 96, height: 96, imageRendering: 'pixelated' }} />
+                  </div>
+                </div>
+                <span className="orbit-font" style={{ fontSize: 20, fontWeight: 700, color: '#ffd700' }}>{user.sc || 0}</span>
+                <span style={{ fontSize: 11, color: 'var(--text2)' }}>SC</span>
+              </div>
             </div>
 
             {/* ELO progress bar */}
@@ -945,7 +977,7 @@ function ProfileScreen() {
             ) : (
               <div className="profile-deck-wall">
                 {(deckStats.decks || []).map(d => {
-                  const img = getCardImage(d.repCard);
+                  const img = d.repSkin ? skinImageUrl(d.repSkin) : getCardImage(d.repCard);
                   return (
                     <div key={d.id} className="profile-deck-tile" onClick={() => setScreen('deckbuilder')}>
                       <div className="profile-deck-tile-card">
@@ -1069,6 +1101,10 @@ function DeckBuilder() {
   // Sync unsaved changes to module-level persistence
   useEffect(() => { _persistedUnsaved = unsaved; }, [unsaved]);
   const [loaded, setLoaded] = useState(false);
+  const [sampleDecks, setSampleDecks] = useState([]);
+  const [showSamples, setShowSamples] = useState(true);
+  const [sampleActive, setSampleActive] = useState(-1);
+  const isSampleMode = sampleActive >= 0;
   const [filters, setFilters] = useState({ name:'',effect:'',cardType:'',subtype:'',archetype:'',sa1:'',sa2:'',ss1:'',ss2:'',level:'',cost:'',hp:'',atk:'' });
   const [cardPage, setCardPage] = useState(0);
   const [renaming, setRenaming] = useState(false);
@@ -1088,7 +1124,7 @@ function DeckBuilder() {
     return shRef.current[deckId][sec];
   };
 
-  // Load decks
+  // Load decks + sample decks
   useEffect(() => {
     (async () => {
       try {
@@ -1102,6 +1138,7 @@ function DeckBuilder() {
           setDecks([nd.deck]);
         }
       } catch (e) { notify(e.message, 'error'); }
+      try { const sd = await api('/sample-decks'); setSampleDecks(sd.decks || []); } catch (e) { /* ignore */ }
       setLoaded(true);
     })();
   }, []);
@@ -1113,20 +1150,33 @@ function DeckBuilder() {
     return () => { window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close); };
   }, []);
 
+  // Escape closes context menu / skin gallery before navigating away
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        if (skinGallery) { e.stopImmediatePropagation(); setSkinGallery(null); return; }
+        if (ctxMenu) { e.stopImmediatePropagation(); setCtxMenu(null); return; }
+      }
+    };
+    window.addEventListener('keydown', handleEsc, true);
+    return () => window.removeEventListener('keydown', handleEsc, true);
+  }, [ctxMenu, skinGallery]);
+
   // Current deck with unsaved overlay
   const currentDeck = useMemo(() => {
-    if (!decks[activeIdx]) return null;
-    const base = decks[activeIdx];
+    const base = isSampleMode ? sampleDecks[sampleActive] : decks[activeIdx];
+    if (!base) return null;
     const overlay = unsaved[base.id];
     return overlay ? { ...base, ...overlay } : base;
-  }, [decks, activeIdx, unsaved]);
+  }, [decks, activeIdx, unsaved, sampleDecks, sampleActive, isSampleMode]);
 
   // Section key mapping
   const SK = { main: 'mainDeck', heroes: 'heroes', potion: 'potionDeck', side: 'sideDeck' };
 
   // Update one or more sections with per-section history
   const updateSections = (changes) => {
-    const deckId = decks[activeIdx]?.id;
+    const base = isSampleMode ? sampleDecks[sampleActive] : decks[activeIdx];
+    const deckId = base?.id;
     if (!deckId) return;
     for (const [sec, val] of Object.entries(changes)) {
       const h = getSH(deckId, sec);
@@ -1156,7 +1206,7 @@ function DeckBuilder() {
 
   // Per-section undo/redo
   const undoSection = (sec) => {
-    const deckId = decks[activeIdx]?.id; if (!deckId) return;
+    const deckId = currentDeck?.id; if (!deckId) return;
     const h = getSH(deckId, sec); if (h.idx <= 0) return;
     h.idx--;
     const val = h.stack[h.idx];
@@ -1170,14 +1220,14 @@ function DeckBuilder() {
     setHistoryTick(t => t + 1);
   };
   const redoSection = (sec) => {
-    const deckId = decks[activeIdx]?.id; if (!deckId) return;
+    const deckId = currentDeck?.id; if (!deckId) return;
     const h = getSH(deckId, sec); if (h.idx >= h.stack.length - 1) return;
     h.idx++;
     setUnsaved(prev => ({ ...prev, [deckId]: { ...(prev[deckId] || {}), [SK[sec]]: h.stack[h.idx] } }));
     setHistoryTick(t => t + 1);
   };
-  const canUndoSec = (sec) => { const id = decks[activeIdx]?.id; const h = id && shRef.current[id]?.[sec]; return h && h.idx > 0; };
-  const canRedoSec = (sec) => { const id = decks[activeIdx]?.id; const h = id && shRef.current[id]?.[sec]; return h && h.idx < h.stack.length - 1; };
+  const canUndoSec = (sec) => { const id = currentDeck?.id; const h = id && shRef.current[id]?.[sec]; return h && h.idx > 0; };
+  const canRedoSec = (sec) => { const id = currentDeck?.id; const h = id && shRef.current[id]?.[sec]; return h && h.idx < h.stack.length - 1; };
 
   // ——— Server operations ———
   const saveCurrent = async () => {
@@ -1185,7 +1235,7 @@ function DeckBuilder() {
     try {
       const data = await api('/decks/' + currentDeck.id, {
         method: 'PUT',
-        body: JSON.stringify({ name: currentDeck.name, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, isDefault: currentDeck.isDefault })
+        body: JSON.stringify({ name: currentDeck.name, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, isDefault: currentDeck.isDefault, coverCard: currentDeck.coverCard || '', skins: currentDeck.skins || {} })
       });
       const newDecks = [...decks]; newDecks[activeIdx] = data.deck;
       const id = currentDeck.id;
@@ -1202,17 +1252,29 @@ function DeckBuilder() {
       const newName = renameVal.trim();
       setRenaming(false);
       try {
-        const data = await api('/decks/' + currentDeck.id, {
-          method: 'PUT',
-          body: JSON.stringify({ name: newName, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, isDefault: currentDeck.isDefault })
-        });
-        const newDecks = [...decks]; newDecks[activeIdx] = data.deck;
-        const id = currentDeck.id;
-        setUnsaved(prev => { const n = { ...prev }; delete n[id]; return n; });
-        delete shRef.current[id];
-        setHistoryTick(t => t + 1);
-        setDecks(newDecks);
-        notify('Deck renamed & saved!', 'success');
+        if (isSampleMode) {
+          // Sample deck rename → create a new real deck with this name and content
+          const created = await api('/decks', { method: 'POST', body: JSON.stringify({ name: newName }) });
+          await api('/decks/' + created.deck.id, { method: 'PUT', body: JSON.stringify({ name: newName, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, isDefault: false }) });
+          const final = await api('/decks/' + created.deck.id);
+          const sampleId = currentDeck.id;
+          setUnsaved(prev => { const n = { ...prev }; delete n[sampleId]; return n; });
+          delete shRef.current[sampleId];
+          const newDecks = [...decks, final.deck]; setDecks(newDecks); setActiveIdx(newDecks.length - 1); setSampleActive(-1);
+          notify('Sample deck saved as "' + newName + '"!', 'success');
+        } else {
+          const data = await api('/decks/' + currentDeck.id, {
+            method: 'PUT',
+            body: JSON.stringify({ name: newName, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, isDefault: currentDeck.isDefault, coverCard: currentDeck.coverCard || '', skins: currentDeck.skins || {} })
+          });
+          const newDecks = [...decks]; newDecks[activeIdx] = data.deck;
+          const id = currentDeck.id;
+          setUnsaved(prev => { const n = { ...prev }; delete n[id]; return n; });
+          delete shRef.current[id];
+          setHistoryTick(t => t + 1);
+          setDecks(newDecks);
+          notify('Deck renamed & saved!', 'success');
+        }
       } catch (e) { notify(e.message, 'error'); }
     } else { setRenaming(false); }
   };
@@ -1222,18 +1284,29 @@ function DeckBuilder() {
     const newName = prompt('New deck name:', currentDeck.name + ' (Copy)');
     if (!newName) return;
     try {
-      await api('/decks/' + currentDeck.id, { method: 'PUT', body: JSON.stringify({ name: currentDeck.name, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, isDefault: currentDeck.isDefault }) });
-      const id = currentDeck.id;
-      setUnsaved(prev => { const n = { ...prev }; delete n[id]; return n; });
-      delete shRef.current[id];
-      const data = await api('/decks/' + currentDeck.id + '/saveas', { method: 'POST', body: JSON.stringify({ name: newName }) });
-      const newDecks = [...decks, data.deck]; setDecks(newDecks); setActiveIdx(newDecks.length - 1);
+      if (isSampleMode) {
+        // Sample deck: create a brand new DB deck with the sample's content
+        const created = await api('/decks', { method: 'POST', body: JSON.stringify({ name: newName }) });
+        await api('/decks/' + created.deck.id, { method: 'PUT', body: JSON.stringify({ name: newName, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, isDefault: false }) });
+        const final = await api('/decks/' + created.deck.id);
+        const sampleId = currentDeck.id;
+        setUnsaved(prev => { const n = { ...prev }; delete n[sampleId]; return n; });
+        delete shRef.current[sampleId];
+        const newDecks = [...decks, final.deck]; setDecks(newDecks); setActiveIdx(newDecks.length - 1); setSampleActive(-1);
+      } else {
+        await api('/decks/' + currentDeck.id, { method: 'PUT', body: JSON.stringify({ name: currentDeck.name, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes, potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck, isDefault: currentDeck.isDefault, coverCard: currentDeck.coverCard || '', skins: currentDeck.skins || {} }) });
+        const id = currentDeck.id;
+        setUnsaved(prev => { const n = { ...prev }; delete n[id]; return n; });
+        delete shRef.current[id];
+        const data = await api('/decks/' + currentDeck.id + '/saveas', { method: 'POST', body: JSON.stringify({ name: newName }) });
+        const newDecks = [...decks, data.deck]; setDecks(newDecks); setActiveIdx(newDecks.length - 1);
+      }
       notify('Saved as "' + newName + '"!', 'success');
     } catch (e) { notify(e.message, 'error'); }
   };
 
   const deleteDeck = async () => {
-    if (decks.length <= 1) return;
+    if (isSampleMode || decks.length <= 1) return;
     if (!confirm('Delete "' + currentDeck.name + '"?')) return;
     try {
       await api('/decks/' + currentDeck.id, { method: 'DELETE' });
@@ -1250,7 +1323,26 @@ function DeckBuilder() {
     const v = isDeckLegal(currentDeck);
     if (!v.legal) { notify('Deck must be legal to set as default', 'error'); return; }
     try {
-      await api('/decks/' + currentDeck.id, { method: 'PUT', body: JSON.stringify({ isDefault: true }) });
+      let deckId = currentDeck.id;
+      // If it's a sample deck, save it as a real deck first
+      if (isSampleMode) {
+        const created = await api('/decks', { method: 'POST', body: JSON.stringify({ name: currentDeck.name }) });
+        deckId = created.deck.id;
+        const final = await api('/decks/' + deckId, { method: 'PUT', body: JSON.stringify({
+          name: currentDeck.name, mainDeck: currentDeck.mainDeck, heroes: currentDeck.heroes,
+          potionDeck: currentDeck.potionDeck, sideDeck: currentDeck.sideDeck || [], isDefault: true,
+        }) });
+        const sampleId = currentDeck.id;
+        setUnsaved(prev => { const n = { ...prev }; delete n[sampleId]; return n; });
+        delete shRef.current[sampleId];
+        const newDecks = [...decks, final.deck].map(d => ({ ...d, isDefault: d.id === deckId }));
+        setDecks(newDecks);
+        setActiveIdx(newDecks.length - 1);
+        setSampleActive(-1);
+        notify('Sample deck saved & set as default!', 'success');
+        return;
+      }
+      await api('/decks/' + deckId, { method: 'PUT', body: JSON.stringify({ isDefault: true }) });
       setDecks(decks.map((d, i) => ({ ...d, isDefault: i === activeIdx })));
       notify('Set as default deck!', 'success');
     } catch (e) { notify(e.message, 'error'); }
@@ -1392,6 +1484,117 @@ function DeckBuilder() {
     else if (card.cardType === 'Potion') addCardTo(cardName, 'potion');
     else addCardTo(cardName, 'main');
   }, [addCardTo]);
+
+  // Cover card management — auto-saves immediately (cover only, not rest of deck)
+  const setCoverCard = useCallback(async (cardName) => {
+    const base = isSampleMode ? sampleDecks[sampleActive] : decks[activeIdx];
+    const deckId = base?.id;
+    if (!deckId) return;
+    // Update local state immediately for visual feedback
+    if (!base.isSample) {
+      const newDecks = [...decks];
+      newDecks[activeIdx] = { ...newDecks[activeIdx], coverCard: cardName };
+      setDecks(newDecks);
+      // Also clear from unsaved overlay if it was there
+      setUnsaved(prev => {
+        const overlay = prev[deckId];
+        if (!overlay) return prev;
+        const n = { ...prev, [deckId]: { ...overlay } };
+        delete n[deckId].coverCard;
+        if (Object.keys(n[deckId]).length === 0) delete n[deckId];
+        return n;
+      });
+      // Save just the cover card to the server
+      try {
+        await api('/decks/' + deckId, { method: 'PUT', body: JSON.stringify({ coverCard: cardName || '' }) });
+      } catch (e) { /* silent */ }
+    } else {
+      // For sample decks, just use unsaved overlay (can't save to server)
+      setUnsaved(prev => ({
+        ...prev,
+        [deckId]: { ...(prev[deckId] || {}), coverCard: cardName }
+      }));
+    }
+  }, [decks, activeIdx, sampleDecks, sampleActive, isSampleMode]);
+
+  // Auto-clear cover card if it's no longer in any section
+  useEffect(() => {
+    if (!currentDeck?.coverCard) return;
+    const allCards = [
+      ...(currentDeck.mainDeck || []),
+      ...(currentDeck.potionDeck || []),
+      ...(currentDeck.sideDeck || []),
+      ...(currentDeck.heroes || []).filter(h => h?.hero).map(h => h.hero),
+    ];
+    if (!allCards.includes(currentDeck.coverCard)) {
+      setCoverCard('');
+    }
+  }, [currentDeck?.mainDeck, currentDeck?.potionDeck, currentDeck?.sideDeck, currentDeck?.heroes]);
+
+  // Skin management — auto-saves immediately (like cover card)
+  const [skinGallery, setSkinGallery] = useState(null); // { cardName, skins: [...] }
+
+  const setSkin = useCallback(async (cardName, skinName) => {
+    const base = isSampleMode ? sampleDecks[sampleActive] : decks[activeIdx];
+    const deckId = base?.id;
+    if (!deckId) return;
+    const oldSkins = currentDeck?.skins || {};
+    const newSkins = { ...oldSkins };
+    if (skinName) newSkins[cardName] = skinName;
+    else delete newSkins[cardName];
+
+    if (!base.isSample) {
+      const newDecks = [...decks];
+      newDecks[activeIdx] = { ...newDecks[activeIdx], skins: newSkins };
+      setDecks(newDecks);
+      setUnsaved(prev => {
+        const overlay = prev[deckId];
+        if (!overlay) return prev;
+        const n = { ...prev, [deckId]: { ...overlay } };
+        delete n[deckId].skins;
+        if (Object.keys(n[deckId]).length === 0) delete n[deckId];
+        return n;
+      });
+      try {
+        await api('/decks/' + deckId, { method: 'PUT', body: JSON.stringify({ skins: newSkins }) });
+      } catch (e) { /* silent */ }
+    } else {
+      setUnsaved(prev => ({
+        ...prev,
+        [deckId]: { ...(prev[deckId] || {}), skins: newSkins }
+      }));
+    }
+  }, [decks, activeIdx, sampleDecks, sampleActive, isSampleMode, currentDeck?.skins]);
+
+  // Auto-clear skins for cards no longer in any section
+  useEffect(() => {
+    if (!currentDeck?.skins || Object.keys(currentDeck.skins).length === 0) return;
+    const allCards = new Set([
+      ...(currentDeck.mainDeck || []),
+      ...(currentDeck.potionDeck || []),
+      ...(currentDeck.sideDeck || []),
+      ...(currentDeck.heroes || []).filter(h => h?.hero).map(h => h.hero),
+    ]);
+    for (const cardName of Object.keys(currentDeck.skins)) {
+      if (!allCards.has(cardName)) setSkin(cardName, null);
+    }
+  }, [currentDeck?.mainDeck, currentDeck?.potionDeck, currentDeck?.sideDeck, currentDeck?.heroes]);
+
+  // Left-click deck card → cover card + skin menu
+  const showCoverMenu = useCallback((cardName, e) => {
+    if (!currentDeck) return;
+    const isCover = currentDeck.coverCard === cardName;
+    const hasSkins = SKINS_DB[cardName] && SKINS_DB[cardName].length > 0;
+    const items = [
+      isCover
+        ? { label: 'Remove as cover card', icon: '✕', color: 'var(--danger)', action: () => setCoverCard('') }
+        : { label: 'Make this the cover card', icon: '⭐', color: '#ffd700', action: () => setCoverCard(cardName) },
+    ];
+    if (hasSkins) {
+      items.push({ label: 'Select skin', icon: '🎨', color: 'var(--accent)', action: () => setSkinGallery({ cardName, options: SKINS_DB[cardName] }) });
+    }
+    setCtxMenu({ x: e.clientX, y: e.clientY, items });
+  }, [currentDeck, setCoverCard]);
 
   // Left-click DB card → context menu
   const showAddMenu = useCallback((cardName, e) => {
@@ -1736,7 +1939,7 @@ function DeckBuilder() {
     e.target.value = '';
 
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const text = ev.target.result;
       const lines = text.split(/\r?\n/);
 
@@ -1800,7 +2003,22 @@ function DeckBuilder() {
         side: sideCards
       });
 
-      notify('Deck imported! (' + mainCards.length + ' main, ' + potionCards.length + ' potions, ' + sideCards.length + ' side)', 'success');
+      // Auto-save imported deck (only for user decks, not sample decks)
+      const deckToSave = isSampleMode ? null : decks[activeIdx];
+      if (deckToSave) {
+        try {
+          const data = await api('/decks/' + deckToSave.id, {
+            method: 'PUT',
+            body: JSON.stringify({ name: deckToSave.name, mainDeck: mainCards, heroes: importedHeroes, potionDeck: potionCards, sideDeck: sideCards, isDefault: deckToSave.isDefault, coverCard: deckToSave.coverCard || '', skins: deckToSave.skins || {} })
+          });
+          const newDecks = [...decks]; newDecks[activeIdx] = data.deck; setDecks(newDecks);
+          setUnsaved(prev => { const n = { ...prev }; delete n[deckToSave.id]; return n; });
+          delete shRef.current[deckToSave.id];
+          setHistoryTick(t => t + 1);
+        } catch (e) { /* silent — local state already updated */ }
+      }
+
+      notify('Deck imported' + (deckToSave ? ' & saved' : '') + '! (' + mainCards.length + ' main, ' + potionCards.length + ' potions, ' + sideCards.length + ' side)', 'success');
     };
     reader.readAsText(file);
   };
@@ -1814,12 +2032,13 @@ function DeckBuilder() {
         <button className="btn" style={{ padding: '4px 10px', fontSize: 9 }} onClick={() => setScreen('menu')}>← MENU</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', margin: '0 8px' }}>DECK BUILDER</h2>
         <div style={{ flex: 1 }} />
-        <button className={'btn' + (hasUnsaved ? ' btn-flash-save' : '')} style={{ padding: '4px 10px', fontSize: 9 }} onClick={saveCurrent} disabled={!hasUnsaved}>💾 SAVE</button>
+        <button className={'btn' + (hasUnsaved && !isSampleMode ? ' btn-flash-save' : '')} style={{ padding: '4px 10px', fontSize: 9 }} onClick={saveCurrent} disabled={!hasUnsaved || isSampleMode}
+          title={isSampleMode ? 'Cannot save sample decks — use Save As or Rename' : ''}>💾 SAVE</button>
         <button className="btn btn-accent2" style={{ padding: '4px 10px', fontSize: 9 }} onClick={saveAs}>SAVE AS</button>
-        <button className="btn btn-danger" style={{ padding: '4px 10px', fontSize: 9 }} onClick={deleteDeck} disabled={decks.length <= 1}>🗑 DELETE</button>
+        <button className="btn btn-danger" style={{ padding: '4px 10px', fontSize: 9 }} onClick={deleteDeck} disabled={decks.length <= 1 || isSampleMode}>🗑 DELETE</button>
         <button className="btn btn-success" style={{ padding: '4px 10px', fontSize: 9 }} onClick={setDefault}
           disabled={!validation.legal || currentDeck?.isDefault}
-          title={!validation.legal ? validation.reasons.join(', ') : currentDeck?.isDefault ? 'Already default' : 'Set as default deck'}>
+          title={!validation.legal ? validation.reasons.join(', ') : currentDeck?.isDefault ? 'Already default' : isSampleMode ? 'Will save sample deck and set as default' : 'Set as default deck'}>
           {currentDeck?.isDefault ? '★ DEFAULT' : '☆ SET DEFAULT'}
         </button>
         <div style={{ width: 1, height: 20, background: 'var(--bg4)', margin: '0 4px' }} />
@@ -1837,13 +2056,32 @@ function DeckBuilder() {
             {decks.map((d, i) => {
               const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
               return (
-                <div key={d.id} className={'deck-list-item' + (i === activeIdx ? ' active' : '')} onClick={() => setActiveIdx(i)}>
+                <div key={d.id} className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); }}>
                   {d.isDefault && <span style={{ color: '#ffd700', fontSize: 10 }}>★</span>}
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
                   <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
                 </div>
               );
             })}
+            {sampleDecks.length > 0 && (
+              <>
+                <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
+                  <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, flex: 1 }}>SAMPLE DECKS</span>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, color: 'var(--accent)', padding: 0 }}
+                    onClick={() => setShowSamples(v => !v)}>{showSamples ? 'Hide' : 'Show'}</button>
+                </div>
+                {showSamples && sampleDecks.map((d, i) => {
+                  const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
+                  return (
+                    <div key={d.id} className={'deck-list-item deck-list-sample' + (isSampleMode && sampleActive === i ? ' active' : '')}
+                      onClick={() => setSampleActive(i)}>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
+                      <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
           </div>
           <button className="btn" style={{ margin: 8, padding: 6, fontSize: 10 }} onClick={async () => {
             try { const data = await api('/decks', { method: 'POST', body: JSON.stringify({ name: 'Deck ' + (decks.length + 1) }) }); setDecks([...decks, data.deck]); setActiveIdx(decks.length); } catch (e) { notify(e.message, 'error'); }
@@ -1900,8 +2138,8 @@ function DeckBuilder() {
                         <div style={{ position: 'relative' }}
                           onMouseDown={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}>
                           <CardMini card={CARDS_BY_NAME[h.hero]}
-                            onClick={() => {}} onRightClick={() => removeFrom(h.hero, 'hero')}
-                            style={{ width: 166, height: 230, aspectRatio: 'unset' }} />
+                            onClick={(e) => showCoverMenu(h.hero, e)} onRightClick={() => removeFrom(h.hero, 'hero')}
+                            style={{ width: 166, height: 230, aspectRatio: 'unset' }} isCover={h.hero === currentDeck?.coverCard} skins={currentDeck?.skins} />
                           <button style={{ position: 'absolute', top: -5, right: -5, background: 'var(--danger)', color: '#fff',
                             border: 'none', width: 18, height: 18, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
                             onClick={() => removeFrom(h.hero, 'hero')}>✕</button>
@@ -1940,7 +2178,7 @@ function DeckBuilder() {
                   const isDragging = deckDrag && deckDrag.section === 'main' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'m-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}>
-                    <CardMini card={card} onClick={() => {}} onRightClick={() => removeFrom(item.card,'main',item.origIdx)} />
+                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e)} onRightClick={() => removeFrom(item.card,'main',item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
                   </div>;
                 })}
               </div>
@@ -1958,7 +2196,7 @@ function DeckBuilder() {
                   const isDragging = deckDrag && deckDrag.section === 'potion' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'p-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}>
-                    <CardMini card={card} onClick={() => {}} onRightClick={() => removeFrom(item.card,'potion',item.origIdx)} />
+                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e)} onRightClick={() => removeFrom(item.card,'potion',item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
                   </div>;
                 })}
               </div>
@@ -1976,7 +2214,7 @@ function DeckBuilder() {
                   const isDragging = deckDrag && deckDrag.section === 'side' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'s-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}>
-                    <CardMini card={card} onClick={() => {}} onRightClick={() => removeFrom(item.card,'side',item.origIdx)} />
+                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e)} onRightClick={() => removeFrom(item.card,'side',item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
                   </div>;
                 })}
               </div>
@@ -2044,6 +2282,31 @@ function DeckBuilder() {
       </div>
 
       {ctxMenu && <CtxMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />}
+      {skinGallery && (
+        <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.7)', zIndex: 10000 }} onClick={() => setSkinGallery(null)}>
+          <div className="skin-gallery-panel animate-in" onClick={e => e.stopPropagation()}>
+            <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 12 }}>
+              🎨 Select Skin — {skinGallery.cardName}
+            </div>
+            <div className="skin-gallery-grid">
+              <div className={'skin-gallery-item' + (!currentDeck?.skins?.[skinGallery.cardName] ? ' skin-selected' : '')}
+                onClick={() => { setSkin(skinGallery.cardName, null); setSkinGallery(null); }}>
+                <img src={cardImageUrl(skinGallery.cardName)} draggable={false} />
+                <div className="skin-gallery-label">Original</div>
+              </div>
+              {skinGallery.options.map(skinName => (
+                <div key={skinName} className={'skin-gallery-item' + (currentDeck?.skins?.[skinGallery.cardName] === skinName ? ' skin-selected' : '')}
+                  onClick={() => { setSkin(skinGallery.cardName, skinName); setSkinGallery(null); }}>
+                  <img src={skinImageUrl(skinName)} draggable={false} />
+                  <div className="skin-gallery-label">{skinName}</div>
+                </div>
+              ))}
+            </div>
+            <button className="btn" style={{ marginTop: 12, padding: '6px 20px', fontSize: 11 }}
+              onClick={() => setSkinGallery(null)}>Close</button>
+          </div>
+        </div>
+      )}
 
       {/* Floating deck drag card */}
       {deckDrag && deckDrag.card && (
@@ -2060,10 +2323,10 @@ function DeckBuilder() {
 //  GAME BOARD
 // ═══════════════════════════════════════════
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins }) {
   const [tt, setTT] = useState(false);
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
-  const imgUrl = card ? cardImageUrl(card.name) : null;
+  const imgUrl = card ? cardImageUrl(card.name, skins) : null;
 
   // Foil support
   const foilType = card?.foil || null;
@@ -2329,8 +2592,9 @@ function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest }) {
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
   const isDeleted = dest === 'deleted';
+  const isDeckReturn = dest === 'deck';
   return (
-    <div className={'discard-anim-card' + (isDeleted ? ' discard-anim-deleted' : '')}
+    <div className={'discard-anim-card' + (isDeleted ? ' discard-anim-deleted' : '') + (isDeckReturn ? ' discard-anim-deck-return' : '')}
       style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px' }}>
       <div className="board-card" style={{ width: '100%', height: '100%' }}>
         {imgUrl ? <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
@@ -2377,7 +2641,7 @@ function DraggablePanel({ children, className, style }) {
     : {};
   return (
     <div ref={panelRef} className={className} style={{ ...style, ...posStyle, cursor: dragging ? 'grabbing' : 'grab' }}
-      onMouseDown={onDown}>
+      onMouseDown={onDown} onClick={e => e.stopPropagation()}>
       {children}
     </div>
   );
@@ -2722,6 +2986,36 @@ function PoisonedOverlay({ stacks }) {
         }}>☠️</span>
       ))}
       {stacks >= 1 && <div className="poison-stack-count">{stacks}</div>}
+    </div>
+  );
+}
+
+// Buff column — displays positive buff icons on heroes/creatures
+function BuffColumn({ buffs }) {
+  if (!buffs || Object.keys(buffs).length === 0) return null;
+  const BUFF_ICONS = { cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' } };
+  const [tip, setTip] = useState(null);
+  return (
+    <div className="buff-column">
+      {Object.entries(buffs).map(([key]) => {
+        const def = BUFF_ICONS[key] || { icon: '✦', tooltip: key };
+        return (
+          <div key={key} className="buff-icon"
+            onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ text: def.tooltip, x: r.right + 6, y: r.top + r.height / 2 }); }}
+            onMouseLeave={() => setTip(null)}>
+            {def.icon}
+          </div>
+        );
+      })}
+      {tip && (
+        <div style={{
+          position: 'fixed', left: tip.x, top: tip.y, transform: 'translateY(-50%)',
+          background: 'var(--bg2)', border: '1px solid var(--accent)', color: 'var(--text)',
+          padding: '3px 10px', fontSize: 11, fontFamily: "'Rajdhani', sans-serif", fontWeight: 600,
+          whiteSpace: 'nowrap', zIndex: 9990, pointerEvents: 'none',
+          boxShadow: '0 2px 8px rgba(0,0,0,.6)',
+        }}>{tip.text}</div>
+      )}
     </div>
   );
 }
@@ -3266,6 +3560,148 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  dark_gear_spin_cw: (() => {
+    return function DarkGearCWEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-dark-gear-flash" />
+          <div className="anim-dark-gear cw">⚙</div>
+        </div>
+      );
+    };
+  })(),
+  dark_gear_spin_ccw: (() => {
+    return function DarkGearCCWEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-dark-gear-flash" />
+          <div className="anim-dark-gear ccw">⚙</div>
+        </div>
+      );
+    };
+  })(),
+  cloud_gather: (() => {
+    return function CloudGatherEffect({ x, y }) {
+      const puffs = useMemo(() => Array.from({ length: 16 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 60 + Math.random() * 50;
+        return {
+          startX: Math.cos(angle) * dist,
+          startY: Math.sin(angle) * dist,
+          size: 14 + Math.random() * 18,
+          delay: Math.random() * 300,
+          dur: 500 + Math.random() * 300,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {puffs.map((p, i) => (
+            <div key={'cg'+i} style={{
+              position: 'absolute', left: p.startX, top: p.startY,
+              fontSize: p.size, color: '#fff',
+              filter: 'drop-shadow(0 0 6px rgba(255,255,255,.7))',
+              animation: `cloudGather ${p.dur}ms ease-in ${p.delay}ms forwards`,
+              opacity: 0,
+              '--startX': p.startX + 'px', '--startY': p.startY + 'px',
+            }}>☁</div>
+          ))}
+          <div style={{
+            position: 'absolute', left: -20, top: -14,
+            fontSize: 40, color: '#fff',
+            filter: 'drop-shadow(0 0 10px rgba(220,240,255,.8))',
+            animation: 'cloudFormCenter 400ms ease-out 600ms forwards',
+            opacity: 0,
+          }}>☁️</div>
+        </div>
+      );
+    };
+  })(),
+  cloud_disperse: (() => {
+    return function CloudDisperseEffect({ x, y }) {
+      const puffs = useMemo(() => Array.from({ length: 18 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 50 + Math.random() * 60;
+        return {
+          endX: Math.cos(angle) * dist,
+          endY: Math.sin(angle) * dist,
+          size: 10 + Math.random() * 14,
+          delay: 250 + Math.random() * 200,
+          dur: 400 + Math.random() * 300,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute', left: -20, top: -14,
+            fontSize: 40, color: '#fff',
+            filter: 'drop-shadow(0 0 10px rgba(220,240,255,.8))',
+            animation: 'cloudDisperseCenter 350ms ease-in forwards',
+            opacity: 1,
+          }}>☁️</div>
+          {puffs.map((p, i) => (
+            <div key={'cd'+i} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: p.size, color: '#fff',
+              filter: 'drop-shadow(0 0 5px rgba(255,255,255,.6))',
+              animation: `cloudDisperse ${p.dur}ms ease-out ${p.delay}ms forwards`,
+              opacity: 0,
+              '--endX': p.endX + 'px', '--endY': p.endY + 'px',
+            }}>☁</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  golden_ankh_revival: (() => {
+    return function GoldenAnkhRevivalEffect({ x, y }) {
+      const ankhs = useMemo(() => Array.from({ length: 12 }, () => ({
+        xOff: -45 + Math.random() * 90,
+        startY: 20 + Math.random() * 30,
+        endY: -70 - Math.random() * 80,
+        delay: 100 + Math.random() * 500,
+        dur: 700 + Math.random() * 500,
+        size: 14 + Math.random() * 16,
+        rot: -20 + Math.random() * 40,
+      })), []);
+      const sparkles = useMemo(() => Array.from({ length: 20 }, () => ({
+        xOff: -50 + Math.random() * 100,
+        startY: 10 + Math.random() * 40,
+        endY: -50 - Math.random() * 70,
+        delay: 200 + Math.random() * 600,
+        dur: 500 + Math.random() * 500,
+        size: 3 + Math.random() * 7,
+        color: ['#ffd700','#ffec80','#fff5cc','#ffb300','#ffe066'][Math.floor(Math.random() * 5)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(255,215,0,.85) 0%, rgba(255,180,0,.4) 35%, rgba(255,240,150,.1) 60%, transparent 80%)', animationDuration: '900ms' }} />
+          <div className="anim-flame-flash" style={{ width: 90, height: 90, marginLeft: -45, marginTop: -45, background: 'radial-gradient(circle, rgba(255,255,220,.95) 0%, rgba(255,215,0,.5) 40%, transparent 70%)', animationDelay: '250ms', animationDuration: '700ms' }} />
+          {ankhs.map((a, i) => (
+            <div key={'ak'+i} style={{
+              position: 'absolute', left: a.xOff, top: a.startY,
+              fontSize: a.size, color: '#ffd700',
+              filter: 'drop-shadow(0 0 6px rgba(255,200,0,.9))',
+              transform: `rotate(${a.rot}deg)`,
+              animation: `ankhFloat ${a.dur}ms ease-out ${a.delay}ms forwards`,
+              opacity: 0,
+              '--endY': a.endY + 'px',
+            }}>𓋹</div>
+          ))}
+          {sparkles.map((s, i) => (
+            <div key={'as'+i} style={{
+              position: 'absolute', left: s.xOff, top: s.startY,
+              width: s.size, height: s.size, borderRadius: '50%',
+              background: s.color,
+              boxShadow: `0 0 ${s.size}px ${s.color}`,
+              animation: `ankhFloat ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              opacity: 0,
+              '--endY': s.endY + 'px',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
   thaw: ThawEffect,
 };
 
@@ -3443,22 +3879,75 @@ function StatusSelectPrompt({ ep, onRespond }) {
 
 function GameBoard({ gameState, lobby, onLeave }) {
   const { user, notify } = useContext(AppContext);
+  const isSpectator = gameState.isSpectator || false;
   const myIdx = gameState.myIndex;
   const oppIdx = myIdx === 0 ? 1 : 0;
   const me = gameState.players[myIdx];
   const opp = gameState.players[oppIdx];
+  const gameSkins = useMemo(() => ({ ...(me.deckSkins || {}), ...(opp.deckSkins || {}) }), [me.deckSkins, opp.deckSkins]);
   const result = gameState.result;
   const iWon = result && result.winnerIdx === myIdx;
   const oppLeft = opp.left || false;
   const oppDisconnected = opp.disconnected || false;
-  const myRematchSent = (gameState.rematchRequests || []).includes(user.id);
+  const meDisconnected = me.disconnected || false;
+  const myRematchSent = !isSpectator && (gameState.rematchRequests || []).includes(user.id);
 
   // Local hand state for reordering
   const [hand, setHand] = useState(me.hand || []);
   const handKeyRef = useRef(JSON.stringify(me.hand || []));
   const [drawAnimCards, setDrawAnimCards] = useState([]); // [{id, cardName, origIdx}]
   const prevHandLenRef = useRef((me.hand || []).length);
+  // Spectator: track bottom player hand count for draw animations (like opponent draw)
+  const [specMeDrawAnims, setSpecMeDrawAnims] = useState([]);
+  const [specMeDrawHidden, setSpecMeDrawHidden] = useState(new Set());
+  const prevSpecMeHandCountRef = useRef(me.handCount || 0);
   useEffect(() => {
+    if (isSpectator) {
+      // Spectator mode: use handCount-based detection (same as opponent draw)
+      const newCount = me.handCount || 0;
+      const prevCount = prevSpecMeHandCountRef.current;
+      if (newCount > prevCount) {
+        const hiddenIdxs = new Set();
+        for (let i = prevCount; i < newCount; i++) hiddenIdxs.add(i);
+        setSpecMeDrawHidden(prev => new Set([...prev, ...hiddenIdxs]));
+        requestAnimationFrame(() => {
+          const deckEl = document.querySelector('[data-my-deck]');
+          const handCards = document.querySelectorAll('.game-hand-me .game-hand-cards .hand-card');
+          const deckRect = deckEl?.getBoundingClientRect();
+          if (deckRect && handCards.length > 0) {
+            const newAnims = [];
+            for (let i = 0; i < newCount - prevCount; i++) {
+              const targetCard = handCards[handCards.length - 1 - (newCount - prevCount - 1 - i)];
+              const targetRect = targetCard?.getBoundingClientRect();
+              if (!targetRect) continue;
+              newAnims.push({
+                id: Date.now() + Math.random() + i,
+                startX: deckRect.left + deckRect.width / 2 - 32,
+                startY: deckRect.top + deckRect.height / 2 - 45,
+                endX: targetRect.left, endY: targetRect.top,
+              });
+            }
+            if (newAnims.length > 0) {
+              setSpecMeDrawAnims(prev => [...prev, ...newAnims]);
+              setTimeout(() => {
+                setSpecMeDrawAnims(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
+                setSpecMeDrawHidden(prev => {
+                  const next = new Set(prev);
+                  hiddenIdxs.forEach(idx => next.delete(idx));
+                  return next.size > 0 ? next : new Set();
+                });
+              }, 500);
+            } else {
+              setSpecMeDrawHidden(new Set());
+            }
+          } else {
+            setSpecMeDrawHidden(new Set());
+          }
+        });
+      }
+      prevSpecMeHandCountRef.current = newCount;
+      return;
+    }
     const newKey = JSON.stringify(me.hand || []);
     if (newKey !== handKeyRef.current) {
       const newHand = me.hand || [];
@@ -3488,7 +3977,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
       }
       prevHandLenRef.current = newHand.length;
     }
-  }, [me.hand]);
+  }, [me.hand, me.handCount]);
 
   // Opponent draw animation tracking
   const [oppDrawAnims, setOppDrawAnims] = useState([]);
@@ -3563,6 +4052,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const [gameAnims, setGameAnims] = useState([]); // Active particle animations (moved up for creature death access)
   const [beamAnims, setBeamAnims] = useState([]); // Beam animations (laser, etc.)
   const [ramAnims, setRamAnims] = useState([]); // Ram animations (hero charges to target and back)
+  const [transferAnims, setTransferAnims] = useState([]); // Card transfer animations (Dark Gear, etc.)
   const [projectileAnims, setProjectileAnims] = useState([]); // Projectile animations (phoenix cannon, etc.)
   const [discardAnims, setDiscardAnims] = useState([]);
   const [myDiscardHidden, setMyDiscardHidden] = useState(0);
@@ -3573,6 +4063,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const oppHandRectsRef = useRef([]);
   const boardCardRectsRef = useRef({ me: {}, opp: {} }); // cardName → [DOMRect, ...]
   const prevMyHandForDiscardRef = useRef([...(me.hand || [])]);
+  const prevMyHandCountForDiscardRef = useRef(me.handCount || 0); // spectator mode
   const prevMyDiscardLenRef = useRef((me.discardPile || []).length);
   const prevMyDeletedLenRef = useRef((me.deletedPile || []).length);
   const prevOppHandCountForDiscardRef = useRef(opp.handCount || 0);
@@ -3640,6 +4131,93 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
   // Own discard/delete detection (useLayoutEffect prevents flash before paint)
   useLayoutEffect(() => {
+    if (isSpectator) {
+      // Spectator mode: use handCount-based detection (same as opponent discard)
+      const newCount = me.handCount || 0;
+      const prevCount = prevMyHandCountForDiscardRef.current;
+      const newDiscardLen = (me.discardPile || []).length;
+      const prevDiscardLen = prevMyDiscardLenRef.current;
+      const newDeletedLen = (me.deletedPile || []).length;
+      const prevDeletedLen = prevMyDeletedLenRef.current;
+      const discardGrew = newDiscardLen > prevDiscardLen;
+      const deletedGrew = newDeletedLen > prevDeletedLen;
+
+      if (discardGrew || deletedGrew) {
+        const newDiscardEntries = discardGrew ? [...me.discardPile.slice(prevDiscardLen)] : [];
+        const newDeletedEntries = deletedGrew ? [...me.deletedPile.slice(prevDeletedLen)] : [];
+        const newAnims = [];
+
+        // 1. Match against hand removals (hand count decreased)
+        if (newCount < prevCount) {
+          const storedRects = myHandRectsRef.current;
+          let handSlotCursor = prevCount - 1;
+          const handDiscardCount = Math.min(prevCount - newCount, newDiscardEntries.length);
+          for (let i = 0; i < handDiscardCount; i++) {
+            const sr = storedRects[Math.max(0, Math.min(handSlotCursor--, storedRects.length - 1))];
+            if (!sr) continue;
+            const cardName = newDiscardEntries.shift();
+            const t = getPileCenter('[data-my-discard]');
+            if (t) newAnims.push({ id: Date.now() + Math.random() + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'discard' });
+          }
+          const handDeletedCount = Math.min(Math.max(0, (prevCount - newCount) - handDiscardCount), newDeletedEntries.length);
+          for (let i = 0; i < handDeletedCount; i++) {
+            const sr = storedRects[Math.max(0, Math.min(handSlotCursor--, storedRects.length - 1))];
+            if (!sr) continue;
+            const cardName = newDeletedEntries.shift();
+            const t = getPileCenter('[data-my-deleted]');
+            if (t) newAnims.push({ id: Date.now() + Math.random() + 0.5 + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'deleted' });
+          }
+        }
+
+        // 2. Remaining entries from board
+        const br = boardCardRectsRef.current.me || {};
+        const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-my-discard]'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-my-deleted]')];
+        newAnims.push(...boardAnims);
+        for (const a of boardAnims) {
+          const card = CARDS_BY_NAME[a.cardName];
+          if (card?.cardType === 'Creature') {
+            const id = Date.now() + Math.random();
+            setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
+            setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
+          }
+        }
+        scheduleAnims(newAnims, setMyDiscardHidden, setMyDeletedHidden);
+      }
+
+      // Spectator: Mulligan return-to-deck (hand count shrinks but no pile grows)
+      if (!discardGrew && !deletedGrew && newCount < prevCount && gameState.mulliganPending) {
+        const storedRects = myHandRectsRef.current;
+        const deckEl = document.querySelector('[data-my-deck]');
+        const deckR = deckEl?.getBoundingClientRect();
+        const deckTarget = deckR ? { x: deckR.left + deckR.width / 2 - 32, y: deckR.top + deckR.height / 2 - 45 } : null;
+        if (deckTarget) {
+          const returnAnims = [];
+          for (let i = 0; i < prevCount - newCount; i++) {
+            const sr = storedRects[Math.max(0, prevCount - 1 - i)];
+            if (!sr) continue;
+            returnAnims.push({ id: Date.now() + Math.random() + i, cardName: '', startX: sr.left, startY: sr.top, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
+          }
+          if (returnAnims.length > 0) {
+            setDiscardAnims(prev => [...prev, ...returnAnims]);
+            setTimeout(() => setDiscardAnims(prev => prev.filter(a => !returnAnims.some(n => n.id === a.id))), 500);
+          }
+        }
+      }
+
+      // Capture positions for NEXT cycle (spectator uses face-down .hand-card)
+      requestAnimationFrame(() => {
+        const rects = [];
+        document.querySelectorAll('.game-hand-me .hand-card').forEach((el, i) => { rects[i] = el.getBoundingClientRect(); });
+        myHandRectsRef.current = rects;
+        captureBoardRects();
+      });
+
+      prevMyHandCountForDiscardRef.current = newCount;
+      prevMyDiscardLenRef.current = newDiscardLen;
+      prevMyDeletedLenRef.current = newDeletedLen;
+      return;
+    }
+
     const newHand = me.hand || [];
     const prevHand = prevMyHandForDiscardRef.current;
     const newDiscardLen = (me.discardPile || []).length;
@@ -3706,6 +4284,32 @@ function GameBoard({ gameState, lobby, onLeave }) {
       scheduleAnims(newAnims, setMyDiscardHidden, setMyDeletedHidden);
     }
 
+    // Mulligan: cards returning to deck (hand shrinks but no pile grows)
+    if (!discardGrew && !deletedGrew && newHand.length < prevHand.length && gameState.mulliganPending) {
+      const removed = [];
+      let ni = 0;
+      for (let i = 0; i < prevHand.length; i++) {
+        if (ni < newHand.length && prevHand[i] === newHand[ni]) { ni++; }
+        else { removed.push({ cardName: prevHand[i], handIdx: i }); }
+      }
+      const storedRects = myHandRectsRef.current;
+      const deckEl = document.querySelector('[data-my-deck]');
+      const deckR = deckEl?.getBoundingClientRect();
+      const deckTarget = deckR ? { x: deckR.left + deckR.width / 2 - 32, y: deckR.top + deckR.height / 2 - 45 } : null;
+      if (deckTarget) {
+        const returnAnims = [];
+        for (const r of removed) {
+          const sr = storedRects[r.handIdx];
+          if (!sr) continue;
+          returnAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
+        }
+        if (returnAnims.length > 0) {
+          setDiscardAnims(prev => [...prev, ...returnAnims]);
+          setTimeout(() => setDiscardAnims(prev => prev.filter(a => !returnAnims.some(n => n.id === a.id))), 500);
+        }
+      }
+    }
+
     // Capture positions for NEXT cycle
     requestAnimationFrame(() => {
       const rects = [];
@@ -3717,7 +4321,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
     prevMyHandForDiscardRef.current = [...newHand];
     prevMyDiscardLenRef.current = newDiscardLen;
     prevMyDeletedLenRef.current = newDeletedLen;
-  }, [me.hand, me.discardPile, me.deletedPile]);
+  }, [me.hand, me.handCount, me.discardPile, me.deletedPile]);
 
   // Opponent discard/delete detection (useLayoutEffect prevents flash before paint)
   useLayoutEffect(() => {
@@ -3775,6 +4379,26 @@ function GameBoard({ gameState, lobby, onLeave }) {
       scheduleAnims(newAnims, setOppDiscardHidden, setOppDeletedHidden);
     }
 
+    // Opponent mulligan: cards returning to deck (hand count shrinks but no pile grows)
+    if (!discardGrew && !deletedGrew && newCount < prevCount && gameState.mulliganPending) {
+      const storedRects = oppHandRectsRef.current;
+      const deckEl = document.querySelector('[data-opp-deck]');
+      const deckR = deckEl?.getBoundingClientRect();
+      const deckTarget = deckR ? { x: deckR.left + deckR.width / 2 - 32, y: deckR.top + deckR.height / 2 - 45 } : null;
+      if (deckTarget) {
+        const returnAnims = [];
+        for (let i = 0; i < prevCount - newCount; i++) {
+          const sr = storedRects[Math.max(0, prevCount - 1 - i)];
+          if (!sr) continue;
+          returnAnims.push({ id: Date.now() + Math.random() + i, cardName: '', startX: sr.left, startY: sr.top, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
+        }
+        if (returnAnims.length > 0) {
+          setDiscardAnims(prev => [...prev, ...returnAnims]);
+          setTimeout(() => setDiscardAnims(prev => prev.filter(a => !returnAnims.some(n => n.id === a.id))), 500);
+        }
+      }
+    }
+
     // Capture positions for NEXT cycle
     requestAnimationFrame(() => {
       const rects = [];
@@ -3791,7 +4415,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
   // Phase helpers
   const currentPhase = gameState.currentPhase || 0;
   const activePlayer = gameState.activePlayer || 0;
-  const isMyTurn = activePlayer === myIdx;
+  const isMyTurn = !isSpectator && activePlayer === myIdx;
   const activePlayerData = gameState.players[activePlayer];
   const phaseColor = activePlayerData?.color || 'var(--accent)';
 
@@ -3814,6 +4438,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
   const getCardDimmed = (cardName) => {
     if (gameState.awaitingFirstChoice) return false; // Let player see hand clearly
+    if (gameState.mulliganPending) return false; // Let player see hand during mulligan
     if (gameState.potionTargeting) return true; // All cards dimmed during targeting
 
     // Hero Action mode (Coffee) — only eligible cards are playable
@@ -4015,6 +4640,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const canHeroPlayCard = (playerData, heroIdx, card) => {
     const hero = playerData.heroes[heroIdx];
     if (!hero || !hero.name || hero.hp <= 0) return false;
+    // Frozen/stunned/negated heroes can't use abilities for spells, creatures, attacks
+    if (card.cardType !== 'Ability') {
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
+    }
     const level = card.level || 0;
     if (level === 0 && !card.spellSchool1) return true; // No requirements
     const abZones = playerData.abilityZones[heroIdx] || [];
@@ -4047,6 +4676,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
   // Game start announcement + turn change announcements
   const [announcement, setAnnouncement] = useState(() => {
     if (gameState.reconnected || gameState.awaitingFirstChoice) return null;
+    if (isSpectator) {
+      const firstPlayer = gameState.players[gameState.activePlayer || 0];
+      return { text: `${firstPlayer?.username || 'Player'} goes first!`, color: 'var(--accent)' };
+    }
     const goesFirst = (gameState.activePlayer || 0) === myIdx;
     return { text: goesFirst ? 'YOU GO FIRST!' : 'YOU GO SECOND!', color: goesFirst ? 'var(--success)' : 'var(--accent)' };
   });
@@ -4063,14 +4696,29 @@ function GameBoard({ gameState, lobby, onLeave }) {
     if (gameState.awaitingFirstChoice) { prevTurnRef.current = gameState.turn; return; }
     if (gameState.turn !== prevTurnRef.current) {
       prevTurnRef.current = gameState.turn;
-      if ((gameState.activePlayer || 0) === myIdx) {
+      if (isSpectator) {
+        const ap = gameState.players[gameState.activePlayer || 0];
+        setAnnouncement({ text: `${ap?.username || 'Player'}'s turn!`, color: 'var(--accent)', short: true });
+      } else if ((gameState.activePlayer || 0) === myIdx) {
         setAnnouncement({ text: 'YOUR TURN!', color: 'var(--success)', short: true });
       }
     }
   }, [gameState.turn, gameState.awaitingFirstChoice]);
 
+  const [mulliganDecided, setMulliganDecided] = useState(false);
+  // Reset mulligan state when a new game starts
+  useEffect(() => {
+    if (!gameState.mulliganPending) setMulliganDecided(false);
+  }, [gameState.mulliganPending]);
+
+  // Reset SC earned display when a new round starts (result clears)
+  useEffect(() => {
+    if (!gameState.result) setScEarned(null);
+  }, [gameState.result]);
+
   const onHandMouseDown = (e, idx) => {
     if (e.button !== 0) return;
+    if (isSpectator) return; // Spectators can't interact with cards
     const cardName = hand[idx];
     const dimmed = getCardDimmed(cardName);
 
@@ -4457,6 +5105,19 @@ function GameBoard({ gameState, lobby, onLeave }) {
   }, [hand, handDrag, playDrag, abilityDrag]);
 
   const [showSurrender, setShowSurrender] = useState(false);
+  const [scEarned, setScEarned] = useState(null); // { rewards: [{id,title,amount,description}], total }
+
+  // Listen for SC earned event
+  useEffect(() => {
+    const onSC = (data) => setScEarned(data);
+    const onSCSpec = (data) => {
+      // Spectators get both players' SC data — just show a combined view
+      if (isSpectator) setScEarned(data);
+    };
+    socket.on('sc_earned', onSC);
+    socket.on('sc_earned_spectator', onSCSpec);
+    return () => { socket.off('sc_earned', onSC); socket.off('sc_earned_spectator', onSCSpec); };
+  }, []);
   const [showFirstChoice, setShowFirstChoice] = useState(false);
   const [deckViewer, setDeckViewer] = useState(null); // 'deck' | 'potion' | null
   const [pileViewer, setPileViewer] = useState(null); // { title, cards } | null
@@ -4662,6 +5323,25 @@ function GameBoard({ gameState, lobby, onLeave }) {
       setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)), dur);
     };
     socket.on('play_ram_animation', onRamAnimation);
+    const onCardTransfer = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, cardName, duration }) => {
+      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
+      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcEl = document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`);
+      const tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const id = Date.now() + Math.random();
+      const dur = duration || 800;
+      setTransferAnims(prev => [...prev, {
+        id, cardName,
+        srcX: sr.left + sr.width / 2 - 34, srcY: sr.top + sr.height / 2 - 48,
+        tgtX: tr.left + tr.width / 2 - 34, tgtY: tr.top + tr.height / 2 - 48,
+        dur,
+      }]);
+      setTimeout(() => setTransferAnims(prev => prev.filter(a => a.id !== id)), dur + 100);
+    };
+    socket.on('play_card_transfer', onCardTransfer);
     const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, emoji, duration, trailClass, emojiStyle, projectileClass }) => {
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
@@ -4700,6 +5380,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
       socket.off('ability_activated', onAbilityActivated); socket.off('play_beam_animation', onBeamAnimation);
       socket.off('play_permanent_animation', onPermanentAnim);
       socket.off('play_ram_animation', onRamAnimation);
+      socket.off('play_card_transfer', onCardTransfer);
       socket.off('play_projectile_animation', onProjectileAnimation);
     };
   }, []);
@@ -4755,7 +5436,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
   }, []);
 
   const handleLeave = () => {
-    socket.emit('leave_game', { roomId: gameState.roomId });
+    if (isSpectator) {
+      socket.emit('leave_room', { roomId: gameState.roomId });
+    } else {
+      socket.emit('leave_game', { roomId: gameState.roomId });
+    }
     onLeave();
   };
   const handleSurrender = () => {
@@ -4789,6 +5474,25 @@ function GameBoard({ gameState, lobby, onLeave }) {
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
   }, [showSurrender, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation]);
+
+  // Space hotkey — advance to next phase
+  useEffect(() => {
+    const handleSpace = (e) => {
+      if (e.code !== 'Space') return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (isSpectator) return;
+      const isMyTurn = (gameState.activePlayer || 0) === myIdx;
+      if (!isMyTurn || gameState.result || gameState.effectPrompt || gameState.potionTargeting || gameState.mulliganPending) return;
+      const cp = gameState.currentPhase;
+      const nextMap = { 2: 3, 3: 4, 4: 5 }; // Main1→Action, Action→Main2, Main2→End
+      const target = nextMap[cp];
+      if (target == null) return;
+      e.preventDefault();
+      socket.emit('advance_phase', { roomId: gameState.roomId, targetPhase: target });
+    };
+    window.addEventListener('keydown', handleSpace);
+    return () => window.removeEventListener('keydown', handleSpace);
+  }, [gameState.activePlayer, gameState.currentPhase, gameState.result, gameState.effectPrompt, gameState.potionTargeting, gameState.mulliganPending, gameState.roomId, myIdx]);
 
   // Listen for opponent's target selections
   useEffect(() => {
@@ -4942,7 +5646,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
   // ── Potion targeting helpers ──
   const pt = gameState.potionTargeting;
-  const isTargeting = pt && pt.ownerIdx === myIdx;
+  const isTargeting = !isSpectator && !result && pt && pt.ownerIdx === myIdx;
   const validTargetIds = isTargeting ? new Set((pt.validTargets || []).map(t => t.id)) : new Set();
   const selectedSet = new Set(potionSelection);
 
@@ -4993,7 +5697,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
   // ── Effect prompt helpers (confirm, card gallery, zone picker) ──
   const ep = gameState.effectPrompt;
-  const isMyEffectPrompt = ep && ep.ownerIdx === myIdx;
+  const isMyEffectPrompt = !isSpectator && !result && ep && ep.ownerIdx === myIdx;
+  const isOppEffectPrompt = !isSpectator && !result && ep && ep.ownerIdx !== myIdx;
   const zonePickSet = new Set();
   if (isMyEffectPrompt && ep.type === 'zonePick') {
     for (const z of (ep.zones || [])) {
@@ -5002,6 +5707,64 @@ function GameBoard({ gameState, lobby, onLeave }) {
   }
   const respondToPrompt = (response) => {
     socket.emit('effect_prompt_response', { roomId: gameState.roomId, response });
+  };
+
+  // ── SC earned display helper ──
+  const renderSCEarned = () => {
+    if (!scEarned) return null;
+    if (isSpectator) {
+      // Spectator sees both players' SC data
+      const entries = [];
+      for (const [piStr, data] of Object.entries(scEarned)) {
+        if (data?.total > 0) {
+          const pName = gameState.players[parseInt(piStr)]?.username || 'Player';
+          entries.push({ name: pName, ...data });
+        }
+      }
+      if (entries.length === 0) return null;
+      return (
+        <div style={{ marginTop: 20, marginBottom: 20, textAlign: 'center' }}>
+          {entries.map(e => (
+            <div key={e.name} style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#ffd700', fontWeight: 700, fontSize: 15 }}>
+                <span>{e.name}:</span>
+                <span>{e.total}</span>
+                <img src="/data/sc.png" style={{ width: 18, height: 18, imageRendering: 'pixelated' }} />
+                <span>earned!</span>
+              </div>
+              <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {(e.rewards || []).map(r => (
+                  <div key={r.id} style={{ fontSize: 12, color: 'var(--text2)' }}>
+                    <span style={{ color: '#ffd700', fontWeight: 600 }}>{r.title}</span>
+                    {' — '}{r.description}{' '}
+                    <span style={{ color: '#ffd700' }}>+{r.amount}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    if (!scEarned.total || scEarned.total <= 0) return null;
+    return (
+      <div style={{ marginTop: 20, marginBottom: 20, textAlign: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#ffd700', fontWeight: 700, fontSize: 18, textShadow: '0 0 12px rgba(255,215,0,.5)' }}>
+          <span>{scEarned.total}</span>
+          <img src="/data/sc.png" style={{ width: 24, height: 24, imageRendering: 'pixelated' }} />
+          <span>earned!</span>
+        </div>
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {(scEarned.rewards || []).map(r => (
+            <div key={r.id} style={{ fontSize: 13, color: 'var(--text2)' }}>
+              <span style={{ color: '#ffd700', fontWeight: 700 }}>{r.title}</span>
+              {' — '}{r.description}{' '}
+              <span style={{ color: '#ffd700', fontWeight: 700 }}>+{r.amount}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   // Compute per-column max support zone count AND left/right island padding across both players
@@ -5094,7 +5857,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 onClick={onHeroClick}
                 style={(isHeroEffectActive || isValidHeroTarget) ? { cursor: 'pointer' } : undefined}>
                 {hero?.name && !isRamming ? (
-                  <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" />
+                  <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={gameSkins} />
                 ) : hero?.name && isRamming ? (
                   <div className="board-zone-empty" style={{ opacity: 0.3 }}>{hero.name.split(',')[0]}</div>
                 ) : (
@@ -5107,6 +5870,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
+                {hero?.name && hero.buffs && <BuffColumn buffs={hero.buffs} />}
               </div>
               <div data-surprise-zone="1" data-surprise-hero={i} data-surprise-owner={ownerLabel}><BoardZone type="surprise" cards={surZones[i] || []} label="Surprise" /></div>
               {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxRight }).map((_, s) => (
@@ -5280,10 +6044,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
                   ) : cards.length > 0 ? (
                     <>
                     {cards.length === 1 ? (
-                      <BoardCard cardName={cards[0]} hp={CARDS_BY_NAME[cards[0]]?.hp} maxHp={CARDS_BY_NAME[cards[0]]?.hp} hpPosition="creature" />
+                      <BoardCard cardName={cards[0]} hp={CARDS_BY_NAME[cards[0]]?.hp} maxHp={CARDS_BY_NAME[cards[0]]?.hp} hpPosition="creature" skins={gameSkins} />
                     ) : (
                       <div className="board-stack">
-                        <BoardCard cardName={cards[cards.length-1]} hp={CARDS_BY_NAME[cards[cards.length-1]]?.hp} maxHp={CARDS_BY_NAME[cards[cards.length-1]]?.hp} hpPosition="creature" label={cards.length+''} />
+                        <BoardCard cardName={cards[cards.length-1]} hp={CARDS_BY_NAME[cards[cards.length-1]]?.hp} maxHp={CARDS_BY_NAME[cards[cards.length-1]]?.hp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />
                       </div>
                     )}
                     {(() => { const cKey = `${pi}-${i}-${z}`; const lvl = (gameState.creatureCounters || {})[cKey]?.level; return lvl ? <div className="creature-level">Lv{lvl}</div> : null; })()}
@@ -5295,6 +6059,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                     {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.frozen ? <FrozenOverlay /> : null; })()}
                     {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.negated ? <NegatedOverlay /> : null; })()}
                     {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null; })()}
+                    {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.buffs ? <BuffColumn buffs={cc.buffs} /> : null; })()}
                     </>
                   ) : (
                     <div className="board-zone-empty">{isIsland ? 'Island' : 'Support'}</div>
@@ -5318,10 +6083,18 @@ function GameBoard({ gameState, lobby, onLeave }) {
   return (
     <div className="screen-full" style={{ background: '#0c0c14' }}>
       <div className="top-bar" style={{ justifyContent: 'space-between' }}>
-        <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => result ? handleLeave() : setShowSurrender(true)}>
-          {result ? '✕ LEAVE' : '⚑ SURRENDER'}
-        </button>
-        <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>PIXEL PARTIES</h2>
+        {isSpectator ? (
+          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={handleLeave}>
+            ✕ LEAVE
+          </button>
+        ) : (
+          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => result ? handleLeave() : setShowSurrender(true)}>
+            {result ? '✕ LEAVE' : '⚑ SURRENDER'}
+          </button>
+        )}
+        <h2 className="orbit-font" style={{ fontSize: 14, color: isSpectator ? 'var(--text2)' : 'var(--accent)' }}>
+          {isSpectator ? '👁 SPECTATING' : 'PIXEL PARTIES'}
+        </h2>
         <span className="badge" style={{ background: lobby?.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby?.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
           {lobby?.type?.toUpperCase() || 'GAME'}
         </span>
@@ -5381,7 +6154,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
             })()}
             {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
-            <div className="board-mid-row">
+            <div className="board-mid-row" style={{ position: 'relative' }}>
               <div className="board-phase-tracker">
                 {['Start Phase', 'Resource Phase', 'Main Phase 1', 'Action Phase', 'Main Phase 2', 'End Phase'].map((phase, i) => {
                   const isActive = currentPhase === i;
@@ -5404,6 +6177,14 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 })}
               </div>
               <div className="board-area-line" />
+              {gameState.format > 1 && !result && (
+                <div className="set-score-fixed orbit-font">
+                  <span style={{ color: 'var(--success)' }}>{gameState.setScore?.[myIdx] || 0}</span>
+                  <span style={{ color: 'var(--text2)', margin: '0 8px' }}>—</span>
+                  <span style={{ color: 'var(--danger)' }}>{gameState.setScore?.[oppIdx] || 0}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text2)', marginLeft: 10 }}>Bo{gameState.format}</span>
+                </div>
+              )}
             </div>
             <div className="board-player-side board-side-me">{renderPlayerSide(me, false)}</div>
             {/* Permanent zones — positioned absolutely to avoid layout interference */}
@@ -5440,12 +6221,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
             <div className="board-util-mid" />
             <div className="board-util-side">
               <div className="board-util-spacer" />
-              <div onClick={() => me.potionDeckCount > 0 && setDeckViewer('potion')} style={{ cursor: me.potionDeckCount > 0 ? 'pointer' : 'default' }}>
+              <div onClick={() => !isSpectator && me.potionDeckCount > 0 && setDeckViewer('potion')} style={{ cursor: !isSpectator && me.potionDeckCount > 0 ? 'pointer' : 'default' }}>
               <BoardZone type="potion" label="Potions" faceDown>
                 {me.potionDeckCount > 0 && <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.potionDeckCount}</div></div>}
               </BoardZone>
               </div>
-              <div onClick={() => me.deckCount > 0 && setDeckViewer('deck')} style={{ cursor: me.deckCount > 0 ? 'pointer' : 'default' }} data-my-deck="1">
+              <div onClick={() => !isSpectator && me.deckCount > 0 && setDeckViewer('deck')} style={{ cursor: !isSpectator && me.deckCount > 0 ? 'pointer' : 'default' }} data-my-deck="1">
               <BoardZone type="deck" label="Deck" faceDown>
                 <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.deckCount}</div></div>
               </BoardZone>
@@ -5454,36 +6235,53 @@ function GameBoard({ gameState, lobby, onLeave }) {
           </div>
         </div>
 
-        {/* My hand — drag to reorder */}
-        <div className="game-hand game-hand-me" ref={handRef}>
-          <div className="game-hand-cards">
-            {displayHand.map((item, i) => {
-              if (item.isGap) return <div key="gap" className="hand-drop-gap" />;
-              const isBeingDragged = handDrag && handDrag.idx === item.origIdx;
-              const dimmed = getCardDimmed(item.card);
-              const isDrawAnim = drawAnimCards.some(a => a.origIdx === item.origIdx);
-              const isPendingPlay = pendingAdditionalPlay && pendingAdditionalPlay.handIndex === item.origIdx;
-              const isForceDiscard = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt?.ownerIdx === myIdx;
-              const isForceDiscardCancellable = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt?.ownerIdx === myIdx;
-              const isAbilityAttach = gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
-              const isAttachEligible = isAbilityAttach && (gameState.effectPrompt.eligibleCards || []).includes(item.card);
-              const isAnyDiscard = isForceDiscard || isForceDiscardCancellable;
-              return (
-                <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx}
-                  className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard ? ' hand-discard-target' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '')}
-                  style={(isDrawAnim || isPendingPlay) ? { visibility: 'hidden' } : undefined}
-                  onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
-                  onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
-                  onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
-                  <BoardCard cardName={item.card} noTooltip={isAnyDiscard} />
+        {/* My hand (bottom player) — drag to reorder for players, face-down for spectators */}
+        <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef}>
+          <div className="game-hand-info">
+            {me.avatar && <img src={me.avatar} className="game-hand-avatar game-hand-avatar-big" />}
+            <span className="orbit-font" style={{ fontSize: 18, fontWeight: 800, color: me.color }}>{me.username}</span>
+            {meDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
+          </div>
+          {isSpectator ? (
+            <div className="game-hand-cards">
+              {Array.from({ length: me.handCount || 0 }).map((_, i) => (
+                <div key={i} className="board-card face-down hand-card" style={specMeDrawHidden.has(i) ? { visibility: 'hidden' } : undefined}>
+                  <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
                 </div>
-              );
-            })}
-          </div>
-          <div className="hand-actions">
-            <button className="btn hand-action-btn" onClick={sortHand} title="Sort hand by type, then name">Sort</button>
-            <button className="btn hand-action-btn" onClick={shuffleHand} title="Shuffle hand randomly">Shuffle</button>
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="game-hand-cards">
+              {displayHand.map((item, i) => {
+                if (item.isGap) return <div key="gap" className="hand-drop-gap" />;
+                const isBeingDragged = handDrag && handDrag.idx === item.origIdx;
+                const dimmed = getCardDimmed(item.card);
+                const isDrawAnim = drawAnimCards.some(a => a.origIdx === item.origIdx);
+                const isPendingPlay = pendingAdditionalPlay && pendingAdditionalPlay.handIndex === item.origIdx;
+                const isForceDiscard = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt?.ownerIdx === myIdx;
+                const isForceDiscardCancellable = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt?.ownerIdx === myIdx;
+                const isAbilityAttach = gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
+                const isAttachEligible = isAbilityAttach && (gameState.effectPrompt.eligibleCards || []).includes(item.card);
+                const isAnyDiscard = isForceDiscard || isForceDiscardCancellable;
+                return (
+                  <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard ? ' hand-discard-target' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '')}
+                    style={(isDrawAnim || isPendingPlay) ? { visibility: 'hidden' } : undefined}
+                    onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
+                    onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
+                    onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
+                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {!isSpectator && (
+            <div className="hand-actions">
+              <button className="btn hand-action-btn" onClick={sortHand} title="Sort hand by type, then name">Sort</button>
+              <button className="btn hand-action-btn" onClick={shuffleHand} title="Shuffle hand randomly">Shuffle</button>
+            </div>
+          )}
           <div className="game-gold-display">
             <span className="game-gold-icon">🪙</span>
             <span className="game-gold-value orbit-font" data-gold-player={myIdx}>{me.gold || 0}</span>
@@ -5494,13 +6292,18 @@ function GameBoard({ gameState, lobby, onLeave }) {
       {/* end game-layout */}
 
       {/* Floating draw animation cards (outside game-layout to avoid overflow clip) */}
-      {drawAnimCards.map(anim => (
+      {!isSpectator && drawAnimCards.map(anim => (
         <DrawAnimCard key={anim.id} cardName={anim.cardName} origIdx={anim.origIdx}
           startX={anim.startX} startY={anim.startY} dimmed={getCardDimmed(anim.cardName)} />
       ))}
       {oppDrawAnims.map(anim => (
         <OppDrawAnimCard key={anim.id} startX={anim.startX} startY={anim.startY}
           endX={anim.endX} endY={anim.endY} cardName={anim.cardName} />
+      ))}
+      {/* Spectator: bottom player draw animations (face-down, like opponent) */}
+      {isSpectator && specMeDrawAnims.map(anim => (
+        <OppDrawAnimCard key={anim.id} startX={anim.startX} startY={anim.startY}
+          endX={anim.endX} endY={anim.endY} />
       ))}
 
       {/* Floating discard animation cards */}
@@ -5587,6 +6390,18 @@ function GameBoard({ gameState, lobby, onLeave }) {
         }}>
           <BoardCard cardName={r.cardName} noTooltip />
           <div className="ram-flame-trail" />
+        </div>
+      ))}
+
+      {/* Card transfer animations (Dark Gear creature steal, etc.) */}
+      {transferAnims.map(t => (
+        <div key={t.id} className="transfer-anim-card" style={{
+          left: t.srcX, top: t.srcY,
+          '--transferDx': (t.tgtX - t.srcX) + 'px',
+          '--transferDy': (t.tgtY - t.srcY) + 'px',
+          animationDuration: t.dur + 'ms',
+        }}>
+          <BoardCard cardName={t.cardName} noTooltip />
         </div>
       ))}
 
@@ -5721,7 +6536,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         });
         return (
           <div className="modal-overlay" onClick={() => setDeckViewer(null)}>
-            <div className="modal animate-in deck-viewer-modal" onClick={e => e.stopPropagation()}>
+            <DraggablePanel className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
                   {deckViewer === 'potion' ? '🧪 POTION DECK' : '📋 MAIN DECK'} ({sorted.length})
@@ -5735,7 +6550,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                   return <CardMini key={name + '-' + i} card={card} onClick={() => {}} style={{ width: '100%', height: 120 }} />;
                 })}
               </div>
-            </div>
+            </DraggablePanel>
           </div>
         );
       })()}
@@ -5751,7 +6566,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         });
         return (
           <div className="modal-overlay" onClick={() => setPileViewer(null)}>
-            <div className="modal animate-in deck-viewer-modal" onClick={e => e.stopPropagation()}>
+            <DraggablePanel className="modal animate-in deck-viewer-modal">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
                   {pileViewer.title} ({sorted.length})
@@ -5769,7 +6584,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
               ) : (
                 <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 20 }}>Empty</div>
               )}
-            </div>
+            </DraggablePanel>
           </div>
         );
       })()}
@@ -5846,7 +6661,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         const cards = ep.cards || [];
         return (
           <div className="modal-overlay" onClick={ep.cancellable !== false ? () => respondToPrompt({ cancelled: true }) : undefined}>
-            <div className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+            <DraggablePanel className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
                   {ep.title || 'Select a Card'}
@@ -5884,7 +6699,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                   );
                 })}
               </div>
-            </div>
+            </DraggablePanel>
           </div>
         );
       })()}
@@ -5923,8 +6738,27 @@ function GameBoard({ gameState, lobby, onLeave }) {
         </DraggablePanel>
       )}
 
+      {/* ── Waiting for opponent (when they have an active effect prompt) ── */}
+      {isOppEffectPrompt && !gameState.potionTargeting && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 260 }}>
+          <div className="orbit-font" style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>
+            {ep.type === 'cardGallery' ? '🔍 Opponent is choosing...' :
+             ep.type === 'confirm' ? '⏳ Waiting for confirmation...' :
+             '⏳ Waiting for opponent...'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text2)' }}>
+            {ep.type === 'cardGallery' ? 'Waiting for opponent to choose a card...' :
+             ep.type === 'confirm' ? 'Waiting for opponent to confirm your selection...' :
+             ep.type === 'zonePick' ? 'Waiting for opponent to select a zone...' :
+             ep.type === 'heroAction' ? 'Waiting for opponent to play a card...' :
+             ep.type === 'forceDiscard' || ep.type === 'forceDiscardCancellable' ? 'Waiting for opponent to discard...' :
+             'Waiting for opponent...'}
+          </div>
+        </DraggablePanel>
+      )}
+
       {/* ── Ability Activation Confirmation ── */}
-      {pendingAbilityActivation && (
+      {pendingAbilityActivation && !result && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#ffcc33' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: '#ffcc33', marginBottom: 8 }}>⚡ Activate Ability</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>Activate {pendingAbilityActivation.abilityName} (Lv.{pendingAbilityActivation.level})?</div>
@@ -6011,7 +6845,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
       })()}
 
       {/* Rematch first-choice dialog (loser only) — floating panel so hand is visible */}
-      {showFirstChoice && (
+      {showFirstChoice && !isSpectator && (
         <DraggablePanel className="first-choice-panel animate-in">
           <div className="pixel-font" style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 12 }}>REMATCH!</div>
           <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>Would you like to go first or second?</div>
@@ -6028,8 +6862,20 @@ function GameBoard({ gameState, lobby, onLeave }) {
         </DraggablePanel>
       )}
 
+      {/* Spectator: waiting for first-choice decision */}
+      {isSpectator && gameState.awaitingFirstChoice && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 280 }}>
+          <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 10 }}>⏳ NEXT ROUND</div>
+          <div style={{ fontSize: 13, color: 'var(--text2)' }}>
+            {gameState.choosingPlayerName
+              ? <><span style={{ color: 'var(--accent2)', fontWeight: 700 }}>{gameState.choosingPlayerName}</span> is deciding who goes first...</>
+              : 'Deciding who goes first...'}
+          </div>
+        </DraggablePanel>
+      )}
+
       {/* Potion/Artifact targeting panel */}
-      {isTargeting && pt && !gameState.effectPrompt && (
+      {!isSpectator && isTargeting && pt && !gameState.effectPrompt && (
         <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out' }}>
           <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
@@ -6058,6 +6904,36 @@ function GameBoard({ gameState, lobby, onLeave }) {
         </DraggablePanel>
       )}
 
+      {/* Mulligan prompt */}
+      {!isSpectator && gameState.mulliganPending && !announcement && !mulliganDecided && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 300 }}>
+          <div className="orbit-font" style={{ fontSize: 15, color: 'var(--accent)', marginBottom: 10 }}>MULLIGAN</div>
+          <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>Would you like to replace your hand with 5 new cards?</div>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button className="btn btn-success" style={{ padding: '10px 28px', fontSize: 13 }}
+              onClick={() => { setMulliganDecided(true); socket.emit('mulligan_decision', { roomId: gameState.roomId, accept: true }); }}>
+              Yes, replace
+            </button>
+            <button className="btn" style={{ padding: '10px 28px', fontSize: 13, borderColor: 'var(--accent)', color: 'var(--accent)' }}
+              onClick={() => { setMulliganDecided(true); socket.emit('mulligan_decision', { roomId: gameState.roomId, accept: false }); }}>
+              No, keep
+            </button>
+          </div>
+        </DraggablePanel>
+      )}
+      {!isSpectator && gameState.mulliganPending && mulliganDecided && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 240 }}>
+          <div style={{ fontSize: 12, color: 'var(--text2)' }}>Waiting for opponent...</div>
+        </DraggablePanel>
+      )}
+      {/* Spectator: waiting for mulligan */}
+      {isSpectator && gameState.mulliganPending && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 280 }}>
+          <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 10 }}>⏳ MULLIGAN</div>
+          <div style={{ fontSize: 13, color: 'var(--text2)' }}>Players are deciding to mulligan...</div>
+        </DraggablePanel>
+      )}
+
       {/* Game announcements */}
       {announcement && (
         <div className={'game-announcement' + (announcement.short ? ' game-announcement-short' : '')}
@@ -6068,22 +6944,60 @@ function GameBoard({ gameState, lobby, onLeave }) {
         </div>
       )}
 
-      {/* Win/Loss overlay */}
-      {result && !showFirstChoice && (
-        <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.75)' }}>
+      {/* Win/Loss overlay — round result (non-final) */}
+      {result && !showFirstChoice && !result.setOver && result.format > 1 && (
+        <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.65)' }}>
           <div className="animate-in" style={{ textAlign: 'center' }}>
             <div className="pixel-font" style={{
-              fontSize: 36, marginBottom: 16,
-              color: iWon ? 'var(--success)' : 'var(--danger)',
-              textShadow: iWon ? '0 0 40px rgba(51,255,136,.5)' : '0 0 40px rgba(255,51,102,.5)',
+              fontSize: 28, marginBottom: 12,
+              color: isSpectator ? 'var(--accent)' : (iWon ? 'var(--success)' : 'var(--danger)'),
+              textShadow: isSpectator ? '0 0 30px rgba(0,240,255,.3)' : (iWon ? '0 0 30px rgba(51,255,136,.4)' : '0 0 30px rgba(255,51,102,.4)'),
             }}>
-              {iWon ? 'YOU WIN!' : 'YOU LOSE'}
+              {isSpectator ? `${result.winnerName} wins the round!` : (iWon ? 'ROUND WIN!' : 'ROUND LOSS')}
             </div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>
-              {result.reason === 'disconnect_timeout' ? 'Opponent timed out' :
-               result.reason === 'opponent_left' ? 'Opponent left the game' :
-               result.reason === 'surrender' ? (iWon ? 'Opponent surrendered' : 'You surrendered') :
-               result.reason === 'all_heroes_dead' ? (iWon ? 'All enemy heroes defeated!' : 'All your heroes were defeated') : ''}
+            <div className="orbit-font" style={{ fontSize: 32, marginBottom: 8, color: 'var(--text)' }}>
+              {result.setScore[0]} — {result.setScore[1]}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text2)' }}>Next round starting soon...</div>
+            {renderSCEarned()}
+          </div>
+        </div>
+      )}
+
+      {/* Set complete overlay — fireworks + final score */}
+      {result && !showFirstChoice && result.setOver && result.format > 1 && (
+        <div className="modal-overlay set-complete-overlay" style={{ background: 'rgba(0,0,0,.8)' }}>
+          <div className="set-fireworks">
+            {Array.from({ length: 24 }).map((_, i) => (
+              <div key={i} className="firework-particle" style={{
+                '--fw-x': (Math.random() * 200 - 100) + 'px',
+                '--fw-y': (Math.random() * -200 - 40) + 'px',
+                '--fw-color': ['#ffd700','#ff3366','#33ff88','#44aaff','#ff8800','#cc44ff'][i % 6],
+                '--fw-delay': (Math.random() * 2) + 's',
+                '--fw-dur': (1 + Math.random()) + 's',
+                left: (20 + Math.random() * 60) + '%',
+                top: (30 + Math.random() * 30) + '%',
+              }} />
+            ))}
+          </div>
+          <div className="animate-in" style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
+            <div className="pixel-font" style={{
+              fontSize: 40, marginBottom: 8,
+              color: isSpectator ? '#ffd700' : (iWon ? '#ffd700' : 'var(--danger)'),
+              textShadow: isSpectator ? '0 0 40px rgba(255,215,0,.6)' : (iWon ? '0 0 40px rgba(255,215,0,.6)' : '0 0 40px rgba(255,51,102,.5)'),
+            }}>
+              {isSpectator ? `🏆 ${result.winnerName} WINS! 🏆` : (iWon ? '🏆 SET VICTORY! 🏆' : 'SET DEFEAT')}
+            </div>
+            <div className="orbit-font" style={{ fontSize: 48, margin: '16px 0', color: 'var(--text)' }}>
+              {result.setScore[0]} — {result.setScore[1]}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>
+              Best of {result.format}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
+              {result.reason === 'disconnect_timeout' ? `${result.loserName} timed out` :
+               result.reason === 'surrender' ? `${result.loserName} surrendered` :
+               result.reason === 'all_heroes_dead' ? `All of ${result.loserName}'s heroes defeated!` : ''}
             </div>
             {result.eloChanges && (
               <div style={{ marginBottom: 20 }}>
@@ -6095,8 +7009,63 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 ))}
               </div>
             )}
+            {renderSCEarned()}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              {!oppLeft && !oppDisconnected ? (
+              {isSpectator ? (
+                <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+              ) : !oppLeft && !oppDisconnected ? (
+                <>
+                  <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch} disabled={myRematchSent}>
+                    {myRematchSent ? '⏳ WAITING...' : '🔄 REMATCH'}
+                  </button>
+                  <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+                </>
+              ) : (
+                <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Win/Loss overlay — Bo1 or fallback */}
+      {result && !showFirstChoice && (result.setOver || !result.format || result.format === 1) && !(result.format > 1) && (
+        <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.75)' }}>
+          <div className="animate-in" style={{ textAlign: 'center' }}>
+            <div className="pixel-font" style={{
+              fontSize: 36, marginBottom: 16,
+              color: isSpectator ? '#ffd700' : (iWon ? 'var(--success)' : 'var(--danger)'),
+              textShadow: isSpectator ? '0 0 40px rgba(255,215,0,.5)' : (iWon ? '0 0 40px rgba(51,255,136,.5)' : '0 0 40px rgba(255,51,102,.5)'),
+            }}>
+              {isSpectator ? `🏆 ${result.winnerName} WINS!` : (iWon ? 'YOU WIN!' : 'YOU LOSE')}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>
+              {isSpectator ? (
+                result.reason === 'disconnect_timeout' ? `${result.loserName} timed out` :
+                result.reason === 'surrender' ? `${result.loserName} surrendered` :
+                result.reason === 'all_heroes_dead' ? `All of ${result.loserName}'s heroes defeated!` : ''
+              ) : (
+                result.reason === 'disconnect_timeout' ? 'Opponent timed out' :
+                result.reason === 'opponent_left' ? 'Opponent left the game' :
+                result.reason === 'surrender' ? (iWon ? 'Opponent surrendered' : 'You surrendered') :
+                result.reason === 'all_heroes_dead' ? (iWon ? 'All enemy heroes defeated!' : 'All your heroes were defeated') : ''
+              )}
+            </div>
+            {result.eloChanges && (
+              <div style={{ marginBottom: 20 }}>
+                {result.eloChanges.map(ec => (
+                  <div key={ec.username} style={{ fontSize: 12, color: ec.username === user.username ? 'var(--text)' : 'var(--text2)' }}>
+                    {ec.username}: {ec.oldElo} → <span style={{ color: ec.newElo > ec.oldElo ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{ec.newElo}</span>
+                    {' '}({ec.newElo > ec.oldElo ? '+' : ''}{ec.newElo - ec.oldElo})
+                  </div>
+                ))}
+              </div>
+            )}
+            {renderSCEarned()}
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              {isSpectator ? (
+                <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+              ) : !oppLeft && !oppDisconnected ? (
                 <>
                   <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch} disabled={myRematchSent}>
                     {myRematchSent ? '⏳ WAITING...' : '🔄 REMATCH'}
@@ -6121,10 +7090,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
 function PlayScreen() {
   const { user, setScreen, notify } = useContext(AppContext);
   const [decks, setDecks] = useState([]);
+  const [sampleDecks, setSampleDecks] = useState([]);
   const [selectedDeck, setSelectedDeck] = useState('');
   const [rooms, setRooms] = useState([]);
   const [creating, setCreating] = useState(false);
   const [gameType, setGameType] = useState('unranked');
+  const [gameFormat, setGameFormat] = useState(1);
   const [playerPw, setPlayerPw] = useState('');
   const [specPw, setSpecPw] = useState('');
   const [joinPw, setJoinPw] = useState('');
@@ -6138,7 +7109,7 @@ function PlayScreen() {
     return pending;
   });
 
-  // Load decks
+  // Load decks + sample decks
   useEffect(() => {
     (async () => {
       try {
@@ -6149,6 +7120,10 @@ function PlayScreen() {
           if (def) setSelectedDeck(def.id);
           else if (data.decks.length) setSelectedDeck(data.decks[0].id);
         }
+      } catch {}
+      try {
+        const sd = await api('/sample-decks');
+        if (sd.decks) setSampleDecks(sd.decks);
       } catch {}
     })();
   }, []);
@@ -6190,13 +7165,13 @@ function PlayScreen() {
     };
   }, []);
 
-  const currentDeckObj = decks.find(d => d.id === selectedDeck);
+  const currentDeckObj = decks.find(d => d.id === selectedDeck) || sampleDecks.find(d => d.id === selectedDeck);
 
   const createGame = () => {
     if (!currentDeckObj) { notify('Select a deck first', 'error'); return; }
     const v = isDeckLegal(currentDeckObj);
     if (!v.legal) { notify('Deck not legal: ' + v.reasons.join(', '), 'error'); return; }
-    socket.emit('create_room', { type: gameType, playerPw: playerPw || null, specPw: specPw || null, deckId: selectedDeck });
+    socket.emit('create_room', { type: gameType, format: gameFormat, playerPw: playerPw || null, specPw: specPw || null, deckId: selectedDeck });
     setCreating(false);
     setPlayerPw(''); setSpecPw('');
   };
@@ -6338,10 +7313,12 @@ function PlayScreen() {
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 16, color: 'var(--accent)' }}>PLAY</h2>
         <div style={{ flex: 1 }} />
-        <label style={{ fontSize: 11, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          Deck:
-          <select className="select" value={selectedDeck} onChange={e => setSelectedDeck(e.target.value)} style={{ fontSize: 11 }}>
-            {decks.map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}</option>)}
+        <label style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+          🃏 Deck:
+          <select className="select" value={selectedDeck} onChange={e => setSelectedDeck(e.target.value)} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
+            {decks.map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}{d.isDefault ? ' ★' : ''}</option>)}
+            {sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
+            {sampleDecks.filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
           </select>
         </label>
         <button className="btn btn-accent2" onClick={() => setCreating(true)}>+ CREATE GAME</button>
@@ -6359,9 +7336,12 @@ function PlayScreen() {
               <div key={r.id} className="room-card" onClick={() => joinRoom(r, false)}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontWeight: 700 }}>{r.host}</span>
-                  <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: r.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
-                    {r.type}
-                  </span>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.08)', color: 'var(--text2)' }}>Bo{r.format}</span>}
+                    <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: r.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+                      {r.type}
+                    </span>
+                  </div>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2 }}>
                   {r.hasPlayerPw ? '🔒 Password' : '🔓 Open'} · {r.playerCount}/2 players
@@ -6382,7 +7362,10 @@ function PlayScreen() {
               <div key={r.id} className="room-card" onClick={() => joinRoom(r, true)}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontWeight: 700 }}>{r.players.join(' vs ')}</span>
-                  <span className="badge" style={{ background: 'rgba(255,0,170,.12)', color: 'var(--accent2)' }}>LIVE</span>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.08)', color: 'var(--text2)' }}>Bo{r.format}</span>}
+                    <span className="badge" style={{ background: 'rgba(255,0,170,.12)', color: 'var(--accent2)' }}>LIVE</span>
+                  </div>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2 }}>
                   👁 {r.spectatorCount} watching · Click to spectate
@@ -6404,6 +7387,14 @@ function PlayScreen() {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button className={'btn' + (gameType === 'unranked' ? ' glow-border' : '')} onClick={() => setGameType('unranked')} style={{ flex: 1 }}>UNRANKED</button>
                   <button className={'btn btn-accent2' + (gameType === 'ranked' ? ' glow-border' : '')} onClick={() => setGameType('ranked')} style={{ flex: 1 }}>RANKED</button>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Format</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className={'btn' + (gameFormat === 1 ? ' btn-format-active' : '')} onClick={() => setGameFormat(1)} style={{ flex: 1 }}>Bo1</button>
+                  <button className={'btn' + (gameFormat === 3 ? ' btn-format-active' : '')} onClick={() => setGameFormat(3)} style={{ flex: 1 }}>Bo3</button>
+                  <button className={'btn' + (gameFormat === 5 ? ' btn-format-active' : '')} onClick={() => setGameFormat(5)} style={{ flex: 1 }}>Bo5</button>
                 </div>
               </div>
               <div>
