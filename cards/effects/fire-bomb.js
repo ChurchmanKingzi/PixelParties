@@ -20,21 +20,27 @@ module.exports = {
     const targets = [];
     for (let pi = 0; pi < 2; pi++) {
       const ps = gs.players[pi];
+      // First-turn protection: cannot target opponent's abilities for removal (generic rule)
+      // See Engine.isAbilityRemovalProtected() — use in any card that removes abilities
+      const isOpponentProtected = pi !== playerIdx && gs.firstTurnProtectedPlayer === pi;
+
       // Abilities (any non-empty ability zone)
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (!ps.heroes[hi]?.name || ps.heroes[hi]?.hp <= 0) continue; // Dead heroes' abilities aren't targetable
-        for (let zi = 0; zi < (ps.abilityZones[hi] || []).length; zi++) {
-          const cards = (ps.abilityZones[hi] || [])[zi] || [];
-          if (cards.length > 0) {
-            targets.push({
-              id: `ability-${pi}-${hi}-${zi}`,
-              type: 'ability',
-              owner: pi,
-              heroIdx: hi,
-              slotIdx: zi,
-              cardName: cards[cards.length - 1], // Top card name for display
-              level: cards.length,
-            });
+      if (!isOpponentProtected) {
+        for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+          if (!ps.heroes[hi]?.name || ps.heroes[hi]?.hp <= 0) continue;
+          for (let zi = 0; zi < (ps.abilityZones[hi] || []).length; zi++) {
+            const cards = (ps.abilityZones[hi] || [])[zi] || [];
+            if (cards.length > 0) {
+              targets.push({
+                id: `ability-${pi}-${hi}-${zi}`,
+                type: 'ability',
+                owner: pi,
+                heroIdx: hi,
+                slotIdx: zi,
+                cardName: cards[cards.length - 1],
+                level: cards.length,
+              });
+            }
           }
         }
       }
@@ -97,12 +103,15 @@ module.exports = {
         const zone = (ps.abilityZones[t.heroIdx] || [])[t.slotIdx] || [];
         if (zone.length > 0) {
           const removed = zone.pop(); // Remove top copy
-          ps.discardPile.push(removed);
-          // Untrack one card instance
+          // Find and fire leave hook on the card instance
           const inst = engine.cardInstances.find(c =>
             c.owner === t.owner && c.zone === 'ability' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx && c.name === removed
           );
-          if (inst) engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
+          if (inst) {
+            await engine.runHooks('onCardLeaveZone', { _onlyCard: inst, card: inst, fromZone: 'ability', fromHeroIdx: t.heroIdx });
+            engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
+          }
+          ps.discardPile.push(removed);
           engine.log('destroy', { card: removed, by: 'Fire Bomb' });
         }
       } else if (t.type === 'equip') {

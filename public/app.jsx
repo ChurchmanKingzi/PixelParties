@@ -1,7 +1,7 @@
 /* ============================================================
    PIXEL PARTIES TCG — Frontend Application
    ============================================================ */
-const { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } = React;
+const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, createContext, useContext } = React;
 
 // ===== API HELPER =====
 let AUTH_TOKEN = null;
@@ -82,6 +82,9 @@ function isDeckLegal(deck) {
   if (filledHeroes.length !== 3) reasons.push('Need exactly 3 Heroes (' + filledHeroes.length + '/3)');
   const pc = (deck.potionDeck || []).length;
   if (pc !== 0 && (pc < 5 || pc > 15)) reasons.push('Potion Deck must have 0 or 5-15 cards (' + pc + ')');
+  // Main deck potions require Nicolas
+  const mainPotions = (deck.mainDeck || []).filter(n => CARDS_BY_NAME[n]?.cardType === 'Potion');
+  if (mainPotions.length > 0 && !hasNicolasHero(deck)) reasons.push('Main deck contains Potions but no Nicolas, the Hidden Alchemist');
   return { legal: reasons.length === 0, reasons };
 }
 
@@ -96,14 +99,31 @@ function countInDeck(deck, cardName, excludeSection) {
   return count;
 }
 
+function hasNicolasHero(deck) {
+  return (deck.heroes || []).some(h => h?.hero === 'Nicolas, the Hidden Alchemist');
+}
+
 function canAddCard(deck, cardName, section) {
   const card = CARDS_BY_NAME[cardName];
   if (!card) return false;
   const ct = card.cardType;
+  // Token cards cannot be added to any deck
+  if (ct === 'Token') return false;
   // Per-card copy limit (e.g. Performance has maxCopies: 4 despite being an Ability)
   const cardMax = card.maxCopies;
   if (section === 'main') {
-    if (ct === 'Hero' || ct === 'Potion') return false;
+    if (ct === 'Hero') return false;
+    // Potions allowed in main deck ONLY if Nicolas is a hero
+    if (ct === 'Potion') {
+      if (!hasNicolasHero(deck)) return false;
+      if ((deck.mainDeck || []).length >= 60) return false;
+      // Total potions across main + potion deck cannot exceed 15
+      const totalPotions = (deck.mainDeck || []).filter(n => CARDS_BY_NAME[n]?.cardType === 'Potion').length
+        + (deck.potionDeck || []).length;
+      if (totalPotions >= 15) return false;
+      if (countInDeck(deck, cardName) >= (cardMax || 2)) return false;
+      return true;
+    }
     if ((deck.mainDeck || []).length >= 60) return false;
     if (ct === 'Ability' && !cardMax) return true; // Unlimited unless maxCopies set
     if (countInDeck(deck, cardName) >= (cardMax || 4)) return false;
@@ -1291,8 +1311,24 @@ function DeckBuilder() {
     if (heroes.some(h => h && h.hero === cardName)) return false;
     let slot = targetSlot != null ? targetSlot : heroes.findIndex(h => !h || !h.hero);
     if (slot < 0 || slot > 2) return false;
+    const replacedHero = heroes[slot]?.hero;
     heroes[slot] = { hero: cardName, ability1: card.startingAbility1 || null, ability2: card.startingAbility2 || null };
-    updateSections({ heroes });
+    // Nicolas removal cleanup: if replacing Nicolas with another hero, move potions out of main deck
+    if (replacedHero === 'Nicolas, the Hidden Alchemist' && cardName !== 'Nicolas, the Hidden Alchemist') {
+      const mainDeck = [...(currentDeck.mainDeck || [])];
+      const potionDeck = [...(currentDeck.potionDeck || [])];
+      const cleanedMain = [];
+      for (const cn of mainDeck) {
+        if (CARDS_BY_NAME[cn]?.cardType === 'Potion') {
+          if (potionDeck.length < 15) potionDeck.push(cn);
+        } else {
+          cleanedMain.push(cn);
+        }
+      }
+      updateSections({ heroes, main: cleanedMain, potion: potionDeck });
+    } else {
+      updateSections({ heroes });
+    }
     return true;
   }, [currentDeck, unsaved, decks, activeIdx]);
 
@@ -1306,7 +1342,25 @@ function DeckBuilder() {
       const heroes = [...(currentDeck.heroes || [])];
       const slot = heroes.findIndex(h => h && h.hero === cardName);
       if (slot >= 0) heroes[slot] = { hero: null, ability1: null, ability2: null };
-      updateSections({ heroes });
+      // Nicolas removal: move main deck Potions back to potion deck
+      if (cardName === 'Nicolas, the Hidden Alchemist') {
+        const mainDeck = [...(currentDeck.mainDeck || [])];
+        const potionDeck = [...(currentDeck.potionDeck || [])];
+        const potionsInMain = [];
+        const cleanedMain = [];
+        for (const cn of mainDeck) {
+          if (CARDS_BY_NAME[cn]?.cardType === 'Potion') potionsInMain.push(cn);
+          else cleanedMain.push(cn);
+        }
+        // Move as many as possible to potion deck (cap 15)
+        for (const pn of potionsInMain) {
+          if (potionDeck.length < 15) potionDeck.push(pn);
+          // else: overflow — removed from deck entirely
+        }
+        updateSections({ heroes, main: cleanedMain, potion: potionDeck });
+      } else {
+        updateSections({ heroes });
+      }
     }
   }, [currentDeck, unsaved, decks, activeIdx]);
 
@@ -1400,6 +1454,20 @@ function DeckBuilder() {
     else if (fromSection === 'side') { const idx = fromIndex != null ? fromIndex : tempDeck.sideDeck.indexOf(cardName); if (idx >= 0) tempDeck.sideDeck.splice(idx, 1); }
     else if (fromSection === 'hero') { const s = tempDeck.heroes.findIndex(h => h && h.hero === cardName); if (s >= 0) tempDeck.heroes[s] = { hero: null, ability1: null, ability2: null }; }
 
+    // Nicolas removal cleanup: move main deck Potions to potion deck
+    if (fromSection === 'hero' && targetSection !== 'hero' && cardName === 'Nicolas, the Hidden Alchemist') {
+      const potionsInMain = [];
+      const cleanedMain = [];
+      for (const cn of tempDeck.mainDeck) {
+        if (CARDS_BY_NAME[cn]?.cardType === 'Potion') potionsInMain.push(cn);
+        else cleanedMain.push(cn);
+      }
+      for (const pn of potionsInMain) {
+        if (tempDeck.potionDeck.length < 15) tempDeck.potionDeck.push(pn);
+      }
+      tempDeck.mainDeck = cleanedMain;
+    }
+
     if (targetSection === 'hero') {
       if (!canAddCard(tempDeck, cardName, 'hero')) return;
       const card = CARDS_BY_NAME[cardName];
@@ -1420,9 +1488,10 @@ function DeckBuilder() {
     }
 
     const changes = {};
-    if (fromSection === 'main' || targetSection === 'main') changes.main = tempDeck.mainDeck;
+    const nicolasCleanup = fromSection === 'hero' && targetSection !== 'hero' && cardName === 'Nicolas, the Hidden Alchemist';
+    if (fromSection === 'main' || targetSection === 'main' || nicolasCleanup) changes.main = tempDeck.mainDeck;
     if (fromSection === 'heroes' || targetSection === 'heroes' || fromSection === 'hero' || targetSection === 'hero') changes.heroes = tempDeck.heroes;
-    if (fromSection === 'potion' || targetSection === 'potion') changes.potion = tempDeck.potionDeck;
+    if (fromSection === 'potion' || targetSection === 'potion' || nicolasCleanup) changes.potion = tempDeck.potionDeck;
     if (fromSection === 'side' || targetSection === 'side') changes.side = tempDeck.sideDeck;
     updateSections(changes);
   }, [currentDeck, addCardTo, addCardAt, updateSections]);
@@ -1991,7 +2060,7 @@ function DeckBuilder() {
 //  GAME BOARD
 // ═══════════════════════════════════════════
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, hpPosition, style, noTooltip }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip }) {
   const [tt, setTT] = useState(false);
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
@@ -2030,7 +2099,12 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, hpPosition, 
           {hp}
         </div>
       )}
-      {tt && card && (
+      {atk != null && hpPosition === 'hero' && (
+        <div className="board-card-atk board-card-atk-hero">
+          {atk}
+        </div>
+      )}
+      {tt && card && ReactDOM.createPortal(
         <div className="board-tooltip">
           {imgUrl && (
             <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
@@ -2052,7 +2126,8 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, hpPosition, 
               {card.level != null && <span>Lv{card.level}</span>}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -2123,6 +2198,24 @@ function GoldGainNumber({ amount, playerIdx, isMe }) {
   );
 }
 
+function GoldLossNumber({ amount, playerIdx, isMe }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const el = document.querySelector(`[data-gold-player="${playerIdx}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left - 10, y: isMe ? r.top - 40 : r.bottom + 10, isMe });
+    }
+  }, [playerIdx]);
+
+  if (!pos) return null;
+  return (
+    <div className={isMe ? 'gold-loss-number' : 'gold-loss-number gold-loss-down'} style={{ left: pos.x, top: pos.y }}>
+      -{amount}
+    </div>
+  );
+}
+
 // Floating level change number above a creature
 function LevelChangeNumber({ delta, owner, heroIdx, zoneSlot, myIdx }) {
   const [pos, setPos] = useState(null);
@@ -2139,6 +2232,46 @@ function LevelChangeNumber({ delta, owner, heroIdx, zoneSlot, myIdx }) {
   return (
     <div className={delta > 0 ? 'level-change-number' : 'level-change-number level-change-negative'} style={{ left: pos.x, top: pos.y }}>
       {delta > 0 ? '+' : ''}{delta}
+    </div>
+  );
+}
+
+// Floating HP change number above a hero (Toughness)
+function ToughnessHpNumber({ amount, owner, heroIdx, myIdx }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const ownerLabel = owner === myIdx ? 'me' : 'opp';
+    const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top - 10 });
+    }
+  }, [owner, heroIdx]);
+
+  if (!pos) return null;
+  return (
+    <div className={amount > 0 ? 'toughness-hp-number toughness-hp-up' : 'toughness-hp-number toughness-hp-down'} style={{ left: pos.x, top: pos.y }}>
+      {amount > 0 ? '+' : ''}{amount}
+    </div>
+  );
+}
+
+// Floating ATK change number above a hero (Fighting)
+function FightingAtkNumber({ amount, owner, heroIdx, myIdx }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const ownerLabel = owner === myIdx ? 'me' : 'opp';
+    const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top - 10 });
+    }
+  }, [owner, heroIdx]);
+
+  if (!pos) return null;
+  return (
+    <div className={amount > 0 ? 'fighting-atk-number fighting-atk-up' : 'fighting-atk-number fighting-atk-down'} style={{ left: pos.x, top: pos.y }}>
+      {amount > 0 ? '+' : ''}{amount}
     </div>
   );
 }
@@ -2173,15 +2306,37 @@ function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
 }
 
 // Opponent draw animation — face-down card flies from opp deck to opp hand
-function OppDrawAnimCard({ id, startX, startY, endX, endY }) {
+function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName }) {
   const dx = endX - startX;
   const dy = endY - startY;
   return (
     <div className="draw-anim-card"
       style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px' }}>
-      <div className="board-card face-down" style={{ width: '100%', height: '100%' }}>
-        <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+      {cardName ? (
+        <BoardCard cardName={cardName} noTooltip />
+      ) : (
+        <div className="board-card face-down" style={{ width: '100%', height: '100%' }}>
+          <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest }) {
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const card = CARDS_BY_NAME[cardName];
+  const imgUrl = card ? cardImageUrl(card.name) : null;
+  const isDeleted = dest === 'deleted';
+  return (
+    <div className={'discard-anim-card' + (isDeleted ? ' discard-anim-deleted' : '')}
+      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px' }}>
+      <div className="board-card" style={{ width: '100%', height: '100%' }}>
+        {imgUrl ? <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+        : <div className="board-card-text">{cardName || '?'}</div>}
       </div>
+      {isDeleted && <div className="delete-energy-overlay" />}
     </div>
   );
 }
@@ -2263,30 +2418,68 @@ function ImmuneIcon({ heroName, statusType }) {
 }
 
 // Card reveal — opponent's played card appears centered and expands/fades
-function CardRevealOverlay({ cardName, onDone }) {
+function CardRevealOverlay({ reveals, onRemove }) {
+  return (
+    <div className="card-reveal-stack">
+      {reveals.map((rev, idx) => (
+        <CardRevealEntry key={rev.id} cardName={rev.cardName} onDone={() => onRemove(rev.id)} />
+      ))}
+    </div>
+  );
+}
+
+function CardRevealEntry({ cardName, onDone }) {
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
   const foilType = card?.foil || null;
+  const [hovered, setHovered] = useState(false);
   useEffect(() => {
-    const t = setTimeout(onDone, 1900);
+    const t = setTimeout(onDone, 3500);
     return () => clearTimeout(t);
   }, []);
   if (!card) return null;
   return (
-    <div className="card-reveal-overlay">
-      <div className="card-reveal-card">
-        {imgUrl ? (
-          <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 4,
-            border: foilType === 'diamond_rare' ? '3px solid rgba(120,200,255,.7)' : foilType === 'secret_rare' ? '3px solid rgba(255,215,0,.6)' : '2px solid var(--bg4)' }} draggable={false} />
-        ) : (
-          <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            background: 'var(--bg3)', borderRadius: 4, border: '2px solid var(--bg4)', padding: 12, textAlign: 'center' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: typeColor(card.cardType), marginBottom: 6 }}>{card.name}</div>
-            <div style={{ fontSize: 12, color: 'var(--text2)' }}>{card.cardType}</div>
-          </div>
-        )}
+    <>
+      <div className="card-reveal-entry"
+        onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+        <div className="card-reveal-card">
+          {imgUrl ? (
+            <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6,
+              border: foilType === 'diamond_rare' ? '3px solid rgba(120,200,255,.7)' : foilType === 'secret_rare' ? '3px solid rgba(255,215,0,.6)' : '2px solid var(--bg4)' }} draggable={false} />
+          ) : (
+            <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              background: 'var(--bg3)', borderRadius: 6, border: '2px solid var(--bg4)', padding: 16, textAlign: 'center' }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: typeColor(card.cardType), marginBottom: 8 }}>{card.name}</div>
+              <div style={{ fontSize: 14, color: 'var(--text2)' }}>{card.cardType}</div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+      {hovered && card && ReactDOM.createPortal(
+        <div className="board-tooltip">
+          {imgUrl && (
+            <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
+              <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
+                border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none' }} />
+            </div>
+          )}
+          <div style={{ padding: '10px 12px' }}>
+            <div style={{ fontWeight: 700, fontSize: 18, color: typeColor(card.cardType), marginBottom: 5 }}>{card.name}</div>
+            <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>
+              {card.cardType}{card.subtype ? ' · ' + card.subtype : ''}{card.archetype ? ' · ' + card.archetype : ''}
+            </div>
+            {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5 }}>{card.effect}</div>}
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
+              {card.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {card.hp}</span>}
+              {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {card.atk}</span>}
+              {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {card.cost}</span>}
+              {card.level != null && <span>Lv{card.level}</span>}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 
@@ -2512,6 +2705,27 @@ function BurnedOverlay({ ticking }) {
   );
 }
 
+function PoisonedOverlay({ stacks }) {
+  const bubbles = useMemo(() => Array.from({ length: 8 }, () => ({
+    x: 10 + Math.random() * 80,
+    y: 20 + Math.random() * 60,
+    size: 6 + Math.random() * 5,
+    delay: Math.random() * 2.5,
+    dur: 0.8 + Math.random() * 0.8,
+  })), []);
+  return (
+    <div className="status-poisoned-overlay">
+      {bubbles.map((b, i) => (
+        <span key={i} className="poisoned-particle" style={{
+          left: b.x + '%', top: b.y + '%', fontSize: b.size,
+          animationDelay: b.delay + 's', animationDuration: b.dur + 's',
+        }}>☠️</span>
+      ))}
+      {stacks >= 1 && <div className="poison-stack-count">{stacks}</div>}
+    </div>
+  );
+}
+
 // Wind swirl — gentle wind particles spiraling around target
 function WindEffect({ x, y }) {
   const particles = useMemo(() => Array.from({ length: 14 }, (_, i) => {
@@ -2630,12 +2844,234 @@ function BeerBubblesEffect({ x, y }) {
   );
 }
 
+function CreatureDeathEffect({ x, y }) {
+  // Rising soul particles + flash + falling sparkles
+  const souls = useMemo(() => Array.from({ length: 14 }, () => ({
+    dx: -20 + Math.random() * 40,
+    dy: -(40 + Math.random() * 60),
+    size: 4 + Math.random() * 6,
+    color: ['#ffffff','#aaccff','#88aaff','#ccddff','#ddeeff'][Math.floor(Math.random() * 5)],
+    delay: Math.random() * 200,
+    dur: 600 + Math.random() * 500,
+  })), []);
+  const sparks = useMemo(() => Array.from({ length: 18 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 15 + Math.random() * 40;
+    return {
+      dx: Math.cos(angle) * speed,
+      dy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 4,
+      color: ['#ff4444','#ff6666','#ffaaaa','#ff8888','#cc3333'][Math.floor(Math.random() * 5)],
+      delay: 50 + Math.random() * 150,
+      dur: 400 + Math.random() * 400,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-creature-death-flash" />
+      {souls.map((p, i) => (
+        <div key={'s'+i} className="anim-creature-death-soul" style={{
+          '--dx': p.dx + 'px', '--dy': p.dy + 'px', '--size': p.size + 'px',
+          '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+        }} />
+      ))}
+      {sparks.map((p, i) => (
+        <div key={'k'+i} className="anim-creature-death-spark" style={{
+          '--dx': p.dx + 'px', '--dy': p.dy + 'px', '--size': p.size + 'px',
+          '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
 const ANIM_REGISTRY = {
   explosion: ExplosionEffect,
+  creature_death: CreatureDeathEffect,
   freeze: FreezeEffect,
   ice_encase: IceEncaseEffect,
   electric_strike: ElectricStrikeEffect,
   flame_strike: FlameStrikeEffect,
+  deep_sea_bubbles: (() => {
+    return function DeepSeaBubblesEffect({ x, y }) {
+      const bubbles = useMemo(() => Array.from({ length: 20 }, () => ({
+        xOff: -40 + Math.random() * 80,
+        startY: 25 + Math.random() * 30,
+        endY: -80 - Math.random() * 60,
+        delay: Math.random() * 800,
+        dur: 800 + Math.random() * 600,
+        size: 6 + Math.random() * 14,
+        opacity: 0.4 + Math.random() * 0.4,
+        wobble: -8 + Math.random() * 16,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {bubbles.map((b, i) => (
+            <div key={'bb'+i} style={{
+              position: 'absolute', left: b.xOff, top: b.startY,
+              width: b.size, height: b.size, borderRadius: '50%',
+              background: 'radial-gradient(circle at 35% 35%, rgba(100,160,220,.6), rgba(20,50,100,.3))',
+              border: '1px solid rgba(80,140,200,.4)',
+              boxShadow: `inset 0 -2px 4px rgba(10,30,60,.3), 0 0 ${b.size/2}px rgba(40,80,140,.3)`,
+              animation: `bubbleRise ${b.dur}ms ease-out ${b.delay}ms forwards`,
+              opacity: 0,
+              '--endY': b.endY + 'px',
+              '--wobble': b.wobble + 'px',
+              '--bubbleOpacity': b.opacity,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  holy_revival: (() => {
+    // Golden-white holy light rising upward — revival/resurrection effect
+    return function HolyRevivalEffect({ x, y }) {
+      const rays = useMemo(() => Array.from({ length: 16 }, () => ({
+        angle: Math.random() * 360,
+        len: 60 + Math.random() * 80,
+        width: 2 + Math.random() * 3,
+        delay: Math.random() * 400,
+        dur: 600 + Math.random() * 400,
+      })), []);
+      const sparkles = useMemo(() => Array.from({ length: 24 }, () => ({
+        xOff: -50 + Math.random() * 100,
+        startY: 20 + Math.random() * 30,
+        endY: -60 - Math.random() * 80,
+        delay: 200 + Math.random() * 600,
+        dur: 500 + Math.random() * 500,
+        size: 4 + Math.random() * 8,
+        color: ['#fffbe6','#ffd700','#fff','#ffe082','#fff9c4'][Math.floor(Math.random() * 5)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 160, height: 160, marginLeft: -80, marginTop: -80, background: 'radial-gradient(circle, rgba(255,255,240,.9) 0%, rgba(255,215,0,.4) 35%, rgba(255,255,200,.1) 60%, transparent 80%)', animationDuration: '800ms' }} />
+          <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,240,180,.5) 40%, transparent 70%)', animationDelay: '200ms', animationDuration: '600ms' }} />
+          {rays.map((r, i) => (
+            <div key={'hr'+i} style={{
+              position: 'absolute', left: 0, top: 0,
+              transform: `rotate(${r.angle}deg)`,
+              transformOrigin: 'center center',
+            }}>
+              <div style={{
+                width: r.width, height: r.len, marginLeft: -r.width/2,
+                background: 'linear-gradient(to top, rgba(255,215,0,.8), rgba(255,255,240,.3) 70%, transparent)',
+                borderRadius: r.width,
+                transformOrigin: 'center bottom',
+                animation: `holyRayGrow ${r.dur}ms ease-out ${r.delay}ms forwards`,
+                opacity: 0,
+              }} />
+            </div>
+          ))}
+          {sparkles.map((s, i) => (
+            <div key={'hs'+i} style={{
+              position: 'absolute', left: s.xOff, top: s.startY,
+              width: s.size, height: s.size, borderRadius: '50%',
+              background: s.color,
+              boxShadow: `0 0 ${s.size}px ${s.color}`,
+              animation: `holySparkleRise ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  arrow_rain: (() => {
+    // Sharp arrow projectiles raining down from above — Rain of Arrows
+    return function ArrowRainEffect({ x, y }) {
+      const arrows = useMemo(() => Array.from({ length: 28 }, (_, i) => ({
+        xOff: -70 + Math.random() * 140,
+        startY: -150 - Math.random() * 100,
+        delay: Math.random() * 600,
+        dur: 200 + Math.random() * 200,
+        rot: 170 + Math.random() * 20,
+        len: 18 + Math.random() * 14,
+      })), []);
+      const impacts = useMemo(() => Array.from({ length: 16 }, () => ({
+        xOff: -50 + Math.random() * 100,
+        delay: 250 + Math.random() * 500,
+        dur: 300 + Math.random() * 200,
+        size: 3 + Math.random() * 5,
+        color: ['#ffcc44','#ff8800','#ffaa22','#ddaa00','#ffe066'][Math.floor(Math.random() * 5)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, background: 'radial-gradient(circle, rgba(255,200,50,.5) 0%, rgba(255,150,0,.2) 50%, transparent 80%)', animationDelay: '300ms' }} />
+          {arrows.map((a, i) => (
+            <div key={'ar'+i} style={{
+              position: 'absolute', left: a.xOff, top: a.startY,
+              animation: `arrowFall ${a.dur}ms ease-in ${a.delay}ms forwards`,
+              opacity: 0,
+            }}>
+              <div style={{
+                width: 2, height: a.len,
+                background: 'linear-gradient(to bottom, transparent 0%, #ffdd66 20%, #ffaa22 80%, #ff8800 100%)',
+                borderRadius: '0 0 1px 1px',
+                boxShadow: '0 0 4px rgba(255,200,50,.6)',
+                transform: `rotate(${a.rot}deg)`,
+                transformOrigin: 'center top',
+              }}>
+                <div style={{ position: 'absolute', bottom: -4, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid #ff8800' }} />
+              </div>
+            </div>
+          ))}
+          {impacts.map((imp, i) => (
+            <div key={'ai'+i} className="anim-explosion-particle" style={{
+              '--dx': imp.xOff + 'px', '--dy': (Math.random() * -20) + 'px', '--size': imp.size + 'px',
+              '--color': imp.color, animationDelay: imp.delay + 'ms', animationDuration: imp.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  flame_avalanche: (() => {
+    // Massive, screen-shaking fire effect for Flame Avalanche
+    return function FlameAvalancheEffect({ x, y }) {
+      const flames = useMemo(() => Array.from({ length: 40 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 80 + Math.random() * 100;
+        return {
+          startX: Math.cos(angle) * dist,
+          startY: Math.sin(angle) * dist,
+          size: 16 + Math.random() * 24,
+          delay: Math.random() * 400,
+          dur: 400 + Math.random() * 400,
+          char: ['🔥','🔥','🔥','🔥','💥','✦','☄️'][Math.floor(Math.random() * 7)],
+        };
+      }), []);
+      const sparks = useMemo(() => Array.from({ length: 30 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 30 + Math.random() * 60;
+        return {
+          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+          size: 4 + Math.random() * 8,
+          color: ['#ff2200','#ff4400','#ff8800','#ffcc00','#ffaa00','#ff0000','#ff6600'][Math.floor(Math.random() * 7)],
+          delay: Math.random() * 300,
+          dur: 500 + Math.random() * 400,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 200, height: 200, marginLeft: -100, marginTop: -100, background: 'radial-gradient(circle, rgba(255,100,0,.9) 0%, rgba(255,60,0,.6) 30%, rgba(255,0,0,.2) 60%, transparent 80%)' }} />
+          <div className="anim-flame-flash" style={{ width: 140, height: 140, marginLeft: -70, marginTop: -70, animationDelay: '100ms', background: 'radial-gradient(circle, rgba(255,255,200,.8) 0%, rgba(255,180,0,.4) 40%, transparent 70%)' }} />
+          {flames.map((f, i) => (
+            <div key={'fa'+i} className="anim-flame-shard" style={{
+              '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
+              animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
+            }}>{f.char}</div>
+          ))}
+          {sparks.map((s, i) => (
+            <div key={'fas'+i} className="anim-explosion-particle" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
   wind: WindEffect,
   shadow_summon: ShadowSummonEffect,
   gold_sparkle: GoldSparkleEffect,
@@ -2658,6 +3094,172 @@ const ANIM_REGISTRY = {
             <div key={'jb'+i} className="anim-beer-bubble" style={{
               '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
               '--color': b.color, animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  poison_tick: (() => {
+    return function PoisonTickEffect({ x, y }) {
+      const bubbles = useMemo(() => Array.from({ length: 14 }, () => ({
+        xOff: -25 + Math.random() * 50,
+        size: 4 + Math.random() * 7,
+        delay: Math.random() * 250,
+        dur: 400 + Math.random() * 400,
+        color: ['#9933cc','#7722aa','#bb55ee','#6611aa','#dd88ff'][Math.floor(Math.random() * 5)],
+        wobble: -8 + Math.random() * 16,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(130,0,180,.8) 0%, rgba(100,0,160,.3) 40%, transparent 70%)' }} />
+          {bubbles.map((b, i) => (
+            <div key={'pt'+i} className="anim-beer-bubble" style={{
+              '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
+              '--color': b.color, animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  poison_vial: (() => {
+    return function PoisonVialEffect({ x, y }) {
+      const ooze = useMemo(() => Array.from({ length: 12 }, () => ({
+        xOff: -30 + Math.random() * 60,
+        size: 6 + Math.random() * 10,
+        delay: Math.random() * 200,
+        dur: 500 + Math.random() * 500,
+        wobble: -10 + Math.random() * 20,
+        color: ['#7722bb','#9933dd','#6611aa','#aa44ee','#551199'][Math.floor(Math.random() * 5)],
+      })), []);
+      const skulls = useMemo(() => Array.from({ length: 5 }, () => ({
+        xOff: -20 + Math.random() * 40,
+        delay: 200 + Math.random() * 300,
+        dur: 600 + Math.random() * 400,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(100,0,160,.9) 0%, rgba(80,0,140,.4) 40%, transparent 70%)' }} />
+          {ooze.map((o, i) => (
+            <div key={'po'+i} className="anim-beer-bubble" style={{
+              '--xOff': o.xOff + 'px', '--size': o.size + 'px', '--wobble': o.wobble + 'px',
+              '--color': o.color, animationDelay: o.delay + 'ms', animationDuration: o.dur + 'ms',
+            }} />
+          ))}
+          {skulls.map((s, i) => (
+            <div key={'ps'+i} className="anim-beer-bubble" style={{
+              '--xOff': s.xOff + 'px', '--size': '14px', '--wobble': '0px',
+              '--color': 'rgba(150,50,200,.6)', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+              fontSize: 14, opacity: 0,
+            }}>💀</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  tea_steam: (() => {
+    return function TeaSteamEffect({ x, y }) {
+      const particles = useMemo(() => Array.from({ length: 16 }, () => ({
+        xOff: -20 + Math.random() * 40,
+        size: 5 + Math.random() * 7,
+        delay: Math.random() * 300,
+        dur: 500 + Math.random() * 500,
+        char: ['🍃','~','≈','☁','·','🍃'][Math.floor(Math.random() * 6)],
+        color: ['#88cc66','#aaddaa','#66aa44','#ccddbb','#bbeeaa'][Math.floor(Math.random() * 5)],
+        wobble: -8 + Math.random() * 16,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(100,180,80,.7) 0%, rgba(80,150,60,.3) 40%, transparent 70%)' }} />
+          {particles.map((p, i) => (
+            <div key={'ts'+i} className="anim-beer-bubble" style={{
+              '--xOff': p.xOff + 'px', '--size': p.size + 'px', '--wobble': p.wobble + 'px',
+              '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+              fontSize: p.size,
+            }}>{p.char}</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  coffee_steam: (() => {
+    return function CoffeeSteamEffect({ x, y }) {
+      const particles = useMemo(() => Array.from({ length: 16 }, () => ({
+        xOff: -22 + Math.random() * 44,
+        size: 5 + Math.random() * 7,
+        delay: Math.random() * 300,
+        dur: 500 + Math.random() * 500,
+        char: ['☕','~','≈','☁','·','♨'][Math.floor(Math.random() * 6)],
+        color: ['#3a2a1a','#5c3d1e','#2a1a0a','#8b6b4a','#4a3020'][Math.floor(Math.random() * 5)],
+        wobble: -8 + Math.random() * 16,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(60,40,20,.8) 0%, rgba(40,25,10,.4) 40%, transparent 70%)' }} />
+          {particles.map((p, i) => (
+            <div key={'cs'+i} className="anim-beer-bubble" style={{
+              '--xOff': p.xOff + 'px', '--size': p.size + 'px', '--wobble': p.wobble + 'px',
+              '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+              fontSize: p.size,
+            }}>{p.char}</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  magic_hammer: (() => {
+    return function MagicHammerEffect({ x, y, w, h }) {
+      const targetW = w || 70;
+      const targetH = h || 90;
+      const hammerW = 55;
+      const hammerH = 80;
+      // Impact sparks
+      const sparks = useMemo(() => Array.from({ length: 14 }, () => {
+        const angle = -Math.PI * 0.15 + Math.random() * Math.PI * 1.3; // mostly sideways/upward
+        const speed = 20 + Math.random() * 50;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: -Math.abs(Math.sin(angle) * speed) - 5,
+          size: 2 + Math.random() * 4,
+          color: ['#ccc','#fff','#aaa','#ff8','#ffa'][Math.floor(Math.random() * 5)],
+          delay: 320 + Math.random() * 80,
+          dur: 250 + Math.random() * 200,
+        };
+      }), []);
+      // Apply squash class to actual target DOM element
+      useEffect(() => {
+        const timer = setTimeout(() => {
+          // Find the hero or support zone element under this animation
+          const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
+          let best = null, bestDist = Infinity;
+          els.forEach(el => {
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            const d = Math.abs(cx - x) + Math.abs(cy - y);
+            if (d < bestDist) { bestDist = d; best = el; }
+          });
+          if (best && bestDist < 80) {
+            best.classList.add('magic-hammer-squashed');
+            setTimeout(() => best.classList.remove('magic-hammer-squashed'), 650);
+          }
+        }, 330);
+        return () => clearTimeout(timer);
+      }, []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Hammerhead — drops from above, bounces back */}
+          <div className="anim-hammer-head" style={{
+            width: hammerW, height: hammerH,
+            marginLeft: -hammerW / 2, marginTop: -targetH / 2 - hammerH,
+          }} />
+          {/* Impact flash */}
+          <div className="anim-hammer-impact" />
+          {/* Impact sparks */}
+          {sparks.map((s, i) => (
+            <div key={'hs'+i} className="anim-explosion-particle" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
             }} />
           ))}
         </div>
@@ -2748,6 +3350,60 @@ function AbilityStack({ cards }) {
 }
 
 // Status select prompt component (for Beer, etc.) — must be a proper component for hooks
+function CardGalleryMultiPrompt({ ep, onRespond }) {
+  const cards = ep.cards || [];
+  const selectCount = ep.selectCount || 3;
+  const [selected, setSelected] = useState([]);
+  const toggleCard = (name) => {
+    setSelected(prev => {
+      if (prev.includes(name)) return prev.filter(n => n !== name);
+      if (prev.length >= selectCount) return prev;
+      return [...prev, name];
+    });
+  };
+  return (
+    <div className="modal-overlay" onClick={ep.cancellable !== false ? () => onRespond({ cancelled: true }) : undefined}>
+      <div className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
+            {ep.title || 'Select Cards'}
+          </span>
+          {ep.cancellable !== false && (
+            <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }}
+              onClick={() => onRespond({ cancelled: true })}>✕ CANCEL</button>
+          )}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+        <div className="deck-viewer-grid">
+          {cards.map((entry, i) => {
+            const card = CARDS_BY_NAME[entry.name];
+            if (!card) return null;
+            const isSel = selected.includes(entry.name);
+            return (
+              <div key={entry.name + '-' + i} style={{ position: 'relative' }}>
+                <CardMini card={card}
+                  onClick={() => toggleCard(entry.name)}
+                  style={{ width: '100%', height: 120, cursor: 'pointer',
+                    outline: isSel ? '3px solid var(--accent)' : 'none',
+                    filter: isSel ? 'brightness(1.2)' : (selected.length >= selectCount ? 'brightness(0.5)' : 'none'),
+                  }} />
+                {isSel && <div style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 3, zIndex: 5 }}>✓</div>}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ textAlign: 'center', marginTop: 12 }}>
+          <button className={'btn ' + (ep.confirmClass || '')} style={{ padding: '8px 24px', fontSize: 12 }}
+            disabled={selected.length !== selectCount}
+            onClick={() => onRespond({ selectedCards: selected })}>
+            {ep.confirmLabel || `Confirm (${selected.length}/${selectCount})`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StatusSelectPrompt({ ep, onRespond }) {
   const [localSelected, setLocalSelected] = useState(() => (ep.statuses || []).map(s => s.key));
   const toggleStatus = (key) => {
@@ -2764,7 +3420,7 @@ function StatusSelectPrompt({ ep, onRespond }) {
             border: localSelected.includes(s.key) ? '1px solid rgba(50,220,80,.5)' : '1px solid rgba(255,255,255,.08)',
           }} onClick={() => toggleStatus(s.key)}>
             <span style={{ fontSize: 16 }}>{s.icon}</span>
-            <span style={{ fontSize: 12, color: localSelected.includes(s.key) ? '#88ffaa' : 'var(--text2)' }}>{s.label}</span>
+            <span style={{ fontSize: 12, color: localSelected.includes(s.key) ? '#88ffaa' : 'var(--text2)' }}>{s.label}{s.stacks > 1 ? ` (×${s.stacks})` : ''}</span>
             <span style={{ marginLeft: 'auto', fontSize: 10, color: localSelected.includes(s.key) ? '#33dd55' : 'var(--text2)', opacity: .6 }}>
               {localSelected.includes(s.key) ? '✓' : '○'}
             </span>
@@ -2836,11 +3492,16 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
   // Opponent draw animation tracking
   const [oppDrawAnims, setOppDrawAnims] = useState([]);
+  const [oppDrawHidden, setOppDrawHidden] = useState(new Set()); // indices to hide during anim
   const prevOppHandCountRef = useRef(opp.handCount || 0);
   useEffect(() => {
     const newCount = opp.handCount || 0;
     const prevCount = prevOppHandCountRef.current;
     if (newCount > prevCount) {
+      // Hide new cards immediately (visibility:hidden preserves layout for position reading)
+      const hiddenIdxs = new Set();
+      for (let i = prevCount; i < newCount; i++) hiddenIdxs.add(i);
+      setOppDrawHidden(prev => new Set([...prev, ...hiddenIdxs]));
       // Wait one frame for DOM to update with new hand cards
       requestAnimationFrame(() => {
         const deckEl = document.querySelector('[data-opp-deck]');
@@ -2848,30 +3509,284 @@ function GameBoard({ gameState, lobby, onLeave }) {
         const deckRect = deckEl?.getBoundingClientRect();
         if (deckRect && handCards.length > 0) {
           const newAnims = [];
+          const deckSearchPending = deckSearchPendingRef.current;
           for (let i = 0; i < newCount - prevCount; i++) {
             // Target the last card(s) in the hand — new cards appear at the end
             const targetCard = handCards[handCards.length - 1 - (newCount - prevCount - 1 - i)];
             const targetRect = targetCard?.getBoundingClientRect();
             if (!targetRect) continue;
-            newAnims.push({
-              id: Date.now() + Math.random() + i,
-              startX: deckRect.left + deckRect.width / 2 - 32,
-              startY: deckRect.top + deckRect.height / 2 - 45,
-              endX: targetRect.left,
-              endY: targetRect.top,
-            });
+            const sx = deckRect.left + deckRect.width / 2 - 32;
+            const sy = deckRect.top + deckRect.height / 2 - 45;
+            // If this is a deck-searched card, show face-up in the normal draw animation
+            if (deckSearchPending.length > 0) {
+              const searchCardName = deckSearchPending.shift();
+              newAnims.push({
+                id: Date.now() + Math.random() + i,
+                startX: sx, startY: sy,
+                endX: targetRect.left, endY: targetRect.top,
+                cardName: searchCardName, // Face-up
+              });
+            } else {
+              newAnims.push({
+                id: Date.now() + Math.random() + i,
+                startX: sx, startY: sy,
+                endX: targetRect.left, endY: targetRect.top,
+              });
+            }
           }
           if (newAnims.length > 0) {
             setOppDrawAnims(prev => [...prev, ...newAnims]);
             setTimeout(() => {
               setOppDrawAnims(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
+              setOppDrawHidden(prev => {
+                const next = new Set(prev);
+                hiddenIdxs.forEach(idx => next.delete(idx));
+                return next.size > 0 ? next : new Set();
+              });
             }, 500);
+          } else {
+            setOppDrawHidden(prev => {
+              const next = new Set(prev);
+              hiddenIdxs.forEach(idx => next.delete(idx));
+              return next.size > 0 ? next : new Set();
+            });
           }
+        } else {
+          setOppDrawHidden(new Set());
         }
       });
     }
     prevOppHandCountRef.current = newCount;
   }, [opp.handCount]);
+
+  // ─── Discard/Delete animation tracking (hand-to-pile + board-to-pile, both players) ───
+  const [gameAnims, setGameAnims] = useState([]); // Active particle animations (moved up for creature death access)
+  const [beamAnims, setBeamAnims] = useState([]); // Beam animations (laser, etc.)
+  const [ramAnims, setRamAnims] = useState([]); // Ram animations (hero charges to target and back)
+  const [projectileAnims, setProjectileAnims] = useState([]); // Projectile animations (phoenix cannon, etc.)
+  const [discardAnims, setDiscardAnims] = useState([]);
+  const [myDiscardHidden, setMyDiscardHidden] = useState(0);
+  const [oppDiscardHidden, setOppDiscardHidden] = useState(0);
+  const [myDeletedHidden, setMyDeletedHidden] = useState(0);
+  const [oppDeletedHidden, setOppDeletedHidden] = useState(0);
+  const myHandRectsRef = useRef([]);
+  const oppHandRectsRef = useRef([]);
+  const boardCardRectsRef = useRef({ me: {}, opp: {} }); // cardName → [DOMRect, ...]
+  const prevMyHandForDiscardRef = useRef([...(me.hand || [])]);
+  const prevMyDiscardLenRef = useRef((me.discardPile || []).length);
+  const prevMyDeletedLenRef = useRef((me.deletedPile || []).length);
+  const prevOppHandCountForDiscardRef = useRef(opp.handCount || 0);
+  const prevOppDiscardLenRef = useRef((opp.discardPile || []).length);
+  const prevOppDeletedLenRef = useRef((opp.deletedPile || []).length);
+
+  // Helper: build pile-target rect
+  const getPileCenter = (selector) => {
+    const el = document.querySelector(selector);
+    const r = el?.getBoundingClientRect();
+    return r ? { x: r.left + r.width / 2 - 32, y: r.top + r.height / 2 - 45 } : null;
+  };
+
+  // Helper: create anims from board rects for unmatched pile entries
+  const animsFromBoard = (entries, boardRects, dest, destSelector) => {
+    const target = getPileCenter(destSelector);
+    if (!target) return [];
+    const anims = [];
+    for (const cardName of entries) {
+      const positions = boardRects[cardName];
+      if (!positions || positions.length === 0) continue;
+      const sr = positions.shift();
+      anims.push({ id: Date.now() + Math.random(), cardName, startX: sr.left, startY: sr.top, endX: target.x, endY: target.y, dest });
+    }
+    return anims;
+  };
+
+  // Helper: schedule anim state + pile hiding
+  const scheduleAnims = (newAnims, setDiscardHidden, setDeletedHidden) => {
+    if (newAnims.length === 0) return;
+    const dc = newAnims.filter(a => a.dest === 'discard').length;
+    const dl = newAnims.filter(a => a.dest === 'deleted').length;
+    if (dc > 0) setDiscardHidden(prev => prev + dc);
+    if (dl > 0) setDeletedHidden(prev => prev + dl);
+    setDiscardAnims(prev => [...prev, ...newAnims]);
+    setTimeout(() => {
+      setDiscardAnims(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
+      if (dc > 0) setDiscardHidden(prev => Math.max(0, prev - dc));
+      if (dl > 0) setDeletedHidden(prev => Math.max(0, prev - dl));
+    }, 500);
+  };
+
+  // Helper: capture board card positions into boardCardRectsRef
+  const captureBoardRects = () => {
+    const br = { me: {}, opp: {} };
+    for (const ow of ['me', 'opp']) {
+      const pi = ow === 'me' ? myIdx : oppIdx;
+      const p = gameState.players[pi];
+      if (!p) continue;
+      document.querySelectorAll(`[data-support-zone][data-support-owner="${ow}"]`).forEach(el => {
+        const cards = p.supportZones?.[el.dataset.supportHero]?.[el.dataset.supportSlot] || [];
+        if (cards.length > 0) { const r = el.getBoundingClientRect(); for (const cn of cards) (br[ow][cn] = br[ow][cn] || []).push(r); }
+      });
+      document.querySelectorAll(`[data-ability-zone][data-ability-owner="${ow}"]`).forEach(el => {
+        const cards = p.abilityZones?.[el.dataset.abilityHero]?.[el.dataset.abilitySlot] || [];
+        if (cards.length > 0) { const r = el.getBoundingClientRect(); for (const cn of cards) (br[ow][cn] = br[ow][cn] || []).push(r); }
+      });
+      document.querySelectorAll(`[data-surprise-zone][data-surprise-owner="${ow}"]`).forEach(el => {
+        const cards = p.surpriseZones?.[el.dataset.surpriseHero] || [];
+        if (cards.length > 0) { const r = el.getBoundingClientRect(); for (const cn of cards) (br[ow][cn] = br[ow][cn] || []).push(r); }
+      });
+    }
+    boardCardRectsRef.current = br;
+  };
+
+  // Own discard/delete detection (useLayoutEffect prevents flash before paint)
+  useLayoutEffect(() => {
+    const newHand = me.hand || [];
+    const prevHand = prevMyHandForDiscardRef.current;
+    const newDiscardLen = (me.discardPile || []).length;
+    const prevDiscardLen = prevMyDiscardLenRef.current;
+    const newDeletedLen = (me.deletedPile || []).length;
+    const prevDeletedLen = prevMyDeletedLenRef.current;
+    const discardGrew = newDiscardLen > prevDiscardLen;
+    const deletedGrew = newDeletedLen > prevDeletedLen;
+
+    if (discardGrew || deletedGrew) {
+      const newDiscardEntries = discardGrew ? [...me.discardPile.slice(prevDiscardLen)] : [];
+      const newDeletedEntries = deletedGrew ? [...me.deletedPile.slice(prevDeletedLen)] : [];
+      const newAnims = [];
+
+      // 1. Match against hand removals
+      if (newHand.length < prevHand.length) {
+        // Sequential subsequence match: newHand is a subsequence of prevHand
+        // (splice preserves relative order), so a forward scan correctly
+        // identifies which exact positions were removed — even for duplicates.
+        const removed = [];
+        let ni = 0;
+        for (let i = 0; i < prevHand.length; i++) {
+          if (ni < newHand.length && prevHand[i] === newHand[ni]) {
+            ni++;
+          } else {
+            removed.push({ cardName: prevHand[i], handIdx: i });
+          }
+        }
+        const storedRects = myHandRectsRef.current;
+        for (const r of removed) {
+          const sr = storedRects[r.handIdx];
+          if (!sr) continue;
+          let idx = newDiscardEntries.indexOf(r.cardName);
+          if (idx >= 0) {
+            newDiscardEntries.splice(idx, 1);
+            const t = getPileCenter('[data-my-discard]');
+            if (t) newAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'discard' });
+            continue;
+          }
+          idx = newDeletedEntries.indexOf(r.cardName);
+          if (idx >= 0) {
+            newDeletedEntries.splice(idx, 1);
+            const t = getPileCenter('[data-my-deleted]');
+            if (t) newAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'deleted' });
+          }
+        }
+      }
+
+      // 2. Remaining entries came from the board — use stored board positions
+      const br = boardCardRectsRef.current.me || {};
+      const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-my-discard]'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-my-deleted]')];
+      newAnims.push(...boardAnims);
+
+      // Trigger creature death effect for board-sourced creatures
+      for (const a of boardAnims) {
+        const card = CARDS_BY_NAME[a.cardName];
+        if (card?.cardType === 'Creature') {
+          const id = Date.now() + Math.random();
+          setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
+          setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
+        }
+      }
+
+      scheduleAnims(newAnims, setMyDiscardHidden, setMyDeletedHidden);
+    }
+
+    // Capture positions for NEXT cycle
+    requestAnimationFrame(() => {
+      const rects = [];
+      document.querySelectorAll('.game-hand-me .hand-slot').forEach((el, i) => { rects[i] = el.getBoundingClientRect(); });
+      myHandRectsRef.current = rects;
+      captureBoardRects();
+    });
+
+    prevMyHandForDiscardRef.current = [...newHand];
+    prevMyDiscardLenRef.current = newDiscardLen;
+    prevMyDeletedLenRef.current = newDeletedLen;
+  }, [me.hand, me.discardPile, me.deletedPile]);
+
+  // Opponent discard/delete detection (useLayoutEffect prevents flash before paint)
+  useLayoutEffect(() => {
+    const newCount = opp.handCount || 0;
+    const prevCount = prevOppHandCountForDiscardRef.current;
+    const newDiscardLen = (opp.discardPile || []).length;
+    const prevDiscardLen = prevOppDiscardLenRef.current;
+    const newDeletedLen = (opp.deletedPile || []).length;
+    const prevDeletedLen = prevOppDeletedLenRef.current;
+    const discardGrew = newDiscardLen > prevDiscardLen;
+    const deletedGrew = newDeletedLen > prevDeletedLen;
+
+    if (discardGrew || deletedGrew) {
+      const newDiscardEntries = discardGrew ? [...opp.discardPile.slice(prevDiscardLen)] : [];
+      const newDeletedEntries = deletedGrew ? [...opp.deletedPile.slice(prevDeletedLen)] : [];
+      const newAnims = [];
+
+      // 1. Match against hand removals (hand count decreased)
+      if (newCount < prevCount) {
+        const storedRects = oppHandRectsRef.current;
+        let handSlotCursor = prevCount - 1;
+        const handDiscardCount = Math.min(prevCount - newCount, newDiscardEntries.length);
+        for (let i = 0; i < handDiscardCount; i++) {
+          const sr = storedRects[Math.max(0, Math.min(handSlotCursor--, storedRects.length - 1))];
+          if (!sr) continue;
+          const cardName = newDiscardEntries.shift();
+          const t = getPileCenter('[data-opp-discard]');
+          if (t) newAnims.push({ id: Date.now() + Math.random() + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'discard' });
+        }
+        const handDeletedCount = Math.min(Math.max(0, (prevCount - newCount) - handDiscardCount), newDeletedEntries.length);
+        for (let i = 0; i < handDeletedCount; i++) {
+          const sr = storedRects[Math.max(0, Math.min(handSlotCursor--, storedRects.length - 1))];
+          if (!sr) continue;
+          const cardName = newDeletedEntries.shift();
+          const t = getPileCenter('[data-opp-deleted]');
+          if (t) newAnims.push({ id: Date.now() + Math.random() + 0.5 + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'deleted' });
+        }
+      }
+
+      // 2. Remaining entries came from the opponent's board
+      const br = boardCardRectsRef.current.opp || {};
+      const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-opp-discard]'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-opp-deleted]')];
+      newAnims.push(...boardAnims);
+
+      // Trigger creature death effect for board-sourced creatures
+      for (const a of boardAnims) {
+        const card = CARDS_BY_NAME[a.cardName];
+        if (card?.cardType === 'Creature') {
+          const id = Date.now() + Math.random();
+          setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
+          setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
+        }
+      }
+
+      scheduleAnims(newAnims, setOppDiscardHidden, setOppDeletedHidden);
+    }
+
+    // Capture positions for NEXT cycle
+    requestAnimationFrame(() => {
+      const rects = [];
+      document.querySelectorAll('.game-hand-opp .hand-card').forEach((el, i) => { rects[i] = el.getBoundingClientRect(); });
+      oppHandRectsRef.current = rects;
+      captureBoardRects();
+    });
+
+    prevOppHandCountForDiscardRef.current = newCount;
+    prevOppDiscardLenRef.current = newDiscardLen;
+    prevOppDeletedLenRef.current = newDeletedLen;
+  }, [opp.handCount, opp.discardPile, opp.deletedPile]);
 
   // Phase helpers
   const currentPhase = gameState.currentPhase || 0;
@@ -2900,6 +3815,27 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const getCardDimmed = (cardName) => {
     if (gameState.awaitingFirstChoice) return false; // Let player see hand clearly
     if (gameState.potionTargeting) return true; // All cards dimmed during targeting
+
+    // Hero Action mode (Coffee) — only eligible cards are playable
+    const heroActionPrompt = gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
+    if (heroActionPrompt) {
+      return !(heroActionPrompt.eligibleCards || []).includes(cardName);
+    }
+
+    // Force Discard mode (Wheels) — all cards are selectable
+    const forceDiscardPrompt = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt.ownerIdx === myIdx;
+    if (forceDiscardPrompt) return false;
+
+    // Cancellable Force Discard mode (Training, etc.) — all cards are selectable
+    const forceDiscardCancellable = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt.ownerIdx === myIdx;
+    if (forceDiscardCancellable) return false;
+
+    // Ability Attach mode (Training, etc.) — only eligible abilities are visible
+    const abilityAttachPrompt = gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt.ownerIdx === myIdx;
+    if (abilityAttachPrompt) {
+      return !(gameState.effectPrompt.eligibleCards || []).includes(cardName);
+    }
+
     if (!isMyTurn) return true;
     const card = CARDS_BY_NAME[cardName];
     if (!card) return false;
@@ -2907,10 +3843,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
     if (currentPhase === 2 || currentPhase === 4) {
       // Main Phase 1 or 2: gray out action types UNLESS they have Additional Action coverage
       if (isActionType) {
+        // Check if this is an inherent action (playable without additional action provider)
+        const isInherent = (gameState.inherentActionCards || []).includes(cardName);
         // Check if any Additional Action covers this card
         const additionalActions = gameState.additionalActions || [];
         const hasAdditional = additionalActions.some(aa => aa.eligibleHandCards.includes(cardName));
-        if (!hasAdditional) return true;
+        if (!hasAdditional && !isInherent) return true;
         // Has additional action — check summonLocked for creatures
         if (card.cardType === 'Creature' && me.summonLocked) return true;
         // Check if the card can actually be played on any hero
@@ -2941,16 +3879,20 @@ function GameBoard({ gameState, lobby, onLeave }) {
         // Gray out targeting artifacts/potions with no valid targets
         if ((gameState.unactivatableArtifacts || []).includes(cardName)) return true;
       }
-      // Gray out Potions with no valid targets
+      // Gray out Potions with no valid targets or when locked
       if (card.cardType === 'Potion') {
+        if (me.potionLocked) return true;
         if ((gameState.unactivatableArtifacts || []).includes(cardName)) return true;
       }
+      // Gray out spells/attacks with custom play conditions that aren't met (Flame Avalanche, etc.)
+      if ((gameState.blockedSpells || []).includes(cardName)) return true;
       return false;
     } else if (currentPhase === 3) {
       // Action Phase: gray out non-action types, and check playability
       if (!isActionType) return true;
       if (card.cardType === 'Creature' && (gameState.summonBlocked || []).includes(cardName)) return true;
       if (card.cardType === 'Creature' && me.summonLocked) return true;
+      if ((gameState.blockedSpells || []).includes(cardName)) return true;
       if (!canActionCardBePlayed(card)) return true;
       return false;
     }
@@ -2960,6 +3902,81 @@ function GameBoard({ gameState, lobby, onLeave }) {
   // Mouse-based drag state (reorder)
   const [handDrag, setHandDrag] = useState(null);
   const handRef = useRef(null);
+  const handAnimDataRef = useRef(null); // FLIP animation data: { oldRects[], indexMap[] }
+
+  // ── Hand Shuffle & Sort with FLIP animation ──
+  const captureHandRects = () => {
+    const slots = handRef.current?.querySelectorAll('.hand-slot');
+    if (!slots) return [];
+    const rects = [];
+    slots.forEach((el, i) => rects[i] = el.getBoundingClientRect());
+    return rects;
+  };
+
+  const shuffleHand = () => {
+    if (hand.length <= 1) return;
+    const oldRects = captureHandRects();
+    const indices = hand.map((_, i) => i);
+    // Fisher-Yates shuffle on indices
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    const newHand = indices.map(i => hand[i]);
+    // indexMap[newIdx] = oldIdx
+    handAnimDataRef.current = { oldRects, indexMap: indices };
+    setHand(newHand);
+    socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand });
+  };
+
+  const sortHand = () => {
+    if (hand.length <= 1) return;
+    const oldRects = captureHandRects();
+    const TYPE_ORDER = { Hero: 0, Creature: 1, Ability: 2, Spell: 3, Attack: 4, Artifact: 5, Potion: 6 };
+    // Build indexed entries for stable sort
+    const entries = hand.map((card, i) => ({ card, oldIdx: i }));
+    entries.sort((a, b) => {
+      const ca = CARDS_BY_NAME[a.card], cb = CARDS_BY_NAME[b.card];
+      const ta = TYPE_ORDER[ca?.cardType] ?? 99, tb = TYPE_ORDER[cb?.cardType] ?? 99;
+      if (ta !== tb) return ta - tb;
+      return a.card.localeCompare(b.card);
+    });
+    const newHand = entries.map(e => e.card);
+    const indexMap = entries.map(e => e.oldIdx); // indexMap[newIdx] = oldIdx
+    handAnimDataRef.current = { oldRects, indexMap };
+    setHand(newHand);
+    socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand });
+  };
+
+  // FLIP animation effect — runs after React re-renders the hand
+  useLayoutEffect(() => {
+    if (!handAnimDataRef.current) return;
+    const { oldRects, indexMap } = handAnimDataRef.current;
+    handAnimDataRef.current = null;
+    const slots = handRef.current?.querySelectorAll('.hand-slot');
+    if (!slots || slots.length === 0) return;
+    slots.forEach((el, newIdx) => {
+      const oldIdx = indexMap[newIdx];
+      if (oldIdx === undefined || !oldRects[oldIdx]) return;
+      const newRect = el.getBoundingClientRect();
+      const dx = oldRects[oldIdx].left - newRect.left;
+      if (Math.abs(dx) < 1) return;
+      el.style.transition = 'none';
+      el.style.transform = `translateX(${dx}px)`;
+    });
+    // Force reflow, then animate to final positions
+    void handRef.current?.offsetHeight;
+    slots.forEach((el) => {
+      if (!el.style.transform || el.style.transform === 'none') return;
+      el.style.transition = 'transform 0.3s ease-out';
+      el.style.transform = '';
+    });
+    // Clean up transition after animation
+    const cleanup = () => {
+      slots.forEach(el => { el.style.transition = ''; });
+    };
+    setTimeout(cleanup, 350);
+  }, [hand]);
 
   // Play-mode drag state (Action Phase — dragging to board)
   const [playDrag, setPlayDrag] = useState(null);
@@ -2969,6 +3986,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
   // Additional Action provider selection state
   const [pendingAdditionalPlay, setPendingAdditionalPlay] = useState(null); // { cardName, handIndex, heroIdx, zoneSlot, providers: [{cardId, cardName, heroIdx, zoneSlot}] }
+  const [pendingAbilityActivation, setPendingAbilityActivation] = useState(null); // { heroIdx, zoneIdx, abilityName, level }
 
   // Check if a hero can receive a specific ability
   const canHeroReceiveAbility = (playerData, heroIdx, abilityName) => {
@@ -3003,7 +4021,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
     const countAbility = (school) => {
       let count = 0;
       for (const slot of abZones) {
-        for (const abName of (slot || [])) { if (abName === school) count++; }
+        if (!slot || slot.length === 0) continue;
+        const baseAbility = slot[0]; // Performance transforms into this
+        for (const abName of slot) {
+          if (abName === school) count++;
+          else if (abName === 'Performance' && baseAbility === school) count++;
+        }
       }
       return count;
     };
@@ -3050,18 +4073,49 @@ function GameBoard({ gameState, lobby, onLeave }) {
     if (e.button !== 0) return;
     const cardName = hand[idx];
     const dimmed = getCardDimmed(cardName);
-    if (dimmed) return; // Don't drag dimmed cards
+
+    // Force Discard mode — clicking any card discards it
+    const forceDiscardActive = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt.ownerIdx === myIdx;
+    if (forceDiscardActive) {
+      e.preventDefault();
+      socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
+      return;
+    }
+
+    // Cancellable Force Discard mode (Training, etc.) — clicking a card discards it
+    const forceDiscardCancellableActive = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt.ownerIdx === myIdx;
+    if (forceDiscardCancellableActive) {
+      e.preventDefault();
+      socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
+      return;
+    }
 
     e.preventDefault();
     const card = CARDS_BY_NAME[cardName];
-    const isPlayable = isMyTurn && card && ACTION_TYPES.includes(card.cardType)
+
+    // Ability Attach mode (Training, etc.) — only eligible ability cards are draggable
+    const abilityAttachPrompt = gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
+    const isAbilityAttachEligible = abilityAttachPrompt && (abilityAttachPrompt.eligibleCards || []).includes(cardName);
+
+    const heroActionPrompt = gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
+    const isHeroAction = !dimmed && heroActionPrompt && (heroActionPrompt.eligibleCards || []).includes(cardName);
+    const isPlayable = !dimmed && (isHeroAction || (isMyTurn && card && ACTION_TYPES.includes(card.cardType)
       && !(card.cardType === 'Creature' && (gameState.summonBlocked || []).includes(cardName))
-      && (currentPhase === 3 || ((currentPhase === 2 || currentPhase === 4) && (gameState.additionalActions || []).some(aa => aa.eligibleHandCards.includes(cardName))));
-    const isAbilityPlayable = isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Ability';
-    const isEquipPlayable = isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Artifact'
+      && (currentPhase === 3 || ((currentPhase === 2 || currentPhase === 4) && ((gameState.additionalActions || []).some(aa => aa.eligibleHandCards.includes(cardName)) || (gameState.inherentActionCards || []).includes(cardName))))));
+    const isAbilityPlayable = isAbilityAttachEligible || (!dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Ability');
+    const isEquipPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Artifact'
       && (card.subtype || '').toLowerCase() === 'equipment' && (me.gold || 0) >= (card.cost || 0);
+    const isArtifactActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
+      && card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment';
+    const isPotionActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Potion';
     const startX = e.clientX, startY = e.clientY;
     let dragging = false;
+
+    // Helper: check if cursor is inside the hand zone
+    const isInsideHandZone = (mx, my) => {
+      const r = handRef.current?.getBoundingClientRect();
+      return r && mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom;
+    };
 
     const onMove = (me2) => {
       if (!dragging) {
@@ -3069,9 +4123,37 @@ function GameBoard({ gameState, lobby, onLeave }) {
         dragging = true;
       }
 
+      const inHand = isInsideHandZone(me2.clientX, me2.clientY);
+
+      // Inside hand zone → always reorder mode (any card type, even dimmed)
+      if (inHand) {
+        setPlayDrag(null);
+        setAbilityDrag(null);
+        setHandDrag({ idx, cardName, mouseX: me2.clientX, mouseY: me2.clientY });
+        return;
+      }
+
+      // Outside hand zone — use card-type-specific drag mode
+      setHandDrag(null);
+
       if (isAbilityPlayable) {
         // Ability play-mode drag — find valid hero/zone target
         let targetHero = -1, targetZone = -1;
+        // During abilityAttach prompt, restrict to specified hero and skip abilityGivenThisTurn
+        const attachHeroOnly = abilityAttachPrompt ? abilityAttachPrompt.heroIdx : -1;
+        const skipAbilityGiven = !!abilityAttachPrompt;
+        const canReceive = (hi, cn) => {
+          if (attachHeroOnly >= 0 && hi !== attachHeroOnly) return false;
+          // Custom canHeroReceiveAbility that optionally skips abilityGivenThisTurn
+          const hero2 = me.heroes[hi];
+          if (!hero2 || !hero2.name || hero2.hp <= 0) return false;
+          if (!skipAbilityGiven && (me.abilityGivenThisTurn || [])[hi]) return false;
+          const abZ = me.abilityZones[hi] || [[], [], []];
+          const isCust = (gameState.customPlacementCards || []).includes(cn);
+          if (isCust) return abZ.some(sl => (sl||[]).length > 0 && (sl||[]).length < 3);
+          for (const sl of abZ) { if ((sl||[]).length > 0 && sl[0] === cn) return sl.length < 3; }
+          return abZ.some(sl => (sl||[]).length === 0);
+        };
         // Check hero zones
         const heroEls = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls) {
@@ -3079,7 +4161,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
           if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
             if (el.dataset.heroOwner === 'me') {
               const hi = parseInt(el.dataset.heroIdx);
-              if (canHeroReceiveAbility(me, hi, cardName)) { targetHero = hi; targetZone = -1; }
+              if (canReceive(hi, cardName)) { targetHero = hi; targetZone = -1; }
             }
           }
         }
@@ -3092,7 +4174,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
               if (el.dataset.abilityOwner === 'me') {
                 const hi = parseInt(el.dataset.abilityHero);
                 const zi = parseInt(el.dataset.abilitySlot);
-                if (canHeroReceiveAbility(me, hi, cardName)) {
+                if (canReceive(hi, cardName)) {
                   const abSlot = (me.abilityZones[hi] || [])[zi] || [];
                   const isCustom = (gameState.customPlacementCards || []).includes(cardName);
 
@@ -3117,6 +4199,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
       } else if (isPlayable && card.cardType === 'Creature') {
         // Play-mode drag — find valid drop target
         let targetHero = -1, targetSlot = -1;
+        const heroActionHeroIdx = heroActionPrompt?.heroIdx;
         const els = document.querySelectorAll('[data-support-zone]');
         for (const el of els) {
           const r = el.getBoundingClientRect();
@@ -3124,6 +4207,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
             const hi = parseInt(el.dataset.supportHero);
             const si = parseInt(el.dataset.supportSlot);
             const isOwn = el.dataset.supportOwner === 'me';
+            // During heroAction, only the Coffee hero's zones are valid
+            if (heroActionHeroIdx !== undefined && hi !== heroActionHeroIdx) continue;
             if (isOwn && canHeroPlayCard(me, hi, card) && findFreeSupportSlot(me, hi) >= 0) {
               // Check this specific slot is free (base or island zones OK for creatures)
               const slotCards = (me.supportZones[hi] || [])[si] || [];
@@ -3174,18 +4259,37 @@ function GameBoard({ gameState, lobby, onLeave }) {
           }
         }
         setPlayDrag({ idx, cardName, card, mouseX: me2.clientX, mouseY: me2.clientY, targetHero, targetSlot, isEquip: true });
+      } else if (isPlayable && (card.cardType === 'Spell' || card.cardType === 'Attack')) {
+        // Spell/Attack drag — target hero zones (hero must have required spell schools)
+        let targetHero = -1;
+        const heroActionHeroIdx2 = heroActionPrompt?.heroIdx;
+        const heroEls2 = document.querySelectorAll('[data-hero-zone]');
+        for (const el of heroEls2) {
+          const r = el.getBoundingClientRect();
+          if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
+            if (el.dataset.heroOwner === 'me') {
+              const hi = parseInt(el.dataset.heroIdx);
+              if (heroActionHeroIdx2 !== undefined && hi !== heroActionHeroIdx2) continue;
+              if (canHeroPlayCard(me, hi, card)) targetHero = hi;
+            }
+          }
+        }
+        setPlayDrag({ idx, cardName, card, mouseX: me2.clientX, mouseY: me2.clientY, targetHero, targetSlot: -1, isSpell: true });
       } else {
+        // Non-playable card outside hand zone — show floating card (no reorder gap)
+        setPlayDrag(null);
+        setAbilityDrag(null);
         setHandDrag({ idx, cardName, mouseX: me2.clientX, mouseY: me2.clientY });
       }
     };
 
-    const onUp = () => {
+    const onUp = (upEvent) => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
 
       if (!dragging) {
         // Click (no drag) — check for potion or non-equip artifact activation
-        if (isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && !getCardDimmed(cardName)) {
+        if (!dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card) {
           if (card.cardType === 'Potion') {
             socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx });
           } else if (card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment') {
@@ -3195,32 +4299,64 @@ function GameBoard({ gameState, lobby, onLeave }) {
         setHandDrag(null); setPlayDrag(null); setAbilityDrag(null); return;
       }
 
+      // Determine if dropped inside the hand zone
+      const droppedInHand = isInsideHandZone(upEvent.clientX, upEvent.clientY);
+
+      if (droppedInHand) {
+        // Dropped inside hand zone — ALWAYS reorder, regardless of card type
+        const newHand = [...hand];
+        newHand.splice(idx, 1);
+        const dropIdx = calcDropIdx(upEvent.clientX, idx);
+        newHand.splice(dropIdx, 0, cardName);
+        setHand(newHand);
+        socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand });
+        setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
+        return;
+      }
+
+      // Dropped outside hand zone — try to play/activate the card
       if (isAbilityPlayable) {
         setAbilityDrag(prev => {
           if (!prev || prev.targetHero < 0) return null;
-          socket.emit('play_ability', {
-            roomId: gameState.roomId,
-            cardName: prev.cardName,
-            handIndex: prev.idx,
-            heroIdx: prev.targetHero,
-            zoneSlot: prev.targetZone,
-          });
+          // During abilityAttach prompt — send as effect_prompt_response
+          if (isAbilityAttachEligible) {
+            socket.emit('effect_prompt_response', {
+              roomId: gameState.roomId,
+              response: { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetZone },
+            });
+          } else {
+            socket.emit('play_ability', {
+              roomId: gameState.roomId,
+              cardName: prev.cardName,
+              handIndex: prev.idx,
+              heroIdx: prev.targetHero,
+              zoneSlot: prev.targetZone,
+            });
+          }
           return null;
         });
       } else if (isPlayable && card.cardType === 'Creature') {
         setPlayDrag(prev => {
           if (!prev || prev.targetHero < 0 || prev.targetSlot < 0) return null;
+
+          // Hero Action mode (Coffee) — send as effect_prompt_response
+          if (isHeroAction) {
+            socket.emit('effect_prompt_response', {
+              roomId: gameState.roomId,
+              response: { cardName: prev.cardName, handIndex: prev.idx, zoneSlot: prev.targetSlot },
+            });
+            return null;
+          }
+
           // Check if this play uses an additional action
           const additionalActions = gameState.additionalActions || [];
           const matchingAAs = additionalActions.filter(aa => aa.eligibleHandCards.includes(prev.cardName));
           const isMainPhase = currentPhase === 2 || currentPhase === 4;
-          const needsAdditional = isMainPhase || matchingAAs.length > 0; // Main Phase always; Action Phase if available
+          const needsAdditional = isMainPhase || matchingAAs.length > 0;
 
           if (needsAdditional && matchingAAs.length > 0) {
-            // Gather all providers across matching AA types
             const allProviders = matchingAAs.flatMap(aa => aa.providers);
             if (allProviders.length > 1) {
-              // Multiple providers — enter selection mode
               setPendingAdditionalPlay({
                 cardName: prev.cardName, handIndex: prev.idx,
                 heroIdx: prev.targetHero, zoneSlot: prev.targetSlot,
@@ -3229,14 +4365,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
               socket.emit('pending_placement', { roomId: gameState.roomId, heroIdx: prev.targetHero, zoneSlot: prev.targetSlot, cardName: prev.cardName });
               return null;
             }
-            // Single provider — auto-consume
             socket.emit('play_creature', {
               roomId: gameState.roomId, cardName: prev.cardName,
               handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetSlot,
               additionalActionProvider: allProviders[0].cardId,
             });
           } else {
-            // Normal action phase play — no additional action
             socket.emit('play_creature', {
               roomId: gameState.roomId, cardName: prev.cardName,
               handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetSlot,
@@ -3256,23 +4390,36 @@ function GameBoard({ gameState, lobby, onLeave }) {
           });
           return null;
         });
-      } else if (isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && !getCardDimmed(cardName)
-        && card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment') {
-        // Non-equip artifact dragged — activate it (same as click)
-        socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx });
-        setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
-      } else {
-        setHandDrag(prev => {
-          if (!prev) return null;
-          const newHand = [...hand];
-          newHand.splice(prev.idx, 1);
-          const dropIdx = calcDropIdx(prev.mouseX, prev.idx);
-          newHand.splice(dropIdx, 0, prev.cardName);
-          setHand(newHand);
-          socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand });
+      } else if (isPlayable && (card.cardType === 'Spell' || card.cardType === 'Attack')) {
+        setPlayDrag(prev => {
+          if (!prev || prev.targetHero < 0) return null;
+
+          // Hero Action mode (Coffee) — send as effect_prompt_response
+          if (isHeroAction) {
+            socket.emit('effect_prompt_response', {
+              roomId: gameState.roomId,
+              response: { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero },
+            });
+            return null;
+          }
+
+          socket.emit('play_spell', {
+            roomId: gameState.roomId,
+            cardName: prev.cardName,
+            handIndex: prev.idx,
+            heroIdx: prev.targetHero,
+          });
           return null;
         });
+      } else if (isArtifactActivatable) {
+        // Non-equip artifact dragged outside hand — activate
+        socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx });
+      } else if (isPotionActivatable) {
+        // Potion dragged outside hand — activate
+        socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx });
       }
+      // Clean up all drag states
+      setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
     };
 
     window.addEventListener('mousemove', onMove);
@@ -3307,7 +4454,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
       filtered.splice(dropIdx, 0, { card: null, origIdx: -1, isGap: true });
     }
     return filtered;
-  }, [hand, handDrag, playDrag]);
+  }, [hand, handDrag, playDrag, abilityDrag]);
 
   const [showSurrender, setShowSurrender] = useState(false);
   const [showFirstChoice, setShowFirstChoice] = useState(false);
@@ -3336,6 +4483,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
   }, []);
 
   const [potionSelection, setPotionSelection] = useState([]); // Selected target IDs during potion targeting
+  // Clear selection when targeting changes (prevents stale selections between multi-step effects)
+  useEffect(() => {
+    setPotionSelection([]);
+  }, [gameState.potionTargeting]);
   const [oppPendingPlacement, setOppPendingPlacement] = useState(null); // { owner, heroIdx, zoneSlot, cardName }
   useEffect(() => {
     const onOppPending = (data) => setOppPendingPlacement(data);
@@ -3343,16 +4494,63 @@ function GameBoard({ gameState, lobby, onLeave }) {
     return () => socket.off('opponent_pending_placement', onOppPending);
   }, []);
   const [explosions, setExplosions] = useState([]); // Target IDs currently showing explosion
-  const [gameAnims, setGameAnims] = useState([]); // Active particle animations
-  const [cardReveal, setCardReveal] = useState(null); // Card name being revealed
+  const [cardReveals, setCardReveals] = useState([]); // [{id, cardName}] — stacked reveals
   const [summonGlow, setSummonGlow] = useState(null); // { owner, heroIdx, zoneSlot }
   const [oppTargetHighlight, setOppTargetHighlight] = useState([]); // Target IDs highlighted on opponent's screen
   const [burnTickingHeroes, setBurnTickingHeroes] = useState([]); // Hero keys ('pi-hi') currently showing burn escalation
+  const [abilityFlash, setAbilityFlash] = useState(null); // { owner, heroIdx, zoneIdx } — flashing ability zone
   const [levelChanges, setLevelChanges] = useState([]); // [{id, delta, owner, heroIdx, zoneSlot}]
+  const deckSearchPendingRef = useRef([]); // Card names queued before sync triggers opp draw anim
+  const [reactionChain, setReactionChain] = useState(null); // [{id, cardName, owner, cardType, isInitialCard, negated, status}]
+  const [cameraFlash, setCameraFlash] = useState(false);
+  const [toughnessHpChanges, setToughnessHpChanges] = useState([]); // [{id, amount, owner, heroIdx}]
+  const toughnessHpSuppressRef = useRef({}); // { 'owner-heroIdx': true } — suppress damage numbers for Toughness HP removal
+  const [fightingAtkChanges, setFightingAtkChanges] = useState([]); // [{id, amount, owner, heroIdx}]
 
   // Listen for opponent card reveal
   useEffect(() => {
-    const onReveal = ({ cardName }) => setCardReveal(cardName);
+    const onReveal = ({ cardName }) => setCardReveals(prev => [...prev, { id: Date.now() + Math.random(), cardName }]);
+    const onDeckSearchAdd = ({ cardName, playerIdx }) => {
+      // If the OPPONENT searched, prepare face-up draw animation
+      if (playerIdx !== myIdx) {
+        deckSearchPendingRef.current = [...deckSearchPendingRef.current, cardName];
+      }
+    };
+    // Reaction chain events
+    const onChainUpdate = ({ links }) => {
+      setReactionChain(links.map(l => ({ ...l, status: l.negated ? 'negated' : 'pending' })));
+    };
+    const onChainResolvingStart = () => {}; // Chain is about to resolve
+    const onChainLinkResolving = ({ linkIndex }) => {
+      setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'resolving' } : l));
+    };
+    const onChainLinkResolved = ({ linkIndex }) => {
+      setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'resolved' } : l));
+    };
+    const onChainLinkNegated = ({ linkIndex }) => {
+      setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'negated', negated: true } : l));
+    };
+    const onChainDone = () => {
+      setTimeout(() => setReactionChain(null), 800);
+    };
+    const onCameraFlash = () => {
+      setCameraFlash(true);
+      setTimeout(() => setCameraFlash(false), 900);
+    };
+    const onToughnessHp = ({ owner, heroIdx, amount }) => {
+      const entry = { id: Date.now() + Math.random(), amount, owner, heroIdx };
+      setToughnessHpChanges(prev => [...prev, entry]);
+      setTimeout(() => setToughnessHpChanges(prev => prev.filter(e => e.id !== entry.id)), 1800);
+      // Mark this hero's HP change as non-damage so the damage number system skips it
+      if (amount < 0) {
+        toughnessHpSuppressRef.current[`${owner}-${heroIdx}`] = true;
+      }
+    };
+    const onFightingAtk = ({ owner, heroIdx, amount }) => {
+      const entry = { id: Date.now() + Math.random(), amount, owner, heroIdx };
+      setFightingAtkChanges(prev => [...prev, entry]);
+      setTimeout(() => setFightingAtkChanges(prev => prev.filter(e => e.id !== entry.id)), 1800);
+    };
     const onSummon = ({ owner, heroIdx, zoneSlot, cardName }) => {
       setSummonGlow({ owner, heroIdx, zoneSlot });
       setTimeout(() => setSummonGlow(null), 1200);
@@ -3374,12 +4572,136 @@ function GameBoard({ gameState, lobby, onLeave }) {
       setLevelChanges(prev => [...prev, entry]);
       setTimeout(() => setLevelChanges(prev => prev.filter(e => e.id !== entry.id)), 1600);
     };
+    const onAbilityActivated = ({ owner, heroIdx, zoneIdx, abilityName }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const abSel = `[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${zoneIdx}"]`;
+      // Set flash overlay on the ability zone (visible to both players)
+      setAbilityFlash({ owner, heroIdx, zoneIdx });
+      setTimeout(() => setAbilityFlash(null), 1800);
+      // Big flashy burst on the ability zone — staggered multi-layer
+      setTimeout(() => playAnimation('gold_sparkle', abSel, { duration: 1400 }), 50);
+      setTimeout(() => playAnimation('gold_sparkle', abSel, { duration: 1200 }), 250);
+      setTimeout(() => playAnimation('gold_sparkle', abSel, { duration: 1000 }), 450);
+      // Sparkle on the gold counter after a short delay
+      setTimeout(() => {
+        const goldEl = document.querySelector(`[data-gold-player="${owner}"]`);
+        if (goldEl) {
+          playAnimation('gold_sparkle', goldEl, { duration: 1000 });
+          setTimeout(() => playAnimation('gold_sparkle', goldEl, { duration: 800 }), 200);
+        }
+      }, 400);
+    };
+    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, color, duration }) => {
+      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
+      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
+      let tgtEl;
+      if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
+        tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
+      } else {
+        tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
+      }
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const id = Date.now() + Math.random();
+      const dur = duration || 1500;
+      setBeamAnims(prev => [...prev, {
+        id, color: color || '#ff2222',
+        x1: sr.left + sr.width / 2, y1: sr.top + sr.height / 2,
+        x2: tr.left + tr.width / 2, y2: tr.top + tr.height / 2,
+      }]);
+      // Also play explosion on target
+      setTimeout(() => playAnimation('explosion', tgtEl, { duration: 800 }), 250);
+      setTimeout(() => setBeamAnims(prev => prev.filter(a => a.id !== id)), dur);
+    };
     socket.on('card_reveal', onReveal);
+    socket.on('deck_search_add', onDeckSearchAdd);
+    socket.on('reaction_chain_update', onChainUpdate);
+    socket.on('reaction_chain_resolving_start', onChainResolvingStart);
+    socket.on('reaction_chain_link_resolving', onChainLinkResolving);
+    socket.on('reaction_chain_link_resolved', onChainLinkResolved);
+    socket.on('reaction_chain_link_negated', onChainLinkNegated);
+    socket.on('reaction_chain_done', onChainDone);
+    socket.on('camera_flash', onCameraFlash);
+    socket.on('toughness_hp_change', onToughnessHp);
+    socket.on('fighting_atk_change', onFightingAtk);
     socket.on('summon_effect', onSummon);
     socket.on('burn_tick', onBurnTick);
     socket.on('play_zone_animation', onZoneAnim);
     socket.on('level_change', onLevelChange);
-    return () => { socket.off('card_reveal', onReveal); socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick); socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange); };
+    socket.on('ability_activated', onAbilityActivated);
+    socket.on('play_beam_animation', onBeamAnimation);
+    const onPermanentAnim = ({ owner, permId, type }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const el = document.querySelector(`[data-perm-id="${permId}"][data-perm-owner="${ownerLabel}"]`);
+      if (el) playAnimation(type || 'holy_revival', el, { duration: 1200 });
+    };
+    socket.on('play_permanent_animation', onPermanentAnim);
+    const onRamAnimation = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, cardName, duration }) => {
+      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
+      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
+      let tgtEl;
+      if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
+        tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
+      } else {
+        tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
+      }
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const id = Date.now() + Math.random();
+      const dur = duration || 1600;
+      setRamAnims(prev => [...prev, {
+        id, cardName,
+        srcX: sr.left + sr.width / 2, srcY: sr.top + sr.height / 2,
+        tgtX: tr.left + tr.width / 2, tgtY: tr.top + tr.height / 2,
+        srcOwner: sourceOwner, srcHeroIdx: sourceHeroIdx, dur,
+      }]);
+      setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)), dur);
+    };
+    socket.on('play_ram_animation', onRamAnimation);
+    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, emoji, duration, trailClass, emojiStyle, projectileClass }) => {
+      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
+      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
+      let tgtEl;
+      if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
+        tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
+      } else {
+        tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
+      }
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const id = Date.now() + Math.random();
+      const dur = duration || 600;
+      setProjectileAnims(prev => [...prev, {
+        id, emoji: emoji || '🐦‍🔥',
+        trailClass: trailClass || null,
+        emojiStyle: emojiStyle || null,
+        projectileClass: projectileClass || null,
+        srcX: sr.left + sr.width / 2, srcY: sr.top + sr.height / 2,
+        tgtX: tr.left + tr.width / 2, tgtY: tr.top + tr.height / 2,
+        dur,
+      }]);
+      setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + 200);
+    };
+    socket.on('play_projectile_animation', onProjectileAnimation);
+    return () => {
+      socket.off('card_reveal', onReveal); socket.off('deck_search_add', onDeckSearchAdd);
+      socket.off('reaction_chain_update', onChainUpdate); socket.off('reaction_chain_resolving_start', onChainResolvingStart);
+      socket.off('reaction_chain_link_resolving', onChainLinkResolving); socket.off('reaction_chain_link_resolved', onChainLinkResolved);
+      socket.off('reaction_chain_link_negated', onChainLinkNegated); socket.off('reaction_chain_done', onChainDone);
+      socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('fighting_atk_change', onFightingAtk);
+      socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick);
+      socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange);
+      socket.off('ability_activated', onAbilityActivated); socket.off('play_beam_animation', onBeamAnimation);
+      socket.off('play_permanent_animation', onPermanentAnim);
+      socket.off('play_ram_animation', onRamAnimation);
+      socket.off('play_projectile_animation', onProjectileAnimation);
+    };
   }, []);
 
   /** Play a visual animation at a DOM element's position. */
@@ -3412,6 +4734,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
           let selector;
           if (type === 'ability') {
             selector = `[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`;
+          } else if (type === 'hero') {
+            selector = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
           } else {
             selector = `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${slotIdx}"]`;
           }
@@ -3449,6 +4773,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
     const handleEsc = (e) => {
       if (e.key === 'Escape') {
         e.stopImmediatePropagation();
+        if (pendingAbilityActivation) { setPendingAbilityActivation(null); return; }
         if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx && gameState.effectPrompt.cancellable !== false) {
           socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
         } else if (gameState.potionTargeting && gameState.potionTargeting.ownerIdx === myIdx) {
@@ -3463,7 +4788,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
     };
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
-  }, [showSurrender, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay]);
+  }, [showSurrender, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation]);
 
   // Listen for opponent's target selections
   useEffect(() => {
@@ -3490,6 +4815,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
   // Damage number + Gold gain animations — detect changes from game state
   const [damageNumbers, setDamageNumbers] = useState([]);
   const [goldGains, setGoldGains] = useState([]);
+  const [goldLosses, setGoldLosses] = useState([]);
   const prevHpRef = useRef(null);
   const prevGoldRef = useRef(null);
   const prevStatusRef = useRef(null);
@@ -3509,6 +4835,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
       for (const [key, cur] of Object.entries(currentHp)) {
         const prev = prevHpRef.current[key];
         if (prev && cur.hp < prev.hp) {
+          // Skip if this HP decrease was from Toughness removal (not real damage)
+          if (toughnessHpSuppressRef.current[key]) {
+            delete toughnessHpSuppressRef.current[key];
+            continue;
+          }
           const dmg = prev.hp - cur.hp;
           newDmgNums.push({ id: Date.now() + Math.random(), amount: dmg, heroName: cur.name });
         }
@@ -3542,6 +4873,20 @@ function GameBoard({ gameState, lobby, onLeave }) {
           const sel = `[data-gold-player="${g.playerIdx}"]`;
           setTimeout(() => playAnimation('gold_sparkle', sel, { duration: 1200 }), 50);
         }
+      }
+      // Detect gold losses
+      const newGoldLosses = [];
+      for (let pi = 0; pi < 2; pi++) {
+        const diff = currentGold[pi] - prevGoldRef.current[pi];
+        if (diff < 0) {
+          newGoldLosses.push({ id: Date.now() + Math.random() + pi + 0.5, amount: -diff, playerIdx: pi });
+        }
+      }
+      if (newGoldLosses.length > 0) {
+        setGoldLosses(prev => [...prev, ...newGoldLosses]);
+        setTimeout(() => {
+          setGoldLosses(prev => prev.filter(g => !newGoldLosses.some(n => n.id === g.id)));
+        }, 1800);
       }
     }
     prevGoldRef.current = currentGold;
@@ -3639,7 +4984,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
     });
   };
 
-  const canConfirmPotion = (pt?.config?.alwaysConfirmable) || potionSelection.length > 0;
+  const canConfirmPotion = (() => {
+    if (pt?.config?.alwaysConfirmable) return true;
+    if (potionSelection.length === 0) return false;
+    const minReq = pt?.config?.minRequired || 0;
+    return potionSelection.length >= minReq;
+  })();
 
   // ── Effect prompt helpers (confirm, card gallery, zone picker) ──
   const ep = gameState.effectPrompt;
@@ -3677,10 +5027,26 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
     const heroRow = (
       <div className="board-row board-hero-row">
-        {[0, 1, 2].map(i => {
+        {[0, 1, 2].flatMap(i => {
           const hero = heroes[i];
           const isDead = hero && hero.hp !== undefined && hero.hp <= 0;
-          const abilityIneligible = !isOpp && abilityDrag && !canHeroReceiveAbility(p, i, abilityDrag.cardName);
+          const abilityAttachActive = !isOpp && gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
+          const abilityIneligible = !isOpp && abilityDrag && (() => {
+            if (abilityAttachActive) {
+              // During abilityAttach: only the specified hero is eligible, skip abilityGivenThisTurn
+              if (i !== gameState.effectPrompt.heroIdx) return true;
+              const hero2 = heroes[i];
+              if (!hero2 || !hero2.name || hero2.hp <= 0) return true;
+              // Check ability zone capacity without abilityGivenThisTurn
+              const abZ = abZones[i] || [[], [], []];
+              const cn = abilityDrag.cardName;
+              const isCust = (gameState.customPlacementCards || []).includes(cn);
+              if (isCust) return !abZ.some(sl => (sl||[]).length > 0 && (sl||[]).length < 3);
+              for (const sl of abZ) { if ((sl||[]).length > 0 && sl[0] === cn) return sl.length >= 3; }
+              return !abZ.some(sl => (sl||[]).length === 0);
+            }
+            return !canHeroReceiveAbility(p, i, abilityDrag.cardName);
+          })();
           const equipIneligible = !isOpp && playDrag && playDrag.isEquip && (() => {
             const hero = heroes[i];
             if (!hero || !hero.name || hero.hp <= 0) return true;
@@ -3695,8 +5061,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
             return false;
           })();
           const spellAttackIneligible = !isOpp && playDrag && !playDrag.isEquip && (playDrag.card?.cardType === 'Spell' || playDrag.card?.cardType === 'Attack') && !canHeroPlayCard(p, i, playDrag.card);
+          // During heroAction, dim all heroes except the Coffee hero
+          const heroActionDimmed = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx && gameState.effectPrompt?.heroIdx !== i;
           const abilityTarget = !isOpp && abilityDrag && abilityDrag.targetHero === i && abilityDrag.targetZone < 0;
           const equipTarget = !isOpp && playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1;
+          const spellTarget = !isOpp && playDrag && playDrag.isSpell && playDrag.targetHero === i;
           const pi = isOpp ? oppIdx : myIdx;
           const heroTargetId = `hero-${pi}-${i}`;
           const isValidHeroTarget = isTargeting && validTargetIds.has(heroTargetId);
@@ -3706,19 +5075,28 @@ function GameBoard({ gameState, lobby, onLeave }) {
           const isImmune = hero?.statuses?.immune;
           const isNegated = hero?.statuses?.negated;
           const isBurned = hero?.statuses?.burned;
+          const isPoisoned = hero?.statuses?.poisoned;
           const isShielded = hero?.statuses?.shielded;
-          return (
+          // Check if this hero has an active hero effect
+          const isHeroEffectActive = !isOpp && (gameState.activeHeroEffects || []).some(e => e.heroIdx === i);
+          const isRamming = ramAnims.some(r => r.srcOwner === pi && r.srcHeroIdx === i);
+          const onHeroClick = isHeroEffectActive && !isValidHeroTarget
+            ? () => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: i })
+            : (isValidHeroTarget ? () => togglePotionTarget(heroTargetId) : undefined);
+          const heroGroup = (
             <div key={i} className="board-hero-group">
               {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxLeft }).map((_, s) => (
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '')}
+              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || heroActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
-                onClick={isValidHeroTarget ? () => togglePotionTarget(heroTargetId) : undefined}
-                style={isValidHeroTarget ? { cursor: 'pointer' } : undefined}>
-                {hero?.name ? (
-                  <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} hpPosition="hero" />
+                onClick={onHeroClick}
+                style={(isHeroEffectActive || isValidHeroTarget) ? { cursor: 'pointer' } : undefined}>
+                {hero?.name && !isRamming ? (
+                  <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" />
+                ) : hero?.name && isRamming ? (
+                  <div className="board-zone-empty" style={{ opacity: 0.3 }}>{hero.name.split(',')[0]}</div>
                 ) : (
                   <div className="board-zone-empty">{'Hero ' + (i+1)}</div>
                 )}
@@ -3726,27 +5104,47 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 {hero?.name && isStunned && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
                 {hero?.name && isNegated && <NegatedOverlay />}
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
+                {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
               </div>
-              <BoardZone type="surprise" cards={surZones[i] || []} label="Surprise" />
+              <div data-surprise-zone="1" data-surprise-hero={i} data-surprise-owner={ownerLabel}><BoardZone type="surprise" cards={surZones[i] || []} label="Surprise" /></div>
               {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxRight }).map((_, s) => (
                 <div key={'rpad-'+s} className="board-zone-spacer" />
               ))}
             </div>
           );
+          if (i < 2) {
+            const areaCards = gameState.areaZones?.[i] || [];
+            return [heroGroup, <div key={'area-'+i} className="board-area-between"><BoardZone type="area" cards={areaCards} label="Area" /></div>];
+          }
+          return [heroGroup];
         })}
       </div>
     );
 
     const abilityRow = (
       <div className="board-row">
-        {[0, 1, 2].map(i => {
+        {[0, 1, 2].flatMap(i => {
           const hero = heroes[i];
           const isDead = hero && hero.hp !== undefined && hero.hp <= 0;
           const isFrozenOrStunned = hero?.statuses?.frozen || hero?.statuses?.stunned || hero?.statuses?.negated;
-          const heroIneligible = !isOpp && abilityDrag && !canHeroReceiveAbility(p, i, abilityDrag.cardName);
-          return (
+          const abilityAttachActive2 = !isOpp && gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
+          const heroIneligible = !isOpp && abilityDrag && (() => {
+            if (abilityAttachActive2) {
+              if (i !== gameState.effectPrompt.heroIdx) return true;
+              const hero2 = heroes[i];
+              if (!hero2 || !hero2.name || hero2.hp <= 0) return true;
+              const abZ = abZones[i] || [[], [], []];
+              const cn = abilityDrag.cardName;
+              const isCust = (gameState.customPlacementCards || []).includes(cn);
+              if (isCust) return !abZ.some(sl => (sl||[]).length > 0 && (sl||[]).length < 3);
+              for (const sl of abZ) { if ((sl||[]).length > 0 && sl[0] === cn) return sl.length >= 3; }
+              return !abZ.some(sl => (sl||[]).length === 0);
+            }
+            return !canHeroReceiveAbility(p, i, abilityDrag.cardName);
+          })();
+          const abilityGroup = (
             <div key={i} className="board-hero-group">
               {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxLeft }).map((_, s) => (
                 <div key={'ablpad-'+s} className="board-zone-spacer" />
@@ -3759,12 +5157,31 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 const isValidPotionTarget = isTargeting && validTargetIds.has(abTargetId);
                 const isSelectedPotionTarget = selectedSet.has(abTargetId);
                 const isExploding = explosions.includes(abTargetId);
+                // Check if this ability is activatable (action-costing)
+                const isActivatable = !isOpp && cards.length > 0 && (gameState.activatableAbilities || []).some(a => a.heroIdx === i && a.zoneIdx === z);
+                // Check if this ability is free-activatable (no action cost, Main Phase)
+                const freeAbilityEntry = !isOpp && cards.length > 0 && (gameState.freeActivatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z);
+                const isFreeActivatable = freeAbilityEntry?.canActivate === true;
+                const isFreeExhausted = freeAbilityEntry && !freeAbilityEntry.canActivate;
+                // Also activatable during heroAction if listed
+                const heroActionPromptAbilities = (!isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx) ? (gameState.effectPrompt.activatableAbilities || []) : [];
+                const isHeroActionActivatable = heroActionPromptAbilities.some(a => a.heroIdx === i && a.zoneIdx === z);
+                const canActivate = isActivatable || isHeroActionActivatable || isFreeActivatable;
+                const isFlashing = abilityFlash && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z;
+                const onAbilityClick = canActivate ? () => {
+                  if (isFreeActivatable) {
+                    // Free activation — no confirmation needed, activate directly
+                    socket.emit('activate_free_ability', { roomId: gameState.roomId, heroIdx: i, zoneIdx: z });
+                  } else {
+                    setPendingAbilityActivation({ heroIdx: i, zoneIdx: z, abilityName: cards[0], level: cards.length, isHeroAction: isHeroActionActivatable });
+                  }
+                } : (isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined);
                 return (
                   <div key={z}
-                    className={'board-zone board-zone-ability' + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget ? ' board-zone-play-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '')}
+                    className={'board-zone board-zone-ability' + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget ? ' board-zone-play-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFlashing ? ' zone-ability-activated' : '')}
                     data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel}
-                    onClick={isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined}
-                    style={isValidPotionTarget ? { cursor: 'pointer' } : undefined}>
+                    onClick={onAbilityClick}
+                    style={canActivate ? { cursor: 'pointer' } : (isValidPotionTarget ? { cursor: 'pointer' } : undefined)}>
                     {cards.length > 0 ? (
                       <AbilityStack cards={cards} />
                     ) : (
@@ -3778,13 +5195,15 @@ function GameBoard({ gameState, lobby, onLeave }) {
               ))}
             </div>
           );
+          if (i < 2) return [abilityGroup, <div key={'abspc-'+i} className="board-area-spacer" />];
+          return [abilityGroup];
         })}
       </div>
     );
 
     const supportRow = (
       <div className="board-row">
-        {[0, 1, 2].map(i => {
+        {[0, 1, 2].flatMap(i => {
           const actualZoneCount = (supZones[i] || []).length || 3;
           const islandCount = islandCounts[i] || 0;
           const baseCount = actualZoneCount - islandCount;
@@ -3808,7 +5227,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
           // First free base zone (for equip auto-place highlight)
           let autoSlot = -1;
           for (let fz = 0; fz < baseCount; fz++) { if (((supZones[i]||[])[fz]||[]).length === 0) { autoSlot = fz; break; } }
-          return (
+          const supportGroup = (
           <div key={i} className="board-hero-group">
             {renderOrder.map((slot, renderIdx) => {
               if (slot.isSpacer) return <div key={'sp-'+renderIdx} className="board-zone-spacer" />;
@@ -3827,13 +5246,17 @@ function GameBoard({ gameState, lobby, onLeave }) {
               const isZonePickTarget = !isOpp && zonePickSet.has(`${pi}-${i}-${z}`);
               // During creature drag: highlight valid zones, dim invalid ones
               const isDraggingCreature = !isOpp && playDrag && playDrag.card?.cardType === 'Creature' && !playDrag.isEquip;
-              const isDragValidZone = isDraggingCreature && cards.length === 0 && canHeroPlayCard(me, i, playDrag.card) && z < ((me.supportZones[i] || []).length || 3);
+              const heroActionActive = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx;
+              const heroActionHeroIdx = heroActionActive ? gameState.effectPrompt.heroIdx : undefined;
+              const isDragValidZone = isDraggingCreature && cards.length === 0 && canHeroPlayCard(me, i, playDrag.card) && z < ((me.supportZones[i] || []).length || 3) && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
               const isDragInvalidZone = isDraggingCreature && !isDragValidZone;
+              // heroAction: dim zones for non-Coffee heroes
+              const isHeroActionZoneDimmed = heroActionActive && !isDraggingCreature && i !== heroActionHeroIdx;
               // Additional Action provider selection highlight
               const isProviderZone = !isOpp && pendingAdditionalPlay && pendingAdditionalPlay.providers.some(p => p.heroIdx === i && p.zoneSlot === z);
               const isProviderSelectionActive = !isOpp && !!pendingAdditionalPlay;
               return (
-                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'}
                   onClick={isProviderZone ? () => {
                     const provider = pendingAdditionalPlay.providers.find(p => p.heroIdx === i && p.zoneSlot === z);
@@ -3871,6 +5294,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                     {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.burned ? <BurnedOverlay /> : null; })()}
                     {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.frozen ? <FrozenOverlay /> : null; })()}
                     {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.negated ? <NegatedOverlay /> : null; })()}
+                    {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null; })()}
                     </>
                   ) : (
                     <div className="board-zone-empty">{isIsland ? 'Island' : 'Support'}</div>
@@ -3880,6 +5304,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
             })}
           </div>
           );
+          if (i < 2) return [supportGroup, <div key={'supspc-'+i} className="board-area-spacer" />];
+          return [supportGroup];
         })}
       </div>
     );
@@ -3911,7 +5337,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
           </div>
           <div className="game-hand-cards">
             {Array.from({ length: opp.handCount || 0 }).map((_, i) => (
-              <div key={i} className="board-card face-down hand-card">
+              <div key={i} className="board-card face-down hand-card" style={oppDrawHidden.has(i) ? { visibility: 'hidden' } : undefined}>
                 <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
               </div>
             ))}
@@ -3924,16 +5350,35 @@ function GameBoard({ gameState, lobby, onLeave }) {
         {/* Board */}
         <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '')}>
           <div className="board-util board-util-left">
-            <BoardZone type="discard" cards={opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile })} onHoverCard={setHoveredPileCard} />
-            <BoardZone type="deleted" cards={opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile })} onHoverCard={setHoveredPileCard} />
-            <BoardZone type="area" cards={gameState.areaZones[0]} label="Area" />
-            <BoardZone type="deleted" cards={me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile })} onHoverCard={setHoveredPileCard} />
-            <BoardZone type="discard" cards={me.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile })} onHoverCard={setHoveredPileCard} />
+            <div className="board-util-side">
+              <div data-opp-discard="1"><BoardZone type="discard" cards={oppDiscardHidden > 0 ? opp.discardPile.slice(0, -oppDiscardHidden) : opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile })} onHoverCard={setHoveredPileCard} /></div>
+              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile })} onHoverCard={setHoveredPileCard} /></div>
+              <div className="board-util-spacer" />
+            </div>
+            <div className="board-util-mid" />
+            <div className="board-util-side">
+              <div className="board-util-spacer" />
+              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile })} onHoverCard={setHoveredPileCard} /></div>
+              <div data-my-discard="1"><BoardZone type="discard" cards={myDiscardHidden > 0 ? me.discardPile.slice(0, -myDiscardHidden) : me.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile })} onHoverCard={setHoveredPileCard} /></div>
+            </div>
           </div>
 
           <div className="board-center" style={{ position: 'relative' }}>
-            {me.summonLocked && <div className="summon-lock-warning">You cannot summon any more Creatures this turn!</div>}
-            {opp.summonLocked && <div className="summon-lock-warning" style={{ color: '#cc8800' }}>{opp.username} cannot summon any more Creatures this turn!</div>}
+            {/* ── Generic Player Debuff Warnings ── */}
+            {(() => {
+              const debuffs = [];
+              if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#ff6644' });
+              if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#cc8800' });
+              if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#ff4444' });
+              if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal damage to your targets this turn!`, color: '#ff8844' });
+              if (me.potionLocked) debuffs.push({ key: 'potion-me', icon: '🧪', text: 'You cannot play any more Potions this turn!', color: '#aa44ff' });
+              if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${opp.username} cannot play any more Potions this turn!`, color: '#8844cc' });
+              return debuffs.map(d => (
+                <div key={d.key} className="summon-lock-warning" style={{ color: d.color }}>
+                  {d.icon ? d.icon + ' ' : ''}{d.text}
+                </div>
+              ));
+            })()}
             {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
             <div className="board-mid-row">
@@ -3941,9 +5386,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 {['Start Phase', 'Resource Phase', 'Main Phase 1', 'Action Phase', 'Main Phase 2', 'End Phase'].map((phase, i) => {
                   const isActive = currentPhase === i;
                   // Which phases can the active player click to advance to?
-                  const canClick = isMyTurn && !result && (
+                  const canClick = isMyTurn && !result && !gameState.effectPrompt && (
                     (currentPhase === 2 && (i === 3 || i === 5)) || // Main1 → Action or End
-                    (currentPhase === 3 && i === 4) ||              // Action → Main2
+                    (currentPhase === 3 && (i === 4 || i === 5)) || // Action → Main2 or End
                     (currentPhase === 4 && i === 5)                 // Main2 → End
                   );
                   return (
@@ -3961,25 +5406,50 @@ function GameBoard({ gameState, lobby, onLeave }) {
               <div className="board-area-line" />
             </div>
             <div className="board-player-side board-side-me">{renderPlayerSide(me, false)}</div>
+            {/* Permanent zones — positioned absolutely to avoid layout interference */}
+            {(opp.permanents || []).length > 0 && (
+              <div className="board-permanents board-permanents-opp">
+                {opp.permanents.map(perm => (
+                  <div key={perm.id} className="board-permanent-slot" data-perm-id={perm.id} data-perm-owner="opp">
+                    <BoardCard cardName={perm.name} />
+                  </div>
+                ))}
+              </div>
+            )}
+            {(me.permanents || []).length > 0 && (
+              <div className="board-permanents board-permanents-me">
+                {me.permanents.map(perm => (
+                  <div key={perm.id} className="board-permanent-slot" data-perm-id={perm.id} data-perm-owner="me">
+                    <BoardCard cardName={perm.name} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="board-util board-util-right">
-            <BoardZone type="deck" label="Deck" faceDown>
-              <div className="board-card face-down" data-opp-deck="1"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.deckCount}</div></div>
-            </BoardZone>
-            <BoardZone type="potion" label="Potions" faceDown>
-              {opp.potionDeckCount > 0 && <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>}
-            </BoardZone>
-            <BoardZone type="area" cards={gameState.areaZones[1]} label="Area" />
-            <div onClick={() => me.potionDeckCount > 0 && setDeckViewer('potion')} style={{ cursor: me.potionDeckCount > 0 ? 'pointer' : 'default' }}>
-            <BoardZone type="potion" label="Potions" faceDown>
-              {me.potionDeckCount > 0 && <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.potionDeckCount}</div></div>}
-            </BoardZone>
+            <div className="board-util-side">
+              <BoardZone type="deck" label="Deck" faceDown>
+                <div className="board-card face-down" data-opp-deck="1"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.deckCount}</div></div>
+              </BoardZone>
+              <BoardZone type="potion" label="Potions" faceDown>
+                {opp.potionDeckCount > 0 && <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>}
+              </BoardZone>
+              <div className="board-util-spacer" />
             </div>
-            <div onClick={() => me.deckCount > 0 && setDeckViewer('deck')} style={{ cursor: me.deckCount > 0 ? 'pointer' : 'default' }} data-my-deck="1">
-            <BoardZone type="deck" label="Deck" faceDown>
-              <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.deckCount}</div></div>
-            </BoardZone>
+            <div className="board-util-mid" />
+            <div className="board-util-side">
+              <div className="board-util-spacer" />
+              <div onClick={() => me.potionDeckCount > 0 && setDeckViewer('potion')} style={{ cursor: me.potionDeckCount > 0 ? 'pointer' : 'default' }}>
+              <BoardZone type="potion" label="Potions" faceDown>
+                {me.potionDeckCount > 0 && <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.potionDeckCount}</div></div>}
+              </BoardZone>
+              </div>
+              <div onClick={() => me.deckCount > 0 && setDeckViewer('deck')} style={{ cursor: me.deckCount > 0 ? 'pointer' : 'default' }} data-my-deck="1">
+              <BoardZone type="deck" label="Deck" faceDown>
+                <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.deckCount}</div></div>
+              </BoardZone>
+              </div>
             </div>
           </div>
         </div>
@@ -3993,15 +5463,26 @@ function GameBoard({ gameState, lobby, onLeave }) {
               const dimmed = getCardDimmed(item.card);
               const isDrawAnim = drawAnimCards.some(a => a.origIdx === item.origIdx);
               const isPendingPlay = pendingAdditionalPlay && pendingAdditionalPlay.handIndex === item.origIdx;
+              const isForceDiscard = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt?.ownerIdx === myIdx;
+              const isForceDiscardCancellable = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt?.ownerIdx === myIdx;
+              const isAbilityAttach = gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
+              const isAttachEligible = isAbilityAttach && (gameState.effectPrompt.eligibleCards || []).includes(item.card);
+              const isAnyDiscard = isForceDiscard || isForceDiscardCancellable;
               return (
                 <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx}
-                  className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '')}
+                  className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard ? ' hand-discard-target' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '')}
                   style={(isDrawAnim || isPendingPlay) ? { visibility: 'hidden' } : undefined}
-                  onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}>
-                  <BoardCard cardName={item.card} />
+                  onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
+                  onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
+                  onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
+                  <BoardCard cardName={item.card} noTooltip={isAnyDiscard} />
                 </div>
               );
             })}
+          </div>
+          <div className="hand-actions">
+            <button className="btn hand-action-btn" onClick={sortHand} title="Sort hand by type, then name">Sort</button>
+            <button className="btn hand-action-btn" onClick={shuffleHand} title="Shuffle hand randomly">Shuffle</button>
           </div>
           <div className="game-gold-display">
             <span className="game-gold-icon">🪙</span>
@@ -4019,7 +5500,13 @@ function GameBoard({ gameState, lobby, onLeave }) {
       ))}
       {oppDrawAnims.map(anim => (
         <OppDrawAnimCard key={anim.id} startX={anim.startX} startY={anim.startY}
-          endX={anim.endX} endY={anim.endY} />
+          endX={anim.endX} endY={anim.endY} cardName={anim.cardName} />
+      ))}
+
+      {/* Floating discard animation cards */}
+      {discardAnims.map(anim => (
+        <DiscardAnimCard key={anim.id} cardName={anim.cardName} dest={anim.dest}
+          startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY} />
       ))}
 
       {/* Floating drag card (outside game-layout to avoid overflow clip) */}
@@ -4049,9 +5536,24 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <GoldGainNumber key={g.id} amount={g.amount} playerIdx={g.playerIdx} isMe={g.playerIdx === myIdx} />
       ))}
 
+      {/* Gold loss numbers */}
+      {goldLosses.map(g => (
+        <GoldLossNumber key={g.id} amount={g.amount} playerIdx={g.playerIdx} isMe={g.playerIdx === myIdx} />
+      ))}
+
       {/* Level change numbers */}
       {levelChanges.map(lc => (
         <LevelChangeNumber key={lc.id} delta={lc.delta} owner={lc.owner} heroIdx={lc.heroIdx} zoneSlot={lc.zoneSlot} myIdx={myIdx} />
+      ))}
+
+      {/* Toughness HP change numbers */}
+      {toughnessHpChanges.map(thp => (
+        <ToughnessHpNumber key={thp.id} amount={thp.amount} owner={thp.owner} heroIdx={thp.heroIdx} myIdx={myIdx} />
+      ))}
+
+      {/* Fighting ATK change numbers */}
+      {fightingAtkChanges.map(fa => (
+        <FightingAtkNumber key={fa.id} amount={fa.amount} owner={fa.owner} heroIdx={fa.heroIdx} myIdx={myIdx} />
       ))}
 
       {/* Modular game animations (explosions, etc.) */}
@@ -4059,9 +5561,89 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <GameAnimationRenderer key={a.id} {...a} />
       ))}
 
+      {/* Beam animations (laser beams, etc.) */}
+      {beamAnims.length > 0 && (
+        <div className="beam-animation-container">
+          <svg>
+            {beamAnims.map(b => (
+              <g key={b.id}>
+                <line className="beam-line-outer" x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} />
+                <line className="beam-line-glow" x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} />
+                <line className="beam-line-core" x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} style={{ stroke: b.color }} />
+                <circle className="beam-impact" cx={b.x2} cy={b.y2} r="5" fill={b.color} opacity="0.8" />
+              </g>
+            ))}
+          </svg>
+        </div>
+      )}
+
+      {/* Ram animations (hero charges to target and back) */}
+      {ramAnims.map(r => (
+        <div key={r.id} className="ram-anim-card" style={{
+          left: r.srcX - 34, top: r.srcY - 48,
+          '--ramDx': (r.tgtX - r.srcX) + 'px',
+          '--ramDy': (r.tgtY - r.srcY) + 'px',
+          animationDuration: r.dur + 'ms',
+        }}>
+          <BoardCard cardName={r.cardName} noTooltip />
+          <div className="ram-flame-trail" />
+        </div>
+      ))}
+
+      {/* Projectile animations (phoenix cannon, etc.) */}
+      {projectileAnims.map(p => (
+        <div key={p.id} className="projectile-anim" style={{
+          left: p.srcX, top: p.srcY,
+          '--projDx': (p.tgtX - p.srcX) + 'px',
+          '--projDy': (p.tgtY - p.srcY) + 'px',
+          animationDuration: p.dur + 'ms',
+        }}>
+          <span className={p.projectileClass || 'projectile-emoji'} style={p.emojiStyle || {}}>{p.projectileClass ? '' : p.emoji}</span>
+          <div className={p.trailClass || 'projectile-flame-trail'} />
+        </div>
+      ))}
+
       {/* Opponent card reveal */}
-      {cardReveal && (
-        <CardRevealOverlay cardName={cardReveal} onDone={() => setCardReveal(null)} />
+      {cardReveals.length > 0 && (
+        <CardRevealOverlay reveals={cardReveals} onRemove={(id) => setCardReveals(prev => prev.filter(r => r.id !== id))} />
+      )}
+
+      {/* ── Reaction Chain Visualization ── */}
+      {reactionChain && reactionChain.length >= 2 && (
+        <div className="reaction-chain-overlay">
+          <div className="reaction-chain-label orbit-font">Chain</div>
+          <div className="reaction-chain-cards">
+            {reactionChain.map((link, i) => (
+              <div key={link.id} className={
+                'reaction-chain-card'
+                + (link.status === 'resolving' ? ' chain-glow' : '')
+                + (link.status === 'negated' ? ' chain-negated' : '')
+                + (link.status === 'resolved' ? ' chain-resolved' : '')
+              }>
+                <BoardCard cardName={link.cardName} style={{ width: 80, height: 112, borderRadius: 4 }} />
+                {link.isInitialCard && <div className="chain-badge chain-badge-initial">INITIAL</div>}
+                {link.status === 'negated' && <div className="chain-negate-symbol">🚫</div>}
+                <div className="chain-owner-dot" style={{ background: link.owner === myIdx ? 'var(--accent)' : 'var(--danger)' }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Camera Flash ── */}
+      {cameraFlash && (
+        <div className="camera-flash-overlay">
+          <div className="camera-flash-icon">
+            <svg viewBox="0 0 100 100" width="120" height="120">
+              <rect x="20" y="30" width="60" height="45" rx="8" fill="#ff69b4" stroke="#fff" strokeWidth="2"/>
+              <circle cx="50" cy="52" r="14" fill="#222" stroke="#fff" strokeWidth="2"/>
+              <circle cx="50" cy="52" r="8" fill="#4af"/>
+              <rect x="38" y="24" width="24" height="10" rx="3" fill="#ff69b4" stroke="#fff" strokeWidth="1.5"/>
+              <ellipse cx="28" cy="22" rx="10" ry="16" fill="none" stroke="#ff69b4" strokeWidth="2" transform="rotate(-30 28 22)"/>
+              <ellipse cx="72" cy="22" rx="10" ry="16" fill="none" stroke="#ff69b4" strokeWidth="2" transform="rotate(30 72 22)"/>
+            </svg>
+          </div>
+        </div>
       )}
 
       {/* Immune status tooltip */}
@@ -4210,6 +5792,55 @@ function GameBoard({ gameState, lobby, onLeave }) {
         </DraggablePanel>
       )}
 
+      {/* ── Effect Prompt: Player Picker ── */}
+      {isMyEffectPrompt && ep.type === 'playerPicker' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 280 }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose a Player'}</div>
+          {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[0, 1].map(pIdx => {
+              const p = pIdx === myIdx ? me : opp;
+              const isMe = pIdx === myIdx;
+              const clr = isMe ? 'var(--success)' : 'var(--danger)';
+              return (
+                <button key={pIdx} className="btn" style={{ padding: '12px 18px', fontSize: 13, borderColor: clr, color: clr, display: 'flex', alignItems: 'center', gap: 12 }}
+                  onClick={() => respondToPrompt({ playerIdx: pIdx })}>
+                  {p.avatar && <img src={p.avatar} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />}
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{p.username}{isMe ? ' (you)' : ''}</div>
+                  </div>
+                </button>
+              );
+            })}
+            {ep.cancellable !== false && (
+              <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
+                onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+            )}
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Effect Prompt: Option Picker (generic multi-option) ── */}
+      {isMyEffectPrompt && ep.type === 'optionPicker' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose'}</div>
+          {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {(ep.options || []).map(opt => (
+              <button key={opt.id} className="btn" style={{ padding: '10px 18px', fontSize: 12, borderColor: opt.color || 'var(--accent)', color: opt.color || 'var(--accent)', textAlign: 'left' }}
+                onClick={() => respondToPrompt({ optionId: opt.id })}>
+                <div style={{ fontWeight: 600 }}>{opt.label}</div>
+                {opt.description && <div style={{ fontSize: 10, opacity: .7, marginTop: 2 }}>{opt.description}</div>}
+              </button>
+            ))}
+            {ep.cancellable !== false && (
+              <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
+                onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+            )}
+          </div>
+        </DraggablePanel>
+      )}
+
       {/* ── Effect Prompt: Card Gallery Picker ── */}
       {isMyEffectPrompt && ep.type === 'cardGallery' && (() => {
         const cards = ep.cards || [];
@@ -4235,6 +5866,15 @@ function GameBoard({ gameState, lobby, onLeave }) {
                       <CardMini card={card}
                         onClick={() => respondToPrompt({ cardName: entry.name, source: entry.source })}
                         style={{ width: '100%', height: 120, cursor: 'pointer' }} />
+                      {entry.count != null && (
+                        <div style={{
+                          position: 'absolute', top: 3, right: 3,
+                          background: 'rgba(0,0,0,.75)', color: '#fff',
+                          fontSize: 10, fontWeight: 700, padding: '1px 5px',
+                          borderRadius: 3, pointerEvents: 'none', zIndex: 5,
+                          border: '1px solid rgba(255,255,255,.25)',
+                        }}>×{entry.count}</div>
+                      )}
                       <div className="gallery-source-badge" style={{
                         background: entry.source === 'hand' ? 'rgba(80,200,120,.85)' : entry.source === 'discard' ? 'rgba(180,80,200,.85)' : 'rgba(80,140,220,.85)',
                       }}>
@@ -4248,6 +5888,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
           </div>
         );
       })()}
+
+      {/* ── Effect Prompt: Multi-Select Card Gallery ── */}
+      {isMyEffectPrompt && ep.type === 'cardGalleryMulti' && (
+        <CardGalleryMultiPrompt ep={ep} onRespond={respondToPrompt} />
+      )}
 
       {/* ── Effect Prompt: Zone Picker Panel ── */}
       {isMyEffectPrompt && ep.type === 'zonePick' && (
@@ -4266,6 +5911,104 @@ function GameBoard({ gameState, lobby, onLeave }) {
       {isMyEffectPrompt && ep.type === 'statusSelect' && (
         <StatusSelectPrompt key={ep.title} ep={ep} onRespond={respondToPrompt} />
       )}
+
+      {/* ── Effect Prompt: Hero Action (Coffee) ── */}
+      {isMyEffectPrompt && ep.type === 'heroAction' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#8b6b4a' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#cc9966', marginBottom: 4 }}>☕ {ep.title}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>Drag a highlighted card onto {ep.heroName}'s zones to play it.</div>
+          <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+        </DraggablePanel>
+      )}
+
+      {/* ── Ability Activation Confirmation ── */}
+      {pendingAbilityActivation && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#ffcc33' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#ffcc33', marginBottom: 8 }}>⚡ Activate Ability</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>Activate {pendingAbilityActivation.abilityName} (Lv.{pendingAbilityActivation.level})?</div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <button className="btn btn-success" style={{ padding: '8px 20px', fontSize: 12 }}
+              onClick={() => {
+                const pa = pendingAbilityActivation;
+                setPendingAbilityActivation(null);
+                if (pa.isHeroAction) {
+                  socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx } });
+                } else {
+                  socket.emit('activate_ability', { roomId: gameState.roomId, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx });
+                }
+              }}>Yes!</button>
+            <button className="btn" style={{ padding: '8px 20px', fontSize: 12, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+              onClick={() => setPendingAbilityActivation(null)}>No</button>
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Force Discard Prompt (Wheels) ── */}
+      {isMyEffectPrompt && ep.type === 'forceDiscard' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--danger)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 4 }}>{ep.title || 'Discard'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
+          <div style={{ fontSize: 11, color: 'var(--danger)', opacity: .8 }}>Click a card in your hand to discard it.</div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Cancellable Force Discard Prompt (Training, etc.) ── */}
+      {isMyEffectPrompt && ep.type === 'forceDiscardCancellable' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--danger)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 4 }}>{ep.title || 'Discard'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
+          <div style={{ fontSize: 11, color: 'var(--danger)', opacity: .8, marginBottom: 12 }}>Click a card in your hand to discard it.</div>
+          <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+        </DraggablePanel>
+      )}
+
+      {/* ── Ability Attach Prompt (Training, etc.) ── */}
+      {isMyEffectPrompt && ep.type === 'abilityAttach' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(100,220,150,.85)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#7fffaa', marginBottom: 4 }}>✦ {ep.title || 'Attach Ability'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
+          <div style={{ fontSize: 11, color: '#7fffaa', opacity: .8, marginBottom: 12 }}>Drag a highlighted Ability from your hand onto the Hero.</div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+            {ep.canFinish && (
+              <button className="btn btn-success" style={{ padding: '6px 16px', fontSize: 11 }}
+                onClick={() => respondToPrompt({ finished: true })}>Done</button>
+            )}
+            <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+              onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Effect Prompt: Deck Search Reveal (opponent sees searched card) ── */}
+      {isMyEffectPrompt && ep.type === 'deckSearchReveal' && (() => {
+        return (
+          <div className="modal-overlay" style={{ zIndex: 10070, background: 'rgba(0,0,0,.55)' }}>
+            <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }} onClick={e => e.stopPropagation()}>
+              <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', textShadow: '0 2px 8px rgba(0,0,0,.8)' }}>
+                {ep.title || 'Card Searched'}
+              </div>
+              <div style={{
+                boxShadow: '0 0 50px rgba(0,0,0,.9), 0 0 100px rgba(255,255,255,.08)',
+                borderRadius: 8,
+              }}>
+                <BoardCard cardName={ep.cardName} style={{ width: 220, height: 308, borderRadius: 8 }} />
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text2)' }}>
+                {ep.searcherName} searched this card from their deck.
+              </div>
+              <button className="btn btn-success" style={{ padding: '10px 36px', fontSize: 13 }}
+                onClick={() => {
+                  respondToPrompt({ confirmed: true });
+                }}>
+                OK
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Rematch first-choice dialog (loser only) — floating panel so hand is visible */}
       {showFirstChoice && (
@@ -4290,6 +6033,14 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out' }}>
           <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
+          {pt.config?.maxTotal > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--accent)', marginBottom: 10, fontWeight: 600 }}>
+              {potionSelection.length} / {pt.config.maxTotal} selected
+              {pt.config.minRequired > 0 && potionSelection.length < pt.config.minRequired
+                ? ` (min ${pt.config.minRequired})`
+                : ''}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
             <button className={'btn ' + (pt.config?.confirmClass || 'btn-success')} style={{ padding: '8px 24px', fontSize: 12 }}
               disabled={!canConfirmPotion}

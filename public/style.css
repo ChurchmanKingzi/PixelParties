@@ -996,14 +996,8 @@ body {
   transform: translateY(-50%);
   z-index: 2;
 }
-.game-hand-opp .game-gold-display {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 2;
-}
-.game-hand-me { border-top: 1px solid var(--bg4); }
+.game-hand-opp .game-gold-display { z-index: 2; }
+.game-hand-me { border-top: 1px solid var(--bg4); position: relative; z-index: 10000; }
 .hand-slot {
   cursor: grab;
   transition: transform .15s;
@@ -1037,6 +1031,19 @@ body {
   0% { transform: translate(0, 0) scale(0.7); opacity: .8; filter: brightness(1.6); }
   60% { opacity: 1; filter: brightness(1.2); }
   100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 1; filter: brightness(1); }
+}
+.discard-anim-card {
+  position: fixed;
+  z-index: 10050;
+  pointer-events: none;
+  width: 64px;
+  height: 90px;
+  animation: cardDiscardFly .4s ease-in forwards;
+}
+@keyframes cardDiscardFly {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; filter: brightness(1); }
+  40% { filter: brightness(1.3); }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.6); opacity: .5; filter: brightness(0.7); }
 }
 /* Deck builder drag */
 .deck-drag-slot { cursor: grab; }
@@ -1326,6 +1333,323 @@ body {
   animation-duration: .25s !important;
 }
 
+/* Poisoned overlay — purple bubbles + stack count */
+.status-poisoned-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: linear-gradient(
+    0deg,
+    rgba(130,0,180,.2) 0%,
+    rgba(100,0,160,.1) 40%,
+    rgba(80,0,140,.06) 100%
+  );
+  border: 2px solid rgba(150,30,200,.45);
+  box-shadow: inset 0 0 10px rgba(130,0,180,.15), 0 0 6px rgba(100,0,160,.2);
+  animation: poisonedShimmer 2s ease-in-out infinite;
+  overflow: hidden;
+}
+@keyframes poisonedShimmer {
+  0%, 100% { box-shadow: inset 0 0 10px rgba(130,0,180,.15), 0 0 6px rgba(100,0,160,.2); }
+  50% { box-shadow: inset 0 0 16px rgba(150,20,200,.25), 0 0 10px rgba(130,0,180,.3); }
+}
+.poisoned-particle {
+  position: absolute;
+  pointer-events: none;
+  filter: drop-shadow(0 0 2px rgba(130,0,180,.8));
+  animation: poisonedBubble ease-in-out infinite alternate;
+}
+@keyframes poisonedBubble {
+  0% { transform: translateY(0) scale(0.6); opacity: .15; }
+  40% { opacity: .8; transform: translateY(-4px) scale(1); }
+  70% { opacity: .4; transform: translateY(-2px) scale(0.7); }
+  100% { transform: translateY(-6px) scale(0.5); opacity: 0; }
+}
+.poison-stack-count {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  font-size: 14px;
+  font-weight: 900;
+  color: #dd66ff;
+  text-shadow: 0 0 6px rgba(150,0,220,.8), 1px 1px 0 #000, -1px -1px 0 #000;
+  z-index: 6;
+  pointer-events: none;
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  text-align: center;
+  border-radius: 50%;
+  background: rgba(60,0,100,.7);
+  border: 2px solid rgba(180,50,255,.6);
+  box-shadow: 0 0 8px rgba(150,0,220,.5), inset 0 0 4px rgba(180,50,255,.3);
+}
+
+/* Activatable ability zone glow */
+.zone-ability-activatable {
+  border-color: rgba(255,200,50,.85) !important;
+  box-shadow: 0 0 14px rgba(255,200,50,.7), 0 0 28px rgba(255,170,0,.3), inset 0 0 10px rgba(255,200,50,.2) !important;
+  animation: abilityPulse 1s ease-in-out infinite !important;
+  position: relative;
+}
+.zone-ability-activatable::after {
+  content: '⚡';
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 14px;
+  filter: drop-shadow(0 0 4px rgba(255,200,50,.9));
+  animation: abilityBoltBounce 0.8s ease-in-out infinite alternate;
+  z-index: 10;
+}
+@keyframes abilityPulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(255,200,50,.7), 0 0 28px rgba(255,170,0,.3), inset 0 0 10px rgba(255,200,50,.2); border-color: rgba(255,200,50,.85); }
+  50% { box-shadow: 0 0 22px rgba(255,200,50,.9), 0 0 40px rgba(255,170,0,.5), inset 0 0 16px rgba(255,200,50,.4); border-color: rgba(255,230,80,1); }
+}
+@keyframes abilityBoltBounce {
+  0% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(-3px) scale(1.15); }
+}
+
+/* Free-activatable ability zone glow (Main Phase, no action cost) */
+.zone-ability-free-activatable {
+  border-color: rgba(100,220,150,.85) !important;
+  box-shadow: 0 0 14px rgba(100,220,150,.7), 0 0 28px rgba(60,200,120,.3), inset 0 0 10px rgba(100,220,150,.2) !important;
+  animation: freeAbilityPulse 1s ease-in-out infinite !important;
+  position: relative;
+}
+.zone-ability-free-activatable::after {
+  content: '✦';
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 13px;
+  color: #7fffaa;
+  filter: drop-shadow(0 0 4px rgba(100,220,150,.9));
+  animation: abilityBoltBounce 0.8s ease-in-out infinite alternate;
+  z-index: 10;
+}
+@keyframes freeAbilityPulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(100,220,150,.7), 0 0 28px rgba(60,200,120,.3), inset 0 0 10px rgba(100,220,150,.2); border-color: rgba(100,220,150,.85); }
+  50% { box-shadow: 0 0 22px rgba(100,220,150,.9), 0 0 40px rgba(60,200,120,.5), inset 0 0 16px rgba(100,220,150,.4); border-color: rgba(130,255,180,1); }
+}
+
+/* Exhausted/unusable free-activation ability — grayed out */
+.zone-ability-exhausted {
+  opacity: 0.45 !important;
+  filter: saturate(0.15) brightness(0.7) !important;
+  border-color: rgba(120,120,120,.5) !important;
+  box-shadow: none !important;
+}
+
+/* Active hero effect glow (e.g. Alice, the Puppeteer Girl) */
+.zone-hero-effect-active {
+  border-color: rgba(255,100,100,.85) !important;
+  box-shadow: 0 0 14px rgba(255,100,100,.7), 0 0 28px rgba(255,50,50,.3), inset 0 0 10px rgba(255,100,100,.2) !important;
+  animation: heroEffectPulse 1.2s ease-in-out infinite !important;
+  position: relative;
+}
+.zone-hero-effect-active::after {
+  content: '⚔';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 15px;
+  filter: drop-shadow(0 0 4px rgba(255,80,80,.9));
+  animation: abilityBoltBounce 0.8s ease-in-out infinite alternate;
+  z-index: 10;
+}
+@keyframes heroEffectPulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(255,100,100,.7), 0 0 28px rgba(255,50,50,.3), inset 0 0 10px rgba(255,100,100,.2); border-color: rgba(255,100,100,.85); }
+  50% { box-shadow: 0 0 22px rgba(255,100,100,.9), 0 0 40px rgba(255,50,50,.5), inset 0 0 16px rgba(255,100,100,.4); border-color: rgba(255,140,140,1); }
+}
+
+/* Laser beam animation */
+.beam-animation-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10200;
+}
+.beam-animation-container svg {
+  width: 100%;
+  height: 100%;
+}
+.beam-line-core {
+  stroke: #ff2222;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 8px rgba(255,0,0,.9)) drop-shadow(0 0 20px rgba(255,50,50,.5));
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: beamDraw 0.3s ease-out forwards;
+}
+.beam-line-glow {
+  stroke: rgba(255,100,100,.4);
+  stroke-width: 12;
+  filter: blur(4px);
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: beamDraw 0.3s ease-out forwards;
+}
+.beam-line-outer {
+  stroke: rgba(255,200,200,.15);
+  stroke-width: 24;
+  filter: blur(8px);
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: beamDraw 0.3s ease-out forwards;
+}
+.beam-impact {
+  animation: beamImpact 0.8s ease-out 0.2s forwards;
+  opacity: 0;
+}
+@keyframes beamDraw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes beamImpact {
+  0% { opacity: 0; r: 5; }
+  20% { opacity: 1; r: 30; }
+  100% { opacity: 0; r: 50; }
+}
+
+/* Arrow rain animation for Rain of Arrows */
+@keyframes arrowFall {
+  0% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(180px); }
+}
+
+/* Ram animation — hero charges to target and back */
+.ram-anim-card {
+  position: fixed;
+  z-index: 10120;
+  pointer-events: none;
+  animation: ramCharge var(--ram-dur, 1600ms) ease-in-out forwards;
+  filter: brightness(1.3) drop-shadow(0 0 12px rgba(255,80,0,.8));
+}
+.ram-anim-card .board-card {
+  width: 68px;
+  height: 95px;
+}
+.ram-flame-trail {
+  position: absolute;
+  inset: -8px;
+  border-radius: 8px;
+  background: radial-gradient(ellipse, rgba(255,100,0,.5) 0%, rgba(255,40,0,.2) 40%, transparent 70%);
+  animation: ramFlameTrail 200ms ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes ramFlameTrail {
+  0% { opacity: 0.6; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1.15); }
+}
+
+/* Projectile animation — flaming emoji flies from source to target */
+.projectile-anim {
+  position: fixed;
+  z-index: 10120;
+  pointer-events: none;
+  animation: projectileFly var(--proj-dur, 600ms) ease-in forwards;
+  transform: translate(-50%, -50%);
+}
+.projectile-emoji {
+  font-size: 64px;
+  filter: drop-shadow(0 0 20px rgba(255,80,0,.9)) drop-shadow(0 0 40px rgba(255,40,0,.6));
+  animation: projectilePulse 100ms ease-in-out infinite alternate;
+}
+.projectile-flame-trail {
+  position: absolute;
+  inset: -20px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255,100,0,.6) 0%, rgba(255,40,0,.3) 30%, transparent 60%);
+  animation: projectileTrailPulse 80ms ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes projectileFly {
+  0% { transform: translate(-50%, -50%) translate(0, 0) scale(0.5); opacity: 0; }
+  10% { transform: translate(-50%, -50%) translate(0, 0) scale(1.2); opacity: 1; }
+  85% { transform: translate(-50%, -50%) translate(var(--projDx), var(--projDy)) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) translate(var(--projDx), var(--projDy)) scale(1.5); opacity: 0; }
+}
+@keyframes projectilePulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.1); }
+}
+@keyframes projectileTrailPulse {
+  0% { opacity: 0.5; transform: scale(1); }
+  100% { opacity: 0.9; transform: scale(1.2); }
+}
+@keyframes ramCharge {
+  0% { transform: translate(0, 0) scale(1.1); opacity: 1; }
+  12% { transform: translate(var(--ramDx), var(--ramDy)) scale(1.2); opacity: 1; }
+  22% { transform: translate(var(--ramDx), var(--ramDy)) scale(1.05); opacity: 1; }
+  34% { transform: translate(0, 0) scale(1); opacity: 1; }
+  90% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0; }
+}
+
+/* Deep sea bubble rise animation for Monster in a Bottle */
+@keyframes bubbleRise {
+  0% { opacity: 0; transform: translateY(0) translateX(0); }
+  15% { opacity: var(--bubbleOpacity, 0.6); }
+  50% { transform: translateY(calc(var(--endY) * 0.5)) translateX(var(--wobble)); }
+  85% { opacity: var(--bubbleOpacity, 0.4); }
+  100% { opacity: 0; transform: translateY(var(--endY)) translateX(0); }
+}
+
+/* Holy revival animation for Resuscitation Potion */
+@keyframes holyRayGrow {
+  0% { opacity: 0; transform: scaleY(0); }
+  30% { opacity: .9; }
+  100% { opacity: 0; transform: scaleY(1); }
+}
+@keyframes holySparkleRise {
+  0% { opacity: 0; transform: translateY(0) scale(0.3); }
+  20% { opacity: 1; transform: translateY(-10px) scale(1); }
+  100% { opacity: 0; transform: translateY(-100px) scale(0.2); }
+}
+
+/* abilityAttach prompt: hand card highlight for attachable abilities */
+.hand-card-attach-eligible {
+  border: 2px solid rgba(100,220,150,.9) !important;
+  box-shadow: 0 0 12px rgba(100,220,150,.6) !important;
+  cursor: grab !important;
+}
+.hand-card-attach-dimmed {
+  opacity: 0.3 !important;
+  filter: saturate(0.1) brightness(0.6) !important;
+  pointer-events: none !important;
+}
+
+/* Ability activation flash — very visible to both players */
+.zone-ability-activated {
+  border-color: #fff !important;
+  box-shadow: 0 0 30px rgba(255,230,100,1), 0 0 60px rgba(255,200,50,.7), 0 0 90px rgba(255,170,0,.4), inset 0 0 20px rgba(255,255,255,.5) !important;
+  animation: abilityActivateFlash 0.4s ease-out 3 !important;
+  z-index: 20 !important;
+}
+.zone-ability-activated::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 6px;
+  border: 3px solid rgba(255,255,255,.8);
+  animation: abilityActivateRing 0.6s ease-out 2;
+  pointer-events: none;
+}
+@keyframes abilityActivateFlash {
+  0% { background: rgba(255,230,100,.6); transform: scale(1.15); }
+  50% { background: rgba(255,255,200,.3); transform: scale(1.05); }
+  100% { background: transparent; transform: scale(1); }
+}
+@keyframes abilityActivateRing {
+  0% { transform: scale(0.8); opacity: 1; border-color: #fff; }
+  100% { transform: scale(1.4); opacity: 0; border-color: rgba(255,200,50,0); }
+}
+
 /* Deck viewer modal */
 .deck-viewer-modal {
   max-width: 520px;
@@ -1400,6 +1724,17 @@ body {
   100% { opacity: 0; transform: translate(-50%, 80px) scale(1.3); }
 }
 .gold-gain-down { animation: goldFloatDown 1.6s ease-out forwards; }
+.gold-loss-number {
+  position: fixed;
+  z-index: 10001;
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  font-size: 38px;
+  color: #ff3344;
+  text-shadow: 0 0 12px rgba(255,50,50,.8), 3px 3px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+  pointer-events: none;
+  animation: goldFloat 1.6s ease-out forwards;
+}
+.gold-loss-down { animation: goldFloatDown 1.6s ease-out forwards; }
 
 /* Level change floating numbers */
 .level-change-number {
@@ -1423,6 +1758,50 @@ body {
   100% { opacity: 0; transform: translate(-50%, -50px) scale(1); }
 }
 
+/* Toughness HP change number above hero */
+.toughness-hp-number {
+  position: fixed;
+  z-index: 10001;
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  font-size: 22px;
+  font-weight: 900;
+  pointer-events: none;
+  animation: toughnessHpFloat 1.6s ease-out forwards;
+}
+.toughness-hp-up {
+  color: #1b7a2e;
+  text-shadow: 0 0 12px rgba(30,140,50,.7), 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
+.toughness-hp-down {
+  color: #8b1a1a;
+  text-shadow: 0 0 12px rgba(160,30,30,.7), 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
+@keyframes toughnessHpFloat {
+  0% { opacity: 1; transform: translate(-50%, 0) scale(0.8); }
+  12% { opacity: 1; transform: translate(-50%, -6px) scale(1.5); }
+  40% { opacity: 1; transform: translate(-50%, -20px) scale(1.2); }
+  100% { opacity: 0; transform: translate(-50%, -55px) scale(1); }
+}
+
+/* Fighting ATK change number above hero */
+.fighting-atk-number {
+  position: fixed;
+  z-index: 10001;
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  font-size: 22px;
+  font-weight: 900;
+  pointer-events: none;
+  animation: toughnessHpFloat 1.6s ease-out forwards;
+}
+.fighting-atk-up {
+  color: #a0a0a0;
+  text-shadow: 0 0 10px rgba(160,160,160,.6), 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
+.fighting-atk-down {
+  color: #9a4444;
+  text-shadow: 0 0 10px rgba(160,60,60,.5), 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
+
 .game-hand-cards {
   display: flex;
   gap: 4px;
@@ -1442,11 +1821,26 @@ body {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   padding: 4px;
-  gap: 4px;
+  gap: 0;
   background: rgba(0,0,0,.2);
   border-right: 1px solid var(--bg4);
+}
+.board-util-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  gap: 3px;
+  min-height: 0;
+}
+.board-util-mid {
+  height: 28px;
+  flex-shrink: 0;
+}
+.board-util-spacer {
+  flex: 1;
 }
 .board-util-right {
   border-right: none;
@@ -1467,10 +1861,43 @@ body {
   gap: 3px;
   min-height: 0;
 }
+.board-permanents {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 50;
+  pointer-events: auto;
+}
+.board-permanents-opp { bottom: 52%; }
+.board-permanents-me { top: 52%; }
+.board-permanent-slot {
+  position: relative;
+  border: 2px solid rgba(255,215,0,.4);
+  border-radius: 6px;
+  box-shadow: 0 0 12px rgba(255,215,0,.2), inset 0 0 8px rgba(255,215,0,.1);
+  padding: 2px;
+  animation: permanentPulse 3s ease-in-out infinite;
+}
+@keyframes permanentPulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(255,215,0,.2), inset 0 0 8px rgba(255,215,0,.1); }
+  50% { box-shadow: 0 0 20px rgba(255,215,0,.35), inset 0 0 12px rgba(255,215,0,.15); }
+}
 .board-row {
   display: flex;
   justify-content: center;
   gap: 24px;
+  align-items: center;
+}
+.board-area-between {
+  display: flex;
+  align-items: center;
+  margin: 0 -8px;
+}
+.board-area-spacer {
+  width: 68px;
+  margin: 0 -8px;
 }
 .board-hero-group {
   display: flex;
@@ -1519,15 +1946,15 @@ body {
   border-style: solid;
 }
 
-/* Gold display */
+/* Gold display — fixed position, same x for both players */
 .game-gold-display {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   gap: 3px;
-  padding: 0;
-  margin-left: -4px;
-  flex-shrink: 0;
-  position: relative;
   z-index: 10002;
 }
 .game-gold-icon { font-size: 32px; }
@@ -1537,6 +1964,26 @@ body {
   color: #ffd700;
   text-shadow: 0 0 10px rgba(255,215,0,.5);
 }
+
+/* Hand action buttons (Sort / Shuffle) — fixed position, left of gold */
+.hand-actions {
+  position: absolute;
+  right: 110px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 10002;
+}
+.hand-action-btn {
+  padding: 3px 8px !important;
+  font-size: 9px !important;
+  letter-spacing: 0.5px;
+  opacity: 0.6;
+  transition: opacity .15s;
+}
+.hand-action-btn:hover { opacity: 1; }
 
 /* Card dimming — uses overlay, not opacity, so tooltip is unaffected */
 .hand-card-dimmed .board-card::before {
@@ -1551,6 +1998,27 @@ body {
   cursor: default;
 }
 .hand-card-dimmed .board-card-hp { opacity: .3; }
+
+
+/* Force discard target — thick red border on hand cards, hover dims */
+.hand-discard-target {
+  cursor: pointer !important;
+}
+.hand-discard-target .board-card {
+  box-shadow: 0 0 10px rgba(255,60,60,.6), 0 0 20px rgba(255,40,40,.3) !important;
+  border: 3px solid rgba(255,60,60,.85) !important;
+  animation: discardPulse 0.8s ease-in-out infinite;
+  transition: filter .15s ease, transform .15s ease;
+}
+.hand-discard-target:hover .board-card {
+  filter: brightness(0.4) grayscale(0.5);
+  transform: scale(0.96);
+  box-shadow: 0 0 16px rgba(255,40,40,.9), 0 0 30px rgba(255,20,20,.5) !important;
+}
+@keyframes discardPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(255,60,60,.6), 0 0 20px rgba(255,40,40,.3); }
+  50% { box-shadow: 0 0 16px rgba(255,60,60,.8), 0 0 28px rgba(255,40,40,.5); }
+}
 .board-area-line {
   flex: 1;
   height: 1px;
@@ -1612,34 +2080,182 @@ body {
 /* ═══ Modular Animation System ═══ */
 
 /* Card reveal — opponent's played card appears centered */
-.card-reveal-overlay {
+.card-reveal-stack {
   position: fixed;
-  inset: 0;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 33%;
   z-index: 10050;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  animation: cardRevealBg 1.8s ease-in-out forwards;
 }
-@keyframes cardRevealBg {
-  0% { background: rgba(0,0,0,0); }
-  15% { background: rgba(0,0,0,.35); }
-  65% { background: rgba(0,0,0,.25); }
-  100% { background: rgba(0,0,0,0); }
+.card-reveal-entry {
+  position: absolute;
+  pointer-events: auto;
+  cursor: default;
+  animation: cardRevealAnim 3.5s ease-in-out forwards;
 }
 .card-reveal-card {
-  width: 200px;
+  width: 340px;
   aspect-ratio: 750 / 1050;
-  animation: cardRevealAnim 1.8s ease-in-out forwards;
-  box-shadow: 0 0 40px rgba(0,0,0,.8), 0 0 80px rgba(255,255,255,.1);
-  border-radius: 6px;
+  box-shadow: 0 0 50px rgba(0,0,0,.7), 0 0 100px rgba(255,255,255,.08);
+  border-radius: 8px;
 }
 @keyframes cardRevealAnim {
-  0% { transform: scale(0.85); opacity: 0; }
-  15% { transform: scale(1); opacity: 1; }
-  60% { transform: scale(1.02); opacity: 1; }
-  100% { transform: scale(1.35); opacity: 0; }
+  0% { transform: scale(0.8); opacity: 0; }
+  8% { transform: scale(1); opacity: 1; }
+  65% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.97); opacity: 0; }
+}
+
+/* ═══ REACTION CHAIN VISUALIZATION ═══ */
+.reaction-chain-overlay {
+  position: fixed;
+  bottom: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10040;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.reaction-chain-label {
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-shadow: 0 0 8px rgba(0,240,255,.4);
+}
+.reaction-chain-cards {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(0,0,0,.7);
+  border: 1px solid var(--bg4);
+  border-radius: 8px;
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+.reaction-chain-card {
+  position: relative;
+  animation: chainSlideIn .35s ease-out backwards;
+  transition: opacity .5s, filter .3s;
+}
+@keyframes chainSlideIn {
+  from { transform: translateX(60px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.chain-badge {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 5;
+}
+.chain-badge-initial {
+  background: rgba(80,140,220,.85);
+  color: #fff;
+}
+.chain-owner-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,.5);
+  z-index: 5;
+}
+/* Resolving — golden glow */
+.chain-glow {
+  filter: brightness(1.3);
+  box-shadow: 0 0 20px rgba(255,215,0,.8), 0 0 40px rgba(255,200,0,.4);
+  animation: chainGlowPulse 0.6s ease-in-out infinite;
+}
+@keyframes chainGlowPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(255,215,0,.8), 0 0 40px rgba(255,200,0,.4); }
+  50% { box-shadow: 0 0 30px rgba(255,215,0,1), 0 0 60px rgba(255,200,0,.6); }
+}
+/* Negated — glitch + shake + 🚫 */
+.chain-negated {
+  animation: chainGlitch .15s linear infinite, chainShake .1s linear infinite;
+  filter: saturate(0.3) brightness(0.7);
+}
+@keyframes chainGlitch {
+  0% { clip-path: inset(0 0 80% 0); filter: hue-rotate(90deg); }
+  20% { clip-path: inset(40% 0 20% 0); filter: hue-rotate(180deg); }
+  40% { clip-path: inset(70% 0 0 0); filter: hue-rotate(270deg); }
+  60% { clip-path: inset(10% 0 60% 0); filter: hue-rotate(45deg); }
+  80% { clip-path: inset(50% 0 10% 0); filter: hue-rotate(135deg); }
+  100% { clip-path: inset(0 0 40% 0); filter: hue-rotate(0deg); }
+}
+@keyframes chainShake {
+  0%, 100% { transform: translate(0,0); }
+  25% { transform: translate(-3px, 2px); }
+  50% { transform: translate(3px, -1px); }
+  75% { transform: translate(-2px, -2px); }
+}
+.chain-negate-symbol {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  z-index: 6;
+  pointer-events: none;
+  filter: drop-shadow(0 0 10px rgba(255,0,0,.8));
+  animation: negateSymbolPop .3s ease-out;
+}
+@keyframes negateSymbolPop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+/* Resolved — fade out */
+.chain-resolved {
+  opacity: 0.15;
+  filter: brightness(1.5) saturate(0);
+  transition: opacity .5s ease-out, filter .5s ease-out;
+}
+
+/* ═══ CAMERA FLASH ═══ */
+.camera-flash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10080;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: cameraFlashBg .8s ease-out forwards;
+}
+@keyframes cameraFlashBg {
+  0% { background: rgba(255,255,255,0); }
+  15% { background: rgba(255,255,255,.95); }
+  40% { background: rgba(255,255,255,.6); }
+  100% { background: rgba(255,255,255,0); }
+}
+.camera-flash-icon {
+  animation: cameraIconPop .8s ease-out forwards;
+  filter: drop-shadow(0 0 30px rgba(255,105,180,.8));
+}
+@keyframes cameraIconPop {
+  0% { transform: scale(0.3); opacity: 0; }
+  20% { transform: scale(1.4); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.9; }
+  100% { transform: scale(1.5); opacity: 0; }
 }
 
 /* Explosion flash */
@@ -1675,6 +2291,57 @@ body {
 @keyframes animExpParticle {
   0% { transform: translate(0, 0) scale(1.2); opacity: 1; }
   20% { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+}
+
+/* Creature death animation — flash + rising souls + red sparks */
+.anim-creature-death-flash {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  left: -40px;
+  top: -40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(200,100,100,.5) 35%, transparent 70%);
+  animation: animDeathFlash .7s ease-out forwards;
+}
+@keyframes animDeathFlash {
+  0% { transform: scale(0.3); opacity: 1; }
+  30% { transform: scale(1.8); opacity: .9; }
+  60% { transform: scale(1.2); opacity: .4; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+.anim-creature-death-soul {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  left: calc(var(--size) / -2);
+  top: calc(var(--size) / -2);
+  border-radius: 50%;
+  background: var(--color);
+  box-shadow: 0 0 8px var(--color), 0 0 16px rgba(150,200,255,.4);
+  animation: animDeathSoul var(--dur, 800ms) ease-out forwards;
+  opacity: 0;
+}
+@keyframes animDeathSoul {
+  0% { transform: translate(0, 0) scale(1); opacity: .9; }
+  30% { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.3); opacity: 0; }
+}
+.anim-creature-death-spark {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  left: calc(var(--size) / -2);
+  top: calc(var(--size) / -2);
+  border-radius: 50%;
+  background: var(--color);
+  box-shadow: 0 0 4px var(--color);
+  animation: animDeathSpark var(--dur, 500ms) ease-out forwards;
+  opacity: 0;
+}
+@keyframes animDeathSpark {
+  0% { transform: translate(0, 0) scale(1.3); opacity: 1; }
   100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
 }
 
@@ -2121,6 +2788,20 @@ body {
   bottom: 3px;
   left: 5px;
 }
+.board-card-atk {
+  position: absolute;
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: #fff;
+  text-shadow: 0 0 4px #000, 0 0 2px #000, 1px 1px 0 #000;
+  z-index: 4;
+  pointer-events: none;
+  line-height: 1;
+}
+.board-card-atk-hero {
+  bottom: 3px;
+  right: 5px;
+}
 .board-card-hp-creature {
   bottom: 3px;
   left: 50%;
@@ -2163,7 +2844,8 @@ body {
 .board-ability-stack-card:first-child { position: relative; }
 .board-ability-stack .board-card-label {
   position: absolute;
-  bottom: 2px; right: 2px;
+  bottom: 2px; left: 50%;
+  transform: translateX(-50%);
   z-index: 5;
 }
 .board-card-text {
@@ -2219,3 +2901,150 @@ body {
 }
 .notification.error { border-color: var(--danger); color: var(--danger); }
 .notification.success { border-color: var(--success); color: var(--success); }
+
+/* ===== MAGIC HAMMER ANIMATION ===== */
+
+/* Hammerhead — metallic rectangle seen from the front, drops from above */
+.anim-hammer-head {
+  position: absolute;
+  border-radius: 3px;
+  background: linear-gradient(180deg,
+    #e8e8e8 0%, #b8b8b8 15%, #a0a0a0 30%,
+    #888 50%, #707070 70%, #585858 90%, #484848 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,.55),
+    inset 0 -2px 0 rgba(0,0,0,.45),
+    inset 3px 0 0 rgba(255,255,255,.2),
+    inset -3px 0 0 rgba(0,0,0,.25),
+    0 6px 24px rgba(0,0,0,.7);
+  border: 1px solid #555;
+  animation: hammerDrop 1s cubic-bezier(.2,0,.8,.4) forwards;
+  opacity: 0;
+}
+
+@keyframes hammerDrop {
+  0%   { transform: translateY(-320px) scaleY(1); opacity: 1; }
+  4%   { opacity: 1; }
+  34%  { transform: translateY(0) scaleY(1); }
+  38%  { transform: translateY(4px) scaleY(.7) scaleX(1.1); }
+  44%  { transform: translateY(0) scaleY(1); }
+  64%  { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-280px); opacity: 0; }
+}
+
+/* Impact flash — wide horizontal ellipse burst */
+.anim-hammer-impact {
+  position: absolute;
+  width: 140px;
+  height: 50px;
+  left: -70px;
+  top: -25px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse,
+    rgba(255,255,255,.95) 0%, rgba(255,240,190,.5) 35%, transparent 70%);
+  animation: hammerImpactFlash .45s ease-out .33s forwards;
+  opacity: 0;
+}
+
+@keyframes hammerImpactFlash {
+  0%   { transform: scale(.3, .3); opacity: 1; }
+  35%  { transform: scale(1.4, 1); opacity: .85; }
+  100% { transform: scale(2, 1.3); opacity: 0; }
+}
+
+/* Squash class — applied to the actual target DOM element */
+.magic-hammer-squashed {
+  animation: hammerSquash .65s ease-out forwards !important;
+  transform-origin: center bottom !important;
+}
+
+@keyframes hammerSquash {
+  0%   { transform: scaleY(1)    scaleX(1); }
+  12%  { transform: scaleY(.12)  scaleX(1.3); }
+  30%  { transform: scaleY(.12)  scaleX(1.3); }
+  55%  { transform: scaleY(1.1)  scaleX(.94); }
+  75%  { transform: scaleY(.96)  scaleX(1.02); }
+  100% { transform: scaleY(1)    scaleX(1); }
+}
+
+/* ===== ICE PROJECTILE TRAIL ===== */
+
+.projectile-ice-trail {
+  position: absolute;
+  inset: -24px;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 30% 40%, rgba(180,220,255,.5) 0%, transparent 40%),
+    radial-gradient(ellipse at 70% 60%, rgba(140,200,250,.4) 0%, transparent 35%),
+    radial-gradient(ellipse at 50% 50%, rgba(100,170,240,.3) 0%, transparent 50%);
+  box-shadow:
+    -8px -4px 6px rgba(180,220,255,.3),
+    -16px -2px 8px rgba(140,200,250,.2),
+    -24px 4px 10px rgba(100,180,240,.15),
+    -32px -6px 6px rgba(200,230,255,.2),
+    -40px 2px 8px rgba(160,210,250,.12),
+    -48px -3px 5px rgba(180,220,255,.1),
+    -12px 8px 5px rgba(220,240,255,.25),
+    -28px 7px 7px rgba(170,215,250,.15),
+    -36px -8px 4px rgba(200,230,255,.12);
+  animation: iceTrailPulse 80ms ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes iceTrailPulse {
+  0%   { opacity: .6; transform: scale(1); }
+  100% { opacity: .9; transform: scale(1.15); }
+}
+
+/* ===== ICE BOLT PROJECTILE ===== */
+
+.projectile-ice-bolt {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%,
+    #fff 0%, #c8e8ff 25%, #70b8ee 55%, #3888cc 100%);
+  box-shadow:
+    0 0 14px rgba(100,180,255,.9),
+    0 0 28px rgba(50,130,220,.5),
+    9px -5px 0 3px rgba(180,220,255,.5),
+    -7px 7px 0 2px rgba(140,200,250,.4),
+    13px 4px 0 2px rgba(200,230,255,.45),
+    -11px -9px 0 3px rgba(160,210,250,.35),
+    5px 11px 0 2px rgba(190,225,255,.3),
+    -4px -13px 0 2px rgba(170,215,250,.35);
+  animation: iceBoltPulse 90ms ease-in-out infinite alternate;
+}
+
+@keyframes iceBoltPulse {
+  0%   { transform: scale(1); filter: brightness(1); }
+  100% { transform: scale(1.15); filter: brightness(1.2); }
+}
+
+/* ===== DARK ENERGY DELETION ANIMATION ===== */
+
+.discard-anim-deleted {
+  filter: brightness(.7) saturate(.5);
+}
+
+.delete-energy-overlay {
+  position: absolute;
+  inset: -6px;
+  border-radius: 6px;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(80,0,120,.5) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 80%, rgba(40,0,80,.4) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 50%, rgba(20,0,40,.3) 0%, transparent 60%);
+  box-shadow:
+    inset 0 0 12px rgba(100,0,160,.6),
+    0 0 16px rgba(80,0,140,.5),
+    0 0 32px rgba(60,0,120,.3);
+  animation: deleteEnergyPulse .4s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes deleteEnergyPulse {
+  0%   { opacity: .6; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1.05); }
+}

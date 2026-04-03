@@ -538,6 +538,11 @@ function sendGameState(room, playerIdx, extra) {
       gold: ps.gold || 0,
       abilityGivenThisTurn: ps.abilityGivenThisTurn || [false,false,false],
       summonLocked: ps.summonLocked || false,
+      damageLocked: ps.damageLocked || false,
+      dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
+      potionLocked: ps.potionLocked || false,
+      permanents: ps.permanents || [],
+      divineGiftUsed: ps.divineGiftUsed || false,
     })),
     areaZones: gs.areaZones, turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
@@ -556,7 +561,29 @@ function sendGameState(room, playerIdx, extra) {
       return cc;
     })() : {},
     additionalActions: room.engine ? room.engine.getAdditionalActions(playerIdx) : [],
+    inherentActionCards: (() => {
+      if (!room.engine) return [];
+      const { loadCardEffect } = require('./cards/effects/_loader');
+      const ps2 = gs.players[playerIdx];
+      const names = new Set();
+      for (const cn of (ps2?.hand || [])) {
+        if (names.has(cn)) continue;
+        const s = loadCardEffect(cn);
+        if (!s) continue;
+        if (s.inherentAction === true) { names.add(cn); continue; }
+        if (typeof s.inherentAction === 'function') {
+          for (let hi = 0; hi < (ps2?.heroes || []).length; hi++) {
+            if (ps2.heroes[hi]?.name && ps2.heroes[hi].hp > 0 && s.inherentAction(gs, playerIdx, hi, room.engine)) { names.add(cn); break; }
+          }
+        }
+      }
+      return [...names];
+    })(),
     unactivatableArtifacts: room.engine ? room.engine.getUnactivatableArtifacts(playerIdx) : [],
+    blockedSpells: room.engine ? room.engine.getBlockedSpells(playerIdx) : [],
+    activatableAbilities: room.engine ? room.engine.getActivatableAbilities(playerIdx) : [],
+    freeActivatableAbilities: room.engine ? room.engine.getFreeActivatableAbilities(playerIdx) : [],
+    activeHeroEffects: room.engine ? room.engine.getActiveHeroEffects(playerIdx) : [],
     ...extra,
   };
   io.to(p.socketId).emit('game_state', state);
@@ -729,7 +756,7 @@ io.on('connection', (socket) => {
       const usr = await db.get('SELECT * FROM users WHERE id = ?', [p.userId]);
       const heroes = (deck?.heroes||[]).map(h => {
         const c = h.hero ? cardsByName[h.hero] : null;
-        return { name:h.hero, hp:c?.hp||0, maxHp:c?.hp||0, ability1:h.ability1||null, ability2:h.ability2||null, statuses:{} };
+        return { name:h.hero, hp:c?.hp||0, maxHp:c?.hp||0, atk:c?.atk||0, baseAtk:c?.atk||0, ability1:h.ability1||null, ability2:h.ability2||null, statuses:{} };
       });
       const abilityZones = heroes.map(h => {
         const z=[[],[],[]];
@@ -744,7 +771,9 @@ io.on('connection', (socket) => {
         color:usr?.color||'#00f0ff', avatar:usr?.avatar||null,
         heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
         hand, mainDeck, potionDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
-        abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0] });
+        abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0],
+        damageLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
+        permanents:[], divineGiftUsed:false });
     }
     room.gameState = { players:playerStates, areaZones:[[],[]], turn:0, activePlayer:0, currentPhase:0, result:null, rematchRequests:[], awaitingFirstChoice:true };
     room.status = 'playing';
@@ -752,14 +781,7 @@ io.on('connection', (socket) => {
 
     // ── DEBUG: Add Performance + Flying Island to both hands, set a random hero to 10 HP ──
     for (let pi = 0; pi < 2; pi++) {
-      playerStates[pi].hand.push('Performance');
-      playerStates[pi].hand.push('Beer');
-      playerStates[pi].hand.push('Juice');
-      playerStates[pi].hand.push('Slime Rancher');
-      playerStates[pi].hand.push('Cloudy Slime');
-      playerStates[pi].hand.push('Sparky Slime');
-      playerStates[pi].hand.push('Splashy Slime');
-      playerStates[pi].discardPile.push('Splashy Slime'); // DEBUG: for testing Shadowy Slime
+      
     }
     const debugHeroPlayer = Math.floor(Math.random() * 2);
     const debugHeroIdx = Math.floor(Math.random() * 3);
@@ -927,6 +949,199 @@ io.on('connection', (socket) => {
     })();
   });
 
+  // Activate an action-costing ability on the board
+  socket.on('activate_ability', ({ roomId, heroIdx, zoneIdx }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.engine || !room.gameState) return;
+    const gs = room.gameState;
+    const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0 || pi !== gs.activePlayer) return;
+
+    const ps = gs.players[pi];
+    const hero = ps.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return;
+
+    const abilitySlot = ps.abilityZones?.[heroIdx]?.[zoneIdx];
+    if (!abilitySlot || abilitySlot.length === 0) return;
+    const abilityName = abilitySlot[0];
+    const level = abilitySlot.length;
+
+    const { loadCardEffect } = require('./cards/effects/_loader');
+    const script = loadCardEffect(abilityName);
+    if (!script?.actionCost || !script?.onActivate) return;
+
+    // Check HOPT
+    const hoptKey = `ability-action:${abilityName}:${pi}`;
+    if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
+
+    // Check if action is available
+    const isActionPhase = gs.currentPhase === 3;
+    const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
+    const hasAdditional = isMainPhase && room.engine.hasAdditionalActionForCategory(pi, 'ability_activation');
+    if (!isActionPhase && !hasAdditional) return;
+
+    // Claim HOPT
+    if (!gs.hoptUsed) gs.hoptUsed = {};
+    gs.hoptUsed[hoptKey] = gs.turn;
+
+    (async () => {
+      try {
+        // Create a context for the ability
+        const inst = room.engine.cardInstances.find(c =>
+          c.owner === pi && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
+        );
+        if (!inst) return;
+        const ctx = room.engine._createContext(inst, {});
+
+        // Play shine animation on the ability
+        for (let i = 0; i < 2; i++) {
+          const sid = gs.players[i]?.socketId;
+          if (sid) io.to(sid).emit('ability_activated', { owner: pi, heroIdx, zoneIdx, abilityName });
+        }
+
+        // Run the activation
+        await script.onActivate(ctx, level);
+
+        // Consume action
+        if (isActionPhase) {
+          await room.engine.advanceToPhase(pi, 4); // Action → Main Phase 2
+        } else if (hasAdditional) {
+          // Consume additional action with ability_activation category
+          for (const inst2 of room.engine.cardInstances) {
+            if (inst2.owner !== pi) continue;
+            if (!inst2.counters.additionalActionType || !inst2.counters.additionalActionAvail) continue;
+            const config = room.engine._additionalActionTypes[inst2.counters.additionalActionType];
+            if (config?.allowedCategories?.includes('ability_activation')) {
+              room.engine.consumeAdditionalAction(pi, inst2.counters.additionalActionType, inst2.id);
+              break;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Engine] activate_ability error:', err.message, err.stack);
+      }
+      for (let i = 0; i < 2; i++) sendGameState(room, i);
+    })();
+  });
+
+  // Activate a free-activation ability (no action cost, Main Phase only)
+  // Generic handler — individual ability logic lives in the card script's onFreeActivate.
+  socket.on('activate_free_ability', ({ roomId, heroIdx, zoneIdx }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.engine || !room.gameState) return;
+    const gs = room.gameState;
+    const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0 || pi !== gs.activePlayer) return;
+    if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return; // Main Phase only
+
+    const ps = gs.players[pi];
+    const hero = ps.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return;
+    if (hero.statuses?.frozen || hero.statuses?.stunned) return;
+
+    const abilitySlot = ps.abilityZones?.[heroIdx]?.[zoneIdx];
+    if (!abilitySlot || abilitySlot.length === 0) return;
+    const abilityName = abilitySlot[0];
+    const level = abilitySlot.length;
+
+    const { loadCardEffect } = require('./cards/effects/_loader');
+    const script = loadCardEffect(abilityName);
+    if (!script?.freeActivation || !script?.onFreeActivate) return;
+
+    // Check HOPT (by ability name — blocks all copies for this player)
+    const hoptKey = `free-ability:${abilityName}:${pi}`;
+    if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
+
+    // Check canFreeActivate (don't claim HOPT yet — effect might cancel)
+    if (script.canFreeActivate) {
+      const inst = room.engine.cardInstances.find(c =>
+        c.owner === pi && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
+      );
+      if (!inst) return;
+      const ctx = room.engine._createContext(inst, { event: 'canFreeActivateCheck' });
+      if (!script.canFreeActivate(ctx, level)) return;
+    }
+
+    (async () => {
+      try {
+        const inst = room.engine.cardInstances.find(c =>
+          c.owner === pi && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
+        );
+        if (!inst) return;
+
+        const ctx = room.engine._createContext(inst, {});
+        // onFreeActivate returns true if the effect resolved (HOPT should be claimed)
+        const resolved = await script.onFreeActivate(ctx, level);
+
+        // Only claim HOPT if the effect actually resolved (not cancelled)
+        if (resolved !== false) {
+          // Generic "ability activated" flash — visible to both players
+          room.engine._broadcastEvent('ability_activated', { owner: pi, heroIdx, zoneIdx });
+
+          if (!gs.hoptUsed) gs.hoptUsed = {};
+          gs.hoptUsed[hoptKey] = gs.turn;
+        }
+      } catch (err) {
+        console.error('[Engine] activate_free_ability error:', err.message, err.stack);
+      }
+      for (let i = 0; i < 2; i++) sendGameState(room, i);
+    })();
+  });
+
+  // Activate a hero's active effect (Main Phase, no action cost)
+  socket.on('activate_hero_effect', ({ roomId, heroIdx }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.engine || !room.gameState) return;
+    const gs = room.gameState;
+    const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0 || pi !== gs.activePlayer) return;
+    if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return;
+
+    const ps = gs.players[pi];
+    const hero = ps.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return;
+    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
+
+    const { loadCardEffect } = require('./cards/effects/_loader');
+    const script = loadCardEffect(hero.name);
+    if (!script?.heroEffect || !script?.onHeroEffect) return;
+
+    const hoptKey = `hero-effect:${hero.name}:${pi}:${heroIdx}`;
+    if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
+
+    if (script.canActivateHeroEffect) {
+      const inst = room.engine.cardInstances.find(c =>
+        c.owner === pi && c.zone === 'hero' && c.heroIdx === heroIdx
+      );
+      if (!inst) return;
+      const ctx = room.engine._createContext(inst, { event: 'canHeroEffectCheck' });
+      if (!script.canActivateHeroEffect(ctx)) return;
+    }
+
+    (async () => {
+      try {
+        const inst = room.engine.cardInstances.find(c =>
+          c.owner === pi && c.zone === 'hero' && c.heroIdx === heroIdx
+        );
+        if (!inst) return;
+
+        const ctx = room.engine._createContext(inst, {});
+        const resolved = await script.onHeroEffect(ctx);
+
+        if (resolved !== false) {
+          if (!gs.hoptUsed) gs.hoptUsed = {};
+          gs.hoptUsed[hoptKey] = gs.turn;
+        }
+      } catch (err) {
+        console.error('[Engine] activate_hero_effect error:', err.message, err.stack);
+      }
+      for (let i = 0; i < 2; i++) sendGameState(room, i);
+    })();
+  });
+
   // Play a creature from hand to support zone
   socket.on('play_creature', ({ roomId, cardName, handIndex, heroIdx, zoneSlot, additionalActionProvider }) => {
     if (!currentUser) return;
@@ -968,7 +1183,9 @@ io.on('connection', (socket) => {
     const countAbility = (school) => {
       let count = 0;
       for (const slot of (ps.abilityZones[heroIdx] || [])) {
-        for (const ab of (slot || [])) { if (ab === school) count++; }
+        if (!slot || slot.length === 0) continue;
+        const base = slot[0];
+        for (const ab of slot) { if (ab === school) count++; else if (ab === 'Performance' && base === school) count++; }
       }
       return count;
     };
@@ -1008,14 +1225,158 @@ io.on('connection', (socket) => {
       try {
         await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot });
         await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
-        // Trigger reaction check for creature summon
-        await room.engine._checkReactionCards('onCreatureSummoned', {});
+        // Trigger reaction check for creature summon (with creature as initial card in chain)
+        await room.engine._checkReactionCards('onCreatureSummoned', {
+          _initialCard: { cardName, owner: pi, cardType: 'Creature' },
+        });
         // Only advance phase if this was a "real" action (not additional) during Action Phase
         if (isActionPhase && !usingAdditional) {
           await room.engine.advanceToPhase(pi, 4);
         }
       } catch (err) {
         console.error('[Engine] play_creature hooks error:', err.message);
+      }
+      for (let i = 0; i < 2; i++) sendGameState(room, i);
+    })();
+  });
+
+  // Play a spell or attack from hand (drag onto a hero)
+  socket.on('play_spell', ({ roomId, cardName, handIndex, heroIdx }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.engine || !room.gameState) return;
+    const gs = room.gameState;
+    const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0 || pi !== gs.activePlayer) return;
+
+    const isActionPhase = gs.currentPhase === 3;
+    const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
+    if (!isActionPhase && !isMainPhase) return;
+
+    const ps = gs.players[pi];
+    if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
+
+    const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
+    const cardData = allCards.find(c => c.name === cardName);
+    if (!cardData || (cardData.cardType !== 'Spell' && cardData.cardType !== 'Attack')) return;
+
+    // Validate hero can cast this spell (spell school / level)
+    const hero = ps.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return;
+    if (hero.statuses?.frozen || hero.statuses?.stunned) return;
+    const level = cardData.level || 0;
+    if (level > 0 || cardData.spellSchool1) {
+      const abZones = ps.abilityZones[heroIdx] || [];
+      const countAb = (school) => { let c = 0; for (const s of abZones) { if (!s || s.length === 0) continue; const base = s[0]; for (const a of s) { if (a === school) c++; else if (a === 'Performance' && base === school) c++; } } return c; };
+      if (cardData.spellSchool1 && countAb(cardData.spellSchool1) < level) return;
+      if (cardData.spellSchool2 && countAb(cardData.spellSchool2) < level) return;
+    }
+
+    // Check custom play conditions (Flame Avalanche, etc.)
+    const { loadCardEffect } = require('./cards/effects/_loader');
+    const script = loadCardEffect(cardName);
+    if (script?.spellPlayCondition && !script.spellPlayCondition(gs, pi)) return;
+
+    // Divine Gift: once per game
+    if (cardName.startsWith('Divine Gift') && ps.divineGiftUsed) return;
+
+    // Check if this is an inherent action (doesn't need additional action, doesn't consume Action Phase)
+    const isInherentAction = typeof script?.inherentAction === 'function'
+      ? script.inherentAction(gs, pi, heroIdx, room.engine)
+      : script?.inherentAction === true;
+
+    // Check if this needs an additional action (Main Phase play)
+    const needsAdditional = isMainPhase && !isInherentAction;
+    let additionalConsumed = false;
+    let consumedInst = null;
+    if (needsAdditional) {
+      const typeId = room.engine.findAdditionalActionForCard(pi, cardName);
+      if (!typeId) return; // No additional action available
+      consumedInst = room.engine.consumeAdditionalAction(pi, typeId);
+      additionalConsumed = true;
+    }
+
+    // Remove from hand
+    ps.hand.splice(handIndex, 1);
+
+    (async () => {
+      try {
+        // Broadcast spell to opponent BEFORE resolving
+        const oi = pi === 0 ? 1 : 0;
+        const oppSid = gs.players[oi]?.socketId;
+        if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
+        await new Promise(r => setTimeout(r, 100));
+
+        // Track card instance with heroIdx so onPlay knows which hero cast it
+        const inst = room.engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
+
+        // Set up spell damage tracking (for Bartas second-cast detection)
+        gs._spellDamageLog = [];
+        gs._spellExcludeTargets = [];
+        gs._spellCancelled = false;
+
+        // Fire onPlay hook (spell resolves here)
+        await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
+
+        // If spell was cancelled (player backed out of target selection), return card to hand
+        if (gs._spellCancelled) {
+          ps.hand.push(cardName);
+          room.engine._untrackCard(inst.id);
+          delete gs._spellDamageLog;
+          delete gs._spellExcludeTargets;
+          delete gs._spellCancelled;
+          // Refund additional action if one was consumed
+          if (additionalConsumed && consumedInst) {
+            consumedInst.counters.additionalActionAvail = 1;
+          }
+          for (let i = 0; i < 2; i++) sendGameState(room, i);
+          return;
+        }
+        delete gs._spellCancelled;
+
+        // Check if the spell declared itself a free action (Fire Bolts enhanced mode, etc.)
+        const becameFreeAction = gs._spellFreeAction === true;
+        delete gs._spellFreeAction;
+        if (becameFreeAction && additionalConsumed && consumedInst) {
+          consumedInst.counters.additionalActionAvail = 1;
+          additionalConsumed = false;
+        }
+
+        // Collect unique damage targets
+        const uniqueTargets = [];
+        const seenIds = new Set();
+        for (const t of (gs._spellDamageLog || [])) {
+          if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
+        }
+
+        // Fire afterSpellResolved hook (Bartas, etc.)
+        await room.engine.runHooks('afterSpellResolved', {
+          spellName: cardName, spellCardData: cardData, heroIdx, casterIdx: pi,
+          damageTargets: uniqueTargets, isSecondCast: !!gs._bartasSecondCast,
+          _skipReactionCheck: true,
+        });
+
+        // Clean up tracking
+        delete gs._spellDamageLog;
+        delete gs._spellExcludeTargets;
+        delete gs._bartasSecondCast;
+
+        // Move to discard
+        ps.discardPile.push(cardName);
+        room.engine._untrackCard(inst.id);
+        room.engine.log('spell_played', { card: cardName, player: ps.username, hero: hero.name, type: cardData.cardType });
+
+        // Advance from Action Phase → Main Phase 2 (if not additional/inherent/free action)
+        if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction) {
+          await room.engine.advanceToPhase(pi, 4);
+        }
+
+        // Mark Divine Gift as used (once per game)
+        if (cardName.startsWith('Divine Gift')) {
+          ps.divineGiftUsed = true;
+        }
+      } catch (err) {
+        console.error('[Engine] play_spell error:', err.message, err.stack);
       }
       for (let i = 0; i < 2; i++) sendGameState(room, i);
     })();
@@ -1093,6 +1454,7 @@ io.on('connection', (socket) => {
     if (gs.potionTargeting) return; // Already targeting
 
     const ps = gs.players[pi];
+    if (ps.potionLocked) return; // Nicolas potion lock active
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
 
     const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
@@ -1117,15 +1479,55 @@ io.on('connection', (socket) => {
       };
       for (let i = 0; i < 2; i++) sendGameState(room, i);
     } else {
-      // No targeting needed — resolve immediately
+      // No targeting needed — execute with reaction window
       (async () => {
-        if (script.resolve) await script.resolve(room.engine, pi, [], []);
-        ps.hand.splice(handIndex, 1);
-        ps.deletedPile.push(cardName);
-        // Reveal card to opponent
+        // Broadcast card to opponent BEFORE resolving (unless script handles it manually)
         const oi = pi === 0 ? 1 : 0;
         const oppSid = gs.players[oi]?.socketId;
-        if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
+        if (!script.deferBroadcast) {
+          if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
+          await new Promise(r => setTimeout(r, 100));
+        }
+
+        let chainResult;
+        try {
+          chainResult = await room.engine.executeCardWithChain({
+            cardName, owner: pi, cardType: 'Potion',
+            resolve: script.resolve ? async () => await script.resolve(room.engine, pi, [], []) : null,
+          });
+        } catch (err) {
+          console.error('[Engine] Potion chain error:', err.message);
+          chainResult = { negated: false, chainFormed: false };
+        }
+        await new Promise(r => setTimeout(r, 100));
+        // If the effect was cancelled (player backed out), don't consume the card
+        if (chainResult.resolveResult?.cancelled) {
+          for (let i = 0; i < 2; i++) sendGameState(room, i);
+          return;
+        }
+        // Use indexOf to find card (handIndex may be stale if resolve modified hand)
+        const currentIdx = ps.hand.indexOf(cardName);
+        if (currentIdx >= 0) ps.hand.splice(currentIdx, 1);
+        if (chainResult.negated) {
+          ps.discardPile.push(cardName); // Negated → discard
+        } else if (chainResult.resolveResult?.placed) {
+          // Card was placed as a permanent — already on the board, don't delete
+          // Still counts as a potion use for Nicolas lock
+          ps.potionsUsedThisTurn = (ps.potionsUsedThisTurn || 0) + 1;
+          if (ps.potionsUsedThisTurn >= 2) {
+            const hasNicolas = (ps.heroes || []).some(h => h?.name === 'Nicolas, the Hidden Alchemist' && h.hp > 0 && !h.statuses?.negated);
+            if (hasNicolas) ps.potionLocked = true;
+          }
+        } else {
+          ps.deletedPile.push(cardName); // Resolved → deleted
+          // Track potion usage for Nicolas lock
+          ps.potionsUsedThisTurn = (ps.potionsUsedThisTurn || 0) + 1;
+          if (ps.potionsUsedThisTurn >= 2) {
+            // Check if Nicolas is alive and not negated
+            const hasNicolas = (ps.heroes || []).some(h => h?.name === 'Nicolas, the Hidden Alchemist' && h.hp > 0 && !h.statuses?.negated);
+            if (hasNicolas) ps.potionLocked = true;
+          }
+        }
         for (let i = 0; i < 2; i++) sendGameState(room, i);
       })();
     }
@@ -1212,11 +1614,32 @@ io.on('connection', (socket) => {
     }
 
     (async () => {
-      // Resolve the effect — may return {aborted: true} to re-enter targeting
-      let result;
-      if (script.resolve) result = await script.resolve(room.engine, pi, selectedIds, validTargets);
+      // Clear targeting before resolve — resolve may use its own prompts
+      gs.potionTargeting = null;
 
-      if (result?.aborted) {
+      // Broadcast card to opponent BEFORE resolving
+      const oi = pi === 0 ? 1 : 0;
+      const oppSid = gs.players[oi]?.socketId;
+      if (oppSid) io.to(oppSid).emit('card_reveal', { cardName: potionName });
+      await new Promise(r => setTimeout(r, 100));
+
+      // Execute with reaction window — defers resolve until chain resolves (if chain forms)
+      let chainResult;
+      try {
+        chainResult = await room.engine.executeCardWithChain({
+          cardName: potionName,
+          owner: pi,
+          cardType: cardType,
+          resolve: script.resolve
+            ? async () => await script.resolve(room.engine, pi, selectedIds, validTargets)
+            : null,
+        });
+      } catch (err) {
+        console.error('[Engine] executeCardWithChain error:', err.message, err.stack);
+        chainResult = { negated: false, chainFormed: false, resolveResult: null };
+      }
+
+      if (chainResult.resolveResult?.aborted) {
         // Re-enter targeting mode (player pressed Back from status select)
         const freshTargets = script.getValidTargets ? script.getValidTargets(gs, pi, room.engine) : validTargets;
         const config = typeof script.targetingConfig === 'function'
@@ -1233,24 +1656,32 @@ io.on('connection', (socket) => {
         return;
       }
 
+      // Brief delay so effect animations finish before self-discard
+      await new Promise(r => setTimeout(r, 100));
+
       // Remove from hand and move to appropriate pile
       const hi = ps.hand.indexOf(potionName);
       if (hi >= 0) ps.hand.splice(hi, 1);
-      if (cardType === 'Potion') {
-        ps.deletedPile.push(potionName); // Potions get deleted
+      if (chainResult.negated) {
+        ps.discardPile.push(potionName); // Negated → always discard
+      } else if (cardType === 'Potion') {
+        ps.deletedPile.push(potionName); // Potions get deleted on resolve
+        // Track potion usage for Nicolas lock
+        ps.potionsUsedThisTurn = (ps.potionsUsedThisTurn || 0) + 1;
+        if (ps.potionsUsedThisTurn >= 2) {
+          const hasNicolas = (ps.heroes || []).some(h => h?.name === 'Nicolas, the Hidden Alchemist' && h.hp > 0 && !h.statuses?.negated);
+          if (hasNicolas) ps.potionLocked = true;
+        }
       } else {
         ps.discardPile.push(potionName); // Artifacts get discarded
       }
-      // Clear targeting
-      gs.potionTargeting = null;
-      // Reveal card to opponent
-      const oi = pi === 0 ? 1 : 0;
-      const oppSid = gs.players[oi]?.socketId;
-      if (oppSid) io.to(oppSid).emit('card_reveal', { cardName: potionName });
-      // Send animation event
-      for (let i = 0; i < 2; i++) {
-        const sid = gs.players[i]?.socketId;
-        if (sid) io.to(sid).emit('potion_resolved', { destroyedIds: selectedIds, animationType: script.animationType || 'explosion' });
+
+      // Play target animation if card resolved (not negated)
+      if (!chainResult.negated) {
+        for (let i = 0; i < 2; i++) {
+          const sid = gs.players[i]?.socketId;
+          if (sid) io.to(sid).emit('potion_resolved', { destroyedIds: selectedIds, animationType: script.animationType || 'explosion' });
+        }
       }
       for (let i = 0; i < 2; i++) sendGameState(room, i);
     })();

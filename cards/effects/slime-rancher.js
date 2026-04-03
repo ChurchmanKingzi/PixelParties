@@ -27,7 +27,7 @@ module.exports = {
       // Register the additional action type (idempotent — OK to call multiple times)
       engine.registerAdditionalActionType(ADDITIONAL_TYPE, {
         label: 'Slime Rancher',
-        actionType: 'Creature',
+        allowedCategories: ['creature'],
         filter: (cardData) => {
           return cardData.cardType === 'Creature'
             && cardData.archetype === 'Slimes'
@@ -62,7 +62,7 @@ module.exports = {
       // Re-register type each turn (in case engine was reset)
       engine.registerAdditionalActionType(ADDITIONAL_TYPE, {
         label: 'Slime Rancher',
-        actionType: 'Creature',
+        allowedCategories: ['creature'],
         filter: (cardData) => {
           return cardData.cardType === 'Creature'
             && cardData.archetype === 'Slimes'

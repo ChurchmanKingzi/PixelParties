@@ -37,6 +37,7 @@ const HOOKS = {
   BEFORE_DAMAGE:     'beforeDamage',
   AFTER_DAMAGE:      'afterDamage',
   ON_HERO_KO:        'onHeroKO',
+  ON_CREATURE_DEATH: 'onCreatureDeath',
 
   // ── Resources ──
   ON_RESOURCE_GAIN:  'onResourceGain',
@@ -54,6 +55,15 @@ const HOOKS = {
   ON_CHAIN_START:    'onChainStart',
   ON_CHAIN_RESOLVE:  'onChainResolve',
   ON_EFFECT_NEGATED: 'onEffectNegated',
+
+  // ── Creature damage (batched) ──
+  BEFORE_CREATURE_DAMAGE_BATCH: 'beforeCreatureDamageBatch',
+  AFTER_CREATURE_DAMAGE_BATCH:  'afterCreatureDamageBatch',
+
+  // ── Reaction chain ──
+  ON_REACTION_ACTIVATED: 'onReactionActivated',  // Fires when a reaction card is added to the chain
+  ON_CARD_ACTIVATION:    'onCardActivation',      // Fires before a card's effect resolves (for reaction window)
+  AFTER_SPELL_RESOLVED:  'afterSpellResolved',    // Fires after a spell/attack's onPlay completes (for Bartas, etc.)
 };
 
 // Phases (indices match the frontend phase tracker)
@@ -80,6 +90,7 @@ const ZONES = {
   DISCARD:  'discard',
   DELETED:  'deleted',
   HERO:     'hero',
+  PERMANENT:'permanent',
 };
 
 // ═══════════════════════════════════════════
@@ -88,10 +99,11 @@ const ZONES = {
 //  Add new statuses here to auto-integrate.
 // ═══════════════════════════════════════════
 const STATUS_EFFECTS = {
-  frozen:  { negative: true, label: 'Frozen',  icon: '❄️' },
-  stunned: { negative: true, label: 'Stunned', icon: '💫' },
-  negated: { negative: true, label: 'Negated', icon: '⚡' },
-  burned:  { negative: true, label: 'Burned',  icon: '🔥' },
+  frozen:  { negative: true, label: 'Frozen',  icon: '❄️', immuneKey: 'freeze_immune' },
+  stunned: { negative: true, label: 'Stunned', icon: '💫', immuneKey: 'stun_immune' },
+  negated: { negative: true, label: 'Negated', icon: '⚡', immuneKey: 'negate_immune' },
+  burned:  { negative: true, label: 'Burned',  icon: '🔥', immuneKey: 'burn_immune' },
+  poisoned:{ negative: true, label: 'Poisoned', icon: '☠️', immuneKey: 'poison_immune' },
   immune:  { negative: false, label: 'Immune',  icon: '🛡️' },
   shielded:{ negative: false, label: 'Shielded', icon: '✨' },
 };
