@@ -497,6 +497,7 @@ function MainMenu() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 280 }} className="animate-in">
         <button className="btn btn-big" onClick={() => setScreen('play')} style={{ fontSize: 16 }}>⚔ PLAY</button>
         <button className="btn btn-big btn-accent2" onClick={() => setScreen('deckbuilder')} style={{ fontSize: 16 }}>✦ EDIT DECK</button>
+        <button className="btn btn-big" onClick={() => setScreen('shop')} style={{ fontSize: 16, borderColor: '#ffd700', color: '#ffd700', background: 'rgba(255,215,0,.08)' }}>✦ SHOP</button>
         <button className="btn btn-big btn-success" onClick={() => setScreen('profile')} style={{ fontSize: 16 }}>♛ VIEW PROFILE</button>
       </div>
       <div style={{ marginTop: 30, display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -547,9 +548,20 @@ function ProfileScreen() {
   const [confirmPw, setConfirmPw] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
 
-  // Cardback gallery
-  const [showCbGallery, setShowCbGallery] = useState(false);
+  // Sleeve gallery (was cardback gallery)
+  const [showSleeveGallery, setShowSleeveGallery] = useState(false);
   const [uploadedCardbacks, setUploadedCardbacks] = useState([]);
+  const [ownedSleeves, setOwnedSleeves] = useState([]);
+
+  // Avatar gallery
+  const [showAvatarGallery, setShowAvatarGallery] = useState(false);
+  const [standardAvatars, setStandardAvatars] = useState([]);
+  const [ownedAvatars, setOwnedAvatars] = useState([]);
+
+  // Board gallery
+  const [showBoardGallery, setShowBoardGallery] = useState(false);
+  const [board, setBoard] = useState(user.board || null);
+  const [ownedBoards, setOwnedBoards] = useState([]);
 
   // Top heroes
   const [topHeroes, setTopHeroes] = useState([]);
@@ -577,20 +589,36 @@ function ProfileScreen() {
     api('/profile/deck-stats').then(setDeckStats).catch(() => {});
     api('/profile/hero-stats').then(d => setTopHeroes(d.heroes || [])).catch(() => {});
     loadCardbackGallery();
+    // Load standard avatars and owned shop items
+    api('/profile/standard-avatars').then(d => setStandardAvatars(d.avatars || [])).catch(() => {});
+    api('/shop/owned').then(d => {
+      setOwnedAvatars(d.owned?.avatar || []);
+      setOwnedSleeves(d.owned?.sleeve || []);
+      setOwnedBoards(d.owned?.board || []);
+    }).catch(() => {});
   }, []);
 
-  // Intercept Escape to close gallery modal before the global handler navigates away
+  // Intercept Escape to close gallery modals
   useEffect(() => {
-    if (!showCbGallery) return;
+    if (!showSleeveGallery && !showAvatarGallery && !showBoardGallery) return;
     const handleEsc = (e) => {
       if (e.key === 'Escape') {
         e.stopImmediatePropagation();
-        setShowCbGallery(false);
+        setShowSleeveGallery(false);
+        setShowAvatarGallery(false);
+        setShowBoardGallery(false);
       }
     };
-    window.addEventListener('keydown', handleEsc, true); // capture phase
+    window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
-  }, [showCbGallery]);
+  }, [showSleeveGallery, showAvatarGallery, showBoardGallery]);
+
+  // Default avatar to first available if none set
+  useEffect(() => {
+    if (!avatar && standardAvatars.length > 0) {
+      setAvatar('/avatars/' + encodeURIComponent(standardAvatars[0]));
+    }
+  }, [standardAvatars]);
 
   const loadCardbackGallery = async () => {
     try {
@@ -658,6 +686,40 @@ function ProfileScreen() {
     setSaving(false);
   };
 
+  // Quick-save a single field without touching other unsaved edits
+  const quickSaveAvatar = async (newAvatar) => {
+    setAvatar(newAvatar);
+    setShowAvatarGallery(false);
+    try {
+      const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
+        color: user.color || '#00f0ff', avatar: newAvatar, cardback: user.cardback, bio: user.bio || ''
+      })});
+      setUser(data.user);
+    } catch (e) { notify(e.message, 'error'); }
+  };
+
+  const quickSaveSleeve = async (newSleeve) => {
+    setCardback(newSleeve);
+    setShowSleeveGallery(false);
+    try {
+      const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
+        color: user.color || '#00f0ff', avatar: user.avatar, cardback: newSleeve, bio: user.bio || ''
+      })});
+      setUser(data.user);
+    } catch (e) { notify(e.message, 'error'); }
+  };
+
+  const quickSaveBoard = async (newBoard) => {
+    setBoard(newBoard);
+    setShowBoardGallery(false);
+    try {
+      const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
+        color: user.color || '#00f0ff', avatar: user.avatar, cardback: user.cardback, bio: user.bio || '', board: newBoard
+      })});
+      setUser(data.user);
+    } catch (e) { notify(e.message, 'error'); }
+  };
+
   const changePassword = async () => {
     if (!oldPw || !newPw) { notify('Fill in all password fields', 'error'); return; }
     if (newPw !== confirmPw) { notify('New passwords do not match', 'error'); return; }
@@ -697,16 +759,16 @@ function ProfileScreen() {
 
             {/* Avatar frame */}
             <div className="profile-hero-area">
-              <div className="profile-avatar-frame" style={{ borderColor: rank.color, boxShadow: `0 0 20px ${rank.glow}, 0 0 40px ${rank.glow}, inset 0 0 15px ${rank.glow}` }}>
+              <div className="profile-avatar-frame" style={{ borderColor: rank.color, boxShadow: `0 0 20px ${rank.glow}, 0 0 40px ${rank.glow}, inset 0 0 15px ${rank.glow}`, cursor: 'pointer' }}
+                onClick={() => setShowAvatarGallery(true)}>
                 <div className="profile-avatar-inner">
                   {avatar
                     ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     : <span style={{ fontSize: 56, opacity: 0.5 }}>👤</span>}
                 </div>
-                <label className="profile-avatar-upload-overlay">
+                <div className="profile-avatar-upload-overlay">
                   <span>✎</span>
-                  <input type="file" accept="image/*" onChange={handleAvatar} style={{ display: 'none' }} />
-                </label>
+                </div>
               </div>
 
               {/* Rank badge */}
@@ -792,12 +854,12 @@ function ProfileScreen() {
         {/* ═══ RIGHT COLUMN — STATS & CUSTOMIZATION ═══ */}
         <div className="profile-right-col">
 
-          {/* Combined: Card Back + Battle Record + Name Color + Top Heroes */}
+          {/* Combined: Sleeve + Battle Record + Name Color + Top Heroes */}
           <div className="profile-section profile-section-wide" style={{ flex: 'none' }}>
             <div style={{ display: 'flex', gap: 28, alignItems: 'stretch' }}>
 
-              {/* Card Back — large preview */}
-              <div className="profile-cardback-preview profile-cardback-xl profile-cardback-clickable" onClick={() => setShowCbGallery(true)}>
+              {/* Sleeve — large preview */}
+              <div className="profile-cardback-preview profile-cardback-xl profile-cardback-clickable" onClick={() => setShowSleeveGallery(true)}>
                 <img src={displayCardback} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 <div className="profile-cardback-hover-overlay">CHANGE</div>
               </div>
@@ -834,19 +896,37 @@ function ProfileScreen() {
                   </div>
                 </div>
 
-                {/* Card Back info */}
+                {/* Sleeve info */}
+                <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div className="profile-section-label">SLEEVE</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, flex: 1 }}>
+                      {cardback ? 'Custom Sleeve' : 'Default Sleeve'}
+                    </div>
+                    <button className="btn" style={{ padding: '6px 16px', fontSize: 11 }}
+                      onClick={() => setShowSleeveGallery(true)}>
+                      CHANGE
+                    </button>
+                  </div>
+                </div>
+
+                {/* Board info */}
                 <div style={{ paddingTop: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div className="profile-section-label">CARD BACK</div>
-                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>
-                    {cardback ? 'Custom Card Back' : 'Default Card Back'}
+                  <div className="profile-section-label">BOARD</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {board ? (
+                      <div style={{ width: 80, height: 45, borderRadius: 4, overflow: 'hidden', border: '1px solid var(--bg4)', flexShrink: 0 }}>
+                        <img src={'/data/shop/boards/' + encodeURIComponent(board) + '.png'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    ) : null}
+                    <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, flex: 1 }}>
+                      {board ? board : 'Default Board'}
+                    </div>
+                    <button className="btn" style={{ padding: '6px 16px', fontSize: 11 }}
+                      onClick={() => setShowBoardGallery(true)}>
+                      CHANGE
+                    </button>
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.5 }}>
-                    Click the preview or the button below to choose from your gallery.
-                  </div>
-                  <button className="btn" style={{ padding: '8px 20px', fontSize: 12, marginTop: 4, alignSelf: 'flex-start' }}
-                    onClick={() => setShowCbGallery(true)}>
-                    OPEN GALLERY
-                  </button>
                 </div>
 
               </div>
@@ -898,43 +978,133 @@ function ProfileScreen() {
             </div>
           </div>
 
-          {/* Cardback Gallery Modal */}
-          {showCbGallery && (
-            <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowCbGallery(false); }}>
+          {/* Sleeve Gallery Modal */}
+          {showSleeveGallery && (
+            <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowSleeveGallery(false); }}>
               <div className="modal" style={{ maxWidth: 620, width: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-                  <h3 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', flex: 1 }}>SELECT CARD BACK</h3>
-                  <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setShowCbGallery(false)}>✕ CLOSE</button>
+                  <h3 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', flex: 1 }}>SELECT SLEEVE</h3>
+                  <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setShowSleeveGallery(false)}>✕ CLOSE</button>
                 </div>
                 <div style={{ overflowY: 'auto', flex: 1 }}>
                   <div className="profile-cb-gallery">
-                    {/* Default cardback */}
-                    <div className={'profile-cb-gallery-item' + (!cardback ? ' active' : '')} onClick={() => { setCardback(null); setShowCbGallery(false); }}>
+                    {/* Default sleeve */}
+                    <div className={'profile-cb-gallery-item' + (!cardback ? ' active' : '')} onClick={() => quickSaveSleeve(null)}>
                       <div className="profile-cb-gallery-card">
                         <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       </div>
                       <div className="profile-cb-gallery-label">Default</div>
                     </div>
-                    {/* Uploaded cardbacks */}
+                    {/* Owned shop sleeves */}
+                    {ownedSleeves.map(sleeveId => (
+                      <div key={sleeveId} className={'profile-cb-gallery-item' + (cardback === '/data/shop/sleeves/' + sleeveId + '.png' ? ' active' : '')}
+                        onClick={() => quickSaveSleeve('/data/shop/sleeves/' + sleeveId + '.png')}>
+                        <div className="profile-cb-gallery-card">
+                          <img src={'/data/shop/sleeves/' + encodeURIComponent(sleeveId) + '.png'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        <div className="profile-cb-gallery-label">{sleeveId}</div>
+                      </div>
+                    ))}
+                    {/* Previously uploaded cardbacks (legacy) */}
                     {uploadedCardbacks.map((cb, i) => (
-                      <div key={i} className={'profile-cb-gallery-item' + (cardback === cb ? ' active' : '')} onClick={() => { setCardback(cb); setShowCbGallery(false); }}>
+                      <div key={'up' + i} className={'profile-cb-gallery-item' + (cardback === cb ? ' active' : '')} onClick={() => quickSaveSleeve(cb)}>
                         <div className="profile-cb-gallery-card">
                           <img src={cb} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
                         <div className="profile-cb-gallery-label">Custom {i + 1}</div>
                       </div>
                     ))}
-                    {/* Upload new */}
-                    <label className="profile-cb-gallery-item profile-cb-gallery-upload">
-                      <div className="profile-cb-gallery-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 4 }}>
-                        <span style={{ fontSize: 28, color: 'var(--accent)', opacity: 0.6 }}>+</span>
-                        <span style={{ fontSize: 9, color: 'var(--text2)' }}>Upload New</span>
-                        <span style={{ fontSize: 8, color: 'var(--text2)' }}>750×1050</span>
-                      </div>
-                      <input type="file" accept="image/*" onChange={handleCardbackUpload} style={{ display: 'none' }} />
-                      <div className="profile-cb-gallery-label">Upload</div>
-                    </label>
                   </div>
+                  {ownedSleeves.length === 0 && uploadedCardbacks.length === 0 && (
+                    <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, marginTop: 12 }}>
+                      Visit the Shop to unlock more sleeves!
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Avatar Gallery Modal */}
+          {showAvatarGallery && (
+            <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowAvatarGallery(false); }}>
+              <div className="modal" style={{ maxWidth: 620, width: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+                  <h3 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', flex: 1 }}>SELECT AVATAR</h3>
+                  <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setShowAvatarGallery(false)}>✕ CLOSE</button>
+                </div>
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                  <div className="profile-avatar-gallery">
+                    {/* Standard avatars (free) */}
+                    {standardAvatars.map(file => {
+                      const url = '/avatars/' + encodeURIComponent(file);
+                      return (
+                        <div key={file} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')}
+                          onClick={() => quickSaveAvatar(url)}>
+                          <div className="profile-avatar-gallery-img">
+                            <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                          <div className="profile-cb-gallery-label">{file.replace(/\.[^.]+$/, '')}</div>
+                        </div>
+                      );
+                    })}
+                    {/* Owned shop avatars */}
+                    {ownedAvatars.map(avatarId => {
+                      const url = '/data/shop/avatars/' + encodeURIComponent(avatarId) + '.png';
+                      return (
+                        <div key={avatarId} className={'profile-avatar-gallery-item' + (avatar === url ? ' active' : '')}
+                          onClick={() => quickSaveAvatar(url)}>
+                          <div className="profile-avatar-gallery-img">
+                            <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                          <div className="profile-cb-gallery-label">{avatarId}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {standardAvatars.length === 0 && ownedAvatars.length === 0 && (
+                    <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, marginTop: 12 }}>
+                      Visit the Shop to unlock more avatars!
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Board Gallery Modal */}
+          {showBoardGallery && (
+            <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowBoardGallery(false); }}>
+              <div className="modal" style={{ maxWidth: 620, width: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+                  <h3 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', flex: 1 }}>SELECT BOARD</h3>
+                  <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setShowBoardGallery(false)}>✕ CLOSE</button>
+                </div>
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                  <div className="profile-cb-gallery">
+                    {/* Default board */}
+                    <div className={'profile-cb-gallery-item' + (!board ? ' active' : '')} onClick={() => quickSaveBoard(null)}>
+                      <div className="profile-cb-gallery-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg3)' }}>
+                        <span style={{ fontSize: 11, color: 'var(--text2)' }}>Default</span>
+                      </div>
+                      <div className="profile-cb-gallery-label">Default</div>
+                    </div>
+                    {/* Owned shop boards */}
+                    {ownedBoards.map(boardId => (
+                      <div key={boardId} className={'profile-cb-gallery-item' + (board === boardId ? ' active' : '')}
+                        onClick={() => quickSaveBoard(boardId)}>
+                        <div className="profile-cb-gallery-card">
+                          <img src={'/data/shop/boards/' + encodeURIComponent(boardId) + '.png'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        <div className="profile-cb-gallery-label">{boardId}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {ownedBoards.length === 0 && (
+                    <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, marginTop: 12 }}>
+                      Visit the Shop to unlock boards!
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1000,6 +1170,360 @@ function ProfileScreen() {
           </div>
 
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════
+//  SHOP SCREEN
+// ═══════════════════════════════════════════
+
+// Purchase celebration overlay — centered on the bought item
+function PurchaseCelebration({ cx, cy, onDone }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const ox = cx ?? canvas.width / 2;
+    const oy = cy ?? canvas.height / 2;
+    const particles = [];
+    const colors = ['#ffd700', '#ffaa00', '#fff8b0', '#ff00aa', '#00f0ff', '#aaff00', '#ff6600', '#ffffff'];
+    const shapes = ['star', 'circle', 'diamond', 'spark'];
+    // Burst from item position
+    for (let i = 0; i < 120; i++) {
+      const angle = (Math.PI * 2 * i / 120) + (Math.random() - 0.5) * 0.5;
+      const speed = 3 + Math.random() * 9;
+      particles.push({
+        x: ox, y: oy,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 2,
+        size: 3 + Math.random() * 8, color: colors[Math.floor(Math.random() * colors.length)],
+        shape: shapes[Math.floor(Math.random() * shapes.length)],
+        life: 1, decay: 0.008 + Math.random() * 0.012,
+        rotation: Math.random() * Math.PI * 2, rotSpeed: (Math.random() - 0.5) * 0.2,
+        gravity: 0.06 + Math.random() * 0.04,
+      });
+    }
+    // Sparkle ring around item
+    for (let i = 0; i < 40; i++) {
+      const angle = (Math.PI * 2 * i / 40);
+      const dist = 50 + Math.random() * 30;
+      particles.push({
+        x: ox + Math.cos(angle) * dist, y: oy + Math.sin(angle) * dist,
+        vx: Math.cos(angle) * 1.5, vy: Math.sin(angle) * 1.5,
+        size: 2 + Math.random() * 4, color: '#ffd700',
+        shape: 'spark', life: 1, decay: 0.015 + Math.random() * 0.01,
+        rotation: 0, rotSpeed: 0, gravity: 0,
+      });
+    }
+    let frame;
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let alive = false;
+      for (const p of particles) {
+        if (p.life <= 0) continue;
+        alive = true;
+        p.x += p.vx; p.y += p.vy; p.vy += p.gravity;
+        p.life -= p.decay; p.rotation += p.rotSpeed;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fillStyle = p.color;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 8;
+        const s = p.size * (0.5 + p.life * 0.5);
+        if (p.shape === 'circle') {
+          ctx.beginPath(); ctx.arc(0, 0, s, 0, Math.PI * 2); ctx.fill();
+        } else if (p.shape === 'diamond') {
+          ctx.beginPath(); ctx.moveTo(0, -s); ctx.lineTo(s * 0.6, 0); ctx.lineTo(0, s); ctx.lineTo(-s * 0.6, 0); ctx.closePath(); ctx.fill();
+        } else if (p.shape === 'star') {
+          ctx.beginPath();
+          for (let j = 0; j < 5; j++) {
+            const a = (j * Math.PI * 2 / 5) - Math.PI / 2;
+            const r = j % 2 === 0 ? s : s * 0.4;
+            j === 0 ? ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r) : ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+            const a2 = ((j + 0.5) * Math.PI * 2 / 5) - Math.PI / 2;
+            ctx.lineTo(Math.cos(a2) * s * 0.4, Math.sin(a2) * s * 0.4);
+          }
+          ctx.closePath(); ctx.fill();
+        } else {
+          ctx.fillRect(-s, -1, s * 2, 2);
+          ctx.fillRect(-1, -s, 2, s * 2);
+        }
+        ctx.restore();
+      }
+      if (alive) frame = requestAnimationFrame(draw);
+      else onDone();
+    };
+    frame = requestAnimationFrame(draw);
+    const timer = setTimeout(onDone, 2500);
+    return () => { cancelAnimationFrame(frame); clearTimeout(timer); };
+  }, []);
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, pointerEvents: 'none' }}>
+      <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
+      <div className="shop-purchase-text" style={{ top: Math.max(40, (cy ?? window.innerHeight / 2) - 60), left: cx ?? '50%' }}>PURCHASED!</div>
+    </div>
+  );
+}
+
+function ShopScreen() {
+  const { user, setUser, setScreen, notify } = useContext(AppContext);
+  const [catalog, setCatalog] = useState(null);
+  const [owned, setOwned] = useState({ avatar: [], sleeve: [], board: [], skin: [] });
+  const [loading, setLoading] = useState(true);
+  const [buying, setBuying] = useState(false);
+  const [tab, setTab] = useState('skins');
+  const [skinFilter, setSkinFilter] = useState('');
+  const [selected, setSelected] = useState(null); // { type, id }
+  const [celebration, setCelebration] = useState(null); // { cx, cy } or null
+  const [randomReveal, setRandomReveal] = useState(null); // { imgUrl, label, subtitle } or null
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [catData, ownData] = await Promise.all([
+          api('/shop/catalog'),
+          api('/shop/owned')
+        ]);
+        setCatalog(catData);
+        setOwned(ownData.owned);
+      } catch (e) { notify(e.message, 'error'); }
+      setLoading(false);
+    })();
+  }, []);
+
+  const toggleSelect = (type, id) => {
+    setSelected(prev => (prev && prev.type === type && prev.id === id) ? null : { type, id });
+  };
+
+  // Get center coords of the clicked button's parent .shop-item
+  const getItemCenter = (e) => {
+    const item = e.target.closest('.shop-item') || e.target.closest('.shop-random-wrap');
+    if (item) {
+      const r = item.getBoundingClientRect();
+      return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    }
+    return { cx: e.clientX, cy: e.clientY };
+  };
+
+  const buyItem = async (itemType, itemId, price, e) => {
+    if (e) e.stopPropagation();
+    if (buying) return;
+    if ((user.sc || 0) < price) { notify('Not enough SC!', 'error'); return; }
+    const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
+    setBuying(true);
+    try {
+      const data = await api('/shop/buy', { method: 'POST', body: JSON.stringify({ itemType, itemId }) });
+      setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], itemId] }));
+      setUser(u => ({ ...u, sc: data.sc }));
+      setCelebration(pos);
+    } catch (e) { notify(e.message, 'error'); }
+    setBuying(false);
+  };
+
+  const buyRandomSkin = async (e) => {
+    if (buying) return;
+    const rp = catalog?.randomPrices?.skin || 5;
+    if ((user.sc || 0) < rp) { notify('Not enough SC!', 'error'); return; }
+    const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
+    setBuying(true);
+    try {
+      const data = await api('/shop/buy-random-skin', { method: 'POST' });
+      setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
+      setUser(u => ({ ...u, sc: data.sc }));
+      setCelebration(pos);
+      setRandomReveal({
+        imgUrl: '/cards/skins/' + encodeURIComponent(data.skinName) + '.png',
+        label: data.skinName,
+        subtitle: data.heroName
+      });
+    } catch (e) { notify(e.message, 'error'); }
+    setBuying(false);
+  };
+
+  const buyRandom = async (itemType, e) => {
+    if (buying) return;
+    const rp = catalog?.randomPrices?.[itemType] || 5;
+    if ((user.sc || 0) < rp) { notify('Not enough SC!', 'error'); return; }
+    const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
+    setBuying(true);
+    try {
+      const data = await api('/shop/buy-random', { method: 'POST', body: JSON.stringify({ itemType }) });
+      setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
+      setUser(u => ({ ...u, sc: data.sc }));
+      setCelebration(pos);
+      const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
+      setRandomReveal({
+        imgUrl: '/data/shop/' + subdir + '/' + encodeURIComponent(data.itemId) + '.png',
+        label: null,
+        subtitle: itemType === 'avatar' ? 'New Avatar!' : 'New Sleeve!'
+      });
+    } catch (e) { notify(e.message, 'error'); }
+    setBuying(false);
+  };
+
+  if (loading || !catalog) {
+    return <div className="screen-center"><div className="pixel-font" style={{ color: 'var(--accent)', animation: 'pulse 1.5s infinite' }}>Loading shop...</div></div>;
+  }
+
+  const prices = catalog.prices || { avatar: 10, sleeve: 10, board: 10, skin: 10 };
+  const randomPrices = catalog.randomPrices || { skin: 5, avatar: 5, sleeve: 5 };
+  const ownedSet = {
+    avatar: new Set(owned.avatar),
+    sleeve: new Set(owned.sleeve),
+    board: new Set(owned.board),
+    skin: new Set(owned.skin),
+  };
+
+  // Gather unique hero names for skin filter
+  const heroNames = [...new Set((catalog.skins || []).map(s => s.heroName))].sort();
+  const filteredSkins = skinFilter
+    ? (catalog.skins || []).filter(s => s.heroName === skinFilter)
+    : (catalog.skins || []);
+
+  const isSelected = (type, id) => selected && selected.type === type && selected.id === id;
+
+  const renderItemGrid = (items, type, imgBase) => {
+    if (items.length === 0) return <div className="shop-empty">No items available yet</div>;
+    const unownedCount = items.filter(it => !ownedSet[type].has(it.id)).length;
+    const hasRandom = type === 'avatar' || type === 'sleeve';
+    return (
+      <React.Fragment>
+        {hasRandom && (
+          <div className="shop-random-wrap">
+            <button className="btn shop-random-btn" disabled={buying || unownedCount === 0 || (user.sc || 0) < (randomPrices[type] || 5)}
+              onClick={(e) => buyRandom(type, e)}>
+              🎲 Random {type === 'avatar' ? 'Avatar' : 'Sleeve'} — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrices[type] || 5}
+            </button>
+            <span className="shop-random-hint">{unownedCount > 0 ? unownedCount + ' left to collect' : 'All collected!'}</span>
+          </div>
+        )}
+        <div className="shop-grid">
+          {items.map(item => {
+            const isOwned = ownedSet[type].has(item.id);
+            const sel = isSelected(type, item.id);
+            return (
+              <div key={item.id} className={'shop-item' + (isOwned ? ' shop-owned' : '') + (sel ? ' shop-selected' : '')}
+                onClick={() => toggleSelect(type, item.id)}>
+                <div className="shop-item-img-wrap">
+                  <img src={imgBase + encodeURIComponent(item.file)} draggable={false} />
+                  {isOwned && <div className="shop-owned-badge">OWNED</div>}
+                </div>
+                {!isOwned && (
+                  <button className="btn shop-buy-btn" disabled={buying || (user.sc || 0) < prices[type]}
+                    onClick={(e) => buyItem(type, item.id, prices[type], e)}>
+                    <img src="/data/sc.png" className="shop-sc-icon" /> {prices[type]}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </React.Fragment>
+    );
+  };
+
+  const renderSkinGrid = () => {
+    if ((catalog.skins || []).length === 0) return <div className="shop-empty">No skins available yet</div>;
+    const allOwned = ownedSet.skin;
+    const unownedCount = (catalog.skins || []).filter(s => !allOwned.has(s.id)).length;
+    return (
+      <React.Fragment>
+        {/* Random Skin Button */}
+        <div className="shop-random-wrap">
+          <button className="btn shop-random-btn" disabled={buying || unownedCount === 0 || (user.sc || 0) < (randomPrices.skin || 5)}
+            onClick={(e) => buyRandomSkin(e)}>
+            🎲 Random Skin — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrices.skin || 5}
+          </button>
+          <span className="shop-random-hint">{unownedCount > 0 ? unownedCount + ' skin' + (unownedCount !== 1 ? 's' : '') + ' left to collect' : 'All collected!'}</span>
+        </div>
+        {/* Hero filter */}
+        {heroNames.length > 1 && (
+          <div className="shop-filter-row">
+            <select className="select" value={skinFilter} onChange={e => setSkinFilter(e.target.value)} style={{ maxWidth: 260, fontSize: 11 }}>
+              <option value="">All Heroes</option>
+              {heroNames.map(h => <option key={h} value={h}>{h}</option>)}
+            </select>
+          </div>
+        )}
+        <div className="shop-grid shop-grid-skins">
+          {filteredSkins.map(skin => {
+            const isOwned = ownedSet.skin.has(skin.id);
+            const sel = isSelected('skin', skin.id);
+            return (
+              <div key={skin.id} className={'shop-item shop-skin-item' + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (sel ? ' shop-selected' : '')}
+                onClick={() => toggleSelect('skin', skin.id)}>
+                <div className="shop-item-img-wrap">
+                  <img src={'/cards/skins/' + encodeURIComponent(skin.skinName) + '.png'} draggable={false}
+                    className={!isOwned ? 'shop-skin-locked' : ''} />
+                  {isOwned && <div className="shop-owned-badge">OWNED</div>}
+                </div>
+                <div className="shop-skin-name" title={skin.heroName}>{skin.skinName}</div>
+                <div className="shop-item-hero">{skin.heroName}</div>
+                {!isOwned && (
+                  <button className="btn shop-buy-btn" disabled={buying || (user.sc || 0) < prices.skin}
+                    onClick={(e) => buyItem('skin', skin.id, prices.skin, e)}>
+                    <img src="/data/sc.png" className="shop-sc-icon" /> {prices.skin}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </React.Fragment>
+    );
+  };
+
+  const tabs = [
+    { id: 'skins', label: '🎨 Skins', count: (catalog.skins || []).length },
+    { id: 'avatars', label: '👤 Avatars', count: (catalog.avatars || []).length },
+    { id: 'sleeves', label: '🃏 Sleeves', count: (catalog.sleeves || []).length },
+    { id: 'boards', label: '🎮 Boards', count: (catalog.boards || []).length },
+  ];
+
+  return (
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)' }}>
+      {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} onDone={() => setCelebration(null)} />}
+      {randomReveal && (
+        <div className="modal-overlay" style={{ zIndex: 90000 }} onClick={() => setRandomReveal(null)}>
+          <div className="shop-reveal-modal animate-in" onClick={e => e.stopPropagation()}>
+            <div className="shop-reveal-glow" />
+            <div className="shop-reveal-img-wrap">
+              <img src={randomReveal.imgUrl} draggable={false} />
+            </div>
+            {randomReveal.label && <div className="shop-reveal-label">{randomReveal.label}</div>}
+            {randomReveal.subtitle && <div className="shop-reveal-subtitle">{randomReveal.subtitle}</div>}
+            <button className="btn" style={{ marginTop: 16, padding: '8px 32px', fontSize: 13, borderColor: '#ffd700', color: '#ffd700' }}
+              onClick={() => setRandomReveal(null)}>NICE!</button>
+          </div>
+        </div>
+      )}
+      <div className="top-bar">
+        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
+        <h2 className="orbit-font" style={{ fontSize: 16, color: '#ffd700' }}>SHOP</h2>
+        <div style={{ flex: 1 }} />
+        <div className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+          <img src="/data/sc.png" style={{ width: 16, height: 16, imageRendering: 'pixelated' }} /> {user.sc || 0} SC
+        </div>
+      </div>
+      <div className="shop-tabs">
+        {tabs.map(t => (
+          <button key={t.id} className={'shop-tab' + (tab === t.id ? ' shop-tab-active' : '')} onClick={() => setTab(t.id)}>
+            {t.label} <span className="shop-tab-count">{t.count}</span>
+          </button>
+        ))}
+      </div>
+      <div className="shop-content animate-in">
+        {tab === 'skins' && renderSkinGrid()}
+        {tab === 'avatars' && renderItemGrid(catalog.avatars || [], 'avatar', '/data/shop/avatars/')}
+        {tab === 'sleeves' && renderItemGrid(catalog.sleeves || [], 'sleeve', '/data/shop/sleeves/')}
+        {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
       </div>
     </div>
   );
@@ -1533,6 +2057,17 @@ function DeckBuilder() {
 
   // Skin management — auto-saves immediately (like cover card)
   const [skinGallery, setSkinGallery] = useState(null); // { cardName, skins: [...] }
+  const [ownedSkins, setOwnedSkins] = useState(null); // Set of owned skin IDs (null = loading)
+
+  // Load owned skins from shop
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await api('/shop/owned');
+        setOwnedSkins(new Set(data.owned?.skin || []));
+      } catch { setOwnedSkins(new Set()); }
+    })();
+  }, []);
 
   const setSkin = useCallback(async (cardName, skinName) => {
     const base = isSampleMode ? sampleDecks[sampleActive] : decks[activeIdx];
@@ -1591,7 +2126,10 @@ function DeckBuilder() {
         : { label: 'Make this the cover card', icon: '⭐', color: '#ffd700', action: () => setCoverCard(cardName) },
     ];
     if (hasSkins) {
-      items.push({ label: 'Select skin', icon: '🎨', color: 'var(--accent)', action: () => setSkinGallery({ cardName, options: SKINS_DB[cardName] }) });
+      const availOpts = ownedSkins ? SKINS_DB[cardName].filter(s => ownedSkins.has(s)) : SKINS_DB[cardName];
+      if (availOpts.length > 0) {
+        items.push({ label: 'Select skin', icon: '🎨', color: 'var(--accent)', action: () => setSkinGallery({ cardName, options: availOpts }) });
+      }
     }
     setCtxMenu({ x: e.clientX, y: e.clientY, items });
   }, [currentDeck, setCoverCard]);
@@ -2396,12 +2934,13 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   );
 }
 
-function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard }) {
+function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style }) {
   const cls = 'board-zone board-zone-' + type;
   const topCardName = cards && cards.length > 0 && !faceDown ? cards[cards.length - 1] : null;
   const suppressChildTooltip = !!onClick && !!onHoverCard;
   return (
     <div className={cls + (onClick && cards?.length > 0 ? ' board-zone-clickable' : '')}
+      style={style}
       onClick={onClick && cards?.length > 0 ? onClick : undefined}
       onMouseEnter={() => topCardName && onHoverCard && !activeDragData && !deckDragState && onHoverCard(topCardName)}
       onMouseLeave={() => onHoverCard && onHoverCard(null)}>
@@ -2432,6 +2971,25 @@ function DamageNumber({ amount, heroName }) {
       setPos({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
     }
   }, [heroName]);
+
+  if (!pos) return null;
+  return (
+    <div className="damage-number" style={{ left: pos.x, top: pos.y }}>
+      -{amount}
+    </div>
+  );
+}
+
+// Floating damage number for creatures (finds by support zone data attributes)
+function CreatureDamageNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const el = document.querySelector(`[data-support-zone="1"][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
+    }
+  }, [ownerLabel, heroIdx, zoneSlot]);
 
   if (!pos) return null;
   return (
@@ -2569,7 +3127,7 @@ function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
 }
 
 // Opponent draw animation — face-down card flies from opp deck to opp hand
-function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName }) {
+function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl }) {
   const dx = endX - startX;
   const dy = endY - startY;
   return (
@@ -2579,7 +3137,7 @@ function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName }) {
         <BoardCard cardName={cardName} noTooltip />
       ) : (
         <div className="board-card face-down" style={{ width: '100%', height: '100%' }}>
-          <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+          <img src={cardbackUrl || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
         </div>
       )}
     </div>
@@ -2990,32 +3548,76 @@ function PoisonedOverlay({ stacks }) {
   );
 }
 
+// ═══ GENERIC GAME TOOLTIP ═══
+// Global tooltip system — renders at top level, escapes overflow:hidden.
+// Usage: onMouseEnter={e => showGameTooltip(e, 'text')} onMouseLeave={hideGameTooltip}
+function showGameTooltip(e, text) {
+  const r = e.currentTarget.getBoundingClientRect();
+  window._gameTooltip = { text, x: r.right + 6, y: r.top + r.height / 2 };
+  window.dispatchEvent(new Event('gameTooltip'));
+}
+function hideGameTooltip() {
+  window._gameTooltip = null;
+  window.dispatchEvent(new Event('gameTooltip'));
+}
+function GameTooltip() {
+  const [tip, setTip] = useState(null);
+  useEffect(() => {
+    const handler = () => setTip(window._gameTooltip ? { ...window._gameTooltip } : null);
+    window.addEventListener('gameTooltip', handler);
+    return () => window.removeEventListener('gameTooltip', handler);
+  }, []);
+  if (!tip) return null;
+  return (
+    <div className="game-tooltip" style={{ position: 'fixed', left: tip.x, top: tip.y, transform: 'translateY(-50%)', zIndex: 9990 }}>
+      {tip.text}
+    </div>
+  );
+}
+
+// Status badges — small icons showing active negative statuses at a glance
+function StatusBadges({ statuses, counters, isHero }) {
+  const badges = [];
+  const s = statuses || {};
+  const c = counters || {};
+  if (s.frozen || c.frozen) badges.push({ key: 'frozen', icon: '❄️', tooltip: 'Frozen: Cannot act and has its effects and Abilities negated.' + (isHero ? ' Cannot be equipped with Artifacts.' : '') });
+  if (s.stunned || c.stunned) badges.push({ key: 'stunned', icon: '⚡', tooltip: 'Stunned: Cannot act and has its effects and Abilities negated.' });
+  if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
+  if (s.poisoned || c.poisoned) {
+    const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
+    badges.push({ key: 'poisoned', icon: '☠️', tooltip: `Poisoned: Takes ${30 * stacks} damage at the start of each of its owner's turns.` });
+  }
+  if (s.negated || c.negated) badges.push({ key: 'negated', icon: '🚫', tooltip: isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.' });
+  if (badges.length === 0) return null;
+  return (
+    <div className="status-badges-row">
+      {badges.map(b => (
+        <div key={b.key} className="status-badge"
+          onMouseEnter={e => showGameTooltip(e, b.tooltip)}
+          onMouseLeave={hideGameTooltip}>
+          {b.icon}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Buff column — displays positive buff icons on heroes/creatures
 function BuffColumn({ buffs }) {
   if (!buffs || Object.keys(buffs).length === 0) return null;
-  const BUFF_ICONS = { cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' } };
-  const [tip, setTip] = useState(null);
+  const BUFF_ICONS = { cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' } };
   return (
     <div className="buff-column">
       {Object.entries(buffs).map(([key]) => {
         const def = BUFF_ICONS[key] || { icon: '✦', tooltip: key };
         return (
           <div key={key} className="buff-icon"
-            onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ text: def.tooltip, x: r.right + 6, y: r.top + r.height / 2 }); }}
-            onMouseLeave={() => setTip(null)}>
+            onMouseEnter={e => showGameTooltip(e, def.tooltip)}
+            onMouseLeave={hideGameTooltip}>
             {def.icon}
           </div>
         );
       })}
-      {tip && (
-        <div style={{
-          position: 'fixed', left: tip.x, top: tip.y, transform: 'translateY(-50%)',
-          background: 'var(--bg2)', border: '1px solid var(--accent)', color: 'var(--text)',
-          padding: '3px 10px', fontSize: 11, fontFamily: "'Rajdhani', sans-serif", fontWeight: 600,
-          whiteSpace: 'nowrap', zIndex: 9990, pointerEvents: 'none',
-          boxShadow: '0 2px 8px rgba(0,0,0,.6)',
-        }}>{tip.text}</div>
-      )}
     </div>
   );
 }
@@ -3186,6 +3788,77 @@ const ANIM_REGISTRY = {
   ice_encase: IceEncaseEffect,
   electric_strike: ElectricStrikeEffect,
   flame_strike: FlameStrikeEffect,
+  stranglehold_squeeze: (() => {
+    return function StrangleholdSqueezeEffect({ x, y }) {
+      useEffect(() => {
+        const timer = setTimeout(() => {
+          const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
+          let best = null, bestDist = Infinity;
+          els.forEach(el => {
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            const d = Math.abs(cx - x) + Math.abs(cy - y);
+            if (d < bestDist) { bestDist = d; best = el; }
+          });
+          if (best && bestDist < 80) {
+            best.classList.add('stranglehold-squeezed');
+            setTimeout(() => best.classList.remove('stranglehold-squeezed'), 1200);
+          }
+        }, 50);
+        return () => clearTimeout(timer);
+      }, []);
+      return null; // No visual overlay — the CSS class does all the work
+    };
+  })(),
+  tiger_impact: (() => {
+    return function TigerImpactEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards', marginLeft: -32, marginTop: -32 }}>🐯</div>
+        </div>
+      );
+    };
+  })(),
+  ox_impact: (() => {
+    return function OxImpactEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards', marginLeft: -32, marginTop: -32 }}>𖤍</div>
+        </div>
+      );
+    };
+  })(),
+  snake_impact: (() => {
+    return function SnakeImpactEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards', marginLeft: -32, marginTop: -32 }}>🐍</div>
+        </div>
+      );
+    };
+  })(),
+  whirlwind_spin: (() => {
+    return function WhirlwindSpinEffect({ x, y }) {
+      useEffect(() => {
+        const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
+        let best = null, bestDist = Infinity;
+        els.forEach(el => {
+          const r = el.getBoundingClientRect();
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          const d = Math.abs(cx - x) + Math.abs(cy - y);
+          if (d < bestDist) { bestDist = d; best = el; }
+        });
+        if (best && bestDist < 80) {
+          best.classList.add('whirlwind-spinning');
+          setTimeout(() => best.classList.remove('whirlwind-spinning'), 2200);
+        }
+      }, []);
+      return null;
+    };
+  })(),
   deep_sea_bubbles: (() => {
     return function DeepSeaBubblesEffect({ x, y }) {
       const bubbles = useMemo(() => Array.from({ length: 20 }, () => ({
@@ -3703,6 +4376,284 @@ const ANIM_REGISTRY = {
     };
   })(),
   thaw: ThawEffect,
+  music_notes: (() => {
+    return function MusicNotesEffect({ x, y }) {
+      const notes = useMemo(() => Array.from({ length: 32 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 20 + Math.random() * 60;
+        return {
+          startX: Math.cos(angle) * dist * 0.4,
+          startY: Math.random() * 20 - 10,
+          endX: Math.cos(angle) * dist,
+          endY: -40 - Math.random() * 120,
+          size: 16 + Math.random() * 20,
+          delay: Math.random() * 600,
+          dur: 700 + Math.random() * 500,
+          char: ['♪','♫','🎵','🎶','♩','♬'][Math.floor(Math.random() * 6)],
+          rot: -30 + Math.random() * 60,
+          opacity: 0.7 + Math.random() * 0.3,
+        };
+      }), []);
+      const sparkles = useMemo(() => Array.from({ length: 16 }, () => ({
+        xOff: -40 + Math.random() * 80,
+        startY: 10 + Math.random() * 20,
+        endY: -50 - Math.random() * 60,
+        delay: 100 + Math.random() * 500,
+        dur: 500 + Math.random() * 400,
+        size: 3 + Math.random() * 5,
+        color: ['#ff66aa','#ffaa44','#66ccff','#ffdd55','#cc88ff','#44ffaa'][Math.floor(Math.random() * 6)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(255,100,200,.4) 0%, rgba(200,100,255,.2) 40%, transparent 70%)' }} />
+          {notes.map((n, i) => (
+            <div key={'mn'+i} style={{
+              position: 'absolute', left: n.startX, top: n.startY,
+              fontSize: n.size, opacity: 0,
+              transform: `rotate(${n.rot}deg)`,
+              animation: `musicNoteFloat ${n.dur}ms ease-out ${n.delay}ms forwards`,
+              '--endX': n.endX + 'px', '--endY': n.endY + 'px',
+              '--noteOpacity': n.opacity,
+              filter: `hue-rotate(${Math.random() * 360}deg)`,
+              textShadow: '0 0 8px rgba(255,150,255,.6)',
+            }}>{n.char}</div>
+          ))}
+          {sparkles.map((s, i) => (
+            <div key={'ms'+i} style={{
+              position: 'absolute', left: s.xOff, top: s.startY,
+              width: s.size, height: s.size, borderRadius: '50%',
+              background: s.color,
+              boxShadow: `0 0 ${s.size + 2}px ${s.color}`,
+              animation: `holySparkleRise ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  necromancy_summon: (() => {
+    return function NecromancySummonEffect({ x, y }) {
+      const skulls = useMemo(() => Array.from({ length: 12 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 30 + Math.random() * 50;
+        return {
+          startX: Math.cos(angle) * dist * 0.3,
+          startY: Math.random() * 15,
+          endX: Math.cos(angle) * dist,
+          endY: -30 - Math.random() * 90,
+          size: 16 + Math.random() * 16,
+          delay: Math.random() * 500,
+          dur: 600 + Math.random() * 500,
+          char: ['💀','☠️','💀','☠️','💀','👻'][Math.floor(Math.random() * 6)],
+          rot: -20 + Math.random() * 40,
+        };
+      }), []);
+      const particles = useMemo(() => Array.from({ length: 28 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 20 + Math.random() * 50;
+        return {
+          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 20,
+          size: 4 + Math.random() * 8,
+          color: ['#8b00ff','#6a0dad','#9932cc','#4b0082','#7b2d8e','#cc44ff','#220033'][Math.floor(Math.random() * 7)],
+          delay: Math.random() * 400,
+          dur: 400 + Math.random() * 400,
+        };
+      }), []);
+      const wisps = useMemo(() => Array.from({ length: 8 }, () => ({
+        xOff: -30 + Math.random() * 60,
+        startY: 20 + Math.random() * 20,
+        endY: -50 - Math.random() * 50,
+        delay: 100 + Math.random() * 400,
+        dur: 700 + Math.random() * 400,
+        size: 10 + Math.random() * 15,
+        opacity: 0.4 + Math.random() * 0.3,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 120, height: 120, marginLeft: -60, marginTop: -60, background: 'radial-gradient(circle, rgba(100,0,180,.7) 0%, rgba(60,0,120,.4) 40%, transparent 70%)' }} />
+          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, animationDelay: '100ms', background: 'radial-gradient(circle, rgba(180,50,255,.5) 0%, rgba(100,0,200,.2) 50%, transparent 70%)' }} />
+          {skulls.map((s, i) => (
+            <div key={'ns'+i} style={{
+              position: 'absolute', left: s.startX, top: s.startY,
+              fontSize: s.size, opacity: 0,
+              transform: `rotate(${s.rot}deg)`,
+              animation: `musicNoteFloat ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              '--endX': s.endX + 'px', '--endY': s.endY + 'px',
+              '--noteOpacity': 0.85,
+              textShadow: '0 0 12px rgba(130,0,220,.8), 0 0 24px rgba(80,0,160,.4)',
+            }}>{s.char}</div>
+          ))}
+          {particles.map((p, i) => (
+            <div key={'np'+i} className="anim-explosion-particle" style={{
+              '--dx': p.dx + 'px', '--dy': p.dy + 'px', '--size': p.size + 'px',
+              '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+            }} />
+          ))}
+          {wisps.map((w, i) => (
+            <div key={'nw'+i} style={{
+              position: 'absolute', left: w.xOff, top: w.startY,
+              width: w.size, height: w.size, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(150,50,255,.6), rgba(80,0,150,.2))',
+              boxShadow: '0 0 8px rgba(130,0,220,.5)',
+              animation: `holySparkleRise ${w.dur}ms ease-out ${w.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  dumbbell_pump: (() => {
+    // Dumbbell pumps up and down twice — Muscle Training
+    return function DumbbellPumpEffect({ x, y }) {
+      const sparks1 = useMemo(() => Array.from({ length: 10 }, () => {
+        const angle = Math.random() * Math.PI;
+        const speed = 15 + Math.random() * 30;
+        return {
+          dx: Math.cos(angle) * speed - speed / 2,
+          dy: -Math.abs(Math.sin(angle) * speed),
+          size: 2 + Math.random() * 4,
+          color: ['#ffcc00','#ff8800','#ffaa33','#ffe066','#fff'][Math.floor(Math.random() * 5)],
+          delay: 480 + Math.random() * 60,
+          dur: 300 + Math.random() * 200,
+        };
+      }), []);
+      const sparks2 = useMemo(() => Array.from({ length: 10 }, () => {
+        const angle = Math.random() * Math.PI;
+        const speed = 15 + Math.random() * 30;
+        return {
+          dx: Math.cos(angle) * speed - speed / 2,
+          dy: -Math.abs(Math.sin(angle) * speed),
+          size: 2 + Math.random() * 4,
+          color: ['#ffcc00','#ff8800','#ffaa33','#ffe066','#fff'][Math.floor(Math.random() * 5)],
+          delay: 1080 + Math.random() * 60,
+          dur: 300 + Math.random() * 200,
+        };
+      }), []);
+      const weightStyle = {
+        width: 10, height: 36,
+        background: 'linear-gradient(to right, #999, #555)',
+        borderRadius: 3,
+        boxShadow: '0 2px 6px rgba(0,0,0,.5), inset 0 1px 2px rgba(255,255,255,.3)',
+      };
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            animation: 'dumbbellPump 1.5s ease-in-out forwards',
+            display: 'flex', flexDirection: 'row', alignItems: 'center',
+            marginLeft: -35, marginTop: -50,
+          }}>
+            <div style={weightStyle} />
+            <div style={{
+              width: 50, height: 8,
+              background: 'linear-gradient(to bottom, #bbb, #888, #bbb)',
+              boxShadow: 'inset 0 0 4px rgba(0,0,0,.3)',
+            }} />
+            <div style={weightStyle} />
+          </div>
+          {sparks1.map((s, i) => (
+            <div key={'ms1'+i} className="anim-explosion-particle" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }} />
+          ))}
+          {sparks2.map((s, i) => (
+            <div key={'ms2'+i} className="anim-explosion-particle" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  water_splash: (() => {
+    // Water splash — hero dives into water (Jump in the River)
+    return function WaterSplashEffect({ x, y }) {
+      const drops = useMemo(() => Array.from({ length: 24 }, () => {
+        const angle = -Math.PI * 0.1 + Math.random() * Math.PI * 1.2;
+        const speed = 25 + Math.random() * 55;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: -Math.abs(Math.sin(angle) * speed) - 10,
+          size: 4 + Math.random() * 8,
+          delay: Math.random() * 200,
+          dur: 500 + Math.random() * 400,
+          color: ['#4488cc','#66aaee','#3377bb','#88ccff','#aaddff','#2266aa'][Math.floor(Math.random() * 6)],
+        };
+      }), []);
+      const ripples = useMemo(() => Array.from({ length: 3 }, (_, i) => ({
+        delay: i * 200,
+        dur: 800 + i * 200,
+        size: 40 + i * 30,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 120, height: 60, marginLeft: -60, marginTop: -10, background: 'radial-gradient(ellipse, rgba(60,140,220,.7) 0%, rgba(40,100,180,.3) 50%, transparent 80%)' }} />
+          {ripples.map((r, i) => (
+            <div key={'wr'+i} style={{
+              position: 'absolute', left: -r.size/2, top: -8,
+              width: r.size, height: r.size * 0.35, borderRadius: '50%',
+              border: '2px solid rgba(100,180,255,.5)',
+              animation: `waterRipple ${r.dur}ms ease-out ${r.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+          {drops.map((d, i) => (
+            <div key={'wd'+i} className="anim-explosion-particle" style={{
+              '--dx': d.dx + 'px', '--dy': d.dy + 'px', '--size': d.size + 'px',
+              '--color': d.color, animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  sunglasses_drop: (() => {
+    // Sunglasses slowly descend onto the Hero — Divine Gift of Coolness
+    return function SunglassesDropEffect({ x, y }) {
+      const sparkles = useMemo(() => Array.from({ length: 12 }, () => ({
+        xOff: -30 + Math.random() * 60,
+        startY: -5 + Math.random() * 15,
+        endY: -40 - Math.random() * 50,
+        delay: 1000 + Math.random() * 400,
+        dur: 500 + Math.random() * 400,
+        size: 3 + Math.random() * 5,
+        color: ['#ffdd44','#fff','#ffcc00','#ffe088','#ffffff'][Math.floor(Math.random() * 5)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            animation: 'sunglassesDrop 1.8s ease-in-out forwards',
+            fontSize: 48, marginLeft: -24, marginTop: -70,
+            filter: 'drop-shadow(0 2px 8px rgba(0,0,0,.4))',
+          }}>🕶️</div>
+          {sparkles.map((s, i) => (
+            <div key={'sg'+i} style={{
+              position: 'absolute', left: s.xOff, top: s.startY,
+              width: s.size, height: s.size, borderRadius: '50%',
+              background: s.color,
+              boxShadow: `0 0 ${s.size + 2}px ${s.color}`,
+              animation: `holySparkleRise ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  anger_mark: (() => {
+    // 💢 anger symbol — pops in and fades (Challenge redirect)
+    return function AngerMarkEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: 52, animation: 'tigerFadeInOut 1s ease-in-out forwards', marginLeft: -26, marginTop: -36 }}>💢</div>
+        </div>
+      );
+    };
+  })(),
 };
 
 function IceEncaseEffect({ x, y }) {
@@ -3788,15 +4739,39 @@ function AbilityStack({ cards }) {
 // Status select prompt component (for Beer, etc.) — must be a proper component for hooks
 function CardGalleryMultiPrompt({ ep, onRespond }) {
   const cards = ep.cards || [];
-  const selectCount = ep.selectCount || 3;
+  const maxSelect = ep.selectCount || 3;
+  const minSelect = ep.minSelect || (ep.maxBudget != null ? 1 : maxSelect);
+  const maxBudget = ep.maxBudget;
+  const costKey = ep.costKey || 'cost';
   const [selected, setSelected] = useState([]);
+
+  const totalCost = maxBudget != null
+    ? selected.reduce((sum, name) => {
+        const entry = cards.find(c => c.name === name);
+        return sum + (entry?.[costKey] || 0);
+      }, 0)
+    : 0;
+
   const toggleCard = (name) => {
     setSelected(prev => {
       if (prev.includes(name)) return prev.filter(n => n !== name);
-      if (prev.length >= selectCount) return prev;
+      if (prev.length >= maxSelect) return prev;
+      // Budget check
+      if (maxBudget != null) {
+        const entry = cards.find(c => c.name === name);
+        const entryCost = entry?.[costKey] || 0;
+        const currentTotal = prev.reduce((sum, n) => {
+          const e = cards.find(c => c.name === n);
+          return sum + (e?.[costKey] || 0);
+        }, 0);
+        if (currentTotal + entryCost > maxBudget) return prev;
+      }
       return [...prev, name];
     });
   };
+
+  const canConfirm = selected.length >= minSelect && selected.length <= maxSelect;
+
   return (
     <div className="modal-overlay" onClick={ep.cancellable !== false ? () => onRespond({ cancelled: true }) : undefined}>
       <div className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
@@ -3809,30 +4784,42 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
               onClick={() => onRespond({ cancelled: true })}>✕ CANCEL</button>
           )}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+        <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
+          {ep.description}
+          {maxBudget != null && (
+            <span style={{ marginLeft: 8, color: totalCost > maxBudget * 0.8 ? '#ffaa33' : 'var(--accent)', fontWeight: 600 }}>
+              (Cost: {totalCost}/{maxBudget})
+            </span>
+          )}
+        </div>
         <div className="deck-viewer-grid">
           {cards.map((entry, i) => {
             const card = CARDS_BY_NAME[entry.name];
             if (!card) return null;
             const isSel = selected.includes(entry.name);
+            const entryCost = entry[costKey] || 0;
+            const wouldExceedBudget = maxBudget != null && !isSel && totalCost + entryCost > maxBudget;
+            const atMax = !isSel && selected.length >= maxSelect;
+            const dimmed = wouldExceedBudget || atMax;
             return (
               <div key={entry.name + '-' + i} style={{ position: 'relative' }}>
                 <CardMini card={card}
-                  onClick={() => toggleCard(entry.name)}
-                  style={{ width: '100%', height: 120, cursor: 'pointer',
+                  onClick={dimmed ? undefined : () => toggleCard(entry.name)}
+                  style={{ width: '100%', height: 120, cursor: dimmed ? 'not-allowed' : 'pointer',
                     outline: isSel ? '3px solid var(--accent)' : 'none',
-                    filter: isSel ? 'brightness(1.2)' : (selected.length >= selectCount ? 'brightness(0.5)' : 'none'),
+                    filter: isSel ? 'brightness(1.2)' : (dimmed ? 'brightness(0.4) saturate(0.3)' : 'none'),
                   }} />
                 {isSel && <div style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 3, zIndex: 5 }}>✓</div>}
+                {maxBudget != null && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd700', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
               </div>
             );
           })}
         </div>
         <div style={{ textAlign: 'center', marginTop: 12 }}>
           <button className={'btn ' + (ep.confirmClass || '')} style={{ padding: '8px 24px', fontSize: 12 }}
-            disabled={selected.length !== selectCount}
+            disabled={!canConfirm}
             onClick={() => onRespond({ selectedCards: selected })}>
-            {ep.confirmLabel || `Confirm (${selected.length}/${selectCount})`}
+            {ep.confirmLabel || `Confirm (${selected.length}/${maxSelect})`}
           </button>
         </div>
       </div>
@@ -3891,6 +4878,43 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const oppDisconnected = opp.disconnected || false;
   const meDisconnected = me.disconnected || false;
   const myRematchSent = !isSpectator && (gameState.rematchRequests || []).includes(user.id);
+
+  // Board skin helpers — construct zone background style from board ID
+  const boardZoneStyle = (boardId, zoneType) => {
+    if (!boardId) return undefined;
+    const num = boardId.replace(/\D/g, '');
+    return {
+      backgroundImage: 'url(/data/shop/boards/' + encodeURIComponent(zoneType + num) + '.png)',
+      backgroundSize: 'cover', backgroundPosition: 'center',
+    };
+  };
+  const myBoardZone = (zoneType) => boardZoneStyle(me.board, zoneType);
+  const oppBoardZone = (zoneType) => boardZoneStyle(opp.board, zoneType);
+
+  // Area zone positioning — measure hero zones to find midpoints between columns
+  const boardCenterRef = useRef(null);
+  const [areaPositions, setAreaPositions] = useState([undefined, undefined]);
+
+  useEffect(() => {
+    const measure = () => {
+      const container = boardCenterRef.current;
+      if (!container) return;
+      // Find all hero zones from the "me" side (bottom) for stable measurement
+      const myHeroes = container.querySelectorAll('[data-hero-owner="me"][data-hero-zone]');
+      if (myHeroes.length < 3) return;
+      const containerRect = container.getBoundingClientRect();
+      const rects = Array.from(myHeroes).sort((a, b) => +a.dataset.heroIdx - +b.dataset.heroIdx).map(el => el.getBoundingClientRect());
+      // Midpoint between hero 0 right edge and hero 1 left edge
+      const mid01 = ((rects[0].left + rects[0].right) / 2 + (rects[1].left + rects[1].right) / 2) / 2 - containerRect.left - 34;
+      // Midpoint between hero 1 right edge and hero 2 left edge
+      const mid12 = ((rects[1].left + rects[1].right) / 2 + (rects[2].left + rects[2].right) / 2) / 2 - containerRect.left - 34;
+      setAreaPositions([mid01, mid12]);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    const timer = setTimeout(measure, 200);
+    return () => { window.removeEventListener('resize', measure); clearTimeout(timer); };
+  }, [gameState.turn, gameState.players[0]?.islandZoneCount, gameState.players[1]?.islandZoneCount]);
 
   // Local hand state for reordering
   const [hand, setHand] = useState(me.hand || []);
@@ -4184,8 +5208,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
         scheduleAnims(newAnims, setMyDiscardHidden, setMyDeletedHidden);
       }
 
-      // Spectator: Mulligan return-to-deck (hand count shrinks but no pile grows)
-      if (!discardGrew && !deletedGrew && newCount < prevCount && gameState.mulliganPending) {
+      // Spectator: Mulligan / hand-return-to-deck (hand count shrinks but no pile grows)
+      if (!discardGrew && !deletedGrew && newCount < prevCount && (gameState.mulliganPending || gameState.handReturnToDeck)) {
         const storedRects = myHandRectsRef.current;
         const deckEl = document.querySelector('[data-my-deck]');
         const deckR = deckEl?.getBoundingClientRect();
@@ -4284,8 +5308,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
       scheduleAnims(newAnims, setMyDiscardHidden, setMyDeletedHidden);
     }
 
-    // Mulligan: cards returning to deck (hand shrinks but no pile grows)
-    if (!discardGrew && !deletedGrew && newHand.length < prevHand.length && gameState.mulliganPending) {
+    // Mulligan / hand-return-to-deck: cards returning to deck (hand shrinks but no pile grows)
+    if (!discardGrew && !deletedGrew && newHand.length < prevHand.length && (gameState.mulliganPending || gameState.handReturnToDeck)) {
       const removed = [];
       let ni = 0;
       for (let i = 0; i < prevHand.length; i++) {
@@ -4379,8 +5403,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
       scheduleAnims(newAnims, setOppDiscardHidden, setOppDeletedHidden);
     }
 
-    // Opponent mulligan: cards returning to deck (hand count shrinks but no pile grows)
-    if (!discardGrew && !deletedGrew && newCount < prevCount && gameState.mulliganPending) {
+    // Opponent mulligan / hand-return-to-deck: cards returning to deck (hand count shrinks but no pile grows)
+    if (!discardGrew && !deletedGrew && newCount < prevCount && (gameState.mulliganPending || gameState.handReturnToDeck)) {
       const storedRects = oppHandRectsRef.current;
       const deckEl = document.querySelector('[data-opp-deck]');
       const deckR = deckEl?.getBoundingClientRect();
@@ -4644,6 +5668,24 @@ function GameBoard({ gameState, lobby, onLeave }) {
     if (card.cardType !== 'Ability') {
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
     }
+    // Combo lock: only the locked hero can act
+    if (playerData.comboLockHeroIdx != null && playerData.comboLockHeroIdx !== heroIdx) return false;
+    // Main Phase: per-hero inherent action restrictions (Muscle Training, etc.)
+    // If a card is playable ONLY via inherent action and this hero isn't eligible, block it.
+    if (currentPhase === 2 || currentPhase === 4) {
+      const inherentHeroes = gameState.inherentActionHeroes?.[card.name];
+      if (inherentHeroes !== undefined) {
+        const hasAdditional = (gameState.additionalActions || []).some(aa => aa.eligibleHandCards.includes(card.name));
+        if (!hasAdditional && !inherentHeroes.includes(heroIdx)) return false;
+      }
+    }
+    // Bonus actions: only allowed card types during active bonus
+    if (playerData.bonusActions?.heroIdx === heroIdx && playerData.bonusActions.remaining > 0) {
+      const allowed = playerData.bonusActions.allowedTypes || [];
+      if (allowed.length > 0 && !allowed.includes(card.cardType)) return false;
+    }
+    // Per-hero duplicate Attack ban (Ghuanjun)
+    if (card.cardType === 'Attack' && hero.ghuanjunAttacksUsed?.includes(card.name)) return false;
     const level = card.level || 0;
     if (level === 0 && !card.spellSchool1) return true; // No requirements
     const abZones = playerData.abilityZones[heroIdx] || [];
@@ -5188,8 +6230,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
     const onChainLinkResolved = ({ linkIndex }) => {
       setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'resolved' } : l));
     };
-    const onChainLinkNegated = ({ linkIndex }) => {
-      setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'negated', negated: true } : l));
+    const onChainLinkNegated = ({ linkIndex, negationStyle }) => {
+      setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'negated', negated: true, negationStyle: negationStyle || null } : l));
     };
     const onChainDone = () => {
       setTimeout(() => setReactionChain(null), 800);
@@ -5312,22 +6354,31 @@ function GameBoard({ gameState, lobby, onLeave }) {
       if (!srcEl || !tgtEl) return;
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
+      const dx = tr.left + tr.width / 2 - (sr.left + sr.width / 2);
+      const dy = tr.top + tr.height / 2 - (sr.top + sr.height / 2);
+      // Angle so the card's top edge faces the target
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
       const id = Date.now() + Math.random();
       const dur = duration || 1600;
       setRamAnims(prev => [...prev, {
         id, cardName,
         srcX: sr.left + sr.width / 2, srcY: sr.top + sr.height / 2,
         tgtX: tr.left + tr.width / 2, tgtY: tr.top + tr.height / 2,
-        srcOwner: sourceOwner, srcHeroIdx: sourceHeroIdx, dur,
+        srcOwner: sourceOwner, srcHeroIdx: sourceHeroIdx, dur, angle,
       }]);
       setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)), dur);
     };
     socket.on('play_ram_animation', onRamAnimation);
-    const onCardTransfer = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, cardName, duration }) => {
+    const onCardTransfer = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, cardName, duration, particles }) => {
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
-      const srcEl = document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`);
-      const tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
+      // Support hero zones (zoneSlot === -1) as source or target
+      const srcEl = sourceZoneSlot < 0
+        ? document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`)
+        : document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`);
+      const tgtEl = targetZoneSlot < 0
+        ? document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`)
+        : document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
       if (!srcEl || !tgtEl) return;
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
@@ -5340,6 +6391,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
         dur,
       }]);
       setTimeout(() => setTransferAnims(prev => prev.filter(a => a.id !== id)), dur + 100);
+      // Play particle effects on source and target if requested
+      if (particles) {
+        playAnimation(particles, srcEl, { duration: dur });
+        setTimeout(() => playAnimation(particles, tgtEl, { duration: dur }), 200);
+      }
     };
     socket.on('play_card_transfer', onCardTransfer);
     const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, emoji, duration, trailClass, emojiStyle, projectileClass }) => {
@@ -5369,6 +6425,31 @@ function GameBoard({ gameState, lobby, onLeave }) {
       setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + 200);
     };
     socket.on('play_projectile_animation', onProjectileAnimation);
+    const onDeckToDeleted = ({ owner, cards }) => {
+      const prefix = owner === myIdx ? 'my' : 'opp';
+      const deckEl = document.querySelector(`[data-${prefix}-deck]`);
+      const deletedEl = document.querySelector(`[data-${prefix}-deleted]`);
+      const deckR = deckEl?.getBoundingClientRect();
+      const delR = deletedEl?.getBoundingClientRect();
+      if (!deckR || !delR || !cards || cards.length === 0) return;
+      const startX = deckR.left + deckR.width / 2 - 32;
+      const startY = deckR.top + deckR.height / 2 - 45;
+      const endX = delR.left + delR.width / 2 - 32;
+      const endY = delR.top + delR.height / 2 - 45;
+      const newAnims = cards.map((cardName, i) => ({
+        id: Date.now() + Math.random() + i,
+        cardName, startX, startY, endX, endY, dest: 'deleted',
+        delay: i * 150,
+      }));
+      // Stagger the animations
+      for (const anim of newAnims) {
+        setTimeout(() => {
+          setDiscardAnims(prev => [...prev, anim]);
+          setTimeout(() => setDiscardAnims(prev => prev.filter(a => a.id !== anim.id)), 500);
+        }, anim.delay);
+      }
+    };
+    socket.on('deck_to_deleted', onDeckToDeleted);
     return () => {
       socket.off('card_reveal', onReveal); socket.off('deck_search_add', onDeckSearchAdd);
       socket.off('reaction_chain_update', onChainUpdate); socket.off('reaction_chain_resolving_start', onChainResolvingStart);
@@ -5382,6 +6463,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
       socket.off('play_ram_animation', onRamAnimation);
       socket.off('play_card_transfer', onCardTransfer);
       socket.off('play_projectile_animation', onProjectileAnimation);
+      socket.off('deck_to_deleted', onDeckToDeleted);
     };
   }, []);
 
@@ -5452,12 +6534,14 @@ function GameBoard({ gameState, lobby, onLeave }) {
     socket.emit('request_rematch', { roomId: gameState.roomId });
   };
 
-  // Escape closes surrender dialog, deck viewer, cancels potion targeting, or cancels effect prompts
+  // Escape closes surrender dialog, deck viewer, cancels potion targeting, cancels effect prompts, or declines mulligan
   useEffect(() => {
-    if (!showSurrender && !deckViewer && !pileViewer && !gameState.potionTargeting && !gameState.effectPrompt) return;
+    const mulliganActive = gameState.mulliganPending && !mulliganDecided && !isSpectator;
+    if (!showSurrender && !deckViewer && !pileViewer && !gameState.potionTargeting && !gameState.effectPrompt && !mulliganActive) return;
     const handleEsc = (e) => {
       if (e.key === 'Escape') {
         e.stopImmediatePropagation();
+        if (mulliganActive) { setMulliganDecided(true); socket.emit('mulligan_decision', { roomId: gameState.roomId, accept: false }); return; }
         if (pendingAbilityActivation) { setPendingAbilityActivation(null); return; }
         if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx && gameState.effectPrompt.cancellable !== false) {
           socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
@@ -5473,7 +6557,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
     };
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
-  }, [showSurrender, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation]);
+  }, [showSurrender, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation, gameState.mulliganPending, mulliganDecided]);
 
   // Space hotkey — advance to next phase
   useEffect(() => {
@@ -5518,9 +6602,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
   // Damage number + Gold gain animations — detect changes from game state
   const [damageNumbers, setDamageNumbers] = useState([]);
+  const [creatureDamageNumbers, setCreatureDamageNumbers] = useState([]);
   const [goldGains, setGoldGains] = useState([]);
   const [goldLosses, setGoldLosses] = useState([]);
   const prevHpRef = useRef(null);
+  const prevCreatureHpRef = useRef(null);
   const prevGoldRef = useRef(null);
   const prevStatusRef = useRef(null);
   useEffect(() => {
@@ -5556,6 +6642,51 @@ function GameBoard({ gameState, lobby, onLeave }) {
       }
     }
     prevHpRef.current = currentHp;
+
+    // Build current creature HP map — include ALL creatures on the board
+    const currentCreatureHp = {};
+    for (let pi = 0; pi < 2; pi++) {
+      const p = gameState.players[pi];
+      for (let hi = 0; hi < (p.supportZones || []).length; hi++) {
+        const zones = p.supportZones[hi] || [];
+        for (let si = 0; si < zones.length; si++) {
+          const slot = zones[si] || [];
+          if (slot.length === 0) continue;
+          const cKey = `${pi}-${hi}-${si}`;
+          const counters = (gameState.creatureCounters || {})[cKey];
+          // Use currentHp from counters if available, otherwise max HP from card DB
+          const maxHp = CARDS_BY_NAME[slot[0]]?.hp;
+          if (maxHp != null) {
+            currentCreatureHp[cKey] = counters?.currentHp ?? maxHp;
+          }
+        }
+      }
+    }
+    // Compare creature HP
+    if (prevCreatureHpRef.current) {
+      const newCreatureDmg = [];
+      for (const [key, curHp] of Object.entries(currentCreatureHp)) {
+        const prevHp = prevCreatureHpRef.current[key];
+        if (prevHp != null && curHp < prevHp) {
+          const [ownerStr, heroIdxStr, slotStr] = key.split('-');
+          const ownerIdx = parseInt(ownerStr);
+          newCreatureDmg.push({
+            id: Date.now() + Math.random(),
+            amount: prevHp - curHp,
+            ownerLabel: ownerIdx === myIdx ? 'me' : 'opp',
+            heroIdx: parseInt(heroIdxStr),
+            zoneSlot: parseInt(slotStr),
+          });
+        }
+      }
+      if (newCreatureDmg.length > 0) {
+        setCreatureDamageNumbers(prev => [...prev, ...newCreatureDmg]);
+        setTimeout(() => {
+          setCreatureDamageNumbers(prev => prev.filter(d => !newCreatureDmg.some(n => n.id === d.id)));
+        }, 1800);
+      }
+    }
+    prevCreatureHpRef.current = currentCreatureHp;
 
     // Compare Gold
     const currentGold = [gameState.players[0].gold || 0, gameState.players[1].gold || 0];
@@ -5698,7 +6829,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
   // ── Effect prompt helpers (confirm, card gallery, zone picker) ──
   const ep = gameState.effectPrompt;
   const isMyEffectPrompt = !isSpectator && !result && ep && ep.ownerIdx === myIdx;
-  const isOppEffectPrompt = !isSpectator && !result && ep && ep.ownerIdx !== myIdx;
+  const isOppEffectPrompt = !isSpectator && !result && ep && ep.ownerIdx !== myIdx && ep.ownerIdx !== (gameState.activePlayer ?? -1);
   const zonePickSet = new Set();
   if (isMyEffectPrompt && ep.type === 'zonePick') {
     for (const z of (ep.zones || [])) {
@@ -5708,6 +6839,20 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const respondToPrompt = (response) => {
     socket.emit('effect_prompt_response', { roomId: gameState.roomId, response });
   };
+
+  // Escape key dismisses deckSearchReveal prompts (opponent's search result confirmation)
+  useEffect(() => {
+    const ep = gameState.effectPrompt;
+    if (!ep || ep.type !== 'deckSearchReveal' || ep.ownerIdx !== myIdx) return;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        respondToPrompt({ confirmed: true });
+      }
+    };
+    window.addEventListener('keydown', handleEsc, true);
+    return () => window.removeEventListener('keydown', handleEsc, true);
+  }, [gameState.effectPrompt]);
 
   // ── SC earned display helper ──
   const renderSCEarned = () => {
@@ -5788,6 +6933,17 @@ function GameBoard({ gameState, lobby, onLeave }) {
     const islandCounts = p.islandZoneCount || [0, 0, 0];
     const ownerLabel = isOpp ? 'opp' : 'me';
 
+    // Board skin: extract number from board ID (e.g. "board1" → "1")
+    const boardNum = p.board ? p.board.replace(/\D/g, '') : null;
+    const zs = (zoneType) => boardNum ? {
+      backgroundImage: 'url(/data/shop/boards/' + encodeURIComponent(zoneType + boardNum) + '.png)',
+      backgroundSize: 'cover', backgroundPosition: 'center',
+    } : undefined;
+    const zsMerge = (zoneType, extra) => {
+      const bg = zs(zoneType);
+      return bg ? { ...bg, ...extra } : extra;
+    };
+
     const heroRow = (
       <div className="board-row board-hero-row">
         {[0, 1, 2].flatMap(i => {
@@ -5855,7 +7011,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
               <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || heroActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
-                style={(isHeroEffectActive || isValidHeroTarget) ? { cursor: 'pointer' } : undefined}>
+                style={zsMerge('hero', (isHeroEffectActive || isValidHeroTarget) ? { cursor: 'pointer' } : undefined)}>
                 {hero?.name && !isRamming ? (
                   <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={gameSkins} />
                 ) : hero?.name && isRamming ? (
@@ -5868,19 +7024,26 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 {hero?.name && isNegated && <NegatedOverlay />}
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
+                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated) && <StatusBadges statuses={hero.statuses} isHero={true} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
                 {hero?.name && hero.buffs && <BuffColumn buffs={hero.buffs} />}
+                {!isOpp && gameState.bonusActions?.heroIdx === i && gameState.bonusActions.remaining > 0 && (
+                  <div className="bonus-action-counter"
+                    onMouseEnter={e => showGameTooltip(e, `${gameState.bonusActions.remaining} bonus Action${gameState.bonusActions.remaining > 1 ? 's' : ''} remaining`)}
+                    onMouseLeave={hideGameTooltip}>
+                    ⚔️{gameState.bonusActions.remaining}
+                  </div>
+                )}
               </div>
-              <div data-surprise-zone="1" data-surprise-hero={i} data-surprise-owner={ownerLabel}><BoardZone type="surprise" cards={surZones[i] || []} label="Surprise" /></div>
+              <div data-surprise-zone="1" data-surprise-hero={i} data-surprise-owner={ownerLabel}><BoardZone type="surprise" cards={surZones[i] || []} label="Surprise" style={zs('surprise')} /></div>
               {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxRight }).map((_, s) => (
                 <div key={'rpad-'+s} className="board-zone-spacer" />
               ))}
             </div>
           );
           if (i < 2) {
-            const areaCards = gameState.areaZones?.[i] || [];
-            return [heroGroup, <div key={'area-'+i} className="board-area-between"><BoardZone type="area" cards={areaCards} label="Area" /></div>];
+            return [heroGroup, <div key={'area-gap-'+i} className="board-area-spacer" />];
           }
           return [heroGroup];
         })}
@@ -5945,7 +7108,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                     className={'board-zone board-zone-ability' + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget ? ' board-zone-play-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFlashing ? ' zone-ability-activated' : '')}
                     data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel}
                     onClick={onAbilityClick}
-                    style={canActivate ? { cursor: 'pointer' } : (isValidPotionTarget ? { cursor: 'pointer' } : undefined)}>
+                    style={zsMerge('ability', canActivate ? { cursor: 'pointer' } : (isValidPotionTarget ? { cursor: 'pointer' } : undefined))}>
                     {cards.length > 0 ? (
                       <AbilityStack cards={cards} />
                     ) : (
@@ -6034,7 +7197,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                       socket.emit('pending_placement_clear', { roomId: gameState.roomId });
                     }
                   } : isZonePickTarget ? () => respondToPrompt({ heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
-                  style={(isValidEquipTarget || isZonePickTarget || isProviderZone) ? { cursor: 'pointer' } : undefined}>
+                  style={zsMerge('support', (isValidEquipTarget || isZonePickTarget || isProviderZone) ? { cursor: 'pointer' } : undefined)}>
                   {(isPlayTarget || isAutoTarget) && playDrag.card ? (
                     <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
                   ) : (!isOpp && pendingAdditionalPlay && pendingAdditionalPlay.heroIdx === i && pendingAdditionalPlay.zoneSlot === z) ? (
@@ -6042,25 +7205,30 @@ function GameBoard({ gameState, lobby, onLeave }) {
                   ) : (isOpp && oppPendingPlacement && oppPendingPlacement.heroIdx === i && oppPendingPlacement.zoneSlot === z) ? (
                     <BoardCard cardName={oppPendingPlacement.cardName} hp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} maxHp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
                   ) : cards.length > 0 ? (
+                    (() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; const isCreature = CARDS_BY_NAME[cards[cards.length-1]]?.cardType === 'Creature'; return !isCreature ? (
+                      <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} />
+                    ) : (
                     <>
                     {cards.length === 1 ? (
-                      <BoardCard cardName={cards[0]} hp={CARDS_BY_NAME[cards[0]]?.hp} maxHp={CARDS_BY_NAME[cards[0]]?.hp} hpPosition="creature" skins={gameSkins} />
+                      (() => { const curHp = cc?.currentHp ?? CARDS_BY_NAME[cards[0]]?.hp; return <BoardCard cardName={cards[0]} hp={curHp} maxHp={CARDS_BY_NAME[cards[0]]?.hp} hpPosition="creature" skins={gameSkins} />; })()
                     ) : (
                       <div className="board-stack">
-                        <BoardCard cardName={cards[cards.length-1]} hp={CARDS_BY_NAME[cards[cards.length-1]]?.hp} maxHp={CARDS_BY_NAME[cards[cards.length-1]]?.hp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />
+                        {(() => { const curHp = cc?.currentHp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; return <BoardCard cardName={cards[cards.length-1]} hp={curHp} maxHp={CARDS_BY_NAME[cards[cards.length-1]]?.hp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />; })()}
                       </div>
                     )}
-                    {(() => { const cKey = `${pi}-${i}-${z}`; const lvl = (gameState.creatureCounters || {})[cKey]?.level; return lvl ? <div className="creature-level">Lv{lvl}</div> : null; })()}
-                    {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.additionalActionAvail ? <div className="additional-action-icon"
+                    {(() => { const lvl = cc?.level; return lvl ? <div className="creature-level">Lv{lvl}</div> : null; })()}
+                    {(() => { return cc?.additionalActionAvail ? <div className="additional-action-icon"
                       onMouseEnter={() => { window._aaTooltipKey = cKey; window.dispatchEvent(new Event('aaHover')); }}
                       onMouseLeave={() => { window._aaTooltipKey = null; window.dispatchEvent(new Event('aaHover')); }}
                     >⚡</div> : null; })()}
-                    {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.burned ? <BurnedOverlay /> : null; })()}
-                    {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.frozen ? <FrozenOverlay /> : null; })()}
-                    {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.negated ? <NegatedOverlay /> : null; })()}
-                    {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null; })()}
-                    {(() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; return cc?.buffs ? <BuffColumn buffs={cc.buffs} /> : null; })()}
+                    {cc?.burned ? <BurnedOverlay /> : null}
+                    {cc?.frozen ? <FrozenOverlay /> : null}
+                    {cc?.negated ? <NegatedOverlay /> : null}
+                    {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
+                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated) ? <StatusBadges counters={cc} isHero={false} /> : null}
+                    {cc?.buffs ? <BuffColumn buffs={cc.buffs} /> : null}
                     </>
+                    ); })()
                   ) : (
                     <div className="board-zone-empty">{isIsland ? 'Island' : 'Support'}</div>
                   )}
@@ -6111,7 +7279,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
           <div className="game-hand-cards">
             {Array.from({ length: opp.handCount || 0 }).map((_, i) => (
               <div key={i} className="board-card face-down hand-card" style={oppDrawHidden.has(i) ? { visibility: 'hidden' } : undefined}>
-                <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                <img src={opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
               </div>
             ))}
           </div>
@@ -6124,19 +7292,19 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '')}>
           <div className="board-util board-util-left">
             <div className="board-util-side">
-              <div data-opp-discard="1"><BoardZone type="discard" cards={oppDiscardHidden > 0 ? opp.discardPile.slice(0, -oppDiscardHidden) : opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile })} onHoverCard={setHoveredPileCard} /></div>
-              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile })} onHoverCard={setHoveredPileCard} /></div>
+              <div data-opp-discard="1"><BoardZone type="discard" cards={oppDiscardHidden > 0 ? opp.discardPile.slice(0, -oppDiscardHidden) : opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} /></div>
+              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} /></div>
               <div className="board-util-spacer" />
             </div>
             <div className="board-util-mid" />
             <div className="board-util-side">
               <div className="board-util-spacer" />
-              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile })} onHoverCard={setHoveredPileCard} /></div>
-              <div data-my-discard="1"><BoardZone type="discard" cards={myDiscardHidden > 0 ? me.discardPile.slice(0, -myDiscardHidden) : me.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile })} onHoverCard={setHoveredPileCard} /></div>
+              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} /></div>
+              <div data-my-discard="1"><BoardZone type="discard" cards={myDiscardHidden > 0 ? me.discardPile.slice(0, -myDiscardHidden) : me.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} /></div>
             </div>
           </div>
 
-          <div className="board-center" style={{ position: 'relative' }}>
+          <div className="board-center" ref={boardCenterRef} style={{ position: 'relative' }}>
             {/* ── Generic Player Debuff Warnings ── */}
             {(() => {
               const debuffs = [];
@@ -6154,6 +7322,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
             })()}
             {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
+            <div className="board-area-zones-center">
+              <BoardZone type="area" cards={gameState.areaZones?.[myIdx] || []} label="Area" style={{...myBoardZone('area'), left: areaPositions[0]}} />
+              <BoardZone type="area" cards={gameState.areaZones?.[oppIdx] || []} label="Area" style={{...oppBoardZone('area'), left: areaPositions[1]}} />
+            </div>
             <div className="board-mid-row" style={{ position: 'relative' }}>
               <div className="board-phase-tracker">
                 {['Start Phase', 'Resource Phase', 'Main Phase 1', 'Action Phase', 'Main Phase 2', 'End Phase'].map((phase, i) => {
@@ -6210,11 +7382,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
           <div className="board-util board-util-right">
             <div className="board-util-side">
-              <BoardZone type="deck" label="Deck" faceDown>
-                <div className="board-card face-down" data-opp-deck="1"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.deckCount}</div></div>
+              <BoardZone type="deck" label="Deck" faceDown style={oppBoardZone('deck')}>
+                <div className="board-card face-down" data-opp-deck="1"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.deckCount}</div></div>
               </BoardZone>
-              <BoardZone type="potion" label="Potions" faceDown>
-                {opp.potionDeckCount > 0 && <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>}
+              <BoardZone type="potion" label="Potions" faceDown style={oppBoardZone('potion')}>
+                {opp.potionDeckCount > 0 && <div className="board-card face-down"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>}
               </BoardZone>
               <div className="board-util-spacer" />
             </div>
@@ -6222,13 +7394,13 @@ function GameBoard({ gameState, lobby, onLeave }) {
             <div className="board-util-side">
               <div className="board-util-spacer" />
               <div onClick={() => !isSpectator && me.potionDeckCount > 0 && setDeckViewer('potion')} style={{ cursor: !isSpectator && me.potionDeckCount > 0 ? 'pointer' : 'default' }}>
-              <BoardZone type="potion" label="Potions" faceDown>
-                {me.potionDeckCount > 0 && <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.potionDeckCount}</div></div>}
+              <BoardZone type="potion" label="Potions" faceDown style={myBoardZone('potion')}>
+                {me.potionDeckCount > 0 && <div className="board-card face-down"><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.potionDeckCount}</div></div>}
               </BoardZone>
               </div>
               <div onClick={() => !isSpectator && me.deckCount > 0 && setDeckViewer('deck')} style={{ cursor: !isSpectator && me.deckCount > 0 ? 'pointer' : 'default' }} data-my-deck="1">
-              <BoardZone type="deck" label="Deck" faceDown>
-                <div className="board-card face-down"><img src="/cardback.png" style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.deckCount}</div></div>
+              <BoardZone type="deck" label="Deck" faceDown style={myBoardZone('deck')}>
+                <div className="board-card face-down"><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.deckCount}</div></div>
               </BoardZone>
               </div>
             </div>
@@ -6246,7 +7418,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
             <div className="game-hand-cards">
               {Array.from({ length: me.handCount || 0 }).map((_, i) => (
                 <div key={i} className="board-card face-down hand-card" style={specMeDrawHidden.has(i) ? { visibility: 'hidden' } : undefined}>
-                  <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                  <img src={me.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
                 </div>
               ))}
             </div>
@@ -6298,12 +7470,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
       ))}
       {oppDrawAnims.map(anim => (
         <OppDrawAnimCard key={anim.id} startX={anim.startX} startY={anim.startY}
-          endX={anim.endX} endY={anim.endY} cardName={anim.cardName} />
+          endX={anim.endX} endY={anim.endY} cardName={anim.cardName} cardbackUrl={opp.cardback} />
       ))}
       {/* Spectator: bottom player draw animations (face-down, like opponent) */}
       {isSpectator && specMeDrawAnims.map(anim => (
         <OppDrawAnimCard key={anim.id} startX={anim.startX} startY={anim.startY}
-          endX={anim.endX} endY={anim.endY} />
+          endX={anim.endX} endY={anim.endY} cardbackUrl={me.cardback} />
       ))}
 
       {/* Floating discard animation cards */}
@@ -6332,6 +7504,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
       {/* Damage numbers */}
       {damageNumbers.map(d => (
         <DamageNumber key={d.id} amount={d.amount} heroName={d.heroName} />
+      ))}
+      {creatureDamageNumbers.map(d => (
+        <CreatureDamageNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} zoneSlot={d.zoneSlot} />
       ))}
 
       {/* Gold gain numbers */}
@@ -6386,6 +7561,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
           left: r.srcX - 34, top: r.srcY - 48,
           '--ramDx': (r.tgtX - r.srcX) + 'px',
           '--ramDy': (r.tgtY - r.srcY) + 'px',
+          '--ramAngle': (r.angle || 0) + 'deg',
           animationDuration: r.dur + 'ms',
         }}>
           <BoardCard cardName={r.cardName} noTooltip />
@@ -6438,6 +7614,16 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 <BoardCard cardName={link.cardName} style={{ width: 80, height: 112, borderRadius: 4 }} />
                 {link.isInitialCard && <div className="chain-badge chain-badge-initial">INITIAL</div>}
                 {link.status === 'negated' && <div className="chain-negate-symbol">🚫</div>}
+                {link.status === 'negated' && link.negationStyle === 'ice' && (
+                  <div className="chain-ice-overlay">
+                    <div className="chain-ice-crystal" style={{ left: 8, top: 12, fontSize: 14, animationDelay: '0ms' }}>❄</div>
+                    <div className="chain-ice-crystal" style={{ left: 55, top: 30, fontSize: 18, animationDelay: '50ms' }}>❄</div>
+                    <div className="chain-ice-crystal" style={{ left: 20, top: 55, fontSize: 12, animationDelay: '100ms' }}>❆</div>
+                    <div className="chain-ice-crystal" style={{ left: 50, top: 75, fontSize: 16, animationDelay: '150ms' }}>❄</div>
+                    <div className="chain-ice-crystal" style={{ left: 12, top: 85, fontSize: 14, animationDelay: '200ms' }}>❅</div>
+                    <div className="chain-ice-crystal" style={{ left: 40, top: 15, fontSize: 11, animationDelay: '80ms' }}>❆</div>
+                  </div>
+                )}
                 <div className="chain-owner-dot" style={{ background: link.owner === myIdx ? 'var(--accent)' : 'var(--danger)' }} />
               </div>
             ))}
@@ -6460,6 +7646,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
           </div>
         </div>
       )}
+
+      {/* ── Global Game Tooltip ── */}
+      <GameTooltip />
 
       {/* Immune status tooltip */}
       {immuneTooltip && (() => {
@@ -6757,6 +7946,18 @@ function GameBoard({ gameState, lobby, onLeave }) {
         </DraggablePanel>
       )}
 
+      {/* ── Waiting for opponent's pre-game hero effect (Bill, etc.) ── */}
+      {!isSpectator && !result && gameState.heroEffectPending && gameState.heroEffectPending.ownerIdx !== myIdx && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 280 }}>
+          <div className="orbit-font" style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>
+            ⏳ Waiting for opponent...
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text2)' }}>
+            Waiting for opponent to resolve {gameState.heroEffectPending.heroName || 'hero'}'s effect...
+          </div>
+        </DraggablePanel>
+      )}
+
       {/* ── Ability Activation Confirmation ── */}
       {pendingAbilityActivation && !result && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#ffcc33' }}>
@@ -6819,7 +8020,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
       {/* ── Effect Prompt: Deck Search Reveal (opponent sees searched card) ── */}
       {isMyEffectPrompt && ep.type === 'deckSearchReveal' && (() => {
         return (
-          <div className="modal-overlay" style={{ zIndex: 10070, background: 'rgba(0,0,0,.55)' }}>
+          <div className="modal-overlay" style={{ zIndex: 10070, background: 'rgba(0,0,0,.55)' }}
+            onClick={() => respondToPrompt({ confirmed: true })}>
             <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }} onClick={e => e.stopPropagation()}>
               <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', textShadow: '0 2px 8px rgba(0,0,0,.8)' }}>
                 {ep.title || 'Card Searched'}
@@ -6879,7 +8081,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out' }}>
           <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
-          {pt.config?.maxTotal > 0 && (
+          {pt.config?.maxTotal > 0 && pt.validTargets?.length > 0 && (
             <div style={{ fontSize: 11, color: 'var(--accent)', marginBottom: 10, fontWeight: 600 }}>
               {potionSelection.length} / {pt.config.maxTotal} selected
               {pt.config.minRequired > 0 && potionSelection.length < pt.config.minRequired
@@ -7088,7 +8290,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
 //  PLAY SCREEN
 // ═══════════════════════════════════════════
 function PlayScreen() {
-  const { user, setScreen, notify } = useContext(AppContext);
+  const { user, setScreen, notify, setInBattle } = useContext(AppContext);
   const [decks, setDecks] = useState([]);
   const [sampleDecks, setSampleDecks] = useState([]);
   const [selectedDeck, setSelectedDeck] = useState('');
@@ -7108,6 +8310,12 @@ function PlayScreen() {
     _pendingGameState = null;
     return pending;
   });
+
+  // Sync battle music state
+  useEffect(() => {
+    setInBattle(!!gameState);
+    return () => setInBattle(false);
+  }, [gameState, setInBattle]);
 
   // Load decks + sample decks
   useEffect(() => {
@@ -7437,11 +8645,88 @@ function PlayScreen() {
 // ═══════════════════════════════════════════
 //  APP ROOT
 // ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
+//  MUSIC MANAGER
+//  Plays bgm_menu on loop outside of battle,
+//  bgm_battle on loop during battle.
+//  Handles browser autoplay policy by unlocking
+//  audio on first user interaction.
+// ═══════════════════════════════════════════
+
+const _bgmMenu = typeof Audio !== 'undefined' ? new Audio('/music/bgm_menu.mp3') : null;
+const _bgmBattle = typeof Audio !== 'undefined' ? new Audio('/music/bgm_battle.mp3') : null;
+if (_bgmMenu) { _bgmMenu.loop = true; _bgmMenu.volume = 0.4; }
+if (_bgmBattle) { _bgmBattle.loop = true; _bgmBattle.volume = 0.4; }
+
+function MusicManager({ inBattle }) {
+  const unlocked = useRef(false);
+  const currentTrack = useRef(null); // 'menu' | 'battle'
+
+  const switchTrack = useCallback((target) => {
+    if (currentTrack.current === target) return;
+    const fadeOut = target === 'battle' ? _bgmMenu : _bgmBattle;
+    const fadeIn = target === 'battle' ? _bgmBattle : _bgmMenu;
+    if (!fadeIn) return;
+
+    // Quick crossfade
+    if (fadeOut && !fadeOut.paused) {
+      const fo = fadeOut;
+      const origVol = fo.volume;
+      let step = 0;
+      const fadeInterval = setInterval(() => {
+        step++;
+        fo.volume = Math.max(0, origVol * (1 - step / 8));
+        if (step >= 8) { clearInterval(fadeInterval); fo.pause(); fo.volume = origVol; fo.currentTime = 0; }
+      }, 40);
+    }
+
+    fadeIn.volume = 0;
+    fadeIn.play().then(() => {
+      let step = 0;
+      const targetVol = 0.4;
+      const fadeInterval = setInterval(() => {
+        step++;
+        fadeIn.volume = Math.min(targetVol, targetVol * (step / 8));
+        if (step >= 8) clearInterval(fadeInterval);
+      }, 40);
+    }).catch(() => {}); // Autoplay blocked — will retry on interaction
+
+    currentTrack.current = target;
+  }, []);
+
+  // Unlock audio on first user interaction
+  useEffect(() => {
+    if (unlocked.current) return;
+    const unlock = () => {
+      if (unlocked.current) return;
+      unlocked.current = true;
+      switchTrack(inBattle ? 'battle' : 'menu');
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+    window.addEventListener('click', unlock, { once: false });
+    window.addEventListener('keydown', unlock, { once: false });
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, [inBattle]);
+
+  // Switch tracks when inBattle changes
+  useEffect(() => {
+    if (!unlocked.current) return;
+    switchTrack(inBattle ? 'battle' : 'menu');
+  }, [inBattle, switchTrack]);
+
+  return null; // No visual output
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [screen, setScreen] = useState('menu');
   const [loading, setLoading] = useState(true);
   const [notif, setNotif] = useState(null);
+  const [inBattle, setInBattle] = useState(false);
 
   const notify = useCallback((message, type) => {
     setNotif({ message, type, id: Date.now() });
@@ -7497,15 +8782,17 @@ function App() {
     );
   }
 
-  const ctx = { user, setUser, screen, setScreen, notify };
+  const ctx = { user, setUser, screen, setScreen, notify, inBattle, setInBattle };
 
   return (
     <AppContext.Provider value={ctx}>
+      <MusicManager inBattle={inBattle} />
       {notif && <Notification key={notif.id} message={notif.message} type={notif.type} onClose={() => setNotif(null)} />}
       {!user ? <AuthScreen /> :
         screen === 'menu' ? <MainMenu /> :
         screen === 'play' ? <PlayScreen /> :
         screen === 'deckbuilder' ? <DeckBuilder /> :
+        screen === 'shop' ? <ShopScreen /> :
         screen === 'profile' ? <ProfileScreen /> :
         <MainMenu />}
     </AppContext.Provider>

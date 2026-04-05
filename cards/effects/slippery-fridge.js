@@ -1,0 +1,297 @@
+// ═══════════════════════════════════════════
+//  CARD EFFECT: "Slippery Fridge"
+//  Reaction Artifact — Can be activated in
+//  response to ANY event (like Juice).
+//  Choose any number of Equip Artifacts on
+//  the board and move each to a different
+//  Hero of the same controller (without
+//  paying their Cost again).
+//
+//  Equip detection covers three sources:
+//  1. cardDB subtype === 'Equipment'
+//  2. inst.counters.treatAsEquip (Initiation Ritual heroes)
+//  3. script.isEquip === true (Flying Island, etc.)
+//
+//  An equip is only eligible if its controller
+//  has another living Hero with a free base
+//  Support Zone (slots 0–2, not island zones).
+// ═══════════════════════════════════════════
+
+const { loadCardEffect } = require('./_loader');
+
+// ─── MODULE-LEVEL CARD DB (cached) ───────
+
+let _cardDBCache = null;
+function _getCardDB() {
+  if (_cardDBCache) return _cardDBCache;
+  try {
+    const allCards = JSON.parse(
+      require('fs').readFileSync(require('path').join(__dirname, '../../data/cards.json'), 'utf-8')
+    );
+    _cardDBCache = {};
+    allCards.forEach(c => { _cardDBCache[c.name] = c; });
+    return _cardDBCache;
+  } catch { return {}; }
+}
+
+// ─── EQUIP DETECTION ─────────────────────
+
+/**
+ * Check if a card name represents an Equip Artifact by data alone.
+ * Used by canActivate (no engine/instance access).
+ */
+function _isEquipByData(cardName) {
+  const cardDB = _getCardDB();
+  const cd = cardDB[cardName];
+  if (!cd) return false;
+  // Equipment subtype
+  if ((cd.subtype || '').toLowerCase() === 'equipment') return true;
+  // Hero/Ascended Hero in support zone = Initiation Ritual
+  if (cd.cardType === 'Hero' || cd.cardType === 'Ascended Hero') return true;
+  // Script-level isEquip flag (Flying Island, etc.)
+  const script = loadCardEffect(cardName);
+  if (script?.isEquip) return true;
+  return false;
+}
+
+/**
+ * Check if a CardInstance in a support zone is an Equip Artifact.
+ * Full check using instance counters + data.
+ */
+function _isEquipInstance(inst) {
+  if (!inst || inst.zone !== 'support') return false;
+  if (inst.counters?.immovable) return false;
+  // Counter-based (Initiation Ritual)
+  if (inst.counters?.treatAsEquip) return true;
+  // Script-level flag
+  const script = inst.loadScript();
+  if (script?.isEquip) return true;
+  // Card data subtype
+  const cardDB = _getCardDB();
+  const cd = cardDB[inst.name];
+  if (cd && (cd.subtype || '').toLowerCase() === 'equipment') return true;
+  return false;
+}
+
+// ─── ZONE HELPERS ────────────────────────
+
+/** Get indices of free base support zones (0–2) for a hero. */
+function _getFreeBaseZones(ps, heroIdx) {
+  const free = [];
+  for (let si = 0; si < 3; si++) {
+    if (((ps.supportZones[heroIdx] || [])[si] || []).length === 0) {
+      free.push(si);
+    }
+  }
+  return free;
+}
+
+/** Check if a player has another living hero (≠ heroIdx) with a free base zone. */
+function _hasOtherHeroWithFreeZone(ps, heroIdx) {
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    if (hi === heroIdx) continue;
+    const h = ps.heroes[hi];
+    if (!h?.name || h.hp <= 0) continue;
+    if (_getFreeBaseZones(ps, hi).length > 0) return true;
+  }
+  return false;
+}
+
+// ─── ELIGIBILITY ─────────────────────────
+
+/**
+ * Find all eligible equip CardInstances on the board.
+ * Eligible = is equip + controller has another living hero with free base zone.
+ */
+function _findEligibleEquips(gs, engine) {
+  const eligible = [];
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support') continue;
+    if (!_isEquipInstance(inst)) continue;
+    const ps = gs.players[inst.owner];
+    if (!ps) continue;
+    // Controller's hero must be alive
+    const hero = ps.heroes?.[inst.heroIdx];
+    if (!hero?.name || hero.hp <= 0) continue;
+    // Must have another living hero with free base zone
+    if (!_hasOtherHeroWithFreeZone(ps, inst.heroIdx)) continue;
+    eligible.push(inst);
+  }
+  return eligible;
+}
+
+// ─── MODULE EXPORTS ──────────────────────
+
+module.exports = {
+  isReaction: true,
+  isTargetingArtifact: true,
+
+  // ── Reaction guard (with engine access) ──
+  reactionCondition: (gs, pi, engine) => {
+    return _findEligibleEquips(gs, engine).length > 0;
+  },
+
+  // ── Proactive guard (no engine access — optimistic) ──
+  canActivate(gs, pi) {
+    for (let pIdx = 0; pIdx < 2; pIdx++) {
+      const ps = gs.players[pIdx];
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        const hero = ps.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
+          const slot = (ps.supportZones[hi] || [])[si] || [];
+          if (slot.length === 0) continue;
+          if (!_isEquipByData(slot[0])) continue;
+          if (_hasOtherHeroWithFreeZone(ps, hi)) return true;
+        }
+      }
+    }
+    return false;
+  },
+
+  // Self-targeting — all interaction handled in resolve
+  getValidTargets: () => [],
+
+  targetingConfig: {
+    description: 'Move an equipped Artifact to a different Hero of the same player.',
+    confirmLabel: '🧊 Open Fridge!',
+    confirmClass: 'btn-info',
+    cancellable: false,
+    alwaysConfirmable: true,
+  },
+
+  validateSelection: () => true,
+
+  animationType: 'none',
+
+  // ── RESOLVE ────────────────────────────
+  // Handles both proactive (selectedIds=[]) and reaction (selectedIds=null) flows.
+  // Moves exactly ONE Equip Artifact to a different Hero of the same controller.
+  // Non-cancellable — the player committed to this in the chain.
+  resolve: async (engine, pi) => {
+    const gs = engine.gs;
+
+    // ── Step 1: Find eligible equips ──
+    const eligible = _findEligibleEquips(gs, engine);
+    if (eligible.length === 0) return true; // Fizzle — no valid targets
+
+    const equipTargets = eligible.map(inst => ({
+      id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
+      type: 'equip',
+      owner: inst.owner,
+      heroIdx: inst.heroIdx,
+      slotIdx: inst.zoneSlot,
+      cardName: inst.name,
+      cardInstance: inst,
+    }));
+
+    // ── Step 2: Select equip to move (non-cancellable) ──
+    const pickedIds = await engine.promptEffectTarget(pi, equipTargets, {
+      title: 'Slippery Fridge',
+      description: 'Select an equipped Artifact to move.',
+      confirmLabel: '🧊 Select!',
+      confirmClass: 'btn-info',
+      cancellable: false,
+      exclusiveTypes: true,
+      maxPerType: { equip: 1 },
+    });
+
+    if (!pickedIds || pickedIds.length === 0) return true; // Safety
+
+    const picked = equipTargets.find(t => t.id === pickedIds[0]);
+    if (!picked) return true;
+
+    const inst = picked.cardInstance;
+    const equipOwner = inst.owner;
+    const ps = gs.players[equipOwner];
+    const srcHeroIdx = inst.heroIdx;
+    const srcSlot = inst.zoneSlot;
+
+    // ── Step 3: Build destination targets ──
+    const destTargets = [];
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      if (hi === srcHeroIdx) continue;
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      const freeZones = _getFreeBaseZones(ps, hi);
+      for (const si of freeZones) {
+        destTargets.push({
+          id: `equip-${equipOwner}-${hi}-${si}`,
+          type: 'equip',
+          owner: equipOwner,
+          heroIdx: hi,
+          slotIdx: si,
+          cardName: '',
+        });
+      }
+      // Also allow clicking the hero directly (auto-picks first free slot)
+      if (freeZones.length > 0) {
+        destTargets.push({
+          id: `hero-${equipOwner}-${hi}`,
+          type: 'hero',
+          owner: equipOwner,
+          heroIdx: hi,
+          cardName: hero.name,
+        });
+      }
+    }
+
+    if (destTargets.length === 0) return true; // Fizzle
+
+    // ── Step 4: Select destination (non-cancellable) ──
+    const destIds = await engine.promptEffectTarget(pi, destTargets, {
+      title: `Slippery Fridge — Move ${inst.name}`,
+      description: `Select a Support Zone to move ${inst.name} to.`,
+      confirmLabel: '🧊 Move!',
+      confirmClass: 'btn-info',
+      cancellable: false,
+      greenSelect: true,
+      exclusiveTypes: false,
+      maxPerType: { hero: 1, equip: 1 },
+    });
+
+    if (!destIds || destIds.length === 0) return true; // Safety
+
+    const dest = destTargets.find(t => t.id === destIds[0]);
+    if (!dest) return true;
+
+    let destHeroIdx, destSlot;
+    if (dest.type === 'equip') {
+      destHeroIdx = dest.heroIdx;
+      destSlot = dest.slotIdx;
+    } else {
+      destHeroIdx = dest.heroIdx;
+      const freeZones = _getFreeBaseZones(ps, destHeroIdx);
+      if (freeZones.length === 0) return true;
+      destSlot = freeZones[0];
+    }
+
+    // ── Step 5: Animate slide ──
+    engine._broadcastEvent('play_card_transfer', {
+      sourceOwner: equipOwner,
+      sourceHeroIdx: srcHeroIdx,
+      sourceZoneSlot: srcSlot,
+      targetOwner: equipOwner,
+      targetHeroIdx: destHeroIdx,
+      targetZoneSlot: destSlot,
+      cardName: inst.name,
+      duration: 600,
+      particles: null,
+    });
+
+    await engine._delay(500);
+
+    // ── Step 6: Move via engine (fires onCardLeaveZone / onCardEnterZone hooks) ──
+    await engine.actionMoveCard(inst, 'support', destHeroIdx, destSlot);
+
+    engine.log('slippery_fridge_move', {
+      card: inst.name,
+      fromHero: ps.heroes[srcHeroIdx]?.name || '?',
+      toHero: ps.heroes[destHeroIdx]?.name || '?',
+      player: ps.username,
+    });
+
+    engine.sync();
+    return true;
+  },
+};

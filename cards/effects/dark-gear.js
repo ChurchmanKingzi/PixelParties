@@ -64,6 +64,8 @@ function getStealableCreatures(engine, playerIdx) {
   const targets = [];
   for (const inst of engine.cardInstances) {
     if (inst.owner !== oppIdx || inst.zone !== 'support') continue;
+    if (engine.isCreatureImmune(inst, 'targeting_immune')) continue;
+    if (engine.isCreatureImmune(inst, 'control_immune')) continue;
     const cd = cardDB[inst.name];
     const level = cd?.level || 1;
     const cost = level * BASE_COST;
@@ -241,14 +243,10 @@ module.exports = {
     await engine._delay(1500);
 
     // ── Apply un-removable effect negation ──
-    inst.counters.negated = 1;
-    if (!inst.counters.buffs) inst.counters.buffs = {};
-    inst.counters.buffs.dark_gear_negated = {
+    engine.actionNegateCreature(inst, 'Dark Gear', {
       expiresAtTurn: gs.turn + 1,
       expiresForPlayer: pi === 0 ? 1 : 0, // expires at start of OPPONENT's next turn (= end of this turn cycle)
-      clearCountersOnExpire: ['negated'],
-      source: 'Dark Gear',
-    };
+    });
 
     engine.log('dark_gear', {
       player: ps.username,

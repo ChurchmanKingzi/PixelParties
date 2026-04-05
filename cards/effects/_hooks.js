@@ -16,6 +16,7 @@ const SPEED = {
 // Hook points (string-based — engine accepts ANY string, these are just for documentation).
 const HOOKS = {
   // ── Game flow ──
+  ON_BEFORE_HAND_DRAW: 'onBeforeHandDraw', // Fires before starting hands are drawn (Bill, etc.)
   ON_GAME_START:    'onGameStart',
   ON_TURN_START:    'onTurnStart',
   ON_TURN_END:      'onTurnEnd',
@@ -65,6 +66,10 @@ const HOOKS = {
   ON_REACTION_ACTIVATED: 'onReactionActivated',  // Fires when a reaction card is added to the chain
   ON_CARD_ACTIVATION:    'onCardActivation',      // Fires before a card's effect resolves (for reaction window)
   AFTER_SPELL_RESOLVED:  'afterSpellResolved',    // Fires after a spell/attack's onPlay completes (for Bartas, etc.)
+
+  // ── Actions ──
+  ON_ACTION_USED:            'onActionUsed',            // Fires when any action is consumed (spell, creature, ability activation, etc.)
+  ON_ADDITIONAL_ACTION_USED: 'onAdditionalActionUsed',  // Fires when an additional action is consumed (Necromancy summon, Slime Rancher, etc.)
 };
 
 // Phases (indices match the frontend phase tracker)
@@ -121,6 +126,8 @@ function getNegativeStatuses() {
 // ═══════════════════════════════════════════
 const BUFF_EFFECTS = {
   cloudy: { label: 'Cloudy', icon: '☁️', tooltip: 'Takes half damage from all sources!', damageMultiplier: 0.5 },
+  submerged: { label: 'Submerged', icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' },
+  negative_status_immune: { label: 'Cool', icon: '😎', tooltip: 'Immune to all negative status effects!' },
 };
 
 module.exports = { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS };

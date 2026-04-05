@@ -222,6 +222,8 @@ class GameEngine {
         if ((hero.statuses?.frozen || hero.statuses?.stunned) && (c.zone === 'hero' || c.zone === 'ability')) return false;
         if (hero.statuses?.negated && (c.zone === 'hero' || c.zone === 'ability')) return false;
       }
+      // Creature-level negation (Dark Gear, Necromancy, Diplomacy, etc.)
+      if (c.zone === 'support' && c.counters?.negated) return false;
       return true;
     });
 
@@ -283,7 +285,7 @@ class GameEngine {
     const engine = this;
     const gs = this.gs;
 
-    return {
+    const ctx = {
       // Hook event data (spread first so card-specific props override)
       ...hookCtx,
 
@@ -319,6 +321,8 @@ class GameEngine {
         if (hookCtx.amount !== undefined) hookCtx.amount = val;
       },
       negate() { hookCtx.negated = true; },
+      /** Set a flag on the hookCtx (survives through all hooks → read by engine after) */
+      setFlag(key, value) { hookCtx[key] = value; },
 
       // ── Game Actions (each fires its own hooks) ──
       async dealDamage(target, amount, type) {
@@ -347,6 +351,15 @@ class GameEngine {
       },
       async discardCards(playerIdx, count) {
         return engine.actionDiscardCards(playerIdx, count);
+      },
+      /**
+       * Safely place a card into a support zone with zone-occupied fallback.
+       * If occupied, auto-relocates to another free base zone on the same hero.
+       * Returns { inst, actualSlot } or null (no free zones — caller handles fizzle).
+       * Does NOT fire onPlay/onCardEnterZone — caller must do that.
+       */
+      safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot) {
+        return engine.safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot);
       },
       async addStatus(target, statusName, opts) {
         return engine.actionAddStatus(target, statusName, opts);
@@ -380,9 +393,72 @@ class GameEngine {
         return engine.actionChangeLevel(target || cardInstance, delta);
       },
 
+      /**
+       * Negate a creature's effects with automatic expiry.
+       * @param {CardInstance} inst - The creature to negate
+       * @param {string} source - Source name (e.g. 'Dark Gear', 'Necromancy')
+       * @param {object} opts - { expiresAtTurn, expiresForPlayer, buffKey?, removeAnim? }
+       */
+      async negateCreature(inst, source, opts) {
+        return engine.actionNegateCreature(inst, source, opts);
+      },
+
+      /**
+       * Check if a creature has a specific immunity.
+       * @param {CardInstance} inst - The creature to check
+       * @param {string} immuneType - e.g. 'targeting_immune', 'control_immune'
+       */
+      isCreatureImmune(inst, immuneType) {
+        return engine.isCreatureImmune(inst, immuneType);
+      },
+
+      /**
+       * Grant ATK to this card's hero. Tracked on the card instance for auto-revocation.
+       * @param {number} amount - ATK to add
+       */
+      grantAtk(amount) {
+        const hero = gs.players[cardInstance.owner]?.heroes?.[cardInstance.heroIdx];
+        if (hero) engine.actionGrantAtk(cardInstance, hero, cardInstance.owner, cardInstance.heroIdx, amount);
+      },
+
+      /**
+       * Revoke ATK previously granted by this card instance.
+       */
+      revokeAtk() {
+        const hero = gs.players[cardInstance.owner]?.heroes?.[cardInstance.heroIdx];
+        if (hero) engine.actionRevokeAtk(cardInstance, hero, cardInstance.owner, cardInstance.heroIdx);
+      },
+
       // ── Player input (async — pauses until client responds) ──
       async promptTarget(validTargets, config) {
-        return engine.promptEffectTarget(cardInstance.controller, validTargets, config);
+        // Auto-filter: remove non-Creature support zone targets unless explicitly allowed
+        let targets = validTargets;
+        if (!config?.allowNonCreatureEquips) {
+          const cardDB = engine._getCardDB();
+          targets = validTargets.filter(t => {
+            if (t.type !== 'equip') return true;
+            const cd = cardDB[t.cardName];
+            return cd && cd.cardType === 'Creature';
+          });
+          if (targets.length === 0 && validTargets.length > 0) targets = validTargets; // Fallback
+        }
+        const selectedIds = await engine.promptEffectTarget(cardInstance.controller, targets, config);
+
+        // ── Target redirect check (Challenge, etc.) ──
+        // Only for single-target selections with hero/creature targets
+        if (selectedIds && selectedIds.length === 1 && !config?.cannotBeRedirected && !config?._skipRedirectCheck) {
+          const selected = validTargets.find(t => t.id === selectedIds[0]);
+          if (selected && selected.owner >= 0) {
+            const redirected = await engine._checkTargetRedirect(
+              selected.owner, selected, validTargets, config || {}, cardInstance
+            );
+            if (redirected) {
+              return [redirected.id]; // Return the redirected target's ID
+            }
+          }
+        }
+
+        return selectedIds;
       },
       async chooseTarget(type, filter) {
         return engine.promptChooseTarget(cardInstance.controller, type, filter);
@@ -506,6 +582,26 @@ class GameEngine {
       },
 
       /**
+       * Show a multi-select card gallery picker. Returns { selectedCards: string[] } or null if cancelled.
+       * @param {Array} cards - [{ name, source?, cost?, ...extraDisplayData }]
+       * @param {object} config - { title, description, cancellable, selectCount, minSelect, maxBudget, costKey, confirmLabel, confirmClass }
+       */
+      async promptCardGalleryMulti(cards, config = {}) {
+        return engine.promptGeneric(cardInstance.controller, {
+          type: 'cardGalleryMulti', cards,
+          title: config.title || cardInstance.name,
+          description: config.description || 'Select cards.',
+          cancellable: config.cancellable !== false,
+          selectCount: config.selectCount || 2,
+          minSelect: config.minSelect,
+          maxBudget: config.maxBudget,
+          costKey: config.costKey || 'cost',
+          confirmLabel: config.confirmLabel,
+          confirmClass: config.confirmClass,
+        });
+      },
+
+      /**
        * Show a zone picker (highlights zones on the board). Returns { heroIdx, slotIdx } or null if cancelled.
        * @param {Array} zones - [{ heroIdx, slotIdx, label }]
        * @param {object} config - { title, description, cancellable }
@@ -536,6 +632,101 @@ class GameEngine {
           confirmLabel: config.confirmLabel || 'Confirm',
           cancellable: config.cancellable !== false,
         });
+      },
+
+      /**
+       * Generic Attack execution handler. Handles target selection, ATK-based
+       * damage calculation, animation, and damage dealing with type 'attack'.
+       * Equipment hooks (Sun Sword burn, Sacred Hammer bonus) fire automatically.
+       * Returns { target, damage, hero, heroIdx } or null if cancelled.
+       *
+       * @param {object} config - {
+       *   title: string, description: string, confirmLabel: string, confirmClass: string,
+       *   animationType: string (zone animation to play on target),
+       *   animDuration: number (ms to wait for animation, default 400),
+       *   side: 'any'|'enemy'|'my' (default 'any'),
+       *   types: ['hero','creature'] (default both),
+       *   excludeSelf: boolean (exclude the attacking hero, default true),
+       *   condition: (target, engine) => bool (optional extra filter),
+       *   damageMultiplier: number (multiply hero.atk, default 1),
+       *   flatDamage: number (add to damage, default 0),
+       * }
+       */
+      async executeAttack(config = {}) {
+        const pi = cardInstance.controller;
+        const heroIdx = cardInstance.heroIdx;
+        const hero = gs.players[pi]?.heroes?.[heroIdx];
+        if (!hero || hero.hp <= 0) return null;
+
+        const atkDamage = Math.max(0, Math.floor((hero.atk || 0) * (config.damageMultiplier || 1)) + (config.flatDamage || 0));
+
+        // Build condition that excludes self if requested
+        const baseCondition = config.condition;
+        const excludeSelf = config.excludeSelf !== false;
+        const combinedCondition = excludeSelf
+          ? (t, eng) => {
+              if (t.type === 'hero' && t.owner === pi && t.heroIdx === heroIdx) return false;
+              return baseCondition ? baseCondition(t, eng) : true;
+            }
+          : baseCondition;
+
+        // Prompt for target
+        const target = await ctx.promptDamageTarget({
+          side: config.side || 'any',
+          types: config.types || ['hero', 'creature'],
+          damageType: 'attack',
+          title: config.title || cardInstance.name,
+          description: config.description || `Deal ${atkDamage} damage.`,
+          confirmLabel: config.confirmLabel || `⚔️ Attack! (${atkDamage})`,
+          confirmClass: config.confirmClass || 'btn-danger',
+          cancellable: config.cancellable !== false,
+          condition: combinedCondition,
+        });
+
+        if (!target) return null; // Cancelled
+
+        // Play animation on target
+        if (config.animationType) {
+          if (target.type === 'hero') {
+            engine._broadcastEvent('play_zone_animation', {
+              type: config.animationType, owner: target.owner,
+              heroIdx: target.heroIdx, zoneSlot: -1,
+            });
+          } else {
+            engine._broadcastEvent('play_zone_animation', {
+              type: config.animationType, owner: target.owner,
+              heroIdx: target.heroIdx, zoneSlot: target.slotIdx,
+            });
+          }
+          await engine._delay(config.animDuration || 400);
+        }
+
+        // Deal ATK-based damage with type 'attack'
+        const attackSource = { name: cardInstance.name, owner: pi, heroIdx, controller: pi };
+        let dealt = 0;
+
+        if (target.type === 'hero') {
+          const targetHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
+          if (targetHero && targetHero.hp > 0) {
+            const result = await engine.actionDealDamage(attackSource, targetHero, atkDamage, 'attack');
+            dealt = result?.dealt || 0;
+          }
+        } else if (target.type === 'equip') {
+          const inst = target.cardInstance || engine.cardInstances.find(c =>
+            c.owner === target.owner && c.zone === 'support' &&
+            c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
+          );
+          if (inst) {
+            await engine.actionDealCreatureDamage(
+              attackSource, inst, atkDamage, 'attack',
+              { sourceOwner: pi, canBeNegated: true },
+            );
+            dealt = atkDamage; // Creature damage doesn't return dealt amount
+          }
+        }
+
+        engine.sync();
+        return { target, damage: dealt || atkDamage, hero, heroIdx, atkDamage };
       },
 
       // ── Queries ──
@@ -588,12 +779,16 @@ class GameEngine {
 
         const addCreatures = (playerIdx) => {
           const ps2 = gs.players[playerIdx];
+          const cardDB = engine._getCardDB();
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
             if (!ps2.heroes[hi]?.name || ps2.heroes[hi].hp <= 0) continue;
             for (let si = 0; si < (ps2.supportZones[hi] || []).length; si++) {
               const slot = (ps2.supportZones[hi] || [])[si] || [];
               if (slot.length === 0) continue;
               const creatureName = slot[0];
+              // Only actual Creatures are targetable — not Equipment, Heroes, etc.
+              const cd = cardDB[creatureName];
+              if (!cd || cd.cardType !== 'Creature') continue;
               const inst = engine.cardInstances.find(c =>
                 c.owner === playerIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
               );
@@ -641,6 +836,27 @@ class GameEngine {
         if (selected && gs._spellDamageLog) {
           gs._spellDamageLog.push({ ...selected });
         }
+
+        // ── Target redirect check (Challenge, etc.) ──
+        // After target is selected, check if the target's owner has a redirect card.
+        // Skipped if config explicitly disables redirection.
+        if (selected && !config.cannotBeRedirected && !config._skipRedirectCheck) {
+          // Determine target's owner
+          const tgtOwner = selected.owner;
+          if (tgtOwner >= 0) {
+            const redirected = await engine._checkTargetRedirect(
+              tgtOwner, selected, filteredTargets, config, cardInstance
+            );
+            if (redirected) {
+              // Update the spell damage log to reflect the new target
+              if (gs._spellDamageLog && gs._spellDamageLog.length > 0) {
+                gs._spellDamageLog[gs._spellDamageLog.length - 1] = { ...redirected };
+              }
+              return redirected;
+            }
+          }
+        }
+
         return selected;
       },
 
@@ -728,6 +944,7 @@ class GameEngine {
         return result;
       },
     };
+    return ctx;
   }
 
   /** Parse shorthand filter strings like "enemySupports", "myHand", etc. */
@@ -1032,6 +1249,19 @@ class GameEngine {
       }
     }
 
+    // Submerged heroes: immune to all damage while owner has other alive non-submerged heroes
+    if (target?.buffs?.submerged && target.hp !== undefined) {
+      const ownerIdx = this._findHeroOwner(target);
+      if (ownerIdx >= 0) {
+        const ps = this.gs.players[ownerIdx];
+        const otherAlive = (ps.heroes || []).some(h => h !== target && h.name && h.hp > 0 && !h.buffs?.submerged);
+        if (otherAlive) {
+          this.log('damage_blocked', { target: this._heroLabel(target), reason: 'submerged' });
+          return { dealt: 0, cancelled: true };
+        }
+      }
+    }
+
     // Flame Avalanche lock: if source player's damageLocked is true,
     // ALL damage to opponent's targets becomes 0 (ABSOLUTE — overrides everything)
     const srcOwner = source?.owner ?? source?.controller ?? -1;
@@ -1045,13 +1275,32 @@ class GameEngine {
       }
     }
 
+    // Immortal buff: damage cannot drop HP below 1
+    if (target?.buffs?.immortal && target.hp !== undefined && target.hp > 0) {
+      const maxDmg = Math.max(0, target.hp - 1);
+      if (hookCtx.amount > maxDmg) {
+        hookCtx.amount = maxDmg;
+        this.log('damage_capped', { target: this._heroLabel(target), reason: 'immortal', cappedTo: maxDmg });
+      }
+    }
+
+    // Generic HP-1 cap (set by beforeDamage hooks, e.g. Ghuanjun)
+    // Runs AFTER all modifiers (Sacred Hammer bonus, etc.) so it's the final word
+    if (hookCtx.capAtHPMinus1 && target?.hp !== undefined && target.hp > 0) {
+      const maxDmg = Math.max(0, target.hp - 1);
+      if (hookCtx.amount > maxDmg) {
+        hookCtx.amount = maxDmg;
+        this.log('damage_capped', { target: this._heroLabel(target), reason: 'capAtHPMinus1', cappedTo: maxDmg });
+      }
+    }
+
     const actualAmount = Math.max(0, hookCtx.amount);
     if (target && target.hp !== undefined) {
       target.hp = Math.max(0, target.hp - actualAmount);
     }
 
     this.log('damage', { source: source?.name, target: this._heroLabel(target), amount: actualAmount, type });
-    await this.runHooks(HOOKS.AFTER_DAMAGE, { source, target, amount: actualAmount, type });
+    await this.runHooks(HOOKS.AFTER_DAMAGE, { source, target, amount: actualAmount, type, sourceHeroIdx: source?.heroIdx ?? -1 });
 
     // ── SC tracking ──
     if (actualAmount > 0 && this.gs._scTracking) {
@@ -1098,6 +1347,7 @@ class GameEngine {
 
     // Check for hero KO
     if (target && target.hp !== undefined && target.hp <= 0) {
+      target.diedOnTurn = this.gs.turn; // Track when hero died (Initiation Ritual, etc.)
       await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source });
 
       // Cleanup: discard equip artifacts and handle island zone removal
@@ -1250,11 +1500,14 @@ class GameEngine {
 
   async actionDestroyCard(source, targetCard) {
     if (!targetCard) return;
+    if (targetCard.counters?.immovable) return; // Cannot be destroyed or removed
     this.log('destroy', { source: source?.name, target: targetCard.name });
     await this.actionMoveCard(targetCard, ZONES.DISCARD);
   }
 
   async actionMoveCard(cardInstance, toZone, toHeroIdx, toSlot) {
+    // Immovable cards cannot leave their zone
+    if (cardInstance.counters?.immovable && toZone !== cardInstance.zone) return;
     const fromZone = cardInstance.zone;
     const fromHeroIdx = cardInstance.heroIdx;
 
@@ -1295,6 +1548,110 @@ class GameEngine {
         this.log('discard', { player: ps.username, card: cardName });
         await this.runHooks(HOOKS.ON_DISCARD, { playerIdx, card: inst, cardName });
       }
+    }
+  }
+
+  // ─── SAFE SUPPORT ZONE PLACEMENT ─────────
+
+  /**
+   * Safely place a card into a support zone with zone-occupied fallback.
+   * If the desired slot is occupied, tries other free BASE zones (0–2) on the same hero.
+   * If no free zone exists, returns null — caller handles fizzle/discard.
+   *
+   * Does NOT fire onPlay/onCardEnterZone hooks — caller is responsible for those
+   * (since hook context varies by card type: creature, equip, token, etc.).
+   *
+   * @param {string} cardName - Card to place
+   * @param {number} playerIdx - Owner player index
+   * @param {number} heroIdx - Target hero index
+   * @param {number} zoneSlot - Desired zone slot
+   * @returns {{ inst: CardInstance, actualSlot: number } | null}
+   */
+  safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return null;
+    if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
+
+    let actualSlot = zoneSlot;
+
+    // Check if desired slot is occupied
+    if ((ps.supportZones[heroIdx][actualSlot] || []).length > 0) {
+      // Find another free base zone (0–2) on the same hero
+      actualSlot = -1;
+      for (let z = 0; z < 3; z++) {
+        if (z !== zoneSlot && ((ps.supportZones[heroIdx][z] || []).length === 0)) {
+          actualSlot = z;
+          break;
+        }
+      }
+      if (actualSlot < 0) {
+        this.log('support_zone_full', { card: cardName, heroIdx, reason: 'no_free_zone' });
+        return null; // No free zones — caller handles fizzle
+      }
+      this.log('support_zone_relocated', { card: cardName, heroIdx, from: zoneSlot, to: actualSlot });
+    }
+
+    // Place the card
+    if (!ps.supportZones[heroIdx][actualSlot]) ps.supportZones[heroIdx][actualSlot] = [];
+    ps.supportZones[heroIdx][actualSlot] = [cardName];
+    const inst = this._trackCard(cardName, playerIdx, 'support', heroIdx, actualSlot);
+    return { inst, actualSlot };
+  }
+
+  /**
+   * Prompt a player to choose cards to discard from their hand.
+   * Uses the standard forceDiscard UI.
+   * @param {number} playerIdx - The player who must discard
+   * @param {number} count - Number of cards to discard
+   * @param {object} opts - { title, source }
+   */
+  async actionPromptForceDiscard(playerIdx, count, opts = {}) {
+    // First-turn protection blocks forced discard
+    if (this.gs.firstTurnProtectedPlayer === playerIdx) {
+      this.log('discard_blocked', { player: this.gs.players[playerIdx]?.username, reason: 'shielded' });
+      return;
+    }
+    const ps = this.gs.players[playerIdx];
+    if (!ps || (ps.hand || []).length === 0) return;
+
+    const toDiscard = Math.min(count, ps.hand.length);
+    for (let i = 0; i < toDiscard; i++) {
+      if ((ps.hand || []).length === 0) break;
+
+      const result = await this.promptGeneric(playerIdx, {
+        type: 'forceDiscard',
+        count: 1,
+        title: opts.title || opts.source || 'Forced Discard',
+        description: `You must discard ${toDiscard - i} more card${toDiscard - i > 1 ? 's' : ''}.`,
+        cancellable: false,
+      });
+
+      if (!result || result.cardName == null) {
+        // Safety fallback: auto-pop
+        const cardName = ps.hand.pop();
+        if (cardName) {
+          ps.discardPile.push(cardName);
+          this.log('forced_discard', { player: ps.username, card: cardName, source: opts.source });
+        }
+      } else {
+        const handIdx = result.handIndex;
+        if (handIdx != null && handIdx >= 0 && handIdx < ps.hand.length && ps.hand[handIdx] === result.cardName) {
+          ps.hand.splice(handIdx, 1);
+        } else {
+          const fallbackIdx = ps.hand.indexOf(result.cardName);
+          if (fallbackIdx >= 0) ps.hand.splice(fallbackIdx, 1);
+          else continue;
+        }
+        ps.discardPile.push(result.cardName);
+        this.log('forced_discard', { player: ps.username, card: result.cardName, source: opts.source });
+      }
+
+      const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: result?.cardName })[0];
+      if (inst) {
+        inst.zone = ZONES.DISCARD;
+        await this.runHooks(HOOKS.ON_DISCARD, { playerIdx, card: inst, cardName: result.cardName, _skipReactionCheck: true });
+      }
+      this.sync();
     }
   }
 
@@ -1409,6 +1766,20 @@ class GameEngine {
     const statusDef = STATUS_EFFECTS[statusName];
     const isNegative = statusDef?.negative === true;
 
+    // Helper: play animation on blocked status (find hero position first)
+    const playBlockedAnim = () => {
+      if (!opts.animationType) return;
+      const ownerIdx = this._findHeroOwner(target);
+      if (ownerIdx < 0) return;
+      const ps = this.gs.players[ownerIdx];
+      const heroIdx = (ps.heroes || []).indexOf(target);
+      if (heroIdx >= 0) {
+        this._broadcastEvent('play_zone_animation', {
+          type: opts.animationType, owner: ownerIdx, heroIdx, zoneSlot: -1,
+        });
+      }
+    };
+
     if (isNegative) {
       // First-turn protection: block ALL negative statuses on protected player's heroes
       if (this.gs.firstTurnProtectedPlayer != null) {
@@ -1416,6 +1787,7 @@ class GameEngine {
         const ps = this.gs.players[protectedIdx];
         if (ps && (ps.heroes || []).includes(target)) {
           this.log('status_blocked', { target: this._heroLabel(target), status: statusName, reason: 'shielded' });
+          playBlockedAnim();
           return false;
         }
       }
@@ -1423,12 +1795,14 @@ class GameEngine {
       // Immune status blocks all negative statuses
       if (target.statuses?.immune) {
         this.log('status_blocked', { target: target.name || this._heroLabel(target), status: statusName, reason: 'immune' });
+        playBlockedAnim();
         return false;
       }
 
       // Specific immunity (burn_immune, freeze_immune, etc.)
       if (statusDef?.immuneKey && target.statuses?.[statusDef.immuneKey]) {
         this.log('status_blocked', { target: target.name || this._heroLabel(target), status: statusName, reason: statusDef.immuneKey });
+        playBlockedAnim();
         return false;
       }
     }
@@ -1599,6 +1973,107 @@ class GameEngine {
     this.sync();
   }
 
+  // ─── CREATURE NEGATION ──────────────────
+
+  /**
+   * Negate a creature's effects with automatic expiry.
+   * Generic handler used by Dark Gear, Necromancy, and future negation effects.
+   * Sets inst.counters.negated = 1 and creates a timed buff that clears it on expiry.
+   * @param {CardInstance} inst - The creature to negate
+   * @param {string} source - Source name (e.g. 'Dark Gear', 'Necromancy')
+   * @param {object} opts
+   * @param {number} opts.expiresAtTurn - Turn number when negation expires
+   * @param {number} opts.expiresForPlayer - Player index whose turn start triggers expiry
+   * @param {string} [opts.buffKey] - Custom buff key (default: auto-generated from source)
+   * @param {string} [opts.removeAnim] - Animation to play when negation expires
+   */
+  actionNegateCreature(inst, source, opts = {}) {
+    if (!inst) return;
+    inst.counters.negated = 1;
+    if (!inst.counters.buffs) inst.counters.buffs = {};
+    const buffKey = opts.buffKey || `${source.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_negated`;
+    inst.counters.buffs[buffKey] = {
+      expiresAtTurn: opts.expiresAtTurn,
+      expiresForPlayer: opts.expiresForPlayer,
+      clearCountersOnExpire: ['negated'],
+      source,
+      ...(opts.removeAnim ? { removeAnim: opts.removeAnim } : {}),
+    };
+    this.log('creature_negated', { creature: inst.name, source, buffKey });
+    this.sync();
+  }
+
+  // ─── ATK MODIFICATION ─────────────────────
+
+  /**
+   * Grant ATK to a hero and track it on the source card instance.
+   * Generic handler for Fighting, Sacred Hammer, equipment, etc.
+   * @param {CardInstance} cardInst - The card granting the ATK (tracks amount for revocation)
+   * @param {object} hero - The hero object
+   * @param {number} ownerIdx - Player index
+   * @param {number} heroIdx - Hero index
+   * @param {number} amount - ATK to add
+   */
+  actionGrantAtk(cardInst, hero, ownerIdx, heroIdx, amount) {
+    if (!hero || !amount) return;
+    hero.atk = (hero.atk || 0) + amount;
+    cardInst.counters.atkGranted = (cardInst.counters.atkGranted || 0) + amount;
+    this._broadcastEvent('fighting_atk_change', { owner: ownerIdx, heroIdx, amount });
+    this.log('atk_grant', { hero: hero.name, amount, source: cardInst.name });
+    this.sync();
+  }
+
+  /**
+   * Revoke ATK previously granted by a card instance.
+   * Reads the stored atkGranted counter and subtracts it.
+   * @param {CardInstance} cardInst - The card whose ATK grant to revoke
+   * @param {object} hero - The hero object
+   * @param {number} ownerIdx - Player index
+   * @param {number} heroIdx - Hero index
+   */
+  actionRevokeAtk(cardInst, hero, ownerIdx, heroIdx) {
+    const granted = cardInst.counters.atkGranted || 0;
+    if (!hero || granted <= 0) return;
+    hero.atk = Math.max(0, (hero.atk || 0) - granted);
+    this._broadcastEvent('fighting_atk_change', { owner: ownerIdx, heroIdx, amount: -granted });
+    this.log('atk_revoke', { hero: hero.name, amount: granted, source: cardInst.name });
+    this.sync();
+  }
+
+  /**
+   * Check if a creature status can be applied (generic immunity check).
+   * Checks for `inst.counters[statusName + '_immune']`.
+   * Used by card scripts before directly setting creature counters.
+   * @param {CardInstance} inst - The creature
+   * @param {string} statusName - e.g. 'frozen', 'burned', 'poisoned'
+   * @returns {boolean} true if the status CAN be applied
+   */
+  canApplyCreatureStatus(inst, statusName) {
+    if (!inst) return false;
+    const immuneKey = statusName + '_immune';
+    if (inst.counters[immuneKey]) return false;
+    return true;
+  }
+
+  /**
+   * Check if a creature has a specific immunity.
+   * Checks creature's own counters AND first-turn protection.
+   * Generic handler for targeting_immune, control_immune, etc.
+   * @param {CardInstance} inst - The creature to check
+   * @param {string} immuneType - Immunity counter key (e.g. 'targeting_immune', 'control_immune')
+   * @returns {boolean}
+   */
+  isCreatureImmune(inst, immuneType) {
+    if (!inst) return false;
+    // Check creature's own immunity counter
+    if (inst.counters[immuneType]) return true;
+    // First-turn protection grants targeting + control immunity
+    if (this.gs.firstTurnProtectedPlayer != null) {
+      if (inst.controller === this.gs.firstTurnProtectedPlayer) return true;
+    }
+    return false;
+  }
+
   // ─── IMMEDIATE HERO ACTION (Coffee, etc.) ──────
 
   /**
@@ -1734,12 +2209,19 @@ class GameEngine {
       if ((ps.supportZones[heroIdx][zoneSlot] || []).length > 0) return { played: false };
 
       ps.hand.splice(handIndex, 1);
-      ps.supportZones[heroIdx][zoneSlot] = [cardName];
-      const inst = this._trackCard(cardName, playerIdx, 'support', heroIdx, zoneSlot);
 
-      this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot, cardName });
+      // Safe placement — handles zone-occupied fallback
+      const placeResult = this.safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot);
+      if (!placeResult) {
+        ps.discardPile.push(cardName);
+        this.log('creature_fizzle', { card: cardName, reason: 'zone_occupied', by: config.title });
+        return { played: false };
+      }
+      const { inst, actualSlot } = placeResult;
 
-      await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot, _skipReactionCheck: true });
+      this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: actualSlot, cardName });
+
+      await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualSlot, _skipReactionCheck: true });
       await this.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _skipReactionCheck: true });
 
       this.log('immediate_action', { hero: hero.name, card: cardName, type: 'Creature', by: config.title });
@@ -1777,6 +2259,15 @@ class GameEngine {
    * Start the game's first turn. Call once after init().
    */
   async startGame() {
+    // Track hand cards — starting hand is drawn before engine init,
+    // so hand cards need to be registered here for hand-zone hooks to fire.
+    for (let pi = 0; pi < 2; pi++) {
+      const ps = this.gs.players[pi];
+      for (const cardName of (ps.hand || [])) {
+        this._trackCard(cardName, pi, ZONES.HAND);
+      }
+    }
+
     // First turn rule: opponent of the starting player is fully shielded
     // (blocks ALL damage, ALL status effects, discard, mill — everything)
     const oppIdx = this.gs.activePlayer === 0 ? 1 : 0;
@@ -1810,6 +2301,16 @@ class GameEngine {
         ps.dealtDamageToOpponent = false;
         ps.potionLocked = false;
         ps.potionsUsedThisTurn = 0;
+        ps.attacksPlayedThisTurn = 0;
+        ps.comboLockHeroIdx = null;
+        ps.heroesActedThisTurn = [];
+        ps.heroesAttackedThisTurn = [];
+        ps.bonusActions = null;
+        // Reset per-hero attack tracking (Ghuanjun duplicate ban)
+        for (const hero of (ps.heroes || [])) {
+          if (hero?.ghuanjunAttacksUsed) hero.ghuanjunAttacksUsed = [];
+          if (hero?._ghuanjunComboUsed) hero._ghuanjunComboUsed = false;
+        }
       }
     }
     this.log('turn_start', { turn: this.gs.turn, activePlayer: this.gs.activePlayer, username: activePs?.username });
@@ -1818,11 +2319,13 @@ class GameEngine {
     // This ensures burn damage only hits burns from previous turns,
     // not burns applied during this turn's ON_TURN_START (e.g. Barker → Fiery Slime)
     await this.processStatusExpiry('START');
+
+    // Process buff expiry (Cloudy, Immortal, etc.) BEFORE burn/poison damage
+    // So end-of-turn buffs like Immortal don't protect during the next turn's ticks
+    await this._processBuffExpiry();
+
     await this.processBurnDamage();
     await this.processPoisonDamage();
-
-    // Process buff expiry (Cloudy, etc.) — after burn/poison so buffs protect during those
-    await this._processBuffExpiry();
 
     // Now fire turn-start hooks (Barker, Slime level-ups, Rancher restore, etc.)
     await this.runHooks(HOOKS.ON_TURN_START, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
@@ -1983,6 +2486,14 @@ class GameEngine {
 
     const allowed = legalTransitions[current];
     if (!allowed || !allowed.includes(targetPhase)) return false;
+
+    // Clear bonus actions when leaving Action Phase
+    if (current === PHASES.ACTION) {
+      const ps = this.gs.players[playerIdx];
+      if (ps?.bonusActions) {
+        ps.bonusActions = null;
+      }
+    }
 
     const phaseName = PHASE_NAMES[current];
     await this.runHooks(HOOKS.ON_PHASE_END, { phase: phaseName, phaseIndex: current });
@@ -2157,6 +2668,7 @@ class GameEngine {
           cancellable: config.cancellable !== undefined ? config.cancellable : true,
           exclusiveTypes: config.exclusiveTypes || false,
           maxPerType: config.maxPerType || {},
+          maxTotal: config.maxTotal || undefined,
         },
       };
       this.sync();
@@ -2178,6 +2690,89 @@ class GameEngine {
   // ─── GENERAL-PURPOSE PROMPT SYSTEM ─────────
   // Uses gs.effectPrompt for state sync (survives reconnects).
   // Types: 'confirm', 'cardGallery', 'zonePick'
+
+  // ─── TARGET REDIRECT (Challenge, etc.) ────────
+
+  /**
+   * Check if the selected target's owner has a redirect card (Challenge, etc.).
+   * Called by promptDamageTarget after target selection.
+   * If a redirect is activated, returns the new target. Otherwise null.
+   *
+   * @param {number} targetOwnerIdx - Owner of the selected target
+   * @param {object} selected - The selected target { id, type, owner, heroIdx, cardName, ... }
+   * @param {Array} validTargets - All valid targets for the effect
+   * @param {object} config - The targeting config from promptDamageTarget
+   * @param {CardInstance} sourceCard - The card that initiated the targeting
+   * @returns {object|null} Redirected target, or null
+   */
+  async _checkTargetRedirect(targetOwnerIdx, selected, validTargets, config, sourceCard) {
+    const ps = this.gs.players[targetOwnerIdx];
+    if (!ps) return null;
+
+    // Scan hand for redirect cards
+    const seen = new Set();
+    for (let hi = 0; hi < ps.hand.length; hi++) {
+      const cardName = ps.hand[hi];
+      if (seen.has(cardName)) continue;
+      seen.add(cardName);
+
+      const script = loadCardEffect(cardName);
+      if (!script?.isTargetRedirect) continue;
+
+      // Check card-specific redirect eligibility
+      if (script.canRedirect && !script.canRedirect(this.gs, targetOwnerIdx, selected, validTargets, config, this)) continue;
+
+      // Prompt the target's owner
+      const attackerName = config.title || sourceCard?.name || 'an effect';
+      const confirmed = await this.promptGeneric(targetOwnerIdx, {
+        type: 'confirm',
+        title: cardName,
+        message: `Your ${selected.cardName} was targeted by ${attackerName}! Activate ${cardName}?`,
+        confirmLabel: `⚔️ ${cardName}!`,
+        cancelLabel: 'No',
+        cancellable: true,
+      });
+
+      if (!confirmed) continue; // Declined — check next redirect card
+
+      // Run the card's redirect logic (hero selection, chain UI, etc.)
+      const result = await script.onRedirect(this, targetOwnerIdx, selected, validTargets, config, sourceCard);
+      if (!result?.redirectTo) continue; // Redirect was cancelled
+
+      // Consume the card from hand
+      const removeIdx = ps.hand.indexOf(cardName);
+      if (removeIdx >= 0) {
+        ps.hand.splice(removeIdx, 1);
+        ps.discardPile.push(cardName);
+        // Untrack hand instance
+        const inst = this.cardInstances.find(c =>
+          c.owner === targetOwnerIdx && c.zone === 'hand' && c.name === cardName
+        );
+        if (inst) this._untrackCard(inst.id);
+      }
+
+      // Reveal to other player + spectators
+      const otherIdx = targetOwnerIdx === 0 ? 1 : 0;
+      const otherSid = this.gs.players[otherIdx]?.socketId;
+      if (otherSid) this.io.to(otherSid).emit('card_reveal', { cardName });
+      if (this.room.spectators) {
+        for (const spec of this.room.spectators) {
+          if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName });
+        }
+      }
+
+      this.log('target_redirect', {
+        redirectCard: cardName,
+        originalTarget: selected.cardName,
+        newTarget: result.redirectTo.cardName,
+        player: ps.username,
+      });
+
+      return result.redirectTo;
+    }
+
+    return null; // No redirect
+  }
 
   /**
    * Show a generic prompt to a player. Returns a Promise that resolves
@@ -2251,10 +2846,11 @@ class GameEngine {
 
   /** Hooks that should NOT trigger reaction checks */
   static REACTION_SKIP_HOOKS = new Set([
-    'onPlay', 'onCardEnterZone', 'onPhaseStart', 'onGameStart',
+    'onPlay', 'onCardEnterZone', 'onPhaseStart', 'onGameStart', 'onBeforeHandDraw',
     'onChainStart', 'onChainResolve', 'onEffectNegated',
     'beforeDamage', 'beforeLevelChange',
     'onResourceSpend', 'onReactionActivated', 'onCardActivation',
+    'onActionUsed', 'onAdditionalActionUsed',
   ]);
 
   /**
@@ -2266,12 +2862,13 @@ class GameEngine {
    * @returns {{ negated: boolean, chainFormed: boolean, resolveResult: any }}
    */
   async executeCardWithChain(cardInfo) {
-    const { cardName, owner, cardType, resolve } = cardInfo;
+    const { cardName, owner, cardType, resolve, goldCost } = cardInfo;
 
     const initialLink = {
       id: uuidv4().substring(0, 12),
       cardName, owner,
       cardType: cardType || 'Unknown',
+      goldCost: goldCost || 0,
       isInitialCard: true,
       negated: false,
       chainClosed: false,
@@ -2321,6 +2918,7 @@ class GameEngine {
         cardName: hookCtx._initialCard.cardName,
         owner: hookCtx._initialCard.owner,
         cardType: hookCtx._initialCard.cardType || 'Unknown',
+        goldCost: hookCtx._initialCard.goldCost || 0,
         isInitialCard: true,
         negated: false, chainClosed: false,
         resolve: hookCtx._initialCard.resolve || null,
@@ -2388,11 +2986,15 @@ class GameEngine {
         if (!script?.isReaction) continue;
 
         const cardData = allCards[cardName];
-        const cost = cardData?.cost || 0;
+        const baseCost = cardData?.cost || 0;
+        // Support dynamic cost (Tool Freezer, etc.) — overrides card data cost
+        const chainCtx = { chain, eventDesc };
+        const cost = script.dynamicCost
+          ? script.dynamicCost(this.gs, pi, this, chainCtx)
+          : baseCost;
         if ((ps.gold || 0) < cost) continue;
 
         // Check reaction condition with chain context
-        const chainCtx = { chain, eventDesc };
         if (script.reactionCondition && !script.reactionCondition(this.gs, pi, this, chainCtx)) continue;
 
         // Prompt the player
@@ -2417,6 +3019,7 @@ class GameEngine {
           id: uuidv4().substring(0, 12),
           cardName, owner: pi,
           cardType: cardData?.cardType || 'Unknown',
+          goldCost: cost,
           isInitialCard: false,
           negated: false, chainClosed: false,
           resolve: script.resolve
@@ -2460,9 +3063,10 @@ class GameEngine {
       const link = chain[i];
 
       if (link.negated) {
-        // Negation visual — glitch + 🚫
+        // Negation visual — glitch + 🚫 (or custom style like ice)
         this._broadcastEvent('reaction_chain_link_negated', {
           linkIndex: i, cardName: link.cardName, owner: link.owner,
+          negationStyle: link.negationStyle || null,
         });
         this.log('card_negated', { card: link.cardName, owner: link.owner });
         await this._delay(600);
@@ -2512,9 +3116,10 @@ class GameEngine {
    * Negate a specific link in a reaction chain.
    * Called by card effects (Camera, etc.) during LIFO resolution.
    */
-  negateChainLink(chain, linkIndex) {
+  negateChainLink(chain, linkIndex, opts = {}) {
     if (linkIndex >= 0 && linkIndex < chain.length) {
       chain[linkIndex].negated = true;
+      if (opts.negationStyle) chain[linkIndex].negationStyle = opts.negationStyle;
     }
   }
 
@@ -2524,7 +3129,7 @@ class GameEngine {
       links: chain.map(l => ({
         id: l.id, cardName: l.cardName, owner: l.owner,
         cardType: l.cardType, isInitialCard: l.isInitialCard,
-        negated: l.negated, chainClosed: l.chainClosed,
+        negated: l.negated, negationStyle: l.negationStyle || null, chainClosed: l.chainClosed,
       })),
     });
   }
@@ -2622,8 +3227,9 @@ class GameEngine {
       if (inst.counters.additionalActionType !== typeId) continue;
       if (!inst.counters.additionalActionAvail) continue;
       if (providerCardId && inst.id !== providerCardId) continue;
-      inst.counters.additionalActionAvail = 0;
-      this.log('additional_action_used', { typeId, provider: inst.name, player: this.gs.players[playerIdx]?.username });
+      // Decrement (supports multi-charge providers like Ghuanjun combo)
+      inst.counters.additionalActionAvail = Math.max(0, (inst.counters.additionalActionAvail || 1) - 1);
+      this.log('additional_action_used', { typeId, provider: inst.name, remaining: inst.counters.additionalActionAvail, player: this.gs.players[playerIdx]?.username });
       return inst;
     }
     return null;
@@ -2714,6 +3320,9 @@ class GameEngine {
         const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
         if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
 
+        // Check script-defined activation condition (Necromancy, etc.)
+        if (script.canActivateAction && !script.canActivateAction(this.gs, playerIdx, hi, slot.length, this)) continue;
+
         result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length });
       }
     }
@@ -2765,6 +3374,34 @@ class GameEngine {
 
       result.push({ heroIdx: hi, heroName: hero.name });
     }
+
+    // Also check equipped hero cards in support zones (Initiation Ritual)
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+
+      for (const inst of this.cardInstances) {
+        if (inst.owner !== playerIdx || inst.zone !== 'support' || inst.heroIdx !== hi) continue;
+        if (!inst.counters?.treatAsEquip) continue;
+        const equipScript = loadCardEffect(inst.name);
+        if (!equipScript?.heroEffect) continue;
+
+        const hoptKey = `hero-effect:${inst.name}:${playerIdx}:${hi}`;
+        if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
+
+        if (equipScript.canActivateHeroEffect) {
+          try {
+            const ctx = this._createContext(inst, { event: 'canHeroEffectCheck' });
+            if (!equipScript.canActivateHeroEffect(ctx)) continue;
+          } catch { continue; }
+        }
+
+        result.push({ heroIdx: hi, heroName: hero.name, equippedCard: inst.name });
+        // No break — allow multiple equipped hero effects per hero
+      }
+    }
+
     return result;
   }
 
@@ -2950,23 +3587,55 @@ class GameEngine {
     if (!hero || !hero.name) return;
     if (!hero.statuses) hero.statuses = {};
 
+    // Helper: play the animation even when blocked (the effect visually "hits" but doesn't stick)
+    const playBlockedAnim = () => {
+      if (opts.animationType) {
+        this._broadcastEvent('play_zone_animation', {
+          type: opts.animationType, owner: playerIdx, heroIdx, zoneSlot: -1,
+        });
+      }
+    };
+
     // Shielded (first-turn protection) blocks ALL status effects — no exceptions
     if (hero.statuses.shielded && statusName !== 'shielded') {
       this.log('status_blocked', { target: hero.name, status: statusName, reason: 'shielded' });
+      playBlockedAnim();
       return;
+    }
+
+    // Submerged heroes: immune to all status effects while owner has other alive non-submerged heroes
+    if (hero.buffs?.submerged) {
+      const ps = this.gs.players[playerIdx];
+      const otherAlive = (ps.heroes || []).some(h => h !== hero && h.name && h.hp > 0 && !h.buffs?.submerged);
+      if (otherAlive) {
+        this.log('status_blocked', { target: hero.name, status: statusName, reason: 'submerged' });
+        playBlockedAnim();
+        return;
+      }
     }
 
     // Regular Immune (post-CC) only blocks CC effects: frozen, stunned, negated
+    // Can be bypassed via opts.bypassImmune (Tiger Kick 3rd attack, etc.)
     const CC_STATUSES = ['frozen', 'stunned', 'negated'];
-    if (hero.statuses.immune && CC_STATUSES.includes(statusName)) {
-      this.log('status_blocked', { target: hero.name, status: statusName, reason: 'immune' });
+
+    // Universal negative status immunity (Divine Gift of Coolness, etc.)
+    const statusDef = STATUS_EFFECTS[statusName];
+    if (statusDef?.negative && hero.buffs?.negative_status_immune) {
+      this.log('status_blocked', { target: hero.name, status: statusName, reason: 'negative_status_immune' });
+      playBlockedAnim();
       return;
     }
 
-    // Per-status immunity (e.g. poison_immune blocks poisoned)
-    const statusDef = STATUS_EFFECTS[statusName];
+    if (!opts.bypassImmune && hero.statuses.immune && CC_STATUSES.includes(statusName)) {
+      this.log('status_blocked', { target: hero.name, status: statusName, reason: 'immune' });
+      playBlockedAnim();
+      return;
+    }
+
+    // Per-status immunity (e.g. poison_immune blocks poisoned, freeze_immune blocks frozen)
     if (statusDef?.immuneKey && hero.statuses[statusDef.immuneKey]) {
       this.log('status_blocked', { target: hero.name, status: statusName, reason: statusDef.immuneKey });
+      playBlockedAnim();
       return;
     }
 
@@ -3097,7 +3766,7 @@ class GameEngine {
     // Apply damage to non-cancelled entries
     for (const e of entries) {
       if (e.cancelled) continue;
-      const actualAmount = Math.max(0, e.amount);
+      let actualAmount = Math.max(0, e.amount);
       if (actualAmount === 0) continue;
 
       // Track: source player dealt damage to opponent's creature
@@ -3110,6 +3779,24 @@ class GameEngine {
       if (e.animType) {
         this._broadcastEvent('play_zone_animation', { type: e.animType, owner: e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot });
         await this._delay(300);
+      }
+
+      // Immortal buff: damage cannot drop HP below 1
+      if (e.inst.counters?.buffs?.immortal && e.inst.counters.currentHp > 0) {
+        const maxDmg = Math.max(0, e.inst.counters.currentHp - 1);
+        if (actualAmount > maxDmg) {
+          actualAmount = maxDmg;
+          this.log('damage_capped', { target: e.inst.name, reason: 'immortal', cappedTo: maxDmg });
+        }
+      }
+
+      // Generic HP-1 cap (set by beforeCreatureDamageBatch hooks, e.g. Ghuanjun)
+      if (e.capAtHPMinus1 && e.inst.counters.currentHp > 0) {
+        const maxDmg = Math.max(0, e.inst.counters.currentHp - 1);
+        if (actualAmount > maxDmg) {
+          actualAmount = maxDmg;
+          this.log('damage_capped', { target: e.inst.name, reason: 'capAtHPMinus1', cappedTo: maxDmg });
+        }
       }
 
       e.inst.counters.currentHp -= actualAmount;
@@ -3302,8 +3989,9 @@ class GameEngine {
       // Find equip artifact CardInstances on this hero's support zones
       const equipInstances = this.cardInstances.filter(c => {
         if (c.owner !== pi || c.zone !== 'support' || c.heroIdx !== hi) return false;
+        if (c.counters?.immovable) return false; // Immovable cards stay even on dead heroes
         const script = c.loadScript();
-        return script?.isEquip === true;
+        return script?.isEquip === true || c.counters?.treatAsEquip === true;
       });
 
       for (const inst of equipInstances) {

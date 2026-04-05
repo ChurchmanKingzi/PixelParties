@@ -67,7 +67,7 @@ module.exports = {
         await engine.addHeroStatus(target.owner, target.heroIdx, 'frozen', { appliedBy: ctx.cardOwner, animationType: 'ice_encase' });
       } else if (target.type === 'equip') {
         const inst = engine.cardInstances.find(c => c.owner === target.owner && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx);
-        if (inst) {
+        if (inst && engine.canApplyCreatureStatus(inst, 'frozen')) {
           inst.counters.frozen = 1;
           engine._broadcastEvent('play_zone_animation', { type: 'ice_encase', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx });
         }

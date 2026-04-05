@@ -18061,7 +18061,7 @@
     "level": null,
     "hp": null,
     "atk": null,
-    "cost": 8,
+    "cost": 4,
     "effect": "The equipped Hero's Attack stat is increased by 30. Additionally, when the equipped Hero hits a Burned target with an Attack, that Attack's damage is increased by the attacker's Attack stat.",
     "archetype": "",
     "setID": "PP MBS1",

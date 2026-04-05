@@ -62,6 +62,7 @@ async function initDatabase() {
   try { await db.execute("ALTER TABLE decks ADD COLUMN cover_card TEXT DEFAULT ''"); } catch {}
   try { await db.execute("ALTER TABLE decks ADD COLUMN skins TEXT DEFAULT '{}'"); } catch {}
   try { await db.execute('ALTER TABLE users ADD COLUMN sc INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute("ALTER TABLE users ADD COLUMN board TEXT DEFAULT NULL"); } catch {}
 
   await db.execute(`CREATE TABLE IF NOT EXISTS hero_stats (
     user_id TEXT NOT NULL,
@@ -110,6 +111,18 @@ async function initDatabase() {
   )`);
   await db.execute('CREATE INDEX IF NOT EXISTS idx_sc_log_user ON sc_log(user_id)');
   await db.execute('CREATE INDEX IF NOT EXISTS idx_sc_log_user_date ON sc_log(user_id, created_at)');
+
+  // Shop purchases table
+  await db.execute(`CREATE TABLE IF NOT EXISTS user_shop_items (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    item_type TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    purchased_at INTEGER DEFAULT (unixepoch()),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(user_id, item_type, item_id)
+  )`);
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_shop_items_user ON user_shop_items(user_id)');
 
   console.log('[DB] Tables initialized');
 }
@@ -181,13 +194,17 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: u.avatar, cardback: u.cardback, bio: u.bio || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at };
+  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at };
 }
 
 // ===== PROFILE ROUTES =====
 app.put('/api/profile', authMiddleware, async (req, res) => {
-  const { color, avatar, cardback, bio } = req.body;
-  await db.run('UPDATE users SET color = ?, avatar = ?, cardback = ?, bio = ? WHERE id = ?', [color || '#00f0ff', avatar || null, cardback || null, (bio || '').slice(0, 200), req.user.userId]);
+  const { color, avatar, cardback, bio, board } = req.body;
+  if (board !== undefined) {
+    await db.run('UPDATE users SET color = ?, avatar = ?, cardback = ?, bio = ?, board = ? WHERE id = ?', [color || '#00f0ff', avatar || null, cardback || null, (bio || '').slice(0, 200), board || null, req.user.userId]);
+  } else {
+    await db.run('UPDATE users SET color = ?, avatar = ?, cardback = ?, bio = ? WHERE id = ?', [color || '#00f0ff', avatar || null, cardback || null, (bio || '').slice(0, 200), req.user.userId]);
+  }
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ user: sanitizeUser(user) });
 });
@@ -600,6 +617,188 @@ let SKINS_DATA = {};
 try { SKINS_DATA = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'skins.json'), 'utf-8')); } catch {}
 app.get('/api/skins', (req, res) => res.json({ skins: SKINS_DATA }));
 
+// ===== SHOP SYSTEM =====
+const SHOP_PRICES = { avatar: 10, sleeve: 10, board: 10, skin: 10 };
+const RANDOM_PRICES = { skin: 5, avatar: 5, sleeve: 5 };
+
+// Scan a shop directory and return available items
+function scanShopDir(subdir) {
+  const dir = path.join(__dirname, 'data', 'shop', subdir);
+  try {
+    return fs.readdirSync(dir).filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()));
+  } catch { return []; }
+}
+
+// Scan skins directory
+function scanSkinFiles() {
+  const dir = path.join(__dirname, 'cards', 'skins');
+  try {
+    return fs.readdirSync(dir).filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()));
+  } catch { return []; }
+}
+
+// Build flat list of all skin IDs from skins.json that have images on disk
+function getAvailableSkins() {
+  const skinFiles = new Set(scanSkinFiles().map(f => path.basename(f, path.extname(f))));
+  // Only include skins for heroes whose card images exist in ./cards
+  const cardsDir = path.join(__dirname, 'cards');
+  let heroFiles = [];
+  try { heroFiles = fs.readdirSync(cardsDir).filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase())); } catch {}
+  const heroSet = new Set(heroFiles.map(f => {
+    const stem = path.basename(f, path.extname(f));
+    return nameByStripped[stem] || stem;
+  }));
+  const result = [];
+  for (const [heroName, skinNames] of Object.entries(SKINS_DATA)) {
+    if (!heroSet.has(heroName)) continue;
+    for (const skinName of skinNames) {
+      if (skinFiles.has(skinName)) {
+        result.push({ heroName, skinName });
+      }
+    }
+  }
+  return result;
+}
+
+// GET /api/shop/catalog — all available shop items
+app.get('/api/shop/catalog', (req, res) => {
+  const avatars = scanShopDir('avatars').map(f => ({ id: path.basename(f, path.extname(f)), file: f }));
+  const sleeves = scanShopDir('sleeves').map(f => ({ id: path.basename(f, path.extname(f)), file: f }));
+  const boards = scanShopDir('boards').filter(f => /^board\d+\./i.test(f)).map(f => ({ id: path.basename(f, path.extname(f)), file: f }));
+
+  // Skins: only for heroes whose cards exist in ./cards
+  const cardsDir = path.join(__dirname, 'cards');
+  let heroFiles = [];
+  try { heroFiles = fs.readdirSync(cardsDir).filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase())); } catch {}
+  const heroSet = new Set(heroFiles.map(f => {
+    const stem = path.basename(f, path.extname(f));
+    return nameByStripped[stem] || stem;
+  }));
+
+  const skinFiles = new Set(scanSkinFiles().map(f => path.basename(f, path.extname(f))));
+  const skins = [];
+  for (const [heroName, skinNames] of Object.entries(SKINS_DATA)) {
+    if (!heroSet.has(heroName)) continue;
+    for (const skinName of skinNames) {
+      if (skinFiles.has(skinName)) {
+        skins.push({ id: skinName, heroName, skinName });
+      }
+    }
+  }
+
+  res.json({
+    avatars, sleeves, boards, skins,
+    prices: SHOP_PRICES,
+    randomPrices: RANDOM_PRICES
+  });
+});
+
+// GET /api/shop/owned — user's purchased items
+app.get('/api/shop/owned', authMiddleware, async (req, res) => {
+  const rows = await db.all('SELECT item_type, item_id FROM user_shop_items WHERE user_id = ?', [req.user.userId]);
+  const owned = { avatar: [], sleeve: [], board: [], skin: [] };
+  for (const r of rows) {
+    if (owned[r.item_type]) owned[r.item_type].push(r.item_id);
+  }
+  res.json({ owned });
+});
+
+// POST /api/shop/buy — buy a specific item
+app.post('/api/shop/buy', authMiddleware, async (req, res) => {
+  const { itemType, itemId } = req.body;
+  if (!itemType || !itemId) return res.status(400).json({ error: 'Missing itemType or itemId' });
+  const price = SHOP_PRICES[itemType];
+  if (price === undefined) return res.status(400).json({ error: 'Invalid item type' });
+
+  // Verify item exists
+  if (itemType === 'skin') {
+    const skinFiles = new Set(scanSkinFiles().map(f => path.basename(f, path.extname(f))));
+    if (!skinFiles.has(itemId)) return res.status(404).json({ error: 'Skin not found' });
+  } else {
+    const subdir = itemType === 'avatar' ? 'avatars' : itemType === 'sleeve' ? 'sleeves' : 'boards';
+    const files = scanShopDir(subdir).map(f => path.basename(f, path.extname(f)));
+    if (!files.includes(itemId)) return res.status(404).json({ error: 'Item not found' });
+  }
+
+  // Check already owned
+  const existing = await db.get('SELECT id FROM user_shop_items WHERE user_id = ? AND item_type = ? AND item_id = ?', [req.user.userId, itemType, itemId]);
+  if (existing) return res.status(409).json({ error: 'Already owned' });
+
+  // Check SC balance
+  const user = await db.get('SELECT sc FROM users WHERE id = ?', [req.user.userId]);
+  if ((user.sc || 0) < price) return res.status(400).json({ error: 'Not enough SC' });
+
+  // Deduct and add
+  await db.run('UPDATE users SET sc = sc - ? WHERE id = ?', [price, req.user.userId]);
+  await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id) VALUES (?, ?, ?, ?)', [uuidv4(), req.user.userId, itemType, itemId]);
+
+  const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
+  res.json({ ok: true, sc: updated.sc });
+});
+
+// POST /api/shop/buy-random-skin — buy a random unowned skin
+app.post('/api/shop/buy-random-skin', authMiddleware, async (req, res) => {
+  const user = await db.get('SELECT sc FROM users WHERE id = ?', [req.user.userId]);
+  if ((user.sc || 0) < RANDOM_PRICES.skin) return res.status(400).json({ error: 'Not enough SC' });
+
+  const allSkins = getAvailableSkins();
+  const ownedRows = await db.all("SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'skin'", [req.user.userId]);
+  const ownedSet = new Set(ownedRows.map(r => r.item_id));
+
+  const unowned = allSkins.filter(s => !ownedSet.has(s.skinName));
+  if (unowned.length === 0) return res.status(400).json({ error: 'You already own all available skins!' });
+
+  const pick = unowned[Math.floor(Math.random() * unowned.length)];
+
+  await db.run('UPDATE users SET sc = sc - ? WHERE id = ?', [RANDOM_PRICES.skin, req.user.userId]);
+  await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id) VALUES (?, ?, ?, ?)', [uuidv4(), req.user.userId, 'skin', pick.skinName]);
+
+  const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
+  res.json({ ok: true, sc: updated.sc, skinName: pick.skinName, heroName: pick.heroName });
+});
+
+// POST /api/shop/buy-random — buy a random unowned item of a given type (avatar or sleeve)
+app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
+  const { itemType } = req.body;
+  if (!itemType || !RANDOM_PRICES[itemType]) return res.status(400).json({ error: 'Invalid item type for random buy' });
+  if (itemType === 'skin') return res.status(400).json({ error: 'Use /api/shop/buy-random-skin for skins' });
+
+  const price = RANDOM_PRICES[itemType];
+  const user = await db.get('SELECT sc FROM users WHERE id = ?', [req.user.userId]);
+  if ((user.sc || 0) < price) return res.status(400).json({ error: 'Not enough SC' });
+
+  const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
+  const allItems = scanShopDir(subdir).map(f => path.basename(f, path.extname(f)));
+  const ownedRows = await db.all('SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = ?', [req.user.userId, itemType]);
+  const ownedSet = new Set(ownedRows.map(r => r.item_id));
+
+  const unowned = allItems.filter(id => !ownedSet.has(id));
+  if (unowned.length === 0) return res.status(400).json({ error: 'You already own all available ' + subdir + '!' });
+
+  const pick = unowned[Math.floor(Math.random() * unowned.length)];
+
+  await db.run('UPDATE users SET sc = sc - ? WHERE id = ?', [price, req.user.userId]);
+  await db.run('INSERT INTO user_shop_items (id, user_id, item_type, item_id) VALUES (?, ?, ?, ?)', [uuidv4(), req.user.userId, itemType, pick]);
+
+  const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
+  res.json({ ok: true, sc: updated.sc, itemId: pick, itemType });
+});
+
+// Standard avatars (free defaults in public/avatars/)
+app.get('/api/profile/standard-avatars', (req, res) => {
+  const dir = path.join(__dirname, 'public', 'avatars');
+  try {
+    const files = fs.readdirSync(dir).filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()));
+    res.json({ avatars: files });
+  } catch { res.json({ avatars: [] }); }
+});
+
+// Standard sleeves (shop items in data/shop/sleeves/)
+app.get('/api/profile/standard-sleeves', (req, res) => {
+  const files = scanShopDir('sleeves');
+  res.json({ sleeves: files });
+});
+
 function parseDeck(row) {
   let skins = {};
   try { skins = JSON.parse(row.skins || '{}'); } catch {}
@@ -849,7 +1048,7 @@ function sendGameState(room, playerIdx, extra) {
   const state = {
     myIndex: playerIdx, roomId: room.id,
     players: gs.players.map((ps, pi) => ({
-      username: ps.username, color: ps.color, avatar: ps.avatar,
+      username: ps.username, color: ps.color, avatar: ps.avatar, cardback: ps.cardback || null, board: ps.board || null,
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       surpriseZones: ps.surpriseZones, supportZones: ps.supportZones,
       islandZoneCount: ps.islandZoneCount || [0,0,0],
@@ -864,6 +1063,7 @@ function sendGameState(room, playerIdx, extra) {
       damageLocked: ps.damageLocked || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
+      comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       permanents: ps.permanents || [],
       divineGiftUsed: ps.divineGiftUsed || false,
       deckSkins: ps.deckSkins || {},
@@ -874,9 +1074,12 @@ function sendGameState(room, playerIdx, extra) {
     summonBlocked: gs.summonBlocked || [],
     customPlacementCards: gs.customPlacementCards || [],
     awaitingFirstChoice: gs.awaitingFirstChoice || false,
+    bonusActions: gs.players[playerIdx]?.bonusActions || null,
     mulliganPending: gs.mulliganPending || false,
+    handReturnToDeck: gs.handReturnToDeck || false,
     potionTargeting: gs.potionTargeting || null,
     effectPrompt: gs.effectPrompt || null,
+    heroEffectPending: gs.heroEffectPending || null,
     creatureCounters: room.engine ? (() => {
       const cc = {};
       for (const inst of room.engine.cardInstances) {
@@ -904,6 +1107,30 @@ function sendGameState(room, playerIdx, extra) {
         }
       }
       return [...names];
+    })(),
+    // Per-hero eligibility for function-based inherent actions (Muscle Training, etc.)
+    // Maps card name → array of hero indices that satisfy the inherent condition.
+    // Cards with inherentAction === true (always inherent) are NOT listed here.
+    inherentActionHeroes: (() => {
+      if (!room.engine) return {};
+      const { loadCardEffect } = require('./cards/effects/_loader');
+      const ps2 = gs.players[playerIdx];
+      const result = {};
+      const seen = new Set();
+      for (const cn of (ps2?.hand || [])) {
+        if (seen.has(cn)) continue;
+        seen.add(cn);
+        const s = loadCardEffect(cn);
+        if (!s || typeof s.inherentAction !== 'function') continue;
+        const heroes = [];
+        for (let hi = 0; hi < (ps2?.heroes || []).length; hi++) {
+          if (ps2.heroes[hi]?.name && ps2.heroes[hi].hp > 0 && s.inherentAction(gs, playerIdx, hi, room.engine)) {
+            heroes.push(hi);
+          }
+        }
+        if (heroes.length > 0) result[cn] = heroes;
+      }
+      return result;
     })(),
     unactivatableArtifacts: room.engine ? room.engine.getUnactivatableArtifacts(playerIdx) : [],
     blockedSpells: room.engine ? room.engine.getBlockedSpells(playerIdx) : [],
@@ -939,7 +1166,7 @@ function sendSpectatorGameState(room) {
     myIndex: 0, // Player 0 at bottom, Player 1 at top (host = bottom)
     roomId: room.id,
     players: gs.players.map((ps) => ({
-      username: ps.username, color: ps.color, avatar: ps.avatar,
+      username: ps.username, color: ps.color, avatar: ps.avatar, cardback: ps.cardback || null, board: ps.board || null,
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       surpriseZones: ps.surpriseZones, supportZones: ps.supportZones,
       islandZoneCount: ps.islandZoneCount || [0, 0, 0],
@@ -966,6 +1193,7 @@ function sendSpectatorGameState(room) {
     awaitingFirstChoice: gs.awaitingFirstChoice || false,
     choosingPlayerName,
     mulliganPending: gs.mulliganPending || false,
+    handReturnToDeck: gs.handReturnToDeck || false,
     potionTargeting: gs.potionTargeting ? {
       potionName: gs.potionTargeting.potionName,
       ownerIdx: gs.potionTargeting.ownerIdx,
@@ -974,6 +1202,7 @@ function sendSpectatorGameState(room) {
       validTargets: gs.potionTargeting.validTargets,
     } : null,
     effectPrompt: gs.effectPrompt || null,
+    heroEffectPending: gs.heroEffectPending || null,
     creatureCounters: room.engine ? (() => {
       const cc = {};
       for (const inst of room.engine.cardInstances) {
@@ -1075,7 +1304,7 @@ async function endGame(room, winnerIdx, reason) {
         room._pendingRematch = { roomId: room.id, loserIdx };
         io.to(loserPs.socketId).emit('rematch_choose_first', {});
       } else {
-        startGameEngine(room, room.id, loserIdx);
+        await startGameEngine(room, room.id, loserIdx);
       }
     }, 4000);
   }
@@ -1136,11 +1365,10 @@ async function setupGameState(room) {
     });
     const mainDeck = shuffle(deck?.mainDeck||[]);
     const potionDeck = shuffle(deck?.potionDeck||[]);
-    const hand = mainDeck.splice(0, 5);
     playerStates.push({ userId:p.userId, username:p.username, socketId:p.socketId,
-      color:usr?.color||'#00f0ff', avatar:usr?.avatar||null,
+      color:usr?.color||'#00f0ff', avatar:usr?.avatar||null, cardback:usr?.cardback||null, board:usr?.board||null,
       heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
-      hand, mainDeck, potionDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
+      hand:[], mainDeck, potionDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
       abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0],
       damageLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
       permanents:[], divineGiftUsed:false, deckSkins: deck?.skins || {} });
@@ -1154,22 +1382,27 @@ async function setupGameState(room) {
   };
   room.status = 'playing';
   room.players.forEach(p => activeGames.set(p.userId, room.id));
-
-  // ── DEBUG ──
-  for (let pi = 0; pi < 2; pi++) {
-    
-  }
-  // ── END DEBUG ──
 }
 
-function startGameEngine(room, roomId, activePlayer) {
+async function startGameEngine(room, roomId, activePlayer) {
   room.gameState.activePlayer = activePlayer;
   room.gameState.turn = 1;
   room.gameState.awaitingFirstChoice = false;
-  room.gameState.mulliganPending = true;
-  room.gameState.mulliganDecisions = [null, null];
   room.engine = new GameEngine(room, io, sendGameState, endGame, sendSpectatorGameState);
   room.engine.init();
+
+  // Fire onBeforeHandDraw hook (Bill, etc.) — before starting hands are drawn
+  await room.engine.runHooks('onBeforeHandDraw', {});
+
+  // Draw starting hands (5 cards per player)
+  for (let pi = 0; pi < 2; pi++) {
+    const ps = room.gameState.players[pi];
+    const drawn = ps.mainDeck.splice(0, 5);
+    ps.hand.push(...drawn);
+  }
+
+  room.gameState.mulliganPending = true;
+  room.gameState.mulliganDecisions = [null, null];
   for(let i=0;i<2;i++) sendGameState(room, i); sendSpectatorGameState(room);
   io.to('room:' + room.id).emit('game_started', sanitizeRoom(room));
   io.emit('rooms', getRoomList());
@@ -1294,7 +1527,7 @@ io.on('connection', (socket) => {
     if (!room || room.hostId !== currentUser.userId || room.players.length < 2) return;
     const activePlayer = Math.random() < 0.5 ? 0 : 1;
     await setupGameState(room);
-    startGameEngine(room, roomId, activePlayer);
+    await startGameEngine(room, roomId, activePlayer);
   });
 
   // ── MULLIGAN ──
@@ -1328,8 +1561,7 @@ io.on('connection', (socket) => {
         for (let i = 0; i < handSize; i++) {
           const card = ps.hand.shift();
           ps.mainDeck.push(card);
-          sendGameState(room, pi);
-          sendSpectatorGameState(room);
+          for (let p = 0; p < 2; p++) sendGameState(room, p); sendSpectatorGameState(room);
           await new Promise(r => setTimeout(r, 180));
         }
         // Wait 1 second
@@ -1341,8 +1573,7 @@ io.on('connection', (socket) => {
           if (ps.mainDeck.length === 0) break;
           const card = ps.mainDeck.shift();
           ps.hand.push(card);
-          sendGameState(room, pi);
-          sendSpectatorGameState(room);
+          for (let p = 0; p < 2; p++) sendGameState(room, p); sendSpectatorGameState(room);
           await new Promise(r => setTimeout(r, 200));
         }
         checkBothReady();
@@ -1514,6 +1745,9 @@ io.on('connection', (socket) => {
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return;
 
+    // Combo lock: if a hero has an exclusive combo active, only that hero can act
+    if (ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== heroIdx) return;
+
     const abilitySlot = ps.abilityZones?.[heroIdx]?.[zoneIdx];
     if (!abilitySlot || abilitySlot.length === 0) return;
     const abilityName = abilitySlot[0];
@@ -1526,6 +1760,9 @@ io.on('connection', (socket) => {
     // Check HOPT
     const hoptKey = `ability-action:${abilityName}:${pi}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
+
+    // Check script-defined activation condition (Necromancy, etc.)
+    if (script.canActivateAction && !script.canActivateAction(gs, pi, heroIdx, level, room.engine)) return;
 
     // Check if action is available
     const isActionPhase = gs.currentPhase === 3;
@@ -1544,7 +1781,6 @@ io.on('connection', (socket) => {
           c.owner === pi && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
         );
         if (!inst) return;
-        const ctx = room.engine._createContext(inst, {});
 
         // Play shine animation on the ability
         for (let i = 0; i < 2; i++) {
@@ -1553,8 +1789,53 @@ io.on('connection', (socket) => {
         }
         sendToSpectators(room, 'ability_activated', { owner: pi, heroIdx, zoneIdx, abilityName });
 
-        // Run the activation
-        await script.onActivate(ctx, level);
+        // ── Reaction chain window — opponents can chain before ability resolves ──
+        const chainResult = await room.engine.executeCardWithChain({
+          cardName: abilityName, owner: pi, cardType: 'Ability', goldCost: 0,
+          resolve: null, // Resolution handled by onActivate below
+        });
+
+        if (chainResult.negated) {
+          // Ability negated — action consumed but effect doesn't resolve
+          if (isActionPhase) {
+            await room.engine.advanceToPhase(pi, 4);
+          } else if (hasAdditional) {
+            for (const inst2 of room.engine.cardInstances) {
+              if (inst2.owner !== pi) continue;
+              if (!inst2.counters.additionalActionType || !inst2.counters.additionalActionAvail) continue;
+              const config = room.engine._additionalActionTypes[inst2.counters.additionalActionType];
+              if (config?.allowedCategories?.includes('ability_activation')) {
+                room.engine.consumeAdditionalAction(pi, inst2.counters.additionalActionType, inst2.id);
+                break;
+              }
+            }
+          }
+          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+          return;
+        }
+
+        const ctx = room.engine._createContext(inst, {});
+
+        // Run the activation — if it returns false, treat as cancelled (refund HOPT, keep action)
+        const result = await script.onActivate(ctx, level);
+        if (result === false) {
+          delete gs.hoptUsed[hoptKey];
+          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+          return;
+        }
+
+        // Fire action hooks
+        const usingAdditional = hasAdditional && !isActionPhase;
+        await room.engine.runHooks('onActionUsed', {
+          actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx,
+          isAdditional: usingAdditional, _skipReactionCheck: true,
+        });
+        if (usingAdditional) {
+          await room.engine.runHooks('onAdditionalActionUsed', {
+            actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx,
+            _skipReactionCheck: true,
+          });
+        }
 
         // Consume action
         if (isActionPhase) {
@@ -1624,14 +1905,33 @@ io.on('connection', (socket) => {
         );
         if (!inst) return;
 
+        // ── Reaction chain window — opponents can chain before ability resolves ──
+        // Broadcast activation first so opponents see what's being activated
+        room.engine._broadcastEvent('ability_activated', { owner: pi, heroIdx, zoneIdx, abilityName });
+
+        const chainResult = await room.engine.executeCardWithChain({
+          cardName: abilityName, owner: pi, cardType: 'Ability', goldCost: 0,
+          resolve: null, // Resolution handled by onFreeActivate below
+        });
+
+        if (chainResult.negated) {
+          // Negated — claim HOPT (activation was attempted) but effect doesn't resolve
+          if (!gs.hoptUsed) gs.hoptUsed = {};
+          gs.hoptUsed[hoptKey] = gs.turn;
+          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+          return;
+        }
+
         const ctx = room.engine._createContext(inst, {});
         // onFreeActivate returns true if the effect resolved (HOPT should be claimed)
         const resolved = await script.onFreeActivate(ctx, level);
 
         // Only claim HOPT if the effect actually resolved (not cancelled)
         if (resolved !== false) {
-          // Generic "ability activated" flash — visible to both players
-          room.engine._broadcastEvent('ability_activated', { owner: pi, heroIdx, zoneIdx });
+          // Generic "ability activated" flash — visible to both players (unless script handles its own)
+          if (!script.noDefaultFlash) {
+            room.engine._broadcastEvent('ability_activated', { owner: pi, heroIdx, zoneIdx });
+          }
 
           if (!gs.hoptUsed) gs.hoptUsed = {};
           gs.hoptUsed[hoptKey] = gs.turn;
@@ -1659,34 +1959,115 @@ io.on('connection', (socket) => {
     if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
     const { loadCardEffect } = require('./cards/effects/_loader');
-    const script = loadCardEffect(hero.name);
-    if (!script?.heroEffect || !script?.onHeroEffect) return;
 
-    const hoptKey = `hero-effect:${hero.name}:${pi}:${heroIdx}`;
-    if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
+    // Collect ALL available hero effects for this hero (own + equipped)
+    const availableEffects = [];
 
-    if (script.canActivateHeroEffect) {
-      const inst = room.engine.cardInstances.find(c =>
-        c.owner === pi && c.zone === 'hero' && c.heroIdx === heroIdx
-      );
-      if (!inst) return;
-      const ctx = room.engine._createContext(inst, { event: 'canHeroEffectCheck' });
-      if (!script.canActivateHeroEffect(ctx)) return;
+    // Hero's own effect
+    const ownScript = loadCardEffect(hero.name);
+    if (ownScript?.heroEffect && ownScript?.onHeroEffect) {
+      const hoptKey = `hero-effect:${hero.name}:${pi}:${heroIdx}`;
+      if (gs.hoptUsed?.[hoptKey] !== gs.turn) {
+        let canActivate = true;
+        if (ownScript.canActivateHeroEffect) {
+          const inst = room.engine.cardInstances.find(c => c.owner === pi && c.zone === 'hero' && c.heroIdx === heroIdx);
+          if (inst) {
+            const ctx = room.engine._createContext(inst, { event: 'canHeroEffectCheck' });
+            canActivate = ownScript.canActivateHeroEffect(ctx);
+            if (!canActivate) console.log(`[HeroEffect] ${hero.name} own: canActivateHeroEffect returned false`);
+          } else {
+            canActivate = false;
+            console.log(`[HeroEffect] ${hero.name} own: no card instance found in hero zone`);
+          }
+        }
+        if (canActivate) {
+          availableEffects.push({
+            name: hero.name,
+            script: ownScript,
+            inst: room.engine.cardInstances.find(c => c.owner === pi && c.zone === 'hero' && c.heroIdx === heroIdx),
+            hoptKey,
+          });
+        }
+      } else {
+        console.log(`[HeroEffect] ${hero.name} own: already used this turn (HOPT)`);
+      }
+    } else {
+      console.log(`[HeroEffect] ${hero.name} own: no heroEffect/onHeroEffect on script (heroEffect=${ownScript?.heroEffect}, onHeroEffect=${typeof ownScript?.onHeroEffect})`);
     }
+
+    // Equipped hero effects
+    for (const ci of room.engine.cardInstances) {
+      if (ci.owner !== pi || ci.zone !== 'support' || ci.heroIdx !== heroIdx) continue;
+      if (!ci.counters?.treatAsEquip) continue;
+      const equipScript = loadCardEffect(ci.name);
+      if (!equipScript?.heroEffect || !equipScript?.onHeroEffect) continue;
+      const hoptKey = `hero-effect:${ci.name}:${pi}:${heroIdx}`;
+      if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
+      let canActivate = true;
+      if (equipScript.canActivateHeroEffect) {
+        try {
+          const ctx = room.engine._createContext(ci, { event: 'canHeroEffectCheck' });
+          canActivate = equipScript.canActivateHeroEffect(ctx);
+        } catch { canActivate = false; }
+      }
+      if (canActivate) {
+        availableEffects.push({ name: ci.name, script: equipScript, inst: ci, hoptKey });
+      }
+    }
+
+    if (availableEffects.length === 0) {
+      console.log(`[HeroEffect] No available effects for hero ${heroIdx} (${hero.name})`);
+      return;
+    }
+    console.log(`[HeroEffect] ${availableEffects.length} effect(s) for hero ${heroIdx} (${hero.name}):`, availableEffects.map(e => `${e.name}${e.inst?.zone === 'support' ? ' (equipped)' : ' (own)'}`));
 
     (async () => {
       try {
-        const inst = room.engine.cardInstances.find(c =>
-          c.owner === pi && c.zone === 'hero' && c.heroIdx === heroIdx
-        );
-        if (!inst) return;
+        let chosen;
 
-        const ctx = room.engine._createContext(inst, {});
-        const resolved = await script.onHeroEffect(ctx);
+        if (availableEffects.length === 1) {
+          chosen = availableEffects[0];
+        } else {
+          // Multiple effects — prompt player to choose via optionPicker
+          const response = await room.engine.promptGeneric(pi, {
+            type: 'optionPicker',
+            title: `${hero.name} — Hero Effect`,
+            description: 'Choose which Hero Effect to activate.',
+            options: availableEffects.map((e, i) => ({
+              id: `effect-${i}`,
+              label: e.name,
+              description: e.script.heroEffect || '',
+              color: e.inst?.zone === 'support' ? 'var(--warning)' : 'var(--accent)',
+            })),
+            cancellable: true,
+          });
+          if (!response || response.cancelled) return;
+          const idx = availableEffects.findIndex((_, i) => `effect-${i}` === response.optionId);
+          chosen = idx >= 0 ? availableEffects[idx] : null;
+          if (!chosen) return;
+        }
+
+        if (!chosen.inst) return;
+
+        // ── Reaction chain window ──
+        const chainResult = await room.engine.executeCardWithChain({
+          cardName: chosen.name, owner: pi, cardType: 'Hero', goldCost: 0,
+          resolve: null,
+        });
+
+        if (chainResult.negated) {
+          if (!gs.hoptUsed) gs.hoptUsed = {};
+          gs.hoptUsed[chosen.hoptKey] = gs.turn;
+          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+          return;
+        }
+
+        const ctx = room.engine._createContext(chosen.inst, {});
+        const resolved = await chosen.script.onHeroEffect(ctx);
 
         if (resolved !== false) {
           if (!gs.hoptUsed) gs.hoptUsed = {};
-          gs.hoptUsed[hoptKey] = gs.turn;
+          gs.hoptUsed[chosen.hoptKey] = gs.turn;
         }
       } catch (err) {
         console.error('[Engine] activate_hero_effect error:', err.message, err.stack);
@@ -1719,6 +2100,8 @@ io.on('connection', (socket) => {
 
     const ps = gs.players[pi];
     if (ps.summonLocked) return; // Summon lock active — can't summon creatures
+    // Combo lock: if a hero has an exclusive combo active, only that hero can act
+    if (ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== heroIdx) return;
     // Validate card is in hand
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
 
@@ -1764,27 +2147,48 @@ io.on('connection', (socket) => {
     // Execute: remove from hand, add to support zone
     ps.hand.splice(handIndex, 1);
     if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
-    ps.supportZones[heroIdx][zoneSlot] = [cardName];
+
+    // Safe placement — handles zone-occupied fallback
+    const placeResult = room.engine.safePlaceInSupport(cardName, pi, heroIdx, zoneSlot);
+    if (!placeResult) {
+      // No free zones — creature fizzles, goes to discard (action still consumed)
+      ps.discardPile.push(cardName);
+      room.engine.log('creature_fizzle', { card: cardName, reason: 'zone_occupied' });
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      return;
+    }
+    const actualZoneSlot = placeResult.actualSlot;
 
     // Track card instance in engine
-    const inst = room.engine._trackCard(cardName, pi, 'support', heroIdx, zoneSlot);
+    const inst = placeResult.inst;
 
     // Emit summon effect highlight to both players for every creature
     for (let i = 0; i < 2; i++) {
       const sid = gs.players[i]?.socketId;
-      if (sid) io.to(sid).emit('summon_effect', { owner: pi, heroIdx, zoneSlot, cardName });
+      if (sid) io.to(sid).emit('summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
     }
-    sendToSpectators(room, 'summon_effect', { owner: pi, heroIdx, zoneSlot, cardName });
+    sendToSpectators(room, 'summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
 
     // Fire hooks, wait for resolution, then advance phase (only if NOT using additional action)
     (async () => {
       try {
-        await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot });
+        await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualZoneSlot });
         await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
         // Trigger reaction check for creature summon (with creature as initial card in chain)
         await room.engine._checkReactionCards('onCreatureSummoned', {
           _initialCard: { cardName, owner: pi, cardType: 'Creature' },
         });
+        // Fire action hooks
+        await room.engine.runHooks('onActionUsed', {
+          actionType: 'creature', playerIdx: pi, cardName, heroIdx,
+          isAdditional: usingAdditional, _skipReactionCheck: true,
+        });
+        if (usingAdditional) {
+          await room.engine.runHooks('onAdditionalActionUsed', {
+            actionType: 'creature', playerIdx: pi, cardName, heroIdx,
+            _skipReactionCheck: true,
+          });
+        }
         // Only advance phase if this was a "real" action (not additional) during Action Phase
         if (isActionPhase && !usingAdditional) {
           await room.engine.advanceToPhase(pi, 4);
@@ -1833,6 +2237,23 @@ io.on('connection', (socket) => {
     const script = loadCardEffect(cardName);
     if (script?.spellPlayCondition && !script.spellPlayCondition(gs, pi)) return;
 
+    // Hero-specific card restrictions (Ghuanjun duplicate Attack ban, etc.)
+    const heroScript = loadCardEffect(hero.name);
+    if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, pi, heroIdx, cardData, room.engine)) return;
+
+    // Also check equipped hero cards in support zones (Initiation Ritual)
+    if (room.engine) {
+      for (const inst of room.engine.cardInstances) {
+        if (inst.owner !== pi || inst.zone !== 'support' || inst.heroIdx !== heroIdx) continue;
+        if (!inst.counters?.treatAsEquip) continue;
+        const equipHeroScript = loadCardEffect(inst.name);
+        if (equipHeroScript?.canPlayCard && !equipHeroScript.canPlayCard(gs, pi, heroIdx, cardData, room.engine)) return;
+      }
+    }
+
+    // Combo lock: if a hero has an exclusive combo active, only that hero can act
+    if (ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== heroIdx) return;
+
     // Divine Gift: once per game
     if (cardName.startsWith('Divine Gift') && ps.divineGiftUsed) return;
 
@@ -1867,6 +2288,36 @@ io.on('connection', (socket) => {
 
         // Track card instance with heroIdx so onPlay knows which hero cast it
         const inst = room.engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
+
+        // ── Reaction chain window — opponents can chain before spell resolves ──
+        const chainResult = await room.engine.executeCardWithChain({
+          cardName, owner: pi, cardType: cardData.cardType, goldCost: 0,
+          resolve: null, // Resolution handled by onPlay below
+        });
+
+        if (chainResult.negated) {
+          // Spell was negated by a reaction chain — to discard, skip resolution
+          ps.discardPile.push(cardName);
+          room.engine._untrackCard(inst.id);
+          if (additionalConsumed && consumedInst) {
+            consumedInst.counters.additionalActionAvail = 1;
+          }
+          // Still count as action used (the action was spent even if negated)
+          if (cardData.cardType === 'Attack') {
+            ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
+            if (!ps.heroesAttackedThisTurn) ps.heroesAttackedThisTurn = [];
+            if (!ps.heroesAttackedThisTurn.includes(heroIdx)) ps.heroesAttackedThisTurn.push(heroIdx);
+            // Track attack name for per-hero duplicate bans (Ghuanjun)
+            if (hero.ghuanjunAttacksUsed && !hero.ghuanjunAttacksUsed.includes(cardName)) hero.ghuanjunAttacksUsed.push(cardName);
+          }
+          if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
+          if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+          if (isActionPhase && !additionalConsumed && !isInherentAction) {
+            await room.engine.advanceToPhase(pi, 4);
+          }
+          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+          return;
+        }
 
         // Set up spell damage tracking (for Bartas second-cast detection)
         gs._spellDamageLog = [];
@@ -1919,15 +2370,51 @@ io.on('connection', (socket) => {
         delete gs._spellExcludeTargets;
         delete gs._bartasSecondCast;
 
-        // Move to discard
-        ps.discardPile.push(cardName);
-        room.engine._untrackCard(inst.id);
+        // Move to discard (unless the spell placed itself on the board as an attachment)
+        if (gs._spellPlacedOnBoard) {
+          delete gs._spellPlacedOnBoard;
+          // Card is already tracked in its new zone by the onPlay hook — don't discard
+        } else {
+          ps.discardPile.push(cardName);
+          room.engine._untrackCard(inst.id);
+        }
         room.engine.log('spell_played', { card: cardName, player: ps.username, hero: hero.name, type: cardData.cardType });
 
-        // Advance from Action Phase → Main Phase 2 (if not additional/inherent/free action)
+        // Track successful attacks for combo effects (Tiger Kick, etc.)
+        if (cardData.cardType === 'Attack') {
+          ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
+          if (!ps.heroesAttackedThisTurn) ps.heroesAttackedThisTurn = [];
+          if (!ps.heroesAttackedThisTurn.includes(heroIdx)) ps.heroesAttackedThisTurn.push(heroIdx);
+          // Track attack name for per-hero duplicate bans (Ghuanjun)
+          if (hero.ghuanjunAttacksUsed && !hero.ghuanjunAttacksUsed.includes(cardName)) hero.ghuanjunAttacksUsed.push(cardName);
+        }
+        // Track which heroes performed actions this turn (Ghuanjun combo check)
+        if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
+        if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+
+        // Fire action hooks (only when an action is actually consumed)
         if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction) {
+          await room.engine.runHooks('onActionUsed', {
+            actionType: cardData.cardType.toLowerCase(), playerIdx: pi, cardName, playedCardName: cardName, heroIdx,
+            isAdditional: false, _skipReactionCheck: true,
+          });
+        } else if (additionalConsumed) {
+          await room.engine.runHooks('onActionUsed', {
+            actionType: cardData.cardType.toLowerCase(), playerIdx: pi, cardName, playedCardName: cardName, heroIdx,
+            isAdditional: true, _skipReactionCheck: true,
+          });
+          await room.engine.runHooks('onAdditionalActionUsed', {
+            actionType: cardData.cardType.toLowerCase(), playerIdx: pi, cardName, playedCardName: cardName, heroIdx,
+            _skipReactionCheck: true,
+          });
+        }
+
+        // Advance from Action Phase → Main Phase 2 (if not additional/inherent/free action)
+        // _preventPhaseAdvance can be set by hooks (Ghuanjun combo) to keep the phase open
+        if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction && !gs._preventPhaseAdvance) {
           await room.engine.advanceToPhase(pi, 4);
         }
+        delete gs._preventPhaseAdvance;
 
         // Mark Divine Gift as used (once per game)
         if (cardName.startsWith('Divine Gift')) {
@@ -1979,18 +2466,46 @@ io.on('connection', (socket) => {
       if (finalSlot < 0 || finalSlot >= 3) return; // Must be base zone (not island)
       if ((ps.supportZones[heroIdx][finalSlot] || []).length > 0) return; // Slot occupied
 
-      // Execute: deduct gold, remove from hand, place
-      ps.gold -= cost;
+      // Remove from hand (gold deduction deferred to after chain — not charged if negated)
       ps.hand.splice(handIndex, 1);
-    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
-      ps.supportZones[heroIdx][finalSlot] = [cardName];
-
-      const inst = room.engine._trackCard(cardName, pi, 'support', heroIdx, finalSlot);
+      if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
 
       (async () => {
         try {
-          await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: finalSlot });
-          await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
+          // Broadcast card to opponent BEFORE chain
+          const oi = pi === 0 ? 1 : 0;
+          const oppSid = gs.players[oi]?.socketId;
+          if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
+          sendToSpectators(room, 'card_reveal', { cardName });
+          await new Promise(r => setTimeout(r, 100));
+
+          // Execute with reaction window (Tool Freezer can react to this)
+          const chainResult = await room.engine.executeCardWithChain({
+            cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
+            resolve: async () => {
+              // Deduct gold on resolve (not negated)
+              if (cost > 0) ps.gold -= cost;
+
+              // Safe placement — handles zone-occupied fallback (Slippery Fridge, etc.)
+              const result = room.engine.safePlaceInSupport(cardName, pi, heroIdx, finalSlot);
+              if (!result) {
+                // No free zones — card fizzles, goes to discard
+                ps.discardPile.push(cardName);
+                room.engine.log('equip_fizzle', { card: cardName, reason: 'zone_occupied_by_chain' });
+                return true;
+              }
+
+              const { inst, actualSlot } = result;
+              await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualSlot });
+              await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
+              return true;
+            },
+          });
+
+          if (chainResult.negated) {
+            // Negated → card goes to discard, gold NOT deducted
+            ps.discardPile.push(cardName);
+          }
         } catch (err) {
           console.error('[Engine] play_artifact hooks error:', err.message);
         }
@@ -2052,7 +2567,7 @@ io.on('connection', (socket) => {
         let chainResult;
         try {
           chainResult = await room.engine.executeCardWithChain({
-            cardName, owner: pi, cardType: 'Potion',
+            cardName, owner: pi, cardType: 'Potion', goldCost: 0,
             resolve: script.resolve ? async () => await script.resolve(room.engine, pi, [], []) : null,
           });
         } catch (err) {
@@ -2167,10 +2682,9 @@ io.on('connection', (socket) => {
 
     const ps = gs.players[pi];
 
-    // Deduct gold for artifacts (unless script handles gold manually)
+    // Gold check for artifacts (deduction deferred to after chain — not charged if negated)
     if (cardType === 'Artifact' && goldCost > 0 && !script.manualGoldCost) {
       if ((ps.gold || 0) < goldCost) return;
-      ps.gold -= goldCost;
     }
 
     (async () => {
@@ -2191,6 +2705,7 @@ io.on('connection', (socket) => {
           cardName: potionName,
           owner: pi,
           cardType: cardType,
+          goldCost: goldCost || 0,
           resolve: script.resolve
             ? async () => await script.resolve(room.engine, pi, selectedIds, validTargets)
             : null,
@@ -2198,6 +2713,11 @@ io.on('connection', (socket) => {
       } catch (err) {
         console.error('[Engine] executeCardWithChain error:', err.message, err.stack);
         chainResult = { negated: false, chainFormed: false, resolveResult: null };
+      }
+
+      // Deduct gold for artifacts AFTER chain — only if NOT negated
+      if (cardType === 'Artifact' && goldCost > 0 && !script.manualGoldCost && !chainResult.negated) {
+        ps.gold -= goldCost;
       }
 
       if (chainResult.resolveResult?.aborted) {
@@ -2237,8 +2757,8 @@ io.on('connection', (socket) => {
         ps.discardPile.push(potionName); // Artifacts get discarded
       }
 
-      // Play target animation if card resolved (not negated)
-      if (!chainResult.negated) {
+      // Play target animation if card resolved (not negated) and has an animation
+      if (!chainResult.negated && (script.animationType || 'explosion') !== 'none') {
         for (let i = 0; i < 2; i++) {
           const sid = gs.players[i]?.socketId;
           if (sid) io.to(sid).emit('potion_resolved', { destroyedIds: selectedIds, animationType: script.animationType || 'explosion' });
@@ -2324,14 +2844,14 @@ io.on('connection', (socket) => {
         room._pendingRematch = { roomId, loserIdx };
         io.to(loserPs.socketId).emit('rematch_choose_first', {});
       } else {
-        startGameEngine(room, roomId, loserIdx);
+        await startGameEngine(room, roomId, loserIdx);
       }
     } else {
       for (let i=0;i<2;i++) sendGameState(room, i);
     }
   });
 
-  socket.on('rematch_first_choice', ({ roomId, goFirst }) => {
+  socket.on('rematch_first_choice', async ({ roomId, goFirst }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?._pendingRematch) return;
@@ -2341,22 +2861,12 @@ io.on('connection', (socket) => {
     if (room._rematchTimer) { clearTimeout(room._rematchTimer); delete room._rematchTimer; }
     delete room._pendingRematch;
     const activePlayer = goFirst ? loserIdx : (loserIdx === 0 ? 1 : 0);
-    startGameEngine(room, roomId, activePlayer);
+    await startGameEngine(room, roomId, activePlayer);
   });
 
   socket.on('leave_room', ({ roomId }) => handleLeaveRoom(socket, roomId, currentUser));
 
   // Debug: add a card to a player's hand
-  socket.on('debug_add_card', ({ roomId, cardName }) => {
-    if (!currentUser) return;
-    const room = rooms.get(roomId);
-    if (!room?.gameState) return;
-    const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
-    if (pi < 0) return;
-    room.gameState.players[pi].hand.push(cardName);
-    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
-  });
-
   socket.on('disconnect', () => {
     if (!currentUser) return;
     const activeRoomId = activeGames.get(currentUser.userId);
