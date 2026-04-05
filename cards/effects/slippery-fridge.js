@@ -1,11 +1,9 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Slippery Fridge"
-//  Reaction Artifact — Can be activated in
-//  response to ANY event (like Juice).
-//  Choose any number of Equip Artifacts on
-//  the board and move each to a different
-//  Hero of the same controller (without
-//  paying their Cost again).
+//  Normal Artifact — Manual activation only.
+//  Choose an Equip Artifact on the board and
+//  move it to a different Hero of the same
+//  controller (without paying Cost again).
 //
 //  Equip detection covers three sources:
 //  1. cardDB subtype === 'Equipment'
@@ -36,37 +34,23 @@ function _getCardDB() {
 
 // ─── EQUIP DETECTION ─────────────────────
 
-/**
- * Check if a card name represents an Equip Artifact by data alone.
- * Used by canActivate (no engine/instance access).
- */
 function _isEquipByData(cardName) {
   const cardDB = _getCardDB();
   const cd = cardDB[cardName];
   if (!cd) return false;
-  // Equipment subtype
   if ((cd.subtype || '').toLowerCase() === 'equipment') return true;
-  // Hero/Ascended Hero in support zone = Initiation Ritual
   if (cd.cardType === 'Hero' || cd.cardType === 'Ascended Hero') return true;
-  // Script-level isEquip flag (Flying Island, etc.)
   const script = loadCardEffect(cardName);
   if (script?.isEquip) return true;
   return false;
 }
 
-/**
- * Check if a CardInstance in a support zone is an Equip Artifact.
- * Full check using instance counters + data.
- */
 function _isEquipInstance(inst) {
   if (!inst || inst.zone !== 'support') return false;
   if (inst.counters?.immovable) return false;
-  // Counter-based (Initiation Ritual)
   if (inst.counters?.treatAsEquip) return true;
-  // Script-level flag
   const script = inst.loadScript();
   if (script?.isEquip) return true;
-  // Card data subtype
   const cardDB = _getCardDB();
   const cd = cardDB[inst.name];
   if (cd && (cd.subtype || '').toLowerCase() === 'equipment') return true;
@@ -75,7 +59,6 @@ function _isEquipInstance(inst) {
 
 // ─── ZONE HELPERS ────────────────────────
 
-/** Get indices of free base support zones (0–2) for a hero. */
 function _getFreeBaseZones(ps, heroIdx) {
   const free = [];
   for (let si = 0; si < 3; si++) {
@@ -86,7 +69,6 @@ function _getFreeBaseZones(ps, heroIdx) {
   return free;
 }
 
-/** Check if a player has another living hero (≠ heroIdx) with a free base zone. */
 function _hasOtherHeroWithFreeZone(ps, heroIdx) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     if (hi === heroIdx) continue;
@@ -97,12 +79,6 @@ function _hasOtherHeroWithFreeZone(ps, heroIdx) {
   return false;
 }
 
-// ─── ELIGIBILITY ─────────────────────────
-
-/**
- * Find all eligible equip CardInstances on the board.
- * Eligible = is equip + controller has another living hero with free base zone.
- */
 function _findEligibleEquips(gs, engine) {
   const eligible = [];
   for (const inst of engine.cardInstances) {
@@ -110,10 +86,8 @@ function _findEligibleEquips(gs, engine) {
     if (!_isEquipInstance(inst)) continue;
     const ps = gs.players[inst.owner];
     if (!ps) continue;
-    // Controller's hero must be alive
     const hero = ps.heroes?.[inst.heroIdx];
     if (!hero?.name || hero.hp <= 0) continue;
-    // Must have another living hero with free base zone
     if (!_hasOtherHeroWithFreeZone(ps, inst.heroIdx)) continue;
     eligible.push(inst);
   }
@@ -123,16 +97,10 @@ function _findEligibleEquips(gs, engine) {
 // ─── MODULE EXPORTS ──────────────────────
 
 module.exports = {
-  isReaction: true,
-  isTargetingArtifact: true,
+  // Manual-only Normal Artifact (no reaction, no targeting config)
 
-  // ── Reaction guard (with engine access) ──
-  reactionCondition: (gs, pi, engine) => {
-    return _findEligibleEquips(gs, engine).length > 0;
-  },
-
-  // ── Proactive guard (no engine access — optimistic) ──
   canActivate(gs, pi) {
+    // Check if any equip on the board can be moved
     for (let pIdx = 0; pIdx < 2; pIdx++) {
       const ps = gs.players[pIdx];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -149,31 +117,17 @@ module.exports = {
     return false;
   },
 
-  // Self-targeting — all interaction handled in resolve
-  getValidTargets: () => [],
-
-  targetingConfig: {
-    description: 'Move an equipped Artifact to a different Hero of the same player.',
-    confirmLabel: '🧊 Open Fridge!',
-    confirmClass: 'btn-info',
-    cancellable: false,
-    alwaysConfirmable: true,
-  },
-
-  validateSelection: () => true,
-
   animationType: 'none',
 
   // ── RESOLVE ────────────────────────────
-  // Handles both proactive (selectedIds=[]) and reaction (selectedIds=null) flows.
   // Moves exactly ONE Equip Artifact to a different Hero of the same controller.
-  // Non-cancellable — the player committed to this in the chain.
+  // First prompt is cancellable — cancelling returns card to hand.
   resolve: async (engine, pi) => {
     const gs = engine.gs;
 
     // ── Step 1: Find eligible equips ──
     const eligible = _findEligibleEquips(gs, engine);
-    if (eligible.length === 0) return true; // Fizzle — no valid targets
+    if (eligible.length === 0) return { cancelled: true }; // Fizzle — no valid targets
 
     const equipTargets = eligible.map(inst => ({
       id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
@@ -185,18 +139,18 @@ module.exports = {
       cardInstance: inst,
     }));
 
-    // ── Step 2: Select equip to move (non-cancellable) ──
+    // ── Step 2: Select equip to move (cancellable) ──
     const pickedIds = await engine.promptEffectTarget(pi, equipTargets, {
       title: 'Slippery Fridge',
       description: 'Select an equipped Artifact to move.',
       confirmLabel: '🧊 Select!',
       confirmClass: 'btn-info',
-      cancellable: false,
+      cancellable: true,
       exclusiveTypes: true,
       maxPerType: { equip: 1 },
     });
 
-    if (!pickedIds || pickedIds.length === 0) return true; // Safety
+    if (!pickedIds || pickedIds.length === 0) return { cancelled: true };
 
     const picked = equipTargets.find(t => t.id === pickedIds[0]);
     if (!picked) return true;

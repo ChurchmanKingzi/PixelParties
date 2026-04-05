@@ -61,6 +61,7 @@ const HOOKS = {
   // ── Creature damage (batched) ──
   BEFORE_CREATURE_DAMAGE_BATCH: 'beforeCreatureDamageBatch',
   AFTER_CREATURE_DAMAGE_BATCH:  'afterCreatureDamageBatch',
+  AFTER_ALL_STATUS_DAMAGE:      'afterAllStatusDamage',
 
   // ── Reaction chain ──
   ON_REACTION_ACTIVATED: 'onReactionActivated',  // Fires when a reaction card is added to the chain

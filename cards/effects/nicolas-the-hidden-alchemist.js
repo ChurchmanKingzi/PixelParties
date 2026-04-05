@@ -13,15 +13,18 @@
 //     more Potions for the rest of that turn. This
 //     lock persists even if Nicolas is defeated
 //     after it triggers.
-//     Handled generically in server.js potion
-//     resolution handlers (use_potion, confirm_potion).
+//     Handled generically via the potionLockAfterN
+//     flag — server.js checks all hero scripts.
 // ═══════════════════════════════════════════
 
 module.exports = {
   activeIn: ['hero'],
+
+  // Generic potion lock: after the controlling player uses N potions
+  // in a turn, their potions are locked for the rest of that turn.
+  potionLockAfterN: 2,
+
   hooks: {
-    // Marker hook — Nicolas's actual potion lock logic is in server.js
-    // to ensure correct timing after potion resolution.
     onGameStart: () => {},
   },
 };

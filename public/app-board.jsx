@@ -1,0 +1,5781 @@
+// ═══════════════════════════════════════════
+//  PIXEL PARTIES — GAME BOARD
+//  BoardCard, BoardZone, animations, effects,
+//  prompts, and the main GameBoard component
+// ═══════════════════════════════════════════
+const { useState, useEffect, useRef, useCallback, useMemo, useContext, useLayoutEffect } = React;
+const { api, emitSocket, socket, AppContext, CardMini, FoilOverlay, useFoilBands,
+        cardImageUrl, skinImageUrl, typeColor, typeClass, CARDS_BY_NAME, SKINS_DB } = window;
+
+// ═══════════════════════════════════════════
+//  SHARED BOARD TOOLTIP SYSTEM
+//  Single tooltip rendered in GameBoard, driven
+//  by mouse events from BoardCard / CardRevealEntry.
+//  Eliminates orphan portal tooltips.
+// ═══════════════════════════════════════════
+let _boardTooltipSetter = null;
+function setBoardTooltip(card) { _boardTooltipSetter?.(card); }
+
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins }) {
+  const card = faceDown ? null : CARDS_BY_NAME[cardName];
+  const imgUrl = card ? cardImageUrl(card.name, skins) : null;
+
+  // Foil support
+  const foilType = card?.foil || null;
+  const isFoil = foilType === 'secret_rare' || foilType === 'diamond_rare';
+  const foilClass = foilType === 'diamond_rare' ? 'foil-diamond-rare' : foilType === 'secret_rare' ? 'foil-secret-rare' : '';
+  const foilBands = useFoilBands(isFoil);
+  const foilMeta = useRef(null);
+  if (isFoil && !foilMeta.current) {
+    foilMeta.current = {
+      shimmerOffset: `${-Math.random() * 5000}ms`,
+      sparkleDelays: SPARKLE_POSITIONS.map(sp => sp.delay + Math.random() * 2),
+    };
+  } else if (!isFoil && foilMeta.current) {
+    foilMeta.current = null;
+  }
+
+  return (
+    <div className={'board-card' + (faceDown ? ' face-down' : '') + (flipped ? ' flipped' : '') + (foilClass ? ' ' + foilClass : '')}
+      style={style}
+      onMouseEnter={() => !noTooltip && !faceDown && card && setBoardTooltip(card)}
+      onMouseLeave={() => setBoardTooltip(null)}>
+      {isFoil && foilMeta.current && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} foilType={foilType} />}
+      {faceDown ? (
+        <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+      ) : imgUrl ? (
+        <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+      ) : (
+        <div className="board-card-text">{cardName || '?'}</div>
+      )}
+      {label && <div className="board-card-label">{label}</div>}
+      {hp != null && hpPosition && (
+        <div className={'board-card-hp board-card-hp-' + hpPosition}>
+          {hp}
+        </div>
+      )}
+      {atk != null && hpPosition === 'hero' && (
+        <div className="board-card-atk board-card-atk-hero">
+          {atk}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style }) {
+  const cls = 'board-zone board-zone-' + type;
+  const topCardName = cards && cards.length > 0 && !faceDown ? cards[cards.length - 1] : null;
+  const suppressChildTooltip = !!onClick && !!onHoverCard;
+  return (
+    <div className={cls + (onClick && cards?.length > 0 ? ' board-zone-clickable' : '')}
+      style={style}
+      onClick={onClick && cards?.length > 0 ? onClick : undefined}
+      onMouseEnter={() => topCardName && onHoverCard && !window.activeDragData && !window.deckDragState && onHoverCard(topCardName)}
+      onMouseLeave={() => onHoverCard && onHoverCard(null)}>
+      {cards && cards.length > 0 ? (
+        cards.length === 1 ? (
+          <BoardCard cardName={cards[0]} faceDown={faceDown} flipped={flipped} label={stackLabel} noTooltip={suppressChildTooltip} />
+        ) : (
+          <div className="board-stack">
+            <BoardCard cardName={cards[cards.length - 1]} faceDown={faceDown} flipped={flipped} label={stackLabel || (cards.length + '')} noTooltip={suppressChildTooltip} />
+          </div>
+        )
+      ) : children || (
+        <div className="board-zone-empty">{label || ''}</div>
+      )}
+    </div>
+  );
+}
+
+// Floating damage number that finds its target hero and animates above it
+function DamageNumber({ amount, heroName }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const el = document.querySelector(`[data-hero-name="${CSS.escape(heroName)}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
+    } else {
+      setPos({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+    }
+  }, [heroName]);
+
+  if (!pos) return null;
+  return (
+    <div className="damage-number" style={{ left: pos.x, top: pos.y }}>
+      -{amount}
+    </div>
+  );
+}
+
+// Floating damage number for creatures (finds by support zone data attributes)
+function CreatureDamageNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const el = document.querySelector(`[data-support-zone="1"][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
+    }
+  }, [ownerLabel, heroIdx, zoneSlot]);
+
+  if (!pos) return null;
+  return (
+    <div className="damage-number" style={{ left: pos.x, top: pos.y }}>
+      -{amount}
+    </div>
+  );
+}
+
+// Floating gold gain number
+function GoldGainNumber({ amount, playerIdx, isMe }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const el = document.querySelector(`[data-gold-player="${playerIdx}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      // Player's gold: float upward from above. Opponent's gold: float downward from below.
+      setPos({ x: r.left - 10, y: isMe ? r.top - 40 : r.bottom + 10, isMe });
+    }
+  }, [playerIdx]);
+
+  if (!pos) return null;
+  return (
+    <div className={isMe ? 'gold-gain-number' : 'gold-gain-number gold-gain-down'} style={{ left: pos.x, top: pos.y }}>
+      +{amount}
+    </div>
+  );
+}
+
+function GoldLossNumber({ amount, playerIdx, isMe }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const el = document.querySelector(`[data-gold-player="${playerIdx}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left - 10, y: isMe ? r.top - 40 : r.bottom + 10, isMe });
+    }
+  }, [playerIdx]);
+
+  if (!pos) return null;
+  return (
+    <div className={isMe ? 'gold-loss-number' : 'gold-loss-number gold-loss-down'} style={{ left: pos.x, top: pos.y }}>
+      -{amount}
+    </div>
+  );
+}
+
+// Floating level change number above a creature
+function LevelChangeNumber({ delta, owner, heroIdx, zoneSlot, myIdx }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const ownerLabel = owner === myIdx ? 'me' : 'opp';
+    const el = document.querySelector(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top });
+    }
+  }, [owner, heroIdx, zoneSlot]);
+
+  if (!pos) return null;
+  return (
+    <div className={delta > 0 ? 'level-change-number' : 'level-change-number level-change-negative'} style={{ left: pos.x, top: pos.y }}>
+      {delta > 0 ? '+' : ''}{delta}
+    </div>
+  );
+}
+
+// Floating HP change number above a hero (Toughness)
+function ToughnessHpNumber({ amount, owner, heroIdx, myIdx }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const ownerLabel = owner === myIdx ? 'me' : 'opp';
+    const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top - 10 });
+    }
+  }, [owner, heroIdx]);
+
+  if (!pos) return null;
+  return (
+    <div className={amount > 0 ? 'toughness-hp-number toughness-hp-up' : 'toughness-hp-number toughness-hp-down'} style={{ left: pos.x, top: pos.y }}>
+      {amount > 0 ? '+' : ''}{amount}
+    </div>
+  );
+}
+
+// Floating ATK change number above a hero (Fighting)
+function FightingAtkNumber({ amount, owner, heroIdx, myIdx }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const ownerLabel = owner === myIdx ? 'me' : 'opp';
+    const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top - 10 });
+    }
+  }, [owner, heroIdx]);
+
+  if (!pos) return null;
+  return (
+    <div className={amount > 0 ? 'fighting-atk-number fighting-atk-up' : 'fighting-atk-number fighting-atk-down'} style={{ left: pos.x, top: pos.y }}>
+      {amount > 0 ? '+' : ''}{amount}
+    </div>
+  );
+}
+
+// Floating card that animates from deck position to hand slot position
+function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
+  const [endPos, setEndPos] = useState(null);
+
+  useEffect(() => {
+    // Wait one frame for the invisible hand slot to be laid out
+    requestAnimationFrame(() => {
+      const targetSlot = document.querySelector(`.game-hand-me .hand-slot[data-hand-idx="${origIdx}"]`);
+      if (targetSlot) {
+        const r = targetSlot.getBoundingClientRect();
+        setEndPos({ x: r.left, y: r.top });
+      }
+    });
+  }, [origIdx]);
+
+  // Before we know the end position, render at deck position (hidden)
+  if (!endPos) return null;
+
+  const dx = endPos.x - startX;
+  const dy = endPos.y - startY;
+
+  return (
+    <div className={'draw-anim-card' + (dimmed ? ' hand-card-dimmed' : '')}
+      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px' }}>
+      <BoardCard cardName={cardName} />
+    </div>
+  );
+}
+
+// Opponent draw animation — face-down card flies from opp deck to opp hand
+function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl }) {
+  const dx = endX - startX;
+  const dy = endY - startY;
+  return (
+    <div className="draw-anim-card"
+      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px' }}>
+      {cardName ? (
+        <BoardCard cardName={cardName} noTooltip />
+      ) : (
+        <div className="board-card face-down" style={{ width: '100%', height: '100%' }}>
+          <img src={cardbackUrl || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest }) {
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const card = CARDS_BY_NAME[cardName];
+  const imgUrl = card ? cardImageUrl(card.name) : null;
+  const isDeleted = dest === 'deleted';
+  const isDeckReturn = dest === 'deck';
+  return (
+    <div className={'discard-anim-card' + (isDeleted ? ' discard-anim-deleted' : '') + (isDeckReturn ? ' discard-anim-deck-return' : '')}
+      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px' }}>
+      <div className="board-card" style={{ width: '100%', height: '100%' }}>
+        {imgUrl ? <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+        : <div className="board-card-text">{cardName || '?'}</div>}
+      </div>
+      {isDeleted && <div className="delete-energy-overlay" />}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+//  MODULAR GAME ANIMATION SYSTEM
+//  Add new animation types by adding to ANIM_REGISTRY.
+//  Usage: playAnimation('explosion', '#target-selector', { duration: 800 })
+// ═══════════════════════════════════════════
+
+// Draggable floating panel — used for targeting dialogs, first-choice, etc.
+function DraggablePanel({ children, className, style }) {
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const offsetRef = useRef({ x: 0, y: 0 });
+  const panelRef = useRef(null);
+  const onDown = (e) => {
+    if (e.target.tagName === 'BUTTON') return; // Don't drag when clicking buttons
+    const r = panelRef.current?.getBoundingClientRect();
+    if (!r) return;
+    offsetRef.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+    setDragging(true);
+    e.preventDefault();
+  };
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e) => {
+      setPos({ x: e.clientX - offsetRef.current.x, y: e.clientY - offsetRef.current.y });
+    };
+    const onUp = () => setDragging(false);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [dragging]);
+  const hasCustomPos = pos.x !== 0 || pos.y !== 0;
+  const posStyle = hasCustomPos
+    ? { position: 'fixed', left: pos.x, top: pos.y, transform: 'none' }
+    : {};
+  return (
+    <div ref={panelRef} className={className} style={{ ...style, ...posStyle, cursor: dragging ? 'grabbing' : 'grab' }}
+      onMouseDown={onDown} onClick={e => e.stopPropagation()}>
+      {children}
+    </div>
+  );
+}
+
+// Frozen overlay with animated snowflake particles
+function FrozenOverlay() {
+  const particles = useMemo(() => Array.from({ length: 14 }, () => ({
+    x: 5 + Math.random() * 90,
+    y: 5 + Math.random() * 90,
+    size: 5 + Math.random() * 7,
+    delay: Math.random() * 3,
+    dur: 1.5 + Math.random() * 2,
+    char: ['❄','❅','❆','✦','✧','·','*'][Math.floor(Math.random() * 7)],
+  })), []);
+  return (
+    <div className="status-frozen-overlay">
+      {particles.map((p, i) => (
+        <span key={i} className="frozen-particle" style={{
+          left: p.x + '%', top: p.y + '%', fontSize: p.size,
+          animationDelay: p.delay + 's', animationDuration: p.dur + 's',
+        }}>{p.char}</span>
+      ))}
+    </div>
+  );
+}
+
+// Immune/Shielded status icon with instant custom tooltip
+function ImmuneIcon({ heroName, statusType }) {
+  const tooltipKey = statusType === 'shielded' ? 'shielded' : 'immune';
+  return (
+    <div className={'status-immune-icon' + (statusType === 'shielded' ? ' status-shielded-icon' : '')}
+      onMouseEnter={() => { window._immuneTooltip = heroName; window._immuneTooltipType = tooltipKey; window.dispatchEvent(new Event('immuneHover')); }}
+      onMouseLeave={() => { window._immuneTooltip = null; window._immuneTooltipType = null; window.dispatchEvent(new Event('immuneHover')); }}>
+      🛡️
+    </div>
+  );
+}
+
+// Card reveal — opponent's played card appears centered and expands/fades
+function CardRevealOverlay({ reveals, onRemove }) {
+  return (
+    <div className="card-reveal-stack">
+      {reveals.map((rev, idx) => (
+        <CardRevealEntry key={rev.id} cardName={rev.cardName} onDone={() => onRemove(rev.id)} />
+      ))}
+    </div>
+  );
+}
+
+function CardRevealEntry({ cardName, onDone }) {
+  const card = CARDS_BY_NAME[cardName];
+  const imgUrl = card ? cardImageUrl(card.name) : null;
+  const foilType = card?.foil || null;
+  useEffect(() => {
+    const t = setTimeout(onDone, 3500);
+    return () => { clearTimeout(t); setBoardTooltip(null); }; // Clear tooltip on unmount
+  }, []);
+  if (!card) return null;
+  return (
+    <div className="card-reveal-entry"
+      onMouseEnter={() => setBoardTooltip(card)} onMouseLeave={() => setBoardTooltip(null)}>
+      <div className="card-reveal-card">
+        {imgUrl ? (
+          <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6,
+            border: foilType === 'diamond_rare' ? '3px solid rgba(120,200,255,.7)' : foilType === 'secret_rare' ? '3px solid rgba(255,215,0,.6)' : '2px solid var(--bg4)' }} draggable={false} />
+        ) : (
+          <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            background: 'var(--bg3)', borderRadius: 6, border: '2px solid var(--bg4)', padding: 16, textAlign: 'center' }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: typeColor(card.cardType), marginBottom: 8 }}>{card.name}</div>
+            <div style={{ fontSize: 14, color: 'var(--text2)' }}>{card.cardType}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ExplosionEffect({ x, y }) {
+  const particles = useMemo(() => Array.from({ length: 24 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 25 + Math.random() * 55;
+    return {
+      dx: Math.cos(angle) * speed,
+      dy: Math.sin(angle) * speed,
+      size: 3 + Math.random() * 8,
+      color: ['#ff4400','#ff8800','#ffcc00','#ff2200','#ffaa00','#fff'][Math.floor(Math.random() * 6)],
+      delay: Math.random() * 80,
+      dur: 350 + Math.random() * 400,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-explosion-flash" />
+      {particles.map((p, i) => (
+        <div key={i} className="anim-explosion-particle" style={{
+          '--dx': p.dx + 'px', '--dy': p.dy + 'px', '--size': p.size + 'px',
+          '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+function FreezeEffect({ x, y, w, h }) {
+  // Snowballs from right side + ice crystal burst
+  const snowballs = useMemo(() => Array.from({ length: 8 }, (_, i) => ({
+    startX: 120 + Math.random() * 40,
+    startY: -40 + Math.random() * 40,
+    delay: i * 60 + Math.random() * 40,
+    dur: 250 + Math.random() * 150,
+    size: 6 + Math.random() * 6,
+  })), []);
+  const crystals = useMemo(() => Array.from({ length: 16 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 15 + Math.random() * 35;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 3 + Math.random() * 7,
+      color: ['#aaddff','#88ccff','#cceeFF','#ffffff','#66bbff'][Math.floor(Math.random() * 5)],
+      delay: 400 + Math.random() * 200,
+      dur: 400 + Math.random() * 300,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      {/* Ice flash */}
+      <div className="anim-freeze-flash" />
+      {/* Snowballs from right */}
+      {snowballs.map((s, i) => (
+        <div key={'sb'+i} className="anim-snowball" style={{
+          '--startX': s.startX + 'px', '--startY': s.startY + 'px',
+          '--size': s.size + 'px',
+          animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+      {/* Ice crystal particles */}
+      {crystals.map((c, i) => (
+        <div key={'cr'+i} className="anim-explosion-particle" style={{
+          '--dx': c.dx + 'px', '--dy': c.dy + 'px', '--size': c.size + 'px',
+          '--color': c.color, animationDelay: c.delay + 'ms', animationDuration: c.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+function ThawEffect({ x, y }) {
+  const drips = useMemo(() => Array.from({ length: 12 }, () => ({
+    xOff: -20 + Math.random() * 40,
+    speed: 30 + Math.random() * 50,
+    size: 3 + Math.random() * 5,
+    delay: Math.random() * 300,
+    dur: 500 + Math.random() * 400,
+    color: ['#aaddff','#88ccff','#cceeFF','#ddf4ff'][Math.floor(Math.random() * 4)],
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-thaw-flash" />
+      {drips.map((d, i) => (
+        <div key={i} className="anim-thaw-drip" style={{
+          '--xOff': d.xOff + 'px', '--speed': d.speed + 'px', '--size': d.size + 'px',
+          '--color': d.color, animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Electric strike — small lightning bolts from all directions converging on target
+function ElectricStrikeEffect({ x, y }) {
+  const bolts = useMemo(() => Array.from({ length: 16 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 55 + Math.random() * 45;
+    return {
+      startX: Math.cos(angle) * dist,
+      startY: Math.sin(angle) * dist,
+      size: 8 + Math.random() * 10,
+      delay: Math.random() * 200,
+      dur: 150 + Math.random() * 150,
+      rotation: (angle * 180 / Math.PI) + 180, // Point toward center
+    };
+  }), []);
+  const sparks = useMemo(() => Array.from({ length: 14 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 12 + Math.random() * 30;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 5,
+      color: ['#ffe033','#fff','#ffcc00','#ffffaa','#ffd700'][Math.floor(Math.random() * 5)],
+      delay: 250 + Math.random() * 150,
+      dur: 250 + Math.random() * 250,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-electric-flash" />
+      {bolts.map((b, i) => (
+        <div key={'eb'+i} className="anim-electric-bolt" style={{
+          '--startX': b.startX + 'px', '--startY': b.startY + 'px', '--size': b.size + 'px',
+          '--rotation': b.rotation + 'deg',
+          animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+        }}>⚡</div>
+      ))}
+      {sparks.map((s, i) => (
+        <div key={'es'+i} className="anim-explosion-particle" style={{
+          '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+          '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Negated overlay — persistent small electricity sparks on the hero
+function NegatedOverlay() {
+  const sparks = useMemo(() => Array.from({ length: 10 }, () => ({
+    x: 8 + Math.random() * 84,
+    y: 8 + Math.random() * 84,
+    size: 7 + Math.random() * 6,
+    delay: Math.random() * 2,
+    dur: 0.4 + Math.random() * 0.6,
+  })), []);
+  return (
+    <div className="status-negated-overlay">
+      {sparks.map((s, i) => (
+        <span key={i} className="negated-spark" style={{
+          left: s.x + '%', top: s.y + '%', fontSize: s.size,
+          animationDelay: s.delay + 's', animationDuration: s.dur + 's',
+        }}>⚡</span>
+      ))}
+    </div>
+  );
+}
+
+// Flame strike — fire converging from all directions onto target
+function FlameStrikeEffect({ x, y }) {
+  const flames = useMemo(() => Array.from({ length: 18 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 55 + Math.random() * 45;
+    return {
+      startX: Math.cos(angle) * dist,
+      startY: Math.sin(angle) * dist,
+      size: 10 + Math.random() * 12,
+      delay: Math.random() * 180,
+      dur: 200 + Math.random() * 150,
+      char: ['🔥','🔥','🔥','✦','·'][Math.floor(Math.random() * 5)],
+    };
+  }), []);
+  const sparks = useMemo(() => Array.from({ length: 12 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 15 + Math.random() * 30;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 5,
+      color: ['#ff4400','#ff8800','#ffcc00','#ff2200','#ffaa00'][Math.floor(Math.random() * 5)],
+      delay: 300 + Math.random() * 150,
+      dur: 300 + Math.random() * 250,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-flame-flash" />
+      {flames.map((f, i) => (
+        <div key={'fl'+i} className="anim-flame-shard" style={{
+          '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
+          animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
+        }}>{f.char}</div>
+      ))}
+      {sparks.map((s, i) => (
+        <div key={'fs'+i} className="anim-explosion-particle" style={{
+          '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+          '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Burned overlay — persistent small flame particles on the hero
+function BurnedOverlay({ ticking }) {
+  const flames = useMemo(() => Array.from({ length: 10 }, () => ({
+    x: 8 + Math.random() * 84,
+    y: 15 + Math.random() * 70,
+    size: 8 + Math.random() * 6,
+    delay: Math.random() * 2,
+    dur: 0.6 + Math.random() * 0.6,
+  })), []);
+  return (
+    <div className={'status-burned-overlay' + (ticking ? ' burn-ticking' : '')}>
+      {flames.map((f, i) => (
+        <span key={i} className="burned-particle" style={{
+          left: f.x + '%', top: f.y + '%', fontSize: f.size,
+          animationDelay: f.delay + 's', animationDuration: f.dur + 's',
+        }}>🔥</span>
+      ))}
+    </div>
+  );
+}
+
+function PoisonedOverlay({ stacks }) {
+  const bubbles = useMemo(() => Array.from({ length: 8 }, () => ({
+    x: 10 + Math.random() * 80,
+    y: 20 + Math.random() * 60,
+    size: 6 + Math.random() * 5,
+    delay: Math.random() * 2.5,
+    dur: 0.8 + Math.random() * 0.8,
+  })), []);
+  return (
+    <div className="status-poisoned-overlay">
+      {bubbles.map((b, i) => (
+        <span key={i} className="poisoned-particle" style={{
+          left: b.x + '%', top: b.y + '%', fontSize: b.size,
+          animationDelay: b.delay + 's', animationDuration: b.dur + 's',
+        }}>☠️</span>
+      ))}
+      {stacks >= 1 && <div className="poison-stack-count">{stacks}</div>}
+    </div>
+  );
+}
+
+// ═══ GENERIC GAME TOOLTIP ═══
+// Global tooltip system — renders at top level, escapes overflow:hidden.
+// Usage: onMouseEnter={e => showGameTooltip(e, 'text')} onMouseLeave={hideGameTooltip}
+function showGameTooltip(e, text) {
+  const r = e.currentTarget.getBoundingClientRect();
+  window._gameTooltip = { text, x: r.right + 6, y: r.top + r.height / 2 };
+  window.dispatchEvent(new Event('gameTooltip'));
+}
+function hideGameTooltip() {
+  window._gameTooltip = null;
+  window.dispatchEvent(new Event('gameTooltip'));
+}
+function GameTooltip() {
+  const [tip, setTip] = useState(null);
+  useEffect(() => {
+    const handler = () => setTip(window._gameTooltip ? { ...window._gameTooltip } : null);
+    window.addEventListener('gameTooltip', handler);
+    return () => window.removeEventListener('gameTooltip', handler);
+  }, []);
+  if (!tip) return null;
+  return (
+    <div className="game-tooltip" style={{ position: 'fixed', left: tip.x, top: tip.y, transform: 'translateY(-50%)', zIndex: 9990 }}>
+      {tip.text}
+    </div>
+  );
+}
+
+// Status badges — small icons showing active negative statuses at a glance
+function StatusBadges({ statuses, counters, isHero }) {
+  const badges = [];
+  const s = statuses || {};
+  const c = counters || {};
+  // Helper: build duration text from status data
+  const dur = (statusData) => {
+    if (!statusData || typeof statusData !== 'object') return ' Wears off at the end of its owner\'s turn.';
+    if (statusData.duration != null && statusData.duration > 1) {
+      return ` Lasts for ${statusData.duration} of its owner's turns.`;
+    }
+    return ' Wears off at the end of its owner\'s turn.';
+  };
+  const durStart = (statusData) => {
+    if (!statusData || typeof statusData !== 'object') return ' Wears off at the start of its owner\'s turn.';
+    return ' Wears off at the start of its owner\'s turn.';
+  };
+  if (s.frozen || c.frozen) badges.push({ key: 'frozen', icon: '❄️', tooltip: 'Frozen: Cannot act and has its effects and Abilities negated.' + (isHero ? ' Cannot be equipped with Artifacts.' : '') + dur(s.frozen || c.frozen) });
+  if (s.stunned || c.stunned) badges.push({ key: 'stunned', icon: '⚡', tooltip: 'Stunned: Cannot act and has its effects and Abilities negated.' + dur(s.stunned || c.stunned) });
+  if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
+  if (s.poisoned || c.poisoned) {
+    const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
+    badges.push({ key: 'poisoned', icon: '☠️', tooltip: `Poisoned: Takes ${30 * stacks} damage at the start of each of its owner's turns.` });
+  }
+  if (s.negated || c.negated) badges.push({ key: 'negated', icon: '🚫', tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.') + dur(s.negated || c.negated) });
+  if (s.immune) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
+  if (s.shielded) badges.push({ key: 'shielded', icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + durStart(s.shielded) });
+  if (badges.length === 0) return null;
+  return (
+    <div className="status-badges-row">
+      {badges.map(b => (
+        <div key={b.key} className="status-badge"
+          onMouseEnter={e => showGameTooltip(e, b.tooltip)}
+          onMouseLeave={hideGameTooltip}>
+          {b.icon}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Buff column — displays positive buff icons on heroes/creatures
+function BuffColumn({ buffs }) {
+  if (!buffs || Object.keys(buffs).length === 0) return null;
+  const BUFF_ICONS = { cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' } };
+  return (
+    <div className="buff-column">
+      {Object.entries(buffs).map(([key]) => {
+        const def = BUFF_ICONS[key] || { icon: '✦', tooltip: key };
+        return (
+          <div key={key} className="buff-icon"
+            onMouseEnter={e => showGameTooltip(e, def.tooltip)}
+            onMouseLeave={hideGameTooltip}>
+            {def.icon}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Wind swirl — gentle wind particles spiraling around target
+function WindEffect({ x, y }) {
+  const particles = useMemo(() => Array.from({ length: 14 }, (_, i) => {
+    const angle = (i / 14) * Math.PI * 2;
+    const radius = 20 + Math.random() * 30;
+    return {
+      startAngle: angle,
+      radius,
+      size: 6 + Math.random() * 8,
+      delay: i * 40 + Math.random() * 60,
+      dur: 500 + Math.random() * 300,
+      char: ['~','≈','∿','⌇','·'][Math.floor(Math.random() * 5)],
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-wind-flash" />
+      {particles.map((p, i) => (
+        <div key={'wp'+i} className="anim-wind-particle" style={{
+          '--startAngle': p.startAngle + 'rad', '--radius': p.radius + 'px', '--size': p.size + 'px',
+          animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+        }}>{p.char}</div>
+      ))}
+    </div>
+  );
+}
+
+// Shadow summon effect — dark tendrils rising from below
+function ShadowSummonEffect({ x, y }) {
+  const tendrils = useMemo(() => Array.from({ length: 16 }, () => {
+    const xOff = -30 + Math.random() * 60;
+    return {
+      xOff,
+      size: 6 + Math.random() * 10,
+      delay: Math.random() * 200,
+      dur: 400 + Math.random() * 400,
+      char: ['▓','░','▒','◆','●'][Math.floor(Math.random() * 5)],
+    };
+  }), []);
+  const wisps = useMemo(() => Array.from({ length: 10 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 10 + Math.random() * 25;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 4,
+      color: ['#6633aa','#442288','#553399','#221144','#7744bb'][Math.floor(Math.random() * 5)],
+      delay: 300 + Math.random() * 200,
+      dur: 300 + Math.random() * 300,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-shadow-flash" />
+      {tendrils.map((t, i) => (
+        <div key={'st'+i} className="anim-shadow-tendril" style={{
+          '--xOff': t.xOff + 'px', '--size': t.size + 'px',
+          animationDelay: t.delay + 'ms', animationDuration: t.dur + 'ms',
+        }}>{t.char}</div>
+      ))}
+      {wisps.map((w, i) => (
+        <div key={'sw'+i} className="anim-explosion-particle" style={{
+          '--dx': w.dx + 'px', '--dy': w.dy + 'px', '--size': w.size + 'px',
+          '--color': w.color, animationDelay: w.delay + 'ms', animationDuration: w.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Gold sparkle — particles burst from the gold counter
+function GoldSparkleEffect({ x, y }) {
+  const sparkles = useMemo(() => Array.from({ length: 12 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 12 + Math.random() * 25;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 3 + Math.random() * 5,
+      color: ['#ffd700','#ffcc00','#ffee55','#fff','#ffaa00'][Math.floor(Math.random() * 5)],
+      delay: Math.random() * 150,
+      dur: 400 + Math.random() * 400,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-gold-flash" />
+      {sparkles.map((s, i) => (
+        <div key={'gs'+i} className="anim-explosion-particle" style={{
+          '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+          '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Beer bubbles — yellow bubbles and foam rising upward
+function BeerBubblesEffect({ x, y }) {
+  const bubbles = useMemo(() => Array.from({ length: 18 }, () => ({
+    xOff: -25 + Math.random() * 50,
+    size: 4 + Math.random() * 8,
+    delay: Math.random() * 300,
+    dur: 500 + Math.random() * 500,
+    color: ['#ffd700','#ffcc33','#fff8dc','#ffe680','#fff'][Math.floor(Math.random() * 5)],
+    wobble: -8 + Math.random() * 16,
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-gold-flash" />
+      {bubbles.map((b, i) => (
+        <div key={'bb'+i} className="anim-beer-bubble" style={{
+          '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
+          '--color': b.color, animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+function CreatureDeathEffect({ x, y }) {
+  // Rising soul particles + flash + falling sparkles
+  const souls = useMemo(() => Array.from({ length: 14 }, () => ({
+    dx: -20 + Math.random() * 40,
+    dy: -(40 + Math.random() * 60),
+    size: 4 + Math.random() * 6,
+    color: ['#ffffff','#aaccff','#88aaff','#ccddff','#ddeeff'][Math.floor(Math.random() * 5)],
+    delay: Math.random() * 200,
+    dur: 600 + Math.random() * 500,
+  })), []);
+  const sparks = useMemo(() => Array.from({ length: 18 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 15 + Math.random() * 40;
+    return {
+      dx: Math.cos(angle) * speed,
+      dy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 4,
+      color: ['#ff4444','#ff6666','#ffaaaa','#ff8888','#cc3333'][Math.floor(Math.random() * 5)],
+      delay: 50 + Math.random() * 150,
+      dur: 400 + Math.random() * 400,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-creature-death-flash" />
+      {souls.map((p, i) => (
+        <div key={'s'+i} className="anim-creature-death-soul" style={{
+          '--dx': p.dx + 'px', '--dy': p.dy + 'px', '--size': p.size + 'px',
+          '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+        }} />
+      ))}
+      {sparks.map((p, i) => (
+        <div key={'k'+i} className="anim-creature-death-spark" style={{
+          '--dx': p.dx + 'px', '--dy': p.dy + 'px', '--size': p.size + 'px',
+          '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+const ANIM_REGISTRY = {
+  explosion: ExplosionEffect,
+  creature_death: CreatureDeathEffect,
+  freeze: FreezeEffect,
+  ice_encase: IceEncaseEffect,
+  electric_strike: ElectricStrikeEffect,
+  flame_strike: FlameStrikeEffect,
+  stranglehold_squeeze: (() => {
+    return function StrangleholdSqueezeEffect({ x, y }) {
+      useEffect(() => {
+        const timer = setTimeout(() => {
+          const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
+          let best = null, bestDist = Infinity;
+          els.forEach(el => {
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            const d = Math.abs(cx - x) + Math.abs(cy - y);
+            if (d < bestDist) { bestDist = d; best = el; }
+          });
+          if (best && bestDist < 80) {
+            best.classList.add('stranglehold-squeezed');
+            setTimeout(() => best.classList.remove('stranglehold-squeezed'), 1200);
+          }
+        }, 50);
+        return () => clearTimeout(timer);
+      }, []);
+      return null; // No visual overlay — the CSS class does all the work
+    };
+  })(),
+  tiger_impact: (() => {
+    return function TigerImpactEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards', marginLeft: -32, marginTop: -32 }}>🐯</div>
+        </div>
+      );
+    };
+  })(),
+  ox_impact: (() => {
+    return function OxImpactEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards', marginLeft: -32, marginTop: -32 }}>𖤍</div>
+        </div>
+      );
+    };
+  })(),
+  snake_impact: (() => {
+    return function SnakeImpactEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: 64, animation: 'tigerFadeInOut 1.2s ease-in-out forwards', marginLeft: -32, marginTop: -32 }}>🐍</div>
+        </div>
+      );
+    };
+  })(),
+  whirlwind_spin: (() => {
+    return function WhirlwindSpinEffect({ x, y }) {
+      useEffect(() => {
+        const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
+        let best = null, bestDist = Infinity;
+        els.forEach(el => {
+          const r = el.getBoundingClientRect();
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          const d = Math.abs(cx - x) + Math.abs(cy - y);
+          if (d < bestDist) { bestDist = d; best = el; }
+        });
+        if (best && bestDist < 80) {
+          best.classList.add('whirlwind-spinning');
+          setTimeout(() => best.classList.remove('whirlwind-spinning'), 2200);
+        }
+      }, []);
+      return null;
+    };
+  })(),
+  deep_sea_bubbles: (() => {
+    return function DeepSeaBubblesEffect({ x, y }) {
+      const bubbles = useMemo(() => Array.from({ length: 20 }, () => ({
+        xOff: -40 + Math.random() * 80,
+        startY: 25 + Math.random() * 30,
+        endY: -80 - Math.random() * 60,
+        delay: Math.random() * 800,
+        dur: 800 + Math.random() * 600,
+        size: 6 + Math.random() * 14,
+        opacity: 0.4 + Math.random() * 0.4,
+        wobble: -8 + Math.random() * 16,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {bubbles.map((b, i) => (
+            <div key={'bb'+i} style={{
+              position: 'absolute', left: b.xOff, top: b.startY,
+              width: b.size, height: b.size, borderRadius: '50%',
+              background: 'radial-gradient(circle at 35% 35%, rgba(100,160,220,.6), rgba(20,50,100,.3))',
+              border: '1px solid rgba(80,140,200,.4)',
+              boxShadow: `inset 0 -2px 4px rgba(10,30,60,.3), 0 0 ${b.size/2}px rgba(40,80,140,.3)`,
+              animation: `bubbleRise ${b.dur}ms ease-out ${b.delay}ms forwards`,
+              opacity: 0,
+              '--endY': b.endY + 'px',
+              '--wobble': b.wobble + 'px',
+              '--bubbleOpacity': b.opacity,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  holy_revival: (() => {
+    // Golden-white holy light rising upward — revival/resurrection effect
+    return function HolyRevivalEffect({ x, y }) {
+      const rays = useMemo(() => Array.from({ length: 16 }, () => ({
+        angle: Math.random() * 360,
+        len: 60 + Math.random() * 80,
+        width: 2 + Math.random() * 3,
+        delay: Math.random() * 400,
+        dur: 600 + Math.random() * 400,
+      })), []);
+      const sparkles = useMemo(() => Array.from({ length: 24 }, () => ({
+        xOff: -50 + Math.random() * 100,
+        startY: 20 + Math.random() * 30,
+        endY: -60 - Math.random() * 80,
+        delay: 200 + Math.random() * 600,
+        dur: 500 + Math.random() * 500,
+        size: 4 + Math.random() * 8,
+        color: ['#fffbe6','#ffd700','#fff','#ffe082','#fff9c4'][Math.floor(Math.random() * 5)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 160, height: 160, marginLeft: -80, marginTop: -80, background: 'radial-gradient(circle, rgba(255,255,240,.9) 0%, rgba(255,215,0,.4) 35%, rgba(255,255,200,.1) 60%, transparent 80%)', animationDuration: '800ms' }} />
+          <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,240,180,.5) 40%, transparent 70%)', animationDelay: '200ms', animationDuration: '600ms' }} />
+          {rays.map((r, i) => (
+            <div key={'hr'+i} style={{
+              position: 'absolute', left: 0, top: 0,
+              transform: `rotate(${r.angle}deg)`,
+              transformOrigin: 'center center',
+            }}>
+              <div style={{
+                width: r.width, height: r.len, marginLeft: -r.width/2,
+                background: 'linear-gradient(to top, rgba(255,215,0,.8), rgba(255,255,240,.3) 70%, transparent)',
+                borderRadius: r.width,
+                transformOrigin: 'center bottom',
+                animation: `holyRayGrow ${r.dur}ms ease-out ${r.delay}ms forwards`,
+                opacity: 0,
+              }} />
+            </div>
+          ))}
+          {sparkles.map((s, i) => (
+            <div key={'hs'+i} style={{
+              position: 'absolute', left: s.xOff, top: s.startY,
+              width: s.size, height: s.size, borderRadius: '50%',
+              background: s.color,
+              boxShadow: `0 0 ${s.size}px ${s.color}`,
+              animation: `holySparkleRise ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  arrow_rain: (() => {
+    // Sharp arrow projectiles raining down from above — Rain of Arrows
+    return function ArrowRainEffect({ x, y }) {
+      const arrows = useMemo(() => Array.from({ length: 28 }, (_, i) => ({
+        xOff: -70 + Math.random() * 140,
+        startY: -150 - Math.random() * 100,
+        delay: Math.random() * 600,
+        dur: 200 + Math.random() * 200,
+        rot: 170 + Math.random() * 20,
+        len: 18 + Math.random() * 14,
+      })), []);
+      const impacts = useMemo(() => Array.from({ length: 16 }, () => ({
+        xOff: -50 + Math.random() * 100,
+        delay: 250 + Math.random() * 500,
+        dur: 300 + Math.random() * 200,
+        size: 3 + Math.random() * 5,
+        color: ['#ffcc44','#ff8800','#ffaa22','#ddaa00','#ffe066'][Math.floor(Math.random() * 5)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, background: 'radial-gradient(circle, rgba(255,200,50,.5) 0%, rgba(255,150,0,.2) 50%, transparent 80%)', animationDelay: '300ms' }} />
+          {arrows.map((a, i) => (
+            <div key={'ar'+i} style={{
+              position: 'absolute', left: a.xOff, top: a.startY,
+              animation: `arrowFall ${a.dur}ms ease-in ${a.delay}ms forwards`,
+              opacity: 0,
+            }}>
+              <div style={{
+                width: 2, height: a.len,
+                background: 'linear-gradient(to bottom, transparent 0%, #ffdd66 20%, #ffaa22 80%, #ff8800 100%)',
+                borderRadius: '0 0 1px 1px',
+                boxShadow: '0 0 4px rgba(255,200,50,.6)',
+                transform: `rotate(${a.rot}deg)`,
+                transformOrigin: 'center top',
+              }}>
+                <div style={{ position: 'absolute', bottom: -4, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid #ff8800' }} />
+              </div>
+            </div>
+          ))}
+          {impacts.map((imp, i) => (
+            <div key={'ai'+i} className="anim-explosion-particle" style={{
+              '--dx': imp.xOff + 'px', '--dy': (Math.random() * -20) + 'px', '--size': imp.size + 'px',
+              '--color': imp.color, animationDelay: imp.delay + 'ms', animationDuration: imp.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  flame_avalanche: (() => {
+    // Massive, screen-shaking fire effect for Flame Avalanche
+    return function FlameAvalancheEffect({ x, y }) {
+      const flames = useMemo(() => Array.from({ length: 40 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 80 + Math.random() * 100;
+        return {
+          startX: Math.cos(angle) * dist,
+          startY: Math.sin(angle) * dist,
+          size: 16 + Math.random() * 24,
+          delay: Math.random() * 400,
+          dur: 400 + Math.random() * 400,
+          char: ['🔥','🔥','🔥','🔥','💥','✦','☄️'][Math.floor(Math.random() * 7)],
+        };
+      }), []);
+      const sparks = useMemo(() => Array.from({ length: 30 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 30 + Math.random() * 60;
+        return {
+          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+          size: 4 + Math.random() * 8,
+          color: ['#ff2200','#ff4400','#ff8800','#ffcc00','#ffaa00','#ff0000','#ff6600'][Math.floor(Math.random() * 7)],
+          delay: Math.random() * 300,
+          dur: 500 + Math.random() * 400,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 200, height: 200, marginLeft: -100, marginTop: -100, background: 'radial-gradient(circle, rgba(255,100,0,.9) 0%, rgba(255,60,0,.6) 30%, rgba(255,0,0,.2) 60%, transparent 80%)' }} />
+          <div className="anim-flame-flash" style={{ width: 140, height: 140, marginLeft: -70, marginTop: -70, animationDelay: '100ms', background: 'radial-gradient(circle, rgba(255,255,200,.8) 0%, rgba(255,180,0,.4) 40%, transparent 70%)' }} />
+          {flames.map((f, i) => (
+            <div key={'fa'+i} className="anim-flame-shard" style={{
+              '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
+              animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
+            }}>{f.char}</div>
+          ))}
+          {sparks.map((s, i) => (
+            <div key={'fas'+i} className="anim-explosion-particle" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  wind: WindEffect,
+  shadow_summon: ShadowSummonEffect,
+  gold_sparkle: GoldSparkleEffect,
+  beer_bubbles: BeerBubblesEffect,
+  juice_bubbles: (() => {
+    // Orange juice bubbles — same as beer but orange palette
+    return function JuiceBubblesEffect({ x, y }) {
+      const bubbles = useMemo(() => Array.from({ length: 18 }, () => ({
+        xOff: -25 + Math.random() * 50,
+        size: 4 + Math.random() * 8,
+        delay: Math.random() * 300,
+        dur: 500 + Math.random() * 500,
+        color: ['#ff8c00','#ffa033','#ffcc66','#ff6600','#ffe0b0'][Math.floor(Math.random() * 5)],
+        wobble: -8 + Math.random() * 16,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(255,140,0,.8) 0%, rgba(255,100,0,.3) 40%, transparent 70%)' }} />
+          {bubbles.map((b, i) => (
+            <div key={'jb'+i} className="anim-beer-bubble" style={{
+              '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
+              '--color': b.color, animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  poison_tick: (() => {
+    return function PoisonTickEffect({ x, y }) {
+      const bubbles = useMemo(() => Array.from({ length: 14 }, () => ({
+        xOff: -25 + Math.random() * 50,
+        size: 4 + Math.random() * 7,
+        delay: Math.random() * 250,
+        dur: 400 + Math.random() * 400,
+        color: ['#9933cc','#7722aa','#bb55ee','#6611aa','#dd88ff'][Math.floor(Math.random() * 5)],
+        wobble: -8 + Math.random() * 16,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(130,0,180,.8) 0%, rgba(100,0,160,.3) 40%, transparent 70%)' }} />
+          {bubbles.map((b, i) => (
+            <div key={'pt'+i} className="anim-beer-bubble" style={{
+              '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
+              '--color': b.color, animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  poison_vial: (() => {
+    return function PoisonVialEffect({ x, y }) {
+      const ooze = useMemo(() => Array.from({ length: 12 }, () => ({
+        xOff: -30 + Math.random() * 60,
+        size: 6 + Math.random() * 10,
+        delay: Math.random() * 200,
+        dur: 500 + Math.random() * 500,
+        wobble: -10 + Math.random() * 20,
+        color: ['#7722bb','#9933dd','#6611aa','#aa44ee','#551199'][Math.floor(Math.random() * 5)],
+      })), []);
+      const skulls = useMemo(() => Array.from({ length: 5 }, () => ({
+        xOff: -20 + Math.random() * 40,
+        delay: 200 + Math.random() * 300,
+        dur: 600 + Math.random() * 400,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(100,0,160,.9) 0%, rgba(80,0,140,.4) 40%, transparent 70%)' }} />
+          {ooze.map((o, i) => (
+            <div key={'po'+i} className="anim-beer-bubble" style={{
+              '--xOff': o.xOff + 'px', '--size': o.size + 'px', '--wobble': o.wobble + 'px',
+              '--color': o.color, animationDelay: o.delay + 'ms', animationDuration: o.dur + 'ms',
+            }} />
+          ))}
+          {skulls.map((s, i) => (
+            <div key={'ps'+i} className="anim-beer-bubble" style={{
+              '--xOff': s.xOff + 'px', '--size': '14px', '--wobble': '0px',
+              '--color': 'rgba(150,50,200,.6)', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+              fontSize: 14, opacity: 0,
+            }}>💀</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  tea_steam: (() => {
+    return function TeaSteamEffect({ x, y }) {
+      const particles = useMemo(() => Array.from({ length: 16 }, () => ({
+        xOff: -20 + Math.random() * 40,
+        size: 5 + Math.random() * 7,
+        delay: Math.random() * 300,
+        dur: 500 + Math.random() * 500,
+        char: ['🍃','~','≈','☁','·','🍃'][Math.floor(Math.random() * 6)],
+        color: ['#88cc66','#aaddaa','#66aa44','#ccddbb','#bbeeaa'][Math.floor(Math.random() * 5)],
+        wobble: -8 + Math.random() * 16,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(100,180,80,.7) 0%, rgba(80,150,60,.3) 40%, transparent 70%)' }} />
+          {particles.map((p, i) => (
+            <div key={'ts'+i} className="anim-beer-bubble" style={{
+              '--xOff': p.xOff + 'px', '--size': p.size + 'px', '--wobble': p.wobble + 'px',
+              '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+              fontSize: p.size,
+            }}>{p.char}</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  coffee_steam: (() => {
+    return function CoffeeSteamEffect({ x, y }) {
+      const particles = useMemo(() => Array.from({ length: 16 }, () => ({
+        xOff: -22 + Math.random() * 44,
+        size: 5 + Math.random() * 7,
+        delay: Math.random() * 300,
+        dur: 500 + Math.random() * 500,
+        char: ['☕','~','≈','☁','·','♨'][Math.floor(Math.random() * 6)],
+        color: ['#3a2a1a','#5c3d1e','#2a1a0a','#8b6b4a','#4a3020'][Math.floor(Math.random() * 5)],
+        wobble: -8 + Math.random() * 16,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(60,40,20,.8) 0%, rgba(40,25,10,.4) 40%, transparent 70%)' }} />
+          {particles.map((p, i) => (
+            <div key={'cs'+i} className="anim-beer-bubble" style={{
+              '--xOff': p.xOff + 'px', '--size': p.size + 'px', '--wobble': p.wobble + 'px',
+              '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+              fontSize: p.size,
+            }}>{p.char}</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  magic_hammer: (() => {
+    return function MagicHammerEffect({ x, y, w, h }) {
+      const targetW = w || 70;
+      const targetH = h || 90;
+      const hammerW = 55;
+      const hammerH = 80;
+      // Impact sparks
+      const sparks = useMemo(() => Array.from({ length: 14 }, () => {
+        const angle = -Math.PI * 0.15 + Math.random() * Math.PI * 1.3; // mostly sideways/upward
+        const speed = 20 + Math.random() * 50;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: -Math.abs(Math.sin(angle) * speed) - 5,
+          size: 2 + Math.random() * 4,
+          color: ['#ccc','#fff','#aaa','#ff8','#ffa'][Math.floor(Math.random() * 5)],
+          delay: 320 + Math.random() * 80,
+          dur: 250 + Math.random() * 200,
+        };
+      }), []);
+      // Apply squash class to actual target DOM element
+      useEffect(() => {
+        const timer = setTimeout(() => {
+          // Find the hero or support zone element under this animation
+          const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
+          let best = null, bestDist = Infinity;
+          els.forEach(el => {
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            const d = Math.abs(cx - x) + Math.abs(cy - y);
+            if (d < bestDist) { bestDist = d; best = el; }
+          });
+          if (best && bestDist < 80) {
+            best.classList.add('magic-hammer-squashed');
+            setTimeout(() => best.classList.remove('magic-hammer-squashed'), 650);
+          }
+        }, 330);
+        return () => clearTimeout(timer);
+      }, []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Hammerhead — drops from above, bounces back */}
+          <div className="anim-hammer-head" style={{
+            width: hammerW, height: hammerH,
+            marginLeft: -hammerW / 2, marginTop: -targetH / 2 - hammerH,
+          }} />
+          {/* Impact flash */}
+          <div className="anim-hammer-impact" />
+          {/* Impact sparks */}
+          {sparks.map((s, i) => (
+            <div key={'hs'+i} className="anim-explosion-particle" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  dark_gear_spin_cw: (() => {
+    return function DarkGearCWEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-dark-gear-flash" />
+          <div className="anim-dark-gear cw">⚙</div>
+        </div>
+      );
+    };
+  })(),
+  dark_gear_spin_ccw: (() => {
+    return function DarkGearCCWEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-dark-gear-flash" />
+          <div className="anim-dark-gear ccw">⚙</div>
+        </div>
+      );
+    };
+  })(),
+  cloud_gather: (() => {
+    return function CloudGatherEffect({ x, y }) {
+      const puffs = useMemo(() => Array.from({ length: 16 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 60 + Math.random() * 50;
+        return {
+          startX: Math.cos(angle) * dist,
+          startY: Math.sin(angle) * dist,
+          size: 14 + Math.random() * 18,
+          delay: Math.random() * 300,
+          dur: 500 + Math.random() * 300,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {puffs.map((p, i) => (
+            <div key={'cg'+i} style={{
+              position: 'absolute', left: p.startX, top: p.startY,
+              fontSize: p.size, color: '#fff',
+              filter: 'drop-shadow(0 0 6px rgba(255,255,255,.7))',
+              animation: `cloudGather ${p.dur}ms ease-in ${p.delay}ms forwards`,
+              opacity: 0,
+              '--startX': p.startX + 'px', '--startY': p.startY + 'px',
+            }}>☁</div>
+          ))}
+          <div style={{
+            position: 'absolute', left: -20, top: -14,
+            fontSize: 40, color: '#fff',
+            filter: 'drop-shadow(0 0 10px rgba(220,240,255,.8))',
+            animation: 'cloudFormCenter 400ms ease-out 600ms forwards',
+            opacity: 0,
+          }}>☁️</div>
+        </div>
+      );
+    };
+  })(),
+  cloud_disperse: (() => {
+    return function CloudDisperseEffect({ x, y }) {
+      const puffs = useMemo(() => Array.from({ length: 18 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 50 + Math.random() * 60;
+        return {
+          endX: Math.cos(angle) * dist,
+          endY: Math.sin(angle) * dist,
+          size: 10 + Math.random() * 14,
+          delay: 250 + Math.random() * 200,
+          dur: 400 + Math.random() * 300,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute', left: -20, top: -14,
+            fontSize: 40, color: '#fff',
+            filter: 'drop-shadow(0 0 10px rgba(220,240,255,.8))',
+            animation: 'cloudDisperseCenter 350ms ease-in forwards',
+            opacity: 1,
+          }}>☁️</div>
+          {puffs.map((p, i) => (
+            <div key={'cd'+i} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: p.size, color: '#fff',
+              filter: 'drop-shadow(0 0 5px rgba(255,255,255,.6))',
+              animation: `cloudDisperse ${p.dur}ms ease-out ${p.delay}ms forwards`,
+              opacity: 0,
+              '--endX': p.endX + 'px', '--endY': p.endY + 'px',
+            }}>☁</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  golden_ankh_revival: (() => {
+    return function GoldenAnkhRevivalEffect({ x, y }) {
+      const ankhs = useMemo(() => Array.from({ length: 12 }, () => ({
+        xOff: -45 + Math.random() * 90,
+        startY: 20 + Math.random() * 30,
+        endY: -70 - Math.random() * 80,
+        delay: 100 + Math.random() * 500,
+        dur: 700 + Math.random() * 500,
+        size: 14 + Math.random() * 16,
+        rot: -20 + Math.random() * 40,
+      })), []);
+      const sparkles = useMemo(() => Array.from({ length: 20 }, () => ({
+        xOff: -50 + Math.random() * 100,
+        startY: 10 + Math.random() * 40,
+        endY: -50 - Math.random() * 70,
+        delay: 200 + Math.random() * 600,
+        dur: 500 + Math.random() * 500,
+        size: 3 + Math.random() * 7,
+        color: ['#ffd700','#ffec80','#fff5cc','#ffb300','#ffe066'][Math.floor(Math.random() * 5)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 150, height: 150, marginLeft: -75, marginTop: -75, background: 'radial-gradient(circle, rgba(255,215,0,.85) 0%, rgba(255,180,0,.4) 35%, rgba(255,240,150,.1) 60%, transparent 80%)', animationDuration: '900ms' }} />
+          <div className="anim-flame-flash" style={{ width: 90, height: 90, marginLeft: -45, marginTop: -45, background: 'radial-gradient(circle, rgba(255,255,220,.95) 0%, rgba(255,215,0,.5) 40%, transparent 70%)', animationDelay: '250ms', animationDuration: '700ms' }} />
+          {ankhs.map((a, i) => (
+            <div key={'ak'+i} style={{
+              position: 'absolute', left: a.xOff, top: a.startY,
+              fontSize: a.size, color: '#ffd700',
+              filter: 'drop-shadow(0 0 6px rgba(255,200,0,.9))',
+              transform: `rotate(${a.rot}deg)`,
+              animation: `ankhFloat ${a.dur}ms ease-out ${a.delay}ms forwards`,
+              opacity: 0,
+              '--endY': a.endY + 'px',
+            }}>𓋹</div>
+          ))}
+          {sparkles.map((s, i) => (
+            <div key={'as'+i} style={{
+              position: 'absolute', left: s.xOff, top: s.startY,
+              width: s.size, height: s.size, borderRadius: '50%',
+              background: s.color,
+              boxShadow: `0 0 ${s.size}px ${s.color}`,
+              animation: `ankhFloat ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              opacity: 0,
+              '--endY': s.endY + 'px',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  thaw: ThawEffect,
+  music_notes: (() => {
+    return function MusicNotesEffect({ x, y }) {
+      const notes = useMemo(() => Array.from({ length: 32 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 20 + Math.random() * 60;
+        return {
+          startX: Math.cos(angle) * dist * 0.4,
+          startY: Math.random() * 20 - 10,
+          endX: Math.cos(angle) * dist,
+          endY: -40 - Math.random() * 120,
+          size: 16 + Math.random() * 20,
+          delay: Math.random() * 600,
+          dur: 700 + Math.random() * 500,
+          char: ['♪','♫','🎵','🎶','♩','♬'][Math.floor(Math.random() * 6)],
+          rot: -30 + Math.random() * 60,
+          opacity: 0.7 + Math.random() * 0.3,
+        };
+      }), []);
+      const sparkles = useMemo(() => Array.from({ length: 16 }, () => ({
+        xOff: -40 + Math.random() * 80,
+        startY: 10 + Math.random() * 20,
+        endY: -50 - Math.random() * 60,
+        delay: 100 + Math.random() * 500,
+        dur: 500 + Math.random() * 400,
+        size: 3 + Math.random() * 5,
+        color: ['#ff66aa','#ffaa44','#66ccff','#ffdd55','#cc88ff','#44ffaa'][Math.floor(Math.random() * 6)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 100, height: 100, marginLeft: -50, marginTop: -50, background: 'radial-gradient(circle, rgba(255,100,200,.4) 0%, rgba(200,100,255,.2) 40%, transparent 70%)' }} />
+          {notes.map((n, i) => (
+            <div key={'mn'+i} style={{
+              position: 'absolute', left: n.startX, top: n.startY,
+              fontSize: n.size, opacity: 0,
+              transform: `rotate(${n.rot}deg)`,
+              animation: `musicNoteFloat ${n.dur}ms ease-out ${n.delay}ms forwards`,
+              '--endX': n.endX + 'px', '--endY': n.endY + 'px',
+              '--noteOpacity': n.opacity,
+              filter: `hue-rotate(${Math.random() * 360}deg)`,
+              textShadow: '0 0 8px rgba(255,150,255,.6)',
+            }}>{n.char}</div>
+          ))}
+          {sparkles.map((s, i) => (
+            <div key={'ms'+i} style={{
+              position: 'absolute', left: s.xOff, top: s.startY,
+              width: s.size, height: s.size, borderRadius: '50%',
+              background: s.color,
+              boxShadow: `0 0 ${s.size + 2}px ${s.color}`,
+              animation: `holySparkleRise ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  necromancy_summon: (() => {
+    return function NecromancySummonEffect({ x, y }) {
+      const skulls = useMemo(() => Array.from({ length: 12 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 30 + Math.random() * 50;
+        return {
+          startX: Math.cos(angle) * dist * 0.3,
+          startY: Math.random() * 15,
+          endX: Math.cos(angle) * dist,
+          endY: -30 - Math.random() * 90,
+          size: 16 + Math.random() * 16,
+          delay: Math.random() * 500,
+          dur: 600 + Math.random() * 500,
+          char: ['💀','☠️','💀','☠️','💀','👻'][Math.floor(Math.random() * 6)],
+          rot: -20 + Math.random() * 40,
+        };
+      }), []);
+      const particles = useMemo(() => Array.from({ length: 28 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 20 + Math.random() * 50;
+        return {
+          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 20,
+          size: 4 + Math.random() * 8,
+          color: ['#8b00ff','#6a0dad','#9932cc','#4b0082','#7b2d8e','#cc44ff','#220033'][Math.floor(Math.random() * 7)],
+          delay: Math.random() * 400,
+          dur: 400 + Math.random() * 400,
+        };
+      }), []);
+      const wisps = useMemo(() => Array.from({ length: 8 }, () => ({
+        xOff: -30 + Math.random() * 60,
+        startY: 20 + Math.random() * 20,
+        endY: -50 - Math.random() * 50,
+        delay: 100 + Math.random() * 400,
+        dur: 700 + Math.random() * 400,
+        size: 10 + Math.random() * 15,
+        opacity: 0.4 + Math.random() * 0.3,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 120, height: 120, marginLeft: -60, marginTop: -60, background: 'radial-gradient(circle, rgba(100,0,180,.7) 0%, rgba(60,0,120,.4) 40%, transparent 70%)' }} />
+          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, animationDelay: '100ms', background: 'radial-gradient(circle, rgba(180,50,255,.5) 0%, rgba(100,0,200,.2) 50%, transparent 70%)' }} />
+          {skulls.map((s, i) => (
+            <div key={'ns'+i} style={{
+              position: 'absolute', left: s.startX, top: s.startY,
+              fontSize: s.size, opacity: 0,
+              transform: `rotate(${s.rot}deg)`,
+              animation: `musicNoteFloat ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              '--endX': s.endX + 'px', '--endY': s.endY + 'px',
+              '--noteOpacity': 0.85,
+              textShadow: '0 0 12px rgba(130,0,220,.8), 0 0 24px rgba(80,0,160,.4)',
+            }}>{s.char}</div>
+          ))}
+          {particles.map((p, i) => (
+            <div key={'np'+i} className="anim-explosion-particle" style={{
+              '--dx': p.dx + 'px', '--dy': p.dy + 'px', '--size': p.size + 'px',
+              '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+            }} />
+          ))}
+          {wisps.map((w, i) => (
+            <div key={'nw'+i} style={{
+              position: 'absolute', left: w.xOff, top: w.startY,
+              width: w.size, height: w.size, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(150,50,255,.6), rgba(80,0,150,.2))',
+              boxShadow: '0 0 8px rgba(130,0,220,.5)',
+              animation: `holySparkleRise ${w.dur}ms ease-out ${w.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  dumbbell_pump: (() => {
+    // Dumbbell pumps up and down twice — Muscle Training
+    return function DumbbellPumpEffect({ x, y }) {
+      const sparks1 = useMemo(() => Array.from({ length: 10 }, () => {
+        const angle = Math.random() * Math.PI;
+        const speed = 15 + Math.random() * 30;
+        return {
+          dx: Math.cos(angle) * speed - speed / 2,
+          dy: -Math.abs(Math.sin(angle) * speed),
+          size: 2 + Math.random() * 4,
+          color: ['#ffcc00','#ff8800','#ffaa33','#ffe066','#fff'][Math.floor(Math.random() * 5)],
+          delay: 480 + Math.random() * 60,
+          dur: 300 + Math.random() * 200,
+        };
+      }), []);
+      const sparks2 = useMemo(() => Array.from({ length: 10 }, () => {
+        const angle = Math.random() * Math.PI;
+        const speed = 15 + Math.random() * 30;
+        return {
+          dx: Math.cos(angle) * speed - speed / 2,
+          dy: -Math.abs(Math.sin(angle) * speed),
+          size: 2 + Math.random() * 4,
+          color: ['#ffcc00','#ff8800','#ffaa33','#ffe066','#fff'][Math.floor(Math.random() * 5)],
+          delay: 1080 + Math.random() * 60,
+          dur: 300 + Math.random() * 200,
+        };
+      }), []);
+      const weightStyle = {
+        width: 10, height: 36,
+        background: 'linear-gradient(to right, #999, #555)',
+        borderRadius: 3,
+        boxShadow: '0 2px 6px rgba(0,0,0,.5), inset 0 1px 2px rgba(255,255,255,.3)',
+      };
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            animation: 'dumbbellPump 1.5s ease-in-out forwards',
+            display: 'flex', flexDirection: 'row', alignItems: 'center',
+            marginLeft: -35, marginTop: -50,
+          }}>
+            <div style={weightStyle} />
+            <div style={{
+              width: 50, height: 8,
+              background: 'linear-gradient(to bottom, #bbb, #888, #bbb)',
+              boxShadow: 'inset 0 0 4px rgba(0,0,0,.3)',
+            }} />
+            <div style={weightStyle} />
+          </div>
+          {sparks1.map((s, i) => (
+            <div key={'ms1'+i} className="anim-explosion-particle" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }} />
+          ))}
+          {sparks2.map((s, i) => (
+            <div key={'ms2'+i} className="anim-explosion-particle" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  water_splash: (() => {
+    // Water splash — hero dives into water (Jump in the River)
+    return function WaterSplashEffect({ x, y }) {
+      const drops = useMemo(() => Array.from({ length: 24 }, () => {
+        const angle = -Math.PI * 0.1 + Math.random() * Math.PI * 1.2;
+        const speed = 25 + Math.random() * 55;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: -Math.abs(Math.sin(angle) * speed) - 10,
+          size: 4 + Math.random() * 8,
+          delay: Math.random() * 200,
+          dur: 500 + Math.random() * 400,
+          color: ['#4488cc','#66aaee','#3377bb','#88ccff','#aaddff','#2266aa'][Math.floor(Math.random() * 6)],
+        };
+      }), []);
+      const ripples = useMemo(() => Array.from({ length: 3 }, (_, i) => ({
+        delay: i * 200,
+        dur: 800 + i * 200,
+        size: 40 + i * 30,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 120, height: 60, marginLeft: -60, marginTop: -10, background: 'radial-gradient(ellipse, rgba(60,140,220,.7) 0%, rgba(40,100,180,.3) 50%, transparent 80%)' }} />
+          {ripples.map((r, i) => (
+            <div key={'wr'+i} style={{
+              position: 'absolute', left: -r.size/2, top: -8,
+              width: r.size, height: r.size * 0.35, borderRadius: '50%',
+              border: '2px solid rgba(100,180,255,.5)',
+              animation: `waterRipple ${r.dur}ms ease-out ${r.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+          {drops.map((d, i) => (
+            <div key={'wd'+i} className="anim-explosion-particle" style={{
+              '--dx': d.dx + 'px', '--dy': d.dy + 'px', '--size': d.size + 'px',
+              '--color': d.color, animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  sunglasses_drop: (() => {
+    // Sunglasses slowly descend onto the Hero — Divine Gift of Coolness
+    return function SunglassesDropEffect({ x, y }) {
+      const sparkles = useMemo(() => Array.from({ length: 12 }, () => ({
+        xOff: -30 + Math.random() * 60,
+        startY: -5 + Math.random() * 15,
+        endY: -40 - Math.random() * 50,
+        delay: 1000 + Math.random() * 400,
+        dur: 500 + Math.random() * 400,
+        size: 3 + Math.random() * 5,
+        color: ['#ffdd44','#fff','#ffcc00','#ffe088','#ffffff'][Math.floor(Math.random() * 5)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            animation: 'sunglassesDrop 1.8s ease-in-out forwards',
+            fontSize: 48, marginLeft: -24, marginTop: -70,
+            filter: 'drop-shadow(0 2px 8px rgba(0,0,0,.4))',
+          }}>🕶️</div>
+          {sparkles.map((s, i) => (
+            <div key={'sg'+i} style={{
+              position: 'absolute', left: s.xOff, top: s.startY,
+              width: s.size, height: s.size, borderRadius: '50%',
+              background: s.color,
+              boxShadow: `0 0 ${s.size + 2}px ${s.color}`,
+              animation: `holySparkleRise ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  anger_mark: (() => {
+    // 💢 anger symbol — pops in and fades (Challenge redirect)
+    return function AngerMarkEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: 52, animation: 'tigerFadeInOut 1s ease-in-out forwards', marginLeft: -26, marginTop: -36 }}>💢</div>
+        </div>
+      );
+    };
+  })(),
+};
+
+function IceEncaseEffect({ x, y }) {
+  // Ice shards from ALL sides converging on target
+  const shards = useMemo(() => Array.from({ length: 20 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 60 + Math.random() * 40;
+    return {
+      startX: Math.cos(angle) * dist,
+      startY: Math.sin(angle) * dist,
+      size: 4 + Math.random() * 8,
+      delay: Math.random() * 150,
+      dur: 200 + Math.random() * 200,
+      char: ['❄','❅','❆','✦','·'][Math.floor(Math.random() * 5)],
+    };
+  }), []);
+  const burstCrystals = useMemo(() => Array.from({ length: 12 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 10 + Math.random() * 25;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 3 + Math.random() * 6,
+      color: ['#aaddff','#88ccff','#cceeFF','#fff','#ddeeff'][Math.floor(Math.random() * 5)],
+      delay: 350 + Math.random() * 100,
+      dur: 300 + Math.random() * 200,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-freeze-flash" style={{ animationDelay: '300ms' }} />
+      {shards.map((s, i) => (
+        <div key={'sh'+i} className="anim-ice-shard" style={{
+          '--startX': s.startX + 'px', '--startY': s.startY + 'px', '--size': s.size + 'px',
+          animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }}>{s.char}</div>
+      ))}
+      {burstCrystals.map((c, i) => (
+        <div key={'bc'+i} className="anim-explosion-particle" style={{
+          '--dx': c.dx + 'px', '--dy': c.dy + 'px', '--size': c.size + 'px',
+          '--color': c.color, animationDelay: c.delay + 'ms', animationDuration: c.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+function GameAnimationRenderer({ type, x, y, w, h }) {
+  const Component = ANIM_REGISTRY[type];
+  if (!Component) return null;
+  return <Component x={x} y={y} w={w} h={h} />;
+}
+
+// Renders an ability zone stack — handles Performance visual transformation
+function AbilityStack({ cards }) {
+  const [hovered, setHovered] = useState(false);
+  // Check if top card is Performance — if so, display the ability below it
+  const topCard = cards[cards.length - 1];
+  const isTopPerformance = topCard === 'Performance';
+  const displayName = isTopPerformance && cards.length > 1 ? cards[cards.length - 2] : topCard;
+
+  return (
+    <div className="board-ability-stack"
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      {cards.map((c, ci) => {
+        // When top is Performance: show the underlying ability image for Performance cards,
+        // but on hover, show the actual Performance card
+        let showName = c;
+        if (c === 'Performance' && !hovered && ci > 0) {
+          // Not hovered: Performance looks like the ability below
+          showName = cards.find(x => x !== 'Performance') || c;
+        }
+        return (
+          <div key={ci} className="board-ability-stack-card" style={{ top: ci * 5 }}>
+            <BoardCard cardName={hovered && ci === cards.length - 1 && isTopPerformance ? 'Performance' : showName} />
+          </div>
+        );
+      })}
+      {cards.length > 1 && <div className="board-card-label">{cards.length}</div>}
+    </div>
+  );
+}
+
+// Status select prompt component (for Beer, etc.) — must be a proper component for hooks
+function CardGalleryMultiPrompt({ ep, onRespond }) {
+  const cards = ep.cards || [];
+  const maxSelect = ep.selectCount || 3;
+  const minSelect = ep.minSelect || (ep.maxBudget != null ? 1 : maxSelect);
+  const maxBudget = ep.maxBudget;
+  const costKey = ep.costKey || 'cost';
+  const [selected, setSelected] = useState([]);
+
+  const totalCost = maxBudget != null
+    ? selected.reduce((sum, name) => {
+        const entry = cards.find(c => c.name === name);
+        return sum + (entry?.[costKey] || 0);
+      }, 0)
+    : 0;
+
+  const toggleCard = (name) => {
+    setSelected(prev => {
+      if (prev.includes(name)) return prev.filter(n => n !== name);
+      if (prev.length >= maxSelect) return prev;
+      // Budget check
+      if (maxBudget != null) {
+        const entry = cards.find(c => c.name === name);
+        const entryCost = entry?.[costKey] || 0;
+        const currentTotal = prev.reduce((sum, n) => {
+          const e = cards.find(c => c.name === n);
+          return sum + (e?.[costKey] || 0);
+        }, 0);
+        if (currentTotal + entryCost > maxBudget) return prev;
+      }
+      return [...prev, name];
+    });
+  };
+
+  const canConfirm = selected.length >= minSelect && selected.length <= maxSelect;
+
+  return (
+    <div className="modal-overlay" onClick={ep.cancellable !== false ? () => onRespond({ cancelled: true }) : undefined}>
+      <div className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
+            {ep.title || 'Select Cards'}
+          </span>
+          {ep.cancellable !== false && (
+            <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }}
+              onClick={() => onRespond({ cancelled: true })}>✕ CANCEL</button>
+          )}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
+          {ep.description}
+          {maxBudget != null && (
+            <span style={{ marginLeft: 8, color: totalCost > maxBudget * 0.8 ? '#ffaa33' : 'var(--accent)', fontWeight: 600 }}>
+              (Cost: {totalCost}/{maxBudget})
+            </span>
+          )}
+        </div>
+        <div className="deck-viewer-grid">
+          {cards.map((entry, i) => {
+            const card = CARDS_BY_NAME[entry.name];
+            if (!card) return null;
+            const isSel = selected.includes(entry.name);
+            const entryCost = entry[costKey] || 0;
+            const wouldExceedBudget = maxBudget != null && !isSel && totalCost + entryCost > maxBudget;
+            const atMax = !isSel && selected.length >= maxSelect;
+            const dimmed = wouldExceedBudget || atMax;
+            return (
+              <div key={entry.name + '-' + i} style={{ position: 'relative' }}>
+                <CardMini card={card}
+                  onClick={dimmed ? undefined : () => toggleCard(entry.name)}
+                  style={{ width: '100%', height: 120, cursor: dimmed ? 'not-allowed' : 'pointer',
+                    outline: isSel ? '3px solid var(--accent)' : 'none',
+                    filter: isSel ? 'brightness(1.2)' : (dimmed ? 'brightness(0.4) saturate(0.3)' : 'none'),
+                  }} />
+                {isSel && <div style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 3, zIndex: 5 }}>✓</div>}
+                {maxBudget != null && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd700', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ textAlign: 'center', marginTop: 12 }}>
+          <button className={'btn ' + (ep.confirmClass || '')} style={{ padding: '8px 24px', fontSize: 12 }}
+            disabled={!canConfirm}
+            onClick={() => onRespond({ selectedCards: selected })}>
+            {ep.confirmLabel || `Confirm (${selected.length}/${maxSelect})`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusSelectPrompt({ ep, onRespond }) {
+  const [localSelected, setLocalSelected] = useState(() => (ep.statuses || []).map(s => s.key));
+  const toggleStatus = (key) => {
+    setLocalSelected(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  };
+  return (
+    <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#33dd55', minWidth: 260 }}>
+      <div className="orbit-font" style={{ fontSize: 13, color: '#33dd55', marginBottom: 4 }}>{ep.title}</div>
+      <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+        {(ep.statuses || []).map(s => (
+          <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 8px', borderRadius: 4,
+            background: localSelected.includes(s.key) ? 'rgba(50,220,80,.15)' : 'rgba(255,255,255,.03)',
+            border: localSelected.includes(s.key) ? '1px solid rgba(50,220,80,.5)' : '1px solid rgba(255,255,255,.08)',
+          }} onClick={() => toggleStatus(s.key)}>
+            <span style={{ fontSize: 16 }}>{s.icon}</span>
+            <span style={{ fontSize: 12, color: localSelected.includes(s.key) ? '#88ffaa' : 'var(--text2)' }}>{s.label}{s.stacks > 1 ? ` (×${s.stacks})` : ''}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: localSelected.includes(s.key) ? '#33dd55' : 'var(--text2)', opacity: .6 }}>
+              {localSelected.includes(s.key) ? '✓' : '○'}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+        <button className="btn btn-success" style={{ padding: '6px 20px', fontSize: 11 }}
+          onClick={() => onRespond({ selectedStatuses: localSelected })}>
+          {ep.confirmLabel || 'Confirm'}
+        </button>
+        {ep.cancellable !== false && (
+          <button className="btn" style={{ padding: '6px 16px', fontSize: 11 }}
+            onClick={() => onRespond({ cancelled: true })}>← Back</button>
+        )}
+      </div>
+    </DraggablePanel>
+  );
+}
+
+function GameBoard({ gameState, lobby, onLeave }) {
+  const { user, setUser, notify } = useContext(AppContext);
+  const isSpectator = gameState.isSpectator || false;
+  const myIdx = gameState.myIndex;
+  const oppIdx = myIdx === 0 ? 1 : 0;
+  const me = gameState.players[myIdx];
+  const opp = gameState.players[oppIdx];
+  const gameSkins = useMemo(() => ({ ...(me.deckSkins || {}), ...(opp.deckSkins || {}) }), [me.deckSkins, opp.deckSkins]);
+  const result = gameState.result;
+  const iWon = result && result.winnerIdx === myIdx;
+  const oppLeft = opp.left || false;
+  const oppDisconnected = opp.disconnected || false;
+  const meDisconnected = me.disconnected || false;
+  const myRematchSent = !isSpectator && (gameState.rematchRequests || []).includes(user.id);
+
+  // ── Shared board tooltip (single instance, driven by BoardCard/CardRevealEntry) ──
+  const [tooltipCard, setTooltipCard] = useState(null);
+  useEffect(() => {
+    _boardTooltipSetter = setTooltipCard;
+    return () => { _boardTooltipSetter = null; };
+  }, []);
+  // Safety: if the mouse isn't over any board-card element, clear the tooltip.
+  // Catches cases where the source element was removed (overlay dismissed, card reveal expired).
+  useEffect(() => {
+    if (!tooltipCard) return;
+    const check = () => {
+      if (!document.querySelector('.board-card:hover, .card-reveal-entry:hover, .card-mini:hover')) {
+        setTooltipCard(null);
+      }
+    };
+    const id = setInterval(check, 300);
+    return () => clearInterval(id);
+  }, [tooltipCard]);
+
+  // Board skin helpers — construct zone background style from board ID
+  const boardZoneStyle = (boardId, zoneType) => {
+    if (!boardId) return undefined;
+    const num = boardId.replace(/\D/g, '');
+    return {
+      backgroundImage: 'url(/data/shop/boards/' + encodeURIComponent(zoneType + num) + '.png)',
+      backgroundSize: 'cover', backgroundPosition: 'center',
+    };
+  };
+  const myBoardZone = (zoneType) => boardZoneStyle(me.board, zoneType);
+  const oppBoardZone = (zoneType) => boardZoneStyle(opp.board, zoneType);
+
+  // Area zone positioning — measure hero zones to find midpoints between columns
+  const boardCenterRef = useRef(null);
+  const [areaPositions, setAreaPositions] = useState([undefined, undefined]);
+
+  useEffect(() => {
+    const measure = () => {
+      const container = boardCenterRef.current;
+      if (!container) return;
+      // Find all hero zones from the "me" side (bottom) for stable measurement
+      const myHeroes = container.querySelectorAll('[data-hero-owner="me"][data-hero-zone]');
+      if (myHeroes.length < 3) return;
+      const containerRect = container.getBoundingClientRect();
+      const rects = Array.from(myHeroes).sort((a, b) => +a.dataset.heroIdx - +b.dataset.heroIdx).map(el => el.getBoundingClientRect());
+      // Half-zone offset: use actual rendered zone width (scales with --board-scale)
+      const halfZone = (myHeroes[0]?.offsetWidth || 68) / 2;
+      // Midpoint between hero 0 right edge and hero 1 left edge
+      const mid01 = ((rects[0].left + rects[0].right) / 2 + (rects[1].left + rects[1].right) / 2) / 2 - containerRect.left - halfZone;
+      // Midpoint between hero 1 right edge and hero 2 left edge
+      const mid12 = ((rects[1].left + rects[1].right) / 2 + (rects[2].left + rects[2].right) / 2) / 2 - containerRect.left - halfZone;
+      setAreaPositions([mid01, mid12]);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    const timer = setTimeout(measure, 200);
+    return () => { window.removeEventListener('resize', measure); clearTimeout(timer); };
+  }, [gameState.turn, gameState.players[0]?.islandZoneCount, gameState.players[1]?.islandZoneCount]);
+
+  // ── Board auto-scaling: fit board to available width ──
+  useEffect(() => {
+    const container = boardCenterRef.current;
+    if (!container) return;
+    const IDEAL_WIDTH = 1100; // px at scale 1.0 — matches full-size reference layout
+    const MIN_SCALE = 0.45;  // never go smaller than this (touch target safety)
+    const updateScale = () => {
+      const available = container.clientWidth;
+      const scale = Math.max(MIN_SCALE, Math.min(1, available / IDEAL_WIDTH));
+      document.documentElement.style.setProperty('--board-scale', scale.toFixed(4));
+    };
+    const ro = new ResizeObserver(updateScale);
+    ro.observe(container);
+    updateScale();
+    return () => { ro.disconnect(); document.documentElement.style.setProperty('--board-scale', '1'); };
+  }, []);
+
+  // Local hand state for reordering
+  const [hand, setHand] = useState(me.hand || []);
+  // Compute resolving card index from LOCAL hand order + server marker
+  const resolvingHandIndex = useMemo(() => {
+    const rc = me.resolvingCard;
+    if (!rc) return -1;
+    let count = 0;
+    for (let i = 0; i < hand.length; i++) {
+      if (hand[i] === rc.name) {
+        count++;
+        if (count === rc.nth) return i;
+      }
+    }
+    return -1;
+  }, [hand, me.resolvingCard]);
+  const handKeyRef = useRef(JSON.stringify(me.hand || []));
+  const [drawAnimCards, setDrawAnimCards] = useState([]); // [{id, cardName, origIdx}]
+  const prevHandLenRef = useRef((me.hand || []).length);
+  // Spectator: track bottom player hand count for draw animations (like opponent draw)
+  const [specMeDrawAnims, setSpecMeDrawAnims] = useState([]);
+  const [specMeDrawHidden, setSpecMeDrawHidden] = useState(new Set());
+  const prevSpecMeHandCountRef = useRef(me.handCount || 0);
+  useEffect(() => {
+    if (isSpectator) {
+      // Spectator mode: use handCount-based detection (same as opponent draw)
+      const newCount = me.handCount || 0;
+      const prevCount = prevSpecMeHandCountRef.current;
+      if (newCount > prevCount) {
+        const hiddenIdxs = new Set();
+        for (let i = prevCount; i < newCount; i++) hiddenIdxs.add(i);
+        setSpecMeDrawHidden(prev => new Set([...prev, ...hiddenIdxs]));
+        requestAnimationFrame(() => {
+          const deckEl = document.querySelector('[data-my-deck]');
+          const handCards = document.querySelectorAll('.game-hand-me .game-hand-cards .hand-card');
+          const deckRect = deckEl?.getBoundingClientRect();
+          if (deckRect && handCards.length > 0) {
+            const newAnims = [];
+            for (let i = 0; i < newCount - prevCount; i++) {
+              const targetCard = handCards[handCards.length - 1 - (newCount - prevCount - 1 - i)];
+              const targetRect = targetCard?.getBoundingClientRect();
+              if (!targetRect) continue;
+              newAnims.push({
+                id: Date.now() + Math.random() + i,
+                startX: deckRect.left + deckRect.width / 2 - 32,
+                startY: deckRect.top + deckRect.height / 2 - 45,
+                endX: targetRect.left, endY: targetRect.top,
+              });
+            }
+            if (newAnims.length > 0) {
+              setSpecMeDrawAnims(prev => [...prev, ...newAnims]);
+              setTimeout(() => {
+                setSpecMeDrawAnims(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
+                setSpecMeDrawHidden(prev => {
+                  const next = new Set(prev);
+                  hiddenIdxs.forEach(idx => next.delete(idx));
+                  return next.size > 0 ? next : new Set();
+                });
+              }, 500);
+            } else {
+              setSpecMeDrawHidden(new Set());
+            }
+          } else {
+            setSpecMeDrawHidden(new Set());
+          }
+        });
+      }
+      prevSpecMeHandCountRef.current = newCount;
+      return;
+    }
+    const newKey = JSON.stringify(me.hand || []);
+    if (newKey !== handKeyRef.current) {
+      const newHand = me.hand || [];
+      const prevLen = prevHandLenRef.current;
+      handKeyRef.current = newKey;
+      setHand(newHand);
+      // Detect newly drawn cards (added at end of hand)
+      if (newHand.length > prevLen) {
+        const deckEl = document.querySelector('[data-my-deck]');
+        const deckRect = deckEl?.getBoundingClientRect();
+        if (deckRect) {
+          const newAnims = [];
+          for (let i = prevLen; i < newHand.length; i++) {
+            newAnims.push({
+              id: Date.now() + Math.random() + i,
+              cardName: newHand[i],
+              origIdx: i,
+              startX: deckRect.left + deckRect.width / 2 - 32,
+              startY: deckRect.top + deckRect.height / 2 - 45,
+            });
+          }
+          setDrawAnimCards(prev => [...prev, ...newAnims]);
+          setTimeout(() => {
+            setDrawAnimCards(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
+          }, 500);
+        }
+      }
+      prevHandLenRef.current = newHand.length;
+    }
+  }, [me.hand, me.handCount]);
+
+  // Opponent draw animation tracking
+  const [oppDrawAnims, setOppDrawAnims] = useState([]);
+  const [oppDrawHidden, setOppDrawHidden] = useState(new Set()); // indices to hide during anim
+  const prevOppHandCountRef = useRef(opp.handCount || 0);
+  useEffect(() => {
+    const newCount = opp.handCount || 0;
+    const prevCount = prevOppHandCountRef.current;
+    if (newCount > prevCount) {
+      // Hide new cards immediately (visibility:hidden preserves layout for position reading)
+      const hiddenIdxs = new Set();
+      for (let i = prevCount; i < newCount; i++) hiddenIdxs.add(i);
+      setOppDrawHidden(prev => new Set([...prev, ...hiddenIdxs]));
+      // Wait one frame for DOM to update with new hand cards
+      requestAnimationFrame(() => {
+        const deckEl = document.querySelector('[data-opp-deck]');
+        const handCards = document.querySelectorAll('.game-hand-opp .game-hand-cards .hand-card');
+        const deckRect = deckEl?.getBoundingClientRect();
+        if (deckRect && handCards.length > 0) {
+          const newAnims = [];
+          const deckSearchPending = deckSearchPendingRef.current;
+          for (let i = 0; i < newCount - prevCount; i++) {
+            // Target the last card(s) in the hand — new cards appear at the end
+            const targetCard = handCards[handCards.length - 1 - (newCount - prevCount - 1 - i)];
+            const targetRect = targetCard?.getBoundingClientRect();
+            if (!targetRect) continue;
+            const sx = deckRect.left + deckRect.width / 2 - 32;
+            const sy = deckRect.top + deckRect.height / 2 - 45;
+            // If this is a deck-searched card, show face-up in the normal draw animation
+            if (deckSearchPending.length > 0) {
+              const searchCardName = deckSearchPending.shift();
+              newAnims.push({
+                id: Date.now() + Math.random() + i,
+                startX: sx, startY: sy,
+                endX: targetRect.left, endY: targetRect.top,
+                cardName: searchCardName, // Face-up
+              });
+            } else {
+              newAnims.push({
+                id: Date.now() + Math.random() + i,
+                startX: sx, startY: sy,
+                endX: targetRect.left, endY: targetRect.top,
+              });
+            }
+          }
+          if (newAnims.length > 0) {
+            setOppDrawAnims(prev => [...prev, ...newAnims]);
+            setTimeout(() => {
+              setOppDrawAnims(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
+              setOppDrawHidden(prev => {
+                const next = new Set(prev);
+                hiddenIdxs.forEach(idx => next.delete(idx));
+                return next.size > 0 ? next : new Set();
+              });
+            }, 500);
+          } else {
+            setOppDrawHidden(prev => {
+              const next = new Set(prev);
+              hiddenIdxs.forEach(idx => next.delete(idx));
+              return next.size > 0 ? next : new Set();
+            });
+          }
+        } else {
+          setOppDrawHidden(new Set());
+        }
+      });
+    }
+    prevOppHandCountRef.current = newCount;
+  }, [opp.handCount]);
+
+  // ─── Discard/Delete animation tracking (hand-to-pile + board-to-pile, both players) ───
+  const [gameAnims, setGameAnims] = useState([]); // Active particle animations (moved up for creature death access)
+  const [beamAnims, setBeamAnims] = useState([]); // Beam animations (laser, etc.)
+  const [ramAnims, setRamAnims] = useState([]); // Ram animations (hero charges to target and back)
+  const [transferAnims, setTransferAnims] = useState([]); // Card transfer animations (Dark Gear, etc.)
+  const [projectileAnims, setProjectileAnims] = useState([]); // Projectile animations (phoenix cannon, etc.)
+  const [discardAnims, setDiscardAnims] = useState([]);
+  const [myDiscardHidden, setMyDiscardHidden] = useState(0);
+  const [oppDiscardHidden, setOppDiscardHidden] = useState(0);
+  const [myDeletedHidden, setMyDeletedHidden] = useState(0);
+  const [oppDeletedHidden, setOppDeletedHidden] = useState(0);
+  const myHandRectsRef = useRef([]);
+  const oppHandRectsRef = useRef([]);
+  const boardCardRectsRef = useRef({ me: {}, opp: {} }); // cardName → [DOMRect, ...]
+  const prevMyHandForDiscardRef = useRef([...(me.hand || [])]);
+  const prevMyHandCountForDiscardRef = useRef(me.handCount || 0); // spectator mode
+  const prevMyDiscardLenRef = useRef((me.discardPile || []).length);
+  const prevMyDeletedLenRef = useRef((me.deletedPile || []).length);
+  const prevOppHandCountForDiscardRef = useRef(opp.handCount || 0);
+  const prevOppDiscardLenRef = useRef((opp.discardPile || []).length);
+  const prevOppDeletedLenRef = useRef((opp.deletedPile || []).length);
+
+  // Helper: build pile-target rect
+  const getPileCenter = (selector) => {
+    const el = document.querySelector(selector);
+    const r = el?.getBoundingClientRect();
+    return r ? { x: r.left + r.width / 2 - 32, y: r.top + r.height / 2 - 45 } : null;
+  };
+
+  // Helper: create anims from board rects for unmatched pile entries
+  const animsFromBoard = (entries, boardRects, dest, destSelector) => {
+    const target = getPileCenter(destSelector);
+    if (!target) return [];
+    const anims = [];
+    for (const cardName of entries) {
+      const positions = boardRects[cardName];
+      if (!positions || positions.length === 0) continue;
+      const sr = positions.shift();
+      anims.push({ id: Date.now() + Math.random(), cardName, startX: sr.left, startY: sr.top, endX: target.x, endY: target.y, dest });
+    }
+    return anims;
+  };
+
+  // Helper: schedule anim state + pile hiding
+  const scheduleAnims = (newAnims, setDiscardHidden, setDeletedHidden) => {
+    if (newAnims.length === 0) return;
+    const dc = newAnims.filter(a => a.dest === 'discard').length;
+    const dl = newAnims.filter(a => a.dest === 'deleted').length;
+    if (dc > 0) setDiscardHidden(prev => prev + dc);
+    if (dl > 0) setDeletedHidden(prev => prev + dl);
+    setDiscardAnims(prev => [...prev, ...newAnims]);
+    setTimeout(() => {
+      setDiscardAnims(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
+      if (dc > 0) setDiscardHidden(prev => Math.max(0, prev - dc));
+      if (dl > 0) setDeletedHidden(prev => Math.max(0, prev - dl));
+    }, 500);
+  };
+
+  // Helper: capture board card positions into boardCardRectsRef
+  const captureBoardRects = () => {
+    const br = { me: {}, opp: {} };
+    for (const ow of ['me', 'opp']) {
+      const pi = ow === 'me' ? myIdx : oppIdx;
+      const p = gameState.players[pi];
+      if (!p) continue;
+      document.querySelectorAll(`[data-support-zone][data-support-owner="${ow}"]`).forEach(el => {
+        const cards = p.supportZones?.[el.dataset.supportHero]?.[el.dataset.supportSlot] || [];
+        if (cards.length > 0) { const r = el.getBoundingClientRect(); for (const cn of cards) (br[ow][cn] = br[ow][cn] || []).push(r); }
+      });
+      document.querySelectorAll(`[data-ability-zone][data-ability-owner="${ow}"]`).forEach(el => {
+        const cards = p.abilityZones?.[el.dataset.abilityHero]?.[el.dataset.abilitySlot] || [];
+        if (cards.length > 0) { const r = el.getBoundingClientRect(); for (const cn of cards) (br[ow][cn] = br[ow][cn] || []).push(r); }
+      });
+      document.querySelectorAll(`[data-surprise-zone][data-surprise-owner="${ow}"]`).forEach(el => {
+        const cards = p.surpriseZones?.[el.dataset.surpriseHero] || [];
+        if (cards.length > 0) { const r = el.getBoundingClientRect(); for (const cn of cards) (br[ow][cn] = br[ow][cn] || []).push(r); }
+      });
+    }
+    boardCardRectsRef.current = br;
+  };
+
+  // Own discard/delete detection (useLayoutEffect prevents flash before paint)
+  useLayoutEffect(() => {
+    if (isSpectator) {
+      // Spectator mode: use handCount-based detection (same as opponent discard)
+      const newCount = me.handCount || 0;
+      const prevCount = prevMyHandCountForDiscardRef.current;
+      const newDiscardLen = (me.discardPile || []).length;
+      const prevDiscardLen = prevMyDiscardLenRef.current;
+      const newDeletedLen = (me.deletedPile || []).length;
+      const prevDeletedLen = prevMyDeletedLenRef.current;
+      const discardGrew = newDiscardLen > prevDiscardLen;
+      const deletedGrew = newDeletedLen > prevDeletedLen;
+
+      if (discardGrew || deletedGrew) {
+        const newDiscardEntries = discardGrew ? [...me.discardPile.slice(prevDiscardLen)] : [];
+        const newDeletedEntries = deletedGrew ? [...me.deletedPile.slice(prevDeletedLen)] : [];
+        const newAnims = [];
+
+        // 1. Match against hand removals (hand count decreased)
+        if (newCount < prevCount) {
+          const storedRects = myHandRectsRef.current;
+          let handSlotCursor = prevCount - 1;
+          const handDiscardCount = Math.min(prevCount - newCount, newDiscardEntries.length);
+          for (let i = 0; i < handDiscardCount; i++) {
+            const sr = storedRects[Math.max(0, Math.min(handSlotCursor--, storedRects.length - 1))];
+            if (!sr) continue;
+            const cardName = newDiscardEntries.shift();
+            const t = getPileCenter('[data-my-discard]');
+            if (t) newAnims.push({ id: Date.now() + Math.random() + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'discard' });
+          }
+          const handDeletedCount = Math.min(Math.max(0, (prevCount - newCount) - handDiscardCount), newDeletedEntries.length);
+          for (let i = 0; i < handDeletedCount; i++) {
+            const sr = storedRects[Math.max(0, Math.min(handSlotCursor--, storedRects.length - 1))];
+            if (!sr) continue;
+            const cardName = newDeletedEntries.shift();
+            const t = getPileCenter('[data-my-deleted]');
+            if (t) newAnims.push({ id: Date.now() + Math.random() + 0.5 + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'deleted' });
+          }
+        }
+
+        // 2. Remaining entries from board
+        const br = boardCardRectsRef.current.me || {};
+        const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-my-discard]'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-my-deleted]')];
+        newAnims.push(...boardAnims);
+        for (const a of boardAnims) {
+          const card = CARDS_BY_NAME[a.cardName];
+          if (card?.cardType === 'Creature') {
+            const id = Date.now() + Math.random();
+            setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
+            setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
+          }
+        }
+        scheduleAnims(newAnims, setMyDiscardHidden, setMyDeletedHidden);
+      }
+
+      // Spectator: Mulligan / hand-return-to-deck (hand count shrinks but no pile grows)
+      if (!discardGrew && !deletedGrew && newCount < prevCount && (gameState.mulliganPending || gameState.handReturnToDeck)) {
+        const storedRects = myHandRectsRef.current;
+        const deckEl = document.querySelector('[data-my-deck]');
+        const deckR = deckEl?.getBoundingClientRect();
+        const deckTarget = deckR ? { x: deckR.left + deckR.width / 2 - 32, y: deckR.top + deckR.height / 2 - 45 } : null;
+        if (deckTarget) {
+          const returnAnims = [];
+          for (let i = 0; i < prevCount - newCount; i++) {
+            const sr = storedRects[Math.max(0, prevCount - 1 - i)];
+            if (!sr) continue;
+            returnAnims.push({ id: Date.now() + Math.random() + i, cardName: '', startX: sr.left, startY: sr.top, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
+          }
+          if (returnAnims.length > 0) {
+            setDiscardAnims(prev => [...prev, ...returnAnims]);
+            setTimeout(() => setDiscardAnims(prev => prev.filter(a => !returnAnims.some(n => n.id === a.id))), 500);
+          }
+        }
+      }
+
+      // Capture positions for NEXT cycle (spectator uses face-down .hand-card)
+      requestAnimationFrame(() => {
+        const rects = [];
+        document.querySelectorAll('.game-hand-me .hand-card').forEach((el, i) => { rects[i] = el.getBoundingClientRect(); });
+        myHandRectsRef.current = rects;
+        captureBoardRects();
+      });
+
+      prevMyHandCountForDiscardRef.current = newCount;
+      prevMyDiscardLenRef.current = newDiscardLen;
+      prevMyDeletedLenRef.current = newDeletedLen;
+      return;
+    }
+
+    const newHand = me.hand || [];
+    const prevHand = prevMyHandForDiscardRef.current;
+    const newDiscardLen = (me.discardPile || []).length;
+    const prevDiscardLen = prevMyDiscardLenRef.current;
+    const newDeletedLen = (me.deletedPile || []).length;
+    const prevDeletedLen = prevMyDeletedLenRef.current;
+    const discardGrew = newDiscardLen > prevDiscardLen;
+    const deletedGrew = newDeletedLen > prevDeletedLen;
+
+    if (discardGrew || deletedGrew) {
+      const newDiscardEntries = discardGrew ? [...me.discardPile.slice(prevDiscardLen)] : [];
+      const newDeletedEntries = deletedGrew ? [...me.deletedPile.slice(prevDeletedLen)] : [];
+      const newAnims = [];
+
+      // 1. Match against hand removals
+      if (newHand.length < prevHand.length) {
+        // Sequential subsequence match: newHand is a subsequence of prevHand
+        // (splice preserves relative order), so a forward scan correctly
+        // identifies which exact positions were removed — even for duplicates.
+        const removed = [];
+        let ni = 0;
+        for (let i = 0; i < prevHand.length; i++) {
+          if (ni < newHand.length && prevHand[i] === newHand[ni]) {
+            ni++;
+          } else {
+            removed.push({ cardName: prevHand[i], handIdx: i });
+          }
+        }
+        const storedRects = myHandRectsRef.current;
+        for (const r of removed) {
+          const sr = storedRects[r.handIdx];
+          if (!sr) continue;
+          let idx = newDiscardEntries.indexOf(r.cardName);
+          if (idx >= 0) {
+            newDiscardEntries.splice(idx, 1);
+            const t = getPileCenter('[data-my-discard]');
+            if (t) newAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'discard' });
+            continue;
+          }
+          idx = newDeletedEntries.indexOf(r.cardName);
+          if (idx >= 0) {
+            newDeletedEntries.splice(idx, 1);
+            const t = getPileCenter('[data-my-deleted]');
+            if (t) newAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'deleted' });
+          }
+        }
+      }
+
+      // 2. Remaining entries came from the board — use stored board positions
+      const br = boardCardRectsRef.current.me || {};
+      const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-my-discard]'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-my-deleted]')];
+      newAnims.push(...boardAnims);
+
+      // Trigger creature death effect for board-sourced creatures
+      for (const a of boardAnims) {
+        const card = CARDS_BY_NAME[a.cardName];
+        if (card?.cardType === 'Creature') {
+          const id = Date.now() + Math.random();
+          setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
+          setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
+        }
+      }
+
+      scheduleAnims(newAnims, setMyDiscardHidden, setMyDeletedHidden);
+    }
+
+    // Mulligan / hand-return-to-deck: cards returning to deck (hand shrinks but no pile grows)
+    if (!discardGrew && !deletedGrew && newHand.length < prevHand.length && (gameState.mulliganPending || gameState.handReturnToDeck)) {
+      const removed = [];
+      let ni = 0;
+      for (let i = 0; i < prevHand.length; i++) {
+        if (ni < newHand.length && prevHand[i] === newHand[ni]) { ni++; }
+        else { removed.push({ cardName: prevHand[i], handIdx: i }); }
+      }
+      const storedRects = myHandRectsRef.current;
+      const deckEl = document.querySelector('[data-my-deck]');
+      const deckR = deckEl?.getBoundingClientRect();
+      const deckTarget = deckR ? { x: deckR.left + deckR.width / 2 - 32, y: deckR.top + deckR.height / 2 - 45 } : null;
+      if (deckTarget) {
+        const returnAnims = [];
+        for (const r of removed) {
+          const sr = storedRects[r.handIdx];
+          if (!sr) continue;
+          returnAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
+        }
+        if (returnAnims.length > 0) {
+          setDiscardAnims(prev => [...prev, ...returnAnims]);
+          setTimeout(() => setDiscardAnims(prev => prev.filter(a => !returnAnims.some(n => n.id === a.id))), 500);
+        }
+      }
+    }
+
+    // Capture positions for NEXT cycle
+    requestAnimationFrame(() => {
+      const rects = [];
+      document.querySelectorAll('.game-hand-me .hand-slot').forEach((el, i) => { rects[i] = el.getBoundingClientRect(); });
+      myHandRectsRef.current = rects;
+      captureBoardRects();
+    });
+
+    prevMyHandForDiscardRef.current = [...newHand];
+    prevMyDiscardLenRef.current = newDiscardLen;
+    prevMyDeletedLenRef.current = newDeletedLen;
+  }, [me.hand, me.handCount, me.discardPile, me.deletedPile]);
+
+  // Opponent discard/delete detection (useLayoutEffect prevents flash before paint)
+  useLayoutEffect(() => {
+    const newCount = opp.handCount || 0;
+    const prevCount = prevOppHandCountForDiscardRef.current;
+    const newDiscardLen = (opp.discardPile || []).length;
+    const prevDiscardLen = prevOppDiscardLenRef.current;
+    const newDeletedLen = (opp.deletedPile || []).length;
+    const prevDeletedLen = prevOppDeletedLenRef.current;
+    const discardGrew = newDiscardLen > prevDiscardLen;
+    const deletedGrew = newDeletedLen > prevDeletedLen;
+
+    if (discardGrew || deletedGrew) {
+      const newDiscardEntries = discardGrew ? [...opp.discardPile.slice(prevDiscardLen)] : [];
+      const newDeletedEntries = deletedGrew ? [...opp.deletedPile.slice(prevDeletedLen)] : [];
+      const newAnims = [];
+
+      // 1. Match against hand removals (hand count decreased)
+      if (newCount < prevCount) {
+        const storedRects = oppHandRectsRef.current;
+        let handSlotCursor = prevCount - 1;
+        const handDiscardCount = Math.min(prevCount - newCount, newDiscardEntries.length);
+        for (let i = 0; i < handDiscardCount; i++) {
+          const sr = storedRects[Math.max(0, Math.min(handSlotCursor--, storedRects.length - 1))];
+          if (!sr) continue;
+          const cardName = newDiscardEntries.shift();
+          const t = getPileCenter('[data-opp-discard]');
+          if (t) newAnims.push({ id: Date.now() + Math.random() + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'discard' });
+        }
+        const handDeletedCount = Math.min(Math.max(0, (prevCount - newCount) - handDiscardCount), newDeletedEntries.length);
+        for (let i = 0; i < handDeletedCount; i++) {
+          const sr = storedRects[Math.max(0, Math.min(handSlotCursor--, storedRects.length - 1))];
+          if (!sr) continue;
+          const cardName = newDeletedEntries.shift();
+          const t = getPileCenter('[data-opp-deleted]');
+          if (t) newAnims.push({ id: Date.now() + Math.random() + 0.5 + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'deleted' });
+        }
+      }
+
+      // 2. Remaining entries came from the opponent's board
+      const br = boardCardRectsRef.current.opp || {};
+      const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-opp-discard]'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-opp-deleted]')];
+      newAnims.push(...boardAnims);
+
+      // Trigger creature death effect for board-sourced creatures
+      for (const a of boardAnims) {
+        const card = CARDS_BY_NAME[a.cardName];
+        if (card?.cardType === 'Creature') {
+          const id = Date.now() + Math.random();
+          setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
+          setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
+        }
+      }
+
+      scheduleAnims(newAnims, setOppDiscardHidden, setOppDeletedHidden);
+    }
+
+    // Opponent mulligan / hand-return-to-deck: cards returning to deck (hand count shrinks but no pile grows)
+    if (!discardGrew && !deletedGrew && newCount < prevCount && (gameState.mulliganPending || gameState.handReturnToDeck)) {
+      const storedRects = oppHandRectsRef.current;
+      const deckEl = document.querySelector('[data-opp-deck]');
+      const deckR = deckEl?.getBoundingClientRect();
+      const deckTarget = deckR ? { x: deckR.left + deckR.width / 2 - 32, y: deckR.top + deckR.height / 2 - 45 } : null;
+      if (deckTarget) {
+        const returnAnims = [];
+        for (let i = 0; i < prevCount - newCount; i++) {
+          const sr = storedRects[Math.max(0, prevCount - 1 - i)];
+          if (!sr) continue;
+          returnAnims.push({ id: Date.now() + Math.random() + i, cardName: '', startX: sr.left, startY: sr.top, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
+        }
+        if (returnAnims.length > 0) {
+          setDiscardAnims(prev => [...prev, ...returnAnims]);
+          setTimeout(() => setDiscardAnims(prev => prev.filter(a => !returnAnims.some(n => n.id === a.id))), 500);
+        }
+      }
+    }
+
+    // Capture positions for NEXT cycle
+    requestAnimationFrame(() => {
+      const rects = [];
+      document.querySelectorAll('.game-hand-opp .hand-card').forEach((el, i) => { rects[i] = el.getBoundingClientRect(); });
+      oppHandRectsRef.current = rects;
+      captureBoardRects();
+    });
+
+    prevOppHandCountForDiscardRef.current = newCount;
+    prevOppDiscardLenRef.current = newDiscardLen;
+    prevOppDeletedLenRef.current = newDeletedLen;
+  }, [opp.handCount, opp.discardPile, opp.deletedPile]);
+
+  // Phase helpers
+  const currentPhase = gameState.currentPhase || 0;
+  const activePlayer = gameState.activePlayer || 0;
+  const isMyTurn = !isSpectator && activePlayer === myIdx;
+  const activePlayerData = gameState.players[activePlayer];
+  const phaseColor = activePlayerData?.color || 'var(--accent)';
+
+  // Card graying logic based on phase
+  const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
+
+  // Check if a creature can be played on ANY hero (level/spell school reqs + free zone)
+  const canCreatureBePlayed = (card) => {
+    if (!card || card.cardType !== 'Creature') return false;
+    return [0,1,2].some(hi => canHeroPlayCard(me, hi, card) && findFreeSupportSlot(me, hi) >= 0);
+  };
+
+  // Check if a Spell or Attack can be used by ANY hero (level/spell school reqs, no zone needed)
+  const canActionCardBePlayed = (card) => {
+    if (!card) return false;
+    if (card.cardType === 'Creature') return canCreatureBePlayed(card);
+    // Spells and Attacks: just need a hero that meets spell school requirements
+    return [0,1,2].some(hi => canHeroPlayCard(me, hi, card));
+  };
+
+  const getCardDimmed = (cardName, handIdx) => {
+    if (gameState.awaitingFirstChoice) return false; // Let player see hand clearly
+    if (gameState.mulliganPending) return false; // Let player see hand during mulligan
+    if (gameState.potionTargeting) return true; // All cards dimmed during targeting
+
+    // The specific resolving card instance is always dimmed (non-interactive)
+    if (handIdx != null && resolvingHandIndex >= 0 && resolvingHandIndex === handIdx) return true;
+
+    // Hero Action mode (Coffee) — only eligible cards are playable
+    const heroActionPrompt = gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
+    if (heroActionPrompt) {
+      return !(heroActionPrompt.eligibleCards || []).includes(cardName);
+    }
+
+    // Force Discard mode (Wheels) — all cards are selectable
+    const forceDiscardPrompt = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt.ownerIdx === myIdx;
+    if (forceDiscardPrompt) return false;
+
+    // Cancellable Force Discard mode (Training, etc.) — all cards are selectable
+    const forceDiscardCancellable = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt.ownerIdx === myIdx;
+    if (forceDiscardCancellable) return false;
+
+    // Ability Attach mode (Training, etc.) — only eligible abilities are visible
+    const abilityAttachPrompt = gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt.ownerIdx === myIdx;
+    if (abilityAttachPrompt) {
+      return !(gameState.effectPrompt.eligibleCards || []).includes(cardName);
+    }
+
+    if (!isMyTurn) return true;
+    const card = CARDS_BY_NAME[cardName];
+    if (!card) return false;
+    const isActionType = ACTION_TYPES.includes(card.cardType);
+    if (currentPhase === 2 || currentPhase === 4) {
+      // Main Phase 1 or 2: gray out action types UNLESS they have Additional Action coverage
+      if (isActionType) {
+        // Check if this is an inherent action (playable without additional action provider)
+        const isInherent = (gameState.inherentActionCards || []).includes(cardName);
+        // Check if any Additional Action covers this card
+        const additionalActions = gameState.additionalActions || [];
+        const hasAdditional = additionalActions.some(aa => aa.eligibleHandCards.includes(cardName));
+        if (!hasAdditional && !isInherent) return true;
+        // Has additional action — check summonLocked for creatures
+        if (card.cardType === 'Creature' && me.summonLocked) return true;
+        // Check if the card can actually be played on any hero
+        if (!canActionCardBePlayed(card)) return true;
+        return false; // Un-gray: playable via Additional Action
+      }
+      // Gray out Abilities that can't be played on any hero
+      if (card.cardType === 'Ability') {
+        const canPlaySomewhere = [0,1,2].some(hi => canHeroReceiveAbility(me, hi, cardName));
+        if (!canPlaySomewhere) return true;
+      }
+      // Gray out Artifacts if not enough gold
+      if (card.cardType === 'Artifact') {
+        if ((me.gold || 0) < (card.cost || 0)) return true;
+        // Gray out Equip artifacts if no hero has a free base support zone
+        const isEquip = (card.subtype || '').toLowerCase() === 'equipment';
+        if (isEquip) {
+          const hasTarget = [0,1,2].some(hi => {
+            const hero = me.heroes[hi];
+            if (!hero || !hero.name || hero.hp <= 0) return false;
+            if (hero.statuses?.frozen) return false; // Can't equip to frozen heroes
+            const supZones = me.supportZones[hi] || [];
+            for (let z = 0; z < 3; z++) { if ((supZones[z] || []).length === 0) return true; }
+            return false;
+          });
+          if (!hasTarget) return true;
+        }
+        // Gray out targeting artifacts/potions with no valid targets
+        if ((gameState.unactivatableArtifacts || []).includes(cardName)) return true;
+      }
+      // Gray out Potions with no valid targets or when locked
+      if (card.cardType === 'Potion') {
+        if (me.potionLocked) return true;
+        if ((gameState.unactivatableArtifacts || []).includes(cardName)) return true;
+      }
+      // Gray out spells/attacks with custom play conditions that aren't met (Flame Avalanche, etc.)
+      if ((gameState.blockedSpells || []).includes(cardName)) return true;
+      return false;
+    } else if (currentPhase === 3) {
+      // Action Phase: gray out non-action types, and check playability
+      if (!isActionType) return true;
+      if (card.cardType === 'Creature' && (gameState.summonBlocked || []).includes(cardName)) return true;
+      if (card.cardType === 'Creature' && me.summonLocked) return true;
+      if ((gameState.blockedSpells || []).includes(cardName)) return true;
+      if (!canActionCardBePlayed(card)) return true;
+      return false;
+    }
+    return true; // Start, Resource, End phases: all dimmed
+  };
+
+  // Mouse-based drag state (reorder)
+  const [handDrag, setHandDrag] = useState(null);
+  const handRef = useRef(null);
+  const handAnimDataRef = useRef(null); // FLIP animation data: { oldRects[], indexMap[] }
+
+  // ── Hand Shuffle & Sort with FLIP animation ──
+  const captureHandRects = () => {
+    const slots = handRef.current?.querySelectorAll('.hand-slot');
+    if (!slots) return [];
+    const rects = [];
+    slots.forEach((el, i) => rects[i] = el.getBoundingClientRect());
+    return rects;
+  };
+
+  const shuffleHand = () => {
+    if (hand.length <= 1) return;
+    const oldRects = captureHandRects();
+    const indices = hand.map((_, i) => i);
+    // Fisher-Yates shuffle on indices
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    const newHand = indices.map(i => hand[i]);
+    // indexMap[newIdx] = oldIdx
+    handAnimDataRef.current = { oldRects, indexMap: indices };
+    setHand(newHand);
+    socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand });
+  };
+
+  const sortHand = () => {
+    if (hand.length <= 1) return;
+    const oldRects = captureHandRects();
+    const TYPE_ORDER = { Hero: 0, Creature: 1, Ability: 2, Spell: 3, Attack: 4, Artifact: 5, Potion: 6 };
+    // Build indexed entries for stable sort
+    const entries = hand.map((card, i) => ({ card, oldIdx: i }));
+    entries.sort((a, b) => {
+      const ca = CARDS_BY_NAME[a.card], cb = CARDS_BY_NAME[b.card];
+      const ta = TYPE_ORDER[ca?.cardType] ?? 99, tb = TYPE_ORDER[cb?.cardType] ?? 99;
+      if (ta !== tb) return ta - tb;
+      return a.card.localeCompare(b.card);
+    });
+    const newHand = entries.map(e => e.card);
+    const indexMap = entries.map(e => e.oldIdx); // indexMap[newIdx] = oldIdx
+    handAnimDataRef.current = { oldRects, indexMap };
+    setHand(newHand);
+    socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand });
+  };
+
+  // FLIP animation effect — runs after React re-renders the hand
+  useLayoutEffect(() => {
+    if (!handAnimDataRef.current) return;
+    const { oldRects, indexMap } = handAnimDataRef.current;
+    handAnimDataRef.current = null;
+    const slots = handRef.current?.querySelectorAll('.hand-slot');
+    if (!slots || slots.length === 0) return;
+    slots.forEach((el, newIdx) => {
+      const oldIdx = indexMap[newIdx];
+      if (oldIdx === undefined || !oldRects[oldIdx]) return;
+      const newRect = el.getBoundingClientRect();
+      const dx = oldRects[oldIdx].left - newRect.left;
+      if (Math.abs(dx) < 1) return;
+      el.style.transition = 'none';
+      el.style.transform = `translateX(${dx}px)`;
+    });
+    // Force reflow, then animate to final positions
+    void handRef.current?.offsetHeight;
+    slots.forEach((el) => {
+      if (!el.style.transform || el.style.transform === 'none') return;
+      el.style.transition = 'transform 0.3s ease-out';
+      el.style.transform = '';
+    });
+    // Clean up transition after animation
+    const cleanup = () => {
+      slots.forEach(el => { el.style.transition = ''; });
+    };
+    setTimeout(cleanup, 350);
+  }, [hand]);
+
+  // Play-mode drag state (Action Phase — dragging to board)
+  const [playDrag, setPlayDrag] = useState(null);
+
+  // Ability drag state (Main Phases — dragging ability to hero/zone)
+  const [abilityDrag, setAbilityDrag] = useState(null); // { idx, cardName, card, mouseX, mouseY, targetHero, targetZone }
+
+  // Additional Action provider selection state
+  const [pendingAdditionalPlay, setPendingAdditionalPlay] = useState(null); // { cardName, handIndex, heroIdx, zoneSlot, providers: [{cardId, cardName, heroIdx, zoneSlot}] }
+  const [pendingAbilityActivation, setPendingAbilityActivation] = useState(null); // { heroIdx, zoneIdx, abilityName, level }
+  const [spellHeroPick, setSpellHeroPick] = useState(null); // { cardName, handIndex, card, eligible, isHeroAction }
+  // Clear spell hero pick when game state changes
+  useEffect(() => { setSpellHeroPick(null); }, [gameState.activePlayer, gameState.currentPhase, gameState.effectPrompt, gameState.turn]);
+
+  // Check if a hero can receive a specific ability
+  const canHeroReceiveAbility = (playerData, heroIdx, abilityName) => {
+    const hero = playerData.heroes[heroIdx];
+    if (!hero || !hero.name || hero.hp <= 0) return false;
+    if ((playerData.abilityGivenThisTurn || [])[heroIdx]) return false;
+    const abZones = playerData.abilityZones[heroIdx] || [[], [], []];
+    const isCustom = (gameState.customPlacementCards || []).includes(abilityName);
+
+    if (isCustom) {
+      // Custom placement (e.g. Performance): needs any occupied zone with <3 cards
+      return abZones.some(slot => (slot || []).length > 0 && (slot || []).length < 3);
+    }
+
+    // Standard: check if hero already has this ability
+    for (const slot of abZones) {
+      if ((slot || []).length > 0 && slot[0] === abilityName) {
+        return slot.length < 3;
+      }
+    }
+    // Doesn't have it — needs a free zone
+    return abZones.some(slot => (slot || []).length === 0);
+  };
+
+  // Check if a hero can play a card (spell school + level check)
+  const canHeroPlayCard = (playerData, heroIdx, card) => {
+    const hero = playerData.heroes[heroIdx];
+    if (!hero || !hero.name || hero.hp <= 0) return false;
+    // Frozen/stunned/negated heroes can't use abilities for spells, creatures, attacks
+    if (card.cardType !== 'Ability') {
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
+    }
+    // Combo lock: only the locked hero can act
+    if (playerData.comboLockHeroIdx != null && playerData.comboLockHeroIdx !== heroIdx) return false;
+    // Main Phase: per-hero inherent action restrictions (Muscle Training, etc.)
+    // If a card is playable ONLY via inherent action and this hero isn't eligible, block it.
+    if (currentPhase === 2 || currentPhase === 4) {
+      const inherentHeroes = gameState.inherentActionHeroes?.[card.name];
+      if (inherentHeroes !== undefined) {
+        const hasAdditional = (gameState.additionalActions || []).some(aa => aa.eligibleHandCards.includes(card.name));
+        if (!hasAdditional && !inherentHeroes.includes(heroIdx)) return false;
+      }
+    }
+    // Bonus actions: only allowed card types during active bonus
+    if (playerData.bonusActions?.heroIdx === heroIdx && playerData.bonusActions.remaining > 0) {
+      const allowed = playerData.bonusActions.allowedTypes || [];
+      if (allowed.length > 0 && !allowed.includes(card.cardType)) return false;
+    }
+    // Per-hero duplicate Attack ban (Ghuanjun)
+    if (card.cardType === 'Attack' && hero.ghuanjunAttacksUsed?.includes(card.name)) return false;
+    const level = card.level || 0;
+    if (level === 0 && !card.spellSchool1) return true; // No requirements
+    const abZones = playerData.abilityZones[heroIdx] || [];
+    const countAbility = (school) => {
+      let count = 0;
+      for (const slot of abZones) {
+        if (!slot || slot.length === 0) continue;
+        const baseAbility = slot[0]; // Performance transforms into this
+        for (const abName of slot) {
+          if (abName === school) count++;
+          else if (abName === 'Performance' && baseAbility === school) count++;
+        }
+      }
+      return count;
+    };
+    if (card.spellSchool1 && countAbility(card.spellSchool1) < level) return false;
+    if (card.spellSchool2 && countAbility(card.spellSchool2) < level) return false;
+    return true;
+  };
+
+  // Find free support zone slot for a hero
+  const findFreeSupportSlot = (playerData, heroIdx) => {
+    const supZones = playerData.supportZones[heroIdx] || [[], [], []];
+    for (let s = 0; s < supZones.length; s++) {
+      if (!supZones[s] || supZones[s].length === 0) return s;
+    }
+    return -1;
+  };
+
+  // Game start announcement + turn change announcements
+  const [announcement, setAnnouncement] = useState(() => {
+    if (gameState.reconnected || gameState.awaitingFirstChoice) return null;
+    if (isSpectator) {
+      const firstPlayer = gameState.players[gameState.activePlayer || 0];
+      return { text: `${firstPlayer?.username || 'Player'} goes first!`, color: 'var(--accent)' };
+    }
+    const goesFirst = (gameState.activePlayer || 0) === myIdx;
+    return { text: goesFirst ? 'YOU GO FIRST!' : 'YOU GO SECOND!', color: goesFirst ? 'var(--success)' : 'var(--accent)' };
+  });
+  const prevTurnRef = useRef(gameState.turn);
+  useEffect(() => {
+    if (announcement) {
+      const duration = announcement.short ? 2000 : 3500;
+      const t = setTimeout(() => setAnnouncement(null), duration);
+      return () => clearTimeout(t);
+    }
+  }, [announcement]);
+  // Detect turn changes — but not during awaitingFirstChoice
+  useEffect(() => {
+    if (gameState.awaitingFirstChoice) { prevTurnRef.current = gameState.turn; return; }
+    if (gameState.turn !== prevTurnRef.current) {
+      prevTurnRef.current = gameState.turn;
+      if (isSpectator) {
+        const ap = gameState.players[gameState.activePlayer || 0];
+        setAnnouncement({ text: `${ap?.username || 'Player'}'s turn!`, color: 'var(--accent)', short: true });
+      } else if ((gameState.activePlayer || 0) === myIdx) {
+        setAnnouncement({ text: 'YOUR TURN!', color: 'var(--success)', short: true });
+      }
+    }
+  }, [gameState.turn, gameState.awaitingFirstChoice]);
+
+  const [mulliganDecided, setMulliganDecided] = useState(false);
+  // Reset mulligan state when a new game starts
+  useEffect(() => {
+    if (!gameState.mulliganPending) setMulliganDecided(false);
+  }, [gameState.mulliganPending]);
+
+  // Reset SC earned display when a new round starts (result clears)
+  useEffect(() => {
+    if (!gameState.result) setScEarned(null);
+  }, [gameState.result]);
+
+  const onHandMouseDown = (e, idx) => {
+    if (e.button !== 0) return;
+    if (isSpectator) return; // Spectators can't interact with cards
+    const cardName = hand[idx];
+    const dimmed = getCardDimmed(cardName, idx);
+
+    // Force Discard mode — any card in hand can be discarded EXCEPT the specific resolving card
+    const forceDiscardActive = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt.ownerIdx === myIdx;
+    if (forceDiscardActive) {
+      if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return; // Can't discard the resolving card
+      e.preventDefault();
+      socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
+      return;
+    }
+
+    // Cancellable Force Discard mode (Training, etc.) — clicking a card discards it
+    const forceDiscardCancellableActive = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt.ownerIdx === myIdx;
+    if (forceDiscardCancellableActive) {
+      if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return; // Can't discard the resolving card
+      e.preventDefault();
+      socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
+      return;
+    }
+
+    // Block activation of the specific resolving card (spam-click prevention) — but NOT force-discard (handled above)
+    if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return;
+
+    e.preventDefault();
+    const card = CARDS_BY_NAME[cardName];
+
+    // Ability Attach mode (Training, etc.) — only eligible ability cards are draggable
+    const abilityAttachPrompt = gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
+    const isAbilityAttachEligible = abilityAttachPrompt && (abilityAttachPrompt.eligibleCards || []).includes(cardName);
+
+    const heroActionPrompt = gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
+    const isHeroAction = !dimmed && heroActionPrompt && (heroActionPrompt.eligibleCards || []).includes(cardName);
+    const isPlayable = !dimmed && (isHeroAction || (isMyTurn && card && ACTION_TYPES.includes(card.cardType)
+      && !(card.cardType === 'Creature' && (gameState.summonBlocked || []).includes(cardName))
+      && (currentPhase === 3 || ((currentPhase === 2 || currentPhase === 4) && ((gameState.additionalActions || []).some(aa => aa.eligibleHandCards.includes(cardName)) || (gameState.inherentActionCards || []).includes(cardName))))));
+    const isAbilityPlayable = isAbilityAttachEligible || (!dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Ability');
+    const isEquipPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Artifact'
+      && (card.subtype || '').toLowerCase() === 'equipment' && (me.gold || 0) >= (card.cost || 0);
+    const isArtifactActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
+      && card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment';
+    const isPotionActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Potion';
+    const startX = e.clientX, startY = e.clientY;
+    let dragging = false;
+
+    // Helper: check if cursor is inside the hand zone
+    const isInsideHandZone = (mx, my) => {
+      const r = handRef.current?.getBoundingClientRect();
+      return r && mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom;
+    };
+
+    const onMove = (me2) => {
+      if (!dragging) {
+        if (Math.abs(me2.clientX - startX) + Math.abs(me2.clientY - startY) < 5) return;
+        dragging = true;
+      }
+
+      const inHand = isInsideHandZone(me2.clientX, me2.clientY);
+
+      // Inside hand zone → always reorder mode (any card type, even dimmed)
+      if (inHand) {
+        setPlayDrag(null);
+        setAbilityDrag(null);
+        setHandDrag({ idx, cardName, mouseX: me2.clientX, mouseY: me2.clientY });
+        return;
+      }
+
+      // Outside hand zone — use card-type-specific drag mode
+      setHandDrag(null);
+
+      if (isAbilityPlayable) {
+        // Ability play-mode drag — find valid hero/zone target
+        let targetHero = -1, targetZone = -1;
+        // During abilityAttach prompt, restrict to specified hero and skip abilityGivenThisTurn
+        const attachHeroOnly = abilityAttachPrompt ? abilityAttachPrompt.heroIdx : -1;
+        const skipAbilityGiven = !!abilityAttachPrompt;
+        const canReceive = (hi, cn) => {
+          if (attachHeroOnly >= 0 && hi !== attachHeroOnly) return false;
+          // Custom canHeroReceiveAbility that optionally skips abilityGivenThisTurn
+          const hero2 = me.heroes[hi];
+          if (!hero2 || !hero2.name || hero2.hp <= 0) return false;
+          if (!skipAbilityGiven && (me.abilityGivenThisTurn || [])[hi]) return false;
+          const abZ = me.abilityZones[hi] || [[], [], []];
+          const isCust = (gameState.customPlacementCards || []).includes(cn);
+          if (isCust) return abZ.some(sl => (sl||[]).length > 0 && (sl||[]).length < 3);
+          for (const sl of abZ) { if ((sl||[]).length > 0 && sl[0] === cn) return sl.length < 3; }
+          return abZ.some(sl => (sl||[]).length === 0);
+        };
+        // Check hero zones
+        const heroEls = document.querySelectorAll('[data-hero-zone]');
+        for (const el of heroEls) {
+          const r = el.getBoundingClientRect();
+          if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
+            if (el.dataset.heroOwner === 'me') {
+              const hi = parseInt(el.dataset.heroIdx);
+              if (canReceive(hi, cardName)) { targetHero = hi; targetZone = -1; }
+            }
+          }
+        }
+        // Check ability zones (more specific target)
+        if (targetHero < 0) {
+          const abEls = document.querySelectorAll('[data-ability-zone]');
+          for (const el of abEls) {
+            const r = el.getBoundingClientRect();
+            if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
+              if (el.dataset.abilityOwner === 'me') {
+                const hi = parseInt(el.dataset.abilityHero);
+                const zi = parseInt(el.dataset.abilitySlot);
+                if (canReceive(hi, cardName)) {
+                  const abSlot = (me.abilityZones[hi] || [])[zi] || [];
+                  const isCustom = (gameState.customPlacementCards || []).includes(cardName);
+
+                  if (isCustom) {
+                    // Custom placement: occupied zones with <3 cards
+                    if (abSlot.length > 0 && abSlot.length < 3) { targetHero = hi; targetZone = zi; }
+                  } else {
+                    // Standard: only matching or empty zones
+                    const existingZone = ((me.abilityZones[hi] || []).findIndex(s => (s||[]).length > 0 && s[0] === cardName));
+                    if (existingZone >= 0) {
+                      if (zi === existingZone && abSlot.length < 3) { targetHero = hi; targetZone = zi; }
+                    } else {
+                      if (abSlot.length === 0) { targetHero = hi; targetZone = zi; }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        setAbilityDrag({ idx, cardName, card, mouseX: me2.clientX, mouseY: me2.clientY, targetHero, targetZone });
+      } else if (isPlayable && card.cardType === 'Creature') {
+        // Play-mode drag — find valid drop target
+        let targetHero = -1, targetSlot = -1;
+        const heroActionHeroIdx = heroActionPrompt?.heroIdx;
+        const els = document.querySelectorAll('[data-support-zone]');
+        for (const el of els) {
+          const r = el.getBoundingClientRect();
+          if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
+            const hi = parseInt(el.dataset.supportHero);
+            const si = parseInt(el.dataset.supportSlot);
+            const isOwn = el.dataset.supportOwner === 'me';
+            // During heroAction, only the Coffee hero's zones are valid
+            if (heroActionHeroIdx !== undefined && hi !== heroActionHeroIdx) continue;
+            if (isOwn && canHeroPlayCard(me, hi, card) && findFreeSupportSlot(me, hi) >= 0) {
+              // Check this specific slot is free (base or island zones OK for creatures)
+              const slotCards = (me.supportZones[hi] || [])[si] || [];
+              if (slotCards.length === 0 && si < ((me.supportZones[hi] || []).length || 3)) { targetHero = hi; targetSlot = si; }
+            }
+          }
+        }
+        setPlayDrag({ idx, cardName, card, mouseX: me2.clientX, mouseY: me2.clientY, targetHero, targetSlot });
+      } else if (isEquipPlayable) {
+        // Equip artifact drag — can drop on support zones OR heroes
+        let targetHero = -1, targetSlot = -1;
+        // Check hero zones first (auto-place in first free base support zone)
+        const heroEls = document.querySelectorAll('[data-hero-zone]');
+        for (const el of heroEls) {
+          const r = el.getBoundingClientRect();
+          if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
+            if (el.dataset.heroOwner === 'me') {
+              const hi = parseInt(el.dataset.heroIdx);
+              const hero = me.heroes[hi];
+              if (hero && hero.name && hero.hp > 0) {
+                // Check for a free base support zone (indices 0-2 only)
+                const supZones = me.supportZones[hi] || [];
+                for (let z = 0; z < 3; z++) {
+                  if ((supZones[z] || []).length === 0) { targetHero = hi; targetSlot = -1; break; }
+                }
+              }
+            }
+          }
+        }
+        // Check support zones (specific placement)
+        if (targetHero < 0) {
+          const els = document.querySelectorAll('[data-support-zone]');
+          for (const el of els) {
+            const r = el.getBoundingClientRect();
+            if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
+              const hi = parseInt(el.dataset.supportHero);
+              const si = parseInt(el.dataset.supportSlot);
+              const isOwn = el.dataset.supportOwner === 'me';
+              const isIsland = el.dataset.supportIsland === 'true';
+              if (isOwn && !isIsland && si < 3) { // Can only equip to base zones
+                const hero = me.heroes[hi];
+                if (hero && hero.name && hero.hp > 0) {
+                  const slotCards = (me.supportZones[hi] || [])[si] || [];
+                  if (slotCards.length === 0) { targetHero = hi; targetSlot = si; }
+                }
+              }
+            }
+          }
+        }
+        setPlayDrag({ idx, cardName, card, mouseX: me2.clientX, mouseY: me2.clientY, targetHero, targetSlot, isEquip: true });
+      } else if (isPlayable && (card.cardType === 'Spell' || card.cardType === 'Attack')) {
+        // Spell/Attack drag — target hero zones (hero must have required spell schools)
+        let targetHero = -1;
+        const heroActionHeroIdx2 = heroActionPrompt?.heroIdx;
+        const heroEls2 = document.querySelectorAll('[data-hero-zone]');
+        for (const el of heroEls2) {
+          const r = el.getBoundingClientRect();
+          if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
+            if (el.dataset.heroOwner === 'me') {
+              const hi = parseInt(el.dataset.heroIdx);
+              if (heroActionHeroIdx2 !== undefined && hi !== heroActionHeroIdx2) continue;
+              if (canHeroPlayCard(me, hi, card)) targetHero = hi;
+            }
+          }
+        }
+        setPlayDrag({ idx, cardName, card, mouseX: me2.clientX, mouseY: me2.clientY, targetHero, targetSlot: -1, isSpell: true });
+      } else {
+        // Non-playable card outside hand zone — show floating card (no reorder gap)
+        setPlayDrag(null);
+        setAbilityDrag(null);
+        setHandDrag({ idx, cardName, mouseX: me2.clientX, mouseY: me2.clientY });
+      }
+    };
+
+    const onUp = (upEvent) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+
+      if (!dragging) {
+        // Click (no drag) — check for potion or non-equip artifact activation
+        if (!dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 3 || currentPhase === 4) && card) {
+          if (card.cardType === 'Potion') {
+            socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx });
+          } else if (card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment') {
+            socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx });
+          } else if ((card.cardType === 'Spell' || card.cardType === 'Attack') && isPlayable) {
+            // Find all heroes that can play this card
+            const eligible = [];
+            for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+              if (canHeroPlayCard(me, hi, card)) {
+                eligible.push({ idx: hi, name: me.heroes[hi].name });
+              }
+            }
+            if (eligible.length === 1) {
+              // Only one eligible hero — auto-play
+              if (isHeroAction) {
+                socket.emit('effect_prompt_response', {
+                  roomId: gameState.roomId,
+                  response: { cardName, handIndex: idx, heroIdx: eligible[0].idx },
+                });
+              } else {
+                socket.emit('play_spell', { roomId: gameState.roomId, cardName, handIndex: idx, heroIdx: eligible[0].idx });
+              }
+            } else if (eligible.length > 1) {
+              // Multiple eligible — show hero selection popup
+              setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isHeroAction });
+            }
+          }
+        }
+        setHandDrag(null); setPlayDrag(null); setAbilityDrag(null); return;
+      }
+
+      // Determine if dropped inside the hand zone
+      const droppedInHand = isInsideHandZone(upEvent.clientX, upEvent.clientY);
+
+      if (droppedInHand) {
+        // Dropped inside hand zone — ALWAYS reorder, regardless of card type
+        const newHand = [...hand];
+        newHand.splice(idx, 1);
+        const dropIdx = calcDropIdx(upEvent.clientX, idx);
+        newHand.splice(dropIdx, 0, cardName);
+        setHand(newHand);
+        socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand });
+        setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
+        return;
+      }
+
+      // Dropped outside hand zone — try to play/activate the card
+      if (isAbilityPlayable) {
+        setAbilityDrag(prev => {
+          if (!prev || prev.targetHero < 0) return null;
+          // During abilityAttach prompt — send as effect_prompt_response
+          if (isAbilityAttachEligible) {
+            socket.emit('effect_prompt_response', {
+              roomId: gameState.roomId,
+              response: { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetZone },
+            });
+          } else {
+            socket.emit('play_ability', {
+              roomId: gameState.roomId,
+              cardName: prev.cardName,
+              handIndex: prev.idx,
+              heroIdx: prev.targetHero,
+              zoneSlot: prev.targetZone,
+            });
+          }
+          return null;
+        });
+      } else if (isPlayable && card.cardType === 'Creature') {
+        setPlayDrag(prev => {
+          if (!prev || prev.targetHero < 0 || prev.targetSlot < 0) return null;
+
+          // Hero Action mode (Coffee) — send as effect_prompt_response
+          if (isHeroAction) {
+            socket.emit('effect_prompt_response', {
+              roomId: gameState.roomId,
+              response: { cardName: prev.cardName, handIndex: prev.idx, zoneSlot: prev.targetSlot },
+            });
+            return null;
+          }
+
+          // Check if this play uses an additional action
+          const additionalActions = gameState.additionalActions || [];
+          const matchingAAs = additionalActions.filter(aa => aa.eligibleHandCards.includes(prev.cardName));
+          const isMainPhase = currentPhase === 2 || currentPhase === 4;
+          const needsAdditional = isMainPhase || matchingAAs.length > 0;
+
+          if (needsAdditional && matchingAAs.length > 0) {
+            const allProviders = matchingAAs.flatMap(aa => aa.providers);
+            if (allProviders.length > 1) {
+              setPendingAdditionalPlay({
+                cardName: prev.cardName, handIndex: prev.idx,
+                heroIdx: prev.targetHero, zoneSlot: prev.targetSlot,
+                providers: allProviders,
+              });
+              socket.emit('pending_placement', { roomId: gameState.roomId, heroIdx: prev.targetHero, zoneSlot: prev.targetSlot, cardName: prev.cardName });
+              return null;
+            }
+            socket.emit('play_creature', {
+              roomId: gameState.roomId, cardName: prev.cardName,
+              handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetSlot,
+              additionalActionProvider: allProviders[0].cardId,
+            });
+          } else {
+            socket.emit('play_creature', {
+              roomId: gameState.roomId, cardName: prev.cardName,
+              handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetSlot,
+            });
+          }
+          return null;
+        });
+      } else if (isEquipPlayable) {
+        setPlayDrag(prev => {
+          if (!prev || prev.targetHero < 0) return null;
+          socket.emit('play_artifact', {
+            roomId: gameState.roomId,
+            cardName: prev.cardName,
+            handIndex: prev.idx,
+            heroIdx: prev.targetHero,
+            zoneSlot: prev.targetSlot, // -1 means auto-place
+          });
+          return null;
+        });
+      } else if (isPlayable && (card.cardType === 'Spell' || card.cardType === 'Attack')) {
+        setPlayDrag(prev => {
+          if (!prev || prev.targetHero < 0) return null;
+
+          // Hero Action mode (Coffee) — send as effect_prompt_response
+          if (isHeroAction) {
+            socket.emit('effect_prompt_response', {
+              roomId: gameState.roomId,
+              response: { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero },
+            });
+            return null;
+          }
+
+          socket.emit('play_spell', {
+            roomId: gameState.roomId,
+            cardName: prev.cardName,
+            handIndex: prev.idx,
+            heroIdx: prev.targetHero,
+          });
+          return null;
+        });
+      } else if (isArtifactActivatable) {
+        // Non-equip artifact dragged outside hand — activate
+        socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx });
+      } else if (isPotionActivatable) {
+        // Potion dragged outside hand — activate
+        socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx });
+      }
+      // Clean up all drag states
+      setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const calcDropIdx = (mouseX, excludeIdx) => {
+    if (!handRef.current) return 0;
+    const slots = handRef.current.querySelectorAll('.hand-slot:not(.hand-dragging)');
+    let targetIdx = slots.length;
+    for (let i = 0; i < slots.length; i++) {
+      const r = slots[i].getBoundingClientRect();
+      if (mouseX < r.left + r.width / 2) { targetIdx = i; break; }
+    }
+    // Adjust for the removed card
+    if (excludeIdx <= targetIdx) return targetIdx;
+    return targetIdx;
+  };
+
+  // Build display hand with gap
+  const displayHand = useMemo(() => {
+    const dragIdx = handDrag?.idx ?? playDrag?.idx ?? abilityDrag?.idx ?? null;
+    if (dragIdx === null) return hand.map((c, i) => ({ card: c, origIdx: i, isGap: false }));
+    const filtered = [];
+    for (let i = 0; i < hand.length; i++) {
+      if (i === dragIdx) continue;
+      filtered.push({ card: hand[i], origIdx: i, isGap: false });
+    }
+    // Only show gap for reorder drag, not play drag
+    if (handDrag) {
+      const dropIdx = calcDropIdx(handDrag.mouseX, handDrag.idx);
+      filtered.splice(dropIdx, 0, { card: null, origIdx: -1, isGap: true });
+    }
+    return filtered;
+  }, [hand, handDrag, playDrag, abilityDrag]);
+
+  const [showSurrender, setShowSurrender] = useState(false);
+  const [scEarned, setScEarned] = useState(null); // { rewards: [{id,title,amount,description}], total }
+
+  // Listen for SC earned event
+  useEffect(() => {
+    const onSC = (data) => {
+      setScEarned(data);
+      if (data.total > 0) setUser(u => ({ ...u, sc: (u.sc || 0) + data.total }));
+    };
+    const onSCSpec = (data) => {
+      // Spectators get both players' SC data — just show a combined view
+      if (isSpectator) setScEarned(data);
+    };
+    socket.on('sc_earned', onSC);
+    socket.on('sc_earned_spectator', onSCSpec);
+    return () => { socket.off('sc_earned', onSC); socket.off('sc_earned_spectator', onSCSpec); };
+  }, []);
+  const [showFirstChoice, setShowFirstChoice] = useState(false);
+  const [deckViewer, setDeckViewer] = useState(null); // 'deck' | 'potion' | null
+  const [pileViewer, setPileViewer] = useState(null); // { title, cards } | null
+  const [hoveredPileCard, setHoveredPileCard] = useState(null); // card name for pile tooltip
+  const [immuneTooltip, setImmuneTooltip] = useState(null); // hero name for immune tooltip
+  const [immuneTooltipType, setImmuneTooltipType] = useState(null); // 'immune' or 'shielded'
+
+  // Listen for immune icon hover (uses window event to escape component boundaries)
+  useEffect(() => {
+    const onHover = () => {
+      setImmuneTooltip(window._immuneTooltip || null);
+      setImmuneTooltipType(window._immuneTooltipType || null);
+    };
+    window.addEventListener('immuneHover', onHover);
+    return () => window.removeEventListener('immuneHover', onHover);
+  }, []);
+
+  // Listen for additional action icon hover
+  const [aaTooltipKey, setAaTooltipKey] = useState(null);
+  useEffect(() => {
+    const onHover = () => setAaTooltipKey(window._aaTooltipKey || null);
+    window.addEventListener('aaHover', onHover);
+    return () => window.removeEventListener('aaHover', onHover);
+  }, []);
+
+  const [potionSelection, setPotionSelection] = useState([]); // Selected target IDs during potion targeting
+  // Clear selection when targeting changes (prevents stale selections between multi-step effects)
+  useEffect(() => {
+    setPotionSelection([]);
+  }, [gameState.potionTargeting]);
+  const [oppPendingPlacement, setOppPendingPlacement] = useState(null); // { owner, heroIdx, zoneSlot, cardName }
+  useEffect(() => {
+    const onOppPending = (data) => setOppPendingPlacement(data);
+    socket.on('opponent_pending_placement', onOppPending);
+    return () => socket.off('opponent_pending_placement', onOppPending);
+  }, []);
+  const [explosions, setExplosions] = useState([]); // Target IDs currently showing explosion
+  const [cardReveals, setCardReveals] = useState([]); // [{id, cardName}] — stacked reveals
+  const [summonGlow, setSummonGlow] = useState(null); // { owner, heroIdx, zoneSlot }
+  const [oppTargetHighlight, setOppTargetHighlight] = useState([]); // Target IDs highlighted on opponent's screen
+  const [burnTickingHeroes, setBurnTickingHeroes] = useState([]); // Hero keys ('pi-hi') currently showing burn escalation
+  const [abilityFlash, setAbilityFlash] = useState(null); // { owner, heroIdx, zoneIdx } — flashing ability zone
+  const [levelChanges, setLevelChanges] = useState([]); // [{id, delta, owner, heroIdx, zoneSlot}]
+  const deckSearchPendingRef = useRef([]); // Card names queued before sync triggers opp draw anim
+  const [reactionChain, setReactionChain] = useState(null); // [{id, cardName, owner, cardType, isInitialCard, negated, status}]
+  const [cameraFlash, setCameraFlash] = useState(false);
+  const [toughnessHpChanges, setToughnessHpChanges] = useState([]); // [{id, amount, owner, heroIdx}]
+  const toughnessHpSuppressRef = useRef({}); // { 'owner-heroIdx': true } — suppress damage numbers for Toughness HP removal
+  const [fightingAtkChanges, setFightingAtkChanges] = useState([]); // [{id, amount, owner, heroIdx}]
+
+  // End-turn confirmation
+  const [askBeforeEndTurn, setAskBeforeEndTurn] = useState(() => localStorage.getItem('pp_ask_end_turn') !== '0');
+  const [showEndTurnConfirm, setShowEndTurnConfirm] = useState(false);
+  const pendingEndTurnRef = useRef(null); // stores the target phase for deferred advance
+
+  // Shared phase advance with optional end-turn confirmation
+  const tryAdvancePhase = useCallback((targetPhase) => {
+    if (targetPhase === 5 && askBeforeEndTurn) {
+      pendingEndTurnRef.current = targetPhase;
+      setShowEndTurnConfirm(true);
+    } else {
+      socket.emit('advance_phase', { roomId: gameState.roomId, targetPhase });
+    }
+  }, [askBeforeEndTurn, gameState.roomId]);
+
+  const confirmEndTurn = useCallback(() => {
+    const target = pendingEndTurnRef.current;
+    pendingEndTurnRef.current = null;
+    setShowEndTurnConfirm(false);
+    if (target != null) socket.emit('advance_phase', { roomId: gameState.roomId, targetPhase: target });
+  }, [gameState.roomId]);
+
+  const cancelEndTurn = useCallback(() => {
+    pendingEndTurnRef.current = null;
+    setShowEndTurnConfirm(false);
+  }, []);
+
+  // Listen for opponent card reveal
+  useEffect(() => {
+    const onReveal = ({ cardName }) => setCardReveals(prev => [...prev, { id: Date.now() + Math.random(), cardName }]);
+    const onDeckSearchAdd = ({ cardName, playerIdx }) => {
+      // If the OPPONENT searched, prepare face-up draw animation
+      if (playerIdx !== myIdx) {
+        deckSearchPendingRef.current = [...deckSearchPendingRef.current, cardName];
+      }
+    };
+    // Reaction chain events
+    const onChainUpdate = ({ links }) => {
+      setReactionChain(links.map(l => ({ ...l, status: l.negated ? 'negated' : 'pending' })));
+    };
+    const onChainResolvingStart = () => {}; // Chain is about to resolve
+    const onChainLinkResolving = ({ linkIndex }) => {
+      setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'resolving' } : l));
+    };
+    const onChainLinkResolved = ({ linkIndex }) => {
+      setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'resolved' } : l));
+    };
+    const onChainLinkNegated = ({ linkIndex, negationStyle }) => {
+      setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'negated', negated: true, negationStyle: negationStyle || null } : l));
+    };
+    const onChainDone = () => {
+      setTimeout(() => setReactionChain(null), 800);
+    };
+    const onCameraFlash = () => {
+      setCameraFlash(true);
+      setTimeout(() => setCameraFlash(false), 900);
+    };
+    const onToughnessHp = ({ owner, heroIdx, amount }) => {
+      const entry = { id: Date.now() + Math.random(), amount, owner, heroIdx };
+      setToughnessHpChanges(prev => [...prev, entry]);
+      setTimeout(() => setToughnessHpChanges(prev => prev.filter(e => e.id !== entry.id)), 1800);
+      // Mark this hero's HP change as non-damage so the damage number system skips it
+      if (amount < 0) {
+        toughnessHpSuppressRef.current[`${owner}-${heroIdx}`] = true;
+      }
+    };
+    const onFightingAtk = ({ owner, heroIdx, amount }) => {
+      const entry = { id: Date.now() + Math.random(), amount, owner, heroIdx };
+      setFightingAtkChanges(prev => [...prev, entry]);
+      setTimeout(() => setFightingAtkChanges(prev => prev.filter(e => e.id !== entry.id)), 1800);
+    };
+    const onSummon = ({ owner, heroIdx, zoneSlot, cardName }) => {
+      setSummonGlow({ owner, heroIdx, zoneSlot });
+      setTimeout(() => setSummonGlow(null), 1200);
+    };
+    const onBurnTick = ({ heroes }) => {
+      const keys = heroes.map(h => `${h.owner}-${h.heroIdx}`);
+      setBurnTickingHeroes(keys);
+      setTimeout(() => setBurnTickingHeroes([]), 1500);
+    };
+    const onZoneAnim = ({ type, owner, heroIdx, zoneSlot }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const sel = zoneSlot >= 0
+        ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
+        : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
+      setTimeout(() => playAnimation(type, sel, { duration: 1000 }), 100);
+    };
+    const onLevelChange = ({ delta, owner, heroIdx, zoneSlot }) => {
+      const entry = { id: Date.now() + Math.random(), delta, owner, heroIdx, zoneSlot };
+      setLevelChanges(prev => [...prev, entry]);
+      setTimeout(() => setLevelChanges(prev => prev.filter(e => e.id !== entry.id)), 1600);
+    };
+    const onAbilityActivated = ({ owner, heroIdx, zoneIdx, abilityName }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const abSel = `[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${zoneIdx}"]`;
+      // Set flash overlay on the ability zone (visible to both players)
+      setAbilityFlash({ owner, heroIdx, zoneIdx });
+      setTimeout(() => setAbilityFlash(null), 1800);
+      // Big flashy burst on the ability zone — staggered multi-layer
+      setTimeout(() => playAnimation('gold_sparkle', abSel, { duration: 1400 }), 50);
+      setTimeout(() => playAnimation('gold_sparkle', abSel, { duration: 1200 }), 250);
+      setTimeout(() => playAnimation('gold_sparkle', abSel, { duration: 1000 }), 450);
+      // Sparkle on the gold counter after a short delay
+      setTimeout(() => {
+        const goldEl = document.querySelector(`[data-gold-player="${owner}"]`);
+        if (goldEl) {
+          playAnimation('gold_sparkle', goldEl, { duration: 1000 });
+          setTimeout(() => playAnimation('gold_sparkle', goldEl, { duration: 800 }), 200);
+        }
+      }, 400);
+    };
+    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, color, duration }) => {
+      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
+      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
+      let tgtEl;
+      if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
+        tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
+      } else {
+        tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
+      }
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const id = Date.now() + Math.random();
+      const dur = duration || 1500;
+      setBeamAnims(prev => [...prev, {
+        id, color: color || '#ff2222',
+        x1: sr.left + sr.width / 2, y1: sr.top + sr.height / 2,
+        x2: tr.left + tr.width / 2, y2: tr.top + tr.height / 2,
+      }]);
+      // Also play explosion on target
+      setTimeout(() => playAnimation('explosion', tgtEl, { duration: 800 }), 250);
+      setTimeout(() => setBeamAnims(prev => prev.filter(a => a.id !== id)), dur);
+    };
+    socket.on('card_reveal', onReveal);
+    socket.on('deck_search_add', onDeckSearchAdd);
+    socket.on('reaction_chain_update', onChainUpdate);
+    socket.on('reaction_chain_resolving_start', onChainResolvingStart);
+    socket.on('reaction_chain_link_resolving', onChainLinkResolving);
+    socket.on('reaction_chain_link_resolved', onChainLinkResolved);
+    socket.on('reaction_chain_link_negated', onChainLinkNegated);
+    socket.on('reaction_chain_done', onChainDone);
+    socket.on('camera_flash', onCameraFlash);
+    socket.on('toughness_hp_change', onToughnessHp);
+    socket.on('fighting_atk_change', onFightingAtk);
+    socket.on('summon_effect', onSummon);
+    socket.on('burn_tick', onBurnTick);
+    socket.on('play_zone_animation', onZoneAnim);
+    socket.on('level_change', onLevelChange);
+    socket.on('ability_activated', onAbilityActivated);
+    socket.on('play_beam_animation', onBeamAnimation);
+    const onPermanentAnim = ({ owner, permId, type }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const el = document.querySelector(`[data-perm-id="${permId}"][data-perm-owner="${ownerLabel}"]`);
+      if (el) playAnimation(type || 'holy_revival', el, { duration: 1200 });
+    };
+    socket.on('play_permanent_animation', onPermanentAnim);
+    const onRamAnimation = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, cardName, duration }) => {
+      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
+      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
+      let tgtEl;
+      if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
+        tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
+      } else {
+        tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
+      }
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const dx = tr.left + tr.width / 2 - (sr.left + sr.width / 2);
+      const dy = tr.top + tr.height / 2 - (sr.top + sr.height / 2);
+      // Angle so the card's top edge faces the target
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+      const id = Date.now() + Math.random();
+      const dur = duration || 1600;
+      setRamAnims(prev => [...prev, {
+        id, cardName,
+        srcX: sr.left + sr.width / 2, srcY: sr.top + sr.height / 2,
+        tgtX: tr.left + tr.width / 2, tgtY: tr.top + tr.height / 2,
+        srcOwner: sourceOwner, srcHeroIdx: sourceHeroIdx, dur, angle,
+      }]);
+      setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)), dur);
+    };
+    socket.on('play_ram_animation', onRamAnimation);
+    const onCardTransfer = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, cardName, duration, particles }) => {
+      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
+      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      // Support hero zones (zoneSlot === -1) as source or target
+      const srcEl = sourceZoneSlot < 0
+        ? document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`)
+        : document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`);
+      const tgtEl = targetZoneSlot < 0
+        ? document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`)
+        : document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const id = Date.now() + Math.random();
+      const dur = duration || 800;
+      setTransferAnims(prev => [...prev, {
+        id, cardName,
+        srcX: sr.left + sr.width / 2 - 34, srcY: sr.top + sr.height / 2 - 48,
+        tgtX: tr.left + tr.width / 2 - 34, tgtY: tr.top + tr.height / 2 - 48,
+        dur,
+      }]);
+      setTimeout(() => setTransferAnims(prev => prev.filter(a => a.id !== id)), dur + 100);
+      // Play particle effects on source and target if requested
+      if (particles) {
+        playAnimation(particles, srcEl, { duration: dur });
+        setTimeout(() => playAnimation(particles, tgtEl, { duration: dur }), 200);
+      }
+    };
+    socket.on('play_card_transfer', onCardTransfer);
+    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, emoji, duration, trailClass, emojiStyle, projectileClass }) => {
+      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
+      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
+      let tgtEl;
+      if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
+        tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
+      } else {
+        tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
+      }
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const id = Date.now() + Math.random();
+      const dur = duration || 600;
+      setProjectileAnims(prev => [...prev, {
+        id, emoji: emoji || '🐦‍🔥',
+        trailClass: trailClass || null,
+        emojiStyle: emojiStyle || null,
+        projectileClass: projectileClass || null,
+        srcX: sr.left + sr.width / 2, srcY: sr.top + sr.height / 2,
+        tgtX: tr.left + tr.width / 2, tgtY: tr.top + tr.height / 2,
+        dur,
+      }]);
+      setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + 200);
+    };
+    socket.on('play_projectile_animation', onProjectileAnimation);
+    const onDeckToDeleted = ({ owner, cards }) => {
+      const prefix = owner === myIdx ? 'my' : 'opp';
+      const deckEl = document.querySelector(`[data-${prefix}-deck]`);
+      const deletedEl = document.querySelector(`[data-${prefix}-deleted]`);
+      const deckR = deckEl?.getBoundingClientRect();
+      const delR = deletedEl?.getBoundingClientRect();
+      if (!deckR || !delR || !cards || cards.length === 0) return;
+      const startX = deckR.left + deckR.width / 2 - 32;
+      const startY = deckR.top + deckR.height / 2 - 45;
+      const endX = delR.left + delR.width / 2 - 32;
+      const endY = delR.top + delR.height / 2 - 45;
+      const newAnims = cards.map((cardName, i) => ({
+        id: Date.now() + Math.random() + i,
+        cardName, startX, startY, endX, endY, dest: 'deleted',
+        delay: i * 150,
+      }));
+      // Stagger the animations
+      for (const anim of newAnims) {
+        setTimeout(() => {
+          setDiscardAnims(prev => [...prev, anim]);
+          setTimeout(() => setDiscardAnims(prev => prev.filter(a => a.id !== anim.id)), 500);
+        }, anim.delay);
+      }
+    };
+    socket.on('deck_to_deleted', onDeckToDeleted);
+    return () => {
+      socket.off('card_reveal', onReveal); socket.off('deck_search_add', onDeckSearchAdd);
+      socket.off('reaction_chain_update', onChainUpdate); socket.off('reaction_chain_resolving_start', onChainResolvingStart);
+      socket.off('reaction_chain_link_resolving', onChainLinkResolving); socket.off('reaction_chain_link_resolved', onChainLinkResolved);
+      socket.off('reaction_chain_link_negated', onChainLinkNegated); socket.off('reaction_chain_done', onChainDone);
+      socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('fighting_atk_change', onFightingAtk);
+      socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick);
+      socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange);
+      socket.off('ability_activated', onAbilityActivated); socket.off('play_beam_animation', onBeamAnimation);
+      socket.off('play_permanent_animation', onPermanentAnim);
+      socket.off('play_ram_animation', onRamAnimation);
+      socket.off('play_card_transfer', onCardTransfer);
+      socket.off('play_projectile_animation', onProjectileAnimation);
+      socket.off('deck_to_deleted', onDeckToDeleted);
+    };
+  }, []);
+
+  /** Play a visual animation at a DOM element's position. */
+  const playAnimation = (type, selector, options = {}) => {
+    const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const id = Date.now() + Math.random();
+    const dur = options.duration || 800;
+    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, ...options }]);
+    setTimeout(() => setGameAnims(prev => prev.filter(a => a.id !== id)), dur);
+  };
+
+  // Listen for potion resolved — trigger explosion animation
+  useEffect(() => {
+    const onResolved = ({ destroyedIds, animationType }) => {
+      if (!destroyedIds || destroyedIds.length === 0) return;
+      setExplosions(destroyedIds);
+      setTimeout(() => setExplosions([]), 800);
+      // Spawn particle animations on each target after a tiny delay for DOM to update
+      setTimeout(() => {
+        for (const targetId of destroyedIds) {
+          // Find DOM element by target ID — ability or equip
+          const parts = targetId.split('-');
+          const type = parts[0]; // 'ability' or 'equip'
+          const ownerPi = parseInt(parts[1]);
+          const heroIdx = parseInt(parts[2]);
+          const slotIdx = parseInt(parts[3]);
+          const ownerLabel = ownerPi === myIdx ? 'me' : 'opp';
+          let selector;
+          if (type === 'ability') {
+            selector = `[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`;
+          } else if (type === 'hero') {
+            selector = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
+          } else {
+            selector = `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${slotIdx}"]`;
+          }
+          playAnimation(animationType || 'explosion', selector, { duration: 900 });
+        }
+      }, 50);
+    };
+    socket.on('potion_resolved', onResolved);
+    return () => socket.off('potion_resolved', onResolved);
+  }, []);
+
+  // Listen for rematch first-choice prompt (loser only)
+  useEffect(() => {
+    const onChooseFirst = () => setShowFirstChoice(true);
+    socket.on('rematch_choose_first', onChooseFirst);
+    return () => socket.off('rematch_choose_first', onChooseFirst);
+  }, []);
+
+  const handleLeave = () => {
+    if (isSpectator) {
+      socket.emit('leave_room', { roomId: gameState.roomId });
+    } else {
+      socket.emit('leave_game', { roomId: gameState.roomId });
+    }
+    onLeave();
+  };
+  const handleSurrender = () => {
+    setShowSurrender(false);
+    socket.emit('leave_game', { roomId: gameState.roomId });
+    // Don't call onLeave — server will send updated game state with result
+  };
+  const handleRematch = () => {
+    socket.emit('request_rematch', { roomId: gameState.roomId });
+  };
+
+  // Escape closes surrender dialog, deck viewer, cancels potion targeting, cancels effect prompts, or declines mulligan
+  useEffect(() => {
+    const mulliganActive = gameState.mulliganPending && !mulliganDecided && !isSpectator;
+    if (!showSurrender && !showEndTurnConfirm && !spellHeroPick && !deckViewer && !pileViewer && !gameState.potionTargeting && !gameState.effectPrompt && !mulliganActive) return;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        if (showEndTurnConfirm) { cancelEndTurn(); return; }
+        if (spellHeroPick) { setSpellHeroPick(null); return; }
+        if (mulliganActive) { setMulliganDecided(true); socket.emit('mulligan_decision', { roomId: gameState.roomId, accept: false }); return; }
+        if (pendingAbilityActivation) { setPendingAbilityActivation(null); return; }
+        if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx && gameState.effectPrompt.cancellable !== false) {
+          socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
+        } else if (gameState.potionTargeting && gameState.potionTargeting.ownerIdx === myIdx) {
+          if (gameState.potionTargeting.config?.cancellable === false) return;
+          socket.emit('cancel_potion', { roomId: gameState.roomId });
+          setPotionSelection([]);
+        } else if (pileViewer) setPileViewer(null);
+        else if (pendingAdditionalPlay) { setPendingAdditionalPlay(null); socket.emit('pending_placement_clear', { roomId: gameState.roomId }); }
+        else if (deckViewer) setDeckViewer(null);
+        else if (showSurrender) setShowSurrender(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc, true);
+    return () => window.removeEventListener('keydown', handleEsc, true);
+  }, [showSurrender, showEndTurnConfirm, cancelEndTurn, spellHeroPick, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation, gameState.mulliganPending, mulliganDecided]);
+
+  // Space hotkey — advance to next phase
+  useEffect(() => {
+    const handleSpace = (e) => {
+      if (e.code !== 'Space') return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (isSpectator) return;
+      if (showEndTurnConfirm) return; // Don't advance while confirmation is showing
+      const isMyTurn = (gameState.activePlayer || 0) === myIdx;
+      if (!isMyTurn || gameState.result || gameState.effectPrompt || gameState.potionTargeting || gameState.mulliganPending) return;
+      const cp = gameState.currentPhase;
+      const nextMap = { 2: 3, 3: 4, 4: 5 }; // Main1→Action, Action→Main2, Main2→End
+      const target = nextMap[cp];
+      if (target == null) return;
+      e.preventDefault();
+      tryAdvancePhase(target);
+    };
+    window.addEventListener('keydown', handleSpace);
+    return () => window.removeEventListener('keydown', handleSpace);
+  }, [gameState.activePlayer, gameState.currentPhase, gameState.result, gameState.effectPrompt, gameState.potionTargeting, gameState.mulliganPending, gameState.roomId, myIdx, tryAdvancePhase, showEndTurnConfirm]);
+
+  // Listen for opponent's target selections
+  useEffect(() => {
+    const onOppTargets = ({ selectedIds }) => setOppTargetHighlight(selectedIds || []);
+    socket.on('opponent_targeting', onOppTargets);
+    return () => socket.off('opponent_targeting', onOppTargets);
+  }, []);
+
+  // ── Card Ping System ──
+  const [pingAnims, setPingAnims] = useState([]); // [{id, selector, color}]
+
+  // Helper: find board zone info from a hovered .board-card element
+  const getPingInfo = useCallback((el) => {
+    if (!el) return null;
+    // Walk up to find zone container with data attributes
+    let node = el;
+    for (let i = 0; i < 8 && node; i++) {
+      if (node.dataset?.heroZone) {
+        return { type: 'hero', owner: node.dataset.heroOwner, heroIdx: node.dataset.heroIdx };
+      }
+      if (node.dataset?.supportZone) {
+        return { type: 'support', owner: node.dataset.supportOwner, heroIdx: node.dataset.supportHero, slot: node.dataset.supportSlot };
+      }
+      if (node.dataset?.abilityZone) {
+        return { type: 'ability', owner: node.dataset.abilityOwner, heroIdx: node.dataset.abilityHero };
+      }
+      if (node.dataset?.permId) {
+        return { type: 'perm', owner: node.dataset.permOwner, permId: node.dataset.permId };
+      }
+      if (node.dataset?.handIdx !== undefined && node.closest('.game-hand-me')) {
+        return { type: 'hand-me', idx: node.dataset.handIdx };
+      }
+      if (node.dataset?.handIdx !== undefined && node.closest('.game-hand-opp')) {
+        return { type: 'hand-opp', idx: node.dataset.handIdx };
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }, []);
+
+  const buildPingSelector = useCallback((info) => {
+    if (!info) return null;
+    switch (info.type) {
+      case 'hero': return `[data-hero-zone][data-hero-owner="${info.owner}"][data-hero-idx="${info.heroIdx}"]`;
+      case 'support': return `[data-support-zone][data-support-owner="${info.owner}"][data-support-hero="${info.heroIdx}"][data-support-slot="${info.slot}"]`;
+      case 'ability': return `[data-ability-zone][data-ability-owner="${info.owner}"][data-ability-hero="${info.heroIdx}"]`;
+      case 'perm': return `[data-perm-id="${info.permId}"]`;
+      case 'hand-me': return `.game-hand-me .hand-slot[data-hand-idx="${info.idx}"]`;
+      case 'hand-opp': return `.game-hand-opp [data-hand-idx="${info.idx}"]`;
+      default: return null;
+    }
+  }, []);
+
+  const emitPing = useCallback((info) => {
+    if (!info || !gameState.roomId || isSpectator) return;
+    socket.emit('ping_card', { roomId: gameState.roomId, ping: info, color: user.color || '#00f0ff' });
+  }, [gameState.roomId, user.color, isSpectator]);
+
+  // Tab key + contextmenu (right-click) → ping hovered card
+  useEffect(() => {
+    const handlePing = (e) => {
+      if (isSpectator || gameState.result) return;
+      const hovered = document.querySelector('.board-card:hover');
+      if (!hovered) return;
+      const info = getPingInfo(hovered);
+      if (!info) return;
+      if (e.type === 'keydown') { if (e.code !== 'Tab') return; e.preventDefault(); }
+      if (e.type === 'contextmenu') {
+        // Only ping if the right-click is directly on a board card
+        if (!e.target.closest('.board-card')) return;
+        e.preventDefault();
+      }
+      emitPing(info);
+    };
+    window.addEventListener('keydown', handlePing);
+    window.addEventListener('contextmenu', handlePing);
+    return () => { window.removeEventListener('keydown', handlePing); window.removeEventListener('contextmenu', handlePing); };
+  }, [isSpectator, gameState.result, getPingInfo, emitPing]);
+
+  // Receive pings
+  useEffect(() => {
+    const onPing = ({ ping, color }) => {
+      const selector = buildPingSelector(ping);
+      const id = Date.now() + Math.random();
+      setPingAnims(prev => [...prev, { id, selector, color }]);
+      setTimeout(() => setPingAnims(prev => prev.filter(p => p.id !== id)), 1200);
+    };
+    socket.on('ping_card', onPing);
+    return () => socket.off('ping_card', onPing);
+  }, [buildPingSelector]);
+
+  // Broadcast selection changes to opponent
+  useEffect(() => {
+    if (isTargeting && gameState.roomId) {
+      socket.emit('targeting_update', { roomId: gameState.roomId, selectedIds: potionSelection });
+    }
+  }, [potionSelection, isTargeting]);
+
+  // Reset potion selection and opponent highlight when targeting clears
+  useEffect(() => {
+    if (!gameState.potionTargeting) {
+      setPotionSelection([]);
+      setOppTargetHighlight([]);
+    }
+  }, [gameState.potionTargeting]);
+
+  // Damage number + Gold gain animations — detect changes from game state
+  const [damageNumbers, setDamageNumbers] = useState([]);
+  const [creatureDamageNumbers, setCreatureDamageNumbers] = useState([]);
+  const [goldGains, setGoldGains] = useState([]);
+  const [goldLosses, setGoldLosses] = useState([]);
+  const prevHpRef = useRef(null);
+  const prevCreatureHpRef = useRef(null);
+  const prevGoldRef = useRef(null);
+  const prevStatusRef = useRef(null);
+  useEffect(() => {
+    // Build current HP map
+    const currentHp = {};
+    for (let pi = 0; pi < 2; pi++) {
+      const p = gameState.players[pi];
+      for (let hi = 0; hi < (p.heroes || []).length; hi++) {
+        const h = p.heroes[hi];
+        if (h?.name) currentHp[`${pi}-${hi}`] = { name: h.name, hp: h.hp, owner: pi === myIdx ? 'me' : 'opp' };
+      }
+    }
+    // Compare HP
+    if (prevHpRef.current) {
+      const newDmgNums = [];
+      for (const [key, cur] of Object.entries(currentHp)) {
+        const prev = prevHpRef.current[key];
+        if (prev && cur.hp < prev.hp) {
+          // Skip if this HP decrease was from Toughness removal (not real damage)
+          if (toughnessHpSuppressRef.current[key]) {
+            delete toughnessHpSuppressRef.current[key];
+            continue;
+          }
+          const dmg = prev.hp - cur.hp;
+          newDmgNums.push({ id: Date.now() + Math.random(), amount: dmg, heroName: cur.name });
+        }
+      }
+      if (newDmgNums.length > 0) {
+        setDamageNumbers(prev => [...prev, ...newDmgNums]);
+        setTimeout(() => {
+          setDamageNumbers(prev => prev.filter(d => !newDmgNums.some(n => n.id === d.id)));
+        }, 1800);
+      }
+    }
+    prevHpRef.current = currentHp;
+
+    // Build current creature HP map — include ALL creatures on the board
+    const currentCreatureHp = {};
+    for (let pi = 0; pi < 2; pi++) {
+      const p = gameState.players[pi];
+      for (let hi = 0; hi < (p.supportZones || []).length; hi++) {
+        const zones = p.supportZones[hi] || [];
+        for (let si = 0; si < zones.length; si++) {
+          const slot = zones[si] || [];
+          if (slot.length === 0) continue;
+          const cKey = `${pi}-${hi}-${si}`;
+          const counters = (gameState.creatureCounters || {})[cKey];
+          // Use currentHp from counters if available, otherwise max HP from card DB
+          const maxHp = CARDS_BY_NAME[slot[0]]?.hp;
+          if (maxHp != null) {
+            currentCreatureHp[cKey] = counters?.currentHp ?? maxHp;
+          }
+        }
+      }
+    }
+    // Compare creature HP
+    if (prevCreatureHpRef.current) {
+      const newCreatureDmg = [];
+      for (const [key, curHp] of Object.entries(currentCreatureHp)) {
+        const prevHp = prevCreatureHpRef.current[key];
+        if (prevHp != null && curHp < prevHp) {
+          const [ownerStr, heroIdxStr, slotStr] = key.split('-');
+          const ownerIdx = parseInt(ownerStr);
+          newCreatureDmg.push({
+            id: Date.now() + Math.random(),
+            amount: prevHp - curHp,
+            ownerLabel: ownerIdx === myIdx ? 'me' : 'opp',
+            heroIdx: parseInt(heroIdxStr),
+            zoneSlot: parseInt(slotStr),
+          });
+        }
+      }
+      if (newCreatureDmg.length > 0) {
+        setCreatureDamageNumbers(prev => [...prev, ...newCreatureDmg]);
+        setTimeout(() => {
+          setCreatureDamageNumbers(prev => prev.filter(d => !newCreatureDmg.some(n => n.id === d.id)));
+        }, 1800);
+      }
+    }
+    prevCreatureHpRef.current = currentCreatureHp;
+
+    // Compare Gold
+    const currentGold = [gameState.players[0].gold || 0, gameState.players[1].gold || 0];
+    if (prevGoldRef.current) {
+      const newGoldGains = [];
+      for (let pi = 0; pi < 2; pi++) {
+        const diff = currentGold[pi] - prevGoldRef.current[pi];
+        if (diff > 0) {
+          newGoldGains.push({ id: Date.now() + Math.random() + pi, amount: diff, playerIdx: pi });
+        }
+      }
+      if (newGoldGains.length > 0) {
+        setGoldGains(prev => [...prev, ...newGoldGains]);
+        setTimeout(() => {
+          setGoldGains(prev => prev.filter(g => !newGoldGains.some(n => n.id === g.id)));
+        }, 1800);
+        // Trigger gold sparkle animation on the gold counter
+        for (const g of newGoldGains) {
+          const sel = `[data-gold-player="${g.playerIdx}"]`;
+          setTimeout(() => playAnimation('gold_sparkle', sel, { duration: 1200 }), 50);
+        }
+      }
+      // Detect gold losses
+      const newGoldLosses = [];
+      for (let pi = 0; pi < 2; pi++) {
+        const diff = currentGold[pi] - prevGoldRef.current[pi];
+        if (diff < 0) {
+          newGoldLosses.push({ id: Date.now() + Math.random() + pi + 0.5, amount: -diff, playerIdx: pi });
+        }
+      }
+      if (newGoldLosses.length > 0) {
+        setGoldLosses(prev => [...prev, ...newGoldLosses]);
+        setTimeout(() => {
+          setGoldLosses(prev => prev.filter(g => !newGoldLosses.some(n => n.id === g.id)));
+        }, 1800);
+      }
+    }
+    prevGoldRef.current = currentGold;
+
+    // Compare hero statuses for freeze/thaw animations
+    const currentStatuses = {};
+    for (let pi = 0; pi < 2; pi++) {
+      for (let hi = 0; hi < (gameState.players[pi].heroes || []).length; hi++) {
+        const h = gameState.players[pi].heroes[hi];
+        if (h?.name) {
+          const key = `${pi}-${hi}`;
+          currentStatuses[key] = { ...h.statuses };
+        }
+      }
+    }
+    if (prevStatusRef.current) {
+      for (const [key, cur] of Object.entries(currentStatuses)) {
+        const prev = prevStatusRef.current[key] || {};
+        const [pi, hi] = key.split('-').map(Number);
+        const ownerLabel = pi === myIdx ? 'me' : 'opp';
+        // Gained frozen or stunned → freeze animation
+        if ((cur.frozen && !prev.frozen) || (cur.stunned && !prev.stunned)) {
+          const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
+          const animType = cur.frozen?.animationType || cur.stunned?.animationType || 'freeze';
+          setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);
+        }
+        // Gained negated → electric strike animation
+        if (cur.negated && !prev.negated) {
+          const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
+          const animType = cur.negated?.animationType || 'electric_strike';
+          setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);
+        }
+        // Lost frozen or stunned → thaw animation
+        if ((!cur.frozen && prev.frozen) || (!cur.stunned && prev.stunned)) {
+          const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
+          setTimeout(() => playAnimation('thaw', sel, { duration: 900 }), 50);
+        }
+        // Lost negated → thaw animation
+        if (!cur.negated && prev.negated) {
+          const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
+          setTimeout(() => playAnimation('thaw', sel, { duration: 900 }), 50);
+        }
+        // Gained burned → flame strike animation
+        if (cur.burned && !prev.burned) {
+          const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
+          const animType = cur.burned?.animationType || 'flame_strike';
+          setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);
+        }
+      }
+    }
+    prevStatusRef.current = currentStatuses;
+  }, [gameState]);
+
+  // ── Potion targeting helpers ──
+  const pt = gameState.potionTargeting;
+  const isTargeting = !isSpectator && !result && pt && pt.ownerIdx === myIdx;
+  const validTargetIds = isTargeting ? new Set((pt.validTargets || []).map(t => t.id)) : new Set();
+  const selectedSet = new Set(potionSelection);
+
+  const togglePotionTarget = (targetId) => {
+    if (!isTargeting || !validTargetIds.has(targetId)) return;
+    const target = pt.validTargets.find(t => t.id === targetId);
+    if (!target) return;
+    setPotionSelection(prev => {
+      if (prev.includes(targetId)) {
+        // Deselect
+        return prev.filter(id => id !== targetId);
+      }
+      // Check exclusive types
+      const config = pt.config || {};
+      if (config.exclusiveTypes) {
+        const prevTargets = prev.map(id => pt.validTargets.find(t => t.id === id)).filter(Boolean);
+        const prevTypes = new Set(prevTargets.map(t => t.type));
+        if (prevTypes.size > 0 && !prevTypes.has(target.type)) {
+          // Switching type — clear previous
+          return [targetId];
+        }
+      }
+      // Check max per type
+      const maxPerType = config.maxPerType || {};
+      const max = maxPerType[target.type] ?? Infinity;
+      const sameType = prev.filter(id => {
+        const t2 = pt.validTargets.find(t => t.id === id);
+        return t2 && t2.type === target.type;
+      });
+      if (sameType.length >= max) {
+        // At limit — swap: remove oldest same-type selection, add new one
+        const without = prev.filter(id => !sameType.includes(id));
+        return [...without, targetId];
+      }
+      // Check global max total
+      const maxTotal = config.maxTotal ?? Infinity;
+      if (prev.length >= maxTotal) return prev; // At global limit — can't add more
+      return [...prev, targetId];
+    });
+  };
+
+  const canConfirmPotion = (() => {
+    if (pt?.config?.alwaysConfirmable) return true;
+    if (potionSelection.length === 0) return false;
+    const minReq = pt?.config?.minRequired || 0;
+    return potionSelection.length >= minReq;
+  })();
+
+  // ── Effect prompt helpers (confirm, card gallery, zone picker) ──
+  const ep = gameState.effectPrompt;
+  const isMyEffectPrompt = !isSpectator && !result && ep && ep.ownerIdx === myIdx;
+  const isOppEffectPrompt = !isSpectator && !result && ep && ep.ownerIdx !== myIdx && ep.ownerIdx !== (gameState.activePlayer ?? -1);
+  const zonePickSet = new Set();
+  if (isMyEffectPrompt && ep.type === 'zonePick') {
+    for (const z of (ep.zones || [])) {
+      zonePickSet.add(`${myIdx}-${z.heroIdx}-${z.slotIdx}`);
+    }
+  }
+  const respondToPrompt = (response) => {
+    socket.emit('effect_prompt_response', { roomId: gameState.roomId, response });
+  };
+
+  // Escape key dismisses deckSearchReveal prompts (opponent's search result confirmation)
+  useEffect(() => {
+    const ep = gameState.effectPrompt;
+    if (!ep || ep.type !== 'deckSearchReveal' || ep.ownerIdx !== myIdx) return;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        respondToPrompt({ confirmed: true });
+      }
+    };
+    window.addEventListener('keydown', handleEsc, true);
+    return () => window.removeEventListener('keydown', handleEsc, true);
+  }, [gameState.effectPrompt]);
+
+  // ── SC earned display helper ──
+  const renderSCEarned = () => {
+    if (!scEarned) return null;
+    if (isSpectator) {
+      // Spectator sees both players' SC data
+      const entries = [];
+      for (const [piStr, data] of Object.entries(scEarned)) {
+        if (data?.total > 0) {
+          const pName = gameState.players[parseInt(piStr)]?.username || 'Player';
+          entries.push({ name: pName, ...data });
+        }
+      }
+      if (entries.length === 0) return null;
+      return (
+        <div style={{ marginTop: 20, marginBottom: 20, textAlign: 'center' }}>
+          {entries.map(e => (
+            <div key={e.name} style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#ffd700', fontWeight: 700, fontSize: 15 }}>
+                <span>{e.name}:</span>
+                <span>{e.total}</span>
+                <img src="/data/sc.png" style={{ width: 18, height: 18, imageRendering: 'pixelated' }} />
+                <span>earned!</span>
+              </div>
+              <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {(e.rewards || []).map(r => (
+                  <div key={r.id} style={{ fontSize: 12, color: 'var(--text2)' }}>
+                    <span style={{ color: '#ffd700', fontWeight: 600 }}>{r.title}</span>
+                    {' — '}{r.description}{' '}
+                    <span style={{ color: '#ffd700' }}>+{r.amount}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    if (!scEarned.total || scEarned.total <= 0) return null;
+    return (
+      <div style={{ marginTop: 20, marginBottom: 20, textAlign: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#ffd700', fontWeight: 700, fontSize: 18, textShadow: '0 0 12px rgba(255,215,0,.5)' }}>
+          <span>{scEarned.total}</span>
+          <img src="/data/sc.png" style={{ width: 24, height: 24, imageRendering: 'pixelated' }} />
+          <span>earned!</span>
+        </div>
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {(scEarned.rewards || []).map(r => (
+            <div key={r.id} style={{ fontSize: 13, color: 'var(--text2)' }}>
+              <span style={{ color: '#ffd700', fontWeight: 700 }}>{r.title}</span>
+              {' — '}{r.description}{' '}
+              <span style={{ color: '#ffd700', fontWeight: 700 }}>+{r.amount}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Compute per-column max support zone count AND left/right island padding across both players
+  const columnLayout = [0, 1, 2].map(hi => {
+    const counts = [0, 1].map(pi => {
+      const ic = (gameState.players[pi].islandZoneCount || [0,0,0])[hi] || 0;
+      return { left: Math.floor(ic / 2), right: ic - Math.floor(ic / 2) };
+    });
+    const maxLeft = Math.max(counts[0].left, counts[1].left);
+    const maxRight = Math.max(counts[0].right, counts[1].right);
+    const maxZones = maxLeft + 3 + maxRight;
+    return { maxZones, maxLeft, maxRight };
+  });
+
+  // Render a player's side (3 hero columns, each with hero+surprise, 3 abilities, N supports)
+  const renderPlayerSide = (p, isOpp) => {
+    const heroes = p.heroes || [];
+    const abZones = p.abilityZones || [];
+    const supZones = p.supportZones || [];
+    const surZones = p.surpriseZones || [];
+    const islandCounts = p.islandZoneCount || [0, 0, 0];
+    const ownerLabel = isOpp ? 'opp' : 'me';
+
+    // Board skin: extract number from board ID (e.g. "board1" → "1")
+    const boardNum = p.board ? p.board.replace(/\D/g, '') : null;
+    const zs = (zoneType) => boardNum ? {
+      backgroundImage: 'url(/data/shop/boards/' + encodeURIComponent(zoneType + boardNum) + '.png)',
+      backgroundSize: 'cover', backgroundPosition: 'center',
+    } : undefined;
+    const zsMerge = (zoneType, extra) => {
+      const bg = zs(zoneType);
+      return bg ? { ...bg, ...extra } : extra;
+    };
+
+    const heroRow = (
+      <div className="board-row board-hero-row">
+        {[0, 1, 2].flatMap(i => {
+          const hero = heroes[i];
+          const isDead = hero && hero.hp !== undefined && hero.hp <= 0;
+          const abilityAttachActive = !isOpp && gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
+          const abilityIneligible = !isOpp && abilityDrag && (() => {
+            if (abilityAttachActive) {
+              // During abilityAttach: only the specified hero is eligible, skip abilityGivenThisTurn
+              if (i !== gameState.effectPrompt.heroIdx) return true;
+              const hero2 = heroes[i];
+              if (!hero2 || !hero2.name || hero2.hp <= 0) return true;
+              // Check ability zone capacity without abilityGivenThisTurn
+              const abZ = abZones[i] || [[], [], []];
+              const cn = abilityDrag.cardName;
+              const isCust = (gameState.customPlacementCards || []).includes(cn);
+              if (isCust) return !abZ.some(sl => (sl||[]).length > 0 && (sl||[]).length < 3);
+              for (const sl of abZ) { if ((sl||[]).length > 0 && sl[0] === cn) return sl.length >= 3; }
+              return !abZ.some(sl => (sl||[]).length === 0);
+            }
+            return !canHeroReceiveAbility(p, i, abilityDrag.cardName);
+          })();
+          const equipIneligible = !isOpp && playDrag && playDrag.isEquip && (() => {
+            const hero = heroes[i];
+            if (!hero || !hero.name || hero.hp <= 0) return true;
+            if (hero.statuses?.frozen) return true; // Can't equip to frozen heroes
+            const supZ = supZones[i] || [];
+            for (let z = 0; z < 3; z++) { if ((supZ[z] || []).length === 0) return false; }
+            return true;
+          })();
+          const creatureIneligible = !isOpp && playDrag && playDrag.card?.cardType === 'Creature' && !playDrag.isEquip && (() => {
+            if (!canHeroPlayCard(p, i, playDrag.card)) return true;
+            if (findFreeSupportSlot(p, i) < 0) return true;
+            return false;
+          })();
+          const spellAttackIneligible = !isOpp && playDrag && !playDrag.isEquip && (playDrag.card?.cardType === 'Spell' || playDrag.card?.cardType === 'Attack') && !canHeroPlayCard(p, i, playDrag.card);
+          // During heroAction, dim all heroes except the Coffee hero
+          const heroActionDimmed = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx && gameState.effectPrompt?.heroIdx !== i;
+          const abilityTarget = !isOpp && abilityDrag && abilityDrag.targetHero === i && abilityDrag.targetZone < 0;
+          const equipTarget = !isOpp && playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1;
+          const spellTarget = !isOpp && playDrag && playDrag.isSpell && playDrag.targetHero === i;
+          const pi = isOpp ? oppIdx : myIdx;
+          const heroTargetId = `hero-${pi}-${i}`;
+          const isValidHeroTarget = isTargeting && validTargetIds.has(heroTargetId);
+          const isSelectedHeroTarget = selectedSet.has(heroTargetId);
+          const isFrozen = hero?.statuses?.frozen;
+          const isStunned = hero?.statuses?.stunned;
+          const isImmune = hero?.statuses?.immune;
+          const isNegated = hero?.statuses?.negated;
+          const isBurned = hero?.statuses?.burned;
+          const isPoisoned = hero?.statuses?.poisoned;
+          const isShielded = hero?.statuses?.shielded;
+          // Check if this hero has an active hero effect
+          const isHeroEffectActive = !isOpp && (gameState.activeHeroEffects || []).some(e => e.heroIdx === i);
+          const isRamming = ramAnims.some(r => r.srcOwner === pi && r.srcHeroIdx === i);
+          const onHeroClick = isHeroEffectActive && !isValidHeroTarget
+            ? () => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: i })
+            : (isValidHeroTarget ? () => togglePotionTarget(heroTargetId) : undefined);
+          const heroGroup = (
+            <div key={i} className="board-hero-group">
+              {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxLeft }).map((_, s) => (
+                <div key={'lpad-'+s} className="board-zone-spacer" />
+              ))}
+              <div className="board-zone-spacer" />
+              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || heroActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '')}
+                data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
+                onClick={onHeroClick}
+                style={zsMerge('hero', (isHeroEffectActive || isValidHeroTarget) ? { cursor: 'pointer' } : undefined)}>
+                {hero?.name && !isRamming ? (
+                  <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={gameSkins} />
+                ) : hero?.name && isRamming ? (
+                  <div className="board-zone-empty" style={{ opacity: 0.3 }}>{hero.name.split(',')[0]}</div>
+                ) : (
+                  <div className="board-zone-empty">{'Hero ' + (i+1)}</div>
+                )}
+                {isDead && hero?.name && <div className="hero-dead-marker">🪦</div>}
+                {hero?.name && isFrozen && <FrozenOverlay />}
+                {hero?.name && isStunned && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
+                {hero?.name && isNegated && <NegatedOverlay />}
+                {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
+                {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
+                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated) && <StatusBadges statuses={hero.statuses} isHero={true} />}
+                {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
+                {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
+                {hero?.name && hero.buffs && <BuffColumn buffs={hero.buffs} />}
+                {!isOpp && gameState.bonusActions?.heroIdx === i && gameState.bonusActions.remaining > 0 && (
+                  <div className="bonus-action-counter"
+                    onMouseEnter={e => showGameTooltip(e, `${gameState.bonusActions.remaining} bonus Action${gameState.bonusActions.remaining > 1 ? 's' : ''} remaining`)}
+                    onMouseLeave={hideGameTooltip}>
+                    ⚔️{gameState.bonusActions.remaining}
+                  </div>
+                )}
+              </div>
+              <div data-surprise-zone="1" data-surprise-hero={i} data-surprise-owner={ownerLabel}><BoardZone type="surprise" cards={surZones[i] || []} label="Surprise" style={zs('surprise')} /></div>
+              {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxRight }).map((_, s) => (
+                <div key={'rpad-'+s} className="board-zone-spacer" />
+              ))}
+            </div>
+          );
+          if (i < 2) {
+            return [heroGroup, <div key={'area-gap-'+i} className="board-area-spacer" />];
+          }
+          return [heroGroup];
+        })}
+      </div>
+    );
+
+    const abilityRow = (
+      <div className="board-row">
+        {[0, 1, 2].flatMap(i => {
+          const hero = heroes[i];
+          const isDead = hero && hero.hp !== undefined && hero.hp <= 0;
+          const isFrozenOrStunned = hero?.statuses?.frozen || hero?.statuses?.stunned || hero?.statuses?.negated;
+          const abilityAttachActive2 = !isOpp && gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
+          const heroIneligible = !isOpp && abilityDrag && (() => {
+            if (abilityAttachActive2) {
+              if (i !== gameState.effectPrompt.heroIdx) return true;
+              const hero2 = heroes[i];
+              if (!hero2 || !hero2.name || hero2.hp <= 0) return true;
+              const abZ = abZones[i] || [[], [], []];
+              const cn = abilityDrag.cardName;
+              const isCust = (gameState.customPlacementCards || []).includes(cn);
+              if (isCust) return !abZ.some(sl => (sl||[]).length > 0 && (sl||[]).length < 3);
+              for (const sl of abZ) { if ((sl||[]).length > 0 && sl[0] === cn) return sl.length >= 3; }
+              return !abZ.some(sl => (sl||[]).length === 0);
+            }
+            return !canHeroReceiveAbility(p, i, abilityDrag.cardName);
+          })();
+          const abilityGroup = (
+            <div key={i} className="board-hero-group">
+              {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxLeft }).map((_, s) => (
+                <div key={'ablpad-'+s} className="board-zone-spacer" />
+              ))}
+              {[0, 1, 2].map(z => {
+                const cards = (abZones[i]||[])[z]||[];
+                const isAbTarget = !isOpp && abilityDrag && abilityDrag.targetHero === i && abilityDrag.targetZone === z;
+                const pi = isOpp ? oppIdx : myIdx;
+                const abTargetId = `ability-${pi}-${i}-${z}`;
+                const isValidPotionTarget = isTargeting && validTargetIds.has(abTargetId);
+                const isSelectedPotionTarget = selectedSet.has(abTargetId);
+                const isExploding = explosions.includes(abTargetId);
+                // Check if this ability is activatable (action-costing)
+                const isActivatable = !isOpp && cards.length > 0 && (gameState.activatableAbilities || []).some(a => a.heroIdx === i && a.zoneIdx === z);
+                // Check if this ability is free-activatable (no action cost, Main Phase)
+                const freeAbilityEntry = !isOpp && cards.length > 0 && (gameState.freeActivatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z);
+                const isFreeActivatable = freeAbilityEntry?.canActivate === true;
+                const isFreeExhausted = freeAbilityEntry && !freeAbilityEntry.canActivate;
+                // Also activatable during heroAction if listed
+                const heroActionPromptAbilities = (!isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx) ? (gameState.effectPrompt.activatableAbilities || []) : [];
+                const isHeroActionActivatable = heroActionPromptAbilities.some(a => a.heroIdx === i && a.zoneIdx === z);
+                const canActivate = isActivatable || isHeroActionActivatable || isFreeActivatable;
+                const isFlashing = abilityFlash && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z;
+                const onAbilityClick = canActivate ? () => {
+                  if (isFreeActivatable) {
+                    // Free activation — no confirmation needed, activate directly
+                    socket.emit('activate_free_ability', { roomId: gameState.roomId, heroIdx: i, zoneIdx: z });
+                  } else {
+                    setPendingAbilityActivation({ heroIdx: i, zoneIdx: z, abilityName: cards[0], level: cards.length, isHeroAction: isHeroActionActivatable });
+                  }
+                } : (isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined);
+                return (
+                  <div key={z}
+                    className={'board-zone board-zone-ability' + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget ? ' board-zone-play-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFlashing ? ' zone-ability-activated' : '')}
+                    data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel}
+                    onClick={onAbilityClick}
+                    style={zsMerge('ability', canActivate ? { cursor: 'pointer' } : (isValidPotionTarget ? { cursor: 'pointer' } : undefined))}>
+                    {cards.length > 0 ? (
+                      <AbilityStack cards={cards} />
+                    ) : (
+                      <div className="board-zone-empty">Ability</div>
+                    )}
+                  </div>
+                );
+              })}
+              {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxRight }).map((_, s) => (
+                <div key={'abrpad-'+s} className="board-zone-spacer" />
+              ))}
+            </div>
+          );
+          if (i < 2) return [abilityGroup, <div key={'abspc-'+i} className="board-area-spacer" />];
+          return [abilityGroup];
+        })}
+      </div>
+    );
+
+    const supportRow = (
+      <div className="board-row">
+        {[0, 1, 2].flatMap(i => {
+          const actualZoneCount = (supZones[i] || []).length || 3;
+          const islandCount = islandCounts[i] || 0;
+          const baseCount = actualZoneCount - islandCount;
+          const myLeft = Math.floor(islandCount / 2);
+          const myRight = islandCount - myLeft;
+          const { maxLeft, maxRight } = columnLayout[i];
+
+          // Build render order: left spacers, left islands, base zones, right islands, right spacers
+          const renderOrder = [];
+          // Left spacers (align with other player's islands)
+          for (let s = 0; s < maxLeft - myLeft; s++) renderOrder.push({ z: -1, isIsland: false, isSpacer: true });
+          // Left island zones
+          for (let li = 0; li < myLeft; li++) renderOrder.push({ z: baseCount + li, isIsland: true });
+          // Base zones
+          for (let bz = 0; bz < baseCount; bz++) renderOrder.push({ z: bz, isIsland: false });
+          // Right island zones
+          for (let ri = 0; ri < myRight; ri++) renderOrder.push({ z: baseCount + myLeft + ri, isIsland: true });
+          // Right spacers
+          for (let s = 0; s < maxRight - myRight; s++) renderOrder.push({ z: -1, isIsland: false, isSpacer: true });
+
+          // First free base zone (for equip auto-place highlight)
+          let autoSlot = -1;
+          for (let fz = 0; fz < baseCount; fz++) { if (((supZones[i]||[])[fz]||[]).length === 0) { autoSlot = fz; break; } }
+          const supportGroup = (
+          <div key={i} className="board-hero-group">
+            {renderOrder.map((slot, renderIdx) => {
+              if (slot.isSpacer) return <div key={'sp-'+renderIdx} className="board-zone-spacer" />;
+              const z = slot.z;
+              const isIsland = slot.isIsland;
+              const cards = (supZones[i]||[])[z]||[];
+              const isPlayTarget = !isOpp && playDrag && playDrag.targetHero === i && playDrag.targetSlot === z;
+              const isAutoTarget = !isOpp && playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1 && z === autoSlot;
+              const pi = isOpp ? oppIdx : myIdx;
+              // Check all possible equip target IDs for this zone
+              const equipTargetIds = (pt?.validTargets || []).filter(t => t.type === 'equip' && t.owner === pi && t.heroIdx === i && t.slotIdx === z).map(t => t.id);
+              const isValidEquipTarget = isTargeting && equipTargetIds.some(id => validTargetIds.has(id));
+              const isSelectedEquipTarget = equipTargetIds.some(id => selectedSet.has(id));
+              const isEquipExploding = equipTargetIds.some(id => explosions.includes(id));
+              const isSummonGlow = summonGlow && summonGlow.owner === pi && summonGlow.heroIdx === i && summonGlow.zoneSlot === z;
+              const isZonePickTarget = !isOpp && zonePickSet.has(`${pi}-${i}-${z}`);
+              // During creature drag: highlight valid zones, dim invalid ones
+              const isDraggingCreature = !isOpp && playDrag && playDrag.card?.cardType === 'Creature' && !playDrag.isEquip;
+              const heroActionActive = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx;
+              const heroActionHeroIdx = heroActionActive ? gameState.effectPrompt.heroIdx : undefined;
+              const isDragValidZone = isDraggingCreature && cards.length === 0 && canHeroPlayCard(me, i, playDrag.card) && z < ((me.supportZones[i] || []).length || 3) && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
+              const isDragInvalidZone = isDraggingCreature && !isDragValidZone;
+              // heroAction: dim zones for non-Coffee heroes
+              const isHeroActionZoneDimmed = heroActionActive && !isDraggingCreature && i !== heroActionHeroIdx;
+              // Additional Action provider selection highlight
+              const isProviderZone = !isOpp && pendingAdditionalPlay && pendingAdditionalPlay.providers.some(p => p.heroIdx === i && p.zoneSlot === z);
+              const isProviderSelectionActive = !isOpp && !!pendingAdditionalPlay;
+              return (
+                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '')}
+                  data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'}
+                  onClick={isProviderZone ? () => {
+                    const provider = pendingAdditionalPlay.providers.find(p => p.heroIdx === i && p.zoneSlot === z);
+                    if (provider) {
+                      socket.emit('play_creature', {
+                        roomId: gameState.roomId, cardName: pendingAdditionalPlay.cardName,
+                        handIndex: pendingAdditionalPlay.handIndex, heroIdx: pendingAdditionalPlay.heroIdx,
+                        zoneSlot: pendingAdditionalPlay.zoneSlot, additionalActionProvider: provider.cardId,
+                      });
+                      setPendingAdditionalPlay(null);
+                      socket.emit('pending_placement_clear', { roomId: gameState.roomId });
+                    }
+                  } : isZonePickTarget ? () => respondToPrompt({ heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
+                  style={zsMerge('support', (isValidEquipTarget || isZonePickTarget || isProviderZone) ? { cursor: 'pointer' } : undefined)}>
+                  {(isPlayTarget || isAutoTarget) && playDrag.card ? (
+                    <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
+                  ) : (!isOpp && pendingAdditionalPlay && pendingAdditionalPlay.heroIdx === i && pendingAdditionalPlay.zoneSlot === z) ? (
+                    <BoardCard cardName={pendingAdditionalPlay.cardName} hp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} maxHp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
+                  ) : (isOpp && oppPendingPlacement && oppPendingPlacement.heroIdx === i && oppPendingPlacement.zoneSlot === z) ? (
+                    <BoardCard cardName={oppPendingPlacement.cardName} hp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} maxHp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
+                  ) : cards.length > 0 ? (
+                    (() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; const isCreature = CARDS_BY_NAME[cards[cards.length-1]]?.cardType === 'Creature'; return !isCreature ? (
+                      <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} />
+                    ) : (
+                    <>
+                    {cards.length === 1 ? (
+                      (() => { const curHp = cc?.currentHp ?? CARDS_BY_NAME[cards[0]]?.hp; return <BoardCard cardName={cards[0]} hp={curHp} maxHp={CARDS_BY_NAME[cards[0]]?.hp} hpPosition="creature" skins={gameSkins} />; })()
+                    ) : (
+                      <div className="board-stack">
+                        {(() => { const curHp = cc?.currentHp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; return <BoardCard cardName={cards[cards.length-1]} hp={curHp} maxHp={CARDS_BY_NAME[cards[cards.length-1]]?.hp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />; })()}
+                      </div>
+                    )}
+                    {(() => { const lvl = cc?.level; return lvl ? <div className="creature-level">Lv{lvl}</div> : null; })()}
+                    {(() => { return cc?.additionalActionAvail ? <div className="additional-action-icon"
+                      onMouseEnter={() => { window._aaTooltipKey = cKey; window.dispatchEvent(new Event('aaHover')); }}
+                      onMouseLeave={() => { window._aaTooltipKey = null; window.dispatchEvent(new Event('aaHover')); }}
+                    >⚡</div> : null; })()}
+                    {cc?.burned ? <BurnedOverlay /> : null}
+                    {cc?.frozen ? <FrozenOverlay /> : null}
+                    {cc?.negated ? <NegatedOverlay /> : null}
+                    {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
+                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated) ? <StatusBadges counters={cc} isHero={false} /> : null}
+                    {cc?.buffs ? <BuffColumn buffs={cc.buffs} /> : null}
+                    </>
+                    ); })()
+                  ) : (
+                    <div className="board-zone-empty">{isIsland ? 'Island' : 'Support'}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          );
+          if (i < 2) return [supportGroup, <div key={'supspc-'+i} className="board-area-spacer" />];
+          return [supportGroup];
+        })}
+      </div>
+    );
+
+    return isOpp
+      ? <>{supportRow}{abilityRow}{heroRow}</>
+      : <>{heroRow}{abilityRow}{supportRow}</>;
+  };
+
+  return (
+    <div className="screen-full" style={{ background: '#0c0c14' }}>
+      {/* Mobile portrait rotation prompt */}
+      <div className="rotate-device-overlay">
+        <div className="rotate-icon">📱</div>
+        <div className="rotate-text">Please rotate your device</div>
+        <div className="rotate-sub">Pixel Parties requires landscape orientation for the best experience</div>
+      </div>
+      <div className="top-bar" style={{ justifyContent: 'space-between' }}>
+        {isSpectator ? (
+          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={handleLeave}>
+            ✕ LEAVE
+          </button>
+        ) : (
+          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => result ? handleLeave() : setShowSurrender(true)}>
+            {result ? '✕ LEAVE' : '⚑ SURRENDER'}
+          </button>
+        )}
+        <h2 className="orbit-font" style={{ fontSize: 14, color: isSpectator ? 'var(--text2)' : 'var(--accent)' }}>
+          {isSpectator ? '👁 SPECTATING' : 'PIXEL PARTIES'}
+        </h2>
+        <span className="badge" style={{ background: lobby?.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby?.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+          {lobby?.type?.toUpperCase() || 'GAME'}
+        </span>
+        <VolumeControl />
+      </div>
+
+      <div className="game-layout">
+        {/* Opponent hand */}
+        <div className="game-hand game-hand-opp">
+          <div className="game-hand-info">
+            {opp.avatar && <img src={opp.avatar} className={'game-hand-avatar game-hand-avatar-big' + (!result && (isMyTurn ? ' avatar-inactive' : ' avatar-active'))} />}
+            <span className="orbit-font" style={{ fontSize: 18, fontWeight: 800, color: opp.color }}>{opp.username}</span>
+            {oppDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
+          </div>
+          <div className="game-hand-cards">
+            {Array.from({ length: opp.handCount || 0 }).map((_, i) => (
+              <div key={i} className="board-card face-down hand-card" data-hand-idx={i} style={oppDrawHidden.has(i) ? { visibility: 'hidden' } : undefined}>
+                <img src={opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+              </div>
+            ))}
+          </div>
+          <div className="game-gold-display">
+            <span className="game-gold-icon">🪙</span>
+            <span className="game-gold-value orbit-font" data-gold-player={oppIdx}>{opp.gold || 0}</span>
+          </div>
+        </div>
+        {/* Board */}
+        <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '')}>
+          <div className="board-util board-util-left">
+            <div className="board-util-side">
+              <div data-opp-discard="1"><BoardZone type="discard" cards={oppDiscardHidden > 0 ? opp.discardPile.slice(0, -oppDiscardHidden) : opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} /></div>
+              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} /></div>
+              <div className="board-util-spacer" />
+            </div>
+            <div className="board-util-mid" />
+            <div className="board-util-side">
+              <div className="board-util-spacer" />
+              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} /></div>
+              <div data-my-discard="1"><BoardZone type="discard" cards={myDiscardHidden > 0 ? me.discardPile.slice(0, -myDiscardHidden) : me.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} /></div>
+            </div>
+          </div>
+
+          <div className="board-center" ref={boardCenterRef} style={{ position: 'relative' }}>
+            {/* ── Generic Player Debuff Warnings ── */}
+            {(() => {
+              const debuffs = [];
+              if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#ff6644' });
+              if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#cc8800' });
+              if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#ff4444' });
+              if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal any more damage to your targets this turn!`, color: '#ff8844' });
+              if (me.potionLocked) debuffs.push({ key: 'potion-me', icon: '🧪', text: 'You cannot play any more Potions this turn!', color: '#aa44ff' });
+              if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${opp.username} cannot play any more Potions this turn!`, color: '#8844cc' });
+              return debuffs.map(d => (
+                <div key={d.key} className="summon-lock-warning" style={{ color: d.color }}>
+                  {d.icon ? d.icon + ' ' : ''}{d.text}
+                </div>
+              ));
+            })()}
+            {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
+            <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
+            <div className="board-area-zones-center">
+              <BoardZone type="area" cards={gameState.areaZones?.[myIdx] || []} label="Area" style={{...myBoardZone('area'), left: areaPositions[0]}} />
+              <BoardZone type="area" cards={gameState.areaZones?.[oppIdx] || []} label="Area" style={{...oppBoardZone('area'), left: areaPositions[1]}} />
+            </div>
+            <div className="board-mid-row" style={{ position: 'relative' }}>
+              <div className="phase-column">
+                <div className="board-phase-tracker">
+                  {['Start Phase', 'Resource Phase', 'Main Phase 1', 'Action Phase', 'Main Phase 2', 'End Phase'].map((phase, i) => {
+                    const isActive = currentPhase === i;
+                    // Which phases can the active player click to advance to?
+                    const canClick = isMyTurn && !result && !gameState.effectPrompt && (
+                      (currentPhase === 2 && (i === 3 || i === 5)) || // Main1 → Action or End
+                      (currentPhase === 3 && (i === 4 || i === 5)) || // Action → Main2 or End
+                      (currentPhase === 4 && i === 5)                 // Main2 → End
+                    );
+                    return (
+                      <div key={i}
+                        className={'board-phase-item' + (isActive ? ' active' : '') + (canClick ? ' clickable' : '')}
+                        style={isActive ? { borderColor: phaseColor, boxShadow: `0 0 10px ${phaseColor}44` } : undefined}
+                        onClick={() => {
+                          if (canClick) tryAdvancePhase(i);
+                        }}>
+                        {phase}
+                      </div>
+                    );
+                  })}
+                </div>
+                {!isSpectator && (() => {
+                  const canAdvance = isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && currentPhase >= 2 && currentPhase <= 4;
+                  const nextMap = { 2: 3, 3: 4, 4: 5 };
+                  return (
+                    <div className="phase-buttons-row">
+                      <button className="btn phase-btn" disabled={!canAdvance}
+                        onClick={() => canAdvance && tryAdvancePhase(nextMap[currentPhase])}>
+                        Next Phase ▸
+                      </button>
+                      <button className="btn btn-danger phase-btn" disabled={!canAdvance}
+                        onClick={() => canAdvance && tryAdvancePhase(5)}>
+                        End Turn ⏹
+                      </button>
+                      <label className="phase-end-check">
+                        <input type="checkbox" checked={askBeforeEndTurn} onChange={e => {
+                          setAskBeforeEndTurn(e.target.checked);
+                          localStorage.setItem('pp_ask_end_turn', e.target.checked ? '1' : '0');
+                        }} />
+                        <span>Confirm end</span>
+                      </label>
+                    </div>
+                  );
+                })()}
+              </div>
+              <div className="board-area-line" />
+              {gameState.format > 1 && !result && (
+                <div className="set-score-fixed orbit-font">
+                  <span style={{ color: 'var(--success)' }}>{gameState.setScore?.[myIdx] || 0}</span>
+                  <span style={{ color: 'var(--text2)', margin: '0 8px' }}>—</span>
+                  <span style={{ color: 'var(--danger)' }}>{gameState.setScore?.[oppIdx] || 0}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text2)', marginLeft: 10 }}>Bo{gameState.format}</span>
+                </div>
+              )}
+            </div>
+            <div className="board-player-side board-side-me">{renderPlayerSide(me, false)}</div>
+            {/* Permanent zones — positioned absolutely to avoid layout interference */}
+            {(opp.permanents || []).length > 0 && (
+              <div className="board-permanents board-permanents-opp">
+                {opp.permanents.map(perm => (
+                  <div key={perm.id} className="board-permanent-slot" data-perm-id={perm.id} data-perm-owner="opp">
+                    <BoardCard cardName={perm.name} />
+                  </div>
+                ))}
+              </div>
+            )}
+            {(me.permanents || []).length > 0 && (
+              <div className="board-permanents board-permanents-me">
+                {me.permanents.map(perm => (
+                  <div key={perm.id} className="board-permanent-slot" data-perm-id={perm.id} data-perm-owner="me">
+                    <BoardCard cardName={perm.name} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="board-util board-util-right">
+            <div className="board-util-side">
+              <BoardZone type="deck" label="Deck" faceDown style={oppBoardZone('deck')}>
+                <div className="board-card face-down" data-opp-deck="1"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.deckCount}</div></div>
+              </BoardZone>
+              <BoardZone type="potion" label="Potions" faceDown style={oppBoardZone('potion')}>
+                {opp.potionDeckCount > 0 && <div className="board-card face-down"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>}
+              </BoardZone>
+              <div className="board-util-spacer" />
+            </div>
+            <div className="board-util-mid" />
+            <div className="board-util-side">
+              <div className="board-util-spacer" />
+              <div onClick={() => !isSpectator && me.potionDeckCount > 0 && setDeckViewer('potion')} style={{ cursor: !isSpectator && me.potionDeckCount > 0 ? 'pointer' : 'default' }}>
+              <BoardZone type="potion" label="Potions" faceDown style={myBoardZone('potion')}>
+                {me.potionDeckCount > 0 && <div className="board-card face-down"><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.potionDeckCount}</div></div>}
+              </BoardZone>
+              </div>
+              <div onClick={() => !isSpectator && me.deckCount > 0 && setDeckViewer('deck')} style={{ cursor: !isSpectator && me.deckCount > 0 ? 'pointer' : 'default' }} data-my-deck="1">
+              <BoardZone type="deck" label="Deck" faceDown style={myBoardZone('deck')}>
+                <div className="board-card face-down"><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.deckCount}</div></div>
+              </BoardZone>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* My hand (bottom player) — drag to reorder for players, face-down for spectators */}
+        <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef}>
+          <div className="game-hand-info">
+            {me.avatar && <img src={me.avatar} className={'game-hand-avatar game-hand-avatar-big' + (!result && (isMyTurn ? ' avatar-active' : ' avatar-inactive'))} />}
+            <span className="orbit-font" style={{ fontSize: 18, fontWeight: 800, color: me.color }}>{me.username}</span>
+            {meDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
+          </div>
+          {isSpectator ? (
+            <div className="game-hand-cards">
+              {Array.from({ length: me.handCount || 0 }).map((_, i) => (
+                <div key={i} className="board-card face-down hand-card" data-hand-idx={i} style={specMeDrawHidden.has(i) ? { visibility: 'hidden' } : undefined}>
+                  <img src={me.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="game-hand-cards">
+              {displayHand.map((item, i) => {
+                if (item.isGap) return <div key="gap" className="hand-drop-gap" />;
+                const isBeingDragged = handDrag && handDrag.idx === item.origIdx;
+                const dimmed = getCardDimmed(item.card, item.origIdx);
+                const isDrawAnim = drawAnimCards.some(a => a.origIdx === item.origIdx);
+                const isPendingPlay = pendingAdditionalPlay && pendingAdditionalPlay.handIndex === item.origIdx;
+                const isForceDiscard = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt?.ownerIdx === myIdx;
+                const isForceDiscardCancellable = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt?.ownerIdx === myIdx;
+                const isAbilityAttach = gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
+                const isAttachEligible = isAbilityAttach && (gameState.effectPrompt.eligibleCards || []).includes(item.card);
+                const isAnyDiscard = isForceDiscard || isForceDiscardCancellable;
+                return (
+                  <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard ? ' hand-discard-target' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '')}
+                    style={(isDrawAnim || isPendingPlay) ? { visibility: 'hidden' } : undefined}
+                    onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
+                    onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
+                    onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
+                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {!isSpectator && (
+            <div className="hand-actions">
+              <button className="btn hand-action-btn" onClick={sortHand} title="Sort hand by type, then name">Sort</button>
+              <button className="btn hand-action-btn" onClick={shuffleHand} title="Shuffle hand randomly">Shuffle</button>
+            </div>
+          )}
+          <div className="game-gold-display">
+            <span className="game-gold-icon">🪙</span>
+            <span className="game-gold-value orbit-font" data-gold-player={myIdx}>{me.gold || 0}</span>
+          </div>
+        </div>
+
+        </div>
+      {/* end game-layout */}
+
+      {/* Floating draw animation cards (outside game-layout to avoid overflow clip) */}
+      {!isSpectator && drawAnimCards.map(anim => (
+        <DrawAnimCard key={anim.id} cardName={anim.cardName} origIdx={anim.origIdx}
+          startX={anim.startX} startY={anim.startY} dimmed={getCardDimmed(anim.cardName)} />
+      ))}
+      {oppDrawAnims.map(anim => (
+        <OppDrawAnimCard key={anim.id} startX={anim.startX} startY={anim.startY}
+          endX={anim.endX} endY={anim.endY} cardName={anim.cardName} cardbackUrl={opp.cardback} />
+      ))}
+      {/* Spectator: bottom player draw animations (face-down, like opponent) */}
+      {isSpectator && specMeDrawAnims.map(anim => (
+        <OppDrawAnimCard key={anim.id} startX={anim.startX} startY={anim.startY}
+          endX={anim.endX} endY={anim.endY} cardbackUrl={me.cardback} />
+      ))}
+
+      {/* Floating discard animation cards */}
+      {discardAnims.map(anim => (
+        <DiscardAnimCard key={anim.id} cardName={anim.cardName} dest={anim.dest}
+          startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY} />
+      ))}
+
+      {/* Floating drag card (outside game-layout to avoid overflow clip) */}
+      {handDrag && (
+        <div className="hand-floating-card" style={{ left: handDrag.mouseX - 32, top: handDrag.mouseY - 45 }}>
+          <BoardCard cardName={handDrag.cardName} />
+        </div>
+      )}
+      {playDrag && (
+        <div className="hand-floating-card" style={{ left: playDrag.mouseX - 32, top: playDrag.mouseY - 45 }}>
+          <BoardCard cardName={playDrag.cardName} />
+        </div>
+      )}
+      {abilityDrag && (
+        <div className="hand-floating-card" style={{ left: abilityDrag.mouseX - 32, top: abilityDrag.mouseY - 45 }}>
+          <BoardCard cardName={abilityDrag.cardName} />
+        </div>
+      )}
+
+      {/* Damage numbers */}
+      {damageNumbers.map(d => (
+        <DamageNumber key={d.id} amount={d.amount} heroName={d.heroName} />
+      ))}
+      {creatureDamageNumbers.map(d => (
+        <CreatureDamageNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} zoneSlot={d.zoneSlot} />
+      ))}
+
+      {/* Gold gain numbers */}
+      {goldGains.map(g => (
+        <GoldGainNumber key={g.id} amount={g.amount} playerIdx={g.playerIdx} isMe={g.playerIdx === myIdx} />
+      ))}
+
+      {/* Gold loss numbers */}
+      {goldLosses.map(g => (
+        <GoldLossNumber key={g.id} amount={g.amount} playerIdx={g.playerIdx} isMe={g.playerIdx === myIdx} />
+      ))}
+
+      {/* Level change numbers */}
+      {levelChanges.map(lc => (
+        <LevelChangeNumber key={lc.id} delta={lc.delta} owner={lc.owner} heroIdx={lc.heroIdx} zoneSlot={lc.zoneSlot} myIdx={myIdx} />
+      ))}
+
+      {/* Toughness HP change numbers */}
+      {toughnessHpChanges.map(thp => (
+        <ToughnessHpNumber key={thp.id} amount={thp.amount} owner={thp.owner} heroIdx={thp.heroIdx} myIdx={myIdx} />
+      ))}
+
+      {/* Fighting ATK change numbers */}
+      {fightingAtkChanges.map(fa => (
+        <FightingAtkNumber key={fa.id} amount={fa.amount} owner={fa.owner} heroIdx={fa.heroIdx} myIdx={myIdx} />
+      ))}
+
+      {/* Modular game animations (explosions, etc.) */}
+      {gameAnims.map(a => (
+        <GameAnimationRenderer key={a.id} {...a} />
+      ))}
+
+      {/* Beam animations (laser beams, etc.) */}
+      {beamAnims.length > 0 && (
+        <div className="beam-animation-container">
+          <svg>
+            {beamAnims.map(b => (
+              <g key={b.id}>
+                <line className="beam-line-outer" x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} />
+                <line className="beam-line-glow" x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} />
+                <line className="beam-line-core" x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} style={{ stroke: b.color }} />
+                <circle className="beam-impact" cx={b.x2} cy={b.y2} r="5" fill={b.color} opacity="0.8" />
+              </g>
+            ))}
+          </svg>
+        </div>
+      )}
+
+      {/* Ram animations (hero charges to target and back) */}
+      {ramAnims.map(r => (
+        <div key={r.id} className="ram-anim-card" style={{
+          left: r.srcX - 34, top: r.srcY - 48,
+          '--ramDx': (r.tgtX - r.srcX) + 'px',
+          '--ramDy': (r.tgtY - r.srcY) + 'px',
+          '--ramAngle': (r.angle || 0) + 'deg',
+          animationDuration: r.dur + 'ms',
+        }}>
+          <BoardCard cardName={r.cardName} noTooltip />
+          <div className="ram-flame-trail" />
+        </div>
+      ))}
+
+      {/* Card transfer animations (Dark Gear creature steal, etc.) */}
+      {transferAnims.map(t => (
+        <div key={t.id} className="transfer-anim-card" style={{
+          left: t.srcX, top: t.srcY,
+          '--transferDx': (t.tgtX - t.srcX) + 'px',
+          '--transferDy': (t.tgtY - t.srcY) + 'px',
+          animationDuration: t.dur + 'ms',
+        }}>
+          <BoardCard cardName={t.cardName} noTooltip />
+        </div>
+      ))}
+
+      {/* Projectile animations (phoenix cannon, etc.) */}
+      {projectileAnims.map(p => (
+        <div key={p.id} className="projectile-anim" style={{
+          left: p.srcX, top: p.srcY,
+          '--projDx': (p.tgtX - p.srcX) + 'px',
+          '--projDy': (p.tgtY - p.srcY) + 'px',
+          animationDuration: p.dur + 'ms',
+        }}>
+          <span className={p.projectileClass || 'projectile-emoji'} style={p.emojiStyle || {}}>{p.projectileClass ? '' : p.emoji}</span>
+          <div className={p.trailClass || 'projectile-flame-trail'} />
+        </div>
+      ))}
+
+      {/* Opponent card reveal */}
+      {cardReveals.length > 0 && (
+        <CardRevealOverlay reveals={cardReveals} onRemove={(id) => setCardReveals(prev => prev.filter(r => r.id !== id))} />
+      )}
+
+      {/* ── Reaction Chain Visualization ── */}
+      {reactionChain && reactionChain.length >= 2 && (
+        <div className="reaction-chain-overlay">
+          <div className="reaction-chain-label orbit-font">Chain</div>
+          <div className="reaction-chain-cards">
+            {reactionChain.map((link, i) => (
+              <div key={link.id} className={
+                'reaction-chain-card'
+                + (link.status === 'resolving' ? ' chain-glow' : '')
+                + (link.status === 'negated' ? ' chain-negated' : '')
+                + (link.status === 'resolved' ? ' chain-resolved' : '')
+              }>
+                <BoardCard cardName={link.cardName} style={{ width: 80, height: 112, borderRadius: 4 }} />
+                {link.isInitialCard && <div className="chain-badge chain-badge-initial">INITIAL</div>}
+                {link.status === 'negated' && <div className="chain-negate-symbol">🚫</div>}
+                {link.status === 'negated' && link.negationStyle === 'ice' && (
+                  <div className="chain-ice-overlay">
+                    <div className="chain-ice-crystal" style={{ left: 8, top: 12, fontSize: 14, animationDelay: '0ms' }}>❄</div>
+                    <div className="chain-ice-crystal" style={{ left: 55, top: 30, fontSize: 18, animationDelay: '50ms' }}>❄</div>
+                    <div className="chain-ice-crystal" style={{ left: 20, top: 55, fontSize: 12, animationDelay: '100ms' }}>❆</div>
+                    <div className="chain-ice-crystal" style={{ left: 50, top: 75, fontSize: 16, animationDelay: '150ms' }}>❄</div>
+                    <div className="chain-ice-crystal" style={{ left: 12, top: 85, fontSize: 14, animationDelay: '200ms' }}>❅</div>
+                    <div className="chain-ice-crystal" style={{ left: 40, top: 15, fontSize: 11, animationDelay: '80ms' }}>❆</div>
+                  </div>
+                )}
+                <div className="chain-owner-dot" style={{ background: link.owner === myIdx ? 'var(--accent)' : 'var(--danger)' }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Camera Flash ── */}
+      {cameraFlash && (
+        <div className="camera-flash-overlay">
+          <div className="camera-flash-icon">
+            <svg viewBox="0 0 100 100" width="120" height="120">
+              <rect x="20" y="30" width="60" height="45" rx="8" fill="#ff69b4" stroke="#fff" strokeWidth="2"/>
+              <circle cx="50" cy="52" r="14" fill="#222" stroke="#fff" strokeWidth="2"/>
+              <circle cx="50" cy="52" r="8" fill="#4af"/>
+              <rect x="38" y="24" width="24" height="10" rx="3" fill="#ff69b4" stroke="#fff" strokeWidth="1.5"/>
+              <ellipse cx="28" cy="22" rx="10" ry="16" fill="none" stroke="#ff69b4" strokeWidth="2" transform="rotate(-30 28 22)"/>
+              <ellipse cx="72" cy="22" rx="10" ry="16" fill="none" stroke="#ff69b4" strokeWidth="2" transform="rotate(30 72 22)"/>
+            </svg>
+          </div>
+        </div>
+      )}
+
+      {/* ── Global Game Tooltip ── */}
+      <GameTooltip />
+
+      {/* Immune status tooltip */}
+      {immuneTooltip && (() => {
+        const el = document.querySelector(`[data-hero-name="${CSS.escape(immuneTooltip)}"] .status-immune-icon`);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return <div className="immune-tooltip" style={{ position: 'fixed', left: r.right + 8, top: r.top - 4 }}>{immuneTooltipType === 'shielded' ? 'Immune to anything during your first turn!' : 'Cannot be Frozen, Stunned or otherwise incapacitated this turn.'}</div>;
+      })()}
+
+      {/* Additional Action icon tooltip */}
+      {aaTooltipKey && (() => {
+        const [ow, hi, sl] = aaTooltipKey.split('-');
+        const ownerLabel = parseInt(ow) === myIdx ? 'me' : 'opp';
+        const el = document.querySelector(`[data-support-owner="${ownerLabel}"][data-support-hero="${hi}"][data-support-slot="${sl}"] .additional-action-icon`);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return <div className="immune-tooltip" style={{ position: 'fixed', left: r.right + 8, top: r.top - 4, borderColor: 'rgba(255,200,0,.4)', color: '#ffdd88' }}>Provides an additional Action.</div>;
+      })()}
+
+      {/* Pile hover tooltip (rendered at top level to escape overflow clipping) */}
+      {hoveredPileCard && CARDS_BY_NAME[hoveredPileCard] && (() => {
+        const card = CARDS_BY_NAME[hoveredPileCard];
+        const imgUrl = cardImageUrl(card.name);
+        const foilType = card.foil || null;
+        const isFoil = foilType === 'secret_rare' || foilType === 'diamond_rare';
+        return (
+          <div className="board-tooltip">
+            {imgUrl && (
+              <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
+                <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
+                  border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none' }} />
+              </div>
+            )}
+            <div style={{ padding: '10px 12px' }}>
+              <div style={{ fontWeight: 700, fontSize: 18, color: typeColor(card.cardType), marginBottom: 5 }}>{card.name}</div>
+              <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>
+                {card.cardType}{card.subtype ? ' · ' + card.subtype : ''}{card.archetype ? ' · ' + card.archetype : ''}
+              </div>
+              {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5 }}>{card.effect}</div>}
+              <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
+                {card.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {card.hp}</span>}
+                {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {card.atk}</span>}
+                {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {card.cost}</span>}
+                {card.level != null && <span>Lv{card.level}</span>}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Board card hover tooltip (shared single instance) */}
+      {tooltipCard && !hoveredPileCard && (() => {
+        const imgUrl = cardImageUrl(tooltipCard.name);
+        const foilType = tooltipCard.foil || null;
+        const isFoil = foilType === 'secret_rare' || foilType === 'diamond_rare';
+        // Token mapping — cards that create tokens show the token tooltip alongside
+        const CARD_TOKEN_MAP = {
+          'Pyroblast': ['Pollution Token'],
+        };
+        const relatedTokens = CARD_TOKEN_MAP[tooltipCard.name] || [];
+        return (
+          <>
+            {relatedTokens.map(tokenName => {
+              const tokenCard = CARDS_BY_NAME[tokenName];
+              if (!tokenCard) return null;
+              const tokenImg = cardImageUrl(tokenCard.name);
+              return (
+                <div key={tokenName} className="board-tooltip board-tooltip-token">
+                  {tokenImg && (
+                    <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
+                      <img src={tokenImg} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block' }} />
+                    </div>
+                  )}
+                  <div style={{ padding: '10px 12px' }}>
+                    <div style={{ fontWeight: 700, fontSize: 18, color: typeColor(tokenCard.cardType), marginBottom: 5 }}>{tokenCard.name}</div>
+                    <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>
+                      {tokenCard.cardType}{tokenCard.subtype ? ' · ' + tokenCard.subtype : ''}
+                    </div>
+                    {tokenCard.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5 }}>{tokenCard.effect}</div>}
+                    <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
+                      {tokenCard.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {tokenCard.hp}</span>}
+                      {tokenCard.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {tokenCard.atk}</span>}
+                      {tokenCard.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {tokenCard.cost}</span>}
+                      {tokenCard.level != null && <span>Lv{tokenCard.level}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="board-tooltip">
+              {imgUrl && (
+                <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
+                  <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
+                    border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none' }} />
+                  {isFoil && <FoilOverlay bands={[]} shimmerOffset="0ms" sparkleDelays={[]} foilType={foilType} />}
+                </div>
+              )}
+              <div style={{ padding: '10px 12px' }}>
+                <div style={{ fontWeight: 700, fontSize: 18, color: typeColor(tooltipCard.cardType), marginBottom: 5 }}>{tooltipCard.name}</div>
+                <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>
+                  {tooltipCard.cardType}{tooltipCard.subtype ? ' · ' + tooltipCard.subtype : ''}{tooltipCard.archetype ? ' · ' + tooltipCard.archetype : ''}
+                </div>
+                {tooltipCard.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5 }}>{tooltipCard.effect}</div>}
+                <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
+                  {tooltipCard.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {tooltipCard.hp}</span>}
+                  {tooltipCard.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {tooltipCard.atk}</span>}
+                  {tooltipCard.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {tooltipCard.cost}</span>}
+                  {tooltipCard.level != null && <span>Lv{tooltipCard.level}</span>}
+                </div>
+              </div>
+            </div>
+          </>
+        );
+      })()}
+
+      {/* Ping flash overlays */}
+      {pingAnims.map(p => {
+        const el = document.querySelector(p.selector);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return (
+          <div key={p.id} className="ping-flash" style={{
+            position: 'fixed', left: r.left, top: r.top, width: r.width, height: r.height,
+            boxShadow: `0 0 16px ${p.color}, 0 0 32px ${p.color}, inset 0 0 12px ${p.color}`,
+            borderColor: p.color,
+            pointerEvents: 'none', zIndex: 10050,
+          }} />
+        );
+      })}
+
+      {/* Surrender confirmation */}
+      {showSurrender && (
+        <div className="modal-overlay" onClick={() => setShowSurrender(false)}>
+          <div className="modal animate-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 340, textAlign: 'center' }}>
+            <div className="pixel-font" style={{ fontSize: 14, color: 'var(--danger)', marginBottom: 16 }}>SURRENDER?</div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>Do you really want to give up?</div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button className="btn btn-danger" style={{ padding: '10px 28px', fontSize: 13 }} onClick={handleSurrender}>YES</button>
+              <button className="btn" style={{ padding: '10px 28px', fontSize: 13 }} onClick={() => setShowSurrender(false)}>NO</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* End Turn confirmation */}
+      {showEndTurnConfirm && (
+        <div className="modal-overlay" onClick={cancelEndTurn}>
+          <div className="modal animate-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 320, textAlign: 'center' }}>
+            <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 16 }}>END YOUR TURN?</div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button className="btn btn-success" style={{ padding: '10px 28px', fontSize: 13 }} onClick={confirmEndTurn}>YES</button>
+              <button className="btn" style={{ padding: '10px 28px', fontSize: 13 }} onClick={cancelEndTurn}>NO</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deck viewer */}
+      {deckViewer && (() => {
+        const raw = deckViewer === 'potion' ? (me.potionDeckCards || []) : (me.mainDeckCards || []);
+        const TYPE_ORDER = ['Hero','Creature','Spell','Attack','Artifact','Ability','Potion','Ascended Hero','Token'];
+        const sorted = [...raw].sort((a, b) => {
+          const ca = CARDS_BY_NAME[a], cb = CARDS_BY_NAME[b];
+          const ta = TYPE_ORDER.indexOf(ca?.cardType || ''), tb = TYPE_ORDER.indexOf(cb?.cardType || '');
+          if (ta !== tb) return ta - tb;
+          return a.localeCompare(b);
+        });
+        return (
+          <div className="modal-overlay" onClick={() => setDeckViewer(null)}>
+            <DraggablePanel className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
+                  {deckViewer === 'potion' ? '🧪 POTION DECK' : '📋 MAIN DECK'} ({sorted.length})
+                </span>
+                <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setDeckViewer(null)}>✕ CLOSE</button>
+              </div>
+              <div className="deck-viewer-grid">
+                {sorted.map((name, i) => {
+                  const card = CARDS_BY_NAME[name];
+                  if (!card) return null;
+                  return <CardMini key={name + '-' + i} card={card} onClick={() => {}} style={{ width: '100%', height: 120 }} />;
+                })}
+              </div>
+            </DraggablePanel>
+          </div>
+        );
+      })()}
+
+      {/* Pile viewer (discard/deleted) */}
+      {pileViewer && (() => {
+        const TYPE_ORDER = ['Hero','Creature','Spell','Attack','Artifact','Ability','Potion','Ascended Hero','Token'];
+        const sorted = [...(pileViewer.cards || [])].sort((a, b) => {
+          const ca = CARDS_BY_NAME[a], cb = CARDS_BY_NAME[b];
+          const ta = TYPE_ORDER.indexOf(ca?.cardType || ''), tb = TYPE_ORDER.indexOf(cb?.cardType || '');
+          if (ta !== tb) return ta - tb;
+          return a.localeCompare(b);
+        });
+        return (
+          <div className="modal-overlay" onClick={() => setPileViewer(null)}>
+            <DraggablePanel className="modal animate-in deck-viewer-modal">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
+                  {pileViewer.title} ({sorted.length})
+                </span>
+                <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setPileViewer(null)}>✕ CLOSE</button>
+              </div>
+              {sorted.length > 0 ? (
+                <div className="deck-viewer-grid">
+                  {sorted.map((name, i) => {
+                    const card = CARDS_BY_NAME[name];
+                    if (!card) return null;
+                    return <CardMini key={name + '-' + i} card={card} onClick={() => {}} style={{ width: '100%', height: 120 }} />;
+                  })}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 20 }}>Empty</div>
+              )}
+            </DraggablePanel>
+          </div>
+        );
+      })()}
+
+      {/* ── Effect Prompt: Confirm Dialog ── */}
+      {isMyEffectPrompt && ep.type === 'confirm' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Confirm'}</div>
+          <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{ep.message}</div>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button className="btn btn-success" style={{ padding: '10px 24px', fontSize: 13 }}
+              onClick={() => respondToPrompt({ confirmed: true })}>
+              {ep.confirmLabel || 'Yes'}
+            </button>
+            <button className="btn" style={{ padding: '10px 24px', fontSize: 13, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+              onClick={() => respondToPrompt({ cancelled: true })}>
+              {ep.cancelLabel || 'No'}
+            </button>
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Effect Prompt: Player Picker ── */}
+      {isMyEffectPrompt && ep.type === 'playerPicker' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 280 }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose a Player'}</div>
+          {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[0, 1].map(pIdx => {
+              const p = pIdx === myIdx ? me : opp;
+              const isMe = pIdx === myIdx;
+              const clr = isMe ? 'var(--success)' : 'var(--danger)';
+              return (
+                <button key={pIdx} className="btn" style={{ padding: '12px 18px', fontSize: 13, borderColor: clr, color: clr, display: 'flex', alignItems: 'center', gap: 12 }}
+                  onClick={() => respondToPrompt({ playerIdx: pIdx })}>
+                  {p.avatar && <img src={p.avatar} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />}
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{p.username}{isMe ? ' (you)' : ''}</div>
+                  </div>
+                </button>
+              );
+            })}
+            {ep.cancellable !== false && (
+              <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
+                onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+            )}
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Effect Prompt: Option Picker (generic multi-option) ── */}
+      {isMyEffectPrompt && ep.type === 'optionPicker' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose'}</div>
+          {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {(ep.options || []).map(opt => (
+              <button key={opt.id} className="btn" style={{ padding: '10px 18px', fontSize: 12, borderColor: opt.color || 'var(--accent)', color: opt.color || 'var(--accent)', textAlign: 'left' }}
+                onClick={() => respondToPrompt({ optionId: opt.id })}>
+                <div style={{ fontWeight: 600 }}>{opt.label}</div>
+                {opt.description && <div style={{ fontSize: 10, opacity: .7, marginTop: 2 }}>{opt.description}</div>}
+              </button>
+            ))}
+            {ep.cancellable !== false && (
+              <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
+                onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+            )}
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Effect Prompt: Card Gallery Picker ── */}
+      {isMyEffectPrompt && ep.type === 'cardGallery' && (() => {
+        const cards = ep.cards || [];
+        return (
+          <div className="modal-overlay" onClick={ep.cancellable !== false ? () => respondToPrompt({ cancelled: true }) : undefined}>
+            <DraggablePanel className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
+                  {ep.title || 'Select a Card'}
+                </span>
+                {ep.cancellable !== false && (
+                  <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }}
+                    onClick={() => respondToPrompt({ cancelled: true })}>✕ CANCEL</button>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+              <div className="deck-viewer-grid">
+                {cards.map((entry, i) => {
+                  const card = CARDS_BY_NAME[entry.name];
+                  if (!card) return null;
+                  return (
+                    <div key={entry.name + '-' + entry.source + '-' + i} style={{ position: 'relative' }}>
+                      <CardMini card={card}
+                        onClick={() => respondToPrompt({ cardName: entry.name, source: entry.source })}
+                        style={{ width: '100%', height: 120, cursor: 'pointer' }} />
+                      {entry.count != null && (
+                        <div style={{
+                          position: 'absolute', top: 3, right: 3,
+                          background: 'rgba(0,0,0,.75)', color: '#fff',
+                          fontSize: 10, fontWeight: 700, padding: '1px 5px',
+                          borderRadius: 3, pointerEvents: 'none', zIndex: 5,
+                          border: '1px solid rgba(255,255,255,.25)',
+                        }}>×{entry.count}</div>
+                      )}
+                      <div className="gallery-source-badge" style={{
+                        background: entry.source === 'hand' ? 'rgba(80,200,120,.85)' : entry.source === 'discard' ? 'rgba(180,80,200,.85)' : 'rgba(80,140,220,.85)',
+                      }}>
+                        {entry.source === 'hand' ? 'HAND' : entry.source === 'discard' ? 'DISCARD' : 'DECK'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </DraggablePanel>
+          </div>
+        );
+      })()}
+
+      {/* ── Effect Prompt: Multi-Select Card Gallery ── */}
+      {isMyEffectPrompt && ep.type === 'cardGalleryMulti' && (
+        <CardGalleryMultiPrompt ep={ep} onRespond={respondToPrompt} />
+      )}
+
+      {/* ── Effect Prompt: Zone Picker Panel ── */}
+      {isMyEffectPrompt && ep.type === 'zonePick' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Select a Zone'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7 }}>Click a highlighted zone on the board.</div>
+          {ep.cancellable !== false && (
+            <button className="btn" style={{ marginTop: 10, padding: '6px 16px', fontSize: 11 }}
+              onClick={() => respondToPrompt({ cancelled: true })}>← Back</button>
+          )}
+        </DraggablePanel>
+      )}
+
+      {/* ── Effect Prompt: Status Select (Beer, etc.) ── */}
+      {isMyEffectPrompt && ep.type === 'statusSelect' && (
+        <StatusSelectPrompt key={ep.title} ep={ep} onRespond={respondToPrompt} />
+      )}
+
+      {/* ── Effect Prompt: Hero Action (Coffee) ── */}
+      {isMyEffectPrompt && ep.type === 'heroAction' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#8b6b4a' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#cc9966', marginBottom: 4 }}>☕ {ep.title}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>Drag a highlighted card onto {ep.heroName}'s zones to play it.</div>
+          <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+        </DraggablePanel>
+      )}
+
+      {/* ── Waiting for opponent (when they have an active effect prompt) ── */}
+      {isOppEffectPrompt && !gameState.potionTargeting && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 260 }}>
+          <div className="orbit-font" style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>
+            {ep.type === 'cardGallery' || ep.type === 'cardGalleryMulti' ? '🔍 Opponent is choosing...' :
+             ep.type === 'deckSearchReveal' ? '🔍 Opponent is viewing...' :
+             ep.type === 'optionPicker' ? '🤔 Opponent is deciding...' :
+             ep.type === 'forceDiscard' || ep.type === 'forceDiscardCancellable' ? '🗑 Opponent is discarding...' :
+             ep.type === 'abilityAttach' ? '⚡ Opponent is equipping...' :
+             '⏳ Waiting for opponent...'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text2)' }}>
+            {ep.type === 'cardGallery' ? 'Waiting for opponent to choose a card...' :
+             ep.type === 'cardGalleryMulti' ? 'Waiting for opponent to select cards...' :
+             ep.type === 'confirm' ? 'Waiting for opponent to confirm...' :
+             ep.type === 'zonePick' ? 'Waiting for opponent to select a zone...' :
+             ep.type === 'heroAction' ? 'Waiting for opponent to play a card...' :
+             ep.type === 'forceDiscard' ? 'Waiting for opponent to discard a card...' :
+             ep.type === 'forceDiscardCancellable' ? 'Waiting for opponent to discard or pass...' :
+             ep.type === 'optionPicker' ? 'Waiting for opponent to choose an option...' :
+             ep.type === 'playerPicker' ? 'Waiting for opponent to pick a player...' :
+             ep.type === 'statusSelect' ? 'Waiting for opponent to choose a status...' :
+             ep.type === 'abilityAttach' ? 'Waiting for opponent to attach an ability...' :
+             ep.type === 'deckSearchReveal' ? 'Waiting for opponent to dismiss search result...' :
+             'Waiting for opponent...'}
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Waiting for opponent's pre-game hero effect (Bill, etc.) ── */}
+      {!isSpectator && !result && gameState.heroEffectPending && gameState.heroEffectPending.ownerIdx !== myIdx && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 280 }}>
+          <div className="orbit-font" style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>
+            ⏳ Waiting for opponent...
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text2)' }}>
+            Waiting for opponent to resolve {gameState.heroEffectPending.heroName || 'hero'}'s effect...
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Ability Activation Confirmation ── */}
+      {pendingAbilityActivation && !result && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#ffcc33' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#ffcc33', marginBottom: 8 }}>⚡ Activate Ability</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>Activate {pendingAbilityActivation.abilityName} (Lv.{pendingAbilityActivation.level})?</div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <button className="btn btn-success" style={{ padding: '8px 20px', fontSize: 12 }}
+              onClick={() => {
+                const pa = pendingAbilityActivation;
+                setPendingAbilityActivation(null);
+                if (pa.isHeroAction) {
+                  socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx } });
+                } else {
+                  socket.emit('activate_ability', { roomId: gameState.roomId, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx });
+                }
+              }}>Yes!</button>
+            <button className="btn" style={{ padding: '8px 20px', fontSize: 12, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+              onClick={() => setPendingAbilityActivation(null)}>No</button>
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Spell/Attack Hero Selection (click-to-play) ── */}
+      {spellHeroPick && !result && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>
+            {spellHeroPick.card?.cardType === 'Attack' ? '⚔️' : '✦'} Play {spellHeroPick.cardName}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>Choose a Hero to play this card:</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {spellHeroPick.eligible.map(h => (
+              <button key={h.idx} className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: 'var(--accent)', color: 'var(--accent)', textAlign: 'left' }}
+                onClick={() => {
+                  const pick = spellHeroPick;
+                  setSpellHeroPick(null);
+                  if (pick.isHeroAction) {
+                    socket.emit('effect_prompt_response', {
+                      roomId: gameState.roomId,
+                      response: { cardName: pick.cardName, handIndex: pick.handIndex, heroIdx: h.idx },
+                    });
+                  } else {
+                    socket.emit('play_spell', {
+                      roomId: gameState.roomId, cardName: pick.cardName,
+                      handIndex: pick.handIndex, heroIdx: h.idx,
+                    });
+                  }
+                }}>
+                {me.heroes[h.idx]?.name || 'Hero ' + (h.idx + 1)}
+              </button>
+            ))}
+            <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
+              onClick={() => setSpellHeroPick(null)}>Cancel</button>
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Force Discard Prompt (Wheels) ── */}
+      {isMyEffectPrompt && ep.type === 'forceDiscard' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--danger)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 4 }}>{ep.title || 'Discard'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
+          <div style={{ fontSize: 11, color: 'var(--danger)', opacity: .8 }}>Click a card in your hand to discard it.</div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Cancellable Force Discard Prompt (Training, etc.) ── */}
+      {isMyEffectPrompt && ep.type === 'forceDiscardCancellable' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--danger)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 4 }}>{ep.title || 'Discard'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
+          <div style={{ fontSize: 11, color: 'var(--danger)', opacity: .8, marginBottom: 12 }}>Click a card in your hand to discard it.</div>
+          <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+        </DraggablePanel>
+      )}
+
+      {/* ── Ability Attach Prompt (Training, etc.) ── */}
+      {isMyEffectPrompt && ep.type === 'abilityAttach' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(100,220,150,.85)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#7fffaa', marginBottom: 4 }}>✦ {ep.title || 'Attach Ability'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
+          <div style={{ fontSize: 11, color: '#7fffaa', opacity: .8, marginBottom: 12 }}>Drag a highlighted Ability from your hand onto the Hero.</div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+            {ep.canFinish && (
+              <button className="btn btn-success" style={{ padding: '6px 16px', fontSize: 11 }}
+                onClick={() => respondToPrompt({ finished: true })}>Done</button>
+            )}
+            <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+              onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Effect Prompt: Deck Search Reveal (opponent sees searched card) ── */}
+      {isMyEffectPrompt && ep.type === 'deckSearchReveal' && (() => {
+        return (
+          <div className="modal-overlay" style={{ zIndex: 10070, background: 'rgba(0,0,0,.55)' }}
+            onClick={() => respondToPrompt({ confirmed: true })}>
+            <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }} onClick={e => e.stopPropagation()}>
+              <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', textShadow: '0 2px 8px rgba(0,0,0,.8)' }}>
+                {ep.title || 'Card Searched'}
+              </div>
+              <div style={{
+                boxShadow: '0 0 50px rgba(0,0,0,.9), 0 0 100px rgba(255,255,255,.08)',
+                borderRadius: 8,
+              }}>
+                <BoardCard cardName={ep.cardName} style={{ width: 220, height: 308, borderRadius: 8 }} />
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text2)' }}>
+                {ep.searcherName} searched this card from their deck.
+              </div>
+              <button className="btn btn-success" style={{ padding: '10px 36px', fontSize: 13 }}
+                onClick={() => {
+                  respondToPrompt({ confirmed: true });
+                }}>
+                OK
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Rematch first-choice dialog (loser only) — floating panel so hand is visible */}
+      {showFirstChoice && !isSpectator && (
+        <DraggablePanel className="first-choice-panel animate-in">
+          <div className="pixel-font" style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 12 }}>REMATCH!</div>
+          <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>Would you like to go first or second?</div>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button className="btn btn-success" style={{ padding: '12px 28px', fontSize: 13 }}
+              onClick={() => { setShowFirstChoice(false); socket.emit('rematch_first_choice', { roomId: gameState.roomId, goFirst: true }); }}>
+              GO FIRST
+            </button>
+            <button className="btn" style={{ padding: '12px 28px', fontSize: 13, borderColor: 'var(--accent)', color: 'var(--accent)' }}
+              onClick={() => { setShowFirstChoice(false); socket.emit('rematch_first_choice', { roomId: gameState.roomId, goFirst: false }); }}>
+              GO SECOND
+            </button>
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* Spectator: waiting for first-choice decision */}
+      {isSpectator && gameState.awaitingFirstChoice && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 280 }}>
+          <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 10 }}>⏳ NEXT ROUND</div>
+          <div style={{ fontSize: 13, color: 'var(--text2)' }}>
+            {gameState.choosingPlayerName
+              ? <><span style={{ color: 'var(--accent2)', fontWeight: 700 }}>{gameState.choosingPlayerName}</span> is deciding who goes first...</>
+              : 'Deciding who goes first...'}
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* Potion/Artifact targeting panel */}
+      {!isSpectator && isTargeting && pt && !gameState.effectPrompt && (
+        <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out' }}>
+          <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
+          {pt.config?.maxTotal > 0 && pt.validTargets?.length > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--accent)', marginBottom: 10, fontWeight: 600 }}>
+              {potionSelection.length} / {pt.config.maxTotal} selected
+              {pt.config.minRequired > 0 && potionSelection.length < pt.config.minRequired
+                ? ` (min ${pt.config.minRequired})`
+                : ''}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button className={'btn ' + (pt.config?.confirmClass || 'btn-success')} style={{ padding: '8px 24px', fontSize: 12 }}
+              disabled={!canConfirmPotion}
+              onClick={() => { socket.emit('confirm_potion', { roomId: gameState.roomId, selectedIds: potionSelection }); }}>
+              {pt.config?.confirmLabel || 'Confirm'}
+              {pt.config?.dynamicCostPerTarget > 0 && ` (${pt.config.dynamicCostPerTarget * potionSelection.length} Gold)`}
+            </button>
+            {pt.config?.cancellable !== false && (
+              <button className="btn" style={{ padding: '8px 24px', fontSize: 12 }}
+                onClick={() => { socket.emit('cancel_potion', { roomId: gameState.roomId }); setPotionSelection([]); }}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* Mulligan prompt */}
+      {!isSpectator && gameState.mulliganPending && !announcement && !mulliganDecided && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 300 }}>
+          <div className="orbit-font" style={{ fontSize: 15, color: 'var(--accent)', marginBottom: 10 }}>MULLIGAN</div>
+          <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>Would you like to replace your hand with 5 new cards?</div>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button className="btn btn-success" style={{ padding: '10px 28px', fontSize: 13 }}
+              onClick={() => { setMulliganDecided(true); socket.emit('mulligan_decision', { roomId: gameState.roomId, accept: true }); }}>
+              Yes, replace
+            </button>
+            <button className="btn" style={{ padding: '10px 28px', fontSize: 13, borderColor: 'var(--accent)', color: 'var(--accent)' }}
+              onClick={() => { setMulliganDecided(true); socket.emit('mulligan_decision', { roomId: gameState.roomId, accept: false }); }}>
+              No, keep
+            </button>
+          </div>
+        </DraggablePanel>
+      )}
+      {!isSpectator && gameState.mulliganPending && mulliganDecided && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 240 }}>
+          <div style={{ fontSize: 12, color: 'var(--text2)' }}>Waiting for opponent...</div>
+        </DraggablePanel>
+      )}
+      {/* Spectator: waiting for mulligan */}
+      {isSpectator && gameState.mulliganPending && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 280 }}>
+          <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 10 }}>⏳ MULLIGAN</div>
+          <div style={{ fontSize: 13, color: 'var(--text2)' }}>Players are deciding to mulligan...</div>
+        </DraggablePanel>
+      )}
+
+      {/* Game announcements */}
+      {announcement && (
+        <div className={'game-announcement' + (announcement.short ? ' game-announcement-short' : '')}
+          onClick={() => setAnnouncement(null)} style={{ cursor: 'pointer' }}>
+          <div className="game-announcement-text" style={{ color: announcement.color }}>
+            {announcement.text}
+          </div>
+        </div>
+      )}
+
+      {/* Win/Loss overlay — round result (non-final) */}
+      {result && !showFirstChoice && !result.setOver && result.format > 1 && (
+        <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.65)' }}>
+          <div className="animate-in" style={{ textAlign: 'center' }}>
+            <div className="pixel-font" style={{
+              fontSize: 28, marginBottom: 12,
+              color: isSpectator ? 'var(--accent)' : (iWon ? 'var(--success)' : 'var(--danger)'),
+              textShadow: isSpectator ? '0 0 30px rgba(0,240,255,.3)' : (iWon ? '0 0 30px rgba(51,255,136,.4)' : '0 0 30px rgba(255,51,102,.4)'),
+            }}>
+              {isSpectator ? `${result.winnerName} wins the round!` : (iWon ? 'ROUND WIN!' : 'ROUND LOSS')}
+            </div>
+            <div className="orbit-font" style={{ fontSize: 32, marginBottom: 8, color: 'var(--text)' }}>
+              {result.setScore[0]} — {result.setScore[1]}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text2)' }}>Next round starting soon...</div>
+            {renderSCEarned()}
+          </div>
+        </div>
+      )}
+
+      {/* Set complete overlay — fireworks + final score */}
+      {result && !showFirstChoice && result.setOver && result.format > 1 && (
+        <div className="modal-overlay set-complete-overlay" style={{ background: 'rgba(0,0,0,.8)' }}>
+          <div className="set-fireworks">
+            {Array.from({ length: 24 }).map((_, i) => (
+              <div key={i} className="firework-particle" style={{
+                '--fw-x': (Math.random() * 200 - 100) + 'px',
+                '--fw-y': (Math.random() * -200 - 40) + 'px',
+                '--fw-color': ['#ffd700','#ff3366','#33ff88','#44aaff','#ff8800','#cc44ff'][i % 6],
+                '--fw-delay': (Math.random() * 2) + 's',
+                '--fw-dur': (1 + Math.random()) + 's',
+                left: (20 + Math.random() * 60) + '%',
+                top: (30 + Math.random() * 30) + '%',
+              }} />
+            ))}
+          </div>
+          <div className="animate-in" style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
+            <div className="pixel-font" style={{
+              fontSize: 40, marginBottom: 8,
+              color: isSpectator ? '#ffd700' : (iWon ? '#ffd700' : 'var(--danger)'),
+              textShadow: isSpectator ? '0 0 40px rgba(255,215,0,.6)' : (iWon ? '0 0 40px rgba(255,215,0,.6)' : '0 0 40px rgba(255,51,102,.5)'),
+            }}>
+              {isSpectator ? `🏆 ${result.winnerName} WINS! 🏆` : (iWon ? '🏆 SET VICTORY! 🏆' : 'SET DEFEAT')}
+            </div>
+            <div className="orbit-font" style={{ fontSize: 48, margin: '16px 0', color: 'var(--text)' }}>
+              {result.setScore[0]} — {result.setScore[1]}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>
+              Best of {result.format}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
+              {result.reason === 'disconnect_timeout' ? `${result.loserName} timed out` :
+               result.reason === 'surrender' ? `${result.loserName} surrendered` :
+               result.reason === 'all_heroes_dead' ? `All of ${result.loserName}'s heroes defeated!` : ''}
+            </div>
+            {result.eloChanges && (
+              <div style={{ marginBottom: 20 }}>
+                {result.eloChanges.map(ec => (
+                  <div key={ec.username} style={{ fontSize: 12, color: ec.username === user.username ? 'var(--text)' : 'var(--text2)' }}>
+                    {ec.username}: {ec.oldElo} → <span style={{ color: ec.newElo > ec.oldElo ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{ec.newElo}</span>
+                    {' '}({ec.newElo > ec.oldElo ? '+' : ''}{ec.newElo - ec.oldElo})
+                  </div>
+                ))}
+              </div>
+            )}
+            {renderSCEarned()}
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              {isSpectator ? (
+                <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+              ) : !oppLeft && !oppDisconnected ? (
+                <>
+                  <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch} disabled={myRematchSent}>
+                    {myRematchSent ? '⏳ WAITING...' : '🔄 REMATCH'}
+                  </button>
+                  <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+                </>
+              ) : (
+                <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Win/Loss overlay — Bo1 or fallback */}
+      {result && !showFirstChoice && (result.setOver || !result.format || result.format === 1) && !(result.format > 1) && (
+        <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.75)' }}>
+          <div className="animate-in" style={{ textAlign: 'center' }}>
+            <div className="pixel-font" style={{
+              fontSize: 36, marginBottom: 16,
+              color: isSpectator ? '#ffd700' : (iWon ? 'var(--success)' : 'var(--danger)'),
+              textShadow: isSpectator ? '0 0 40px rgba(255,215,0,.5)' : (iWon ? '0 0 40px rgba(51,255,136,.5)' : '0 0 40px rgba(255,51,102,.5)'),
+            }}>
+              {isSpectator ? `🏆 ${result.winnerName} WINS!` : (iWon ? 'YOU WIN!' : 'YOU LOSE')}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>
+              {isSpectator ? (
+                result.reason === 'disconnect_timeout' ? `${result.loserName} timed out` :
+                result.reason === 'surrender' ? `${result.loserName} surrendered` :
+                result.reason === 'all_heroes_dead' ? `All of ${result.loserName}'s heroes defeated!` : ''
+              ) : (
+                result.reason === 'disconnect_timeout' ? 'Opponent timed out' :
+                result.reason === 'opponent_left' ? 'Opponent left the game' :
+                result.reason === 'surrender' ? (iWon ? 'Opponent surrendered' : 'You surrendered') :
+                result.reason === 'all_heroes_dead' ? (iWon ? 'All enemy heroes defeated!' : 'All your heroes were defeated') : ''
+              )}
+            </div>
+            {result.eloChanges && (
+              <div style={{ marginBottom: 20 }}>
+                {result.eloChanges.map(ec => (
+                  <div key={ec.username} style={{ fontSize: 12, color: ec.username === user.username ? 'var(--text)' : 'var(--text2)' }}>
+                    {ec.username}: {ec.oldElo} → <span style={{ color: ec.newElo > ec.oldElo ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{ec.newElo}</span>
+                    {' '}({ec.newElo > ec.oldElo ? '+' : ''}{ec.newElo - ec.oldElo})
+                  </div>
+                ))}
+              </div>
+            )}
+            {renderSCEarned()}
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              {isSpectator ? (
+                <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+              ) : !oppLeft && !oppDisconnected ? (
+                <>
+                  <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch} disabled={myRematchSent}>
+                    {myRematchSent ? '⏳ WAITING...' : '🔄 REMATCH'}
+                  </button>
+                  <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+                </>
+              ) : (
+                <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════
+//  PLAY SCREEN
+// ═══════════════════════════════════════════
+
+// ===== CROSS-FILE EXPORTS =====
+window.BoardCard = BoardCard;
+window.GameBoard = GameBoard;

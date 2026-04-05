@@ -18,6 +18,10 @@ const { loadCardEffect } = require('./_loader');
 module.exports = {
   activeIn: ['ability'],
 
+  // When stacked on an ability, Performance counts as that ability's
+  // spell school for spell-school requirement checks.
+  isWildcardAbility: true,
+
   // Custom placement rules — overrides standard ability placement.
   // Performance can ONLY go onto occupied ability zones with <3 cards.
   // It CANNOT go into empty zones, and it works on ANY ability type.

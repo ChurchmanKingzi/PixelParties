@@ -23,10 +23,11 @@ const { getNegativeStatuses } = require('./_hooks');
 
 module.exports = {
   inherentAction: true,
+  oncePerGame: true,
+  oncePerGameKey: 'divineGift',
 
   spellPlayCondition(gs, pi) {
     const ps = gs.players[pi];
-    if (ps.divineGiftUsed) return false;
     // Need at least 1 free base Support Zone on any hero
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       if (!ps.heroes[hi]?.name) continue;

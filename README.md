@@ -32,17 +32,30 @@ Then open **http://localhost:3000** in your browser.
 pixel-parties/
 ├── server.js          # Express + Socket.io + SQLite backend
 ├── package.json       # Dependencies
+├── db.js              # Database abstraction (libsql — local SQLite or Turso)
 ├── public/
 │   ├── index.html     # Entry point (loads React + Socket.io)
 │   ├── style.css      # Full stylesheet
 │   └── app.jsx        # React frontend (compiled in-browser by Babel)
+├── cards/
+│   └── effects/
+│       ├── _engine.js   # Card effect engine (hooks, chains, game actions)
+│       ├── _hooks.js    # Hook points, speed levels, status/buff registries
+│       ├── _loader.js   # Card script loader (lazy, cached)
+│       ├── _TEMPLATE.js # Scaffold for new card scripts
+│       ├── CARD_API.md  # Full API reference for card authors
+│       └── *.js         # Individual card effect scripts
 ├── data/
 │   └── cards.json     # Card database (1,385 cards)
-├── uploads/
-│   ├── avatars/       # User avatar uploads
-│   └── cardbacks/     # User cardback uploads
 └── README.md
 ```
+
+## Creating New Cards
+
+1. Copy `cards/effects/_TEMPLATE.js` to `cards/effects/your-card-name.js`
+2. Read `cards/effects/CARD_API.md` for the full API reference
+3. Uncomment the flags and handlers you need
+4. The engine auto-discovers the file — no registration needed
 
 ## Features
 
@@ -93,7 +106,7 @@ The `data/cards.json` file contains all 1,385 cards with:
 
 ## Tech Stack
 
-- **Backend:** Node.js, Express, Socket.io, better-sqlite3, bcryptjs
+- **Backend:** Node.js, Express, Socket.io, @libsql/client (SQLite / Turso), bcryptjs
 - **Frontend:** React 18 (via CDN), Babel standalone (JSX compilation)
 - **Database:** SQLite (file-based, zero config)
 - **Real-time:** Socket.io for lobby, rooms, and spectating

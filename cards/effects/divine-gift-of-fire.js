@@ -8,6 +8,8 @@
 
 module.exports = {
   inherentAction: true,
+  oncePerGame: true,
+  oncePerGameKey: 'divineGift',
 
   hooks: {
     onPlay: async (ctx) => {

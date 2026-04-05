@@ -16,6 +16,25 @@ const { loadCardEffect } = require('./cards/effects/_loader');
 const PORT = process.env.PORT || 3000;
 const PROFILE_SECRET = process.env.PROFILE_SECRET || 'pxlParties_s3cret_k3y_2025!';
 const profileImportUsed = new Set();
+
+// ===== CARD DATABASE CACHE =====
+// Module-level card DB cache — loaded once, used everywhere.
+// Replaces per-request JSON.parse(fs.readFileSync(...)) calls.
+let _cachedCardDB = null;    // { cardName: cardData }
+let _cachedCardArray = null;  // [cardData, ...]
+function getCardDB() {
+  if (!_cachedCardDB) {
+    _cachedCardArray = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
+    _cachedCardDB = {};
+    _cachedCardArray.forEach(c => { _cachedCardDB[c.name] = c; });
+  }
+  return _cachedCardDB;
+}
+function getCardArray() {
+  if (!_cachedCardArray) getCardDB();
+  return _cachedCardArray;
+}
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
@@ -128,6 +147,17 @@ async function initDatabase() {
 }
 
 // ===== AUTH MIDDLEWARE =====
+
+/** Pick a random standard avatar from public/avatars/, or null if none available. */
+function getRandomDefaultAvatar() {
+  try {
+    const dir = path.join(__dirname, 'public', 'avatars');
+    const exts = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
+    const files = fs.readdirSync(dir).filter(f => exts.has(path.extname(f).toLowerCase()));
+    if (files.length === 0) return null;
+    return '/avatars/' + encodeURIComponent(files[Math.floor(Math.random() * files.length)]);
+  } catch { return null; }
+}
 // Simple token-based auth using cookies
 const sessions = new Map(); // token -> { userId, username }
 
@@ -153,7 +183,8 @@ app.post('/api/auth/signup', async (req, res) => {
 
   const id = uuidv4();
   const hash = bcrypt.hashSync(password, 10);
-  await db.run('INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)', [id, username.trim(), hash]);
+  const defaultAvatar = getRandomDefaultAvatar();
+  await db.run('INSERT INTO users (id, username, password_hash, avatar) VALUES (?, ?, ?, ?)', [id, username.trim(), hash, defaultAvatar]);
 
   // Create default deck
   await db.run('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)', [uuidv4(), id, 'My First Deck']);
@@ -177,6 +208,14 @@ app.post('/api/auth/login', async (req, res) => {
   const token = uuidv4();
   sessions.set(token, { userId: user.id, username: user.username });
   res.cookie('pp_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
+  // Assign a random default avatar if the user doesn't have one
+  if (!user.avatar) {
+    const defaultAvatar = getRandomDefaultAvatar();
+    if (defaultAvatar) {
+      await db.run('UPDATE users SET avatar = ? WHERE id = ?', [defaultAvatar, user.id]);
+      user.avatar = defaultAvatar;
+    }
+  }
   res.json({ token, user: sanitizeUser(user) });
 });
 
@@ -190,6 +229,14 @@ app.post('/api/auth/logout', async (req, res) => {
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   if (!user) return res.status(404).json({ error: 'User not found' });
+  // Assign a random default avatar if the user doesn't have one
+  if (!user.avatar) {
+    const defaultAvatar = getRandomDefaultAvatar();
+    if (defaultAvatar) {
+      await db.run('UPDATE users SET avatar = ? WHERE id = ?', [defaultAvatar, user.id]);
+      user.avatar = defaultAvatar;
+    }
+  }
   res.json({ user: sanitizeUser(user), token: req.authToken });
 });
 
@@ -458,9 +505,8 @@ app.get('/api/profile/hero-stats', authMiddleware, async (req, res) => {
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
 
 // Build reverse lookup: filename-safe name (no commas) → actual card name
-const cardsJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
 const nameByStripped = {};
-cardsJson.forEach(c => { nameByStripped[c.name.replace(/,/g, '')] = c.name; });
+getCardArray().forEach(c => { nameByStripped[c.name.replace(/,/g, '')] = c.name; });
 
 app.get('/api/cards/available', async (req, res) => {
   const cardsDir = path.join(__dirname, 'cards');
@@ -518,21 +564,35 @@ app.put('/api/decks/:id', authMiddleware, async (req, res) => {
   res.json({ deck: parseDeck(updated) });
 });
 
+app.post('/api/decks/:id/set-default', authMiddleware, async (req, res) => {
+  const deck = await db.get('SELECT id FROM decks WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
+  if (!deck) return res.status(404).json({ error: 'Deck not found' });
+  await db.run('UPDATE decks SET is_default = 0 WHERE user_id = ?', [req.user.userId]);
+  await db.run('UPDATE decks SET is_default = 1 WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
+  res.json({ ok: true });
+});
+
 app.post('/api/decks/:id/saveas', authMiddleware, async (req, res) => {
-  const { name } = req.body;
-  const original = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
-  if (!original) return res.status(404).json({ error: 'Deck not found' });
+  try {
+    const { name } = req.body;
+    const original = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
+    if (!original) return res.status(404).json({ error: 'Deck not found' });
 
-  const newId = uuidv4();
-  await db.run('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)', [newId, req.user.userId, name || original.name + ' (Copy)']);
-  await db.run('UPDATE decks SET name=?, main_deck=?, heroes=?, potion_deck=?, side_deck=?, is_default=?, updated_at=unixepoch() WHERE id=? AND user_id=?', [
-    name || original.name + ' (Copy)',
-    original.main_deck, original.heroes, original.potion_deck, original.side_deck, 0,
-    newId, req.user.userId
-  ]);
+    const newId = uuidv4();
+    await db.run(
+      'INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, cover_card, skins, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, unixepoch(), unixepoch())',
+      [newId, req.user.userId, name || original.name + ' (Copy)',
+       original.main_deck, original.heroes, original.potion_deck, original.side_deck,
+       original.cover_card || '', original.skins || '{}']
+    );
 
-  const newDeck = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [newId, req.user.userId]);
-  res.json({ deck: parseDeck(newDeck) });
+    const newDeck = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [newId, req.user.userId]);
+    if (!newDeck) return res.status(500).json({ error: 'Failed to create deck copy' });
+    res.json({ deck: parseDeck(newDeck) });
+  } catch (err) {
+    console.error('[SaveAs] Error:', err.message);
+    res.status(500).json({ error: 'Failed to save deck copy' });
+  }
 });
 
 app.delete('/api/decks/:id', authMiddleware, async (req, res) => {
@@ -545,8 +605,7 @@ function loadSampleDecks() {
   const dir = path.join(__dirname, 'data', 'SampleDecks');
   if (!fs.existsSync(dir)) return [];
 
-  const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
-  const cardsByName = {}; allCards.forEach(c => { cardsByName[c.name] = c; });
+  const cardsByName = getCardDB();
 
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.txt')).sort();
   const decks = [];
@@ -893,7 +952,16 @@ async function evaluateSCRewards(room, winnerIdx, reason) {
           met = isWinner && isRanked;
           break;
         case 'win_all_heroes_alive':
-          met = isWinner && (ps.heroes || []).filter(h => h.name).every(h => h.hp > 0);
+          if (isWinner && (ps.heroes || []).filter(h => h.name).every(h => h.hp > 0)) {
+            if (reason === 'surrender') {
+              // Only eligible on surrender if opponent lost ≥1 hero AND turn ≥5
+              const oppHeroes = opp.heroes || [];
+              const oppDead = oppHeroes.filter(h => h.name && h.hp <= 0).length;
+              met = oppDead >= 1 && turn >= 5;
+            } else {
+              met = true;
+            }
+          }
           break;
         case 'win_last_hero_low':
           if (isWinner) {
@@ -922,12 +990,34 @@ async function evaluateSCRewards(room, winnerIdx, reason) {
         case 'creature_overkill':
           met = t.creatureOverkill;
           break;
-        case 'all_abilities_filled':
-          met = t.allAbilitiesFilled;
+        case 'all_abilities_filled': {
+          // Check ALL heroes (alive AND dead) have all 3 ability slots filled
+          let filled = true;
+          for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+            if (!ps.heroes[hi]?.name) continue; // Skip empty hero slots
+            const abZ = ps.abilityZones?.[hi] || [];
+            for (let z = 0; z < 3; z++) {
+              if ((abZ[z] || []).length === 0) { filled = false; break; }
+            }
+            if (!filled) break;
+          }
+          met = filled && (ps.heroes || []).some(h => h.name);
           break;
-        case 'all_abilities_level3':
-          met = t.allAbilitiesLevel3;
+        }
+        case 'all_abilities_level3': {
+          // Check ALL heroes (alive AND dead) have all 3 ability slots at level 3
+          let maxed = true;
+          for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+            if (!ps.heroes[hi]?.name) continue;
+            const abZ = ps.abilityZones?.[hi] || [];
+            for (let z = 0; z < 3; z++) {
+              if ((abZ[z] || []).length < 3) { maxed = false; break; }
+            }
+            if (!maxed) break;
+          }
+          met = maxed && (ps.heroes || []).some(h => h.name);
           break;
+        }
         case 'win_turn_30':
           met = isWinner && turn >= 30;
           break;
@@ -1040,6 +1130,40 @@ const rooms = new Map();
 const activeGames = new Map(); // userId -> roomId
 const disconnectTimers = new Map(); // userId -> timeout handle
 
+/**
+ * After a potion resolves, check if any hero on the player's side
+ * has a potionLockAfterN flag and the threshold has been met.
+ * Generic replacement for hardcoded hero-name checks.
+ */
+function checkPotionLock(ps) {
+  ps.potionsUsedThisTurn = (ps.potionsUsedThisTurn || 0) + 1;
+  for (const hero of (ps.heroes || [])) {
+    if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) continue;
+    const heroScript = loadCardEffect(hero.name);
+    if (heroScript?.potionLockAfterN && ps.potionsUsedThisTurn >= heroScript.potionLockAfterN) {
+      ps.potionLocked = true;
+      break;
+    }
+  }
+}
+
+/**
+ * Find the current hand index of a resolving card tracked by nth-occurrence.
+ * Returns -1 if the card was removed from hand (self-discarded).
+ */
+function getResolvingHandIndex(ps) {
+  if (!ps._resolvingCard) return -1;
+  const { name, nth } = ps._resolvingCard;
+  let count = 0;
+  for (let i = 0; i < (ps.hand || []).length; i++) {
+    if (ps.hand[i] === name) {
+      count++;
+      if (count === nth) return i;
+    }
+  }
+  return -1; // Card was removed from hand during resolution
+}
+
 function sendGameState(room, playerIdx, extra) {
   const p = room.players[playerIdx];
   if (!p?.socketId) return;
@@ -1065,7 +1189,8 @@ function sendGameState(room, playerIdx, extra) {
       potionLocked: ps.potionLocked || false,
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       permanents: ps.permanents || [],
-      divineGiftUsed: ps.divineGiftUsed || false,
+      oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
+      resolvingCard: ps._resolvingCard || null,
       deckSkins: ps.deckSkins || {},
     })),
     areaZones: gs.areaZones, turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
@@ -1182,7 +1307,8 @@ function sendSpectatorGameState(room) {
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
       permanents: ps.permanents || [],
-      divineGiftUsed: ps.divineGiftUsed || false,
+      oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
+      resolvingCard: ps._resolvingCard || null,
       deckSkins: ps.deckSkins || {},
     })),
     areaZones: gs.areaZones, turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
@@ -1324,8 +1450,7 @@ function cleanupRoom(roomId) {
 
 /** Set up fresh game state: decks, hands, heroes — but don't start the engine or turns. */
 async function setupGameState(room) {
-  const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
-  const cardsByName = {}; allCards.forEach(c => { cardsByName[c.name] = c; });
+  const cardsByName = getCardDB();
   const shuffle = (arr) => { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
 
   const playerStates = [];
@@ -1371,7 +1496,7 @@ async function setupGameState(room) {
       hand:[], mainDeck, potionDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
       abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0],
       damageLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
-      permanents:[], divineGiftUsed:false, deckSkins: deck?.skins || {} });
+      permanents:[], _oncePerGameUsed: new Set(), _resolvingCard: null, deckSkins: deck?.skins || {} });
   }
   room.gameState = { players:playerStates, areaZones:[[],[]], turn:0, activePlayer:0, currentPhase:0, result:null, rematchRequests:[], awaitingFirstChoice:true,
     _gameStartTime: Date.now(),
@@ -1399,6 +1524,7 @@ async function startGameEngine(room, roomId, activePlayer) {
     const ps = room.gameState.players[pi];
     const drawn = ps.mainDeck.splice(0, 5);
     ps.hand.push(...drawn);
+
   }
 
   room.gameState.mulliganPending = true;
@@ -1659,8 +1785,7 @@ io.on('connection', (socket) => {
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
 
     // Load card data
-    const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
-    const cardData = allCards.find(c => c.name === cardName);
+    const cardData = getCardDB()[cardName];
     if (!cardData || cardData.cardType !== 'Ability') return;
 
     // Validate hero
@@ -2083,54 +2208,19 @@ io.on('connection', (socket) => {
     if (!room?.engine || !room.gameState) return;
     const gs = room.gameState;
     const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
-    if (pi < 0 || pi !== gs.activePlayer) return;
 
-    const isActionPhase = gs.currentPhase === 3;
-    const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
+    const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Creature']);
+    if (!v) return;
+    const { ps, cardData, isActionPhase, isMainPhase } = v;
 
-    // Must be Action Phase or Main Phase (with additional action)
-    if (!isActionPhase && !isMainPhase) return;
+    // Creature-specific checks
+    if (ps.summonLocked) return;
+    if ((gs.summonBlocked || []).includes(cardName)) return;
 
-    // Check for additional action coverage
+    // Additional action handling — creatures in Main Phase MUST use one
     const additionalTypeId = room.engine.findAdditionalActionForCard(pi, cardName);
     const usingAdditional = !!additionalTypeId;
-
-    // In Main Phase, MUST have additional action to play a creature
     if (isMainPhase && !usingAdditional) return;
-
-    const ps = gs.players[pi];
-    if (ps.summonLocked) return; // Summon lock active — can't summon creatures
-    // Combo lock: if a hero has an exclusive combo active, only that hero can act
-    if (ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== heroIdx) return;
-    // Validate card is in hand
-    if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
-
-    // Load card data
-    const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
-    const cardData = allCards.find(c => c.name === cardName);
-    if (!cardData || cardData.cardType !== 'Creature') return;
-
-    // Validate hero
-    const hero = ps.heroes[heroIdx];
-    if (!hero || !hero.name || hero.hp <= 0) return;
-    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
-
-    // Validate spell school / level
-    const level = cardData.level || 0;
-    const countAbility = (school) => {
-      let count = 0;
-      for (const slot of (ps.abilityZones[heroIdx] || [])) {
-        if (!slot || slot.length === 0) continue;
-        const base = slot[0];
-        for (const ab of slot) { if (ab === school) count++; else if (ab === 'Performance' && base === school) count++; }
-      }
-      return count;
-    };
-    if (cardData.spellSchool1 && countAbility(cardData.spellSchool1) < level) return;
-    if (cardData.spellSchool2 && countAbility(cardData.spellSchool2) < level) return;
-
-    // Check custom summoning conditions
-    if ((gs.summonBlocked || []).includes(cardName)) return;
 
     // Validate support zone slot is free
     if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
@@ -2207,60 +2297,10 @@ io.on('connection', (socket) => {
     if (!room?.engine || !room.gameState) return;
     const gs = room.gameState;
     const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
-    if (pi < 0 || pi !== gs.activePlayer) return;
 
-    const isActionPhase = gs.currentPhase === 3;
-    const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
-    if (!isActionPhase && !isMainPhase) return;
-
-    const ps = gs.players[pi];
-    if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
-
-    const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
-    const cardData = allCards.find(c => c.name === cardName);
-    if (!cardData || (cardData.cardType !== 'Spell' && cardData.cardType !== 'Attack')) return;
-
-    // Validate hero can cast this spell (spell school / level)
-    const hero = ps.heroes?.[heroIdx];
-    if (!hero?.name || hero.hp <= 0) return;
-    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
-    const level = cardData.level || 0;
-    if (level > 0 || cardData.spellSchool1) {
-      const abZones = ps.abilityZones[heroIdx] || [];
-      const countAb = (school) => { let c = 0; for (const s of abZones) { if (!s || s.length === 0) continue; const base = s[0]; for (const a of s) { if (a === school) c++; else if (a === 'Performance' && base === school) c++; } } return c; };
-      if (cardData.spellSchool1 && countAb(cardData.spellSchool1) < level) return;
-      if (cardData.spellSchool2 && countAb(cardData.spellSchool2) < level) return;
-    }
-
-    // Check custom play conditions (Flame Avalanche, etc.)
-    const { loadCardEffect } = require('./cards/effects/_loader');
-    const script = loadCardEffect(cardName);
-    if (script?.spellPlayCondition && !script.spellPlayCondition(gs, pi)) return;
-
-    // Hero-specific card restrictions (Ghuanjun duplicate Attack ban, etc.)
-    const heroScript = loadCardEffect(hero.name);
-    if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, pi, heroIdx, cardData, room.engine)) return;
-
-    // Also check equipped hero cards in support zones (Initiation Ritual)
-    if (room.engine) {
-      for (const inst of room.engine.cardInstances) {
-        if (inst.owner !== pi || inst.zone !== 'support' || inst.heroIdx !== heroIdx) continue;
-        if (!inst.counters?.treatAsEquip) continue;
-        const equipHeroScript = loadCardEffect(inst.name);
-        if (equipHeroScript?.canPlayCard && !equipHeroScript.canPlayCard(gs, pi, heroIdx, cardData, room.engine)) return;
-      }
-    }
-
-    // Combo lock: if a hero has an exclusive combo active, only that hero can act
-    if (ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== heroIdx) return;
-
-    // Divine Gift: once per game
-    if (cardName.startsWith('Divine Gift') && ps.divineGiftUsed) return;
-
-    // Check if this is an inherent action (doesn't need additional action, doesn't consume Action Phase)
-    const isInherentAction = typeof script?.inherentAction === 'function'
-      ? script.inherentAction(gs, pi, heroIdx, room.engine)
-      : script?.inherentAction === true;
+    const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Spell', 'Attack']);
+    if (!v) return;
+    const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
 
     // Check if this needs an additional action (Main Phase play)
     const needsAdditional = isMainPhase && !isInherentAction;
@@ -2273,9 +2313,9 @@ io.on('connection', (socket) => {
       additionalConsumed = true;
     }
 
-    // Remove from hand
-    ps.hand.splice(handIndex, 1);
-    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+    // Mark card as resolving (stays in hand visually, prevents re-play)
+    const nth = ps.hand.slice(0, handIndex + 1).filter(c => c === cardName).length;
+    ps._resolvingCard = { name: cardName, nth };
 
     (async () => {
       try {
@@ -2296,7 +2336,10 @@ io.on('connection', (socket) => {
         });
 
         if (chainResult.negated) {
-          // Spell was negated by a reaction chain — to discard, skip resolution
+          // Spell was negated — remove from hand + discard in single sync
+          const hi = getResolvingHandIndex(ps);
+          ps._resolvingCard = null;
+          if (hi >= 0) { ps.hand.splice(hi, 1); if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++; }
           ps.discardPile.push(cardName);
           room.engine._untrackCard(inst.id);
           if (additionalConsumed && consumedInst) {
@@ -2307,7 +2350,7 @@ io.on('connection', (socket) => {
             ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
             if (!ps.heroesAttackedThisTurn) ps.heroesAttackedThisTurn = [];
             if (!ps.heroesAttackedThisTurn.includes(heroIdx)) ps.heroesAttackedThisTurn.push(heroIdx);
-            // Track attack name for per-hero duplicate bans (Ghuanjun)
+            // Per-hero duplicate attack ban (managed by hero hooks, needed here since onActionUsed doesn't fire for negated spells)
             if (hero.ghuanjunAttacksUsed && !hero.ghuanjunAttacksUsed.includes(cardName)) hero.ghuanjunAttacksUsed.push(cardName);
           }
           if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
@@ -2327,9 +2370,9 @@ io.on('connection', (socket) => {
         // Fire onPlay hook (spell resolves here)
         await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
 
-        // If spell was cancelled (player backed out of target selection), return card to hand
+        // If spell was cancelled (player backed out of target selection), unmark and keep in hand
         if (gs._spellCancelled) {
-          ps.hand.push(cardName);
+          ps._resolvingCard = null;
           room.engine._untrackCard(inst.id);
           delete gs._spellDamageLog;
           delete gs._spellExcludeTargets;
@@ -2371,24 +2414,25 @@ io.on('connection', (socket) => {
         delete gs._bartasSecondCast;
 
         // Move to discard (unless the spell placed itself on the board as an attachment)
+        const resolveHi = getResolvingHandIndex(ps);
+        ps._resolvingCard = null;
+        if (resolveHi >= 0) { ps.hand.splice(resolveHi, 1); if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++; }
         if (gs._spellPlacedOnBoard) {
           delete gs._spellPlacedOnBoard;
           // Card is already tracked in its new zone by the onPlay hook — don't discard
         } else {
-          ps.discardPile.push(cardName);
+          if (resolveHi >= 0) ps.discardPile.push(cardName);
           room.engine._untrackCard(inst.id);
         }
         room.engine.log('spell_played', { card: cardName, player: ps.username, hero: hero.name, type: cardData.cardType });
 
-        // Track successful attacks for combo effects (Tiger Kick, etc.)
+        // Track successful attacks for combo effects
         if (cardData.cardType === 'Attack') {
           ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
           if (!ps.heroesAttackedThisTurn) ps.heroesAttackedThisTurn = [];
           if (!ps.heroesAttackedThisTurn.includes(heroIdx)) ps.heroesAttackedThisTurn.push(heroIdx);
-          // Track attack name for per-hero duplicate bans (Ghuanjun)
-          if (hero.ghuanjunAttacksUsed && !hero.ghuanjunAttacksUsed.includes(cardName)) hero.ghuanjunAttacksUsed.push(cardName);
         }
-        // Track which heroes performed actions this turn (Ghuanjun combo check)
+        // Track which heroes performed actions this turn
         if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
         if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
 
@@ -2416,9 +2460,11 @@ io.on('connection', (socket) => {
         }
         delete gs._preventPhaseAdvance;
 
-        // Mark Divine Gift as used (once per game)
-        if (cardName.startsWith('Divine Gift')) {
-          ps.divineGiftUsed = true;
+        // Mark once-per-game cards as used
+        if (script?.oncePerGame) {
+          const opgKey = script.oncePerGameKey || cardName;
+          if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+          ps._oncePerGameUsed.add(opgKey);
         }
       } catch (err) {
         console.error('[Engine] play_spell error:', err.message, err.stack);
@@ -2440,8 +2486,7 @@ io.on('connection', (socket) => {
     const ps = gs.players[pi];
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
 
-    const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
-    const cardData = allCards.find(c => c.name === cardName);
+    const cardData = getCardDB()[cardName];
     if (!cardData || cardData.cardType !== 'Artifact') return;
 
     // Check gold
@@ -2528,11 +2573,11 @@ io.on('connection', (socket) => {
     if (gs.potionTargeting) return; // Already targeting
 
     const ps = gs.players[pi];
-    if (ps.potionLocked) return; // Nicolas potion lock active
+    if (ps.potionLocked) return; // Potion lock active (hero ability threshold reached)
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
+    if (ps._resolvingCard && handIndex === getResolvingHandIndex(ps)) return; // This specific card is resolving
 
-    const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
-    const cardData = allCards.find(c => c.name === cardName);
+    const cardData = getCardDB()[cardName];
     if (!cardData || cardData.cardType !== 'Potion') return;
 
     // Load card script for targeting
@@ -2553,7 +2598,11 @@ io.on('connection', (socket) => {
       };
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     } else {
-      // No targeting needed — execute with reaction window
+      // No targeting needed — mark this specific card instance as resolving
+      const nth = ps.hand.slice(0, handIndex + 1).filter(c => c === cardName).length;
+      ps._resolvingCard = { name: cardName, nth };
+
+      // Execute with reaction window (async)
       (async () => {
         // Broadcast card to opponent BEFORE resolving (unless script handles it manually)
         const oi = pi === 0 ? 1 : 0;
@@ -2575,33 +2624,30 @@ io.on('connection', (socket) => {
           chainResult = { negated: false, chainFormed: false };
         }
         await new Promise(r => setTimeout(r, 100));
-        // If the effect was cancelled (player backed out), don't consume the card
+        // If the effect was cancelled (player backed out), unmark and keep in hand
         if (chainResult.resolveResult?.cancelled) {
+          ps._resolvingCard = null;
           for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
           return;
         }
-        // Use indexOf to find card (handIndex may be stale if resolve modified hand)
-        const currentIdx = ps.hand.indexOf(cardName);
-        if (currentIdx >= 0) { ps.hand.splice(currentIdx, 1); if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++; }
-        if (chainResult.negated) {
-          ps.discardPile.push(cardName); // Negated → discard
-        } else if (chainResult.resolveResult?.placed) {
-          // Card was placed as a permanent — already on the board, don't delete
-          // Still counts as a potion use for Nicolas lock
-          ps.potionsUsedThisTurn = (ps.potionsUsedThisTurn || 0) + 1;
-          if (ps.potionsUsedThisTurn >= 2) {
-            const hasNicolas = (ps.heroes || []).some(h => h?.name === 'Nicolas, the Hidden Alchemist' && h.hp > 0 && !h.statuses?.negated);
-            if (hasNicolas) ps.potionLocked = true;
+        // Remove the specific resolving card from hand, move to pile (single sync → triggers animation)
+        const currentIdx = getResolvingHandIndex(ps);
+        ps._resolvingCard = null;
+        if (currentIdx >= 0) {
+          ps.hand.splice(currentIdx, 1);
+          if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+          if (chainResult.negated) {
+            ps.discardPile.push(cardName);
+          } else if (chainResult.resolveResult?.placed) {
+            checkPotionLock(ps);
+          } else {
+            ps.deletedPile.push(cardName);
+            checkPotionLock(ps);
           }
         } else {
-          ps.deletedPile.push(cardName); // Resolved → deleted
-          // Track potion usage for Nicolas lock
-          ps.potionsUsedThisTurn = (ps.potionsUsedThisTurn || 0) + 1;
-          if (ps.potionsUsedThisTurn >= 2) {
-            // Check if Nicolas is alive and not negated
-            const hasNicolas = (ps.heroes || []).some(h => h?.name === 'Nicolas, the Hidden Alchemist' && h.hp > 0 && !h.statuses?.negated);
-            if (hasNicolas) ps.potionLocked = true;
-          }
+          // Card was already removed from hand during resolution (e.g. self-discarded)
+          // Still count potion lock but don't double-add to piles
+          if (!chainResult.negated && !chainResult.resolveResult?.placed) checkPotionLock(ps);
         }
         for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       })();
@@ -2621,9 +2667,9 @@ io.on('connection', (socket) => {
 
     const ps = gs.players[pi];
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
+    if (ps._resolvingCard && handIndex === getResolvingHandIndex(ps)) return; // This specific card is resolving
 
-    const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'));
-    const cardData = allCards.find(c => c.name === cardName);
+    const cardData = getCardDB()[cardName];
     if (!cardData || cardData.cardType !== 'Artifact') return;
     if ((cardData.subtype || '').toLowerCase() === 'equipment') return; // Equips use play_artifact
 
@@ -2653,6 +2699,56 @@ io.on('connection', (socket) => {
         config,
       };
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    } else if (script.resolve) {
+      // No targeting needed — resolve directly (card handles its own prompts)
+      const nth = ps.hand.slice(0, handIndex + 1).filter(c => c === cardName).length;
+      ps._resolvingCard = { name: cardName, nth };
+
+      (async () => {
+        const oi = pi === 0 ? 1 : 0;
+        const oppSid = gs.players[oi]?.socketId;
+        if (!script.deferBroadcast) {
+          if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
+          sendToSpectators(room, 'card_reveal', { cardName });
+          await new Promise(r => setTimeout(r, 100));
+        }
+
+        let chainResult;
+        try {
+          chainResult = await room.engine.executeCardWithChain({
+            cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
+            resolve: async () => await script.resolve(room.engine, pi, [], []),
+          });
+        } catch (err) {
+          console.error('[Engine] Artifact resolve error:', err.message);
+          chainResult = { negated: false, chainFormed: false };
+        }
+        await new Promise(r => setTimeout(r, 100));
+
+        if (chainResult.resolveResult?.cancelled) {
+          ps._resolvingCard = null;
+          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+          return;
+        }
+
+        // Deduct gold only if not negated
+        if (cost > 0 && !script.manualGoldCost && !chainResult.negated) {
+          ps.gold -= cost;
+        }
+
+        const currentIdx = getResolvingHandIndex(ps);
+        ps._resolvingCard = null;
+        if (currentIdx >= 0) {
+          ps.hand.splice(currentIdx, 1);
+          if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+          if (chainResult.negated) {
+            ps.discardPile.push(cardName);
+          } else {
+            ps.discardPile.push(cardName);
+          }
+        }
+        for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      })();
     }
   });
 
@@ -2691,6 +2787,10 @@ io.on('connection', (socket) => {
       // Clear targeting before resolve — resolve may use its own prompts
       gs.potionTargeting = null;
 
+      // Mark this specific card instance as resolving
+      const nth = ps.hand.slice(0, handIndex + 1).filter(c => c === potionName).length;
+      ps._resolvingCard = { name: potionName, nth };
+
       // Broadcast card to opponent BEFORE resolving
       const oi = pi === 0 ? 1 : 0;
       const oppSid = gs.players[oi]?.socketId;
@@ -2721,7 +2821,8 @@ io.on('connection', (socket) => {
       }
 
       if (chainResult.resolveResult?.aborted) {
-        // Re-enter targeting mode (player pressed Back from status select)
+        // Re-enter targeting mode — unmark resolving, card stays in hand
+        ps._resolvingCard = null;
         const freshTargets = script.getValidTargets ? script.getValidTargets(gs, pi, room.engine) : validTargets;
         const config = typeof script.targetingConfig === 'function'
           ? script.targetingConfig(gs, pi, goldCost)
@@ -2737,24 +2838,26 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Brief delay so effect animations finish before self-discard
+      // Brief delay so effect animations finish before pile assignment
       await new Promise(r => setTimeout(r, 100));
 
-      // Remove from hand and move to appropriate pile
-      const hi = ps.hand.indexOf(potionName);
-      if (hi >= 0) { ps.hand.splice(hi, 1); if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++; }
-      if (chainResult.negated) {
-        ps.discardPile.push(potionName); // Negated → always discard
-      } else if (cardType === 'Potion') {
-        ps.deletedPile.push(potionName); // Potions get deleted on resolve
-        // Track potion usage for Nicolas lock
-        ps.potionsUsedThisTurn = (ps.potionsUsedThisTurn || 0) + 1;
-        if (ps.potionsUsedThisTurn >= 2) {
-          const hasNicolas = (ps.heroes || []).some(h => h?.name === 'Nicolas, the Hidden Alchemist' && h.hp > 0 && !h.statuses?.negated);
-          if (hasNicolas) ps.potionLocked = true;
+      // Remove the specific resolving card from hand, move to pile (single sync → triggers animation)
+      const hi = getResolvingHandIndex(ps);
+      ps._resolvingCard = null;
+      if (hi >= 0) {
+        ps.hand.splice(hi, 1);
+        if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+        if (chainResult.negated) {
+          ps.discardPile.push(potionName);
+        } else if (cardType === 'Potion') {
+          ps.deletedPile.push(potionName);
+          checkPotionLock(ps);
+        } else {
+          ps.discardPile.push(potionName);
         }
       } else {
-        ps.discardPile.push(potionName); // Artifacts get discarded
+        // Card was already removed from hand during resolution (e.g. self-discarded)
+        if (!chainResult.negated && cardType === 'Potion') checkPotionLock(ps);
       }
 
       // Play target animation if card resolved (not negated) and has an animation
@@ -2780,6 +2883,29 @@ io.on('connection', (socket) => {
     const oppSid = room.gameState.players[oi]?.socketId;
     if (oppSid) io.to(oppSid).emit('opponent_targeting', { selectedIds });
     sendToSpectators(room, 'opponent_targeting', { selectedIds });
+  });
+
+  // Card ping — broadcast to opponent and spectators
+  socket.on('ping_card', ({ roomId, ping, color }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.gameState) return;
+    const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+    const oi = pi === 0 ? 1 : 0;
+    // Flip perspective for opponent: sender's "me" → opponent's "opp" and vice versa
+    const flipped = { ...ping };
+    if (flipped.owner === 'me') flipped.owner = 'opp';
+    else if (flipped.owner === 'opp') flipped.owner = 'me';
+    if (flipped.type === 'hand-me') flipped.type = 'hand-opp';
+    else if (flipped.type === 'hand-opp') flipped.type = 'hand-me';
+    const oppSid = room.gameState.players[oi]?.socketId;
+    if (oppSid) io.to(oppSid).emit('ping_card', { ping: flipped, color });
+    // Spectators see from player 0's perspective — translate accordingly
+    const specPing = pi === 0 ? { ...ping } : { ...flipped };
+    sendToSpectators(room, 'ping_card', { ping: specPing, color });
+    // Echo back to sender unchanged (their perspective is already correct)
+    socket.emit('ping_card', { ping, color });
   });
 
   // Relay pending creature placement (for additional action selection visual)
@@ -2814,6 +2940,8 @@ io.on('connection', (socket) => {
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi !== room.gameState.potionTargeting.ownerIdx) return;
     room.gameState.potionTargeting = null;
+    // Resolve the engine's pending prompt so the play_spell handler can reach its cancel path
+    if (room.engine) room.engine.resolveEffectPrompt([]);
     for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   });
 
@@ -2824,6 +2952,12 @@ io.on('connection', (socket) => {
     if (!room?.engine || !room.gameState?.effectPrompt) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi !== room.gameState.effectPrompt.ownerIdx) return;
+    // Reject force-discard of the specific resolving card instance
+    const epType = room.gameState.effectPrompt.type;
+    if ((epType === 'forceDiscard' || epType === 'forceDiscardCancellable') && response?.handIndex != null) {
+      const ps = room.gameState.players[pi];
+      if (ps._resolvingCard && response.handIndex === getResolvingHandIndex(ps)) return;
+    }
     room.engine.resolveGenericPrompt(response);
   });
 

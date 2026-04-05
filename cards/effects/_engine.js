@@ -2097,7 +2097,7 @@ class GameEngine {
       const level = cd.level || 0;
       if (level > 0 || cd.spellSchool1) {
         const abZones = ps.abilityZones[heroIdx] || [];
-        const countAb = (school) => { let c = 0; for (const s of abZones) { if (!s || s.length === 0) continue; const base = s[0]; for (const a of s) { if (a === school) c++; else if (a === 'Performance' && base === school) c++; } } return c; };
+        const countAb = (school) => this.countAbilitiesForSchool(school, abZones);
         if (cd.spellSchool1 && countAb(cd.spellSchool1) < level) continue;
         if (cd.spellSchool2 && countAb(cd.spellSchool2) < level) continue;
       }
@@ -2109,15 +2109,97 @@ class GameEngine {
         if (!hasFree) continue;
         if (ps.summonLocked) continue;
       }
-      // Divine Gift: once per game
-      if (cardName.startsWith('Divine Gift') && ps.divineGiftUsed) continue;
-      // Spells/Attacks with custom play conditions (Flame Avalanche, etc.)
+      // Once-per-game cards (Divine Gift, etc.)
       const script = loadCardEffect(cardName);
+      if (script?.oncePerGame) {
+        const opgKey = script.oncePerGameKey || cardName;
+        if (ps._oncePerGameUsed?.has(opgKey)) continue;
+      }
+      // Spells/Attacks with custom play conditions
       if (script?.spellPlayCondition && !script.spellPlayCondition(this.gs, playerIdx)) continue;
       seen.add(cardName);
       eligible.push(cardName);
     }
     return eligible;
+  }
+
+  /**
+   * Shared validation for playing action cards (Spell, Attack, Creature) from hand.
+   * Covers: phase check, hand validation, card data lookup, hero validation,
+   * spell school/level, combo lock, once-per-game, canPlayCard hero restrictions,
+   * spellPlayCondition, and inherent action detection.
+   *
+   * @param {number} pi - Player index
+   * @param {string} cardName - Card name
+   * @param {number} handIndex - Index in hand
+   * @param {number} heroIdx - Hero to play under
+   * @param {string[]} expectedTypes - Allowed card types (e.g. ['Spell','Attack'])
+   * @returns {object|null} Computed context or null if validation fails
+   */
+  validateActionPlay(pi, cardName, handIndex, heroIdx, expectedTypes) {
+    const gs = this.gs;
+    if (pi < 0 || pi !== gs.activePlayer) return null;
+
+    const isActionPhase = gs.currentPhase === 3;
+    const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
+    if (!isActionPhase && !isMainPhase) return null;
+
+    const ps = gs.players[pi];
+    if (!ps) return null;
+
+    // Hand validation
+    if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return null;
+
+    // Card data lookup (uses engine's cached card DB)
+    const cardData = this._getCardDB()[cardName];
+    if (!cardData || !expectedTypes.includes(cardData.cardType)) return null;
+
+    // Hero validation
+    const hero = ps.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return null;
+    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return null;
+
+    // Combo lock
+    if (ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== heroIdx) return null;
+
+    // Spell school / level requirements
+    const level = cardData.level || 0;
+    if (level > 0 || cardData.spellSchool1) {
+      const abZones = ps.abilityZones[heroIdx] || [];
+      if (cardData.spellSchool1 && this.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) return null;
+      if (cardData.spellSchool2 && this.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) return null;
+    }
+
+    // Load card script
+    const script = loadCardEffect(cardName);
+
+    // Once-per-game check
+    if (script?.oncePerGame) {
+      const opgKey = script.oncePerGameKey || cardName;
+      if (ps._oncePerGameUsed?.has(opgKey)) return null;
+    }
+
+    // Custom play conditions (spells/attacks)
+    if (script?.spellPlayCondition && !script.spellPlayCondition(gs, pi)) return null;
+
+    // Hero-specific card restrictions (e.g. duplicate attack bans)
+    const heroScript = loadCardEffect(hero.name);
+    if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, pi, heroIdx, cardData, this)) return null;
+
+    // Equipped hero card restrictions (treatAsEquip cards in support zones)
+    for (const inst of this.cardInstances) {
+      if (inst.owner !== pi || inst.zone !== 'support' || inst.heroIdx !== heroIdx) continue;
+      if (!inst.counters?.treatAsEquip) continue;
+      const equipScript = loadCardEffect(inst.name);
+      if (equipScript?.canPlayCard && !equipScript.canPlayCard(gs, pi, heroIdx, cardData, this)) return null;
+    }
+
+    // Inherent action detection
+    const isInherentAction = typeof script?.inherentAction === 'function'
+      ? script.inherentAction(gs, pi, heroIdx, this)
+      : script?.inherentAction === true;
+
+    return { ps, cardData, hero, script, level, isActionPhase, isMainPhase, isInherentAction };
   }
 
   /**
@@ -2306,11 +2388,6 @@ class GameEngine {
         ps.heroesActedThisTurn = [];
         ps.heroesAttackedThisTurn = [];
         ps.bonusActions = null;
-        // Reset per-hero attack tracking (Ghuanjun duplicate ban)
-        for (const hero of (ps.heroes || [])) {
-          if (hero?.ghuanjunAttacksUsed) hero.ghuanjunAttacksUsed = [];
-          if (hero?._ghuanjunComboUsed) hero._ghuanjunComboUsed = false;
-        }
       }
     }
     this.log('turn_start', { turn: this.gs.turn, activePlayer: this.gs.activePlayer, username: activePs?.username });
@@ -2320,12 +2397,16 @@ class GameEngine {
     // not burns applied during this turn's ON_TURN_START (e.g. Barker → Fiery Slime)
     await this.processStatusExpiry('START');
 
-    // Process buff expiry (Cloudy, Immortal, etc.) BEFORE burn/poison damage
-    // So end-of-turn buffs like Immortal don't protect during the next turn's ticks
-    await this._processBuffExpiry();
-
+    // Burn/poison damage BEFORE buff expiry — so buffs like Cloudy still
+    // halve status damage on the turn they expire
     await this.processBurnDamage();
     await this.processPoisonDamage();
+
+    // Hook: all status damage done — deferred effects (Elixir revive choice) can resolve
+    await this.runHooks(HOOKS.AFTER_ALL_STATUS_DAMAGE, { _skipReactionCheck: true });
+
+    // Process buff expiry (Cloudy, Immortal, etc.) AFTER status damage
+    await this._processBuffExpiry();
 
     // Now fire turn-start hooks (Barker, Slime level-ups, Rancher restore, etc.)
     await this.runHooks(HOOKS.ON_TURN_START, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
@@ -2580,12 +2661,15 @@ class GameEngine {
     for (const cardName of (ps.hand || [])) {
       if (seen.has(cardName)) continue;
       seen.add(cardName);
-      // Divine Gift: once per game across all Divine Gift cards
-      if (cardName.startsWith('Divine Gift') && ps.divineGiftUsed) {
-        blocked.push(cardName);
-        continue;
-      }
       const script = loadCardEffect(cardName);
+      // Once-per-game cards
+      if (script?.oncePerGame) {
+        const opgKey = script.oncePerGameKey || cardName;
+        if (ps._oncePerGameUsed?.has(opgKey)) {
+          blocked.push(cardName);
+          continue;
+        }
+      }
       if (script?.spellPlayCondition) {
         if (!script.spellPlayCondition(this.gs, playerIdx)) blocked.push(cardName);
       }
@@ -3295,6 +3379,7 @@ class GameEngine {
   getActivatableAbilities(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
+    if (this.gs.activePlayer !== playerIdx) return [];
     const result = [];
     const currentPhase = this.gs.currentPhase;
     const isActionPhase = currentPhase === 3;
@@ -3312,7 +3397,7 @@ class GameEngine {
       for (let zi = 0; zi < (ps.abilityZones[hi] || []).length; zi++) {
         const slot = (ps.abilityZones[hi] || [])[zi] || [];
         if (slot.length === 0) continue;
-        const abilityName = slot[0]; // Base ability name (may have Performance on top)
+        const abilityName = slot[0]; // Base ability name (wildcard abilities stack on top)
         const script = loadCardEffect(abilityName);
         if (!script?.actionCost) continue;
 
@@ -3340,6 +3425,7 @@ class GameEngine {
   getActiveHeroEffects(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
+    if (this.gs.activePlayer !== playerIdx) return [];
     const result = [];
     const currentPhase = this.gs.currentPhase;
     const isMainPhase = currentPhase === 2 || currentPhase === 4;
@@ -3419,6 +3505,7 @@ class GameEngine {
   getFreeActivatableAbilities(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
+    if (this.gs.activePlayer !== playerIdx) return [];
     const result = [];
     const currentPhase = this.gs.currentPhase;
     const isMainPhase = currentPhase === 2 || currentPhase === 4;
@@ -3550,6 +3637,27 @@ class GameEngine {
 
     this.sync();
     return { success: true, zoneSlot: targetZone, inst };
+  }
+
+  /**
+   * Count how many ability cards in a hero's ability zones match a given spell school.
+   * Wildcard abilities (e.g. Performance with isWildcardAbility: true) count as the
+   * base ability's school when stacked on top.
+   * @param {string} school - Spell school name to count
+   * @param {Array} abZones - The hero's ability zones array (e.g. ps.abilityZones[heroIdx])
+   * @returns {number} count of matching abilities
+   */
+  countAbilitiesForSchool(school, abZones) {
+    let count = 0;
+    for (const slot of abZones) {
+      if (!slot || slot.length === 0) continue;
+      const base = slot[0];
+      for (const ab of slot) {
+        if (ab === school) { count++; }
+        else if (base === school && loadCardEffect(ab)?.isWildcardAbility) { count++; }
+      }
+    }
+    return count;
   }
 
   /**

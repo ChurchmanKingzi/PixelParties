@@ -19,6 +19,8 @@ module.exports = {
 
   hooks: {
     onResourceGain: (ctx) => {
+      // Only boost during Resource Phase
+      if (ctx.phaseIndex !== 1) return;
       if (ctx.playerIdx !== ctx.cardOwner) return;
       ctx.modifyAmount(4);
     },

@@ -22,6 +22,15 @@ module.exports = {
   },
 
   hooks: {
+    // Reset per-turn attack tracking at the start of each turn
+    onTurnStart: async (ctx) => {
+      const hero = ctx.attachedHero;
+      if (hero) {
+        hero.ghuanjunAttacksUsed = [];
+        hero._ghuanjunComboUsed = false;
+      }
+    },
+
     onActionUsed: async (ctx) => {
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
       if (ctx.playerIdx !== ctx.cardOwner) return;
