@@ -8,7 +8,21 @@ window._isTouchDevice = false;
 window.addEventListener('touchstart', function onFirstTouch() {
   window._isTouchDevice = true;
   window.removeEventListener('touchstart', onFirstTouch);
+  // Auto-request fullscreen on mobile landscape
+  if (window.innerWidth > window.innerHeight && document.documentElement.requestFullscreen) {
+    try { document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {}); } catch {}
+  }
 }, { passive: true });
+
+// Re-request fullscreen when rotating to landscape (if previously granted)
+window.addEventListener('orientationchange', () => {
+  if (!window._isTouchDevice) return;
+  setTimeout(() => {
+    if (window.innerWidth > window.innerHeight && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+      try { document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {}); } catch {}
+    }
+  }, 300);
+});
 
 // ===== MOBILE LONG-PRESS TOOLTIP SYSTEM =====
 // Long-press (≥400ms) = show card tooltip, release = dismiss
