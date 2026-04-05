@@ -69,25 +69,29 @@ function MainMenu() {
     setUser(null);
   };
   return (
-    <div className="screen-center" style={{ flexDirection: 'column', gap: 20, position: 'relative' }}>
-      <div style={{ position: 'absolute', top: 12, right: 16 }}><VolumeControl /></div>
-      <h1 className="pixel-font" style={{ fontSize: 24, color: 'var(--accent)', textShadow: '0 0 30px var(--accent)' }}>PIXEL PARTIES</h1>
-      <div className="orbit-font" style={{ fontSize: 12, color: 'var(--text2)', letterSpacing: 3, marginBottom: 20 }}>TRADING CARD GAME</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 280 }} className="animate-in">
-        <button className="btn btn-big" onClick={() => setScreen('play')} style={{ fontSize: 16 }}>⚔ PLAY</button>
-        <button className="btn btn-big btn-accent2" onClick={() => setScreen('deckbuilder')} style={{ fontSize: 16 }}>✦ EDIT DECK</button>
-        <button className="btn btn-big" onClick={() => setScreen('shop')} style={{ fontSize: 16, borderColor: '#ffd700', color: '#ffd700', background: 'rgba(255,215,0,.08)' }}>✦ SHOP</button>
-        <button className="btn btn-big btn-success" onClick={() => setScreen('profile')} style={{ fontSize: 16 }}>♛ VIEW PROFILE</button>
+    <div className="screen-center main-menu-screen" style={{ flexDirection: 'column', gap: 20, position: 'relative' }}>
+      <div style={{ position: 'absolute', top: 12, right: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button className="btn menu-logout-btn" style={{ padding: '4px 16px', fontSize: 10 }} onClick={logout}>LOGOUT</button>
+        <VolumeControl />
       </div>
-      <div style={{ marginTop: 30, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-        <span style={{ color: user.color || 'var(--accent)', fontWeight: 800, fontSize: 22 }} className="orbit-font">{user.username}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span className="badge" style={{ background: 'rgba(170,255,0,.12)', color: 'var(--accent3)', fontSize: 18, padding: '8px 16px' }}>ELO {user.elo}</span>
-          <span className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '8px 16px' }}>
-            <img src="/data/sc.png" style={{ width: 22, height: 22, imageRendering: 'pixelated' }} /> {user.sc || 0} SC
-          </span>
+      <h1 className="pixel-font menu-title" style={{ fontSize: 24, color: 'var(--accent)', textShadow: '0 0 30px var(--accent)' }}>PIXEL PARTIES</h1>
+      <div className="orbit-font menu-subtitle" style={{ fontSize: 12, color: 'var(--text2)', letterSpacing: 3 }}>TRADING CARD GAME</div>
+      <div className="menu-body">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 280 }} className="animate-in menu-buttons">
+          <button className="btn btn-big" onClick={() => setScreen('play')} style={{ fontSize: 16 }}>⚔ PLAY</button>
+          <button className="btn btn-big btn-accent2" onClick={() => setScreen('deckbuilder')} style={{ fontSize: 16 }}>✦ EDIT DECK</button>
+          <button className="btn btn-big" onClick={() => setScreen('shop')} style={{ fontSize: 16, borderColor: '#ffd700', color: '#ffd700', background: 'rgba(255,215,0,.08)' }}>✦ SHOP</button>
+          <button className="btn btn-big btn-success" onClick={() => setScreen('profile')} style={{ fontSize: 16 }}>♛ VIEW PROFILE</button>
         </div>
-        <button className="btn" style={{ padding: '4px 16px', fontSize: 10, marginTop: 4 }} onClick={logout}>LOGOUT</button>
+        <div className="menu-user-info">
+          <span style={{ color: user.color || 'var(--accent)', fontWeight: 800, fontSize: 22 }} className="orbit-font">{user.username}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <span className="badge" style={{ background: 'rgba(170,255,0,.12)', color: 'var(--accent3)', fontSize: 18, padding: '8px 16px' }}>ELO {user.elo}</span>
+            <span className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '8px 16px' }}>
+              <img src="/data/sc.png" style={{ width: 22, height: 22, imageRendering: 'pixelated' }} /> {user.sc || 0} SC
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -514,7 +518,7 @@ function ProfileScreen() {
               </div>
 
               {/* Right: Top Heroes */}
-              <div style={{ borderLeft: '1px solid var(--bg4)', paddingLeft: 24, display: 'flex', flexDirection: 'column', flex: 1, minWidth: 140 }}>
+              <div className="profile-heroes-col" style={{ borderLeft: '1px solid var(--bg4)', paddingLeft: 24, display: 'flex', flexDirection: 'column', flex: 1, minWidth: 140 }}>
                 <div className="profile-section-label">TOP HEROES</div>
                 {topHeroes.length === 0 ? (
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -535,14 +539,17 @@ function ProfileScreen() {
                               ? <img src={heroImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                               : <div style={{ width: '100%', height: '100%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'var(--text2)' }}>?</div>
                             }
+                            <div className="profile-top-hero-wr-overlay" style={{ color: h.winRate >= 50 ? 'var(--success)' : 'var(--danger)' }}>
+                              {h.winRate}%
+                            </div>
                           </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="profile-top-hero-details" style={{ flex: 1, minWidth: 0 }}>
                             <div className="profile-top-hero-name" title={h.name}>{h.name}</div>
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
+                            <div className="profile-top-hero-stats" style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
                               <span className="orbit-font" style={{ fontSize: 14, fontWeight: 700, color: h.winRate >= 50 ? 'var(--success)' : 'var(--danger)' }}>
                                 {h.winRate}%
                               </span>
-                              <span style={{ fontSize: 9, color: 'var(--text2)' }}>
+                              <span className="profile-top-hero-wl" style={{ fontSize: 9, color: 'var(--text2)' }}>
                                 {h.wins}W / {h.losses}L
                               </span>
                             </div>

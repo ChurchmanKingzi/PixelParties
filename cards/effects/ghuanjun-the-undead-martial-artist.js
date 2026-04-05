@@ -109,12 +109,24 @@ module.exports = {
 
     // Flag Ghuanjun's Attacks to cap damage at target HP - 1 (prevents kills)
     // Uses setFlag so the cap applies AFTER all other modifiers (Sacred Hammer, etc.)
+    // Also enforces base ATK damage: Ghuanjun's Attacks always use baseAtk,
+    // ignoring ATK buffs from Equips/Abilities. Bonus damage applied by other
+    // effects (e.g. Sacred Hammer) still procs because it adds its own flat delta.
     beforeDamage: (ctx) => {
       if (ctx.type !== 'attack') return;
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
       const sourceOwner = ctx.source?.owner ?? ctx.source?.controller ?? -1;
       if (sourceOwner !== ctx.cardOwner) return;
       ctx.setFlag('capAtHPMinus1', true);
+
+      // Enforce base ATK: subtract the difference between current and base ATK
+      const hero = ctx.players?.[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
+      if (hero && hero.baseAtk !== undefined) {
+        const diff = (hero.atk || 0) - (hero.baseAtk || 0);
+        if (diff !== 0) {
+          ctx.modifyAmount(-diff);
+        }
+      }
     },
 
     // After Attack damage to hero: apply Immortal buff for other sources
@@ -136,15 +148,21 @@ module.exports = {
       engine.sync();
     },
 
-    // Flag creature damage from Ghuanjun Attacks for HP-1 cap
+    // Flag creature damage from Ghuanjun Attacks for HP-1 cap + base ATK enforcement
     beforeCreatureDamageBatch: (ctx) => {
       if (!ctx.entries) return;
       const heroIdx = ctx.cardHeroIdx;
       const pi = ctx.cardOwner;
+      const hero = ctx.players?.[pi]?.heroes?.[heroIdx];
+      const diff = hero ? (hero.atk || 0) - (hero.baseAtk || 0) : 0;
       for (const e of ctx.entries) {
         if (e.type !== 'attack' || e.cancelled) continue;
         if ((e.source?.heroIdx ?? -1) !== heroIdx || (e.source?.owner ?? -1) !== pi) continue;
         e.capAtHPMinus1 = true;
+        // Enforce base ATK: subtract equip/ability ATK bonuses from damage
+        if (diff !== 0) {
+          e.amount = Math.max(0, e.amount - diff);
+        }
       }
     },
 

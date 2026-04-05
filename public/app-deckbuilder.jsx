@@ -592,7 +592,7 @@ function DeckBuilder() {
   }, [currentDeck?.mainDeck, currentDeck?.potionDeck, currentDeck?.sideDeck, currentDeck?.heroes]);
 
   // Left-click deck card → cover card + skin menu
-  const showCoverMenu = useCallback((cardName, e) => {
+  const showCoverMenu = useCallback((cardName, e, section, origIdx) => {
     if (!currentDeck) return;
     const isCover = currentDeck.coverCard === cardName;
     const hasSkins = SKINS_DB[cardName] && SKINS_DB[cardName].length > 0;
@@ -607,8 +607,12 @@ function DeckBuilder() {
         items.push({ label: 'Select skin', icon: '🎨', color: 'var(--accent)', action: () => setSkinGallery({ cardName, options: availOpts }) });
       }
     }
+    // Remove from deck option
+    if (section) {
+      items.push({ label: 'Remove from deck', icon: '🗑', color: 'var(--danger)', action: () => removeFrom(cardName, section, origIdx) });
+    }
     setCtxMenu({ x: e.clientX, y: e.clientY, items });
-  }, [currentDeck, setCoverCard]);
+  }, [currentDeck, setCoverCard, removeFrom]);
 
   // Left-click DB card → context menu
   const showAddMenu = useCallback((cardName, e) => {
@@ -1063,9 +1067,9 @@ function DeckBuilder() {
         <VolumeControl />
       </div>
 
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div className="db-content" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* ── LEFT: DECK LIST ── */}
-        <div style={{ width: 170, background: 'var(--bg2)', borderRight: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <div className="db-panel-left" style={{ width: 170, background: 'var(--bg2)', borderRight: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
           <div className="orbit-font" style={{ padding: 8, fontSize: 10, color: 'var(--text2)', fontWeight: 700 }}>YOUR DECKS</div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {decks.map((d, i) => {
@@ -1104,7 +1108,7 @@ function DeckBuilder() {
         </div>
 
         {/* ── CENTER: ALL DECK SECTIONS ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+        <div className="db-panel-center" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
           {/* Deck name + validation */}
           <div style={{ padding: '6px 12px', background: 'var(--bg3)', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {renaming ? (
@@ -1135,7 +1139,7 @@ function DeckBuilder() {
               handleDrop('hero', { ...d, targetSlot: slot }, mx, my);
             }} onDragPos={onGalleryDragPos} className="deck-section">
               <SecHeader sec="heroes" color="#bb77ff" icon="👑" label="HEROES" count={heroes.filter(h=>h&&h.hero).length} max={3} />
-              <div className="deck-section-body" data-deck-section="hero" style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-evenly', gap: 40, padding: 12 }}>
+              <div className="deck-section-body db-hero-row" data-deck-section="hero" style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-evenly', gap: 40, padding: 12 }}>
                 {heroes.map((h, i) => {
                   const isDropTarget = (() => {
                     if (galleryDragOver && galleryDragOver.section === 'hero') return true;
@@ -1153,7 +1157,7 @@ function DeckBuilder() {
                         <div style={{ position: 'relative' }}
                           onMouseDown={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}>
                           <CardMini card={CARDS_BY_NAME[h.hero]}
-                            onClick={(e) => showCoverMenu(h.hero, e)} onRightClick={() => removeFrom(h.hero, 'hero')}
+                            onClick={(e) => showCoverMenu(h.hero, e, 'hero')}
                             style={{ width: 166, height: 230, aspectRatio: 'unset' }} isCover={h.hero === currentDeck?.coverCard} skins={currentDeck?.skins} />
                           <button style={{ position: 'absolute', top: -5, right: -5, background: 'var(--danger)', color: '#fff',
                             border: 'none', width: 18, height: 18, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
@@ -1193,7 +1197,7 @@ function DeckBuilder() {
                   const isDragging = deckDrag && deckDrag.section === 'main' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'m-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}>
-                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e)} onRightClick={() => removeFrom(item.card,'main',item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
+                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'main', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
                   </div>;
                 })}
               </div>
@@ -1211,7 +1215,7 @@ function DeckBuilder() {
                   const isDragging = deckDrag && deckDrag.section === 'potion' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'p-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}>
-                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e)} onRightClick={() => removeFrom(item.card,'potion',item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
+                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'potion', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
                   </div>;
                 })}
               </div>
@@ -1229,7 +1233,7 @@ function DeckBuilder() {
                   const isDragging = deckDrag && deckDrag.section === 'side' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'s-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}>
-                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e)} onRightClick={() => removeFrom(item.card,'side',item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
+                    <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'side', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
                   </div>;
                 })}
               </div>
@@ -1239,7 +1243,7 @@ function DeckBuilder() {
         </div>
 
         {/* ── RIGHT: CARD DATABASE ── */}
-        <div style={{ width: 400, background: 'var(--bg2)', borderLeft: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <div className="db-panel-right" style={{ width: 400, background: 'var(--bg2)', borderLeft: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
           <div className="orbit-font" style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text2)', fontWeight: 700 }}>
             CARD DATABASE ({filteredCards.length} / {AVAILABLE_CARDS.length})
           </div>
@@ -1267,7 +1271,7 @@ function DeckBuilder() {
           </div>
           {/* Card grid */}
           <div style={{ flex: 1, overflowY: 'auto', padding: 6 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+            <div className="db-card-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
               {pageCards.map((card, i) => {
                 const canMain = canAddCard(currentDeck || {}, card.name, 'main');
                 const canHero = canAddCard(currentDeck || {}, card.name, 'hero');

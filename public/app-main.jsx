@@ -565,6 +565,12 @@ function App() {
 
   return (
     <AppContext.Provider value={ctx}>
+      {/* Global portrait rotation lock — all screens need landscape */}
+      <div className="rotate-device-overlay" id="rotate-overlay">
+        <div className="rotate-icon">📱</div>
+        <div className="rotate-text">Please rotate your device</div>
+        <div className="rotate-sub">Pixel Parties requires landscape orientation for the best experience</div>
+      </div>
       <MusicManager inBattle={inBattle} />
       {notif && <Notification key={notif.id} message={notif.message} type={notif.type} onClose={() => setNotif(null)} />}
       {!user ? <AuthScreen /> :

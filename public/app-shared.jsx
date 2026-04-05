@@ -3,6 +3,42 @@
    ============================================================ */
 const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, createContext, useContext } = React;
 
+// ===== TOUCH DETECTION =====
+window._isTouchDevice = false;
+window.addEventListener('touchstart', function onFirstTouch() {
+  window._isTouchDevice = true;
+  window.removeEventListener('touchstart', onFirstTouch);
+}, { passive: true });
+
+// ===== MOBILE LONG-PRESS TOOLTIP SYSTEM =====
+// Long-press (≥400ms) = show card tooltip, release = dismiss
+// Quick tap = normal action (play card, open menu, etc.)
+window._tapTooltipCard = null;
+window._tapTooltipSetters = new Set();
+window._longPressTimer = null;
+window._longPressFired = false;
+const LONG_PRESS_MS = 400;
+window.LONG_PRESS_MS = LONG_PRESS_MS;
+
+function setTapTooltip(cardName) {
+  window._tapTooltipCard = cardName;
+  window._tapTooltipSetters.forEach(fn => fn(cardName));
+}
+function clearTapTooltip() { setTapTooltip(null); }
+
+// Dismiss tooltip on any touch end (after long-press)
+document.addEventListener('touchend', () => {
+  clearTimeout(window._longPressTimer);
+  if (window._longPressFired) {
+    // Small delay so the tooltip is visible before dismissing
+    setTimeout(clearTapTooltip, 50);
+    window._longPressFired = false;
+  }
+}, { passive: true });
+document.addEventListener('touchmove', () => {
+  // Cancel long-press if finger moves
+  clearTimeout(window._longPressTimer);
+}, { passive: true });
 // ===== API HELPER =====
 window.AUTH_TOKEN = null;
 
@@ -341,6 +377,18 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
   // Use shared board tooltip if available (game context), otherwise inline tooltip
   const useSharedTooltip = !!window._boardTooltipSetter;
 
+  // Sync with global tap-tooltip state (dismiss when another card is tapped)
+  useEffect(() => {
+    if (!window._isTouchDevice) return;
+    const sync = (activeCard) => {
+      if (activeCard !== card.name) {
+        setTT(false);
+      }
+    };
+    window._tapTooltipSetters.add(sync);
+    return () => window._tapTooltipSetters.delete(sync);
+  }, [card.name]);
+
   const show = (e) => {
     if (window.activeDragData || window.deckDragState) return;
     if (useSharedTooltip) {
@@ -355,6 +403,25 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
     } else {
       setTT(false);
     }
+  };
+  // Touch: long-press to show tooltip, quick tap for action
+  const handleClick = (e) => {
+    if (window._isTouchDevice && window._longPressFired) {
+      // Long-press just ended — don't fire click action
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    onClick && onClick(e);
+  };
+  const handleTouchStart = (e) => {
+    if (!window._isTouchDevice) return;
+    window._longPressFired = false;
+    window._longPressTimer = setTimeout(() => {
+      window._longPressFired = true;
+      setTapTooltip(card.name);
+      if (useSharedTooltip) window._boardTooltipSetter(card); else setTT(true);
+    }, LONG_PRESS_MS);
   };
   const onDragStart = (e) => {
     if (dragData) {
@@ -373,7 +440,8 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
         draggable={!!dragData}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
-        onClick={onClick}
+        onClick={handleClick}
+        onTouchStart={handleTouchStart}
         onContextMenu={(e) => { e.preventDefault(); onRightClick && onRightClick(); }}
         onMouseEnter={show} onMouseLeave={hide}>
         {isFoil && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} foilType={foilType} />}
@@ -405,13 +473,13 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
         )}
       </div>
       {tt && !useSharedTooltip && (
-        <div className="tooltip" style={{
+        <div className={'tooltip card-tooltip' + (inGallery ? ' card-tooltip-gallery' : '')} style={{
           right: inGallery ? GALLERY_W : 0, top: TOP_BAR_H, width: GALLERY_W,
           height: 'calc(100vh - ' + TOP_BAR_H + 'px)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}>
           {imgUrl && (
-            <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
+            <div className="card-tooltip-img" style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
               <img src={imgUrl} alt="" style={{
                 width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
                 border: ttBorderColor
@@ -419,7 +487,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
               {isFoil && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} foilType={foilType} />}
             </div>
           )}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
+          <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
             <div style={{ fontWeight: 700, marginBottom: 5, color: typeColor(card.cardType), fontSize: 18 }}>{card.name}</div>
             <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>
               {card.cardType}{card.subtype ? ' · ' + card.subtype : ''}{card.archetype ? ' · ' + card.archetype : ''}

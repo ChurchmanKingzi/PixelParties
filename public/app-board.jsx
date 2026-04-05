@@ -39,7 +39,16 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
     <div className={'board-card' + (faceDown ? ' face-down' : '') + (flipped ? ' flipped' : '') + (foilClass ? ' ' + foilClass : '')}
       style={style}
       onMouseEnter={() => !noTooltip && !faceDown && card && setBoardTooltip(card)}
-      onMouseLeave={() => setBoardTooltip(null)}>
+      onMouseLeave={() => setBoardTooltip(null)}
+      onTouchStart={() => {
+        if (noTooltip || faceDown || !card) return;
+        window._longPressFired = false;
+        window._longPressTimer = setTimeout(() => {
+          window._longPressFired = true;
+          setTapTooltip(card.name);
+          setBoardTooltip(card);
+        }, window.LONG_PRESS_MS || 400);
+      }}>
       {isFoil && foilMeta.current && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} foilType={foilType} />}
       {faceDown ? (
         <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
@@ -2001,10 +2010,21 @@ function GameBoard({ gameState, lobby, onLeave }) {
     _boardTooltipSetter = setTooltipCard;
     return () => { _boardTooltipSetter = null; };
   }, []);
+  // Sync: when global tap-tooltip clears, also clear board tooltip
+  useEffect(() => {
+    if (!window._isTouchDevice) return;
+    const sync = (activeCard) => {
+      if (!activeCard) setTooltipCard(null);
+    };
+    window._tapTooltipSetters.add(sync);
+    return () => window._tapTooltipSetters.delete(sync);
+  }, []);
   // Safety: if the mouse isn't over any board-card element, clear the tooltip.
   // Catches cases where the source element was removed (overlay dismissed, card reveal expired).
   useEffect(() => {
     if (!tooltipCard) return;
+    // On touch devices, tooltip stays until explicitly dismissed by tap
+    if (window._isTouchDevice) return;
     const check = () => {
       if (!document.querySelector('.board-card:hover, .card-reveal-entry:hover, .card-mini:hover')) {
         setTooltipCard(null);
@@ -3869,6 +3889,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
   }, [gameState.roomId, user.color, isSpectator]);
 
   // Tab key + contextmenu (right-click) → ping hovered card
+  // Mobile: double-tap → ping
   useEffect(() => {
     const handlePing = (e) => {
       if (isSpectator || gameState.result) return;
@@ -3884,9 +3905,38 @@ function GameBoard({ gameState, lobby, onLeave }) {
       }
       emitPing(info);
     };
+    // Double-tap detection for mobile pinging
+    let lastTapTime = 0;
+    let lastTapTarget = null;
+    const handleDoubleTap = (e) => {
+      if (!window._isTouchDevice || isSpectator || gameState.result) return;
+      const card = e.target.closest('.board-card');
+      if (!card) { lastTapTarget = null; return; }
+      const now = Date.now();
+      if (lastTapTarget === card && now - lastTapTime < 300) {
+        // Double-tap detected — ping this card
+        const info = getPingInfo(card);
+        if (info) {
+          emitPing(info);
+          // Cancel any pending long-press tooltip
+          clearTimeout(window._longPressTimer);
+          window._longPressFired = false;
+        }
+        lastTapTarget = null;
+        lastTapTime = 0;
+      } else {
+        lastTapTarget = card;
+        lastTapTime = now;
+      }
+    };
     window.addEventListener('keydown', handlePing);
     window.addEventListener('contextmenu', handlePing);
-    return () => { window.removeEventListener('keydown', handlePing); window.removeEventListener('contextmenu', handlePing); };
+    document.addEventListener('touchstart', handleDoubleTap, { passive: true });
+    return () => {
+      window.removeEventListener('keydown', handlePing);
+      window.removeEventListener('contextmenu', handlePing);
+      document.removeEventListener('touchstart', handleDoubleTap);
+    };
   }, [isSpectator, gameState.result, getPingInfo, emitPing]);
 
   // Receive pings
@@ -4567,12 +4617,6 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
   return (
     <div className="screen-full" style={{ background: '#0c0c14' }}>
-      {/* Mobile portrait rotation prompt */}
-      <div className="rotate-device-overlay">
-        <div className="rotate-icon">📱</div>
-        <div className="rotate-text">Please rotate your device</div>
-        <div className="rotate-sub">Pixel Parties requires landscape orientation for the best experience</div>
-      </div>
       <div className="top-bar" style={{ justifyContent: 'space-between' }}>
         {isSpectator ? (
           <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={handleLeave}>

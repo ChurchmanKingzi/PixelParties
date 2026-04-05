@@ -4228,10 +4228,10 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   75% { transform: rotate(15deg); }
 }
 
-/* Show overlay + hide game in portrait on small screens */
+/* Show overlay + hide ALL screens in portrait on small devices */
 @media (orientation: portrait) and (max-width: 900px) {
   .rotate-device-overlay { display: flex !important; }
-  .game-layout { display: none !important; }
+  .screen-full, .screen-center { display: none !important; }
 }
 
 /* Touch-friendly: ensure minimum tap targets at small scales */
@@ -4241,6 +4241,366 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   .phase-btn { min-height: 32px; }
 }
 
+/* ═══ Deck Builder responsive ═══ */
+
+/* Narrow landscape (phones, small tablets in landscape) */
+@media (max-width: 1100px) {
+  .db-panel-right { width: 280px !important; }
+  .db-panel-left { width: 120px !important; }
+  .db-card-grid { grid-template-columns: repeat(3, 1fr) !important; }
+}
+
+@media (max-width: 850px) {
+  /* Top bar: allow wrapping */
+  .top-bar { flex-wrap: wrap; gap: 4px; padding: 4px 8px !important; }
+  .top-bar .btn, .top-bar label.btn { padding: 3px 6px !important; font-size: 8px !important; }
+  .top-bar h2 { font-size: 11px !important; }
+
+  /* Deck panels: shrink further */
+  .db-panel-right { width: 200px !important; }
+  .db-panel-left { width: 90px !important; }
+  .db-card-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Deck section body: tighter spacing */
+  .deck-section-body { gap: 3px !important; }
+  .db-hero-row { gap: 12px !important; padding: 6px !important; }
+
+  /* Deck list items */
+  .deck-list-item { font-size: 9px !important; padding: 4px 6px !important; }
+
+  /* Card mini in deck sections — shrink */
+  .deck-section-body .card-mini { max-width: 72px; }
+}
+
+@media (max-width: 700px) {
+  /* Very narrow landscape: collapse left panel */
+  .db-panel-left { width: 70px !important; }
+  .db-panel-left .orbit-font { font-size: 7px !important; }
+  .db-panel-right { width: 160px !important; }
+  .db-card-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 2px !important; }
+
+  /* Filters: single column */
+  .db-panel-right div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  .db-panel-right .db-filter-input,
+  .db-panel-right .db-filter-select {
+    font-size: 9px !important;
+    padding: 3px 4px !important;
+  }
+}
+
 /* ── Scaled inline overrides for game hand ── */
 .game-hand .orbit-font { font-size: calc(18px * var(--board-scale)) !important; }
 .game-hand-me .orbit-font { font-size: calc(16px * var(--board-scale)) !important; }
+
+/* ═══ General responsive ═══ */
+
+/* Ensure nothing overflows viewport */
+@media (max-width: 1024px) {
+  .screen-full, .screen-center { max-width: 100vw; overflow-x: hidden; }
+  .panel { max-width: calc(100vw - 32px); }
+}
+
+/* Scale card-slot and card-mini OUTSIDE deck sections for narrow screens */
+@media (max-width: 850px) {
+  .card-slot:not(.deck-section-body *) {
+    width: 72px !important;
+    height: 100px !important;
+    font-size: 7px;
+  }
+  .db-card-grid .card-mini,
+  .card-mini:not(.deck-section-body *) {
+    font-size: 7px;
+  }
+  .card-mini .card-name { font-size: 6px; }
+  .card-mini .card-type { font-size: 6px; }
+  .card-mini .card-stats { font-size: 6px; }
+  /* Deck section cards: let grid auto-size them */
+  .deck-section-body .card-mini { font-size: 6px; }
+  .deck-section-body .card-mini .card-name { font-size: 5px; }
+}
+
+@media (max-width: 700px) {
+  .card-slot:not(.deck-section-body *) {
+    width: 58px !important;
+    height: 82px !important;
+    font-size: 6px;
+  }
+  .deck-section-body .card-mini { font-size: 5px; }
+}
+
+/* Profile screen responsive */
+@media (max-width: 850px) {
+  .profile-identity-col { width: 220px !important; min-width: 180px !important; }
+  .profile-identity-panel { padding: 14px 12px 10px; }
+  .profile-right-col { padding: 12px 14px; }
+}
+@media (max-width: 700px) {
+  .profile-identity-col { width: 160px !important; min-width: 140px !important; }
+}
+
+/* Lobby/Play screen responsive */
+@media (max-width: 850px) {
+  .top-bar { gap: 6px; padding: 6px 10px; }
+}
+
+/* ═══ Main Menu responsive ═══ */
+.menu-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+}
+.menu-user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (max-height: 500px) {
+  /* Landscape mobile — reorganize menu to horizontal */
+  .main-menu-screen { flex-direction: row !important; gap: 0 !important; padding: 10px 24px !important; justify-content: center !important; }
+  .menu-title { font-size: 16px !important; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); }
+  .menu-subtitle { font-size: 9px !important; position: absolute; top: 32px; left: 50%; transform: translateX(-50%); }
+  .menu-body { flex-direction: row; gap: 40px; margin-top: 20px; }
+  .menu-buttons { width: 200px !important; gap: 8px !important; }
+  .menu-buttons .btn-big { font-size: 12px !important; padding: 6px 12px !important; }
+  .menu-user-info { align-items: flex-start; gap: 8px; }
+  .menu-user-info .orbit-font { font-size: 16px !important; }
+  .menu-user-info .badge { font-size: 13px !important; padding: 5px 10px !important; }
+  .menu-logout-btn { display: block; }
+}
+
+/* ═══ Create Game modal compact ═══ */
+@media (max-height: 500px) {
+  .modal { padding: 12px 16px !important; min-width: 280px !important; max-height: 90vh !important; }
+  .modal h3 { font-size: 13px !important; margin-bottom: 8px !important; }
+  .modal .btn { padding: 5px 8px !important; font-size: 10px !important; }
+  .modal .input { padding: 4px 8px !important; font-size: 10px !important; }
+  /* Hide Game Type / Format labels on mobile */
+  .modal div[style*="fontSize: 11"] { display: none !important; }
+}
+
+/* ═══ Profile responsive — deck collection + hero medals ═══ */
+/* Win% overlay on hero card */
+.profile-top-hero-wr-overlay {
+  display: none;
+}
+.profile-top-hero-card { position: relative; }
+
+@media (max-width: 850px) {
+  .profile-top-hero-rank { display: none !important; }
+  .profile-deck-tile-card { width: 64px !important; height: 90px !important; }
+  .profile-deck-wall { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)) !important; gap: 6px !important; }
+
+  /* Top Heroes: bigger images, win% overlay, hide stats/W/L text */
+  .profile-top-hero-card { width: 78px !important; height: 109px !important; }
+  .profile-top-hero-wr-overlay {
+    display: flex !important;
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,.75);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px; font-weight: 800;
+    justify-content: center; padding: 2px 0;
+    text-shadow: 0 0 6px currentColor;
+  }
+  .profile-top-hero-stats { display: none !important; }
+  .profile-top-hero-wl { display: none !important; }
+  .profile-top-hero-bar { display: none !important; }
+  .profile-top-hero-name { font-size: 10px !important; }
+
+  /* Deck collection: ensure it's visible and scrollable */
+  .profile-section-wide { flex: none !important; min-height: 200px !important; }
+  .profile-deck-wall { min-height: 120px; }
+
+  /* Fix profile container width — prevent cut-off */
+  .profile-identity-col { width: 200px !important; min-width: 160px !important; }
+  .profile-right-col { padding: 10px 12px !important; overflow-x: hidden; }
+}
+@media (max-width: 700px) {
+  .profile-deck-tile-card { width: 50px !important; height: 70px !important; }
+  .profile-deck-wall { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)) !important; }
+  .profile-top-hero { gap: 2px !important; }
+  .profile-top-hero-card { width: 68px !important; height: 95px !important; }
+  .profile-top-hero-details { display: none !important; }
+}
+
+/* ═══ Battle board mobile ═══ */
+@media (max-height: 500px) {
+  /* Compact opponent hand */
+  .game-hand-opp {
+    min-height: 40px !important;
+    padding: 2px 8px !important;
+  }
+  .game-hand-opp .game-hand-avatar-big {
+    width: 28px !important; height: 28px !important;
+  }
+  .game-hand-opp .orbit-font { font-size: 11px !important; }
+  .game-hand-opp .game-hand-cards .board-card {
+    height: 36px !important;
+  }
+  .game-hand-opp .game-gold-icon { font-size: 18px !important; }
+  .game-hand-opp .game-gold-value { font-size: 16px !important; }
+
+  /* Compact player hand — allow cards to be cut off */
+  .game-hand-me {
+    min-height: 54px !important;
+    padding: 2px 8px !important;
+    overflow: visible;
+  }
+  .game-hand-me .game-hand-avatar-big {
+    width: 28px !important; height: 28px !important;
+  }
+  .game-hand-me .orbit-font { font-size: 11px !important; }
+
+  /* Make BOARD-CENTER scroll, not the whole game-board — sidebars stay fixed */
+  .game-board {
+    overflow: hidden !important;
+  }
+  .board-center {
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+  /* Player sides: natural height so board-center scrolls */
+  .board-player-side {
+    flex: none !important;
+    min-height: auto !important;
+    justify-content: flex-start !important;
+  }
+
+  /* Separate player halves */
+  .board-side-opp { padding-bottom: 2px; }
+  .board-side-me { padding-top: 2px; }
+
+  /* ── Area zones: flow-based at midpoint, keep JS horizontal positions ── */
+  .board-area-zones-center {
+    position: relative !important;
+    top: auto !important;
+    transform: none !important;
+    height: 0 !important;
+    overflow: visible !important;
+    pointer-events: none !important;
+    z-index: 10 !important;
+  }
+  .board-area-zones-center .board-zone {
+    position: absolute !important;
+    top: 0 !important;
+    transform: translateY(-50%) translateX(calc(var(--spacer-w) * 1.15)) !important;
+    pointer-events: auto !important;
+  }
+
+  /* ── Floating numbers: scale down ── */
+  .damage-number { font-size: 12px !important; }
+  .gold-gain-number, .gold-loss-number { font-size: 20px !important; }
+  .toughness-hp-number { font-size: 14px !important; }
+  .fighting-atk-number { font-size: 14px !important; }
+  .level-change-number { font-size: 9px !important; }
+
+  /* Compact phase tracker + buttons — much smaller */
+  .board-mid-row { padding: 1px 0 !important; gap: 4px !important; }
+  .board-phase-tracker { gap: 1px !important; }
+  .board-phase-item { padding: 1px 4px !important; font-size: 6px !important; min-height: auto !important; }
+  .phase-buttons-row { gap: 2px !important; margin-top: 1px !important; }
+  .phase-btn { padding: 1px 5px !important; font-size: 6px !important; min-height: 16px !important; }
+  .phase-end-check { font-size: 6px !important; }
+  .phase-end-check input { width: 8px !important; height: 8px !important; }
+  .phase-column { zoom: 0.9; }
+
+  /* Compact top bar in battle */
+  .game-layout > .top-bar { padding: 2px 8px !important; }
+  .game-layout > .top-bar .btn { padding: 2px 8px !important; font-size: 8px !important; }
+  .game-layout > .top-bar h2 { font-size: 10px !important; }
+}
+
+/* ═══ Deck editor: make right panel fully scrollable on mobile ═══ */
+@media (max-height: 500px) {
+  .db-panel-right {
+    overflow-y: auto !important;
+  }
+  /* Allow filter section to scroll away */
+  .db-panel-right > div[style*="flexShrink: 0"] {
+    flex-shrink: 1 !important;
+  }
+  /* Compact filter inputs */
+  .db-filter-input, .db-filter-select {
+    padding: 2px 4px !important;
+    font-size: 9px !important;
+  }
+  /* Deck section hero row */
+  .db-hero-row { gap: 8px !important; padding: 4px !important; }
+  .db-hero-row .card-slot { width: 60px !important; height: 84px !important; }
+
+  /* ── Card tooltip: match right column width, image-only ── */
+  .card-tooltip {
+    width: 200px !important;
+    height: auto !important;
+    max-height: calc(100vh - 40px) !important;
+    top: 38px !important;
+  }
+  /* Gallery tooltip: position to the LEFT of the gallery panel */
+  .card-tooltip-gallery {
+    right: 200px !important;
+  }
+  /* Hide text info, show only card image */
+  .card-tooltip .card-tooltip-info { display: none !important; }
+  .card-tooltip .card-tooltip-img img {
+    aspect-ratio: 750/1050 !important;
+    width: 100% !important;
+  }
+
+  /* Gallery cards: smaller in grid */
+  .db-card-grid .card-mini {
+    height: 80px !important;
+  }
+}
+
+/* Touch devices: make tooltips tappable/scrollable */
+@media (pointer: coarse) {
+  .board-tooltip, .tooltip { pointer-events: auto !important; cursor: default; }
+}
+
+/* ═══ Board tooltip mobile ═══ */
+@media (max-height: 500px) {
+  .board-tooltip {
+    width: 240px !important;
+    font-size: 11px !important;
+  }
+  /* Hide text info under card image — image only */
+  .board-tooltip > div:last-child { display: none !important; }
+  .board-tooltip img { max-width: 100%; }
+  .board-tooltip-token { display: none !important; }
+
+  /* Scale down status/buff/immune icons */
+  .status-badge { width: 12px !important; height: 12px !important; font-size: 7px !important; }
+  .buff-icon { width: 14px !important; height: 14px !important; font-size: 8px !important; }
+  .status-immune-icon { font-size: 10px !important; }
+  .additional-action-icon { font-size: 8px !important; }
+  .bonus-action-counter { font-size: 8px !important; padding: 0 3px !important; }
+}
+
+/* Tooltip width matches right panel at narrower breakpoints */
+@media (max-height: 500px) and (max-width: 700px) {
+  .card-tooltip { width: 160px !important; }
+  .card-tooltip-gallery { right: 160px !important; }
+}
+
+/* Profile heroes column — tighter on mobile */
+@media (max-width: 850px) {
+  .profile-heroes-col {
+    padding-left: 8px !important;
+    min-width: 100px !important;
+  }
+}
+
+/* ═══ Battle: fix sidebar pile positions on mobile ═══ */
+@media (max-height: 500px) {
+  .board-util-side {
+    justify-content: center !important;
+    gap: 2px !important;
+  }
+  .board-util-spacer { flex: 0 0 2px !important; }
+  .board-util { padding: 2px !important; }
+}

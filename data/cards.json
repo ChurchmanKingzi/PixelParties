@@ -9097,7 +9097,7 @@
     "hp": 400,
     "atk": 80,
     "cost": null,
-    "effect": "During your Action Phase, this Hero may perform up to 2 Attacks as additional Actions, but if it does, no other Hero you control can perform Actions this turn. This Hero can never perform more than 1 copy of the same Attack per turn. The HP of targets hit by an Attack from this Hero cannot drop below 1 until the end of the turn.",
+    "effect": "During your Action Phase, this Hero may perform up to 2 Attacks as additional Actions, but if it does, no other Hero you control can perform Actions this turn. This Hero can never perform more than 1 copy of the same Attack per turn. The HP of targets hit by an Attack from this Hero cannot drop below 1 until the end of the turn. This Hero's Attacks deal damage equal to this Hero's base Attack stat.",
     "archetype": "",
     "setID": "PP MSCH",
     "banned": "",
