@@ -782,51 +782,48 @@ function DeckBuilder() {
   }, []);
 
   const onDeckCardMouseDown = useCallback((e, section, fromIdx, cardName) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    const startX = e.clientX, startY = e.clientY;
+    if (e.type === 'mousedown' && e.button !== 0) return;
+    if (e.cancelable) e.preventDefault();
+    const _startPt = window.getPointerXY(e);
+    const startX = _startPt.x, startY = _startPt.y;
     let dragging = false;
 
-    const onMove = (me2) => {
-      if (!dragging) {
-        if (Math.abs(me2.clientX - startX) + Math.abs(me2.clientY - startY) < 5) return;
-        dragging = true;
-        window.deckDragState = { section, fromIdx, cardName };
-      }
-      setDeckDrag({ section, fromIdx, cardName, card: CARDS_BY_NAME[cardName], mouseX: me2.clientX, mouseY: me2.clientY });
-    };
-
-    const onUp = (me2) => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      if (!dragging) { setDeckDrag(null); window.deckDragState = null; return; }
-
-      // Find which section body the mouse is over
-      const dropTarget = findDropTarget(me2.clientX, me2.clientY, section, fromIdx);
-      if (dropTarget) {
-        if (dropTarget.section === section && section !== 'hero') {
-          // Same section reorder
-          reorderInSection(section, fromIdx, dropTarget.idx);
-        } else if (dropTarget.section === 'hero' && section === 'hero') {
-          // Hero→Hero: swap slots
-          swapHeroes(fromIdx, dropTarget.idx);
-        } else if (dropTarget.section === 'hero') {
-          // Other→Hero: move to specific slot
-          handleDrop('hero', { cardName, fromSection: section, fromIndex: fromIdx, targetSlot: dropTarget.idx });
-        } else {
-          // Cross-section move with position
-          handleDrop(dropTarget.section, { cardName, fromSection: section, fromIndex: fromIdx }, me2.clientX, me2.clientY);
+    window.addDragListeners(
+      (mx, my) => {
+        if (!dragging) {
+          if (Math.abs(mx - startX) + Math.abs(my - startY) < 5) return;
+          dragging = true;
+          window.deckDragState = { section, fromIdx, cardName };
         }
-      } else {
-        // Dropped outside any section — remove from deck
-        removeFrom(cardName, section, fromIdx);
-      }
-      setDeckDrag(null);
-      window.deckDragState = null;
-    };
+        setDeckDrag({ section, fromIdx, cardName, card: CARDS_BY_NAME[cardName], mouseX: mx, mouseY: my });
+      },
+      (mx, my) => {
+        if (!dragging) { setDeckDrag(null); window.deckDragState = null; return; }
 
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+        // Find which section body the pointer is over
+        const dropTarget = findDropTarget(mx, my, section, fromIdx);
+        if (dropTarget) {
+          if (dropTarget.section === section && section !== 'hero') {
+            // Same section reorder
+            reorderInSection(section, fromIdx, dropTarget.idx);
+          } else if (dropTarget.section === 'hero' && section === 'hero') {
+            // Hero→Hero: swap slots
+            swapHeroes(fromIdx, dropTarget.idx);
+          } else if (dropTarget.section === 'hero') {
+            // Other→Hero: move to specific slot
+            handleDrop('hero', { cardName, fromSection: section, fromIndex: fromIdx, targetSlot: dropTarget.idx });
+          } else {
+            // Cross-section move with position
+            handleDrop(dropTarget.section, { cardName, fromSection: section, fromIndex: fromIdx }, mx, my);
+          }
+        } else {
+          // Dropped outside any section — remove from deck
+          removeFrom(cardName, section, fromIdx);
+        }
+        setDeckDrag(null);
+        window.deckDragState = null;
+      }
+    );
   }, [currentDeck, reorderInSection, swapHeroes, handleDrop, removeFrom]);
 
   const findDropTarget = (mouseX, mouseY, fromSection, fromIdx) => {
@@ -1155,7 +1152,8 @@ function DeckBuilder() {
                       {/* Hero card first (166×230) */}
                       {h && h.hero && CARDS_BY_NAME[h.hero] ? (
                         <div style={{ position: 'relative' }}
-                          onMouseDown={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}>
+                          onMouseDown={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}
+                          onTouchStart={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}>
                           <CardMini card={CARDS_BY_NAME[h.hero]}
                             onClick={(e) => showCoverMenu(h.hero, e, 'hero')}
                             style={{ width: 166, height: 230, aspectRatio: 'unset' }} isCover={h.hero === currentDeck?.coverCard} skins={currentDeck?.skins} />
@@ -1196,7 +1194,8 @@ function DeckBuilder() {
                   const card = CARDS_BY_NAME[item.card]; if (!card) return null;
                   const isDragging = deckDrag && deckDrag.section === 'main' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'m-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
-                    onMouseDown={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}>
+                    onMouseDown={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}
+                    onTouchStart={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}>
                     <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'main', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
                   </div>;
                 })}
@@ -1214,7 +1213,8 @@ function DeckBuilder() {
                   const card = CARDS_BY_NAME[item.card]; if (!card) return null;
                   const isDragging = deckDrag && deckDrag.section === 'potion' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'p-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
-                    onMouseDown={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}>
+                    onMouseDown={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}
+                    onTouchStart={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}>
                     <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'potion', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
                   </div>;
                 })}
@@ -1232,7 +1232,8 @@ function DeckBuilder() {
                   const card = CARDS_BY_NAME[item.card]; if (!card) return null;
                   const isDragging = deckDrag && deckDrag.section === 'side' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'s-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
-                    onMouseDown={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}>
+                    onMouseDown={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}
+                    onTouchStart={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}>
                     <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'side', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
                   </div>;
                 })}

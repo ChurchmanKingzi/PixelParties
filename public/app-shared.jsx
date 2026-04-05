@@ -53,6 +53,48 @@ document.addEventListener('touchmove', () => {
   // Cancel long-press if finger moves
   clearTimeout(window._longPressTimer);
 }, { passive: true });
+// ===== UNIFIED POINTER HELPERS (mouse + touch) =====
+// Extracts {x,y} from any mouse or touch event.
+function getPointerXY(e) {
+  if (e.touches && e.touches.length > 0) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  if (e.changedTouches && e.changedTouches.length > 0) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+  return { x: e.clientX, y: e.clientY };
+}
+window.getPointerXY = getPointerXY;
+
+// Registers move+up listeners for BOTH mouse and touch, returns a cleanup function.
+// onMove(x, y, rawEvent), onUp(x, y, rawEvent)
+function addDragListeners(onMove, onUp) {
+  const handleMouseMove = (e) => onMove(e.clientX, e.clientY, e);
+  const handleMouseUp = (e) => { cleanup(); onUp(e.clientX, e.clientY, e); };
+  const handleTouchMove = (e) => {
+    if (e.cancelable) e.preventDefault(); // prevent scroll while dragging
+    const t = e.touches[0];
+    if (t) onMove(t.clientX, t.clientY, e);
+  };
+  const handleTouchEnd = (e) => {
+    cleanup();
+    const t = e.changedTouches[0];
+    if (t) onUp(t.clientX, t.clientY, e);
+    else onUp(0, 0, e);
+  };
+  const handleTouchCancel = (e) => { cleanup(); onUp(0, 0, e); };
+  function cleanup() {
+    window.removeEventListener('mousemove', handleMouseMove);
+    window.removeEventListener('mouseup', handleMouseUp);
+    window.removeEventListener('touchmove', handleTouchMove);
+    window.removeEventListener('touchend', handleTouchEnd);
+    window.removeEventListener('touchcancel', handleTouchCancel);
+  }
+  window.addEventListener('mousemove', handleMouseMove);
+  window.addEventListener('mouseup', handleMouseUp);
+  window.addEventListener('touchmove', handleTouchMove, { passive: false });
+  window.addEventListener('touchend', handleTouchEnd);
+  window.addEventListener('touchcancel', handleTouchCancel);
+  return cleanup;
+}
+window.addDragListeners = addDragListeners;
+
 // ===== API HELPER =====
 window.AUTH_TOKEN = null;
 

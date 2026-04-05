@@ -42,10 +42,9 @@ body {
   font-family: 'Rajdhani', sans-serif;
   overflow: hidden;
   height: 100vh;
-  height: 100dvh;
 }
 
-#root { height: 100vh; height: 100dvh; }
+#root { height: 100vh; }
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg2); }
@@ -516,13 +515,11 @@ body {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  height: 100dvh;
   background: linear-gradient(135deg, #0a0a12 0%, #1a0a2e 50%, #0a1a1e 100%);
 }
 
 .screen-full {
   height: 100vh;
-  height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -1055,6 +1052,9 @@ body {
 .hand-slot {
   cursor: grab;
   transition: transform .15s;
+  touch-action: none; /* prevent browser scroll/zoom during card drag */
+  -webkit-user-select: none;
+  user-select: none;
 }
 .hand-slot:active { cursor: grabbing; }
 .hand-dragging {
@@ -1100,7 +1100,7 @@ body {
   100% { transform: translate(var(--dx), var(--dy)) scale(0.6); opacity: .5; filter: brightness(0.7); }
 }
 /* Deck builder drag */
-.deck-drag-slot { cursor: grab; }
+.deck-drag-slot { cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; }
 .deck-drag-slot:active { cursor: grabbing; }
 .deck-dragging { opacity: 0; width: 0; overflow: hidden; }
 .deck-drag-gap {
@@ -1743,6 +1743,7 @@ body {
   box-shadow: 0 8px 40px rgba(0,0,0,.7), 0 0 20px rgba(0,240,255,.15);
   padding: 24px 40px;
   text-align: center;
+  touch-action: none;
 }
 
 /* Damage numbers */
@@ -4540,7 +4541,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   .card-tooltip {
     width: 200px !important;
     height: auto !important;
-    max-height: calc(100dvh - 40px) !important;
+    max-height: calc(100vh - 40px) !important;
     top: 38px !important;
   }
   /* Gallery tooltip: position to the LEFT of the gallery panel */

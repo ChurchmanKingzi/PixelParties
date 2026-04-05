@@ -97,7 +97,7 @@ function _findEligibleEquips(gs, engine) {
 // ─── MODULE EXPORTS ──────────────────────
 
 module.exports = {
-  // Manual-only Normal Artifact (no reaction, no targeting config)
+  isTargetingArtifact: true,
 
   canActivate(gs, pi) {
     // Check if any equip on the board can be moved
@@ -220,7 +220,25 @@ module.exports = {
       destSlot = freeZones[0];
     }
 
-    // ── Step 5: Animate slide ──
+    // ── Step 5: Execute the move ──
+
+    // 5a: Fire onCardLeaveZone for ONLY the moved card (prevents other equips revoking ATK)
+    await engine.runHooks('onCardLeaveZone', {
+      _onlyCard: inst, card: inst,
+      fromZone: 'support', fromHeroIdx: srcHeroIdx,
+      _skipReactionCheck: true,
+    });
+
+    // 5a-cleanup: Reset atkGranted counter so re-grant on new hero starts fresh
+    // (revokeAtk subtracts from hero.atk but doesn't reset the counter)
+    if (inst.counters.atkGranted) inst.counters.atkGranted = 0;
+
+    // 5b: Remove from source support zone
+    const srcSlotArr = (ps.supportZones[srcHeroIdx] || [])[srcSlot] || [];
+    const srcIdx = srcSlotArr.indexOf(inst.name);
+    if (srcIdx >= 0) srcSlotArr.splice(srcIdx, 1);
+
+    // 5c: Animate slide
     engine._broadcastEvent('play_card_transfer', {
       sourceOwner: equipOwner,
       sourceHeroIdx: srcHeroIdx,
@@ -232,11 +250,33 @@ module.exports = {
       duration: 600,
       particles: null,
     });
-
+    engine.sync();
     await engine._delay(500);
 
-    // ── Step 6: Move via engine (fires onCardLeaveZone / onCardEnterZone hooks) ──
-    await engine.actionMoveCard(inst, 'support', destHeroIdx, destSlot);
+    // 5d: Place into destination support zone
+    if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
+    if (!ps.supportZones[destHeroIdx][destSlot]) ps.supportZones[destHeroIdx][destSlot] = [];
+    ps.supportZones[destHeroIdx][destSlot].push(inst.name);
+
+    // 5e: Update card instance
+    inst.zone = 'support';
+    inst.heroIdx = destHeroIdx;
+    inst.zoneSlot = destSlot;
+
+    engine.sync();
+
+    // 5f: Fire onCardEnterZone for ONLY the moved card
+    await engine.runHooks('onCardEnterZone', {
+      _onlyCard: inst, enteringCard: inst,
+      toZone: 'support', toHeroIdx: destHeroIdx,
+    });
+
+    // 5g: Re-fire onPlay so the equip re-grants ATK on the new hero
+    await engine.runHooks('onPlay', {
+      _onlyCard: inst, playedCard: inst,
+      cardName: inst.name, zone: 'support',
+      heroIdx: destHeroIdx, zoneSlot: destSlot,
+    });
 
     engine.log('slippery_fridge_move', {
       card: inst.name,

@@ -313,23 +313,26 @@ function DraggablePanel({ children, className, style }) {
   const [dragging, setDragging] = useState(false);
   const offsetRef = useRef({ x: 0, y: 0 });
   const panelRef = useRef(null);
+  const cleanupRef = useRef(null);
   const onDown = (e) => {
     if (e.target.tagName === 'BUTTON') return; // Don't drag when clicking buttons
     const r = panelRef.current?.getBoundingClientRect();
     if (!r) return;
-    offsetRef.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+    const pt = window.getPointerXY(e);
+    offsetRef.current = { x: pt.x - r.left, y: pt.y - r.top };
     setDragging(true);
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
   };
   useEffect(() => {
     if (!dragging) return;
-    const onMove = (e) => {
-      setPos({ x: e.clientX - offsetRef.current.x, y: e.clientY - offsetRef.current.y });
-    };
-    const onUp = () => setDragging(false);
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    const cleanup = window.addDragListeners(
+      (mx, my) => {
+        setPos({ x: mx - offsetRef.current.x, y: my - offsetRef.current.y });
+      },
+      () => setDragging(false)
+    );
+    cleanupRef.current = cleanup;
+    return cleanup;
   }, [dragging]);
   const hasCustomPos = pos.x !== 0 || pos.y !== 0;
   const posStyle = hasCustomPos
@@ -337,7 +340,7 @@ function DraggablePanel({ children, className, style }) {
     : {};
   return (
     <div ref={panelRef} className={className} style={{ ...style, ...posStyle, cursor: dragging ? 'grabbing' : 'grab' }}
-      onMouseDown={onDown} onClick={e => e.stopPropagation()}>
+      onMouseDown={onDown} onTouchStart={onDown} onClick={e => e.stopPropagation()}>
       {children}
     </div>
   );
@@ -2952,7 +2955,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
   }, [gameState.result]);
 
   const onHandMouseDown = (e, idx) => {
-    if (e.button !== 0) return;
+    if (e.type === 'mousedown' && e.button !== 0) return;
     if (isSpectator) return; // Spectators can't interact with cards
     const cardName = hand[idx];
     const dimmed = getCardDimmed(cardName, idx);
@@ -2996,7 +2999,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
     const isArtifactActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
       && card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment';
     const isPotionActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Potion';
-    const startX = e.clientX, startY = e.clientY;
+    const _startPt = window.getPointerXY(e);
+    const startX = _startPt.x, startY = _startPt.y;
     let dragging = false;
 
     // Helper: check if cursor is inside the hand zone
@@ -3005,19 +3009,19 @@ function GameBoard({ gameState, lobby, onLeave }) {
       return r && mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom;
     };
 
-    const onMove = (me2) => {
+    const onMove = (mx, my) => {
       if (!dragging) {
-        if (Math.abs(me2.clientX - startX) + Math.abs(me2.clientY - startY) < 5) return;
+        if (Math.abs(mx - startX) + Math.abs(my - startY) < 5) return;
         dragging = true;
       }
 
-      const inHand = isInsideHandZone(me2.clientX, me2.clientY);
+      const inHand = isInsideHandZone(mx, my);
 
       // Inside hand zone → always reorder mode (any card type, even dimmed)
       if (inHand) {
         setPlayDrag(null);
         setAbilityDrag(null);
-        setHandDrag({ idx, cardName, mouseX: me2.clientX, mouseY: me2.clientY });
+        setHandDrag({ idx, cardName, mouseX: mx, mouseY: my });
         return;
       }
 
@@ -3046,7 +3050,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         const heroEls = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls) {
           const r = el.getBoundingClientRect();
-          if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
+          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
             if (el.dataset.heroOwner === 'me') {
               const hi = parseInt(el.dataset.heroIdx);
               if (canReceive(hi, cardName)) { targetHero = hi; targetZone = -1; }
@@ -3058,7 +3062,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
           const abEls = document.querySelectorAll('[data-ability-zone]');
           for (const el of abEls) {
             const r = el.getBoundingClientRect();
-            if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
+            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
               if (el.dataset.abilityOwner === 'me') {
                 const hi = parseInt(el.dataset.abilityHero);
                 const zi = parseInt(el.dataset.abilitySlot);
@@ -3083,7 +3087,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
             }
           }
         }
-        setAbilityDrag({ idx, cardName, card, mouseX: me2.clientX, mouseY: me2.clientY, targetHero, targetZone });
+        setAbilityDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetZone });
       } else if (isPlayable && card.cardType === 'Creature') {
         // Play-mode drag — find valid drop target
         let targetHero = -1, targetSlot = -1;
@@ -3091,7 +3095,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         const els = document.querySelectorAll('[data-support-zone]');
         for (const el of els) {
           const r = el.getBoundingClientRect();
-          if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
+          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
             const hi = parseInt(el.dataset.supportHero);
             const si = parseInt(el.dataset.supportSlot);
             const isOwn = el.dataset.supportOwner === 'me';
@@ -3104,7 +3108,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: me2.clientX, mouseY: me2.clientY, targetHero, targetSlot });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot });
       } else if (isEquipPlayable) {
         // Equip artifact drag — can drop on support zones OR heroes
         let targetHero = -1, targetSlot = -1;
@@ -3112,7 +3116,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         const heroEls = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls) {
           const r = el.getBoundingClientRect();
-          if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
+          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
             if (el.dataset.heroOwner === 'me') {
               const hi = parseInt(el.dataset.heroIdx);
               const hero = me.heroes[hi];
@@ -3131,7 +3135,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
           const els = document.querySelectorAll('[data-support-zone]');
           for (const el of els) {
             const r = el.getBoundingClientRect();
-            if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
+            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
               const hi = parseInt(el.dataset.supportHero);
               const si = parseInt(el.dataset.supportSlot);
               const isOwn = el.dataset.supportOwner === 'me';
@@ -3146,7 +3150,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: me2.clientX, mouseY: me2.clientY, targetHero, targetSlot, isEquip: true });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot, isEquip: true });
       } else if (isPlayable && (card.cardType === 'Spell' || card.cardType === 'Attack')) {
         // Spell/Attack drag — target hero zones (hero must have required spell schools)
         let targetHero = -1;
@@ -3154,7 +3158,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         const heroEls2 = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls2) {
           const r = el.getBoundingClientRect();
-          if (me2.clientX >= r.left && me2.clientX <= r.right && me2.clientY >= r.top && me2.clientY <= r.bottom) {
+          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
             if (el.dataset.heroOwner === 'me') {
               const hi = parseInt(el.dataset.heroIdx);
               if (heroActionHeroIdx2 !== undefined && hi !== heroActionHeroIdx2) continue;
@@ -3162,19 +3166,16 @@ function GameBoard({ gameState, lobby, onLeave }) {
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: me2.clientX, mouseY: me2.clientY, targetHero, targetSlot: -1, isSpell: true });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot: -1, isSpell: true });
       } else {
         // Non-playable card outside hand zone — show floating card (no reorder gap)
         setPlayDrag(null);
         setAbilityDrag(null);
-        setHandDrag({ idx, cardName, mouseX: me2.clientX, mouseY: me2.clientY });
+        setHandDrag({ idx, cardName, mouseX: mx, mouseY: my });
       }
     };
 
-    const onUp = (upEvent) => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-
+    const onUp = (upX, upY) => {
       if (!dragging) {
         // Click (no drag) — check for potion or non-equip artifact activation
         if (!dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 3 || currentPhase === 4) && card) {
@@ -3210,13 +3211,13 @@ function GameBoard({ gameState, lobby, onLeave }) {
       }
 
       // Determine if dropped inside the hand zone
-      const droppedInHand = isInsideHandZone(upEvent.clientX, upEvent.clientY);
+      const droppedInHand = isInsideHandZone(upX, upY);
 
       if (droppedInHand) {
         // Dropped inside hand zone — ALWAYS reorder, regardless of card type
         const newHand = [...hand];
         newHand.splice(idx, 1);
-        const dropIdx = calcDropIdx(upEvent.clientX, idx);
+        const dropIdx = calcDropIdx(upX, idx);
         newHand.splice(dropIdx, 0, cardName);
         setHand(newHand);
         socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand });
@@ -3332,8 +3333,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
       setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
     };
 
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addDragListeners(onMove, onUp);
   };
 
   const calcDropIdx = (mouseX, excludeIdx) => {
@@ -4833,6 +4833,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                     className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard ? ' hand-discard-target' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '')}
                     style={(isDrawAnim || isPendingPlay) ? { visibility: 'hidden' } : undefined}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
+                    onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
                     onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
                     <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} />

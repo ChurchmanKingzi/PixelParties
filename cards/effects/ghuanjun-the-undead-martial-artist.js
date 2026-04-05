@@ -31,6 +31,38 @@ module.exports = {
       }
     },
 
+    // Remove Ghuanjun's immortal buffs at the END of the owner's turn.
+    // The buff also carries expiresBeforeStatusDamage as a safety net
+    // in case Ghuanjun dies mid-turn (dead heroes' hooks don't fire).
+    onTurnEnd: async (ctx) => {
+      if (!ctx.isMyTurn) return;
+      const engine = ctx._engine;
+      const gs = engine.gs;
+      let expired = false;
+
+      // Remove from heroes
+      for (let tpi = 0; tpi < 2; tpi++) {
+        const ps = gs.players[tpi];
+        for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+          const hero = ps.heroes[hi];
+          if (hero?.buffs?.immortal?.source === 'Ghuanjun') {
+            await engine.actionRemoveBuff(hero, tpi, hi, 'immortal');
+            expired = true;
+          }
+        }
+      }
+
+      // Remove from creatures
+      for (const inst of engine.cardInstances) {
+        if (inst.zone !== 'support' || !inst.counters?.buffs?.immortal) continue;
+        if (inst.counters.buffs.immortal.source !== 'Ghuanjun') continue;
+        await engine.actionRemoveCreatureBuff(inst, 'immortal');
+        expired = true;
+      }
+
+      if (expired) engine.sync();
+    },
+
     onActionUsed: async (ctx) => {
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
       if (ctx.playerIdx !== ctx.cardOwner) return;
@@ -109,9 +141,9 @@ module.exports = {
 
     // Flag Ghuanjun's Attacks to cap damage at target HP - 1 (prevents kills)
     // Uses setFlag so the cap applies AFTER all other modifiers (Sacred Hammer, etc.)
-    // Also enforces base ATK damage: Ghuanjun's Attacks always use baseAtk,
-    // ignoring ATK buffs from Equips/Abilities. Bonus damage applied by other
-    // effects (e.g. Sacred Hammer) still procs because it adds its own flat delta.
+    // Also enforces base ATK damage: only corrects Attacks that declare usesHeroAtk
+    // (i.e. attacks that deal hero.atk damage). Attacks that already use baseAtk
+    // (Strong Ox, Tiger Kick, Venom Snake) don't set the flag and are left alone.
     beforeDamage: (ctx) => {
       if (ctx.type !== 'attack') return;
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
@@ -119,17 +151,20 @@ module.exports = {
       if (sourceOwner !== ctx.cardOwner) return;
       ctx.setFlag('capAtHPMinus1', true);
 
-      // Enforce base ATK: subtract the difference between current and base ATK
-      const hero = ctx.players?.[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
-      if (hero && hero.baseAtk !== undefined) {
-        const diff = (hero.atk || 0) - (hero.baseAtk || 0);
-        if (diff !== 0) {
-          ctx.modifyAmount(-diff);
+      // Enforce base ATK: only correct attacks that use hero.atk for damage
+      if (ctx.source?.usesHeroAtk) {
+        const hero = ctx.players?.[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
+        if (hero && hero.baseAtk !== undefined) {
+          const diff = (hero.atk || 0) - (hero.baseAtk || 0);
+          if (diff !== 0) {
+            ctx.modifyAmount(-diff);
+          }
         }
       }
     },
 
-    // After Attack damage to hero: apply Immortal buff for other sources
+    // After Attack damage to hero: apply Immortal buff with auto-expiry
+    // Expires at start of opponent's turn BEFORE burn/poison fires
     afterDamage: async (ctx) => {
       if (ctx.type !== 'attack') return;
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
@@ -143,7 +178,12 @@ module.exports = {
       if (!target || target.hp === undefined) return;
       if (target.buffs?.immortal) return;
       if (!target.buffs) target.buffs = {};
-      target.buffs.immortal = { source: 'Ghuanjun', expiresAtTurn: gs.turn + 1, expiresForPlayer: oppIdx };
+      target.buffs.immortal = {
+        source: 'Ghuanjun',
+        expiresAtTurn: gs.turn + 1,
+        expiresForPlayer: oppIdx,
+        expiresBeforeStatusDamage: true,
+      };
       engine.log('immortal_applied', { target: target.name || 'Hero', by: 'Ghuanjun' });
       engine.sync();
     },
@@ -154,19 +194,21 @@ module.exports = {
       const heroIdx = ctx.cardHeroIdx;
       const pi = ctx.cardOwner;
       const hero = ctx.players?.[pi]?.heroes?.[heroIdx];
-      const diff = hero ? (hero.atk || 0) - (hero.baseAtk || 0) : 0;
       for (const e of ctx.entries) {
         if (e.type !== 'attack' || e.cancelled) continue;
         if ((e.source?.heroIdx ?? -1) !== heroIdx || (e.source?.owner ?? -1) !== pi) continue;
         e.capAtHPMinus1 = true;
-        // Enforce base ATK: subtract equip/ability ATK bonuses from damage
-        if (diff !== 0) {
-          e.amount = Math.max(0, e.amount - diff);
+        // Only correct attacks that use hero.atk for damage
+        if (e.source?.usesHeroAtk && hero) {
+          const diff = (hero.atk || 0) - (hero.baseAtk || 0);
+          if (diff !== 0) {
+            e.amount = Math.max(0, e.amount - diff);
+          }
         }
       }
     },
 
-    // After creature batch: apply Immortal buff
+    // After creature batch: apply Immortal buff with auto-expiry
     afterCreatureDamageBatch: (ctx) => {
       if (!ctx.entries) return;
       const engine = ctx._engine;
@@ -180,7 +222,12 @@ module.exports = {
         const inst = e.inst;
         if (!inst || inst.zone !== 'support' || inst.counters?.buffs?.immortal) continue;
         if (!inst.counters.buffs) inst.counters.buffs = {};
-        inst.counters.buffs.immortal = { source: 'Ghuanjun', expiresAtTurn: gs.turn + 1, expiresForPlayer: oppIdx };
+        inst.counters.buffs.immortal = {
+          source: 'Ghuanjun',
+          expiresAtTurn: gs.turn + 1,
+          expiresForPlayer: oppIdx,
+          expiresBeforeStatusDamage: true,
+        };
         engine.log('immortal_applied', { target: inst.name, by: 'Ghuanjun' });
       }
     },

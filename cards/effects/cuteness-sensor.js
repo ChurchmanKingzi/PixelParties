@@ -20,6 +20,8 @@ module.exports = {
   isTargetingArtifact: true,
 
   canActivate(gs, pi) {
+    // Hand lock — cannot add cards to hand
+    if (gs.players[pi]?.handLocked) return false;
     // Must have at least one "Cute" card in deck
     return (gs.players[pi]?.mainDeck || []).some(name => isCuteCard(name));
   },
@@ -42,6 +44,7 @@ module.exports = {
   resolve: async (engine, pi) => {
     const ps = engine.gs.players[pi];
     if (!ps) return;
+    if (ps.handLocked) return;
 
     // Build deduplicated gallery from deck — "Cute" cards only
     const countMap = {};

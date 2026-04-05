@@ -11,6 +11,8 @@ module.exports = {
   isTargetingArtifact: true,
 
   canActivate(gs, pi) {
+    // Hand lock — cannot add cards to hand
+    if (gs.players[pi]?.handLocked) return false;
     // HOPT check
     const hoptKey = `cute-cheese:${pi}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
@@ -37,6 +39,7 @@ module.exports = {
   resolve: async (engine, pi) => {
     const ps = engine.gs.players[pi];
     if (!ps) return;
+    if (ps.handLocked) return;
 
     // Claim HOPT
     if (!engine.claimHOPT('cute-cheese', pi)) return;

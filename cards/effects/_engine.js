@@ -218,7 +218,7 @@ class GameEngine {
       if ((c.zone === 'hero' || c.zone === 'ability' || c.zone === 'support') && c.heroIdx >= 0) {
         const hero = this.gs.players[c.controller ?? c.owner]?.heroes?.[c.heroIdx];
         if (!hero || !hero.name) return false; // Empty hero slot
-        if (hero.hp <= 0) return false;
+        if (hero.hp <= 0 && !hookCtx._bypassDeadHeroFilter) return false;
         if ((hero.statuses?.frozen || hero.statuses?.stunned) && (c.zone === 'hero' || c.zone === 'ability')) return false;
         if (hero.statuses?.negated && (c.zone === 'hero' || c.zone === 'ability')) return false;
       }
@@ -499,6 +499,23 @@ class GameEngine {
       },
 
       /**
+       * Lock hand additions for the card's controller for the rest of this turn.
+       * Prevents all draws and cards being added to hand (search effects, etc.).
+       */
+      lockHand() {
+        const ps = gs.players[cardInstance.controller];
+        if (ps) ps.handLocked = true;
+        engine.sync();
+      },
+
+      /**
+       * Check if the card's controller has hand additions locked this turn.
+       */
+      isHandLocked() {
+        return !!gs.players[cardInstance.controller]?.handLocked;
+      },
+
+      /**
        * Register an additional action type (call once from card script init/play).
        */
       registerAdditionalActionType(typeId, config) {
@@ -702,7 +719,7 @@ class GameEngine {
         }
 
         // Deal ATK-based damage with type 'attack'
-        const attackSource = { name: cardInstance.name, owner: pi, heroIdx, controller: pi };
+        const attackSource = { name: cardInstance.name, owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
         let dealt = 0;
 
         if (target.type === 'hero') {
@@ -727,6 +744,33 @@ class GameEngine {
 
         engine.sync();
         return { target, damage: dealt || atkDamage, hero, heroIdx, atkDamage };
+      },
+
+      // ── Generic AoE Handler ──
+      /**
+       * Generic AoE effect handler. Collects targets, handles Ida single-target
+       * override, plays animations, and deals damage via proper channels.
+       *
+       * @param {object} config
+       * @param {string}   config.side           - 'enemy' | 'own' | 'both'
+       * @param {string[]} [config.types]        - ['hero','creature'] (default both)
+       * @param {number}   [config.damage]       - Damage to deal. 0 = collect + animate only. (default 0)
+       * @param {string}   [config.damageType]   - e.g. 'destruction_spell', 'attack', 'fire'
+       * @param {string}   config.sourceName     - Card name for logging & source tracking
+       * @param {string}   [config.animationType]- Animation played on all targets
+       * @param {number}   [config.animDelay]    - Delay after animation (default 300)
+       * @param {number}   [config.hitDelay]     - Delay between individual hero hits (default 150)
+       * @param {Function} [config.heroFilter]   - (hero, heroIdx, playerIdx) => bool
+       * @param {Function} [config.creatureFilter]- (inst, cardData) => bool
+       * @param {number}   [config.heroMinHp]    - Only heroes with hp >= this
+       * @param {number}   [config.heroMaxHp]    - Only heroes with hp <= this
+       * @param {number}   [config.creatureMinHp]- Only creatures with currentHp >= this
+       * @param {number}   [config.creatureMaxHp]- Only creatures with currentHp <= this
+       * @param {object}   [config.singleTargetPrompt] - Ida override: { title, description, confirmLabel, cancellable }
+       * @returns {{ heroes, creatures, wasSingleTarget, cancelled }}
+       */
+      async aoeHit(config = {}) {
+        return engine.actionAoeHit(cardInstance, config);
       },
 
       // ── Queries ──
@@ -1463,6 +1507,7 @@ class GameEngine {
   async actionDrawCards(playerIdx, count) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
+    if (ps.handLocked) return [];
 
     const drawn = [];
     for (let i = 0; i < count; i++) {
@@ -1906,11 +1951,16 @@ class GameEngine {
    * Process buff expiry at the start of a turn.
    * Removes buffs whose expiresAtTurn matches the current turn
    * and expiresForPlayer matches the active player.
-   * Called after burn/poison so buffs still protect during those.
+   *
+   * Supports two-pass operation via opts.beforeStatusDamage:
+   *   true  → only expire buffs with expiresBeforeStatusDamage flag (Immortal, etc.)
+   *   false → only expire buffs WITHOUT that flag (Cloudy, etc.)
+   *   undefined → expire all matching buffs (legacy behavior)
    */
-  async _processBuffExpiry() {
+  async _processBuffExpiry(opts = {}) {
     const currentTurn = this.gs.turn;
     const activePlayer = this.gs.activePlayer;
+    const filterEarly = opts.beforeStatusDamage;
     let expired = false;
 
     // Hero buffs
@@ -1920,10 +1970,11 @@ class GameEngine {
         const hero = ps.heroes[hi];
         if (!hero?.buffs) continue;
         for (const [buffName, buffData] of Object.entries(hero.buffs)) {
-          if (buffData.expiresAtTurn === currentTurn && buffData.expiresForPlayer === activePlayer) {
-            await this.actionRemoveBuff(hero, pi, hi, buffName);
-            expired = true;
-          }
+          if (buffData.expiresAtTurn !== currentTurn || buffData.expiresForPlayer !== activePlayer) continue;
+          if (filterEarly === true && !buffData.expiresBeforeStatusDamage) continue;
+          if (filterEarly === false && buffData.expiresBeforeStatusDamage) continue;
+          await this.actionRemoveBuff(hero, pi, hi, buffName);
+          expired = true;
         }
       }
     }
@@ -1932,10 +1983,11 @@ class GameEngine {
     for (const inst of this.cardInstances) {
       if (inst.zone !== ZONES.SUPPORT || !inst.counters?.buffs) continue;
       for (const [buffName, buffData] of Object.entries(inst.counters.buffs)) {
-        if (buffData.expiresAtTurn === currentTurn && buffData.expiresForPlayer === activePlayer) {
-          await this.actionRemoveCreatureBuff(inst, buffName);
-          expired = true;
-        }
+        if (buffData.expiresAtTurn !== currentTurn || buffData.expiresForPlayer !== activePlayer) continue;
+        if (filterEarly === true && !buffData.expiresBeforeStatusDamage) continue;
+        if (filterEarly === false && buffData.expiresBeforeStatusDamage) continue;
+        await this.actionRemoveCreatureBuff(inst, buffName);
+        expired = true;
       }
     }
 
@@ -2379,6 +2431,7 @@ class GameEngine {
     for (const ps of this.gs.players) {
       if (ps) {
         ps.summonLocked = false;
+        ps.handLocked = false;
         ps.damageLocked = false;
         ps.dealtDamageToOpponent = false;
         ps.potionLocked = false;
@@ -2397,7 +2450,11 @@ class GameEngine {
     // not burns applied during this turn's ON_TURN_START (e.g. Barker → Fiery Slime)
     await this.processStatusExpiry('START');
 
-    // Burn/poison damage BEFORE buff expiry — so buffs like Cloudy still
+    // Early buff expiry: remove buffs flagged with expiresBeforeStatusDamage BEFORE
+    // burn/poison fires (e.g. Ghuanjun's Immortal should not protect through opponent's burn tick)
+    await this._processBuffExpiry({ beforeStatusDamage: true });
+
+    // Burn/poison damage BEFORE regular buff expiry — so buffs like Cloudy still
     // halve status damage on the turn they expire
     await this.processBurnDamage();
     await this.processPoisonDamage();
@@ -2405,8 +2462,8 @@ class GameEngine {
     // Hook: all status damage done — deferred effects (Elixir revive choice) can resolve
     await this.runHooks(HOOKS.AFTER_ALL_STATUS_DAMAGE, { _skipReactionCheck: true });
 
-    // Process buff expiry (Cloudy, Immortal, etc.) AFTER status damage
-    await this._processBuffExpiry();
+    // Process regular buff expiry (Cloudy, etc.) AFTER status damage
+    await this._processBuffExpiry({ beforeStatusDamage: false });
 
     // Now fire turn-start hooks (Barker, Slime level-ups, Rancher restore, etc.)
     await this.runHooks(HOOKS.ON_TURN_START, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
@@ -3813,6 +3870,198 @@ class GameEngine {
     }
   }
 
+  // ─── GENERIC AOE HANDLER ───────────────
+  /**
+   * Generic AoE effect handler. Collects targets based on config, handles Ida
+   * single-target override, plays animations, and deals damage via proper channels.
+   * Used by Flame Avalanche, Rain of Arrows, and future AoE cards.
+   *
+   * @param {CardInstance} cardInst - The card triggering the AoE
+   * @param {object} config - See ctx.aoeHit() jsdoc for full config
+   * @returns {{ heroes: Array, creatures: Array, wasSingleTarget: boolean, cancelled: boolean }}
+   */
+  async actionAoeHit(cardInst, config = {}) {
+    const gs = this.gs;
+    const pi = cardInst.controller;
+    const oppIdx = pi === 0 ? 1 : 0;
+    const heroIdx = cardInst.heroIdx;
+    const damage = config.damage || 0;
+    const damageType = config.damageType || 'other';
+    const sourceName = config.sourceName || cardInst.name;
+    const types = config.types || ['hero', 'creature'];
+    const animationType = config.animationType;
+    const animDelay = config.animDelay ?? 300;
+    const hitDelay = config.hitDelay ?? 150;
+    const cardDB = this._getCardDB();
+
+    // Determine which player indices to target
+    const targetPlayers = [];
+    if (config.side === 'enemy') targetPlayers.push(oppIdx);
+    else if (config.side === 'own') targetPlayers.push(pi);
+    else if (config.side === 'both') targetPlayers.push(0, 1);
+    else targetPlayers.push(oppIdx); // default: enemy
+
+    // ── Ida single-target override check ──
+    const heroFlags = gs.heroFlags?.[`${pi}-${heroIdx}`];
+    const isSingleTarget = !!(heroFlags?.forcesSingleTarget && config.singleTargetPrompt);
+
+    if (isSingleTarget) {
+      const prompt = config.singleTargetPrompt;
+      const sideMap = { enemy: 'enemy', own: 'my', both: 'any' };
+      const target = await this._createContext(cardInst, {}).promptDamageTarget({
+        side: sideMap[config.side] || 'enemy',
+        types: types.includes('creature') ? ['hero', 'creature'] : ['hero'],
+        damageType,
+        title: prompt.title || sourceName,
+        description: prompt.description || `Deal ${damage} damage.`,
+        confirmLabel: prompt.confirmLabel || `💥 ${damage} Damage!`,
+        confirmClass: prompt.confirmClass || 'btn-danger',
+        cancellable: prompt.cancellable !== false,
+      });
+
+      if (!target) return { heroes: [], creatures: [], wasSingleTarget: true, cancelled: true };
+
+      // Animation on single target
+      if (animationType) {
+        const slot = target.type === 'hero' ? -1 : target.slotIdx;
+        this._broadcastEvent('play_zone_animation', {
+          type: animationType, owner: target.owner,
+          heroIdx: target.heroIdx, zoneSlot: slot,
+        });
+        await this._delay(animDelay);
+      }
+
+      // Deal damage to single target
+      if (damage > 0) {
+        if (target.type === 'hero') {
+          const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
+          if (hero && hero.hp > 0) {
+            const ctx = this._createContext(cardInst, {});
+            await ctx.dealDamage(hero, damage, damageType);
+          }
+          return {
+            heroes: [{ hero: gs.players[target.owner]?.heroes?.[target.heroIdx], heroIdx: target.heroIdx, owner: target.owner }],
+            creatures: [], wasSingleTarget: true, cancelled: false,
+          };
+        } else if (target.cardInstance) {
+          await this.actionDealCreatureDamage(
+            { name: sourceName, owner: pi, heroIdx },
+            target.cardInstance, damage, damageType,
+            { sourceOwner: pi, canBeNegated: true },
+          );
+          return {
+            heroes: [], creatures: [{ inst: target.cardInstance }],
+            wasSingleTarget: true, cancelled: false,
+          };
+        }
+      }
+
+      // Damage 0 — return target info without dealing damage
+      const result = { heroes: [], creatures: [], wasSingleTarget: true, cancelled: false };
+      if (target.type === 'hero') {
+        result.heroes.push({ hero: gs.players[target.owner]?.heroes?.[target.heroIdx], heroIdx: target.heroIdx, owner: target.owner });
+      } else if (target.cardInstance) {
+        result.creatures.push({ inst: target.cardInstance });
+      }
+      return result;
+    }
+
+    // ── AoE mode (normal) ──
+
+    // Collect heroes
+    const allHeroes = [];       // for animation (includes shielded)
+    const hitHeroes = [];       // for damage (excludes shielded)
+    if (types.includes('hero')) {
+      for (const tpi of targetPlayers) {
+        const ps = gs.players[tpi];
+        for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+          const hero = ps.heroes[hi];
+          if (!hero?.name || hero.hp <= 0) continue;
+          // HP threshold filters
+          if (config.heroMinHp !== undefined && hero.hp < config.heroMinHp) continue;
+          if (config.heroMaxHp !== undefined && hero.hp > config.heroMaxHp) continue;
+          // Custom filter
+          if (config.heroFilter && !config.heroFilter(hero, hi, tpi)) continue;
+
+          allHeroes.push({ hero, heroIdx: hi, owner: tpi });
+          if (!hero.statuses?.shielded) {
+            hitHeroes.push({ hero, heroIdx: hi, owner: tpi });
+          }
+        }
+      }
+    }
+
+    // Collect creatures (only Creature/Token card types)
+    const creatureEntries = [];
+    if (types.includes('creature')) {
+      for (const tpi of targetPlayers) {
+        for (const inst of this.cardInstances) {
+          if (inst.owner !== tpi || inst.zone !== 'support') continue;
+          const cd = cardDB[inst.name];
+          if (!cd || (cd.cardType !== 'Creature' && cd.cardType !== 'Token')) continue;
+          // HP threshold filters
+          const currentHp = inst.counters.currentHp ?? (cd.hp || 0);
+          if (config.creatureMinHp !== undefined && currentHp < config.creatureMinHp) continue;
+          if (config.creatureMaxHp !== undefined && currentHp > config.creatureMaxHp) continue;
+          // Custom filter
+          if (config.creatureFilter && !config.creatureFilter(inst, cd)) continue;
+
+          creatureEntries.push({
+            inst, amount: damage, type: damageType,
+            source: { name: sourceName, owner: pi, heroIdx },
+            sourceOwner: pi, canBeNegated: true,
+            isStatusDamage: false,
+            animType: animationType,
+          });
+        }
+      }
+    }
+
+    // Play animations on ALL targets simultaneously (even shielded)
+    if (animationType) {
+      for (const { heroIdx: hi, owner } of allHeroes) {
+        this._broadcastEvent('play_zone_animation', { type: animationType, owner, heroIdx: hi, zoneSlot: -1 });
+      }
+      // Creature animations are handled by processCreatureDamageBatch's animType,
+      // but if damage is 0 we play them manually
+      if (damage === 0) {
+        for (const e of creatureEntries) {
+          this._broadcastEvent('play_zone_animation', {
+            type: animationType, owner: e.inst.owner,
+            heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
+          });
+        }
+      }
+      if (allHeroes.length > 0 || creatureEntries.length > 0) {
+        await this._delay(animDelay);
+      }
+    }
+
+    // Deal damage to heroes
+    if (damage > 0) {
+      const ctx = this._createContext(cardInst, {});
+      for (const { hero } of hitHeroes) {
+        if (hero.hp <= 0) continue; // May have died from a previous hit this loop
+        await ctx.dealDamage(hero, damage, damageType);
+        this.sync();
+        if (hitDelay > 0) await this._delay(hitDelay);
+      }
+
+      // Deal damage to creatures via batch
+      if (creatureEntries.length > 0) {
+        await this.processCreatureDamageBatch(creatureEntries);
+      }
+    }
+
+    this.sync();
+    return {
+      heroes: allHeroes,
+      creatures: creatureEntries.map(e => ({ inst: e.inst })),
+      wasSingleTarget: false,
+      cancelled: false,
+    };
+  }
+
   // ─── CREATURE DAMAGE (GENERIC BATCHED) ────
   /**
    * Deal damage to one or more creatures in a single batch.
@@ -3975,11 +4224,14 @@ class GameEngine {
       burnedHeroes.push({ owner: ap, heroIdx: hi, heroName: hero.name });
     }
 
-    // Also find burned creatures
+    // Also find burned creatures (not Equipment Artifacts, Spells, etc.)
     const burnedCreatures = [];
+    const burnCardDB = this._getCardDB();
     for (const inst of this.cardInstances) {
       if (inst.owner !== ap || inst.zone !== 'support') continue;
       if (!inst.counters.burned) continue;
+      const cd = burnCardDB[inst.name];
+      if (!cd || (cd.cardType !== 'Creature' && cd.cardType !== 'Token')) continue;
       burnedCreatures.push(inst);
     }
 
@@ -4034,11 +4286,14 @@ class GameEngine {
       poisonedHeroes.push({ owner: ap, heroIdx: hi, heroName: hero.name, stacks });
     }
 
-    // Poisoned creatures
+    // Poisoned creatures (not Equipment Artifacts, Spells, etc.)
     const poisonedCreatures = [];
+    const poisonCardDB = this._getCardDB();
     for (const inst of this.cardInstances) {
       if (inst.owner !== ap || inst.zone !== 'support') continue;
       if (!inst.counters.poisoned) continue;
+      const cd = poisonCardDB[inst.name];
+      if (!cd || (cd.cardType !== 'Creature' && cd.cardType !== 'Token')) continue;
       const stacks = inst.counters.poisonStacks || 1;
       poisonedCreatures.push({ inst, stacks });
     }
@@ -4094,17 +4349,21 @@ class GameEngine {
       const hi = ps.heroes.findIndex(h => h === hero);
       if (hi < 0) continue;
 
-      // Find equip artifact CardInstances on this hero's support zones
-      const equipInstances = this.cardInstances.filter(c => {
+      // Find all non-Creature/non-Token cards on this hero's support zones (Artifacts, Spells, Attacks, etc.)
+      // Creatures and Tokens have their own mechanics; immovable cards (e.g. Divine Gift of Coolness) are protected
+      const cardDB = this._getCardDB();
+      const destroyableInstances = this.cardInstances.filter(c => {
         if (c.owner !== pi || c.zone !== 'support' || c.heroIdx !== hi) return false;
         if (c.counters?.immovable) return false; // Immovable cards stay even on dead heroes
-        const script = c.loadScript();
-        return script?.isEquip === true || c.counters?.treatAsEquip === true;
+        const cd = cardDB[c.name];
+        if (cd && (cd.cardType === 'Creature' || cd.cardType === 'Token')) return false;
+        return true;
       });
 
-      for (const inst of equipInstances) {
-        // Fire onCardLeaveZone (triggers Flying Island cleanup etc.)
-        await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, { _onlyCard: inst, card: inst, fromZone: 'support', fromHeroIdx: hi });
+      for (const inst of destroyableInstances) {
+        // Fire onCardLeaveZone (triggers Sun Sword cleanup, Flying Island, etc.)
+        // _bypassDeadHeroFilter: hero is already dead, but we still need cleanup hooks to fire
+        await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, { _onlyCard: inst, card: inst, fromZone: 'support', fromHeroIdx: hi, _bypassDeadHeroFilter: true });
         // Move card to discard
         const supZones = ps.supportZones[hi] || [];
         for (let zi = 0; zi < supZones.length; zi++) {

@@ -109,10 +109,11 @@ async function thawAll(engine, pi) {
 
 /**
  * Check if the player controls an active Sun Sword.
+ * Optionally exclude a specific card ID (the one currently being removed).
  */
-function hasSunSword(engine, pi) {
+function hasSunSword(engine, pi, excludeId) {
   return engine.cardInstances.some(c =>
-    c.owner === pi && c.zone === 'support' && c.name === 'The Sun Sword'
+    c.owner === pi && c.zone === 'support' && c.name === 'The Sun Sword' && c.id !== excludeId
   );
 }
 
@@ -161,7 +162,7 @@ module.exports = {
       ctx.revokeAtk();
 
       // Only remove freeze immunity if no other Sun Sword is still equipped
-      if (!hasSunSword(engine, pi)) {
+      if (!hasSunSword(engine, pi, ctx.card.id)) {
         removeFreezeImmunity(engine, pi);
       }
       engine.sync();

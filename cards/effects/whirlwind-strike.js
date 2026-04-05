@@ -69,7 +69,7 @@ module.exports = {
       });
       await engine._delay(400);
 
-      const attackSource = { name: 'Whirlwind Strike', owner: pi, heroIdx, controller: pi };
+      const attackSource = { name: 'Whirlwind Strike', owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
       const cardDB = engine._getCardDB();
 
       // ── Collect ALL damage targets first, then process ──
