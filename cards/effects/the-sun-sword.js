@@ -13,6 +13,8 @@
 //     Burned, Burn it.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 const ATK_BONUS = 20;
 
 // ─── HELPERS ─────────────────────────────
@@ -40,7 +42,7 @@ function applyFreezeImmunity(engine, pi) {
   for (const inst of engine.cardInstances) {
     if (inst.owner !== pi || inst.zone !== 'support') continue;
     const cd = cardDB[inst.name];
-    if (!cd || cd.cardType !== 'Creature') continue;
+    if (!cd || !hasCardType(cd, 'Creature')) continue;
     inst.counters.freeze_immune = 1;
     if (!inst.counters.buffs) inst.counters.buffs = {};
     inst.counters.buffs.freeze_immune = { source: 'The Sun Sword' };
@@ -72,7 +74,7 @@ function removeFreezeImmunity(engine, pi) {
   for (const inst of engine.cardInstances) {
     if (inst.owner !== pi || inst.zone !== 'support') continue;
     const cd = cardDB[inst.name];
-    if (!cd || cd.cardType !== 'Creature') continue;
+    if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (inst.counters.freeze_immune) delete inst.counters.freeze_immune;
     if (inst.counters.buffs?.freeze_immune?.source === 'The Sun Sword') {
       delete inst.counters.buffs.freeze_immune;
@@ -181,7 +183,7 @@ module.exports = {
       // Only Creatures get buffs, not Equipment Artifacts
       const cardDB = ctx._engine._getCardDB();
       const cd = cardDB[entering.name];
-      if (!cd || cd.cardType !== 'Creature') return;
+      if (!cd || !hasCardType(cd, 'Creature')) return;
 
       // Apply freeze immunity to the entering creature
       entering.counters.freeze_immune = 1;

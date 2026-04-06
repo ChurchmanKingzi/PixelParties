@@ -15,6 +15,8 @@
 //  Support Zone (slots 0–2, not island zones).
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 const { loadCardEffect } = require('./_loader');
 
 // ─── MODULE-LEVEL CARD DB (cached) ───────
@@ -39,7 +41,7 @@ function _isEquipByData(cardName) {
   const cd = cardDB[cardName];
   if (!cd) return false;
   if ((cd.subtype || '').toLowerCase() === 'equipment') return true;
-  if (cd.cardType === 'Hero' || cd.cardType === 'Ascended Hero') return true;
+  if (hasCardType(cd, 'Hero') || hasCardType(cd, 'Ascended Hero')) return true;
   const script = loadCardEffect(cardName);
   if (script?.isEquip) return true;
   return false;

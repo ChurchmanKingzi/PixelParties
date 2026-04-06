@@ -41,12 +41,18 @@ function heroCanAcceptFighting(ps, heroIdx) {
 /**
  * Check if a hero has at least 1 Equipment Artifact in its Support Zones.
  */
-function heroHasEquipment(ps, heroIdx, cardDB) {
+function heroHasEquipment(ps, heroIdx, cardDB, engine) {
   for (let si = 0; si < (ps.supportZones[heroIdx] || []).length; si++) {
     const slot = (ps.supportZones[heroIdx] || [])[si] || [];
     if (slot.length === 0) continue;
-    const cd = cardDB[slot[0]];
-    if (cd && (cd.subtype || '').toLowerCase() === 'equipment') return true;
+    if (engine) {
+      // Use centralized equip detection (handles treatAsEquip, Hero-in-support, etc.)
+      const inst = engine.cardInstances.find(c => c.owner !== undefined && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === si);
+      if (engine.isEquipInZone(slot[0], inst)) return true;
+    } else {
+      const cd = cardDB[slot[0]];
+      if (cd && (cd.subtype || '').toLowerCase() === 'equipment') return true;
+    }
   }
   return false;
 }
@@ -86,7 +92,7 @@ module.exports = {
     if ((ps.heroesAttackedThisTurn || []).includes(heroIdx)) return false;
 
     const cardDB = engine._getCardDB();
-    return heroHasEquipment(ps, heroIdx, cardDB);
+    return heroHasEquipment(ps, heroIdx, cardDB, engine);
   },
 
   hooks: {

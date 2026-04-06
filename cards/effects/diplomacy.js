@@ -18,6 +18,8 @@
 //  Animation: white doves from hero to target.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 const MAX_LEVEL = [1, 2, 3];   // index 0 = Lv1, etc.
 const GOLD_COST = [20, 10, 5]; // index 0 = Lv1, etc.
 
@@ -68,7 +70,7 @@ function getEligibleCreatures(engine, pi, maxCreatureLevel) {
     if (engine.isCreatureImmune(inst, 'targeting_immune')) continue;
     if (engine.isCreatureImmune(inst, 'control_immune')) continue;
     const cd = cardDB[inst.name];
-    if (!cd || cd.cardType !== 'Creature') continue;
+    if (!cd || !hasCardType(cd, 'Creature')) continue;
     if ((cd.level || 0) > maxCreatureLevel) continue;
     targets.push({
       id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,

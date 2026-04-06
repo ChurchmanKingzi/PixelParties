@@ -784,6 +784,8 @@ function DeckBuilder() {
   const onDeckCardMouseDown = useCallback((e, section, fromIdx, cardName) => {
     if (e.type === 'mousedown' && e.button !== 0) return;
     if (e.cancelable) e.preventDefault();
+    // Cancel any long-press tooltip timer so it doesn't fire during drag
+    clearTimeout(window._longPressTimer);
     const _startPt = window.getPointerXY(e);
     const startX = _startPt.x, startY = _startPt.y;
     let dragging = false;
@@ -793,12 +795,22 @@ function DeckBuilder() {
         if (!dragging) {
           if (Math.abs(mx - startX) + Math.abs(my - startY) < 5) return;
           dragging = true;
+          clearTimeout(window._longPressTimer);
           window.deckDragState = { section, fromIdx, cardName };
         }
         setDeckDrag({ section, fromIdx, cardName, card: CARDS_BY_NAME[cardName], mouseX: mx, mouseY: my });
       },
       (mx, my) => {
-        if (!dragging) { setDeckDrag(null); window.deckDragState = null; return; }
+        if (!dragging) {
+          setDeckDrag(null); window.deckDragState = null;
+          // On touch, preventDefault on touchstart suppresses the browser click.
+          // Emulate it so CardMini onClick (cover menu, etc.) still works.
+          if (window._isTouchDevice) {
+            const el = document.elementFromPoint(mx, my);
+            if (el) el.click();
+          }
+          return;
+        }
 
         // Find which section body the pointer is over
         const dropTarget = findDropTarget(mx, my, section, fromIdx);
@@ -842,7 +854,15 @@ function DeckBuilder() {
       if (mouseX >= rect.left && mouseX <= rect.right && mouseY >= rect.top && mouseY <= rect.bottom) {
         const targetSection = secEl.dataset.deckSection;
         if (targetSection === 'hero') continue; // Handled above by individual hero slots
-        const slots = secEl.querySelectorAll('.deck-drag-slot');
+        const allSlots = secEl.querySelectorAll('.deck-drag-slot');
+        // Build list of visible (non-dragging) slots for hit detection,
+        // tracking their original indices so the returned idx matches the
+        // deck array with the drag source removed (same as original behavior).
+        const slots = [];
+        for (let i = 0; i < allSlots.length; i++) {
+          if (allSlots[i].classList.contains('deck-dragging')) continue;
+          slots.push(allSlots[i]);
+        }
         let targetIdx = slots.length;
         for (let i = 0; i < slots.length; i++) {
           const sr = slots[i].getBoundingClientRect();
@@ -880,16 +900,19 @@ function DeckBuilder() {
 
     if (!deckDrag) return baseItems();
 
-    // Source section — remove dragged card and insert gap at cursor
+    // Source section — keep dragged card in DOM (for touch tracking) but insert gap at cursor
     if (deckDrag.section === section) {
       const dropTarget = findDropTarget(deckDrag.mouseX, deckDrag.mouseY, deckDrag.section, deckDrag.fromIdx);
       const filled = [];
       for (let i = 0; i < cards.length; i++) {
-        if (i === deckDrag.fromIdx) continue;
         filled.push({ card: cards[i], origIdx: i, isGap: false, isEmpty: false });
       }
       if (dropTarget && dropTarget.section === section) {
-        const insertAt = Math.min(dropTarget.idx > deckDrag.fromIdx ? dropTarget.idx - 1 : dropTarget.idx, filled.length);
+        // findDropTarget returns indices that skip the drag source, but filled
+        // still contains it — adjust insertion point past the drag source
+        let insertAt = dropTarget.idx;
+        if (insertAt >= deckDrag.fromIdx) insertAt++;
+        insertAt = Math.min(insertAt, filled.length);
         filled.splice(insertAt, 0, { card: null, origIdx: -1, isGap: true, isEmpty: false });
       }
       return padToCapacity(filled, cap);
@@ -1151,7 +1174,7 @@ function DeckBuilder() {
                     <div data-hero-slot={i} style={{ display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', outline: isDropTarget ? '2px solid var(--accent)' : 'none', borderRadius: 4, padding: 4 }}>
                       {/* Hero card first (166×230) */}
                       {h && h.hero && CARDS_BY_NAME[h.hero] ? (
-                        <div style={{ position: 'relative' }}
+                        <div style={{ position: 'relative' }} data-touch-drag="1"
                           onMouseDown={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}
                           onTouchStart={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}>
                           <CardMini card={CARDS_BY_NAME[h.hero]}
@@ -1193,7 +1216,7 @@ function DeckBuilder() {
                   if (item.isEmpty) return <div key={'empty-'+idx} className="deck-drag-slot deck-empty-slot"><div className="card-slot" style={{ width: '100%', height: '100%', fontSize: 9 }} /></div>;
                   const card = CARDS_BY_NAME[item.card]; if (!card) return null;
                   const isDragging = deckDrag && deckDrag.section === 'main' && deckDrag.fromIdx === item.origIdx;
-                  return <div key={'m-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
+                  return <div key={'m-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')} data-touch-drag="1"
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}
                     onTouchStart={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}>
                     <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'main', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
@@ -1212,7 +1235,7 @@ function DeckBuilder() {
                   if (item.isEmpty) return <div key={'empty-'+idx} className="deck-drag-slot deck-empty-slot"><div className="card-slot" style={{ width: '100%', height: '100%', fontSize: 9 }} /></div>;
                   const card = CARDS_BY_NAME[item.card]; if (!card) return null;
                   const isDragging = deckDrag && deckDrag.section === 'potion' && deckDrag.fromIdx === item.origIdx;
-                  return <div key={'p-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
+                  return <div key={'p-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')} data-touch-drag="1"
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}
                     onTouchStart={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}>
                     <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'potion', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
@@ -1231,7 +1254,7 @@ function DeckBuilder() {
                   if (item.isEmpty) return <div key={'empty-'+idx} className="deck-drag-slot deck-empty-slot"><div className="card-slot" style={{ width: '100%', height: '100%', fontSize: 9 }} /></div>;
                   const card = CARDS_BY_NAME[item.card]; if (!card) return null;
                   const isDragging = deckDrag && deckDrag.section === 'side' && deckDrag.fromIdx === item.origIdx;
-                  return <div key={'s-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')}
+                  return <div key={'s-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')} data-touch-drag="1"
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}
                     onTouchStart={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}>
                     <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'side', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />

@@ -11,6 +11,8 @@
 //  with all current and future Destruction Spells.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 const { loadCardEffect } = require('./_loader');
 
 module.exports = {
@@ -38,7 +40,7 @@ module.exports = {
       // Check spell is a Normal Destruction Magic Spell
       const spellData = ctx.spellCardData;
       if (!spellData) return;
-      if (spellData.cardType !== 'Spell') return;
+      if (!hasCardType(spellData, 'Spell')) return;
       if ((spellData.subtype || '').toLowerCase() !== 'normal') return;
       if (spellData.spellSchool1 !== 'Destruction Magic' && spellData.spellSchool2 !== 'Destruction Magic') return;
 

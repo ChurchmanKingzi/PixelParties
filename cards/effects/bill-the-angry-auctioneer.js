@@ -9,6 +9,8 @@
 //  No gold cost.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 module.exports = {
   activeIn: ['hero'],
 
@@ -41,7 +43,7 @@ module.exports = {
       for (const cardName of (ps.mainDeck || [])) {
         if (seen.has(cardName)) continue;
         const cd = cardDB[cardName];
-        if (!cd || cd.cardType !== 'Artifact') continue;
+        if (!cd || !hasCardType(cd, 'Artifact')) continue;
         if ((cd.subtype || '').toLowerCase() !== 'equipment') continue;
         if ((cd.cost || 0) > 20) continue;
         seen.add(cardName);

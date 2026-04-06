@@ -23,12 +23,14 @@ function getTargetArtifactLink(chain, pi) {
   // Search from the end — the most recently played card
   for (let i = chain.length - 1; i >= 0; i--) {
     const link = chain[i];
-    if (link.cardType === 'Artifact' && link.owner !== pi && !link.negated) {
+    if (hasCardType(link, 'Artifact') && link.owner !== pi && !link.negated) {
       return { link, index: i };
     }
   }
   return null;
 }
+
+const { hasCardType } = require('./_hooks');
 
 module.exports = {
   isReaction: true,

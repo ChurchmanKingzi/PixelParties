@@ -131,4 +131,24 @@ const BUFF_EFFECTS = {
   negative_status_immune: { label: 'Cool', icon: '😎', tooltip: 'Immune to all negative status effects!' },
 };
 
-module.exports = { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS };
+// ═══════════════════════════════════════════
+//  CARD TYPE HELPER
+//  Supports multi-type cards where cardType
+//  is slash-delimited (e.g. "Creature/Token").
+//  Use instead of raw cd.cardType === 'X' checks.
+// ═══════════════════════════════════════════
+
+/**
+ * Check if a card has a specific type.
+ * Handles single types ("Creature") and multi-types ("Creature/Token").
+ * @param {object} cd - Card data object (from cards.json)
+ * @param {string} type - Type to check for (e.g. 'Creature', 'Token', 'Artifact')
+ * @returns {boolean}
+ */
+function hasCardType(cd, type) {
+  if (!cd?.cardType) return false;
+  if (cd.cardType === type) return true; // Fast path for single-type cards
+  return cd.cardType.split('/').some(t => t.trim() === type);
+}
+
+module.exports = { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType };

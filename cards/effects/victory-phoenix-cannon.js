@@ -11,6 +11,8 @@
 //  Bartas second-cast) fully resolves.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 const fs = require('fs');
 const path = require('path');
 const { loadCardEffect } = require('./_loader');
@@ -100,7 +102,7 @@ module.exports = {
       for (const cardName of (ps.hand || [])) {
         if (seen.has(cardName)) continue;
         const cd = cardDB[cardName];
-        if (!cd || cd.cardType !== 'Spell') continue;
+        if (!cd || !hasCardType(cd, 'Spell')) continue;
         if ((cd.subtype || '').toLowerCase() !== 'normal') continue;
         if (cd.spellSchool1 !== 'Destruction Magic' && cd.spellSchool2 !== 'Destruction Magic') continue;
         if ((cd.level || 0) > 1) continue;

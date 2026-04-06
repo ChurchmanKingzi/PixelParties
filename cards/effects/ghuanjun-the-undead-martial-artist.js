@@ -3,6 +3,8 @@
 //  Uses generic bonusActions system for the combo.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 module.exports = {
   activeIn: ['hero'],
 
@@ -16,7 +18,7 @@ module.exports = {
       if (allowed.length > 0 && !allowed.includes(cardData.cardType)) return false;
     }
     // Duplicate Attack ban (always active for Ghuanjun)
-    if (cardData.cardType !== 'Attack') return true;
+    if (!hasCardType(cardData, 'Attack')) return true;
     const used = hero.ghuanjunAttacksUsed || [];
     return !used.includes(cardData.name);
   },

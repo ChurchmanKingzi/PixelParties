@@ -62,6 +62,19 @@ function getPointerXY(e) {
 }
 window.getPointerXY = getPointerXY;
 
+// ── CAPTURE-PHASE TOUCH PREVENTION ──
+// This listener fires BEFORE React's event delegation and before the browser's
+// compositor decides to scroll. Without this, React's delegated onTouchStart
+// calls preventDefault() too late — the browser has already claimed the touch
+// for native scrolling, which kills subsequent touchmove events.
+// Elements with [data-touch-drag] opt in to this early prevention.
+document.addEventListener('touchstart', function(e) {
+  const drag = e.target.closest('[data-touch-drag]');
+  if (drag && e.cancelable) {
+    e.preventDefault();
+  }
+}, { capture: true, passive: false });
+
 // Registers move+up listeners for BOTH mouse and touch, returns a cleanup function.
 // onMove(x, y, rawEvent), onUp(x, y, rawEvent)
 function addDragListeners(onMove, onUp) {

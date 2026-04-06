@@ -7,6 +7,8 @@
 //  This is a "placement" (special summon).
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 module.exports = {
   activeIn: ['hero'],
 
@@ -35,7 +37,7 @@ module.exports = {
       const eligibleCards = [];
       for (const name of (ps.hand || [])) {
         const c = cardDB[name];
-        if (c && c.cardType === 'Creature' && (c.level || 0) <= 1) {
+        if (c && hasCardType(c, 'Creature') && (c.level || 0) <= 1) {
           if (!eligibleCards.some(e => e.name === name && e.source === 'hand')) {
             eligibleCards.push({ name, source: 'hand' });
           }
@@ -43,7 +45,7 @@ module.exports = {
       }
       for (const name of (ps.mainDeck || [])) {
         const c = cardDB[name];
-        if (c && c.cardType === 'Creature' && (c.level || 0) <= 1) {
+        if (c && hasCardType(c, 'Creature') && (c.level || 0) <= 1) {
           if (!eligibleCards.some(e => e.name === name && e.source === 'deck')) {
             eligibleCards.push({ name, source: 'deck' });
           }

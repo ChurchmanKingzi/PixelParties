@@ -15,6 +15,8 @@
 //     Restored at Start Phase.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 const ADDITIONAL_TYPE = 'summon_slime_not_rancher';
 
 module.exports = {
@@ -29,7 +31,7 @@ module.exports = {
         label: 'Slime Rancher',
         allowedCategories: ['creature'],
         filter: (cardData) => {
-          return cardData.cardType === 'Creature'
+          return hasCardType(cardData, 'Creature')
             && cardData.archetype === 'Slimes'
             && cardData.name !== 'Slime Rancher';
         },
@@ -64,7 +66,7 @@ module.exports = {
         label: 'Slime Rancher',
         allowedCategories: ['creature'],
         filter: (cardData) => {
-          return cardData.cardType === 'Creature'
+          return hasCardType(cardData, 'Creature')
             && cardData.archetype === 'Slimes'
             && cardData.name !== 'Slime Rancher';
         },

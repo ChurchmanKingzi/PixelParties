@@ -53,6 +53,8 @@ function getLivingHeroesWithFreeZone(ps) {
 
 // ─── MODULE EXPORTS ──────────────────────
 
+const { hasCardType } = require('./_hooks');
+
 module.exports = {
   isTargetingArtifact: true,
 
@@ -195,7 +197,7 @@ module.exports = {
       for (let ci = slot.length - 1; ci >= 0; ci--) {
         const cardName = slot[ci];
         const cd = cardDB[cardName];
-        if (!cd || cd.cardType !== 'Ability') continue;
+        if (!cd || !hasCardType(cd, 'Ability')) continue;
         slot.splice(ci, 1);
         ps.discardPile.push(cardName);
         const inst = engine.cardInstances.find(c =>

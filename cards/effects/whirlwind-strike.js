@@ -6,6 +6,8 @@
 //  in their Support Zones.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 module.exports = {
   hooks: {
     onPlay: async (ctx) => {
@@ -20,48 +22,19 @@ module.exports = {
 
       const atkDamage = hero.atk || 0;
 
-      // Build target list: opponent's living heroes
-      const targets = [];
-      const oppPs = gs.players[oppIdx];
-      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-        const h = oppPs.heroes[hi];
-        if (!h?.name || h.hp <= 0) continue;
-        targets.push({
-          id: `hero-${oppIdx}-${hi}`, type: 'hero',
-          owner: oppIdx, heroIdx: hi, cardName: h.name,
-        });
-      }
-
-      if (targets.length === 0) {
-        gs._spellCancelled = true;
-        return;
-      }
-
-      // Prompt: select up to 2 opponent heroes
-      const selectedIds = await engine.promptEffectTarget(pi, targets, {
+      // Use generic targeting: up to 2 enemy heroes
+      const selectedHeroes = await ctx.promptMultiTarget({
+        types: ['hero'],
+        side: 'enemy',
+        max: 2,
         title: 'Whirlwind Strike',
         description: `Deal ${atkDamage} damage to up to 2 Heroes and all their Creatures.`,
         confirmLabel: `🌪️ Whirlwind! (${atkDamage})`,
         confirmClass: 'btn-danger',
         cancellable: true,
-        exclusiveTypes: true,
-        maxPerType: { hero: 2 },
-        maxTotal: 2,
       });
 
-      if (!selectedIds || selectedIds.length === 0) {
-        gs._spellCancelled = true;
-        return;
-      }
-
-      const selectedHeroes = selectedIds
-        .map(id => targets.find(t => t.id === id))
-        .filter(Boolean);
-
-      if (selectedHeroes.length === 0) {
-        gs._spellCancelled = true;
-        return;
-      }
+      if (selectedHeroes.length === 0) return;
 
       // ── ANIMATION: spin up on attacker ──
       engine._broadcastEvent('play_zone_animation', {
@@ -89,7 +62,7 @@ module.exports = {
           if (inst.heroIdx !== tgt.heroIdx) continue;
           // Check cardType from DB
           const cd = cardDB[inst.name];
-          if (!cd || cd.cardType !== 'Creature') continue;
+          if (!cd || !hasCardType(cd, 'Creature')) continue;
           allCreatureEntries.push({
             inst, amount: atkDamage, type: 'attack',
             source: attackSource, sourceOwner: pi,

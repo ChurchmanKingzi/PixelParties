@@ -26,6 +26,8 @@
 //  system using ability-name-based HOPT keys).
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 const { loadCardEffect } = require('./_loader');
 
 // ─── HELPERS ─────────────────────────────
@@ -43,7 +45,7 @@ function getEligibleHandAbilities(engine, playerIdx, heroIdx) {
   for (const cardName of (ps.hand || [])) {
     if (seen.has(cardName)) continue;
     const cd = cardDB[cardName];
-    if (!cd || cd.cardType !== 'Ability') continue;
+    if (!cd || !hasCardType(cd, 'Ability')) continue;
     if (!engine.canAttachAbilityToHero(playerIdx, cardName, heroIdx)) continue;
     seen.add(cardName);
     result.push(cardName);
@@ -62,7 +64,7 @@ function getEligibleDeckAbilities(engine, playerIdx, heroIdx) {
   const countMap = {};
   for (const cardName of (ps.mainDeck || [])) {
     const cd = cardDB[cardName];
-    if (!cd || cd.cardType !== 'Ability') continue;
+    if (!cd || !hasCardType(cd, 'Ability')) continue;
     if (!engine.canAttachAbilityToHero(playerIdx, cardName, heroIdx)) continue;
     countMap[cardName] = (countMap[cardName] || 0) + 1;
   }

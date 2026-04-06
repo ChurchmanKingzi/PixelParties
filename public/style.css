@@ -1052,9 +1052,6 @@ body {
 .hand-slot {
   cursor: grab;
   transition: transform .15s;
-  touch-action: none; /* prevent browser scroll/zoom during card drag */
-  -webkit-user-select: none;
-  user-select: none;
 }
 .hand-slot:active { cursor: grabbing; }
 .hand-dragging {
@@ -1100,9 +1097,10 @@ body {
   100% { transform: translate(var(--dx), var(--dy)) scale(0.6); opacity: .5; filter: brightness(0.7); }
 }
 /* Deck builder drag */
-.deck-drag-slot { cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; }
+[data-touch-drag] { touch-action: none; }
+.deck-drag-slot { cursor: grab; }
 .deck-drag-slot:active { cursor: grabbing; }
-.deck-dragging { opacity: 0; width: 0; overflow: hidden; }
+.deck-dragging { position: absolute; width: 0; height: 0; opacity: 0; overflow: hidden; }
 .deck-drag-gap {
   width: var(--card-w);
   aspect-ratio: 5 / 7;
@@ -1743,7 +1741,6 @@ body {
   box-shadow: 0 8px 40px rgba(0,0,0,.7), 0 0 20px rgba(0,240,255,.15);
   padding: 24px 40px;
   text-align: center;
-  touch-action: none;
 }
 
 /* Damage numbers */

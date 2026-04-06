@@ -10,6 +10,8 @@
 //  Ida override, animations, and damage.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 module.exports = {
   hooks: {
     onPlay: async (ctx) => {
@@ -21,7 +23,7 @@ module.exports = {
       const creatureCount = engine.cardInstances.filter(inst => {
         if (inst.owner !== pi || inst.zone !== 'support') return false;
         const cd = cardDB[inst.name];
-        return cd && (cd.cardType === 'Creature' || cd.cardType === 'Token');
+        return cd && hasCardType(cd, 'Creature');
       }).length;
 
       const damage = 30 * creatureCount; // Can be 0 — spell still visually happens

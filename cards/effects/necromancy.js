@@ -70,7 +70,7 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel) {
   for (const cardName of (ps.discardPile || [])) {
     if (seen.has(cardName)) continue;
     const cd = cardDB[cardName];
-    if (!cd || cd.cardType !== 'Creature') continue;
+    if (!cd || !hasCardType(cd, 'Creature')) continue;
     if ((cd.level || 0) > necromancyLevel) continue;
     if (!heroCanSummon(ps, heroIdx, cd)) continue;
     seen.add(cardName);
@@ -80,6 +80,8 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel) {
 }
 
 // ─── CARD MODULE ─────────────────────────
+
+const { hasCardType } = require('./_hooks');
 
 module.exports = {
   activeIn: ['ability'],

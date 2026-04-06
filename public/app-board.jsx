@@ -2964,7 +2964,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
     const forceDiscardActive = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt.ownerIdx === myIdx;
     if (forceDiscardActive) {
       if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return; // Can't discard the resolving card
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
       socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
       return;
     }
@@ -2973,7 +2973,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
     const forceDiscardCancellableActive = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt.ownerIdx === myIdx;
     if (forceDiscardCancellableActive) {
       if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return; // Can't discard the resolving card
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
       socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
       return;
     }
@@ -2981,7 +2981,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
     // Block activation of the specific resolving card (spam-click prevention) — but NOT force-discard (handled above)
     if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return;
 
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     const card = CARDS_BY_NAME[cardName];
 
     // Ability Attach mode (Training, etc.) — only eligible ability cards are draggable
@@ -3353,17 +3353,18 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const displayHand = useMemo(() => {
     const dragIdx = handDrag?.idx ?? playDrag?.idx ?? abilityDrag?.idx ?? null;
     if (dragIdx === null) return hand.map((c, i) => ({ card: c, origIdx: i, isGap: false }));
-    const filtered = [];
-    for (let i = 0; i < hand.length; i++) {
-      if (i === dragIdx) continue;
-      filtered.push({ card: hand[i], origIdx: i, isGap: false });
-    }
+    // Keep dragged card in array (DOM element must persist for mobile touch tracking).
+    // The render code applies hand-dragging class to hide it visually.
+    const items = hand.map((c, i) => ({ card: c, origIdx: i, isGap: false }));
     // Only show gap for reorder drag, not play drag
     if (handDrag) {
       const dropIdx = calcDropIdx(handDrag.mouseX, handDrag.idx);
-      filtered.splice(dropIdx, 0, { card: null, origIdx: -1, isGap: true });
+      // Adjust for drag source still being in the array
+      let insertAt = dropIdx;
+      if (insertAt >= handDrag.idx) insertAt++;
+      items.splice(insertAt, 0, { card: null, origIdx: -1, isGap: true });
     }
-    return filtered;
+    return items;
   }, [hand, handDrag, playDrag, abilityDrag]);
 
   const [showSurrender, setShowSurrender] = useState(false);
@@ -3784,32 +3785,46 @@ function GameBoard({ gameState, lobby, onLeave }) {
     socket.emit('request_rematch', { roomId: gameState.roomId });
   };
 
-  // Escape closes surrender dialog, deck viewer, cancels potion targeting, cancels effect prompts, or declines mulligan
+  // Escape closes surrender dialog, deck viewer, cancels potion targeting, cancels effect prompts, declines mulligan — or opens surrender dialog
   useEffect(() => {
     const mulliganActive = gameState.mulliganPending && !mulliganDecided && !isSpectator;
-    if (!showSurrender && !showEndTurnConfirm && !spellHeroPick && !deckViewer && !pileViewer && !gameState.potionTargeting && !gameState.effectPrompt && !mulliganActive) return;
     const handleEsc = (e) => {
-      if (e.key === 'Escape') {
-        e.stopImmediatePropagation();
-        if (showEndTurnConfirm) { cancelEndTurn(); return; }
-        if (spellHeroPick) { setSpellHeroPick(null); return; }
-        if (mulliganActive) { setMulliganDecided(true); socket.emit('mulligan_decision', { roomId: gameState.roomId, accept: false }); return; }
-        if (pendingAbilityActivation) { setPendingAbilityActivation(null); return; }
-        if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx && gameState.effectPrompt.cancellable !== false) {
-          socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
-        } else if (gameState.potionTargeting && gameState.potionTargeting.ownerIdx === myIdx) {
-          if (gameState.potionTargeting.config?.cancellable === false) return;
-          socket.emit('cancel_potion', { roomId: gameState.roomId });
-          setPotionSelection([]);
-        } else if (pileViewer) setPileViewer(null);
-        else if (pendingAdditionalPlay) { setPendingAdditionalPlay(null); socket.emit('pending_placement_clear', { roomId: gameState.roomId }); }
-        else if (deckViewer) setDeckViewer(null);
-        else if (showSurrender) setShowSurrender(false);
-      }
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      if (showEndTurnConfirm) { cancelEndTurn(); return; }
+      if (spellHeroPick) { setSpellHeroPick(null); return; }
+      if (mulliganActive) { setMulliganDecided(true); socket.emit('mulligan_decision', { roomId: gameState.roomId, accept: false }); return; }
+      if (pendingAbilityActivation) { setPendingAbilityActivation(null); return; }
+      if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx && gameState.effectPrompt.cancellable !== false) {
+        socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
+      } else if (gameState.potionTargeting && gameState.potionTargeting.ownerIdx === myIdx) {
+        if (gameState.potionTargeting.config?.cancellable === false) return;
+        socket.emit('cancel_potion', { roomId: gameState.roomId });
+        setPotionSelection([]);
+      } else if (pileViewer) setPileViewer(null);
+      else if (pendingAdditionalPlay) { setPendingAdditionalPlay(null); socket.emit('pending_placement_clear', { roomId: gameState.roomId }); }
+      else if (deckViewer) setDeckViewer(null);
+      else if (showSurrender) setShowSurrender(false);
+      else if (!gameState.result && !isSpectator) setShowSurrender(true);
     };
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
-  }, [showSurrender, showEndTurnConfirm, cancelEndTurn, spellHeroPick, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation, gameState.mulliganPending, mulliganDecided]);
+  }, [showSurrender, showEndTurnConfirm, cancelEndTurn, spellHeroPick, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation, gameState.mulliganPending, mulliganDecided, gameState.result, isSpectator]);
+
+  // Enter/Space confirms active confirmation dialogs
+  useEffect(() => {
+    if (!showSurrender && !showEndTurnConfirm) return;
+    const handleConfirm = (e) => {
+      if (e.key !== 'Enter' && e.code !== 'Space') return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (showSurrender) handleSurrender();
+      else if (showEndTurnConfirm) confirmEndTurn();
+    };
+    window.addEventListener('keydown', handleConfirm, true);
+    return () => window.removeEventListener('keydown', handleConfirm, true);
+  }, [showSurrender, showEndTurnConfirm, confirmEndTurn]);
 
   // Space hotkey — advance to next phase
   useEffect(() => {
@@ -3817,7 +3832,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
       if (e.code !== 'Space') return;
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (isSpectator) return;
-      if (showEndTurnConfirm) return; // Don't advance while confirmation is showing
+      if (showEndTurnConfirm || showSurrender) return; // Don't advance while confirmation is showing
       const isMyTurn = (gameState.activePlayer || 0) === myIdx;
       if (!isMyTurn || gameState.result || gameState.effectPrompt || gameState.potionTargeting || gameState.mulliganPending) return;
       const cp = gameState.currentPhase;
@@ -3829,7 +3844,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
     };
     window.addEventListener('keydown', handleSpace);
     return () => window.removeEventListener('keydown', handleSpace);
-  }, [gameState.activePlayer, gameState.currentPhase, gameState.result, gameState.effectPrompt, gameState.potionTargeting, gameState.mulliganPending, gameState.roomId, myIdx, tryAdvancePhase, showEndTurnConfirm]);
+  }, [gameState.activePlayer, gameState.currentPhase, gameState.result, gameState.effectPrompt, gameState.potionTargeting, gameState.mulliganPending, gameState.roomId, myIdx, tryAdvancePhase, showEndTurnConfirm, showSurrender]);
 
   // Listen for opponent's target selections
   useEffect(() => {
@@ -4819,7 +4834,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
             <div className="game-hand-cards">
               {displayHand.map((item, i) => {
                 if (item.isGap) return <div key="gap" className="hand-drop-gap" />;
-                const isBeingDragged = handDrag && handDrag.idx === item.origIdx;
+                const isBeingDragged = (handDrag && handDrag.idx === item.origIdx) || (playDrag && playDrag.idx === item.origIdx) || (abilityDrag && abilityDrag.idx === item.origIdx);
                 const dimmed = getCardDimmed(item.card, item.origIdx);
                 const isDrawAnim = drawAnimCards.some(a => a.origIdx === item.origIdx);
                 const isPendingPlay = pendingAdditionalPlay && pendingAdditionalPlay.handIndex === item.origIdx;
@@ -4829,7 +4844,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 const isAttachEligible = isAbilityAttach && (gameState.effectPrompt.eligibleCards || []).includes(item.card);
                 const isAnyDiscard = isForceDiscard || isForceDiscardCancellable;
                 return (
-                  <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx}
+                  <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-touch-drag="1"
                     className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard ? ' hand-discard-target' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '')}
                     style={(isDrawAnim || isPendingPlay) ? { visibility: 'hidden' } : undefined}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}

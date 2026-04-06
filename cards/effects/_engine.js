@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const { v4: uuidv4 } = require('uuid');
-const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS } = require('./_hooks');
+const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
 const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
@@ -438,7 +438,7 @@ class GameEngine {
           targets = validTargets.filter(t => {
             if (t.type !== 'equip') return true;
             const cd = cardDB[t.cardName];
-            return cd && cd.cardType === 'Creature';
+            return cd && hasCardType(cd, 'Creature');
           });
           if (targets.length === 0 && validTargets.length > 0) targets = validTargets; // Fallback
         }
@@ -832,7 +832,7 @@ class GameEngine {
               const creatureName = slot[0];
               // Only actual Creatures are targetable — not Equipment, Heroes, etc.
               const cd = cardDB[creatureName];
-              if (!cd || cd.cardType !== 'Creature') continue;
+              if (!cd || !hasCardType(cd, 'Creature')) continue;
               const inst = engine.cardInstances.find(c =>
                 c.owner === playerIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
               );
@@ -936,15 +936,20 @@ class GameEngine {
         };
         const addCreatures = (playerIdx) => {
           const ps2 = gs.players[playerIdx];
+          const cardDB = engine._getCardDB();
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
             if (!ps2.heroes[hi]?.name || ps2.heroes[hi].hp <= 0) continue;
             for (let si = 0; si < (ps2.supportZones[hi] || []).length; si++) {
               const slot = (ps2.supportZones[hi] || [])[si] || [];
               if (slot.length === 0) continue;
+              const creatureName = slot[0];
+              // Only actual Creatures are targetable — not Equipment, Tokens, Spells, etc.
+              const cd = cardDB[creatureName];
+              if (!cd || !hasCardType(cd, 'Creature')) continue;
               const inst2 = engine.cardInstances.find(c =>
                 c.owner === playerIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
               );
-              const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: slot[0], cardInstance: inst2 };
+              const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst2 };
               if (config.condition && !config.condition(t, engine)) continue;
               targets.push(t);
             }
@@ -2154,7 +2159,7 @@ class GameEngine {
         if (cd.spellSchool2 && countAb(cd.spellSchool2) < level) continue;
       }
       // Creatures need a free support zone
-      if (cd.cardType === 'Creature') {
+      if (hasCardType(cd, 'Creature')) {
         const supZones = ps.supportZones[heroIdx] || [];
         let hasFree = false;
         for (let z = 0; z < 3; z++) { if ((supZones[z] || []).length === 0) { hasFree = true; break; } }
@@ -2337,7 +2342,7 @@ class GameEngine {
     const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
     if (!ACTION_TYPES.includes(cardData.cardType)) return { played: false };
 
-    if (cardData.cardType === 'Creature') {
+    if (hasCardType(cardData, 'Creature')) {
       if (zoneSlot === undefined || zoneSlot < 0) return { played: false };
       if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
       if ((ps.supportZones[heroIdx][zoneSlot] || []).length > 0) return { played: false };
@@ -3416,6 +3421,25 @@ class GameEngine {
   }
 
   /**
+   * Check if a card in a support zone should be treated as an Equipment Artifact.
+   * Centralises equip detection so all cards use consistent logic.
+   * Detects: script.isEquip, DB subtype 'Equipment', treatAsEquip counter
+   * (Initiation Ritual heroes), and Hero/Ascended Hero cards in support zones.
+   * @param {string} cardName - Card name to check
+   * @param {object} [inst] - Optional card instance (for treatAsEquip counter check)
+   * @returns {boolean}
+   */
+  isEquipInZone(cardName, inst) {
+    if (inst?.counters?.treatAsEquip) return true;
+    const cd = this._getCardDB()[cardName];
+    if (cd && (cd.subtype || '').toLowerCase() === 'equipment') return true;
+    if (cd && (hasCardType(cd, 'Hero') || hasCardType(cd, 'Ascended Hero'))) return true;
+    const script = loadCardEffect(cardName);
+    if (script?.isEquip) return true;
+    return false;
+  }
+
+  /**
    * Check if a player has any available additional action covering a specific category.
    */
   hasAdditionalActionForCategory(playerIdx, category) {
@@ -3998,7 +4022,7 @@ class GameEngine {
         for (const inst of this.cardInstances) {
           if (inst.owner !== tpi || inst.zone !== 'support') continue;
           const cd = cardDB[inst.name];
-          if (!cd || (cd.cardType !== 'Creature' && cd.cardType !== 'Token')) continue;
+          if (!cd || !hasCardType(cd, 'Creature')) continue;
           // HP threshold filters
           const currentHp = inst.counters.currentHp ?? (cd.hp || 0);
           if (config.creatureMinHp !== undefined && currentHp < config.creatureMinHp) continue;
@@ -4224,14 +4248,14 @@ class GameEngine {
       burnedHeroes.push({ owner: ap, heroIdx: hi, heroName: hero.name });
     }
 
-    // Also find burned creatures (not Equipment Artifacts, Spells, etc.)
+    // Also find burned creatures (not Equipment Artifacts, Spells, Tokens, etc.)
     const burnedCreatures = [];
     const burnCardDB = this._getCardDB();
     for (const inst of this.cardInstances) {
       if (inst.owner !== ap || inst.zone !== 'support') continue;
       if (!inst.counters.burned) continue;
       const cd = burnCardDB[inst.name];
-      if (!cd || (cd.cardType !== 'Creature' && cd.cardType !== 'Token')) continue;
+      if (!cd || !hasCardType(cd, 'Creature')) continue;
       burnedCreatures.push(inst);
     }
 
@@ -4286,14 +4310,14 @@ class GameEngine {
       poisonedHeroes.push({ owner: ap, heroIdx: hi, heroName: hero.name, stacks });
     }
 
-    // Poisoned creatures (not Equipment Artifacts, Spells, etc.)
+    // Poisoned creatures (not Equipment Artifacts, Spells, Tokens, etc.)
     const poisonedCreatures = [];
     const poisonCardDB = this._getCardDB();
     for (const inst of this.cardInstances) {
       if (inst.owner !== ap || inst.zone !== 'support') continue;
       if (!inst.counters.poisoned) continue;
       const cd = poisonCardDB[inst.name];
-      if (!cd || (cd.cardType !== 'Creature' && cd.cardType !== 'Token')) continue;
+      if (!cd || !hasCardType(cd, 'Creature')) continue;
       const stacks = inst.counters.poisonStacks || 1;
       poisonedCreatures.push({ inst, stacks });
     }
@@ -4356,7 +4380,7 @@ class GameEngine {
         if (c.owner !== pi || c.zone !== 'support' || c.heroIdx !== hi) return false;
         if (c.counters?.immovable) return false; // Immovable cards stay even on dead heroes
         const cd = cardDB[c.name];
-        if (cd && (cd.cardType === 'Creature' || cd.cardType === 'Token')) return false;
+        if (cd && (hasCardType(cd, 'Creature') || hasCardType(cd, 'Token'))) return false;
         return true;
       });
 

@@ -6,6 +6,20 @@
 //  Destroyed cards go to discard pile.
 // ═══════════════════════════════════════════
 const { loadCardEffect } = require('./_loader');
+const { hasCardType } = require('./_hooks');
+
+let _cardDBCache = null;
+function _getCardDB() {
+  if (_cardDBCache) return _cardDBCache;
+  try {
+    const allCards = JSON.parse(
+      require('fs').readFileSync(require('path').join(__dirname, '../../data/cards.json'), 'utf-8')
+    );
+    _cardDBCache = {};
+    allCards.forEach(c => { _cardDBCache[c.name] = c; });
+    return _cardDBCache;
+  } catch { return {}; }
+}
 
 module.exports = {
   isPotion: true,
@@ -18,6 +32,7 @@ module.exports = {
   /** Compute all valid targets on the board. */
   getValidTargets(gs, playerIdx) {
     const targets = [];
+    const cardDB = _getCardDB();
     for (let pi = 0; pi < 2; pi++) {
       const ps = gs.players[pi];
       // First-turn protection: cannot target opponent's abilities for removal (generic rule)
@@ -51,7 +66,12 @@ module.exports = {
           const cards = (ps.supportZones[hi] || [])[zi] || [];
           for (const cardName of cards) {
             const script = loadCardEffect(cardName);
-            if (script?.isEquip) {
+            const cd = cardDB[cardName];
+            // isEquip script flag, OR a Hero/Ascended Hero in support zone (Initiation Ritual)
+            const isEquip = script?.isEquip
+              || (cd && (cd.subtype || '').toLowerCase() === 'equipment')
+              || (cd && (cd.cardType === 'Hero' || cd.cardType === 'Ascended Hero'));
+            if (isEquip) {
               targets.push({
                 id: `equip-${pi}-${hi}-${zi}-${cardName}`,
                 type: 'equip',

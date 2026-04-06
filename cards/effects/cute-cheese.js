@@ -7,6 +7,8 @@
 //  (see Magnetic Glove) with a type filter.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 module.exports = {
   isTargetingArtifact: true,
 
@@ -18,7 +20,7 @@ module.exports = {
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
     // Must have at least one Creature in deck
     const cardDB = _getCardDB();
-    return (gs.players[pi]?.mainDeck || []).some(name => cardDB[name]?.cardType === 'Creature');
+    return (gs.players[pi]?.mainDeck || []).some(name => hasCardType(cardDB[name], 'Creature'));
   },
 
   // No board targets — self-targeting effect
@@ -48,7 +50,7 @@ module.exports = {
     const cardDB = engine._getCardDB();
     const countMap = {};
     for (const cardName of (ps.mainDeck || [])) {
-      if (cardDB[cardName]?.cardType !== 'Creature') continue;
+      if (!hasCardType(cardDB[cardName], 'Creature')) continue;
       countMap[cardName] = (countMap[cardName] || 0) + 1;
     }
 
@@ -72,7 +74,7 @@ module.exports = {
     // Verify the card is actually in the deck and is a Creature
     const deckIdx = ps.mainDeck.indexOf(result.cardName);
     if (deckIdx < 0) return;
-    if (cardDB[result.cardName]?.cardType !== 'Creature') return;
+    if (!hasCardType(cardDB[result.cardName], 'Creature')) return;
 
     // Remove from deck, add to hand
     ps.mainDeck.splice(deckIdx, 1);

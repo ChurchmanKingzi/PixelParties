@@ -6,6 +6,8 @@
 //  At the start of owner's turn, gain 1 level.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 module.exports = {
   activeIn: ['support'],
 
@@ -18,10 +20,8 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = ctx.players[pi];
 
-      // Load card database for original level lookup
-      const allCards = require('fs').readFileSync(require('path').join(__dirname, '../../data/cards.json'), 'utf-8');
-      const cardDB = {};
-      JSON.parse(allCards).forEach(c => { cardDB[c.name] = c; });
+      // Use engine's cached card database
+      const cardDB = engine._getCardDB();
 
       // Count unique Creature names with original level 0 across all support zones
       const uniqueNames = new Set();
@@ -31,7 +31,7 @@ module.exports = {
         for (const slot of (ps.supportZones[hi] || [])) {
           for (const cardName of (slot || [])) {
             const c = cardDB[cardName];
-            if (c && c.cardType === 'Creature' && (c.level || 0) === 0) {
+            if (c && hasCardType(c, 'Creature') && (c.level || 0) === 0) {
               uniqueNames.add(cardName);
             }
           }

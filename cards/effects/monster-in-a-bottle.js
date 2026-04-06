@@ -10,6 +10,8 @@
 //  Deleted after use (standard Potion behavior).
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 const fs = require('fs');
 const path = require('path');
 
@@ -69,7 +71,7 @@ function getEligibleCreatures(gs, pi) {
     for (const name of list) {
       if (seen.has(name + ':' + source)) continue;
       const cd = cardDB[name];
-      if (!cd || cd.cardType !== 'Creature') continue;
+      if (!cd || !hasCardType(cd, 'Creature')) continue;
       if ((cd.level || 0) > 3) continue;
       if (summonBlocked.includes(name)) continue;
       // Check if ANY living hero with free zones can summon this
@@ -127,7 +129,7 @@ module.exports = {
         for (const name of list) {
           if (seen.has(name + ':' + source)) continue;
           const cd = cardDB[name];
-          if (!cd || cd.cardType !== 'Creature') continue;
+          if (!cd || !hasCardType(cd, 'Creature')) continue;
           if ((cd.level || 0) > 3) continue;
           if (summonBlocked.includes(name)) continue;
           let canSummon = false;
