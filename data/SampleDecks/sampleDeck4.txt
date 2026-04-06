@@ -1,0 +1,33 @@
+=== PIXEL PARTIES DECK ===
+Name: Sample Deck: Heal Burn
+
+== HEROES ==
+Kazena, the Storming Rebel
+Nao, the Barrier Priestess
+Treasure Huntress Semi
+
+== MAIN DECK ==
+4x Brilliant Idea
+3x Cure
+2x Dark Gear
+1x Divine Gift of The Light
+4x Friendship
+2x Golden Ankh
+1x Guardian Angel
+4x Heal
+4x Healing Melody
+4x Lifeforce Howitzer
+3x Magnetic Glove
+2x Martyry
+4x Overheal Shock
+4x Performance
+3x Shard of Chaos
+2x Shield of Death
+2x Shield of Life
+4x Support Magic
+3x The Yeeting
+4x Wheels
+
+== POTION DECK ==
+
+== SIDE DECK ==

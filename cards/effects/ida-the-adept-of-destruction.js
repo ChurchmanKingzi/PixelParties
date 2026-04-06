@@ -27,13 +27,13 @@ module.exports = {
     onGameStart: (ctx) => {
       const gs = ctx.gameState;
       if (!gs.heroFlags) gs.heroFlags = {};
-      gs.heroFlags[`${ctx.cardOwner}-${ctx.cardHeroIdx}`] = { forcesSingleTarget: true };
+      gs.heroFlags[`${ctx.cardOriginalOwner}-${ctx.cardHeroIdx}`] = { forcesSingleTarget: true };
     },
 
     onPlay: (ctx) => {
       const gs = ctx.gameState;
       if (!gs.heroFlags) gs.heroFlags = {};
-      gs.heroFlags[`${ctx.cardOwner}-${ctx.cardHeroIdx}`] = { forcesSingleTarget: true };
+      gs.heroFlags[`${ctx.cardOriginalOwner}-${ctx.cardHeroIdx}`] = { forcesSingleTarget: true };
     },
 
     /**

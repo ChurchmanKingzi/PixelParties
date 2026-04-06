@@ -26,12 +26,18 @@ module.exports = {
   activeIn: ['permanent'],
 
   canActivate(gs, pi) {
+    const ps = gs.players[pi];
+    if (ps?._oncePerGameUsed?.has('elixirOfImmortality')) return false;
     return true;
   },
 
   resolve: async (engine, pi) => {
     const ps = engine.gs.players[pi];
     if (!ps) return { cancelled: true };
+
+    // Mark as used (once per game)
+    if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+    ps._oncePerGameUsed.add('elixirOfImmortality');
 
     const oi = pi === 0 ? 1 : 0;
     const oppSid = engine.gs.players[oi]?.socketId;

@@ -53,7 +53,7 @@ module.exports = {
 
       // Ram animation: hero charges to target and back
       engine._broadcastEvent('play_ram_animation', {
-        sourceOwner: pi, sourceHeroIdx: heroIdx,
+        sourceOwner: ctx.cardHeroOwner, sourceHeroIdx: heroIdx,
         targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
         targetZoneSlot: tgtZoneSlot,
         cardName: hero.name, duration: 1200,
@@ -95,7 +95,7 @@ module.exports = {
         const healAmount = Math.min(dealt, hero.maxHp - hero.hp);
         if (healAmount > 0) {
           hero.hp += healAmount;
-          engine._broadcastEvent('play_zone_animation', { type: 'heal_sparkle', owner: pi, heroIdx, zoneSlot: -1 });
+          engine._broadcastEvent('play_zone_animation', { type: 'heal_sparkle', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
           engine.log('tiger_kick_heal', { hero: hero.name, amount: healAmount });
         }
       }

@@ -1135,14 +1135,28 @@ const disconnectTimers = new Map(); // userId -> timeout handle
  * has a potionLockAfterN flag and the threshold has been met.
  * Generic replacement for hardcoded hero-name checks.
  */
-function checkPotionLock(ps) {
+function checkPotionLock(ps, gs, pi) {
   ps.potionsUsedThisTurn = (ps.potionsUsedThisTurn || 0) + 1;
+  // Check own heroes
   for (const hero of (ps.heroes || [])) {
     if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) continue;
     const heroScript = loadCardEffect(hero.name);
     if (heroScript?.potionLockAfterN && ps.potionsUsedThisTurn >= heroScript.potionLockAfterN) {
       ps.potionLocked = true;
-      break;
+      return;
+    }
+  }
+  // Check charmed opponent heroes controlled by this player
+  if (gs && pi != null) {
+    const oi = pi === 0 ? 1 : 0;
+    for (const hero of (gs.players[oi]?.heroes || [])) {
+      if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) continue;
+      if (hero.charmedBy !== pi) continue;
+      const heroScript = loadCardEffect(hero.name);
+      if (heroScript?.potionLockAfterN && ps.potionsUsedThisTurn >= heroScript.potionLockAfterN) {
+        ps.potionLocked = true;
+        return;
+      }
     }
   }
 }
@@ -1187,6 +1201,7 @@ function sendGameState(room, playerIdx, extra) {
       damageLocked: ps.damageLocked || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
+      supportSpellLocked: ps.supportSpellLocked || false,
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       permanents: ps.permanents || [],
       oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
@@ -1306,6 +1321,7 @@ function sendSpectatorGameState(room) {
       damageLocked: ps.damageLocked || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
+      supportSpellLocked: ps.supportSpellLocked || false,
       permanents: ps.permanents || [],
       oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
       resolvingCard: ps._resolvingCard || null,
@@ -1399,6 +1415,16 @@ async function endGame(room, winnerIdx, reason) {
   if (setOver) room.status = 'finished';
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   io.emit('rooms', getRoomList());
+
+  // ── Emit updated profile stats (wins/losses/elo) to both players ──
+  for (let i = 0; i < 2; i++) {
+    const userId = gs.players[i]?.userId;
+    const sid = gs.players[i]?.socketId;
+    if (userId && sid) {
+      const updated = await db.get('SELECT wins, losses, elo, sc FROM users WHERE id = ?', [userId]);
+      if (updated) io.to(sid).emit('user_stats_updated', updated);
+    }
+  }
 
   // ── SC reward evaluation ──
   try {
@@ -1858,7 +1884,7 @@ io.on('connection', (socket) => {
   });
 
   // Activate an action-costing ability on the board
-  socket.on('activate_ability', ({ roomId, heroIdx, zoneIdx }) => {
+  socket.on('activate_ability', ({ roomId, heroIdx, zoneIdx, charmedOwner }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine || !room.gameState) return;
@@ -1866,12 +1892,17 @@ io.on('connection', (socket) => {
     const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0 || pi !== gs.activePlayer) return;
 
-    const ps = gs.players[pi];
+    // Determine which player's heroes to look at
+    const heroOwner = charmedOwner != null ? charmedOwner : pi;
+    const ps = gs.players[heroOwner];
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return;
 
+    // If charmedOwner is set, verify the hero is actually charmed by this player
+    if (charmedOwner != null && hero.charmedBy !== pi) return;
+
     // Combo lock: if a hero has an exclusive combo active, only that hero can act
-    if (ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== heroIdx) return;
+    if (charmedOwner == null && gs.players[pi].comboLockHeroIdx != null && gs.players[pi].comboLockHeroIdx !== heroIdx) return;
 
     const abilitySlot = ps.abilityZones?.[heroIdx]?.[zoneIdx];
     if (!abilitySlot || abilitySlot.length === 0) return;
@@ -1903,16 +1934,16 @@ io.on('connection', (socket) => {
       try {
         // Create a context for the ability
         const inst = room.engine.cardInstances.find(c =>
-          c.owner === pi && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
+          c.owner === heroOwner && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
         );
         if (!inst) return;
 
         // Play shine animation on the ability
         for (let i = 0; i < 2; i++) {
           const sid = gs.players[i]?.socketId;
-          if (sid) io.to(sid).emit('ability_activated', { owner: pi, heroIdx, zoneIdx, abilityName });
+          if (sid) io.to(sid).emit('ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
         }
-        sendToSpectators(room, 'ability_activated', { owner: pi, heroIdx, zoneIdx, abilityName });
+        sendToSpectators(room, 'ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
 
         // ── Reaction chain window — opponents can chain before ability resolves ──
         const chainResult = await room.engine.executeCardWithChain({
@@ -1939,10 +1970,26 @@ io.on('connection', (socket) => {
           return;
         }
 
+        // For charmed heroes: temporarily set controller to the charming player
+        const origController = inst.controller;
+        const origOwner = inst.owner;
+        if (charmedOwner != null) {
+          inst.controller = pi;
+          inst.owner = pi;
+          inst.heroOwner = charmedOwner;
+        }
+
         const ctx = room.engine._createContext(inst, {});
 
         // Run the activation — if it returns false, treat as cancelled (refund HOPT, keep action)
         const result = await script.onActivate(ctx, level);
+
+        // Restore original controller/owner
+        if (charmedOwner != null) {
+          inst.controller = origController;
+          inst.owner = origOwner;
+          delete inst.heroOwner;
+        }
         if (result === false) {
           delete gs.hoptUsed[hoptKey];
           for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
@@ -1986,19 +2033,26 @@ io.on('connection', (socket) => {
 
   // Activate a free-activation ability (no action cost, Main Phase only)
   // Generic handler — individual ability logic lives in the card script's onFreeActivate.
-  socket.on('activate_free_ability', ({ roomId, heroIdx, zoneIdx }) => {
+  socket.on('activate_free_ability', ({ roomId, heroIdx, zoneIdx, charmedOwner }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine || !room.gameState) return;
     const gs = room.gameState;
     const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0 || pi !== gs.activePlayer) return;
-    if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return; // Main Phase only
+    const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
+    const isActionPhase = gs.currentPhase === 3;
+    if (!isMainPhase && !isActionPhase) return; // Main or Action Phase
 
-    const ps = gs.players[pi];
+    // Determine which player's heroes to look at
+    const heroOwner = charmedOwner != null ? charmedOwner : pi;
+    const ps = gs.players[heroOwner];
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return;
     if (hero.statuses?.frozen || hero.statuses?.stunned) return;
+
+    // If charmedOwner is set, verify the hero is actually charmed by this player
+    if (charmedOwner != null && hero.charmedBy !== pi) return;
 
     const abilitySlot = ps.abilityZones?.[heroIdx]?.[zoneIdx];
     if (!abilitySlot || abilitySlot.length === 0) return;
@@ -2009,6 +2063,9 @@ io.on('connection', (socket) => {
     const script = loadCardEffect(abilityName);
     if (!script?.freeActivation || !script?.onFreeActivate) return;
 
+    // Action Phase: only scripts with actionPhaseEligible can activate here
+    if (isActionPhase && !script.actionPhaseEligible) return;
+
     // Check HOPT (by ability name — blocks all copies for this player)
     const hoptKey = `free-ability:${abilityName}:${pi}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
@@ -2016,7 +2073,7 @@ io.on('connection', (socket) => {
     // Check canFreeActivate (don't claim HOPT yet — effect might cancel)
     if (script.canFreeActivate) {
       const inst = room.engine.cardInstances.find(c =>
-        c.owner === pi && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
+        c.owner === heroOwner && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
       );
       if (!inst) return;
       const ctx = room.engine._createContext(inst, { event: 'canFreeActivateCheck' });
@@ -2026,13 +2083,13 @@ io.on('connection', (socket) => {
     (async () => {
       try {
         const inst = room.engine.cardInstances.find(c =>
-          c.owner === pi && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
+          c.owner === heroOwner && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
         );
         if (!inst) return;
 
         // ── Reaction chain window — opponents can chain before ability resolves ──
         // Broadcast activation first so opponents see what's being activated
-        room.engine._broadcastEvent('ability_activated', { owner: pi, heroIdx, zoneIdx, abilityName });
+        room.engine._broadcastEvent('ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
 
         const chainResult = await room.engine.executeCardWithChain({
           cardName: abilityName, owner: pi, cardType: 'Ability', goldCost: 0,
@@ -2047,19 +2104,40 @@ io.on('connection', (socket) => {
           return;
         }
 
+        // For charmed heroes: temporarily set controller to the charming player
+        const origController = inst.controller;
+        const origOwner = inst.owner;
+        if (charmedOwner != null) {
+          inst.controller = pi;
+          inst.owner = pi;
+          inst.heroOwner = charmedOwner;
+        }
+
         const ctx = room.engine._createContext(inst, {});
         // onFreeActivate returns true if the effect resolved (HOPT should be claimed)
         const resolved = await script.onFreeActivate(ctx, level);
+
+        // Restore original controller/owner
+        if (charmedOwner != null) {
+          inst.controller = origController;
+          inst.owner = origOwner;
+          delete inst.heroOwner;
+        }
 
         // Only claim HOPT if the effect actually resolved (not cancelled)
         if (resolved !== false) {
           // Generic "ability activated" flash — visible to both players (unless script handles its own)
           if (!script.noDefaultFlash) {
-            room.engine._broadcastEvent('ability_activated', { owner: pi, heroIdx, zoneIdx });
+            room.engine._broadcastEvent('ability_activated', { owner: heroOwner, heroIdx, zoneIdx });
           }
 
           if (!gs.hoptUsed) gs.hoptUsed = {};
           gs.hoptUsed[hoptKey] = gs.turn;
+
+          // If activated during Action Phase, consume the action
+          if (isActionPhase) {
+            await room.engine.advanceToPhase(pi, 4);
+          }
         }
       } catch (err) {
         console.error('[Engine] activate_free_ability error:', err.message, err.stack);
@@ -2069,7 +2147,7 @@ io.on('connection', (socket) => {
   });
 
   // Activate a hero's active effect (Main Phase, no action cost)
-  socket.on('activate_hero_effect', ({ roomId, heroIdx }) => {
+  socket.on('activate_hero_effect', ({ roomId, heroIdx, charmedOwner }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine || !room.gameState) return;
@@ -2078,10 +2156,14 @@ io.on('connection', (socket) => {
     if (pi < 0 || pi !== gs.activePlayer) return;
     if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return;
 
-    const ps = gs.players[pi];
+    const heroOwner = charmedOwner != null ? charmedOwner : pi;
+    const ps = gs.players[heroOwner];
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return;
     if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
+
+    // If charmedOwner is set, verify the hero is actually charmed by this player
+    if (charmedOwner != null && hero.charmedBy !== pi) return;
 
     const { loadCardEffect } = require('./cards/effects/_loader');
 
@@ -2095,34 +2177,28 @@ io.on('connection', (socket) => {
       if (gs.hoptUsed?.[hoptKey] !== gs.turn) {
         let canActivate = true;
         if (ownScript.canActivateHeroEffect) {
-          const inst = room.engine.cardInstances.find(c => c.owner === pi && c.zone === 'hero' && c.heroIdx === heroIdx);
+          const inst = room.engine.cardInstances.find(c => c.owner === heroOwner && c.zone === 'hero' && c.heroIdx === heroIdx);
           if (inst) {
             const ctx = room.engine._createContext(inst, { event: 'canHeroEffectCheck' });
             canActivate = ownScript.canActivateHeroEffect(ctx);
-            if (!canActivate) console.log(`[HeroEffect] ${hero.name} own: canActivateHeroEffect returned false`);
           } else {
             canActivate = false;
-            console.log(`[HeroEffect] ${hero.name} own: no card instance found in hero zone`);
           }
         }
         if (canActivate) {
           availableEffects.push({
             name: hero.name,
             script: ownScript,
-            inst: room.engine.cardInstances.find(c => c.owner === pi && c.zone === 'hero' && c.heroIdx === heroIdx),
+            inst: room.engine.cardInstances.find(c => c.owner === heroOwner && c.zone === 'hero' && c.heroIdx === heroIdx),
             hoptKey,
           });
         }
-      } else {
-        console.log(`[HeroEffect] ${hero.name} own: already used this turn (HOPT)`);
       }
-    } else {
-      console.log(`[HeroEffect] ${hero.name} own: no heroEffect/onHeroEffect on script (heroEffect=${ownScript?.heroEffect}, onHeroEffect=${typeof ownScript?.onHeroEffect})`);
     }
 
     // Equipped hero effects
     for (const ci of room.engine.cardInstances) {
-      if (ci.owner !== pi || ci.zone !== 'support' || ci.heroIdx !== heroIdx) continue;
+      if (ci.owner !== heroOwner || ci.zone !== 'support' || ci.heroIdx !== heroIdx) continue;
       if (!ci.counters?.treatAsEquip) continue;
       const equipScript = loadCardEffect(ci.name);
       if (!equipScript?.heroEffect || !equipScript?.onHeroEffect) continue;
@@ -2187,8 +2263,24 @@ io.on('connection', (socket) => {
           return;
         }
 
+        // For charmed heroes: temporarily set controller to the charming player
+        const origController2 = chosen.inst.controller;
+        const origOwner2 = chosen.inst.owner;
+        if (charmedOwner != null) {
+          chosen.inst.controller = pi;
+          chosen.inst.owner = pi;
+          chosen.inst.heroOwner = charmedOwner;
+        }
+
         const ctx = room.engine._createContext(chosen.inst, {});
         const resolved = await chosen.script.onHeroEffect(ctx);
+
+        // Restore original controller/owner
+        if (charmedOwner != null) {
+          chosen.inst.controller = origController2;
+          chosen.inst.owner = origOwner2;
+          delete chosen.inst.heroOwner;
+        }
 
         if (resolved !== false) {
           if (!gs.hoptUsed) gs.hoptUsed = {};
@@ -2216,6 +2308,9 @@ io.on('connection', (socket) => {
     // Creature-specific checks
     if (ps.summonLocked) return;
     if ((gs.summonBlocked || []).includes(cardName)) return;
+    // Charmed heroes' support zones are locked
+    const creatureHero = ps.heroes?.[heroIdx];
+    if (creatureHero?.statuses?.charmed) return;
 
     // Additional action handling — creatures in Main Phase MUST use one
     const additionalTypeId = room.engine.findAdditionalActionForCard(pi, cardName);
@@ -2291,14 +2386,14 @@ io.on('connection', (socket) => {
   });
 
   // Play a spell or attack from hand (drag onto a hero)
-  socket.on('play_spell', ({ roomId, cardName, handIndex, heroIdx }) => {
+  socket.on('play_spell', ({ roomId, cardName, handIndex, heroIdx, charmedOwner }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine || !room.gameState) return;
     const gs = room.gameState;
     const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
 
-    const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Spell', 'Attack']);
+    const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Spell', 'Attack'], { charmedOwner });
     if (!v) return;
     const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
 
@@ -2307,7 +2402,7 @@ io.on('connection', (socket) => {
     let additionalConsumed = false;
     let consumedInst = null;
     if (needsAdditional) {
-      const typeId = room.engine.findAdditionalActionForCard(pi, cardName);
+      const typeId = room.engine.findAdditionalActionForCard(pi, cardName, heroIdx);
       if (!typeId) return; // No additional action available
       consumedInst = room.engine.consumeAdditionalAction(pi, typeId);
       additionalConsumed = true;
@@ -2319,15 +2414,12 @@ io.on('connection', (socket) => {
 
     (async () => {
       try {
-        // Broadcast spell to opponent BEFORE resolving
         const oi = pi === 0 ? 1 : 0;
         const oppSid = gs.players[oi]?.socketId;
-        if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
-        sendToSpectators(room, 'card_reveal', { cardName });
-        await new Promise(r => setTimeout(r, 100));
 
         // Track card instance with heroIdx so onPlay knows which hero cast it
         const inst = room.engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
+        if (charmedOwner != null) inst.heroOwner = charmedOwner;
 
         // ── Reaction chain window — opponents can chain before spell resolves ──
         const chainResult = await room.engine.executeCardWithChain({
@@ -2367,11 +2459,17 @@ io.on('connection', (socket) => {
         gs._spellExcludeTargets = [];
         gs._spellCancelled = false;
 
+        // Queue card reveal — will fire when the player confirms a target prompt
+        if (!chainResult.chainFormed) {
+          gs._pendingCardReveal = { cardName, ownerIdx: pi };
+        }
+
         // Fire onPlay hook (spell resolves here)
         await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
 
         // If spell was cancelled (player backed out of target selection), unmark and keep in hand
         if (gs._spellCancelled) {
+          delete gs._pendingCardReveal;
           ps._resolvingCard = null;
           room.engine._untrackCard(inst.id);
           delete gs._spellDamageLog;
@@ -2385,6 +2483,9 @@ io.on('connection', (socket) => {
           return;
         }
         delete gs._spellCancelled;
+
+        // Fire pending reveal if it wasn't consumed by a prompt (auto-resolve spells)
+        if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
 
         // Check if the spell declared itself a free action (Fire Bolts enhanced mode, etc.)
         const becameFreeAction = gs._spellFreeAction === true;
@@ -2425,6 +2526,26 @@ io.on('connection', (socket) => {
           room.engine._untrackCard(inst.id);
         }
         room.engine.log('spell_played', { card: cardName, player: ps.username, hero: hero.name, type: cardData.cardType });
+
+        // Track Support Spell usage (for Friendship Lv1 restriction)
+        if (cardData.cardType === 'Spell' && cardData.spellSchool1 === 'Support Magic') {
+          ps.supportSpellUsedThisTurn = true;
+          // Friendship Lv1: lock all Support Spells if this was played via Friendship additional action
+          if (additionalConsumed && consumedInst?.counters?.additionalActionType?.startsWith('friendship_support')) {
+            const { loadCardEffect: loadFx } = require('./cards/effects/_loader');
+            const friendshipScript = loadFx('Friendship');
+            // Only lock at Lv1
+            const abZones = ps.abilityZones[heroIdx] || [];
+            let friendshipLevel = 0;
+            for (const slot of abZones) {
+              if ((slot || []).includes('Friendship')) { friendshipLevel = (slot || []).length; break; }
+            }
+            if (friendshipLevel <= 1) {
+              ps.supportSpellLocked = true;
+              room.engine.log('support_spell_locked', { player: ps.username, by: 'Friendship' });
+            }
+          }
+        }
 
         // Track successful attacks for combo effects
         if (cardData.cardType === 'Attack') {
@@ -2496,8 +2617,14 @@ io.on('connection', (socket) => {
     const hero = ps.heroes[heroIdx];
     if (!hero || !hero.name || hero.hp <= 0) return;
     if (hero.statuses?.frozen) return; // Can't equip to frozen heroes
+    // Charmed heroes' support zones are locked
+    if (hero.statuses?.charmed) return;
     const isEquip = (cardData.subtype || '').toLowerCase() === 'equipment';
     if (isEquip) {
+      // Per-card equip restrictions (e.g. Lifeforce Howitzer 1-per-hero)
+      const equipScript = loadCardEffect(cardName);
+      if (equipScript?.canEquipToHero && !equipScript.canEquipToHero(gs, pi, heroIdx, room.engine)) return;
+
       if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
       // Auto-find free support zone if zoneSlot is -1 (dropped on hero)
       let finalSlot = zoneSlot;
@@ -2639,15 +2766,15 @@ io.on('connection', (socket) => {
           if (chainResult.negated) {
             ps.discardPile.push(cardName);
           } else if (chainResult.resolveResult?.placed) {
-            checkPotionLock(ps);
+            checkPotionLock(ps, gs, pi);
           } else {
             ps.deletedPile.push(cardName);
-            checkPotionLock(ps);
+            checkPotionLock(ps, gs, pi);
           }
         } else {
           // Card was already removed from hand during resolution (e.g. self-discarded)
           // Still count potion lock but don't double-add to piles
-          if (!chainResult.negated && !chainResult.resolveResult?.placed) checkPotionLock(ps);
+          if (!chainResult.negated && !chainResult.resolveResult?.placed) checkPotionLock(ps, gs, pi);
         }
         for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       })();
@@ -2708,9 +2835,7 @@ io.on('connection', (socket) => {
         const oi = pi === 0 ? 1 : 0;
         const oppSid = gs.players[oi]?.socketId;
         if (!script.deferBroadcast) {
-          if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
-          sendToSpectators(room, 'card_reveal', { cardName });
-          await new Promise(r => setTimeout(r, 100));
+          gs._pendingCardReveal = { cardName, ownerIdx: pi };
         }
 
         let chainResult;
@@ -2726,10 +2851,14 @@ io.on('connection', (socket) => {
         await new Promise(r => setTimeout(r, 100));
 
         if (chainResult.resolveResult?.cancelled) {
+          delete gs._pendingCardReveal;
           ps._resolvingCard = null;
           for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
           return;
         }
+
+        // Fire pending reveal if it wasn't consumed by a prompt
+        if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
 
         // Deduct gold only if not negated
         if (cost > 0 && !script.manualGoldCost && !chainResult.negated) {
@@ -2743,6 +2872,8 @@ io.on('connection', (socket) => {
           if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
           if (chainResult.negated) {
             ps.discardPile.push(cardName);
+          } else if (script.deleteOnUse) {
+            ps.deletedPile.push(cardName);
           } else {
             ps.discardPile.push(cardName);
           }
@@ -2838,6 +2969,16 @@ io.on('connection', (socket) => {
         return;
       }
 
+      if (chainResult.resolveResult?.cancelled) {
+        // Fully cancelled — refund gold, card stays in hand
+        if (cardType === 'Artifact' && goldCost > 0 && !script.manualGoldCost && !chainResult.negated) {
+          ps.gold += goldCost; // Refund gold deducted above
+        }
+        ps._resolvingCard = null;
+        for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+        return;
+      }
+
       // Brief delay so effect animations finish before pile assignment
       await new Promise(r => setTimeout(r, 100));
 
@@ -2851,13 +2992,13 @@ io.on('connection', (socket) => {
           ps.discardPile.push(potionName);
         } else if (cardType === 'Potion') {
           ps.deletedPile.push(potionName);
-          checkPotionLock(ps);
+          checkPotionLock(ps, gs, pi);
         } else {
           ps.discardPile.push(potionName);
         }
       } else {
         // Card was already removed from hand during resolution (e.g. self-discarded)
-        if (!chainResult.negated && cardType === 'Potion') checkPotionLock(ps);
+        if (!chainResult.negated && cardType === 'Potion') checkPotionLock(ps, gs, pi);
       }
 
       // Play target animation if card resolved (not negated) and has an animation

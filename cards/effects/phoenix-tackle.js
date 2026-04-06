@@ -61,12 +61,12 @@ module.exports = {
       const tgtZoneSlot = target.type === 'hero' ? undefined : target.slotIdx;
 
       // Engulf caster in flames
-      engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: pi, heroIdx, zoneSlot: -1 });
+      engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
       await engine._delay(200);
 
       // Ram: hero flies to target and back
       engine._broadcastEvent('play_ram_animation', {
-        sourceOwner: pi, sourceHeroIdx: heroIdx,
+        sourceOwner: ctx.cardHeroOwner, sourceHeroIdx: heroIdx,
         targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
         targetZoneSlot: tgtZoneSlot,
         cardName: hero.name, duration: 1200,
@@ -106,7 +106,7 @@ module.exports = {
 
       // Recoil damage to caster
       if (hero.hp > 0) {
-        engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: pi, heroIdx, zoneSlot: -1 });
+        engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
         await engine._delay(200);
         await ctx.dealDamage(hero, recoil, 'other');
         engine.sync();

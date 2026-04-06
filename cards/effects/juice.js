@@ -30,34 +30,19 @@ function getTargetStatuses(target, engine) {
 }
 
 function getValidTargets(gs, engine) {
-  const targets = [];
+  if (!engine) return [];
   const negKeys = getNegativeStatuses();
+  const targets = [];
   for (let pi = 0; pi < 2; pi++) {
-    const ps = gs.players[pi];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses && negKeys.some(k => hero.statuses[k])) {
-        targets.push({
-          id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: hero.name,
-        });
-      }
-      if (engine) {
-        for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
-          const slot = (ps.supportZones[hi] || [])[si] || [];
-          if (slot.length === 0) continue;
-          const inst = engine.cardInstances.find(c =>
-            c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
-          );
-          if (inst && negKeys.some(k => inst.counters[k])) {
-            targets.push({
-              id: `equip-${pi}-${hi}-${si}`, type: 'equip', owner: pi,
-              heroIdx: hi, slotIdx: si, cardName: slot[0],
-            });
-          }
-        }
-      }
-    }
+    const heroes = engine.getHeroTargets(pi).filter(t => {
+      const hero = gs.players[pi].heroes[t.heroIdx];
+      return hero.statuses && negKeys.some(k => hero.statuses[k]);
+    });
+    const creatures = engine.getCreatureTargets(pi).filter(t => {
+      const inst = t.cardInstance;
+      return inst && negKeys.some(k => inst.counters[k]);
+    });
+    targets.push(...heroes, ...creatures);
   }
   return targets;
 }

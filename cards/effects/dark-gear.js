@@ -61,28 +61,18 @@ function getStealableCreatures(engine, playerIdx) {
   const ps = engine.gs.players[playerIdx];
   const gold = ps.gold || 0;
   const cardDB = engine._getCardDB();
-  const targets = [];
-  for (const inst of engine.cardInstances) {
-    if (inst.owner !== oppIdx || inst.zone !== 'support') continue;
-    if (engine.isCreatureImmune(inst, 'targeting_immune')) continue;
-    if (engine.isCreatureImmune(inst, 'control_immune')) continue;
-    const cd = cardDB[inst.name];
+  return engine.getCreatureTargets(oppIdx).filter(t => {
+    const inst = t.cardInstance;
+    if (inst && engine.isCreatureImmune(inst, 'targeting_immune')) return false;
+    if (inst && engine.isCreatureImmune(inst, 'control_immune')) return false;
+    const cd = cardDB[t.cardName];
     const level = cd?.level || 1;
     const cost = level * BASE_COST;
-    if (gold < cost) continue;
-    targets.push({
-      id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
-      type: 'equip',
-      owner: inst.owner,
-      heroIdx: inst.heroIdx,
-      slotIdx: inst.zoneSlot,
-      cardName: inst.name,
-      cardInstance: inst,
-      level,
-      cost,
-    });
-  }
-  return targets;
+    if (gold < cost) return false;
+    t.level = level;
+    t.cost = cost;
+    return true;
+  });
 }
 
 module.exports = {

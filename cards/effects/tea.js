@@ -38,27 +38,20 @@ function getTargetStatuses(target, engine) {
 }
 
 function getOwnStatusedTargets(gs, pi, engine) {
-  const ps = gs.players[pi];
-  const targets = [];
+  if (!engine) return [];
   const negKeys = getNegativeStatuses();
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
-    if (hero.statuses && negKeys.some(k => hero.statuses[k])) {
-      targets.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: hero.name });
-    }
-    if (engine) {
-      for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
-        const slot = (ps.supportZones[hi] || [])[si] || [];
-        if (slot.length === 0) continue;
-        const inst = engine.cardInstances.find(c => c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si);
-        if (inst && negKeys.some(k => inst.counters[k])) {
-          targets.push({ id: `equip-${pi}-${hi}-${si}`, type: 'equip', owner: pi, heroIdx: hi, slotIdx: si, cardName: slot[0] });
-        }
-      }
-    }
-  }
-  return targets;
+
+  const heroes = engine.getHeroTargets(pi).filter(t => {
+    const hero = gs.players[pi].heroes[t.heroIdx];
+    return hero.statuses && negKeys.some(k => hero.statuses[k]);
+  });
+
+  const creatures = engine.getCreatureTargets(pi).filter(t => {
+    const inst = t.cardInstance;
+    return inst && negKeys.some(k => inst.counters[k]);
+  });
+
+  return [...heroes, ...creatures];
 }
 
 /** Check if a target is immune to ALL of the given statuses */
@@ -100,40 +93,33 @@ function isImmuneToAll(target, statusKeys, engine) {
 function getSecondTargets(gs, engine, firstTarget, removedStatuses, poisonStacks) {
   const targets = [];
   for (let pi = 0; pi < 2; pi++) {
-    const ps = gs.players[pi];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      const t = { id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: hero.name };
-      if (t.id === firstTarget.id) continue; // Can't target self
-      // Check poison stacks eligibility
+    // Heroes
+    for (const t of engine.getHeroTargets(pi)) {
+      if (t.id === firstTarget.id) continue;
+      const hero = gs.players[pi].heroes[t.heroIdx];
       if (removedStatuses.includes('poisoned') && hero.statuses?.poisoned) {
         const existingStacks = hero.statuses.poisoned.stacks || 1;
         if (existingStacks >= poisonStacks) {
-          // Already has equal or more stacks — check if OTHER statuses can apply
           const otherStatuses = removedStatuses.filter(k => k !== 'poisoned');
           if (otherStatuses.length === 0 || isImmuneToAll(t, otherStatuses, engine)) continue;
         }
       } else if (isImmuneToAll(t, removedStatuses, engine)) continue;
       targets.push(t);
+    }
 
-      // Creatures
-      for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
-        const slot = (ps.supportZones[hi] || [])[si] || [];
-        if (slot.length === 0) continue;
-        const ct = { id: `equip-${pi}-${hi}-${si}`, type: 'equip', owner: pi, heroIdx: hi, slotIdx: si, cardName: slot[0] };
-        if (ct.id === firstTarget.id) continue;
-        const inst = engine.cardInstances.find(c => c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si);
-        if (!inst) continue;
-        if (removedStatuses.includes('poisoned') && inst.counters.poisoned) {
-          const existingStacks = inst.counters.poisonStacks || 1;
-          if (existingStacks >= poisonStacks) {
-            const otherStatuses = removedStatuses.filter(k => k !== 'poisoned');
-            if (otherStatuses.length === 0 || isImmuneToAll(ct, otherStatuses, engine)) continue;
-          }
-        } else if (isImmuneToAll(ct, removedStatuses, engine)) continue;
-        targets.push(ct);
-      }
+    // Creatures
+    for (const ct of engine.getCreatureTargets(pi)) {
+      if (ct.id === firstTarget.id) continue;
+      const inst = ct.cardInstance;
+      if (!inst) continue;
+      if (removedStatuses.includes('poisoned') && inst.counters.poisoned) {
+        const existingStacks = inst.counters.poisonStacks || 1;
+        if (existingStacks >= poisonStacks) {
+          const otherStatuses = removedStatuses.filter(k => k !== 'poisoned');
+          if (otherStatuses.length === 0 || isImmuneToAll(ct, otherStatuses, engine)) continue;
+        }
+      } else if (isImmuneToAll(ct, removedStatuses, engine)) continue;
+      targets.push(ct);
     }
   }
   return targets;

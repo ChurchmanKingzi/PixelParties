@@ -81,6 +81,7 @@ module.exports = {
           count: 1,
           title: 'Wheels — Draw 4',
           description: `You must delete ${2 - d} more card${2 - d > 1 ? 's' : ''} from your hand.`,
+          instruction: 'Click a card in your hand to delete it.',
           cancellable: false,
         });
 

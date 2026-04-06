@@ -67,16 +67,18 @@ module.exports = {
 
     onActionUsed: async (ctx) => {
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
-      if (ctx.playerIdx !== ctx.cardOwner) return;
-      if (ctx.actionType !== 'attack') return;
 
       const engine = ctx._engine;
       const gs = engine.gs;
-      const pi = ctx.cardOwner;
-      const ps = gs.players[pi];
+      const pi = ctx.cardOwner; // Effective controller (auto-resolved)
       const heroIdx = ctx.cardHeroIdx;
-      const hero = ps.heroes?.[heroIdx];
+      const hero = gs.players[ctx.cardOriginalOwner]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
+
+      if (ctx.playerIdx !== pi) return;
+      if (ctx.actionType !== 'attack') return;
+
+      const ps = gs.players[pi];
 
       // Track Attack name (duplicate ban)
       if (!hero.ghuanjunAttacksUsed) hero.ghuanjunAttacksUsed = [];
@@ -114,7 +116,7 @@ module.exports = {
       ps.comboLockHeroIdx = heroIdx;
 
       // Flash Ghuanjun to indicate combo activation
-      engine._broadcastEvent('play_zone_animation', { type: 'electric_strike', owner: pi, heroIdx, zoneSlot: -1 });
+      engine._broadcastEvent('play_zone_animation', { type: 'electric_strike', owner: ctx.cardOriginalOwner, heroIdx, zoneSlot: -1 });
       await engine._delay(300);
 
       const oppIdx = pi === 0 ? 1 : 0;
@@ -135,7 +137,7 @@ module.exports = {
 
     onAdditionalActionUsed: (ctx) => {
       if (ctx.heroIdx !== ctx.cardHeroIdx || ctx.playerIdx !== ctx.cardOwner || ctx.actionType !== 'attack') return;
-      const hero = ctx.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
+      const hero = ctx.players[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
       if (!hero) return;
       if (!hero.ghuanjunAttacksUsed) hero.ghuanjunAttacksUsed = [];
       if (!hero.ghuanjunAttacksUsed.includes(ctx.playedCardName)) hero.ghuanjunAttacksUsed.push(ctx.playedCardName);
@@ -153,9 +155,8 @@ module.exports = {
       if (sourceOwner !== ctx.cardOwner) return;
       ctx.setFlag('capAtHPMinus1', true);
 
-      // Enforce base ATK: only correct attacks that use hero.atk for damage
       if (ctx.source?.usesHeroAtk) {
-        const hero = ctx.players?.[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
+        const hero = ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
         if (hero && hero.baseAtk !== undefined) {
           const diff = (hero.atk || 0) - (hero.baseAtk || 0);
           if (diff !== 0) {
@@ -194,8 +195,8 @@ module.exports = {
     beforeCreatureDamageBatch: (ctx) => {
       if (!ctx.entries) return;
       const heroIdx = ctx.cardHeroIdx;
-      const pi = ctx.cardOwner;
-      const hero = ctx.players?.[pi]?.heroes?.[heroIdx];
+      const pi = ctx.cardOwner; // Effective controller (auto-resolved)
+      const hero = ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[heroIdx];
       for (const e of ctx.entries) {
         if (e.type !== 'attack' || e.cancelled) continue;
         if ((e.source?.heroIdx ?? -1) !== heroIdx || (e.source?.owner ?? -1) !== pi) continue;
@@ -215,7 +216,7 @@ module.exports = {
       if (!ctx.entries) return;
       const engine = ctx._engine;
       const gs = engine.gs;
-      const pi = ctx.cardOwner;
+      const pi = ctx.cardOwner; // Effective controller (auto-resolved)
       const oppIdx = pi === 0 ? 1 : 0;
       const heroIdx = ctx.cardHeroIdx;
       for (const e of ctx.entries) {

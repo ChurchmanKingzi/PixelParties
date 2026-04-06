@@ -222,8 +222,8 @@ class GameEngine {
         if ((hero.statuses?.frozen || hero.statuses?.stunned) && (c.zone === 'hero' || c.zone === 'ability')) return false;
         if (hero.statuses?.negated && (c.zone === 'hero' || c.zone === 'ability')) return false;
       }
-      // Creature-level negation (Dark Gear, Necromancy, Diplomacy, etc.)
-      if (c.zone === 'support' && c.counters?.negated) return false;
+      // Creature-level negation/freeze/stun (Dark Gear, Necromancy, Slimes, etc.)
+      if (c.zone === 'support' && (c.counters?.negated || c.counters?.frozen || c.counters?.stunned)) return false;
       return true;
     });
 
@@ -285,6 +285,21 @@ class GameEngine {
     const engine = this;
     const gs = this.gs;
 
+    // ── Resolve effective controller for cards attached to charmed heroes ──
+    // This ensures ALL equipment hooks, ability hooks, and hero hooks
+    // automatically use the charming player as controller/owner.
+    let effectiveOwner = cardInstance.owner;
+    let effectiveController = cardInstance.controller;
+    let effectiveHeroOwner = cardInstance.heroOwner != null ? cardInstance.heroOwner : cardInstance.controller;
+    if (cardInstance.heroIdx >= 0 && (cardInstance.zone === 'support' || cardInstance.zone === 'ability' || cardInstance.zone === 'hero')) {
+      const heroObj = gs.players[cardInstance.owner]?.heroes?.[cardInstance.heroIdx];
+      if (heroObj?.charmedBy != null) {
+        effectiveController = heroObj.charmedBy;
+        effectiveOwner = heroObj.charmedBy;
+        effectiveHeroOwner = cardInstance.owner; // hero is still physically on original owner's side
+      }
+    }
+
     const ctx = {
       // Hook event data (spread first so card-specific props override)
       ...hookCtx,
@@ -292,12 +307,14 @@ class GameEngine {
       // ── Card-specific info (always refers to the card whose hook is firing) ──
       card: cardInstance,
       cardName: cardInstance.name,
-      cardOwner: cardInstance.owner,
-      cardController: cardInstance.controller,
+      cardOwner: effectiveOwner,
+      cardOriginalOwner: cardInstance.owner, // Always the original owner (for flag keys, etc.)
+      cardController: effectiveController,
       cardZone: cardInstance.zone,
       cardHeroIdx: cardInstance.heroIdx,
+      cardHeroOwner: effectiveHeroOwner,
       attachedHero: cardInstance.heroIdx >= 0
-        ? gs.players[cardInstance.controller]?.heroes?.[cardInstance.heroIdx] || null
+        ? gs.players[effectiveHeroOwner]?.heroes?.[cardInstance.heroIdx] || null
         : null,
 
       // Game state reads
@@ -305,7 +322,7 @@ class GameEngine {
       phaseIndex: gs.currentPhase || 0,
       turn: gs.turn || 0,
       activePlayer: gs.activePlayer || 0,
-      isMyTurn: (gs.activePlayer || 0) === cardInstance.controller,
+      isMyTurn: (gs.activePlayer || 0) === effectiveController,
       players: gs.players,
 
       // Internal
@@ -330,6 +347,9 @@ class GameEngine {
       },
       async healHero(target, amount) {
         return engine.actionHealHero(cardInstance, target, amount);
+      },
+      async healCreature(target, amount) {
+        return engine.actionHealCreature(cardInstance, target, amount);
       },
       async reviveHero(playerIdx, heroIdx, hp, opts) {
         return engine.actionReviveHero(playerIdx, heroIdx, hp, opts);
@@ -813,8 +833,8 @@ class GameEngine {
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
             const hero = ps2.heroes[hi];
             if (!hero?.name || hero.hp <= 0) continue;
-            // Note: shielded/protected heroes ARE still selectable as targets.
-            // The actual damage/status block is handled by actionDealDamage / addHeroStatus.
+            // Skip heroes charmed by the caster (they're on the caster's side)
+            if (hero.charmedBy === pi && playerIdx !== pi) continue;
             const t = { id: `hero-${playerIdx}-${hi}`, type: 'hero', owner: playerIdx, heroIdx: hi, cardName: hero.name };
             if (config.condition && !config.condition(t, engine)) continue;
             targets.push(t);
@@ -846,6 +866,17 @@ class GameEngine {
         if (types.includes('hero')) {
           if (side === 'enemy' || side === 'any') addHeroes(oppIdx);
           if (side === 'my' || side === 'any') addHeroes(pi);
+          // Add charmed opponent heroes to the caster's side
+          if (side === 'my' || side === 'any') {
+            const charmedOps = gs.players[oppIdx];
+            for (let hi = 0; hi < (charmedOps.heroes || []).length; hi++) {
+              const h = charmedOps.heroes[hi];
+              if (!h?.name || h.hp <= 0 || h.charmedBy !== pi) continue;
+              const t = { id: `hero-${oppIdx}-${hi}`, type: 'hero', owner: oppIdx, heroIdx: hi, cardName: h.name };
+              if (config.condition && !config.condition(t, engine)) continue;
+              if (!targets.some(x => x.id === t.id)) targets.push(t);
+            }
+          }
         }
         if (types.includes('creature')) {
           if (side === 'enemy' || side === 'any') addCreatures(oppIdx);
@@ -929,6 +960,7 @@ class GameEngine {
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
             const hero = ps2.heroes[hi];
             if (!hero?.name || hero.hp <= 0) continue;
+            if (hero.charmedBy === pi && playerIdx !== pi) continue;
             const t = { id: `hero-${playerIdx}-${hi}`, type: 'hero', owner: playerIdx, heroIdx: hi, cardName: hero.name };
             if (config.condition && !config.condition(t, engine)) continue;
             targets.push(t);
@@ -959,6 +991,16 @@ class GameEngine {
         if (types.includes('hero')) {
           if (side === 'enemy' || side === 'any') addHeroes(oppIdx);
           if (side === 'my' || side === 'any') addHeroes(pi);
+          if (side === 'my' || side === 'any') {
+            const charmedOps2 = gs.players[oppIdx];
+            for (let hi = 0; hi < (charmedOps2.heroes || []).length; hi++) {
+              const h = charmedOps2.heroes[hi];
+              if (!h?.name || h.hp <= 0 || h.charmedBy !== pi) continue;
+              const t = { id: `hero-${oppIdx}-${hi}`, type: 'hero', owner: oppIdx, heroIdx: hi, cardName: h.name };
+              if (config.condition && !config.condition(t, engine)) continue;
+              if (!targets.some(x => x.id === t.id)) targets.push(t);
+            }
+          }
         }
         if (types.includes('creature')) {
           if (side === 'enemy' || side === 'any') addCreatures(oppIdx);
@@ -1298,6 +1340,12 @@ class GameEngine {
       }
     }
 
+    // Charmed heroes are immune to all damage (Charme Lv3)
+    if (target?.statuses?.charmed && target.hp !== undefined) {
+      this.log('damage_blocked', { target: this._heroLabel(target), reason: 'charmed' });
+      return { dealt: 0, cancelled: true };
+    }
+
     // Submerged heroes: immune to all damage while owner has other alive non-submerged heroes
     if (target?.buffs?.submerged && target.hp !== undefined) {
       const ownerIdx = this._findHeroOwner(target);
@@ -1397,13 +1445,19 @@ class GameEngine {
     // Check for hero KO
     if (target && target.hp !== undefined && target.hp <= 0) {
       target.diedOnTurn = this.gs.turn; // Track when hero died (Initiation Ritual, etc.)
-      await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source });
+      await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, _bypassDeadHeroFilter: true });
 
-      // Cleanup: discard equip artifacts and handle island zone removal
-      await this.handleHeroDeathCleanup(target);
+      // If a hook (Guardian Angel) restored HP, skip death processing
+      if (target.hp > 0) {
+        delete target.diedOnTurn;
+      } else if (!target._koProcessed) {
+        // Cleanup: discard equip artifacts and handle island zone removal
+        target._koProcessed = true;
+        await this.handleHeroDeathCleanup(target);
 
-      // Check if ALL heroes of a player are dead → opponent wins
-      await this.checkAllHeroesDead();
+        // Check if ALL heroes of a player are dead → opponent wins
+        await this.checkAllHeroesDead();
+      }
     }
 
     return { dealt: actualAmount, cancelled: false };
@@ -1411,9 +1465,93 @@ class GameEngine {
 
   async actionHealHero(source, target, amount) {
     if (!target || target.hp === undefined) return;
-    const healed = Math.min(amount, (target.maxHp || target.hp) - target.hp);
-    target.hp = Math.min(target.maxHp || target.hp + amount, target.hp + amount);
-    this.log('heal', { source: source?.name, target: this._heroLabel(target), amount: healed });
+
+    // Check if target has Overheal Shock — converts healing to damage
+    let targetPi = -1, targetHi = -1;
+    for (let p = 0; p < 2; p++) {
+      for (let h = 0; h < (this.gs.players[p]?.heroes || []).length; h++) {
+        if (this.gs.players[p].heroes[h] === target) { targetPi = p; targetHi = h; break; }
+      }
+      if (targetPi >= 0) break;
+    }
+    if (targetPi >= 0 && targetHi >= 0) {
+      const supportZones = this.gs.players[targetPi].supportZones[targetHi] || [];
+      const hasOverhealShock = supportZones.some(slot => (slot || []).includes('Overheal Shock'));
+      if (hasOverhealShock) {
+        this.log('heal_reversed', { source: source?.name, target: this._heroLabel(target), amount, by: 'Overheal Shock' });
+        await this.actionDealDamage(source, target, amount, 'other');
+        return;
+      }
+    }
+
+    const maxHp = target.maxHp || target.hp;
+    let allowOverheal = false;
+    if (source && source.owner != null && source.heroIdx >= 0) {
+      const heroOwnerIdx = source.heroOwner != null ? source.heroOwner : source.owner;
+      const flagKey = `${heroOwnerIdx}-${source.heroIdx}`;
+      if (this.gs.heroFlags?.[flagKey]?.overhealPassive && target.hp <= maxHp) allowOverheal = true;
+    }
+    const hpBefore = target.hp;
+    if (allowOverheal) {
+      target.hp += amount;
+      this.log('heal', { source: source?.name, target: this._heroLabel(target), amount, overheal: target.hp > maxHp });
+    } else {
+      // If already above maxHp (overhealed), do nothing
+      if (target.hp >= maxHp) return;
+      const healed = Math.min(amount, maxHp - target.hp);
+      target.hp = Math.min(maxHp, target.hp + amount);
+      this.log('heal', { source: source?.name, target: this._heroLabel(target), amount: healed });
+    }
+
+    // Fire afterHeal hook (Lifeforce Howitzer, etc.)
+    const actualHealed = target.hp - hpBefore;
+    if (actualHealed > 0 && targetPi >= 0 && targetHi >= 0) {
+      await this.runHooks('afterHeal', {
+        target, healedAmount: actualHealed, source,
+        targetOwner: targetPi, targetHeroIdx: targetHi,
+        _skipReactionCheck: true,
+      });
+    }
+  }
+
+  /**
+   * Heal a creature (card instance in support zone).
+   * Respects Nao's overheal passive — if the source hero has overhealPassive,
+   * currentHp can exceed the creature's base HP.
+   * @param {CardInstance} source - The card performing the heal
+   * @param {CardInstance} target - The creature card instance to heal
+   * @param {number} amount - Amount to heal
+   */
+  async actionHealCreature(source, target, amount) {
+    if (!target || !target.counters) return;
+    const cd = this._getCardDB()[target.name];
+    const baseHp = cd?.hp || 0;
+    if (baseHp <= 0) return;
+
+    // Monia-style creature protection
+    if (hasCardType(cd, 'Creature')) {
+      const hookCtx = { creature: target, effectType: 'heal', source, cancelled: false, _skipReactionCheck: true };
+      await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
+      if (hookCtx.cancelled) return;
+    }
+    const currentHp = target.counters.currentHp ?? baseHp;
+    // Check overheal passive
+    let allowOverheal = false;
+    if (source && source.owner != null && source.heroIdx >= 0) {
+      const heroOwnerIdx = source.heroOwner != null ? source.heroOwner : source.owner;
+      const flagKey = `${heroOwnerIdx}-${source.heroIdx}`;
+      if (this.gs.heroFlags?.[flagKey]?.overhealPassive && currentHp <= baseHp) allowOverheal = true;
+    }
+    if (allowOverheal) {
+      target.counters.currentHp = currentHp + amount;
+      this.log('heal_creature', { source: source?.name, target: target.name, amount, overheal: target.counters.currentHp > baseHp });
+    } else {
+      // If already above baseHp (overhealed), do nothing
+      if (currentHp >= baseHp) return;
+      const healed = Math.min(amount, baseHp - currentHp);
+      target.counters.currentHp = Math.min(baseHp, currentHp + amount);
+      this.log('heal_creature', { source: source?.name, target: target.name, amount: healed });
+    }
   }
 
   /**
@@ -1551,6 +1689,23 @@ class GameEngine {
   async actionDestroyCard(source, targetCard) {
     if (!targetCard) return;
     if (targetCard.counters?.immovable) return; // Cannot be destroyed or removed
+    // First-turn protection: cards belonging to the protected player cannot be destroyed
+    if (this.gs.firstTurnProtectedPlayer != null && targetCard.owner === this.gs.firstTurnProtectedPlayer) {
+      this.log('destroy_blocked', { card: targetCard.name, reason: 'first-turn protection' });
+      return;
+    }
+    // Monia-style creature protection
+    if (targetCard.zone === 'support') {
+      const cd = this._getCardDB()[targetCard.name];
+      if (cd && hasCardType(cd, 'Creature')) {
+        const hookCtx = { creature: targetCard, effectType: 'destroy', source, cancelled: false, _skipReactionCheck: true };
+        await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
+        if (hookCtx.cancelled) {
+          this.log('destroy_blocked', { card: targetCard.name, reason: 'creature protection' });
+          return;
+        }
+      }
+    }
     this.log('destroy', { source: source?.name, target: targetCard.name });
     await this.actionMoveCard(targetCard, ZONES.DISCARD);
   }
@@ -1560,6 +1715,19 @@ class GameEngine {
     if (cardInstance.counters?.immovable && toZone !== cardInstance.zone) return;
     const fromZone = cardInstance.zone;
     const fromHeroIdx = cardInstance.heroIdx;
+
+    // Monia-style creature protection for control changes (not destruction — that's handled in actionDestroyCard)
+    if (fromZone === 'support' && toZone !== ZONES.DISCARD && toZone !== ZONES.DELETED) {
+      const cd = this._getCardDB()[cardInstance.name];
+      if (cd && hasCardType(cd, 'Creature')) {
+        const hookCtx = { creature: cardInstance, effectType: 'move', source: null, cancelled: false, _skipReactionCheck: true };
+        await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
+        if (hookCtx.cancelled) {
+          this.log('move_blocked', { card: cardInstance.name, reason: 'creature protection' });
+          return;
+        }
+      }
+    }
 
     await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, { card: cardInstance, fromZone, fromHeroIdx });
 
@@ -1751,6 +1919,7 @@ class GameEngine {
         count: 1,
         title,
         description: `You have ${ps.hand.length} cards in hand (max ${maxSize}). ${verb} ${excess} more.`,
+        instruction: `Click a card in your hand to ${verb.toLowerCase()} it.`,
         cancellable: false,
       });
 
@@ -1840,6 +2009,13 @@ class GameEngine {
           playBlockedAnim();
           return false;
         }
+      }
+
+      // Charmed heroes are immune to negative statuses
+      if (target?.statuses?.charmed) {
+        this.log('status_blocked', { target: this._heroLabel(target), status: statusName, reason: 'charmed' });
+        playBlockedAnim();
+        return false;
       }
 
       // Immune status blocks all negative statuses
@@ -2105,10 +2281,12 @@ class GameEngine {
    * @param {string} statusName - e.g. 'frozen', 'burned', 'poisoned'
    * @returns {boolean} true if the status CAN be applied
    */
-  canApplyCreatureStatus(inst, statusName) {
+  canApplyCreatureStatus(inst, statusName, source) {
     if (!inst) return false;
     const immuneKey = statusName + '_immune';
     if (inst.counters[immuneKey]) return false;
+    // Monia-style creature protection (synchronous check via _moniaShieldActive)
+    if (this.gs._moniaShieldActive != null && inst.owner === this.gs._moniaShieldActive) return false;
     return true;
   }
 
@@ -2193,7 +2371,7 @@ class GameEngine {
    * @param {string[]} expectedTypes - Allowed card types (e.g. ['Spell','Attack'])
    * @returns {object|null} Computed context or null if validation fails
    */
-  validateActionPlay(pi, cardName, handIndex, heroIdx, expectedTypes) {
+  validateActionPlay(pi, cardName, handIndex, heroIdx, expectedTypes, opts = {}) {
     const gs = this.gs;
     if (pi < 0 || pi !== gs.activePlayer) return null;
 
@@ -2211,18 +2389,23 @@ class GameEngine {
     const cardData = this._getCardDB()[cardName];
     if (!cardData || !expectedTypes.includes(cardData.cardType)) return null;
 
-    // Hero validation
-    const hero = ps.heroes?.[heroIdx];
+    // Hero validation — charmed heroes are on the opponent's side
+    const heroOwner = opts.charmedOwner != null ? opts.charmedOwner : pi;
+    const heroPs = gs.players[heroOwner];
+    const hero = heroPs?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return null;
-    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return null;
+    if (hero.statuses?.frozen || hero.statuses?.stunned) return null;
 
-    // Combo lock
-    if (ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== heroIdx) return null;
+    // If charmedOwner is set, verify the hero is actually charmed by this player
+    if (opts.charmedOwner != null && hero.charmedBy !== pi) return null;
 
-    // Spell school / level requirements
+    // Combo lock (only for own heroes)
+    if (opts.charmedOwner == null && ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== heroIdx) return null;
+
+    // Spell school / level requirements — use the charmed hero's ability zones
     const level = cardData.level || 0;
     if (level > 0 || cardData.spellSchool1) {
-      const abZones = ps.abilityZones[heroIdx] || [];
+      const abZones = hero.statuses?.negated ? [] : (heroPs.abilityZones[heroIdx] || []);
       if (cardData.spellSchool1 && this.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) return null;
       if (cardData.spellSchool2 && this.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) return null;
     }
@@ -2235,6 +2418,9 @@ class GameEngine {
       const opgKey = script.oncePerGameKey || cardName;
       if (ps._oncePerGameUsed?.has(opgKey)) return null;
     }
+
+    // Support Spell lock (Friendship Lv1 debuff)
+    if (ps.supportSpellLocked && cardData.cardType === 'Spell' && cardData.spellSchool1 === 'Support Magic') return null;
 
     // Custom play conditions (spells/attacks)
     if (script?.spellPlayCondition && !script.spellPlayCondition(gs, pi)) return null;
@@ -2429,6 +2615,22 @@ class GameEngine {
    */
   async startTurn() {
     this.gs.currentPhase = PHASES.START;
+
+    // ── Revert charmed heroes (Charme Lv3) ──
+    for (const ps of this.gs.players) {
+      if (!ps) continue;
+      for (const hero of (ps.heroes || [])) {
+        if (hero?.charmedBy != null) {
+          delete hero.charmedBy;
+          delete hero.charmedFromOwner;
+          delete hero.charmedHeroIdx;
+          if (hero.statuses?.charmed) delete hero.statuses.charmed;
+          this.log('charme_revert', { hero: hero.name });
+        }
+      }
+    }
+    delete this.gs._charmedSupportLocked;
+
     // Reset per-turn flags
     const activePs = this.gs.players[this.gs.activePlayer];
     if (activePs) activePs.abilityGivenThisTurn = [false, false, false];
@@ -2440,6 +2642,8 @@ class GameEngine {
         ps.damageLocked = false;
         ps.dealtDamageToOpponent = false;
         ps.potionLocked = false;
+        ps.supportSpellLocked = false;
+        ps.supportSpellUsedThisTurn = false;
         ps.potionsUsedThisTurn = 0;
         ps.attacksPlayedThisTurn = 0;
         ps.comboLockHeroIdx = null;
@@ -2720,6 +2924,7 @@ class GameEngine {
     if (!ps) return [];
     const blocked = [];
     const seen = new Set();
+    const allCards = this._getCardDB();
     for (const cardName of (ps.hand || [])) {
       if (seen.has(cardName)) continue;
       seen.add(cardName);
@@ -2728,6 +2933,14 @@ class GameEngine {
       if (script?.oncePerGame) {
         const opgKey = script.oncePerGameKey || cardName;
         if (ps._oncePerGameUsed?.has(opgKey)) {
+          blocked.push(cardName);
+          continue;
+        }
+      }
+      // Support Spell lock (Friendship Lv1 debuff)
+      if (ps.supportSpellLocked) {
+        const cd = allCards[cardName];
+        if (cd && cd.cardType === 'Spell' && cd.spellSchool1 === 'Support Magic') {
           blocked.push(cardName);
           continue;
         }
@@ -2752,7 +2965,7 @@ class GameEngine {
       if (seen.has(cardName)) continue;
       seen.add(cardName);
       const script = loadCardEffect(cardName);
-      if (script?.canActivate && (script.isTargetingArtifact || script.isPotion)) {
+      if (script?.canActivate && (script.isTargetingArtifact || script.isPotion || script.resolve)) {
         if (!script.canActivate(this.gs, playerIdx)) blocked.push(cardName);
       }
       // Reaction cards: check reactionCondition
@@ -2822,6 +3035,24 @@ class GameEngine {
   }
 
   /**
+   * Broadcast a pending card_reveal to the opponent once the player has confirmed.
+   * Called from resolveEffectPrompt / resolveGenericPrompt after a non-cancelled response.
+   */
+  _firePendingCardReveal() {
+    const pending = this.gs._pendingCardReveal;
+    if (!pending) return;
+    delete this.gs._pendingCardReveal;
+    const oi = pending.ownerIdx === 0 ? 1 : 0;
+    const oppSid = this.gs.players[oi]?.socketId;
+    if (oppSid) this.io.to(oppSid).emit('card_reveal', { cardName: pending.cardName });
+    if (this.room.spectators) {
+      for (const spec of this.room.spectators) {
+        if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName: pending.cardName });
+      }
+    }
+  }
+
+  /**
    * Resolve a pending effect prompt (called by server socket handler).
    */
   resolveEffectPrompt(selectedIds) {
@@ -2829,6 +3060,7 @@ class GameEngine {
     const { resolve } = this._pendingPrompt;
     this._pendingPrompt = null;
     this.gs.potionTargeting = null;
+    if (selectedIds && selectedIds.length > 0) this._firePendingCardReveal();
     resolve(selectedIds || []);
     return true;
   }
@@ -2946,6 +3178,7 @@ class GameEngine {
     if (response?.cancelled) {
       resolve(null);
     } else {
+      this._firePendingCardReveal();
       resolve(response);
     }
     this.sync();
@@ -3128,6 +3361,11 @@ class GameEngine {
 
       for (let hi = 0; hi < ps.hand.length; hi++) {
         const cardName = ps.hand[hi];
+        // Skip cards currently being played/resolved (prevents self-chaining)
+        if (ps._resolvingCard) {
+          const nth = ps.hand.slice(0, hi + 1).filter(c => c === ps._resolvingCard.name).length;
+          if (cardName === ps._resolvingCard.name && nth === ps._resolvingCard.nth) continue;
+        }
         const script = loadCardEffect(cardName);
         if (!script?.isReaction) continue;
 
@@ -3338,7 +3576,7 @@ class GameEngine {
       const typeId = inst.counters.additionalActionType;
       const config = this._additionalActionTypes[typeId];
       if (!config) continue;
-      if (!byType[typeId]) byType[typeId] = { typeId, label: config.label, allowedCategories: config.allowedCategories || [], providers: [], eligibleHandCards: [] };
+      if (!byType[typeId]) byType[typeId] = { typeId, label: config.label, allowedCategories: config.allowedCategories || [], heroRestricted: !!config.heroRestricted, providers: [], eligibleHandCards: [] };
       byType[typeId].providers.push({ cardId: inst.id, cardName: inst.name, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
     }
 
@@ -3373,9 +3611,11 @@ class GameEngine {
       if (inst.counters.additionalActionType !== typeId) continue;
       if (!inst.counters.additionalActionAvail) continue;
       if (providerCardId && inst.id !== providerCardId) continue;
-      // Decrement (supports multi-charge providers like Ghuanjun combo)
       inst.counters.additionalActionAvail = Math.max(0, (inst.counters.additionalActionAvail || 1) - 1);
       this.log('additional_action_used', { typeId, provider: inst.name, remaining: inst.counters.additionalActionAvail, player: this.gs.players[playerIdx]?.username });
+      // Fire onConsume callback if defined
+      const config = this._additionalActionTypes[typeId];
+      if (config?.onConsume) config.onConsume(this, playerIdx, inst);
       return inst;
     }
     return null;
@@ -3385,7 +3625,7 @@ class GameEngine {
    * Check if a hand card can be played via any additional action.
    * Returns the matching typeId or null.
    */
-  findAdditionalActionForCard(playerIdx, cardName) {
+  findAdditionalActionForCard(playerIdx, cardName, heroIdx) {
     const allCards = this._getCardDB();
     const cardData = allCards[cardName];
     if (!cardData) return null;
@@ -3401,9 +3641,11 @@ class GameEngine {
       const typeId = inst.counters.additionalActionType;
       const config = this._additionalActionTypes[typeId];
       if (!config) continue;
+      // Hero-restricted: provider must be on the same hero as the spell caster
+      if (config.heroRestricted && heroIdx != null && inst.heroIdx !== heroIdx) continue;
       // Check category
       if (config.allowedCategories && !config.allowedCategories.includes(category)) continue;
-      // Check specific filter (e.g., Slime Rancher's archetype filter)
+      // Check specific filter
       if (config.filter && !config.filter(cardData)) continue;
       return typeId;
     }
@@ -3437,6 +3679,52 @@ class GameEngine {
     const script = loadCardEffect(cardName);
     if (script?.isEquip) return true;
     return false;
+  }
+
+  /**
+   * Get standardised target objects for all living Heroes of a player.
+   * Returns [{ id, type:'hero', owner, heroIdx, cardName }]
+   * @param {number} playerIdx
+   */
+  getHeroTargets(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    const targets = [];
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      targets.push({ id: `hero-${playerIdx}-${hi}`, type: 'hero', owner: playerIdx, heroIdx: hi, cardName: hero.name });
+    }
+    return targets;
+  }
+
+  /**
+   * Get standardised target objects for all Creatures (by card type) in a player's support zones.
+   * Excludes Equipment Artifacts, Tokens, attached Spells/Attacks, etc.
+   * Returns [{ id, type:'equip', owner, heroIdx, slotIdx, cardName, cardInstance }]
+   * @param {number} playerIdx
+   */
+  getCreatureTargets(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    const cardDB = this._getCardDB();
+    const targets = [];
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
+        const slot = (ps.supportZones[hi] || [])[si] || [];
+        if (slot.length === 0) continue;
+        const cd = cardDB[slot[0]];
+        if (!cd || !hasCardType(cd, 'Creature')) continue;
+        const inst = this.cardInstances.find(c =>
+          c.owner === playerIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
+        );
+        targets.push({
+          id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx,
+          heroIdx: hi, slotIdx: si, cardName: slot[0], cardInstance: inst || null,
+        });
+      }
+    }
+    return targets;
   }
 
   /**
@@ -3492,6 +3780,34 @@ class GameEngine {
         result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length });
       }
     }
+
+    // Also check charmed opponent heroes (Charme Lv3)
+    const oi = playerIdx === 0 ? 1 : 0;
+    const ops = this.gs.players[oi];
+    if (ops) {
+      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
+        const hero = ops.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.charmedBy !== playerIdx) continue;
+        if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+
+        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
+          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+          if (slot.length === 0) continue;
+          const abilityName = slot[0];
+          const script = loadCardEffect(abilityName);
+          if (!script?.actionCost) continue;
+
+          const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
+          if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
+
+          if (script.canActivateAction && !script.canActivateAction(this.gs, playerIdx, hi, slot.length, this)) continue;
+
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, charmedOwner: oi });
+        }
+      }
+    }
+
     return result;
   }
 
@@ -3569,6 +3885,37 @@ class GameEngine {
       }
     }
 
+    // Also check charmed opponent heroes (Charme Lv3)
+    const oi = playerIdx === 0 ? 1 : 0;
+    const ops = this.gs.players[oi];
+    if (ops) {
+      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
+        const hero = ops.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.charmedBy !== playerIdx) continue;
+        if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+
+        const script = loadCardEffect(hero.name);
+        if (!script?.heroEffect) continue;
+
+        const hoptKey = `hero-effect:${hero.name}:${playerIdx}:${hi}`;
+        if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
+
+        if (script.canActivateHeroEffect) {
+          try {
+            const inst = this.cardInstances.find(c =>
+              c.owner === oi && c.zone === 'hero' && c.heroIdx === hi
+            );
+            if (!inst) continue;
+            const ctx = this._createContext(inst, { event: 'canHeroEffectCheck' });
+            if (!script.canActivateHeroEffect(ctx)) continue;
+          } catch { continue; }
+        }
+
+        result.push({ heroIdx: hi, heroName: hero.name, charmedOwner: oi });
+      }
+    }
+
     return result;
   }
 
@@ -3590,6 +3937,7 @@ class GameEngine {
     const result = [];
     const currentPhase = this.gs.currentPhase;
     const isMainPhase = currentPhase === 2 || currentPhase === 4;
+    const isActionPhase = currentPhase === 3;
 
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
@@ -3608,6 +3956,11 @@ class GameEngine {
         const exhausted = this.gs.hoptUsed?.[hoptKey] === this.gs.turn;
 
         let canActivate = !exhausted && isMainPhase;
+
+        // Some free abilities can also activate during Action Phase (Charme Lv1 copying action-cost abilities)
+        if (!canActivate && !exhausted && isActionPhase && script.actionPhaseEligible) {
+          canActivate = true;
+        }
 
         // Check script's canFreeActivate condition
         if (canActivate && script.canFreeActivate) {
@@ -3630,6 +3983,46 @@ class GameEngine {
         result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted });
       }
     }
+
+    // Also check charmed opponent heroes (Charme Lv3)
+    const oi = playerIdx === 0 ? 1 : 0;
+    const ops = this.gs.players[oi];
+    if (ops) {
+      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
+        const hero = ops.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.charmedBy !== playerIdx) continue; // Only charmed by this player
+        if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+
+        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
+          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+          if (slot.length === 0) continue;
+          const abilityName = slot[0];
+          const script = loadCardEffect(abilityName);
+          if (!script?.freeActivation) continue;
+
+          const hoptKey = `free-ability:${abilityName}:${playerIdx}`;
+          const exhausted = this.gs.hoptUsed?.[hoptKey] === this.gs.turn;
+          let canActivate = !exhausted && isMainPhase;
+          if (!canActivate && !exhausted && isActionPhase && script.actionPhaseEligible) canActivate = true;
+
+          if (canActivate && script.canFreeActivate) {
+            try {
+              const inst = this.cardInstances.find(c =>
+                c.owner === oi && c.zone === 'ability' && c.heroIdx === hi && c.zoneSlot === zi
+              );
+              if (inst) {
+                const ctx = this._createContext(inst, { event: 'canFreeActivateCheck' });
+                canActivate = !!script.canFreeActivate(ctx, slot.length);
+              } else canActivate = false;
+            } catch { canActivate = false; }
+          }
+
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted, charmedOwner: oi });
+        }
+      }
+    }
+
     return result;
   }
 
@@ -3926,7 +4319,8 @@ class GameEngine {
     else targetPlayers.push(oppIdx); // default: enemy
 
     // ── Ida single-target override check ──
-    const heroFlags = gs.heroFlags?.[`${pi}-${heroIdx}`];
+    const flagOwner = cardInst.heroOwner != null ? cardInst.heroOwner : pi;
+    const heroFlags = gs.heroFlags?.[`${flagOwner}-${heroIdx}`];
     const isSingleTarget = !!(heroFlags?.forcesSingleTarget && config.singleTargetPrompt);
 
     if (isSingleTarget) {
@@ -4001,6 +4395,8 @@ class GameEngine {
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
           const hero = ps.heroes[hi];
           if (!hero?.name || hero.hp <= 0) continue;
+          // Skip heroes charmed by the caster (they're on the caster's side)
+          if (hero.charmedBy === pi && tpi !== pi) continue;
           // HP threshold filters
           if (config.heroMinHp !== undefined && hero.hp < config.heroMinHp) continue;
           if (config.heroMaxHp !== undefined && hero.hp > config.heroMaxHp) continue;

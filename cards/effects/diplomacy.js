@@ -174,13 +174,13 @@ module.exports = {
 
     // Flash the Diplomacy ability zone
     engine._broadcastEvent('ability_activated', {
-      owner: pi, heroIdx, zoneIdx: ctx.card.zoneSlot,
+      owner: ctx.cardOriginalOwner, heroIdx, zoneIdx: ctx.card.zoneSlot,
     });
 
     // Play dove projectiles from Diplomacy hero to target creature (staggered)
     for (let i = 0; i < 3; i++) {
       engine._broadcastEvent('play_projectile_animation', {
-        sourceOwner: pi,
+        sourceOwner: ctx.cardHeroOwner,
         sourceHeroIdx: heroIdx,
         targetOwner: target.owner,
         targetHeroIdx: target.heroIdx,

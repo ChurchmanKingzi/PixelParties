@@ -93,7 +93,8 @@ module.exports = {
 
       await engine._delay(400);
 
-      // ── Deal damage to ALL targets without intermediate syncs ──
+      // ── Deal damage to ALL targets — heroes individually, creatures batched ──
+      const creatureBatch = [];
       for (const target of hitTargets) {
         if (target.type === 'hero') {
           const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
@@ -106,13 +107,19 @@ module.exports = {
             c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
           );
           if (inst) {
-            await engine.actionDealCreatureDamage(
-              { name: 'Pyroblast', owner: pi, heroIdx },
-              inst, 100, 'destruction_spell',
-              { sourceOwner: pi, canBeNegated: true },
-            );
+            creatureBatch.push({
+              inst, amount: 100, type: 'destruction_spell',
+              source: { name: 'Pyroblast', owner: pi, heroIdx },
+              sourceOwner: pi, canBeNegated: true,
+              isStatusDamage: false, animType: null,
+            });
           }
         }
+      }
+
+      // Process all creature damage as a single batch
+      if (creatureBatch.length > 0) {
+        await engine.processCreatureDamageBatch(creatureBatch);
       }
 
       // Single sync after all damage — damage numbers appear simultaneously

@@ -105,7 +105,7 @@ module.exports = {
       engine.log('diamond_self_damage', { hero: hero.name, amount: selfDamage, protectedCount: opponentEntries.length, negatedCount });
 
       // Play shield animation on Diamond
-      engine._broadcastEvent('play_zone_animation', { type: 'gold_sparkle', owner: pi, heroIdx, zoneSlot: -1 });
+      engine._broadcastEvent('play_zone_animation', { type: 'gold_sparkle', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
 
       // Deal damage to Diamond (type 'other', can kill)
       await engine.actionDealDamage({ name: 'Diamond, the Keeper of Peace' }, hero, selfDamage, 'other');

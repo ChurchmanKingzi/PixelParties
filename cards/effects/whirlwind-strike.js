@@ -78,7 +78,7 @@ module.exports = {
 
         // Fast ram
         engine._broadcastEvent('play_ram_animation', {
-          sourceOwner: pi, sourceHeroIdx: heroIdx,
+          sourceOwner: ctx.cardHeroOwner, sourceHeroIdx: heroIdx,
           targetOwner: tgt.owner, targetHeroIdx: tgt.heroIdx,
           cardName: hero.name, duration: 800,
         });

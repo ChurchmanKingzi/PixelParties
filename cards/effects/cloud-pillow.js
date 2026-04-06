@@ -19,7 +19,6 @@ module.exports = {
 
   canActivate(gs, pi) {
     const ps = gs.players[pi];
-    // Need at least one living hero or creature
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (hero?.name && hero.hp > 0) return true;
@@ -27,29 +26,14 @@ module.exports = {
     return false;
   },
 
-  getValidTargets(gs, pi) {
-    const ps = gs.players[pi];
-    const targets = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      // Don't target already-cloudy heroes
-      if (hero.buffs?.cloudy) continue;
-      targets.push({
-        id: `hero-${pi}-${hi}`, type: 'hero', owner: pi,
-        heroIdx: hi, cardName: hero.name,
-      });
-      // Creatures in this hero's support zones
-      for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
-        const slot = (ps.supportZones[hi] || [])[si] || [];
-        if (slot.length === 0) continue;
-        targets.push({
-          id: `equip-${pi}-${hi}-${si}`, type: 'equip', owner: pi,
-          heroIdx: hi, slotIdx: si, cardName: slot[0],
-        });
-      }
-    }
-    return targets;
+  getValidTargets(gs, pi, engine) {
+    if (!engine) return [];
+    const heroes = engine.getHeroTargets(pi).filter(t => {
+      const hero = gs.players[pi].heroes[t.heroIdx];
+      return !hero.buffs?.cloudy;
+    });
+    const creatures = engine.getCreatureTargets(pi);
+    return [...heroes, ...creatures];
   },
 
   targetingConfig: {

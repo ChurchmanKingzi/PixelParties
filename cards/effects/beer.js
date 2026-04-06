@@ -50,48 +50,20 @@ module.exports = {
   },
 
   getValidTargets: (gs, pi, engine) => {
-    const ps = gs.players[pi];
-    const targets = [];
+    if (!engine) return [];
     const negKeys = getNegativeStatuses();
 
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
+    const heroes = engine.getHeroTargets(pi).filter(t => {
+      const hero = gs.players[pi].heroes[t.heroIdx];
+      return hero.statuses && negKeys.some(k => hero.statuses[k]);
+    });
 
-      // Hero with negative statuses
-      if (hero.statuses && negKeys.some(k => hero.statuses[k])) {
-        targets.push({
-          id: `hero-${pi}-${hi}`,
-          type: 'hero',
-          owner: pi,
-          heroIdx: hi,
-          cardName: hero.name,
-        });
-      }
+    const creatures = engine.getCreatureTargets(pi).filter(t => {
+      const inst = t.cardInstance;
+      return inst && negKeys.some(k => inst.counters[k]);
+    });
 
-      // Creatures with negative statuses (check engine card instances)
-      if (engine) {
-        for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
-          const slot = (ps.supportZones[hi] || [])[si] || [];
-          if (slot.length === 0) continue;
-          const inst = engine.cardInstances.find(c =>
-            c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
-          );
-          if (inst && negKeys.some(k => inst.counters[k])) {
-            targets.push({
-              id: `equip-${pi}-${hi}-${si}`,
-              type: 'equip',
-              owner: pi,
-              heroIdx: hi,
-              slotIdx: si,
-              cardName: slot[0],
-            });
-          }
-        }
-      }
-    }
-
-    return targets;
+    return [...heroes, ...creatures];
   },
 
   targetingConfig: {

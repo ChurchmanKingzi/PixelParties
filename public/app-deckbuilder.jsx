@@ -1176,7 +1176,8 @@ function DeckBuilder() {
                       {h && h.hero && CARDS_BY_NAME[h.hero] ? (
                         <div style={{ position: 'relative' }} data-touch-drag="1"
                           onMouseDown={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}
-                          onTouchStart={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}>
+                          onTouchStart={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}
+                          onContextMenu={(e) => { e.preventDefault(); removeFrom(h.hero, 'hero'); }}>
                           <CardMini card={CARDS_BY_NAME[h.hero]}
                             onClick={(e) => showCoverMenu(h.hero, e, 'hero')}
                             style={{ width: 166, height: 230, aspectRatio: 'unset' }} isCover={h.hero === currentDeck?.coverCard} skins={currentDeck?.skins} />
@@ -1218,7 +1219,8 @@ function DeckBuilder() {
                   const isDragging = deckDrag && deckDrag.section === 'main' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'m-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')} data-touch-drag="1"
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}
-                    onTouchStart={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}>
+                    onTouchStart={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}
+                    onContextMenu={(e) => { e.preventDefault(); removeFrom(item.card, 'main', item.origIdx); }}>
                     <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'main', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
                   </div>;
                 })}
@@ -1237,7 +1239,8 @@ function DeckBuilder() {
                   const isDragging = deckDrag && deckDrag.section === 'potion' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'p-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')} data-touch-drag="1"
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}
-                    onTouchStart={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}>
+                    onTouchStart={(e) => onDeckCardMouseDown(e, 'potion', item.origIdx, item.card)}
+                    onContextMenu={(e) => { e.preventDefault(); removeFrom(item.card, 'potion', item.origIdx); }}>
                     <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'potion', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
                   </div>;
                 })}
@@ -1256,7 +1259,8 @@ function DeckBuilder() {
                   const isDragging = deckDrag && deckDrag.section === 'side' && deckDrag.fromIdx === item.origIdx;
                   return <div key={'s-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')} data-touch-drag="1"
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}
-                    onTouchStart={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}>
+                    onTouchStart={(e) => onDeckCardMouseDown(e, 'side', item.origIdx, item.card)}
+                    onContextMenu={(e) => { e.preventDefault(); removeFrom(item.card, 'side', item.origIdx); }}>
                     <CardMini card={card} onClick={(e) => showCoverMenu(item.card, e, 'side', item.origIdx)} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
                   </div>;
                 })}

@@ -48,7 +48,7 @@ module.exports = {
       const tgtZoneSlot = target.type === 'hero' ? undefined : target.slotIdx;
 
       // Charge up at caster
-      engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: pi, heroIdx, zoneSlot: -1 });
+      engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
       await engine._delay(200);
 
       // Fire phoenix projectile
@@ -204,7 +204,7 @@ module.exports = {
 
       // ── Phase 3: 200 recoil AFTER everything resolves ──
       if (hero.hp > 0) {
-        engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: pi, heroIdx, zoneSlot: -1 });
+        engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
         await engine._delay(200);
         await ctx.dealDamage(hero, 200, 'other');
         engine.log('recoil', { hero: hero.name, amount: 200, by: 'Victory Phoenix Cannon' });

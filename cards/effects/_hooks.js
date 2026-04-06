@@ -60,6 +60,7 @@ const HOOKS = {
 
   // ── Creature damage (batched) ──
   BEFORE_CREATURE_DAMAGE_BATCH: 'beforeCreatureDamageBatch',
+  BEFORE_CREATURE_AFFECTED: 'beforeCreatureAffected',
   AFTER_CREATURE_DAMAGE_BATCH:  'afterCreatureDamageBatch',
   AFTER_ALL_STATUS_DAMAGE:      'afterAllStatusDamage',
 

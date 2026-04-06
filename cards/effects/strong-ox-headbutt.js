@@ -50,7 +50,7 @@ module.exports = {
 
       // Ram animation
       engine._broadcastEvent('play_ram_animation', {
-        sourceOwner: pi, sourceHeroIdx: heroIdx,
+        sourceOwner: ctx.cardHeroOwner, sourceHeroIdx: heroIdx,
         targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
         targetZoneSlot: tgtZoneSlot,
         cardName: hero.name, duration: 1200,

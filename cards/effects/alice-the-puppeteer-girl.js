@@ -67,7 +67,7 @@ module.exports = {
     // Play laser beam animation from Alice to target
     const targetZoneSlot = target.type === 'equip' ? target.slotIdx : -1;
     engine._broadcastEvent('play_beam_animation', {
-      sourceOwner: pi,
+      sourceOwner: ctx.cardHeroOwner,
       sourceHeroIdx: heroIdx,
       targetOwner: target.owner,
       targetHeroIdx: target.heroIdx,

@@ -31,7 +31,7 @@ module.exports = {
 
       // Play ice projectile animation from casting hero to target
       engine._broadcastEvent('play_projectile_animation', {
-        sourceOwner: pi,
+        sourceOwner: ctx.cardHeroOwner,
         sourceHeroIdx: heroIdx,
         targetOwner: target.owner,
         targetHeroIdx: target.heroIdx,
