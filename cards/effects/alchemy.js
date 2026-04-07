@@ -13,6 +13,7 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  blockedByHandLock: true,
   activeIn: ['ability'],
   freeActivation: true,
 

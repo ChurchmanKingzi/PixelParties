@@ -8,6 +8,7 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  blockedByHandLock: true,
   spellPlayCondition(gs, pi) {
     const ps = gs.players[pi];
     if (ps?.handLocked) return false;

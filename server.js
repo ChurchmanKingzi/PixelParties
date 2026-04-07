@@ -1201,6 +1201,15 @@ function sendGameState(room, playerIdx, extra) {
       damageLocked: ps.damageLocked || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
+      handLocked: ps.handLocked || false,
+      handLockBlockedCards: (ps.handLocked && pi === playerIdx) ? (() => {
+        const blocked = new Set();
+        for (const cn of ps.hand) {
+          const scr = loadCardEffect(cn);
+          if (scr?.blockedByHandLock) blocked.add(cn);
+        }
+        return [...blocked];
+      })() : [],
       supportSpellLocked: ps.supportSpellLocked || false,
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       permanents: ps.permanents || [],
@@ -1321,6 +1330,7 @@ function sendSpectatorGameState(room) {
       damageLocked: ps.damageLocked || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
+      handLocked: ps.handLocked || false,
       supportSpellLocked: ps.supportSpellLocked || false,
       permanents: ps.permanents || [],
       oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],

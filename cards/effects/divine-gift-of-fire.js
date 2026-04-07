@@ -45,7 +45,7 @@ module.exports = {
         // Apply burn to the single target
         for (const { hero, heroIdx: hi, owner } of result.heroes) {
           if (hero && hero.hp > 0 && !hero.statuses?.burned) {
-            await engine.actionAddStatus(hero, 'burned', { permanent: true });
+            await engine.addHeroStatus(owner, hi, 'burned', { permanent: true });
           }
         }
         for (const { inst } of result.creatures) {
@@ -91,10 +91,10 @@ module.exports = {
         animDelay: 600,
       });
 
-      // Apply Burned status to all collected heroes
+      // Apply Burned status to all collected heroes (batch — no individual reaction windows)
       for (const { hero, heroIdx: hi, owner } of result.heroes) {
         if (!hero || hero.hp <= 0 || hero.statuses?.burned) continue;
-        await engine.actionAddStatus(hero, 'burned', { permanent: true });
+        await engine.addHeroStatus(owner, hi, 'burned', { permanent: true, _skipReactionCheck: true });
       }
 
       // Apply Burned to all collected creatures
@@ -103,6 +103,9 @@ module.exports = {
         inst.counters.burned = true;
         engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: 'Divine Gift of Fire' });
       }
+
+      // Single reaction window for the entire batch
+      await engine._checkReactionCards('onStatusApplied', { status: 'burned', batchSource: 'Divine Gift of Fire' });
 
       engine.sync();
       await engine._delay(400);

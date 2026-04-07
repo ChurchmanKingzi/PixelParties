@@ -65,6 +65,9 @@ module.exports = {
      * and trigger the healing prompt for the caster (per-hero HOPT).
      */
     afterSpellResolved: async (ctx) => {
+      // Only triggers while on the board as a permanent, not from hand
+      if (ctx.card.zone !== 'permanent') return;
+
       const engine = ctx._engine;
       const gs = engine.gs;
       const spellData = ctx.spellCardData;
@@ -115,7 +118,7 @@ module.exports = {
             cardName: h.name,
           });
         }
-        // Creatures
+        // Creatures only (not Artifacts/Attachments)
         for (let hi = 0; hi < (gs.players[p].heroes || []).length; hi++) {
           if (!gs.players[p].heroes[hi]?.name || gs.players[p].heroes[hi].hp <= 0) continue;
           for (let si = 0; si < (gs.players[p].supportZones[hi] || []).length; si++) {
@@ -126,7 +129,7 @@ module.exports = {
             );
             if (!inst2) continue;
             const cd = engine._getCardDB()[inst2.name];
-            if (!cd) continue;
+            if (!cd || cd.cardType !== 'Creature') continue;
             targets.push({
               id: `equip-${p}-${hi}-${si}`,
               type: 'equip',

@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  blockedByHandLock: true,
   isPotion: true,
 
   canActivate(gs, pi) {

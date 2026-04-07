@@ -21,6 +21,7 @@ class CardInstance {
     this.id = uuidv4().substring(0, 12);
     this.name = name;
     this.owner = owner;       // Player index (0 or 1)
+    this.originalOwner = owner; // Original owner — never changes (for discard pile routing)
     this.controller = owner;  // Can differ from owner (stolen cards)
     this.zone = zone;
     this.heroIdx = heroIdx;   // Which hero column (-1 = N/A)
@@ -902,7 +903,7 @@ class GameEngine {
 
         if (!selectedIds || selectedIds.length === 0) {
           // Mark spell as cancelled so the handler can return the card to hand
-          gs._spellCancelled = true;
+          if (!config.noSpellCancel) gs._spellCancelled = true;
           return null;
         }
         const selected = filteredTargets.find(t => t.id === selectedIds[0]) || null;
@@ -1578,6 +1579,7 @@ class GameEngine {
     const reviveHp = Math.min(hp, maxHp);
     hero.hp = reviveHp;
     hero.statuses = {};
+    delete hero._koProcessed; // Allow death cleanup to fire again if hero dies again
 
     if (opts.maxHpCap != null) {
       hero.maxHp = opts.maxHpCap;
@@ -4233,19 +4235,20 @@ class GameEngine {
       }
       hero.statuses.poisoned.stacks = newStacks;
       this.log('status_add', { target: hero.name, status: 'poisoned', stacks: newStacks, owner: playerIdx });
-      await this.runHooks(HOOKS.ON_STATUS_APPLIED, { target: hero, heroOwner: playerIdx, heroIdx, statusName });
+      await this.runHooks(HOOKS.ON_STATUS_APPLIED, { target: hero, heroOwner: playerIdx, heroIdx, statusName, _skipReactionCheck: opts._skipReactionCheck });
       this.sync();
       return;
     }
 
     const statusOpts = { appliedTurn: this.gs.turn, appliedBy: opts.appliedBy ?? -1, ...opts };
+    delete statusOpts._skipReactionCheck; // Internal flag, not stored on hero
     if (statusName === 'poisoned') {
       statusOpts.stacks = opts.addStacks || opts.stacks || 1;
       delete statusOpts.addStacks; // Clean up
     }
     hero.statuses[statusName] = statusOpts;
     this.log('status_add', { target: hero.name, status: statusName, owner: playerIdx });
-    await this.runHooks(HOOKS.ON_STATUS_APPLIED, { target: hero, heroOwner: playerIdx, heroIdx, statusName });
+    await this.runHooks(HOOKS.ON_STATUS_APPLIED, { target: hero, heroOwner: playerIdx, heroIdx, statusName, _skipReactionCheck: opts._skipReactionCheck });
     this.sync();
   }
 
@@ -4592,13 +4595,15 @@ class GameEngine {
         const ps = this.gs.players[e.inst.owner];
         this.log('creature_destroyed', { card: e.inst.name, by: e.source?.name || e.type, owner: e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot });
         // Store death info before cleanup
-        const deathInfo = { name: e.inst.name, owner: e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot };
+        const deathInfo = { name: e.inst.name, owner: e.inst.owner, originalOwner: e.inst.originalOwner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot };
         const supSlot = ps.supportZones[e.inst.heroIdx]?.[e.inst.zoneSlot];
         if (supSlot) {
           const idx = supSlot.indexOf(e.inst.name);
           if (idx >= 0) supSlot.splice(idx, 1);
         }
-        ps.discardPile.push(e.inst.name);
+        // Cards return to their ORIGINAL owner's discard pile
+        const creatureDiscardPs = this.gs.players[e.inst.originalOwner];
+        if (creatureDiscardPs) creatureDiscardPs.discardPile.push(e.inst.name);
         this._untrackCard(e.inst.id);
         await this.runHooks('onCardLeaveZone', { card: e.inst, fromZone: 'support', fromHeroIdx: e.inst.heroIdx, _skipReactionCheck: true });
         await this.runHooks(HOOKS.ON_CREATURE_DEATH, { creature: deathInfo, source: e.source, _skipReactionCheck: true });
@@ -4790,7 +4795,9 @@ class GameEngine {
           const idx = (supZones[zi] || []).indexOf(inst.name);
           if (idx >= 0) { supZones[zi].splice(idx, 1); break; }
         }
-        ps.discardPile.push(inst.name);
+        // Cards return to their ORIGINAL owner's discard pile
+        const discardPs = this.gs.players[inst.originalOwner];
+        if (discardPs) discardPs.discardPile.push(inst.name);
         this.cardInstances = this.cardInstances.filter(c => c.id !== inst.id);
       }
       break;
@@ -4832,10 +4839,11 @@ class GameEngine {
         const hero = ps.heroes[heroIdx];
         this.log('island_zone_defeat', { card: cardName, hero: hero?.name });
         await this.runHooks(HOOKS.ON_HERO_KO, { hero: { name: cardName, hp: 0 }, source: null });
-        // Move to discard
-        ps.discardPile.push(cardName);
-        // Untrack card instance
+        // Move to discard — use original owner's pile
         const inst = this.cardInstances.find(c => c.owner === playerIdx && c.zone === 'support' && c.heroIdx === heroIdx && c.name === cardName);
+        const islandDiscardPs = this.gs.players[inst?.originalOwner ?? playerIdx];
+        if (islandDiscardPs) islandDiscardPs.discardPile.push(cardName);
+        // Untrack card instance
         if (inst) {
           this.cardInstances = this.cardInstances.filter(c => c.id !== inst.id);
         }
@@ -4926,18 +4934,27 @@ class GameEngine {
 
   /** Add a card to its new position in the raw game state arrays. */
   _addCardToState(inst) {
+    switch (inst.zone) {
+      case ZONES.DISCARD: {
+        // Cards always return to their ORIGINAL owner's discard pile
+        const discardPs = this.gs.players[inst.originalOwner];
+        if (discardPs) discardPs.discardPile.push(inst.name);
+        return;
+      }
+      case ZONES.DELETED: {
+        // Cards always return to their ORIGINAL owner's deleted pile
+        const deletePs = this.gs.players[inst.originalOwner];
+        if (deletePs) deletePs.deletedPile.push(inst.name);
+        return;
+      }
+    }
+
     const ps = this.gs.players[inst.owner];
     if (!ps) return;
 
     switch (inst.zone) {
       case ZONES.HAND:
         ps.hand.push(inst.name);
-        break;
-      case ZONES.DISCARD:
-        ps.discardPile.push(inst.name);
-        break;
-      case ZONES.DELETED:
-        ps.deletedPile.push(inst.name);
         break;
       case ZONES.SUPPORT: {
         if (inst.heroIdx >= 0 && inst.zoneSlot >= 0) {

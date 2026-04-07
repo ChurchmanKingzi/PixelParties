@@ -17,6 +17,7 @@ function isCuteCard(name) {
 }
 
 module.exports = {
+  blockedByHandLock: true,
   isTargetingArtifact: true,
 
   canActivate(gs, pi) {

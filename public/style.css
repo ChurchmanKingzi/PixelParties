@@ -1052,6 +1052,7 @@ body {
 .hand-slot {
   cursor: grab;
   transition: transform .15s;
+  position: relative;
 }
 .hand-slot:active { cursor: grabbing; }
 .hand-dragging {
@@ -2162,6 +2163,21 @@ body {
   cursor: default;
 }
 .hand-card-dimmed .board-card-hp { opacity: .3; }
+
+/* Hand-lock blocked indicator (Kazena draw lock) */
+.hand-lock-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 48px;
+  color: #ff4444;
+  z-index: 5;
+  pointer-events: none;
+  text-shadow: 0 0 12px rgba(255, 0, 0, .6), 0 0 24px rgba(255, 0, 0, .3);
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.8));
+  line-height: 1;
+}
 
 
 /* Force discard target — thick red border on hand cards, hover dims */

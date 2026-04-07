@@ -10,6 +10,7 @@
 const { hasCardType } = require('./_hooks');
 
 module.exports = {
+  blockedByHandLock: true,
   isTargetingArtifact: true,
 
   canActivate(gs, pi) {

@@ -176,11 +176,12 @@ module.exports = {
       const slot = abZones[zi] || [];
       while (slot.length > 0) {
         const cardName = slot.pop();
-        ps.discardPile.push(cardName);
         // Untrack instance
         const inst = engine.cardInstances.find(c =>
           c.owner === pi && c.zone === 'ability' && c.heroIdx === deadHeroIdx && c.zoneSlot === zi && c.name === cardName
         );
+        const irDiscardPs = gs.players[inst?.originalOwner ?? pi];
+        if (irDiscardPs) irDiscardPs.discardPile.push(cardName);
         if (inst) {
           await engine.runHooks('onCardLeaveZone', { _onlyCard: inst, card: inst, fromZone: 'ability', fromHeroIdx: deadHeroIdx, _skipReactionCheck: true });
           engine._untrackCard(inst.id);
@@ -199,10 +200,11 @@ module.exports = {
         const cd = cardDB[cardName];
         if (!cd || !hasCardType(cd, 'Ability')) continue;
         slot.splice(ci, 1);
-        ps.discardPile.push(cardName);
         const inst = engine.cardInstances.find(c =>
           c.owner === pi && c.zone === 'support' && c.heroIdx === deadHeroIdx && c.zoneSlot === zi && c.name === cardName
         );
+        const irSupDiscardPs = gs.players[inst?.originalOwner ?? pi];
+        if (irSupDiscardPs) irSupDiscardPs.discardPile.push(cardName);
         if (inst) {
           await engine.runHooks('onCardLeaveZone', { _onlyCard: inst, card: inst, fromZone: 'support', fromHeroIdx: deadHeroIdx, _skipReactionCheck: true });
           engine._untrackCard(inst.id);

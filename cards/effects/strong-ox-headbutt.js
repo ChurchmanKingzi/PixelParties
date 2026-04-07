@@ -154,8 +154,10 @@ module.exports = {
                     if (inst) {
                       await engine.runHooks('onCardLeaveZone', { _onlyCard: inst, card: inst, fromZone: 'ability', fromHeroIdx: tgtHeroIdx });
                       engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
+                      gs.players[inst.originalOwner].discardPile.push(removed);
+                    } else {
+                      gs.players[tgtOwner].discardPile.push(removed);
                     }
-                    gs.players[tgtOwner].discardPile.push(removed);
                     engine.log('ability_removed', { card: removed, by: 'Strong Ox Headbutt', from: targetHero.name });
                   }
                 }

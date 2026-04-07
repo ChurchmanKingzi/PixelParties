@@ -5238,6 +5238,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 if (item.isGap) return <div key="gap" className="hand-drop-gap" />;
                 const isBeingDragged = (handDrag && handDrag.idx === item.origIdx) || (playDrag && playDrag.idx === item.origIdx) || (abilityDrag && abilityDrag.idx === item.origIdx);
                 const dimmed = getCardDimmed(item.card, item.origIdx);
+                const isHandLockBlocked = dimmed && me.handLocked && (me.handLockBlockedCards || []).includes(item.card);
                 const isDrawAnim = drawAnimCards.some(a => a.origIdx === item.origIdx);
                 const isPendingPlay = pendingAdditionalPlay && pendingAdditionalPlay.handIndex === item.origIdx;
                 const isForceDiscard = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt?.ownerIdx === myIdx;
@@ -5270,6 +5271,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
                     onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
                     <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} />
+                    {isHandLockBlocked && <div className="hand-lock-indicator">⦸</div>}
                   </div>
                 );
               })}

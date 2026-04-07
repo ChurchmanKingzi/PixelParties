@@ -30,9 +30,12 @@ module.exports = {
           cardName: hero.name,
         });
         // Creatures in support zones
+        const pvCardDB = engine._getCardDB();
         for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
           const slot = (ps.supportZones[hi] || [])[si] || [];
           if (slot.length === 0) continue;
+          const pvCD = pvCardDB[slot[0]];
+          if (!pvCD || pvCD.cardType !== 'Creature') continue;
           targets.push({
             id: `equip-${pi}-${hi}-${si}`,
             type: 'equip',

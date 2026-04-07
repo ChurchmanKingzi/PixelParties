@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  blockedByHandLock: true,
   isTargetingArtifact: true,
 
   canActivate(gs, pi) {

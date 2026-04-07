@@ -195,7 +195,7 @@ module.exports = {
       );
       if (gaInst) {
         engine._untrackCard(gaInst.id);
-        gs.players[heroPi].deletedPile.push('Guardian Angel');
+        gs.players[gaInst.originalOwner].deletedPile.push('Guardian Angel');
       }
 
       // Set HP to 1 (prevent death)

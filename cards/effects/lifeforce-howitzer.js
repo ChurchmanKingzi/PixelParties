@@ -55,58 +55,20 @@ module.exports = {
       const damage = Math.min(healedAmount, 200);
       const oi = pi === 0 ? 1 : 0;
 
-      // Build opponent targets
-      const targets = [];
-      const ops = gs.players[oi];
-      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-        const h = ops.heroes[hi];
-        if (!h?.name || h.hp <= 0) continue;
-        targets.push({
-          id: `hero-${oi}-${hi}`,
-          type: 'hero',
-          owner: oi,
-          heroIdx: hi,
-          cardName: h.name,
-        });
-      }
-      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-        if (!ops.heroes[hi]?.name || ops.heroes[hi].hp <= 0) continue;
-        for (let si = 0; si < (ops.supportZones[hi] || []).length; si++) {
-          const slot = (ops.supportZones[hi] || [])[si] || [];
-          if (slot.length === 0) continue;
-          const inst = engine.cardInstances.find(c =>
-            c.owner === oi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
-          );
-          if (!inst) continue;
-          targets.push({
-            id: `equip-${oi}-${hi}-${si}`,
-            type: 'equip',
-            owner: oi,
-            heroIdx: hi,
-            slotIdx: si,
-            cardName: slot[0],
-            cardInstance: inst,
-          });
-        }
-      }
-
-      if (targets.length === 0) return;
-
-      // Prompt player to choose target (cancellable)
-      const picked = await engine.promptEffectTarget(pi, targets, {
+      // Prompt player to choose enemy target (cancellable)
+      const target = await ctx.promptDamageTarget({
+        side: 'enemy',
+        types: ['hero', 'creature'],
+        damageType: 'artifact',
         title: 'Lifeforce Howitzer',
         description: `${hero.name} was healed for ${healedAmount} HP! Deal ${damage} damage to an opponent's target?`,
         confirmLabel: `💥 Fire! (${damage})`,
         confirmClass: 'btn-danger',
         cancellable: true,
-        exclusiveTypes: true,
-        maxPerType: { hero: 1, equip: 1 },
+        noSpellCancel: true,
       });
 
-      if (!picked || picked.length === 0) return; // Cancelled
-
-      const target = targets.find(t => t.id === picked[0]);
-      if (!target) return;
+      if (!target) return; // Cancelled
 
       // Mark as fired this turn
       card.counters.howitzerFiredThisTurn = true;
@@ -125,7 +87,7 @@ module.exports = {
       await engine._delay(400);
 
       // Deal damage
-      const dmgSource = { name: 'Lifeforce Howitzer', owner: pi, heroIdx };
+      const dmgSource = { name: 'Lifeforce Howitzer', owner: ctx.cardOriginalOwner, heroIdx };
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {

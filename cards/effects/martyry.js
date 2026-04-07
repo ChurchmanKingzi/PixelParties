@@ -138,7 +138,7 @@ module.exports = {
     const originalZoneSlot = selected.type === 'hero' ? undefined : selected.slotIdx;
 
     engine._broadcastEvent('play_ram_animation', {
-      sourceOwner: ctx.cardHeroOwner, sourceHeroIdx: selectedHeroIdx,
+      sourceOwner: pi, sourceHeroIdx: selectedHeroIdx,
       targetOwner: originalOwner, targetHeroIdx: originalHeroIdx,
       targetZoneSlot: originalZoneSlot,
       cardName: martyrHero.name, duration: 1200,

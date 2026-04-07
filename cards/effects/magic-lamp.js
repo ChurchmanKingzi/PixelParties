@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  blockedByHandLock: true,
   isPotion: true,
   deferBroadcast: true, // Broadcast after selections, not before
 

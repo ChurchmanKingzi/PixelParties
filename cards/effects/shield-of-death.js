@@ -55,70 +55,46 @@ module.exports = {
       const pi = ctx.cardOwner; // Effective controller
       const heroIdx = card.heroIdx;
 
-      // Build all targets (any hero or creature, either side)
-      const targets = [];
-      for (let p = 0; p < 2; p++) {
-        for (let hi = 0; hi < (gs.players[p].heroes || []).length; hi++) {
-          const h = gs.players[p].heroes[hi];
-          if (!h?.name || h.hp <= 0) continue;
-          targets.push({ id: `hero-${p}-${hi}`, type: 'hero', owner: p, heroIdx: hi, cardName: h.name });
-        }
-        for (let hi = 0; hi < (gs.players[p].heroes || []).length; hi++) {
-          if (!gs.players[p].heroes[hi]?.name || gs.players[p].heroes[hi].hp <= 0) continue;
-          for (let si = 0; si < (gs.players[p].supportZones[hi] || []).length; si++) {
-            const slot = (gs.players[p].supportZones[hi] || [])[si] || [];
-            if (slot.length === 0) continue;
-            const inst = engine.cardInstances.find(c =>
-              c.owner === p && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
-            );
-            if (!inst) continue;
-            targets.push({ id: `equip-${p}-${hi}-${si}`, type: 'equip', owner: p, heroIdx: hi, slotIdx: si, cardName: slot[0], cardInstance: inst });
-          }
-        }
-      }
-
-      if (targets.length === 0) return;
-
-      const picked = await engine.promptEffectTarget(pi, targets, {
+      // Prompt: select any hero or creature target
+      const target = await ctx.promptDamageTarget({
+        side: 'any',
+        types: ['hero', 'creature'],
+        damageType: 'artifact',
         title: 'Shield of Death',
         description: `${ctx.attachedHero?.name || 'Hero'} survived damage! Choose a target to deal 100 damage.`,
         confirmLabel: '💀 Retaliate! (100)',
         confirmClass: 'btn-danger',
         cancellable: true,
-        exclusiveTypes: true,
-        maxPerType: { hero: 1, equip: 1 },
+        noSpellCancel: true,
       });
 
-      if (!picked || picked.length === 0) {
+      if (!target) {
         card.counters.shieldFiredThisTurn = false; // Refund if cancelled
         return;
       }
 
-      const sel = targets.find(t => t.id === picked[0]);
-      if (!sel) { card.counters.shieldFiredThisTurn = false; return; }
-
       // Dark skulls animation on target
       engine._broadcastEvent('play_zone_animation', {
-        type: 'death_skulls', owner: sel.owner, heroIdx: sel.heroIdx,
-        zoneSlot: sel.type === 'hero' ? -1 : sel.slotIdx,
+        type: 'death_skulls', owner: target.owner, heroIdx: target.heroIdx,
+        zoneSlot: target.type === 'hero' ? -1 : target.slotIdx,
       });
       await engine._delay(400);
 
       // Deal damage
-      const dmgSource = { name: 'Shield of Death', owner: pi, heroIdx };
-      if (sel.type === 'hero') {
-        const h = gs.players[sel.owner]?.heroes?.[sel.heroIdx];
+      const dmgSource = { name: 'Shield of Death', owner: ctx.cardOriginalOwner, heroIdx };
+      if (target.type === 'hero') {
+        const h = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (h && h.hp > 0) await engine.actionDealDamage(dmgSource, h, 100, 'artifact');
       } else {
-        const inst = sel.cardInstance || engine.cardInstances.find(c =>
-          c.owner === sel.owner && c.zone === 'support' && c.heroIdx === sel.heroIdx && c.zoneSlot === sel.slotIdx
+        const inst = target.cardInstance || engine.cardInstances.find(c =>
+          c.owner === target.owner && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst) {
           await engine.actionDealCreatureDamage(dmgSource, inst, 100, 'artifact', { sourceOwner: pi, canBeNegated: true });
         }
       }
 
-      engine.log('shield_of_death', { player: gs.players[pi].username, target: sel.cardName });
+      engine.log('shield_of_death', { player: gs.players[pi].username, target: target.cardName });
       engine.sync();
     },
 

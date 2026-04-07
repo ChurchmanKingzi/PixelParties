@@ -130,8 +130,11 @@ module.exports = {
           if (inst) {
             await engine.runHooks('onCardLeaveZone', { _onlyCard: inst, card: inst, fromZone: 'ability', fromHeroIdx: t.heroIdx });
             engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
+            const fbDiscardPs = gs.players[inst.originalOwner];
+            if (fbDiscardPs) fbDiscardPs.discardPile.push(removed);
+          } else {
+            ps.discardPile.push(removed);
           }
-          ps.discardPile.push(removed);
           engine.log('destroy', { card: removed, by: 'Fire Bomb' });
         }
       } else if (t.type === 'equip') {
@@ -145,7 +148,8 @@ module.exports = {
           const zone = (ps.supportZones[t.heroIdx] || [])[t.slotIdx] || [];
           const idx = zone.indexOf(t.cardName);
           if (idx >= 0) zone.splice(idx, 1);
-          ps.discardPile.push(t.cardName);
+          const fbSupDiscardPs = gs.players[inst.originalOwner];
+          if (fbSupDiscardPs) fbSupDiscardPs.discardPile.push(t.cardName);
           engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
           engine.log('destroy', { card: t.cardName, by: 'Fire Bomb' });
         }

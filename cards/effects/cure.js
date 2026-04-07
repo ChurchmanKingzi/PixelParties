@@ -50,6 +50,8 @@ function getValidTargets(gs, engine, excludeHeroKey) {
           c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
         );
         if (!inst) continue;
+        const cureCD = engine._getCardDB()[inst.name];
+        if (!cureCD || cureCD.cardType !== 'Creature') continue; // Only Creatures can be cured
         if (negKeys.some(k => inst.counters[k])) {
           targets.push({
             id: `equip-${pi}-${hi}-${si}`,
