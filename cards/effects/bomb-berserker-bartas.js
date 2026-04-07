@@ -96,6 +96,8 @@ module.exports = {
       });
       if (!confirmed) return;
 
+      engine.log('bartas_second_cast', { player: ps.username, hero: hero.name, spell: ctx.spellName });
+
       // Set up second cast: exclude first target, mark as second cast
       gs._spellDamageLog = [];
       gs._spellExcludeTargets = [firstTargetId];

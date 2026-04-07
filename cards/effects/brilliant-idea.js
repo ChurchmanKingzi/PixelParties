@@ -11,7 +11,6 @@ module.exports = {
   blockedByHandLock: true,
   spellPlayCondition(gs, pi) {
     const ps = gs.players[pi];
-    if (ps?.handLocked) return false;
     return (ps?.mainDeck || []).length > 0;
   },
 
@@ -23,7 +22,6 @@ module.exports = {
       const heroIdx = ctx.cardHeroIdx;
       const ps = gs.players[pi];
       if (!ps) return;
-      if (ps.handLocked) { gs._spellCancelled = true; return; }
 
       // Confirm
       const choice = await engine.promptGeneric(pi, {

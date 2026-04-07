@@ -23,8 +23,6 @@ module.exports = {
    */
   canFreeActivate(ctx, level) {
     const ps = ctx.players[ctx.cardOwner];
-    // Hand lock — cannot add cards to hand
-    if (ps.handLocked) return false;
     const goldCost = level >= 3 ? 0 : level >= 2 ? 4 : 8;
     if ((ps.gold || 0) < goldCost) return false;
     if ((ps.potionDeck || []).length === 0) return false;
@@ -39,7 +37,6 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const ps = ctx.players[pi];
-    if (ps.handLocked) return false;
     const goldCost = level >= 3 ? 0 : level >= 2 ? 4 : 8;
 
     // Confirmation prompt

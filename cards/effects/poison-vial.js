@@ -14,8 +14,9 @@ module.exports = {
     return this.getValidTargets(gs, playerIdx).length > 0;
   },
 
-  getValidTargets(gs, playerIdx) {
+  getValidTargets(gs, playerIdx, engine) {
     const targets = [];
+    const pvCardDB = engine ? engine._getCardDB() : {};
     for (let pi = 0; pi < 2; pi++) {
       const ps = gs.players[pi];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -30,7 +31,6 @@ module.exports = {
           cardName: hero.name,
         });
         // Creatures in support zones
-        const pvCardDB = engine._getCardDB();
         for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
           const slot = (ps.supportZones[hi] || [])[si] || [];
           if (slot.length === 0) continue;

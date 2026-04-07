@@ -373,6 +373,18 @@ class GameEngine {
       async discardCards(playerIdx, count) {
         return engine.actionDiscardCards(playerIdx, count);
       },
+      /** Add a specific card to a player's hand with logging. */
+      addCardToHand(playerIdx, cardName, source) {
+        return engine.actionAddCardToHand(playerIdx, cardName, source || cardInstance.name);
+      },
+      /** Mill cards from deck to discard/delete pile. */
+      millCards(playerIdx, count, destination, source) {
+        return engine.actionMillCards(playerIdx, count, destination, source || cardInstance.name);
+      },
+      /** Shuffle cards from hand back into deck. */
+      shuffleBackToDeck(playerIdx, cardNames, source) {
+        return engine.actionShuffleBackToDeck(playerIdx, cardNames, source || cardInstance.name);
+      },
       /**
        * Safely place a card into a support zone with zone-occupied fallback.
        * If occupied, auto-relocates to another free base zone on the same hero.
@@ -1397,7 +1409,7 @@ class GameEngine {
       target.hp = Math.max(0, target.hp - actualAmount);
     }
 
-    this.log('damage', { source: source?.name, target: this._heroLabel(target), amount: actualAmount, type });
+    this.log('damage', { source: source?.name, target: this._heroLabel(target), amount: actualAmount, damageType: type });
     await this.runHooks(HOOKS.AFTER_DAMAGE, { source, target, amount: actualAmount, type, sourceHeroIdx: source?.heroIdx ?? -1 });
 
     // ── SC tracking ──
@@ -1445,7 +1457,8 @@ class GameEngine {
 
     // Check for hero KO
     if (target && target.hp !== undefined && target.hp <= 0) {
-      target.diedOnTurn = this.gs.turn; // Track when hero died (Initiation Ritual, etc.)
+      target.diedOnTurn = this.gs.turn;
+      this.log('hero_ko', { hero: this._heroLabel(target), source: source?.name || 'damage' });
       await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, _bypassDeadHeroFilter: true });
 
       // If a hook (Guardian Angel) restored HP, skip death processing
@@ -1688,6 +1701,74 @@ class GameEngine {
     return drawn;
   }
 
+  /**
+   * Add a specific card to a player's hand (e.g. search effects).
+   * Logs 'card_added_to_hand' automatically.
+   * @param {number} playerIdx
+   * @param {string} cardName
+   * @param {string} [source] - Name of the effect/card that caused the add
+   */
+  actionAddCardToHand(playerIdx, cardName, source) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return;
+    ps.hand.push(cardName);
+    this.log('card_added_to_hand', { player: ps.username, card: cardName, by: source || null });
+    this.sync();
+  }
+
+  /**
+   * Mill cards from a player's deck to discard or deleted pile.
+   * @param {number} playerIdx
+   * @param {number} count
+   * @param {'discard'|'delete'} [destination='discard']
+   * @param {string} [source] - Name of the card/effect causing the mill
+   */
+  actionMillCards(playerIdx, count, destination = 'discard', source) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+    const milled = [];
+    for (let i = 0; i < count; i++) {
+      if (ps.mainDeck.length === 0) break;
+      const cardName = ps.mainDeck.shift();
+      if (destination === 'delete') {
+        ps.deletedPile.push(cardName);
+      } else {
+        ps.discardPile.push(cardName);
+      }
+      milled.push(cardName);
+    }
+    if (milled.length > 0) {
+      this.log('mill', { player: ps.username, count: milled.length, destination, source: source || null });
+    }
+    this.sync();
+    return milled;
+  }
+
+  /**
+   * Shuffle cards from hand back into deck.
+   * @param {number} playerIdx
+   * @param {string[]} cardNames - Cards to shuffle back
+   * @param {string} [source] - Name of the card/effect causing the shuffle
+   */
+  actionShuffleBackToDeck(playerIdx, cardNames, source) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !cardNames.length) return;
+    for (const cn of cardNames) {
+      const idx = ps.hand.indexOf(cn);
+      if (idx >= 0) {
+        ps.hand.splice(idx, 1);
+        ps.mainDeck.push(cn);
+      }
+    }
+    // Shuffle the deck
+    for (let i = ps.mainDeck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ps.mainDeck[i], ps.mainDeck[j]] = [ps.mainDeck[j], ps.mainDeck[i]];
+    }
+    this.log('shuffle_back', { player: ps.username, count: cardNames.length, source: source || null });
+    this.sync();
+  }
+
   async actionDestroyCard(source, targetCard) {
     if (!targetCard) return;
     if (targetCard.counters?.immovable) return; // Cannot be destroyed or removed
@@ -1815,6 +1896,13 @@ class GameEngine {
     if (!ps.supportZones[heroIdx][actualSlot]) ps.supportZones[heroIdx][actualSlot] = [];
     ps.supportZones[heroIdx][actualSlot] = [cardName];
     const inst = this._trackCard(cardName, playerIdx, 'support', heroIdx, actualSlot);
+    // Log token placements
+    const cardDB = this._getCardDB();
+    const cd = cardDB[cardName];
+    if (cd && (cd.cardType === 'Token')) {
+      const heroName = ps.heroes?.[heroIdx]?.name || 'Hero';
+      this.log('token_placed', { player: ps.username, card: cardName, hero: heroName });
+    }
     return { inst, actualSlot };
   }
 
@@ -1826,8 +1914,8 @@ class GameEngine {
    * @param {object} opts - { title, source }
    */
   async actionPromptForceDiscard(playerIdx, count, opts = {}) {
-    // First-turn protection blocks forced discard
-    if (this.gs.firstTurnProtectedPlayer === playerIdx) {
+    // First-turn protection blocks forced discard (but not self-inflicted costs)
+    if (!opts.selfInflicted && this.gs.firstTurnProtectedPlayer === playerIdx) {
       this.log('discard_blocked', { player: this.gs.players[playerIdx]?.username, reason: 'shielded' });
       return;
     }
@@ -2036,7 +2124,7 @@ class GameEngine {
     }
 
     target.statuses[statusName] = { ...opts, appliedTurn: this.gs.turn };
-    this.log('status_add', { target: target.name || this._heroLabel(target), status: statusName });
+    this.log('status_add', { target: target.name || this._heroLabel(target), status: statusName, source: opts.source || opts.by || null });
     await this.runHooks(HOOKS.ON_STATUS_APPLIED, { target, status: statusName, opts });
     return true;
   }
@@ -2427,6 +2515,9 @@ class GameEngine {
     // Custom play conditions (spells/attacks)
     if (script?.spellPlayCondition && !script.spellPlayCondition(gs, pi)) return null;
 
+    // Generic draw/search lock: cards with blockedByHandLock cannot be played while hand is locked
+    if (script?.blockedByHandLock && ps.handLocked) return null;
+
     // Hero-specific card restrictions (e.g. duplicate attack bans)
     const heroScript = loadCardEffect(hero.name);
     if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, pi, heroIdx, cardData, this)) return null;
@@ -2551,7 +2642,7 @@ class GameEngine {
       await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualSlot, _skipReactionCheck: true });
       await this.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _skipReactionCheck: true });
 
-      this.log('immediate_action', { hero: hero.name, card: cardName, type: 'Creature', by: config.title });
+      this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title });
 
     } else {
       // Spell or Attack
@@ -2562,7 +2653,7 @@ class GameEngine {
       delete this.gs._immediateActionContext;
       ps.discardPile.push(cardName);
       this._untrackCard(inst.id);
-      this.log('immediate_action', { hero: hero.name, card: cardName, type: cardData.cardType, by: config.title });
+      this.log('immediate_action', { hero: hero.name, card: cardName, cardType: cardData.cardType, by: config.title });
     }
 
     this.sync();
@@ -3052,6 +3143,23 @@ class GameEngine {
         if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName: pending.cardName });
       }
     }
+    // Fire any pending play log at the same time as the card reveal
+    this._firePendingPlayLog();
+  }
+
+  /**
+   * Queue a log entry to fire when the card is revealed (on first confirmed prompt).
+   * If no prompts occur, call _firePendingPlayLog() manually after resolution.
+   */
+  _setPendingPlayLog(type, data) {
+    this.gs._pendingPlayLog = { type, data };
+  }
+
+  _firePendingPlayLog() {
+    const pending = this.gs._pendingPlayLog;
+    if (!pending) return;
+    delete this.gs._pendingPlayLog;
+    this.log(pending.type, pending.data);
   }
 
   /**
@@ -3779,6 +3887,9 @@ class GameEngine {
         // Check script-defined activation condition (Necromancy, etc.)
         if (script.canActivateAction && !script.canActivateAction(this.gs, playerIdx, hi, slot.length, this)) continue;
 
+        // Generic draw/search lock
+        if (script.blockedByHandLock && ps.handLocked) continue;
+
         result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length });
       }
     }
@@ -3921,6 +4032,86 @@ class GameEngine {
     return result;
   }
 
+  // ─── ACTIVE CREATURE EFFECTS ─────────────
+  /**
+   * Get all creatures on the board with activatable effects for a player.
+   * Soft HOPT per creature INSTANCE (each copy is independent).
+   * Also scans charmed opponent heroes' creatures.
+   * Returns array of { owner, heroIdx, zoneSlot, cardName, canActivate, instId }
+   */
+  getActivatableCreatures(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+    if (this.gs.activePlayer !== playerIdx) return [];
+    const currentPhase = this.gs.currentPhase;
+    const isMainPhase = currentPhase === 2 || currentPhase === 4;
+    if (!isMainPhase) return [];
+
+    const result = [];
+    const cardDB = this._getCardDB();
+
+    const scanPlayer = (pi, charmedOwner) => {
+      const scanPs = this.gs.players[pi];
+      if (!scanPs) return;
+
+      for (let hi = 0; hi < (scanPs.heroes || []).length; hi++) {
+        const hero = scanPs.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        // If scanning charmed heroes, only include those charmed by playerIdx
+        if (charmedOwner != null && hero.charmedBy !== playerIdx) continue;
+        if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+
+        for (let zi = 0; zi < (scanPs.supportZones[hi] || []).length; zi++) {
+          const slot = (scanPs.supportZones[hi] || [])[zi] || [];
+          if (slot.length === 0) continue;
+          const creatureName = slot[0];
+          const cd = cardDB[creatureName];
+          if (!cd || !hasCardType(cd, 'Creature')) continue;
+
+          const script = loadCardEffect(creatureName);
+          if (!script?.creatureEffect) continue;
+
+          const inst = this.cardInstances.find(c =>
+            c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
+          );
+          if (!inst) continue;
+
+          // Summoning sickness: creatures cannot activate on the turn they were summoned
+          const hasSummoningSickness = inst.turnPlayed === (this.gs.turn || 0);
+
+          // Soft HOPT per creature instance
+          const hoptKey = `creature-effect:${inst.id}`;
+          const exhausted = this.gs.hoptUsed?.[hoptKey] === this.gs.turn;
+          let canActivate = !exhausted && !hasSummoningSickness;
+
+          // Check script's activation condition
+          if (canActivate && script.canActivateCreatureEffect) {
+            try {
+              const ctx = this._createContext(inst, { event: 'canCreatureEffectCheck' });
+              canActivate = !!script.canActivateCreatureEffect(ctx);
+            } catch { canActivate = false; }
+          }
+
+          result.push({
+            owner: pi, heroIdx: hi, zoneSlot: zi,
+            cardName: creatureName, canActivate, exhausted,
+            instId: inst.id,
+            charmedOwner: charmedOwner != null ? pi : undefined,
+          });
+        }
+      }
+    };
+
+    // Own creatures
+    scanPlayer(playerIdx, null);
+
+    // Charmed opponent heroes' creatures
+    const oi = playerIdx === 0 ? 1 : 0;
+    scanPlayer(oi, oi);
+
+    return result;
+  }
+
   // ─── FREE ABILITY ACTIVATION ─────────────
   /**
    * Get all abilities on the board that have freeActivation (no action cost,
@@ -3964,6 +4155,13 @@ class GameEngine {
           canActivate = true;
         }
 
+        // Generic draw/search lock
+        let handLockBlocked = false;
+        if (canActivate && script.blockedByHandLock && ps.handLocked) {
+          canActivate = false;
+          handLockBlocked = true;
+        }
+
         // Check script's canFreeActivate condition
         if (canActivate && script.canFreeActivate) {
           try {
@@ -3982,7 +4180,7 @@ class GameEngine {
           }
         }
 
-        result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted });
+        result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted, handLockBlocked });
       }
     }
 
@@ -4580,7 +4778,7 @@ class GameEngine {
       }
 
       e.inst.counters.currentHp -= actualAmount;
-      this.log('creature_damage', { source: e.source?.name || e.source, target: e.inst.name, amount: actualAmount, type: e.type, owner: e.inst.owner });
+      this.log('creature_damage', { source: e.source?.name || e.source, target: e.inst.name, amount: actualAmount, damageType: e.type, owner: e.inst.owner });
 
       // ── SC tracking: creature overkill ──
       if (this.gs._scTracking && e.sourceOwner >= 0 && e.sourceOwner < 2) {

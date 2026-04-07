@@ -36,6 +36,8 @@ module.exports = {
       if (gs.heroFlags?.[flagKey]) {
         gs.heroFlags[flagKey].moniaUsedThisTurn = false;
       }
+      // Clear stale shield flag (afterSpellResolved never fires in engine)
+      delete gs._moniaShieldActive;
     },
 
     /**
@@ -72,14 +74,12 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps || (ps.hand || []).length === 0) return;
 
-      // Find eligible entries (not cancelled, not status damage, negatable)
-      const eligible = entries.filter(e =>
-        !e.cancelled && !e.isStatusDamage && e.canBeNegated !== false
-      );
-      if (eligible.length === 0) return;
+      // Find all entries that affect creatures (not cancelled, not status damage)
+      const promptable = entries.filter(e => !e.cancelled && !e.isStatusDamage);
+      if (promptable.length === 0) return;
 
       // Determine affected creature owners
-      const affectedOwners = new Set(eligible.map(e => e.inst.owner));
+      const affectedOwners = new Set(promptable.map(e => e.inst.owner));
 
       // Build prompt options (no "Cancel" — the panel has its own cancel button)
       let options;
@@ -92,9 +92,9 @@ module.exports = {
         ];
       } else {
         const ownerIdx = [...affectedOwners][0];
-        const singleCreature = eligible.length === 1;
+        const singleCreature = promptable.length === 1;
         const desc = singleCreature
-          ? `Protect ${eligible[0].inst.name}`
+          ? `Protect ${promptable[0].inst.name}`
           : `Save ${ownerLabel(ownerIdx)} Creatures`;
         options = [
           { id: `save-${ownerIdx}`, label: `🛡️ ${desc} (discard 1)` },
@@ -123,9 +123,10 @@ module.exports = {
       // Set shield active for subsequent batches in this resolution
       gs._moniaShieldActive = protectOwner;
 
-      // Cancel eligible entries for the protected owner
-      for (const e of eligible) {
-        if (e.inst.owner === protectOwner) {
+      // Cancel ONLY negatable entries for the protected owner
+      // Unnegatable damage (Acid Vial, Ida) still goes through — Monia "wastes" the effect
+      for (const e of promptable) {
+        if (e.inst.owner === protectOwner && e.canBeNegated !== false) {
           e.cancelled = true;
         }
       }
@@ -133,11 +134,11 @@ module.exports = {
       engine.log('monia_protect', {
         player: ps.username, hero: hero.name,
         protectedOwner: gs.players[protectOwner]?.username,
-        creaturesProtected: eligible.filter(e => e.inst.owner === protectOwner).map(e => e.inst.name),
+        creaturesProtected: promptable.filter(e => e.inst.owner === protectOwner).map(e => e.inst.name),
       });
 
       // ── Animation: Monia rams into each protected creature ──
-      const protectedCreatures = eligible.filter(e => e.inst.owner === protectOwner);
+      const protectedCreatures = promptable.filter(e => e.inst.owner === protectOwner);
       for (const e of protectedCreatures) {
         engine._broadcastEvent('play_ram_animation', {
           sourceOwner: ctx.cardOriginalOwner, sourceHeroIdx: heroIdx,
@@ -150,12 +151,10 @@ module.exports = {
       }
       await engine._delay(400);
 
-      // ── Discard 1 card ──
+      // ── Discard 1 card (player chooses) ──
       if (ps.hand.length > 0) {
-        await engine.actionDiscardCards(pi, 1);
+        await engine.actionPromptForceDiscard(pi, 1, { title: `${hero.name} — Discard 1`, source: hero.name, selfInflicted: true });
       }
-
-      engine.sync();
     },
 
     /**
@@ -229,12 +228,10 @@ module.exports = {
       });
       await engine._delay(500);
 
-      // Discard 1 card
+      // Discard 1 card (player chooses)
       if (ps.hand.length > 0) {
-        await engine.actionDiscardCards(pi, 1);
+        await engine.actionPromptForceDiscard(pi, 1, { title: `${hero.name} — Discard 1`, source: hero.name, selfInflicted: true });
       }
-
-      engine.sync();
     },
 
     /**

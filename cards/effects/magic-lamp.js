@@ -12,8 +12,6 @@ module.exports = {
   deferBroadcast: true, // Broadcast after selections, not before
 
   canActivate(gs, pi) {
-    // Hand lock — cannot add cards to hand
-    if (gs.players[pi]?.handLocked) return false;
     const ps = gs.players[pi];
     // Need 3+ cards with different names in deck
     const uniqueNames = new Set(ps.mainDeck || []);
@@ -26,7 +24,6 @@ module.exports = {
     const oppIdx = pi === 0 ? 1 : 0;
     const oppPs = gs.players[oppIdx];
     if (!ps || !oppPs) return { cancelled: true };
-    if (ps.handLocked) return { cancelled: true };
 
     // Build deduplicated gallery from deck
     const seen = new Set();

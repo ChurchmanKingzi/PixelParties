@@ -1911,6 +1911,94 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  acid_splash: (() => {
+    return function AcidSplashEffect({ x, y }) {
+      const drops = useMemo(() => Array.from({ length: 22 }, () => ({
+        xOff: -50 + Math.random() * 100,
+        size: 8 + Math.random() * 16,
+        delay: Math.random() * 120,
+        dur: 500 + Math.random() * 600,
+        wobble: -20 + Math.random() * 40,
+        color: ['#cc1111','#ee3322','#ff4433','#dd2200','#aa0000','#ff6644','#ff2200','#cc0000'][Math.floor(Math.random() * 8)],
+      })), []);
+      const splats = useMemo(() => Array.from({ length: 6 }, () => ({
+        xOff: -25 + Math.random() * 50,
+        yOff: -15 + Math.random() * 30,
+        delay: 50 + Math.random() * 200,
+        dur: 600 + Math.random() * 400,
+        size: 18 + Math.random() * 8,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(220,0,0,.95) 0%, rgba(180,0,0,.5) 35%, rgba(120,0,0,.2) 60%, transparent 80%)', width: 120, height: 120, marginLeft: -60, marginTop: -60 }} />
+          {drops.map((d, i) => (
+            <div key={'ad'+i} className="anim-beer-bubble" style={{
+              '--xOff': d.xOff + 'px', '--size': d.size + 'px', '--wobble': d.wobble + 'px',
+              '--color': d.color, animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+            }} />
+          ))}
+          {splats.map((s, i) => (
+            <div key={'as'+i} className="anim-beer-bubble" style={{
+              '--xOff': s.xOff + 'px', '--size': s.size + 'px', '--wobble': '0px',
+              '--color': 'rgba(200,20,0,.7)', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+              fontSize: s.size, opacity: 0, left: s.yOff,
+            }}>🧪</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  laser_burst: (() => {
+    return function LaserBurstEffect({ x, y }) {
+      const beams = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+        angle: (i * 30) + Math.random() * 10 - 5,
+        length: 40 + Math.random() * 30,
+        delay: Math.random() * 150,
+        dur: 400 + Math.random() * 300,
+        width: 2 + Math.random() * 2,
+      })), []);
+      const sparks = useMemo(() => Array.from({ length: 8 }, () => ({
+        angle: Math.random() * 360,
+        dist: 20 + Math.random() * 25,
+        size: 3 + Math.random() * 4,
+        delay: 100 + Math.random() * 200,
+        dur: 300 + Math.random() * 300,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(255,0,0,.9) 0%, rgba(200,0,0,.4) 40%, transparent 70%)', width: 80, height: 80, marginLeft: -40, marginTop: -40 }} />
+          {beams.map((b, i) => (
+            <div key={'lb'+i} style={{
+              position: 'absolute',
+              left: 0, top: 0,
+              width: b.length, height: b.width,
+              background: `linear-gradient(90deg, #ff2222, #ff4444, transparent)`,
+              boxShadow: '0 0 6px #ff2222, 0 0 12px rgba(255,0,0,.4)',
+              transform: `rotate(${b.angle}deg)`,
+              transformOrigin: '0 50%',
+              opacity: 0,
+              animation: `laserBeamShoot ${b.dur}ms ease-out ${b.delay}ms forwards`,
+            }} />
+          ))}
+          {sparks.map((s, i) => (
+            <div key={'ls'+i} style={{
+              position: 'absolute',
+              left: Math.cos(s.angle * Math.PI / 180) * s.dist,
+              top: Math.sin(s.angle * Math.PI / 180) * s.dist,
+              width: s.size, height: s.size,
+              borderRadius: '50%',
+              background: '#ff4444',
+              boxShadow: '0 0 4px #ff2222',
+              opacity: 0,
+              animation: `healSparkleParticle ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              '--spark-tx': `${Math.cos(s.angle * Math.PI / 180) * 15}px`,
+              '--spark-ty': `${Math.sin(s.angle * Math.PI / 180) * 15}px`,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
   thought_bubbles: (() => {
     return function ThoughtBubblesEffect({ x, y }) {
       const bubbles = useMemo(() => [
@@ -2451,6 +2539,16 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const [gameAnims, setGameAnims] = useState([]); // Active particle animations (moved up for creature death access)
   const [beamAnims, setBeamAnims] = useState([]); // Beam animations (laser, etc.)
   const [ramAnims, setRamAnims] = useState([]); // Ram animations (hero charges to target and back)
+
+  // ── Chat & Action Log state ──
+  const [chatMessages, setChatMessages] = useState([]);
+  const [privateChats, setPrivateChats] = useState({}); // { pairKey: [msgs] }
+  const [chatView, setChatView] = useState('main'); // 'main' | 'players' | 'private:username'
+  const [chatInput, setChatInput] = useState('');
+  const [actionLog, setActionLog] = useState([]);
+  const [pingFlash, setPingFlash] = useState(null); // { color }
+  const chatBodyRef = useRef(null);
+  const actionLogRef = useRef(null);
   const [transferAnims, setTransferAnims] = useState([]); // Card transfer animations (Dark Gear, etc.)
   const [projectileAnims, setProjectileAnims] = useState([]); // Projectile animations (phoenix cannon, etc.)
   const [discardAnims, setDiscardAnims] = useState([]);
@@ -2878,6 +2976,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
     if (!isMyTurn) return true;
     const card = CARDS_BY_NAME[cardName];
     if (!card) return false;
+
+    // Hand-lock: dim non-Ability cards that are blocked by handLock
+    if (me.handLocked && card.cardType !== 'Ability' && (me.handLockBlockedCards || []).includes(cardName)) return true;
+
     const isActionType = ACTION_TYPES.includes(card.cardType);
     if (currentPhase === 2 || currentPhase === 4) {
       // Main Phase 1 or 2: gray out action types UNLESS they have Additional Action coverage
@@ -3823,10 +3925,12 @@ function GameBoard({ gameState, lobby, onLeave }) {
         }
       }, 400);
     };
-    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, color, duration }) => {
+    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, color, duration }) => {
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
-      const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
+      const srcEl = sourceZoneSlot != null && sourceZoneSlot >= 0
+        ? document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`)
+        : document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
       let tgtEl;
       if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
         tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
@@ -4061,6 +4165,75 @@ function GameBoard({ gameState, lobby, onLeave }) {
       socket.off('deck_to_deleted', onDeckToDeleted);
     };
   }, []);
+
+  // ── Chat & Action Log socket listeners ──
+  useEffect(() => {
+    const onChatMsg = (entry) => {
+      setChatMessages(prev => [...prev, entry]);
+      setTimeout(() => chatBodyRef.current?.scrollTo({ top: chatBodyRef.current.scrollHeight, behavior: 'smooth' }), 50);
+    };
+    const onChatPrivate = (entry) => {
+      const pairKey = [entry.from, entry.to].sort().join('::');
+      setPrivateChats(prev => ({ ...prev, [pairKey]: [...(prev[pairKey] || []), entry] }));
+    };
+    const onChatPing = ({ from, color }) => {
+      setPingFlash({ color });
+      setTimeout(() => setPingFlash(null), 900);
+    };
+    const onActionLog = (entry) => {
+      setActionLog(prev => [...prev, entry]);
+      setTimeout(() => actionLogRef.current?.scrollTo({ top: actionLogRef.current.scrollHeight, behavior: 'smooth' }), 50);
+    };
+    const onChatHistory = ({ main, private: priv }) => {
+      if (main) setChatMessages(main);
+      if (priv) setPrivateChats(priv);
+    };
+    socket.on('chat_message', onChatMsg);
+    socket.on('chat_private', onChatPrivate);
+    socket.on('chat_ping', onChatPing);
+    socket.on('action_log', onActionLog);
+    socket.on('chat_history', onChatHistory);
+    // Request chat history on mount (for reconnects)
+    if (gameState?.roomId) socket.emit('request_chat_history', { roomId: gameState.roomId });
+    return () => {
+      socket.off('chat_message', onChatMsg);
+      socket.off('chat_private', onChatPrivate);
+      socket.off('chat_ping', onChatPing);
+      socket.off('action_log', onActionLog);
+      socket.off('chat_history', onChatHistory);
+    };
+  }, []);
+
+  // ── Scrollable battlefield detection + centering offset ──
+  useEffect(() => {
+    const el = boardCenterRef.current;
+    if (!el) return;
+    const check = () => {
+      // First compute centering offset WITHOUT scroll mode
+      el.classList.remove('can-scroll');
+      const rect = el.getBoundingClientRect();
+      const viewportCenter = window.innerWidth / 2;
+      const boardCenter = rect.left + rect.width / 2;
+      const offset = viewportCenter - boardCenter;
+      // Set on game-layout so hands can also use the offset
+      const layout = el.closest('.game-layout');
+      if (layout) layout.style.setProperty('--center-offset', offset + 'px');
+      el.style.setProperty('--center-offset', offset + 'px');
+      // Now check if natural content overflows (ignoring transform)
+      // Use scrollWidth which reflects content width before transform
+      if (el.scrollWidth > el.clientWidth + 4) {
+        el.classList.add('can-scroll');
+        // In scroll mode, disable centering transform to avoid layout confusion
+        el.style.setProperty('--center-offset', '0px');
+        if (layout) layout.style.setProperty('--center-offset', '0px');
+      }
+    };
+    check();
+    const obs = new ResizeObserver(check);
+    obs.observe(el);
+    window.addEventListener('resize', check);
+    return () => { obs.disconnect(); window.removeEventListener('resize', check); };
+  });
 
   /** Play a visual animation at a DOM element's position. */
   const playAnimation = (type, selector, options = {}) => {
@@ -4425,6 +4598,20 @@ function GameBoard({ gameState, lobby, onLeave }) {
           });
         }
       }
+      // Detect lethal damage: creature existed last frame but is now gone (destroyed)
+      for (const [key, prevHp] of Object.entries(prevCreatureHpRef.current)) {
+        if (!(key in currentCreatureHp) && prevHp > 0) {
+          const [ownerStr, heroIdxStr, slotStr] = key.split('-');
+          const ownerIdx = parseInt(ownerStr);
+          newCreatureDmg.push({
+            id: Date.now() + Math.random(),
+            amount: prevHp,
+            ownerLabel: ownerIdx === myIdx ? 'me' : 'opp',
+            heroIdx: parseInt(heroIdxStr),
+            zoneSlot: parseInt(slotStr),
+          });
+        }
+      }
       if (newCreatureDmg.length > 0) {
         setCreatureDamageNumbers(prev => [...prev, ...newCreatureDmg]);
         setTimeout(() => {
@@ -4671,6 +4858,298 @@ function GameBoard({ gameState, lobby, onLeave }) {
   });
 
   // Render a player's side (3 hero columns, each with hero+surprise, 3 abilities, N supports)
+  // ── Collapse state for log/chat ──
+  const [logCollapsed, setLogCollapsed] = useState(false);
+  const [chatCollapsed, setChatCollapsed] = useState(false);
+  const toggleLogCollapse = () => { setLogCollapsed(v => !v); if (chatCollapsed) setChatCollapsed(false); };
+  const toggleChatCollapse = () => { setChatCollapsed(v => !v); if (logCollapsed) setLogCollapsed(false); };
+
+  // ── Action Log Formatter ──
+  const formatLogEntry = (entry) => {
+    const pName = (name, color) => <span className="log-player-name" style={{ color: color || '#fff' }}>{name}</span>;
+    const logCardColor = (name) => {
+      const card = CARDS_BY_NAME[name];
+      if (!card) return '#ffcc44';
+      const m = { Artifact:'#ffd700', Potion:'#a0724a', Ability:'#4488ff', Spell:'#ff4444', Attack:'#ff4444', Creature:'#44cc66', Hero:'#bb66ff', 'Ascended Hero':'#bb66ff', Token:'#999' };
+      return m[card.cardType] || '#ffcc44';
+    };
+    const cName = (name) => <span className="log-card-name" style={{ color: logCardColor(name) }}>{name}</span>;
+    const p0 = gameState.players[0], p1 = gameState.players[1];
+    const getPlayer = (username) => {
+      if (username === p0.username) return { name: p0.username, color: p0.color };
+      if (username === p1.username) return { name: p1.username, color: p1.color };
+      return { name: username || '?', color: '#aaa' };
+    };
+    const playerByName = (n) => getPlayer(n);
+    const t = entry.type;
+    const statusColor = (s) => {
+      const sl = (s||'').toLowerCase();
+      if (sl === 'burned' || sl === 'burn') return '#ff8833';
+      if (sl === 'frozen' || sl === 'freeze') return '#88ddff';
+      if (sl === 'stunned' || sl === 'stun') return '#ffdd44';
+      if (sl === 'negated' || sl === 'negate') return '#ccaa22';
+      if (sl === 'poisoned' || sl === 'poison') return '#bb66ff';
+      if (sl === 'petrified' || sl === 'petrify') return '#999';
+      if (sl === 'shielded' || sl === 'shield') return '#44ddff';
+      if (sl === 'charmed' || sl === 'charme') return '#ff66aa';
+      if (sl === 'submerged' || sl === 'submerge') return '#4488cc';
+      if (sl === 'immune' || sl === 'immunity') return '#66ffaa';
+      return '#aa88ff';
+    };
+    /** Capitalize first letter of a status/buff name */
+    const capStatus = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+    /** Render a status/buff name in its color, capitalized */
+    const styledStatus = (s) => <strong style={{ color: statusColor(s) }}>{capStatus(s)}</strong>;
+    try {
+      if (t === 'turn_start') { const p = playerByName(entry.username); return <span className="log-info">── Turn {entry.turn} ({pName(p.name, p.color)}) ──</span>; }
+      if (t === 'spell_played') {
+        const p = playerByName(entry.player);
+        const verb = entry.type === 'Attack' || (entry.cardType || entry.type2) === 'Attack' ? 'used' : 'played';
+        return <span>{pName(p.name, p.color)} {verb} {cName(entry.card)}!</span>;
+      }
+      if (t === 'creature_summoned') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} summoned {cName(entry.card)}!</span>; }
+      if (t === 'ability_attached') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} attached {cName(entry.card)} to {entry.hero}.</span>; }
+      if (t === 'artifact_equipped') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} equipped {cName(entry.card)} to {entry.hero}{entry.cost ? ` (${entry.cost}G)` : ''}.</span>; }
+      if (t === 'ability_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} activated {cName(entry.card)} (Lv{entry.level})!</span>; }
+      if (t === 'hero_effect_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} activated their effect!</span>; }
+      if (t === 'creature_effect_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {cName(entry.card)} activated its effect!</span>; }
+      if (t === 'token_placed') { const p = playerByName(entry.player); return <span>{cName(entry.card)} placed on {pName(p.name, p.color)}'s {entry.hero}.</span>; }
+      if (t === 'damage') { return <span className="log-damage">{cName(entry.source)} dealt <span className="log-amount">{entry.amount}</span> to {entry.target}!</span>; }
+      if (t === 'creature_damage') { return <span className="log-damage">{cName(entry.source)} dealt <span className="log-amount">{entry.amount}</span> to {cName(entry.target)}!</span>; }
+      if (t === 'recoil') { return <span className="log-damage">{entry.hero} takes <span className="log-amount">{entry.amount}</span> recoil from {cName(entry.by)}!</span>; }
+      if (t === 'creature_destroyed') { return <span className="log-damage">{cName(entry.card)} was defeated!</span>; }
+      if (t === 'hero_ko') { return <span className="log-hero-defeated">💀 {entry.hero} was defeated!</span>; }
+      if (t === 'heal') { return <span className="log-heal">{entry.target} healed <span className="log-amount">{entry.amount}</span> HP!</span>; }
+      if (t === 'heal_creature') { return <span className="log-heal">{cName(entry.target)} healed <span className="log-amount">{entry.amount}</span> HP!</span>; }
+      if (t === 'draw_batch') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} drew {entry.count} card{entry.count>1?'s':''}.</span>; }
+      if (t === 'potion_draw') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} drew a card from Potion Deck!</span>; }
+      if (t === 'status_add') {
+        const s = entry.status || '';
+        if (s.toLowerCase() === 'shielded') return null;
+        const src = entry.source ? <> by {cName(entry.source)}</> : '';
+        return <span>{entry.target} was {styledStatus(s)}{src}!</span>;
+      }
+      if (t === 'status_remove') {
+        if ((entry.status||'').toLowerCase() === 'shielded') return null;
+        return <span className="log-info">{entry.target} lost {styledStatus(entry.status)}.</span>;
+      }
+      if (t === 'status_blocked') {
+        return <span className="log-info">{styledStatus(entry.status)} on {entry.target} was blocked ({entry.reason}).</span>;
+      }
+      if (t === 'buff_add') {
+        const target = entry.hero || entry.creature;
+        return <span>{target} received {styledStatus(entry.buff)}!</span>;
+      }
+      if (t === 'buff_remove') {
+        const target = entry.hero || entry.creature;
+        return <span className="log-info">{target} lost {styledStatus(entry.buff)}.</span>;
+      }
+      if (t === 'card_negated') { return <span className="log-info">{cName(entry.card)} was {styledStatus('negated')}!</span>; }
+      if (t === 'effect_negated') { return <span className="log-info">{cName(entry.card)} was {styledStatus('negated')}!</span>; }
+      if (t === 'creature_negated') { return <span className="log-info">{cName(entry.creature)}'s effects were {styledStatus('negated')}!</span>; }
+      if (t === 'hero_revived') { return <span className="log-heal">{entry.hero} was revived with {entry.hp} HP!</span>; }
+      if (t === 'gold_gain') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} gained <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.amount}</span> Gold.</span>; }
+      if (t === 'gold_spend') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} spent <span className="log-amount" style={{color:'#cc8844'}}>{entry.amount}</span> Gold.</span>; }
+      if (t === 'forced_discard') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} discarded {cName(entry.card)}.</span>; }
+      if (t === 'discard') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} discarded {cName(entry.card)}.</span>; }
+      if (t === 'discard_batch') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} discarded {entry.count} card{entry.count>1?'s':''}.</span>; }
+      if (t === 'delete_batch') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} deleted {entry.count} card{entry.count>1?'s':''}.</span>; }
+      if (t === 'force_delete') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} deleted {cName(entry.card)}{entry.by ? ` (${entry.by})` : ''}.</span>; }
+      if (t === 'destroy') { return <span className="log-damage">{cName(entry.target)} was destroyed!</span>; }
+      if (t === 'all_heroes_dead') { return <span className="log-damage" style={{fontWeight:700}}>All heroes defeated!</span>; }
+      if (t === 'reaction_activated') { return <span className="log-status">{cName(entry.card)} activated as a Reaction!</span>; }
+      if (t === 'burn_damage') { return <span className="log-damage">{entry.target} took <span className="log-amount" style={{color:'#ff8833'}}>{entry.amount}</span> {styledStatus('burn')} damage!</span>; }
+      if (t === 'poison_damage') { return <span className="log-damage">{entry.target} took <span className="log-amount" style={{color:'#bb66ff'}}>{entry.amount}</span> {styledStatus('poison')} damage!</span>; }
+      if (t === 'level_change') { return <span className="log-info">{cName(entry.card)} is now Lv{entry.newLevel}.</span>; }
+      if (t === 'deck_out') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)} decked out!</span>; }
+      if (t === 'target_redirect') { return <span className="log-info">Target redirected to {entry.newTarget}!</span>; }
+      if (t === 'move') { return <span className="log-info">{cName(entry.card)} was moved.</span>; }
+      if (t === 'card_played') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} used {cName(entry.card)}{entry.cost ? ` (${entry.cost}G)` : ''}!</span>; }
+      if (t === 'placement') { return <span>{cName(entry.card)} was summoned by {cName(entry.by)}!</span>; }
+      if (t === 'hand_limit_discard') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} discarded {cName(entry.card)} (hand limit).</span>; }
+      if (t === 'hand_limit_deleted') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} deleted {cName(entry.card)} (hand limit).</span>; }
+      if (t === 'card_added_to_hand') {
+        const p = playerByName(entry.player);
+        const via = entry.by ? <> via {cName(entry.by)}</> : '';
+        return <span>{pName(p.name, p.color)} added {cName(entry.card)} to hand{via}!</span>;
+      }
+      if (t === 'deck_search') {
+        const p = playerByName(entry.player);
+        return <span>{pName(p.name, p.color)} added {cName(entry.card)} from their deck to their hand via {cName(entry.by)}!</span>;
+      }
+      if (t === 'charme_steal') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} stole {cName(entry.card)} from {entry.from}!</span>; }
+      if (t === 'charme_control') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} took control of {entry.target}!</span>; }
+      if (t === 'damage_blocked') { return <span className="log-info">Damage to {entry.target} was blocked ({entry.reason}).</span>; }
+      if (t === 'bartas_second_cast') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} casts {cName(entry.spell)} at a second target!</span>; }
+      if (t === 'force_discard') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} discarded {cName(entry.card)}{entry.by ? ` (${entry.by})` : ''}.</span>; }
+      if (t === 'shuffle_back') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} shuffled {entry.count} card{entry.count>1?'s':''} back into deck{entry.source ? ` (${entry.source})` : ''}.</span>; }
+      if (t === 'leadership_shuffle') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} shuffled {entry.count} card{entry.count!==1?'s':''} back and redraws.</span>; }
+      if (t === 'elana_shuffle') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} shuffled hand back and draws {entry.drawing} cards.</span>; }
+      if (t === 'mill') {
+        const p = playerByName(entry.player);
+        const dest = entry.destination === 'delete' ? 'deleted' : 'discarded';
+        return <span>{pName(p.name, p.color)} milled {entry.count} card{entry.count>1?'s':''} ({dest}){entry.source ? <> by {cName(entry.source)}</> : ''}.</span>;
+      }
+      if (t === 'additional_action_used') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} used an additional action ({cName(entry.provider)}).</span>; }
+      if (t === 'atk_grant') { return <span className="log-info">{entry.hero} gained +{entry.amount} ATK from {cName(entry.source)}.</span>; }
+      if (t === 'atk_revoke') { return <span className="log-info">{entry.hero} lost {entry.amount} ATK ({cName(entry.source)}).</span>; }
+      if (t === 'max_hp_increase') { return <span className="log-info">{entry.hero} max HP increased to {entry.newMax}.</span>; }
+      if (t === 'max_hp_decrease') { return <span className="log-info">{entry.hero} max HP decreased to {entry.newMax}.</span>; }
+      if (t === 'shard_retrieve') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} retrieved {(entry.retrieved||[]).map((c,i) => <React.Fragment key={i}>{i>0 && ', '}{cName(c)}</React.Fragment>)} from discard!</span>; }
+      if (t === 'shard_delete') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} deleted {(entry.deleted||[]).length} card{(entry.deleted||[]).length!==1?'s':''}.</span>; }
+      if (t === 'creature_revived') { const p = playerByName(entry.player); return <span className="log-heal">{cName(entry.card)} was revived{entry.by ? <> by {cName(entry.by)}</> : ''}!</span>; }
+      if (t === 'permanent_placed') { const p = playerByName(entry.player); return <span className="log-info">{cName(entry.card)} entered play for {pName(p.name, p.color)}.</span>; }
+      if (t === 'permanent_removed') { const p = playerByName(entry.player); return <span className="log-info">{cName(entry.card)} left play for {pName(p.name, p.color)}.</span>; }
+      if (t === 'monia_protect') {
+        if (entry.protectedCreature) return <span className="log-status">{entry.hero} protected {cName(entry.protectedCreature)}!</span>;
+        if (entry.creaturesProtected?.length) return <span className="log-status">{entry.hero} protected {entry.creaturesProtected.map((c,i) => <React.Fragment key={i}>{i>0 && ', '}{cName(c)}</React.Fragment>)}!</span>;
+        return null;
+      }
+      if (t === 'diamond_protect') { return <span className="log-status">Diamond protected {cName(entry.creature)} — damage {styledStatus('negated')}!</span>; }
+      if (t === 'diamond_protect_failed') { return <span className="log-info">Diamond tried to protect {cName(entry.creature)} but damage cannot be negated.</span>; }
+      if (t === 'diamond_self_damage') { return <span className="log-damage">{entry.hero} takes <span className="log-amount">{entry.amount}</span> self-damage protecting {entry.protectedCount} creature{entry.protectedCount!==1?'s':''}!</span>; }
+      if (t === 'diamond_status_immune') { return <span className="log-info">{cName(entry.creature)} is immune to status effects (Diamond).</span>; }
+      if (t === 'ghuanjun_combo') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} enters combo mode!</span>; }
+      if (t === 'immortal_applied') { return <span className="log-status">{entry.target} gained Immortal from {entry.by}!</span>; }
+      if (t === 'bill_equip') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s Bill equipped {cName(entry.equip)} to {entry.hero}!</span>; }
+      if (t === 'kazena_storm') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s Kazena drew {entry.drawn} card{entry.drawn!==1?'s':''}!</span>; }
+      if (t === 'tharx_draw') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s Tharx drew {entry.drawn} card{entry.drawn!==1?'s':''} ({entry.creatures} creature{entry.creatures!==1?'s':''})!</span>; }
+    } catch(e) {}
+    return null;
+  };
+
+  // ── Pre-process action log: batch consecutive draws and discards ──
+  const processedLog = useMemo(() => {
+    const result = [];
+    for (let i = 0; i < actionLog.length; i++) {
+      const entry = actionLog[i];
+      if (entry.type === 'draw') {
+        let count = 1;
+        while (i + 1 < actionLog.length && actionLog[i + 1].type === 'draw' && actionLog[i + 1].player === entry.player) { count++; i++; }
+        result.push({ ...entry, type: 'draw_batch', count, id: entry.id });
+      } else if (entry.type === 'discard' || entry.type === 'forced_discard') {
+        let count = 1;
+        const firstCard = entry.card;
+        while (i + 1 < actionLog.length && (actionLog[i + 1].type === 'discard' || actionLog[i + 1].type === 'forced_discard') && actionLog[i + 1].player === entry.player) { count++; i++; }
+        if (count > 1) result.push({ ...entry, type: 'discard_batch', count, id: entry.id });
+        else result.push(entry);
+      } else if (entry.type === 'force_delete') {
+        let count = 1;
+        while (i + 1 < actionLog.length && actionLog[i + 1].type === 'force_delete' && actionLog[i + 1].player === entry.player) { count++; i++; }
+        if (count > 1) result.push({ ...entry, type: 'delete_batch', count, id: entry.id });
+        else result.push(entry);
+      } else {
+        result.push(entry);
+      }
+    }
+    return result;
+  }, [actionLog]);
+
+  // ── Render Action Log ──
+  const renderActionLog = () => {
+    return (
+      <div className="action-log-panel" style={logCollapsed ? { flex: '0 0 28px' } : chatCollapsed ? { flex: 1 } : undefined}>
+        <div className="action-log-header" style={{ cursor: 'pointer' }} onClick={toggleLogCollapse}>
+          <span style={{ flex: 1 }}>⚔ Action Log</span>
+          <span style={{ fontSize: 10, opacity: .6 }}>{logCollapsed ? '▸' : '▾'}</span>
+        </div>
+        {!logCollapsed && (
+          <div className="action-log-body" ref={actionLogRef}>
+            {processedLog.map((entry, i) => {
+              const formatted = formatLogEntry(entry);
+              if (!formatted) return null;
+              return <div key={entry.id || i} className="action-log-entry">{formatted}</div>;
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Chat send handler ──
+  const sendChat = () => {
+    const text = chatInput.trim();
+    if (!text) return;
+    if (chatView.startsWith('private:')) {
+      const target = chatView.slice(8);
+      socket.emit('chat_private', { roomId: gameState.roomId, targetUsername: target, text });
+    } else {
+      socket.emit('chat_message', { roomId: gameState.roomId, text });
+    }
+    setChatInput('');
+  };
+
+  // ── Render Chat Panel ──
+  const renderChatPanel = () => {
+    const participants = gameState.roomParticipants || { players: [], spectators: [] };
+    const isPrivate = chatView.startsWith('private:');
+    const privateTarget = isPrivate ? chatView.slice(8) : null;
+    const myUsername = gameState.players[gameState.myIndex]?.username || '';
+    const pairKey = privateTarget ? [myUsername, privateTarget].sort().join('::') : null;
+    const privateMsgs = pairKey ? (privateChats[pairKey] || []) : [];
+
+    return (
+      <div className="chat-panel" style={chatCollapsed ? { flex: '0 0 28px' } : logCollapsed ? { flex: 1 } : { position: 'relative' }}>
+        {!chatCollapsed && pingFlash && <div className="chat-ping-flash" style={{ color: pingFlash.color, background: pingFlash.color }} />}
+        <div className="chat-header" style={{ cursor: 'pointer' }} onClick={toggleChatCollapse}>
+          {!chatCollapsed && isPrivate && <span className="chat-header-back" onClick={(e) => { e.stopPropagation(); setChatView('main'); }}>◀</span>}
+          <span style={{ flex: 1 }}>{isPrivate && !chatCollapsed ? `DM: ${privateTarget}` : '💬 Chat'}</span>
+          <span style={{ fontSize: 10, opacity: .6 }}>{chatCollapsed ? '▸' : '▾'}</span>
+        </div>
+        {!chatCollapsed && (<>
+        {!isPrivate && (
+          <div className="chat-tabs">
+            <div className={'chat-tab' + (chatView === 'main' ? ' active' : '')} onClick={() => setChatView('main')}>Chat</div>
+            <div className={'chat-tab' + (chatView === 'players' ? ' active' : '')} onClick={() => setChatView('players')}>Players</div>
+          </div>
+        )}
+        {chatView === 'players' ? (
+          <div className="chat-body">
+            {participants.players.map(p => (
+              <div key={p.username} className="player-list-entry" onClick={() => p.username !== myUsername && setChatView('private:' + p.username)}>
+                {p.avatar && <img className="player-list-avatar" src={p.avatar} alt="" />}
+                <span className="player-list-name" style={{ color: p.color }}>{p.username}{p.username === myUsername ? ' (you)' : ''}</span>
+                <span className="player-list-badge">PLAYER</span>
+              </div>
+            ))}
+            {participants.spectators.map(s => (
+              <div key={s.username} className="player-list-entry" onClick={() => s.username !== myUsername && setChatView('private:' + s.username)}>
+                {s.avatar && <img className="player-list-avatar" src={s.avatar} alt="" />}
+                <span className="player-list-name" style={{ color: '#888' }}>{s.username}{s.username === myUsername ? ' (you)' : ''}</span>
+                <span className="player-list-badge">SPECTATOR</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="chat-body" ref={chatBodyRef}>
+            {(isPrivate ? privateMsgs : chatMessages).map(msg => (
+              <div key={msg.id} className={'chat-msg' + (msg.isSpectator ? ' spectator-msg' : '')}>
+                {msg.avatar && <img className="chat-msg-avatar" src={msg.avatar} alt="" />}
+                <span className="chat-msg-name"
+                  style={{ color: msg.isSpectator ? '#888' : (msg.color || '#fff') }}
+                  onClick={() => (msg.from || msg.username) !== myUsername && setChatView('private:' + (msg.from || msg.username))}
+                >{msg.from || msg.username}</span>
+                <span className="chat-msg-text">: {msg.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="chat-input-row">
+          <input
+            className="chat-input"
+            placeholder={isPrivate ? `Message ${privateTarget}...` : 'Type a message...'}
+            value={chatInput}
+            onChange={e => setChatInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); sendChat(); } }}
+            maxLength={500}
+          />
+          <button className="chat-send-btn" onClick={sendChat}>►</button>
+        </div>
+        </>)}
+      </div>
+    );
+  };
+
   const renderPlayerSide = (p, isOpp) => {
     const heroes = p.heroes || [];
     const abZones = p.abilityZones || [];
@@ -4850,6 +5329,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 );
                 const isFreeActivatable = freeAbilityEntry?.canActivate === true;
                 const isFreeExhausted = freeAbilityEntry && !freeAbilityEntry.canActivate;
+                const isAbilityHandLockBlocked = freeAbilityEntry?.handLockBlocked === true;
                 // Also activatable during heroAction if listed
                 const heroActionPromptAbilities = (!isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx) ? (gameState.effectPrompt.activatableAbilities || []) : [];
                 const isHeroActionActivatable = heroActionPromptAbilities.some(a => a.heroIdx === i && a.zoneIdx === z);
@@ -4874,7 +5354,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
                     onClick={onAbilityClick}
                     style={zsMerge('ability', canActivate ? { cursor: 'pointer' } : (isValidPotionTarget ? { cursor: 'pointer' } : undefined))}>
                     {cards.length > 0 ? (
-                      <AbilityStack cards={cards} />
+                      <>
+                        <AbilityStack cards={cards} />
+                        {isAbilityHandLockBlocked && <div className="hand-lock-indicator" style={{ fontSize: 32 }}>⦸</div>}
+                      </>
                     ) : (
                       <div className="board-zone-empty">Ability</div>
                     )}
@@ -4946,10 +5429,17 @@ function GameBoard({ gameState, lobby, onLeave }) {
               // Additional Action provider selection highlight
               const isProviderZone = !isOpp && pendingAdditionalPlay && pendingAdditionalPlay.providers.some(p => p.heroIdx === i && p.zoneSlot === z);
               const isProviderSelectionActive = !isOpp && !!pendingAdditionalPlay;
+              // Active creature effect check
+              const creatureEffectEntry = cards.length > 0 && (gameState.activatableCreatures || []).find(c =>
+                c.heroIdx === i && c.zoneSlot === z && ((!isOpp && !c.charmedOwner) || (isOpp && c.charmedOwner === pi))
+              );
+              const isCreatureActivatable = creatureEffectEntry?.canActivate === true;
               return (
-                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'}
-                  onClick={isProviderZone ? () => {
+                  onClick={isCreatureActivatable ? () => {
+                    socket.emit('activate_creature_effect', { roomId: gameState.roomId, heroIdx: i, zoneSlot: z, charmedOwner: creatureEffectEntry?.charmedOwner });
+                  } : isProviderZone ? () => {
                     const provider = pendingAdditionalPlay.providers.find(p => p.heroIdx === i && p.zoneSlot === z);
                     if (provider) {
                       socket.emit('play_creature', {
@@ -4961,7 +5451,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                       socket.emit('pending_placement_clear', { roomId: gameState.roomId });
                     }
                   } : isZonePickTarget ? () => respondToPrompt({ heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
-                  style={zsMerge('support', (isValidEquipTarget || isZonePickTarget || isProviderZone) ? { cursor: 'pointer' } : undefined)}>
+                  style={zsMerge('support', (isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable) ? { cursor: 'pointer' } : undefined)}>
                   {(isPlayTarget || isAutoTarget) && playDrag.card ? (
                     <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
                   ) : (!isOpp && pendingAdditionalPlay && pendingAdditionalPlay.heroIdx === i && pendingAdditionalPlay.zoneSlot === z) ? (
@@ -5069,6 +5559,52 @@ function GameBoard({ gameState, lobby, onLeave }) {
             </div>
           </div>
 
+          {/* Phase tracker — positioned absolutely, left edge */}
+          <div className="phase-column">
+            <div className="board-phase-tracker">
+              {['Start Phase', 'Resource Phase', 'Main Phase 1', 'Action Phase', 'Main Phase 2', 'End Phase'].map((phase, i) => {
+                const isActive = currentPhase === i;
+                const canClick = isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && (
+                  (currentPhase === 2 && (i === 3 || i === 5)) ||
+                  (currentPhase === 3 && (i === 4 || i === 5)) ||
+                  (currentPhase === 4 && i === 5)
+                );
+                return (
+                  <div key={i}
+                    className={'board-phase-item' + (isActive ? ' active' : '') + (canClick ? ' clickable' : '')}
+                    style={isActive ? { borderColor: phaseColor, boxShadow: `0 0 10px ${phaseColor}44` } : undefined}
+                    onClick={() => { if (canClick) tryAdvancePhase(i); }}>
+                    {phase}
+                  </div>
+                );
+              })}
+            </div>
+            {!isSpectator && (() => {
+              const canAdvance = isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && currentPhase >= 2 && currentPhase <= 4;
+              const nextMap = { 2: 3, 3: 4, 4: 5 };
+              return (
+                <div className="phase-buttons-row">
+                  <button className="btn phase-btn" disabled={!canAdvance}
+                    onClick={() => canAdvance && tryAdvancePhase(nextMap[currentPhase])}>
+                    Next Phase ▸
+                  </button>
+                  <button className="btn btn-danger phase-btn" disabled={!canAdvance}
+                    onClick={() => canAdvance && tryAdvancePhase(5)}>
+                    End Turn ⏹
+                  </button>
+                  <label className="phase-end-check">
+                    <input type="checkbox" checked={askBeforeEndTurn} onChange={e => {
+                      setAskBeforeEndTurn(e.target.checked);
+                      localStorage.setItem('pp_ask_end_turn', e.target.checked ? '1' : '0');
+                    }} />
+                    <span>Confirm end</span>
+                  </label>
+                </div>
+              );
+            })()}
+          </div>
+
+          <div className="board-center-spacer" />
           <div className="board-center" ref={boardCenterRef} style={{ position: 'relative' }}>
             {/* ── Generic Player Debuff Warnings ── */}
             {(() => {
@@ -5094,52 +5630,6 @@ function GameBoard({ gameState, lobby, onLeave }) {
               <BoardZone type="area" cards={gameState.areaZones?.[oppIdx] || []} label="Area" style={{...oppBoardZone('area'), left: areaPositions[1]}} />
             </div>
             <div className="board-mid-row" style={{ position: 'relative' }}>
-              <div className="phase-column">
-                <div className="board-phase-tracker">
-                  {['Start Phase', 'Resource Phase', 'Main Phase 1', 'Action Phase', 'Main Phase 2', 'End Phase'].map((phase, i) => {
-                    const isActive = currentPhase === i;
-                    // Which phases can the active player click to advance to?
-                    const canClick = isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && (
-                      (currentPhase === 2 && (i === 3 || i === 5)) || // Main1 → Action or End
-                      (currentPhase === 3 && (i === 4 || i === 5)) || // Action → Main2 or End
-                      (currentPhase === 4 && i === 5)                 // Main2 → End
-                    );
-                    return (
-                      <div key={i}
-                        className={'board-phase-item' + (isActive ? ' active' : '') + (canClick ? ' clickable' : '')}
-                        style={isActive ? { borderColor: phaseColor, boxShadow: `0 0 10px ${phaseColor}44` } : undefined}
-                        onClick={() => {
-                          if (canClick) tryAdvancePhase(i);
-                        }}>
-                        {phase}
-                      </div>
-                    );
-                  })}
-                </div>
-                {!isSpectator && (() => {
-                  const canAdvance = isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && currentPhase >= 2 && currentPhase <= 4;
-                  const nextMap = { 2: 3, 3: 4, 4: 5 };
-                  return (
-                    <div className="phase-buttons-row">
-                      <button className="btn phase-btn" disabled={!canAdvance}
-                        onClick={() => canAdvance && tryAdvancePhase(nextMap[currentPhase])}>
-                        Next Phase ▸
-                      </button>
-                      <button className="btn btn-danger phase-btn" disabled={!canAdvance}
-                        onClick={() => canAdvance && tryAdvancePhase(5)}>
-                        End Turn ⏹
-                      </button>
-                      <label className="phase-end-check">
-                        <input type="checkbox" checked={askBeforeEndTurn} onChange={e => {
-                          setAskBeforeEndTurn(e.target.checked);
-                          localStorage.setItem('pp_ask_end_turn', e.target.checked ? '1' : '0');
-                        }} />
-                        <span>Confirm end</span>
-                      </label>
-                    </div>
-                  );
-                })()}
-              </div>
               <div className="board-area-line" />
               {gameState.format > 1 && !result && (
                 <div className="set-score-fixed orbit-font">
@@ -5188,6 +5678,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 })}
               </div>
             )}
+          </div>
+
+          <div className="chat-log-column">
+            {renderActionLog()}
+            {renderChatPanel()}
           </div>
 
           <div className="board-util board-util-right">
