@@ -32,7 +32,7 @@
   --sidebar-w: calc(76px * var(--board-scale));
   --board-font: calc(9px * var(--board-scale));
   --hand-min-h: calc(102px * var(--board-scale));
-  --chat-col-w: max(calc(270px * var(--board-scale)), 220px);
+  --chat-col-w: 324px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2245,6 +2245,86 @@ body {
 }
 .board-zone-hero { border-color: rgba(140,80,220,.5); background: rgba(140,80,220,.08); }
 .board-zone-surprise { border-color: rgba(200,50,50,.5); background: rgba(200,50,50,.08); }
+
+/* Surprise flip animation */
+.surprise-flipping {
+  animation: surprise-flip-anim 0.8s ease-out;
+}
+@keyframes surprise-flip-anim {
+  0% { transform: rotateY(0deg) scale(1); }
+  30% { transform: rotateY(90deg) scale(1.2); filter: brightness(2); }
+  60% { transform: rotateY(180deg) scale(1.3); filter: brightness(2.5); box-shadow: 0 0 30px rgba(255,100,50,.8); }
+  100% { transform: rotateY(360deg) scale(1); filter: brightness(1); box-shadow: none; }
+}
+
+/* Own face-down surprise: semi-transparent to indicate hidden from opponent */
+.surprise-own-facedown .board-card,
+.surprise-own-facedown .board-zone-empty { opacity: 0.45; }
+
+/* Opponent's known re-set surprise: semi-transparent face-up card */
+.surprise-known-facedown .board-card { opacity: 0.45; filter: sepia(0.3); }
+
+/* Surprise re-setting animation: flash + glow */
+.surprise-resetting {
+  animation: surprise-reset-anim 1.2s ease-out;
+}
+@keyframes surprise-reset-anim {
+  0% { filter: brightness(1); transform: scale(1); }
+  20% { filter: brightness(2.5) sepia(0.5); transform: scale(1.15); box-shadow: 0 0 25px rgba(210,170,80,.8); }
+  50% { filter: brightness(1.8) sepia(0.3); transform: scale(1.05); box-shadow: 0 0 15px rgba(210,170,80,.5); }
+  100% { filter: brightness(1); transform: scale(1); box-shadow: none; }
+}
+
+/* Surprise zone drag highlights — prominent colored borders + glow */
+.surprise-drop-eligible {
+  border: 2px solid rgba(255,140,40,.9) !important;
+  background: rgba(255,140,40,.15) !important;
+  box-shadow: 0 0 14px 3px rgba(255,140,40,.35), inset 0 0 10px rgba(255,140,40,.15);
+  animation: surprise-eligible-pulse 1s ease-in-out infinite alternate;
+}
+@keyframes surprise-eligible-pulse {
+  from { box-shadow: 0 0 14px 3px rgba(255,140,40,.35), inset 0 0 10px rgba(255,140,40,.15); }
+  to   { box-shadow: 0 0 20px 6px rgba(255,140,40,.5),  inset 0 0 14px rgba(255,140,40,.25); }
+}
+.surprise-drop-active {
+  border: 2px solid rgba(255,180,50,1) !important;
+  background: rgba(255,180,50,.25) !important;
+  box-shadow: 0 0 24px 6px rgba(255,180,50,.6), inset 0 0 16px rgba(255,180,50,.3);
+  transform: scale(1.04);
+  transition: transform .1s, box-shadow .1s;
+}
+.surprise-drop-ineligible {
+  opacity: 0.35;
+  filter: saturate(0.3);
+}
+
+/* Spider Avalanche animation — torrential downpour of tiny spiders */
+.anim-spider-flash {
+  position: absolute; left: -40px; top: -20px; width: 80px; height: 80px;
+  background: radial-gradient(circle, rgba(80,0,120,.5) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: spider-flash 0.3s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes spider-flash {
+  0% { opacity: 0; transform: scale(0.3); }
+  50% { opacity: 1; transform: scale(1.2); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+.anim-spider-drop {
+  position: absolute; left: 0; top: 0;
+  font-size: var(--size, 8px);
+  opacity: 0;
+  pointer-events: none;
+  animation: spider-drop-fall forwards ease-in;
+  transform: translate(var(--startX), -80px);
+  filter: drop-shadow(0 0 2px rgba(80,0,120,.6));
+}
+@keyframes spider-drop-fall {
+  0%   { opacity: 0; transform: translate(var(--startX), -80px) scale(0.5); }
+  15%  { opacity: 1; transform: translate(var(--startX), -40px) scale(1); }
+  100% { opacity: 0; transform: translate(calc(var(--startX) + var(--drift)), 80px) scale(0.7); }
+}
 .board-zone-ability { border-color: rgba(50,100,220,.5); background: rgba(50,100,220,.08); }
 .board-zone-support { border-color: rgba(220,200,50,.5); background: rgba(220,200,50,.08); }
 .board-zone-clickable { cursor: pointer; }
@@ -2281,6 +2361,51 @@ body {
 @keyframes additionalActionPulse {
   0%, 100% { filter: drop-shadow(0 0 3px rgba(255,200,0,.6)); transform: scale(1); }
   50% { filter: drop-shadow(0 0 6px rgba(255,200,0,1)); transform: scale(1.15); }
+}
+
+.summoning-sickness-icon {
+  position: absolute;
+  left: 1px;
+  top: 2px;
+  font-size: calc(12px * var(--board-scale));
+  z-index: 5;
+  cursor: default;
+  opacity: 0.8;
+  filter: drop-shadow(0 0 2px rgba(150,150,255,.6));
+  animation: summonSickPulse 2.5s ease-in-out infinite;
+  line-height: 1;
+}
+@keyframes summonSickPulse {
+  0%, 100% { opacity: 0.6; filter: drop-shadow(0 0 2px rgba(150,150,255,.4)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 5px rgba(150,150,255,.8)); }
+}
+
+@keyframes terrorPulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.25); opacity: 1; filter: brightness(1.3); }
+}
+
+@keyframes nomuSparkle {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.5); }
+  30% { opacity: 1; transform: translate(calc(var(--np-x) * 0.4), calc(var(--np-y) * 0.4)) scale(1.2); }
+  100% { opacity: 0; transform: translate(var(--np-x), var(--np-y)) scale(0.3); }
+}
+
+.mummified-icon {
+  position: absolute;
+  right: 1px;
+  bottom: 2px;
+  font-size: calc(14px * var(--board-scale));
+  z-index: 5;
+  cursor: default;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 3px rgba(200,180,120,.7));
+  animation: mummifiedPulse 3s ease-in-out infinite;
+  line-height: 1;
+}
+@keyframes mummifiedPulse {
+  0%, 100% { opacity: 0.7; filter: drop-shadow(0 0 2px rgba(200,180,120,.5)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 6px rgba(200,180,120,.9)); }
 }
 
 /* ═══ Modular Animation System ═══ */

@@ -21,7 +21,8 @@ module.exports = {
       // Count ALL creatures the player controls (Creature/Token types only)
       const cardDB = engine._getCardDB();
       const creatureCount = engine.cardInstances.filter(inst => {
-        if (inst.owner !== pi || inst.zone !== 'support') return false;
+        if (inst.controller !== pi || inst.zone !== 'support') return false;
+        if (inst.faceDown) return false;
         const cd = cardDB[inst.name];
         return cd && hasCardType(cd, 'Creature');
       }).length;

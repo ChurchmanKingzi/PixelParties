@@ -14,7 +14,12 @@ const { api, emitSocket, socket, AppContext, CardMini, FoilOverlay, useFoilBands
 //  Eliminates orphan portal tooltips.
 // ═══════════════════════════════════════════
 let _boardTooltipSetter = null;
-function setBoardTooltip(card) { _boardTooltipSetter?.(card); }
+let _boardTooltipLocked = false;
+function setBoardTooltip(card) {
+  // When locked (prompt card hovered), ignore external clears
+  if (!card && _boardTooltipLocked) return;
+  _boardTooltipSetter?.(card);
+}
 
 function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
@@ -717,7 +722,7 @@ function GameTooltip() {
 }
 
 // Status badges — small icons showing active negative statuses at a glance
-function StatusBadges({ statuses, counters, isHero }) {
+function StatusBadges({ statuses, counters, isHero, player }) {
   const badges = [];
   const s = statuses || {};
   const c = counters || {};
@@ -738,7 +743,8 @@ function StatusBadges({ statuses, counters, isHero }) {
   if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
   if (s.poisoned || c.poisoned) {
     const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
-    badges.push({ key: 'poisoned', icon: '☠️', tooltip: `Poisoned: Takes ${30 * stacks} damage at the start of each of its owner's turns.` });
+    const perStack = player?.poisonDamagePerStack || 30;
+    badges.push({ key: 'poisoned', icon: '☠️', tooltip: `Poisoned: Takes ${perStack * stacks} damage at the start of each of its owner's turns.` });
   }
   if (s.negated || c.negated) badges.push({ key: 'negated', icon: '🚫', tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.') + dur(s.negated || c.negated) });
   if (s.immune) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
@@ -937,11 +943,36 @@ function CreatureDeathEffect({ x, y }) {
   );
 }
 
+// Spider Avalanche — torrential downpour of tiny spiders
+function SpiderAvalancheEffect({ x, y, w, h }) {
+  const spiders = useMemo(() => Array.from({ length: 80 }, () => ({
+    startX: -60 + Math.random() * 120,
+    delay: Math.random() * 600,
+    dur: 300 + Math.random() * 400,
+    size: 6 + Math.random() * 8,
+    drift: -15 + Math.random() * 30,
+    char: ['🕷','🕷','🕷','🕷','·','·'][Math.floor(Math.random() * 6)],
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y - 60, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-spider-flash" />
+      {spiders.map((s, i) => (
+        <div key={i} className="anim-spider-drop" style={{
+          '--startX': s.startX + 'px', '--drift': s.drift + 'px',
+          '--size': s.size + 'px',
+          animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }}>{s.char}</div>
+      ))}
+    </div>
+  );
+}
+
 const ANIM_REGISTRY = {
   explosion: ExplosionEffect,
   creature_death: CreatureDeathEffect,
   freeze: FreezeEffect,
   ice_encase: IceEncaseEffect,
+  spider_avalanche: SpiderAvalancheEffect,
   electric_strike: ElectricStrikeEffect,
   flame_strike: FlameStrikeEffect,
   stranglehold_squeeze: (() => {
@@ -2024,6 +2055,442 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  whirlpool: (() => {
+    return function WhirlpoolEffect({ x, y }) {
+      const rings = useMemo(() => Array.from({ length: 9 }, (_, i) => ({
+        radius: 20 + i * 16,
+        delay: i * 60,
+        dur: 900 - i * 40,
+        opacity: 1 - i * 0.08,
+        width: 4 - i * 0.25,
+      })), []);
+      const drops = useMemo(() => Array.from({ length: 24 }, (_, i) => ({
+        angle: (i / 24) * 360 + Math.random() * 15,
+        dist: 35 + Math.random() * 55,
+        delay: Math.random() * 300,
+        dur: 700 + Math.random() * 300,
+        size: 5 + Math.random() * 8,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
+          {rings.map((r, i) => (
+            <div key={'r'+i} style={{
+              position: 'absolute', left: -r.radius, top: -r.radius,
+              width: r.radius * 2, height: r.radius * 2,
+              border: `${r.width}px solid rgba(40,140,220,${r.opacity})`,
+              borderRadius: '50%', opacity: 0,
+              boxShadow: `0 0 ${8+i*3}px rgba(60,170,255,${r.opacity * 0.6}), inset 0 0 ${6+i*2}px rgba(80,190,255,${r.opacity * 0.35})`,
+              animation: `whirlSpin ${r.dur}ms ease-in ${r.delay}ms forwards`,
+            }} />
+          ))}
+          {drops.map((d, i) => {
+            const rad = (d.angle * Math.PI) / 180;
+            return (
+              <span key={'d'+i} style={{
+                position: 'absolute', width: d.size, height: d.size, borderRadius: '50%',
+                background: 'rgba(60,180,255,0.9)',
+                boxShadow: '0 0 6px rgba(80,200,255,0.8)',
+                left: Math.cos(rad) * d.dist - d.size/2,
+                top: Math.sin(rad) * d.dist - d.size/2,
+                opacity: 0,
+                animation: `whirlDrop ${d.dur}ms ease-in ${d.delay}ms forwards`,
+                '--wd-tx': `${-Math.cos(rad) * d.dist * 0.9}px`,
+                '--wd-ty': `${-Math.sin(rad) * d.dist * 0.9}px`,
+              }} />
+            );
+          })}
+          <span style={{
+            position: 'absolute', fontSize: 40, left: -20, top: -20, opacity: 0,
+            animation: 'whirlEmoji 900ms ease-in 50ms forwards',
+            filter: 'drop-shadow(0 0 8px rgba(60,180,255,0.8))',
+          }}>🌊</span>
+          <style>{`
+            @keyframes whirlSpin {
+              0% { opacity: 0; transform: rotate(0deg) scale(1.8); }
+              20% { opacity: 1; transform: rotate(180deg) scale(1.2); }
+              55% { opacity: 0.9; transform: rotate(540deg) scale(0.55); }
+              100% { opacity: 0; transform: rotate(1080deg) scale(0.03); }
+            }
+            @keyframes whirlDrop {
+              0% { opacity: 0.9; transform: translate(0,0) scale(1); }
+              40% { opacity: 0.8; transform: translate(calc(var(--wd-tx)*0.4), calc(var(--wd-ty)*0.4)) scale(0.8); }
+              100% { opacity: 0; transform: translate(var(--wd-tx), var(--wd-ty)) scale(0.05); }
+            }
+            @keyframes whirlEmoji {
+              0% { opacity: 0; transform: scale(0.6) rotate(0deg); }
+              20% { opacity: 1; transform: scale(1.8) rotate(120deg); }
+              55% { opacity: 0.8; transform: scale(1) rotate(450deg); }
+              100% { opacity: 0; transform: scale(0.1) rotate(900deg); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  gate_shield: (() => {
+    return function GateShieldEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
+          <span style={{
+            position: 'absolute', fontSize: 48, left: -24, top: -35, opacity: 0,
+            filter: 'drop-shadow(0 0 10px rgba(80,180,255,0.8)) drop-shadow(0 0 20px rgba(60,140,220,0.5))',
+            animation: 'gateShieldPop 900ms ease-out forwards',
+          }}>🛡️</span>
+          {Array.from({ length: 8 }).map((_, i) => {
+            const angle = (i / 8) * 360;
+            const rad = (angle * Math.PI) / 180;
+            return (
+              <div key={i} style={{
+                position: 'absolute',
+                width: 6, height: 6, borderRadius: '50%',
+                background: 'rgba(100,200,255,0.9)',
+                boxShadow: '0 0 6px rgba(80,180,255,0.7)',
+                left: Math.cos(rad) * 30 - 3,
+                top: Math.sin(rad) * 30 - 3,
+                opacity: 0,
+                animation: `gateShieldRing 700ms ease-out ${i * 50}ms forwards`,
+              }} />
+            );
+          })}
+          <style>{`
+            @keyframes gateShieldPop {
+              0% { opacity: 0; transform: scale(0.3) translateY(10px); }
+              30% { opacity: 1; transform: scale(1.4) translateY(-5px); }
+              60% { opacity: 0.9; transform: scale(1) translateY(0); }
+              100% { opacity: 0; transform: scale(0.8) translateY(-15px); }
+            }
+            @keyframes gateShieldRing {
+              0% { opacity: 0; transform: scale(0.5); }
+              40% { opacity: 1; transform: scale(1.3); }
+              100% { opacity: 0; transform: scale(0.3); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  sand_twister: (() => {
+    return function SandTwisterEffect({ x, y }) {
+      const particles = useMemo(() => Array.from({ length: 24 }, (_, i) => ({
+        angle: (i / 24) * 360 * 2 + Math.random() * 30,
+        radius: 4 + (i / 24) * 18,
+        size: 3 + Math.random() * 4,
+        delay: i * 20,
+        dur: 600 + Math.random() * 200,
+        rise: 10 + (i / 24) * 30,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
+          {particles.map((p, i) => (
+            <span key={i} style={{
+              position: 'absolute', width: p.size, height: p.size, borderRadius: '50%',
+              background: `rgba(${190+Math.random()*40},${160+Math.random()*40},${100+Math.random()*40},${0.6+Math.random()*0.3})`,
+              left: -p.size / 2, top: -p.size / 2, opacity: 0,
+              animation: `sandTwist ${p.dur}ms ease-out ${p.delay}ms forwards`,
+              '--tw-r': `${p.radius}px`, '--tw-rise': `${p.rise}px`,
+              '--tw-a': `${p.angle}deg`,
+              boxShadow: '0 0 3px rgba(190,160,100,0.4)',
+            }} />
+          ))}
+          <span style={{
+            position: 'absolute', fontSize: 18, left: -9, top: -9, opacity: 0,
+            animation: 'twisterEmoji 700ms ease-out 100ms forwards',
+          }}>🌪️</span>
+          <style>{`
+            @keyframes sandTwist {
+              0% { opacity: 0; transform: rotate(var(--tw-a)) translateX(2px) translateY(0); }
+              30% { opacity: 0.9; transform: rotate(calc(var(--tw-a) + 180deg)) translateX(var(--tw-r)) translateY(calc(var(--tw-rise) * -0.3)); }
+              70% { opacity: 0.7; transform: rotate(calc(var(--tw-a) + 360deg)) translateX(var(--tw-r)) translateY(calc(var(--tw-rise) * -0.7)); }
+              100% { opacity: 0; transform: rotate(calc(var(--tw-a) + 540deg)) translateX(calc(var(--tw-r) * 0.5)) translateY(calc(var(--tw-rise) * -1)); }
+            }
+            @keyframes twisterEmoji {
+              0% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+              40% { opacity: 1; transform: scale(1.3) rotate(180deg); }
+              100% { opacity: 0; transform: scale(0.5) rotate(360deg) translateY(-20px); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  mummy_wrap: (() => {
+    return function MummyWrapEffect({ x, y }) {
+      const strips = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+        angle: (i / 12) * 360 + Math.random() * 30,
+        width: 12 + Math.random() * 16,
+        height: 3 + Math.random() * 2,
+        dist: 6 + Math.random() * 20,
+        delay: i * 30 + Math.random() * 60,
+        dur: 400 + Math.random() * 300,
+        rot: Math.random() * 60 - 30,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
+          {strips.map((s, i) => {
+            const rad = (s.angle * Math.PI) / 180;
+            return (
+              <div key={i} style={{
+                position: 'absolute',
+                width: s.width, height: s.height, borderRadius: 1,
+                background: `linear-gradient(90deg, rgba(220,200,160,0.9), rgba(180,160,120,0.7))`,
+                boxShadow: '0 0 3px rgba(180,160,120,0.4)',
+                left: -s.width / 2, top: -s.height / 2,
+                opacity: 0,
+                transform: `rotate(${s.rot}deg)`,
+                animation: `mummyStripWrap ${s.dur}ms ease-in ${s.delay}ms forwards`,
+                '--wrap-sx': `${Math.cos(rad) * 35}px`,
+                '--wrap-sy': `${Math.sin(rad) * 35}px`,
+                '--wrap-ex': `${Math.cos(rad) * s.dist}px`,
+                '--wrap-ey': `${Math.sin(rad) * s.dist}px`,
+              }} />
+            );
+          })}
+          <span style={{
+            position: 'absolute', fontSize: 22, left: -11, top: -11, opacity: 0,
+            animation: 'mummyEmojiPop 600ms ease-out 100ms forwards',
+          }}>👻</span>
+          <style>{`
+            @keyframes mummyStripWrap {
+              0% { opacity: 0; transform: translate(var(--wrap-sx), var(--wrap-sy)) rotate(0deg) scaleX(0.3); }
+              40% { opacity: 0.9; transform: translate(0,0) rotate(180deg) scaleX(1.2); }
+              70% { opacity: 0.8; transform: translate(var(--wrap-ex), var(--wrap-ey)) rotate(300deg) scaleX(1); }
+              100% { opacity: 0; transform: translate(var(--wrap-ex), var(--wrap-ey)) rotate(360deg) scaleX(0.5); }
+            }
+            @keyframes mummyEmojiPop {
+              0% { opacity: 0; transform: scale(0.3); }
+              40% { opacity: 1; transform: scale(1.4); }
+              100% { opacity: 0; transform: scale(0.6) translateY(-15px); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  fan_blow: (() => {
+    return function FanBlowEffect({ x, y }) {
+      const particles = useMemo(() => [
+        ...Array.from({ length: 6 }, (_, i) => ({
+          type: 'fan', x: -12 + Math.random() * 24, y: -5 + Math.random() * 10,
+          delay: i * 40, dur: 500 + Math.random() * 200,
+          size: 14 + Math.random() * 6,
+        })),
+        ...Array.from({ length: 14 }, (_, i) => ({
+          type: 'wind', x: -8 + Math.random() * 16, y: -10 + Math.random() * 20,
+          delay: 50 + Math.random() * 200, dur: 400 + Math.random() * 300,
+          size: 8 + Math.random() * 16,
+          angle: -30 + Math.random() * 60,
+        })),
+      ], []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
+          {particles.map((p, i) => p.type === 'fan' ? (
+            <span key={i} style={{
+              position: 'absolute', fontSize: p.size,
+              left: p.x, top: p.y, opacity: 0,
+              animation: `fanAppear ${p.dur}ms ease-out ${p.delay}ms forwards`,
+            }}>🪭</span>
+          ) : (
+            <span key={i} style={{
+              position: 'absolute', left: p.x, top: p.y, opacity: 0,
+              width: p.size, height: 2, borderRadius: 2,
+              background: `rgba(${200+Math.random()*55},${180+Math.random()*50},${120+Math.random()*80},0.7)`,
+              transform: `rotate(${p.angle}deg)`,
+              animation: `fanWindLine ${p.dur}ms ease-out ${p.delay}ms forwards`,
+              '--fan-dist': `${40 + Math.random() * 30}px`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes fanAppear {
+              0% { opacity: 0; transform: scale(0.5) rotate(-20deg); }
+              30% { opacity: 1; transform: scale(1.3) rotate(10deg); }
+              60% { opacity: 0.8; transform: scale(1.1) rotate(-5deg); }
+              100% { opacity: 0; transform: scale(0.8) rotate(15deg) translateX(20px); }
+            }
+            @keyframes fanWindLine {
+              0% { opacity: 0; transform: translateX(0) scaleX(0.5); }
+              30% { opacity: 0.8; transform: translateX(10px) scaleX(1.5); }
+              100% { opacity: 0; transform: translateX(var(--fan-dist)) scaleX(0.3); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  cactus_burst: (() => {
+    return function CactusBurstEffect({ x, y }) {
+      const particles = useMemo(() => Array.from({ length: 16 }, (_, i) => ({
+        angle: (i / 16) * 360 + Math.random() * 22,
+        dist: 12 + Math.random() * 22,
+        size: 6 + Math.random() * 8,
+        delay: Math.random() * 100,
+        dur: 400 + Math.random() * 300,
+        drift: -8 - Math.random() * 15,
+        isCactus: Math.random() < 0.4,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
+          {particles.map((p, i) => {
+            const rad = (p.angle * Math.PI) / 180;
+            const tx = Math.cos(rad) * p.dist;
+            const ty = Math.sin(rad) * p.dist + p.drift;
+            return p.isCactus ? (
+              <span key={i} style={{
+                position: 'absolute', fontSize: p.size + 4,
+                left: -p.size / 2, top: -p.size / 2, opacity: 0,
+                animation: `cactusPop ${p.dur}ms ease-out ${p.delay}ms forwards`,
+                '--cact-tx': `${tx}px`, '--cact-ty': `${ty}px`,
+              }}>🌵</span>
+            ) : (
+              <span key={i} style={{
+                position: 'absolute', width: p.size, height: p.size, borderRadius: '50%',
+                background: `rgba(${60+Math.random()*40},${140+Math.random()*60},${50+Math.random()*30},0.8)`,
+                left: -p.size / 2, top: -p.size / 2, opacity: 0,
+                animation: `cactusPop ${p.dur}ms ease-out ${p.delay}ms forwards`,
+                '--cact-tx': `${tx}px`, '--cact-ty': `${ty}px`,
+                boxShadow: '0 0 4px rgba(80,180,60,0.5)',
+              }} />
+            );
+          })}
+          <style>{`
+            @keyframes cactusPop {
+              0% { opacity: 0; transform: translate(0,0) scale(0.4); }
+              20% { opacity: 1; transform: translate(calc(var(--cact-tx)*0.3), calc(var(--cact-ty)*0.3)) scale(1.2); }
+              60% { opacity: 0.8; transform: translate(var(--cact-tx), var(--cact-ty)) scale(1); }
+              100% { opacity: 0; transform: translate(calc(var(--cact-tx)*1.3), calc(var(--cact-ty)*1.2)) scale(0.2); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  mushroom_spore: (() => {
+    return function MushroomSporeEffect({ x, y }) {
+      const particles = useMemo(() => Array.from({ length: 20 }, (_, i) => ({
+        angle: Math.random() * 360,
+        dist: 8 + Math.random() * 28,
+        size: 5 + Math.random() * 8,
+        delay: Math.random() * 150,
+        dur: 400 + Math.random() * 300,
+        drift: -15 - Math.random() * 25,
+        emoji: ['🍄', '☁'][Math.random() < 0.35 ? 0 : 1],
+        color: `rgba(${80+Math.random()*60},${120+Math.random()*60},${40+Math.random()*40},${0.6+Math.random()*0.3})`,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
+          {particles.map((p, i) => {
+            const rad = (p.angle * Math.PI) / 180;
+            const tx = Math.cos(rad) * p.dist;
+            const ty = Math.sin(rad) * p.dist + p.drift;
+            return p.emoji === '🍄' ? (
+              <span key={i} style={{
+                position: 'absolute', fontSize: p.size + 2,
+                left: -p.size / 2, top: -p.size / 2, opacity: 0,
+                animation: `sporeFloat ${p.dur}ms ease-out ${p.delay}ms forwards`,
+                '--spore-tx': `${tx}px`, '--spore-ty': `${ty}px`,
+              }}>{p.emoji}</span>
+            ) : (
+              <span key={i} style={{
+                position: 'absolute', width: p.size, height: p.size, borderRadius: '50%',
+                background: p.color, filter: 'blur(2px)',
+                left: -p.size / 2, top: -p.size / 2, opacity: 0,
+                animation: `sporeFloat ${p.dur}ms ease-out ${p.delay}ms forwards`,
+                '--spore-tx': `${tx}px`, '--spore-ty': `${ty}px`,
+              }} />
+            );
+          })}
+          <style>{`
+            @keyframes sporeFloat {
+              0% { opacity: 0; transform: translate(0,0) scale(0.5); }
+              25% { opacity: 0.9; transform: translate(calc(var(--spore-tx) * 0.3), calc(var(--spore-ty) * 0.2)) scale(1.1); }
+              70% { opacity: 0.7; transform: translate(var(--spore-tx), calc(var(--spore-ty) * 0.7)) scale(0.9); }
+              100% { opacity: 0; transform: translate(calc(var(--spore-tx) * 1.2), var(--spore-ty)) scale(0.3); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  dark_swarm: (() => {
+    return function DarkSwarmEffect({ x, y }) {
+      const particles = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+        angle: Math.random() * 360,
+        dist: 5 + Math.random() * 25,
+        size: 4 + Math.random() * 6,
+        delay: Math.random() * 200,
+        dur: 300 + Math.random() * 300,
+        orbit: 15 + Math.random() * 20,
+        orbitSpeed: 0.8 + Math.random() * 1.2,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
+          {particles.map((p, i) => {
+            const rad = (p.angle * Math.PI) / 180;
+            const tx = Math.cos(rad) * p.dist;
+            const ty = Math.sin(rad) * p.dist;
+            return (
+              <span key={i} style={{
+                position: 'absolute', width: p.size, height: p.size, borderRadius: '50%',
+                background: `radial-gradient(circle, rgba(${120+Math.random()*40},${20+Math.random()*30},${160+Math.random()*60},0.9), rgba(40,0,60,0.7))`,
+                left: -p.size / 2, top: -p.size / 2,
+                opacity: 0,
+                animation: `darkSwarmFly ${p.dur}ms ease-in-out ${p.delay}ms forwards`,
+                '--swarm-tx': `${tx}px`, '--swarm-ty': `${ty}px`,
+                '--swarm-orbit': `${p.orbit}px`,
+                boxShadow: '0 0 6px 2px rgba(130,30,180,0.6)',
+              }} />
+            );
+          })}
+          <style>{`
+            @keyframes darkSwarmFly {
+              0% { opacity: 0; transform: translate(0,0) scale(0.3); }
+              20% { opacity: 0.95; transform: translate(calc(var(--swarm-tx) * 0.3), calc(var(--swarm-ty) * 0.3)) scale(1.2); }
+              50% { opacity: 1; transform: translate(var(--swarm-tx), var(--swarm-ty)) scale(1); }
+              80% { opacity: 0.8; transform: translate(calc(var(--swarm-tx) * 0.6), calc(var(--swarm-ty) * 1.3)) scale(0.8); }
+              100% { opacity: 0; transform: translate(var(--swarm-tx), calc(var(--swarm-ty) + 10px)) scale(0.2); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  sand_reset: (() => {
+    return function SandResetEffect({ x, y }) {
+      const particles = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+        angle: (i / 18) * 360 + Math.random() * 20,
+        dist: 10 + Math.random() * 30,
+        size: 3 + Math.random() * 5,
+        delay: Math.random() * 300,
+        dur: 500 + Math.random() * 400,
+        emoji: ['🏜', '✨'][Math.random() < 0.8 ? 0 : 1],
+        drift: -20 - Math.random() * 30,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
+          {particles.map((p, i) => {
+            const rad = (p.angle * Math.PI) / 180;
+            const tx = Math.cos(rad) * p.dist;
+            const ty = Math.sin(rad) * p.dist + p.drift;
+            return (
+              <span key={i} style={{
+                position: 'absolute', fontSize: p.size + 4,
+                left: -p.size / 2, top: -p.size / 2,
+                opacity: 0,
+                animation: `sandParticleFly ${p.dur}ms ease-out ${p.delay}ms forwards`,
+                '--sand-tx': `${tx}px`, '--sand-ty': `${ty}px`,
+              }}>{p.emoji}</span>
+            );
+          })}
+          <style>{`
+            @keyframes sandParticleFly {
+              0% { opacity: 0.9; transform: translate(0,0) scale(1); }
+              60% { opacity: 0.7; }
+              100% { opacity: 0; transform: translate(var(--sand-tx), var(--sand-ty)) scale(0.3); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
 };
 
 function IceEncaseEffect({ x, y }) {
@@ -2981,7 +3448,20 @@ function GameBoard({ gameState, lobby, onLeave }) {
     if (me.handLocked && card.cardType !== 'Ability' && (me.handLockBlockedCards || []).includes(cardName)) return true;
 
     const isActionType = ACTION_TYPES.includes(card.cardType);
+    const isSurprise = (card.subtype || '').toLowerCase() === 'surprise';
     if (currentPhase === 2 || currentPhase === 4) {
+      // Surprise cards: playable if any hero has an empty surprise zone
+      if (isSurprise) {
+        const canSetSurprise = [0,1,2].some(hi => {
+          const hero = me.heroes[hi];
+          if (!hero || !hero.name || hero.hp <= 0) return false;
+          return ((me.surpriseZones || [])[hi] || []).length === 0;
+        });
+        // Also check Bakhm support zones for Surprise Creatures
+        const canSetBakhm = card.cardType === 'Creature' && (gameState.bakhmSurpriseSlots || []).some(b => b.freeSlots.length > 0);
+        if (canSetSurprise || canSetBakhm) return false; // Un-gray: can be set face-down
+        // Surprise can also be played normally if it has additional action coverage — fall through
+      }
       // Main Phase 1 or 2: gray out action types UNLESS they have Additional Action coverage
       if (isActionType) {
         // Check if this is an inherent action (playable without additional action provider)
@@ -3126,6 +3606,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
   // Ability drag state (Main Phases — dragging ability to hero/zone)
   const [abilityDrag, setAbilityDrag] = useState(null); // { idx, cardName, card, mouseX, mouseY, targetHero, targetZone }
+
+  // Surprise drag state (Main Phases — dragging Surprise card to hero's surprise zone)
+  // surpriseDrag merged into playDrag (with isSurprise: true flag)
 
   // Additional Action provider selection state
   const [pendingAdditionalPlay, setPendingAdditionalPlay] = useState(null); // { cardName, handIndex, heroIdx, zoneSlot, providers: [{cardId, cardName, heroIdx, zoneSlot}] }
@@ -3328,6 +3811,13 @@ function GameBoard({ gameState, lobby, onLeave }) {
       return;
     }
 
+    // Block hand play while any dialog/submenu is open
+    if (showSurrender || showEndTurnConfirm || spellHeroPick) return;
+    if (gameState.surprisePending) return; // Lock hand during surprise prompts for both players
+    const activePrompt = gameState.effectPrompt;
+    if (activePrompt && activePrompt.ownerIdx === myIdx
+        && !['forceDiscard','forceDiscardCancellable','handPick','abilityAttach','heroAction'].includes(activePrompt.type)) return;
+
     // Block activation of the specific resolving card (spam-click prevention) — but NOT force-discard (handled above)
     if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return;
 
@@ -3349,6 +3839,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
     const isArtifactActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
       && card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment';
     const isPotionActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Potion';
+    const isSurprisePlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
+      && (card.subtype || '').toLowerCase() === 'surprise'
+      && ([0,1,2].some(hi => { const h = me.heroes[hi]; return h && h.name && h.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0; })
+        || (card.cardType === 'Creature' && (gameState.bakhmSurpriseSlots || []).some(b => b.freeSlots.length > 0)));
     const _startPt = window.getPointerXY(e);
     const startX = _startPt.x, startY = _startPt.y;
     let dragging = false;
@@ -3501,6 +3995,59 @@ function GameBoard({ gameState, lobby, onLeave }) {
           }
         }
         setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot, isEquip: true });
+      } else if (isSurprisePlayable && !isPlayable) {
+        // Surprise drag — target hero zones (hero must be alive with empty surprise zone)
+        let targetHero = -1;
+        let targetBakhmSlot = -1;
+        const surEls = document.querySelectorAll('[data-surprise-zone]');
+        for (const el of surEls) {
+          const r = el.getBoundingClientRect();
+          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+            if (el.dataset.surpriseOwner === 'me') {
+              const hi = parseInt(el.dataset.surpriseHero);
+              const hero = me.heroes[hi];
+              if (hero && hero.name && hero.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0) {
+                targetHero = hi;
+              }
+            }
+          }
+        }
+        // Also check hero zones for convenience (drop on hero = surprise zone)
+        if (targetHero < 0) {
+          const heroEls3 = document.querySelectorAll('[data-hero-zone]');
+          for (const el of heroEls3) {
+            const r = el.getBoundingClientRect();
+            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+              if (el.dataset.heroOwner === 'me') {
+                const hi = parseInt(el.dataset.heroIdx);
+                const hero = me.heroes[hi];
+                if (hero && hero.name && hero.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0) {
+                  targetHero = hi;
+                }
+              }
+            }
+          }
+        }
+        // Check Bakhm support zones for Surprise Creatures
+        if (targetHero < 0 && card.cardType === 'Creature') {
+          const bakhmSlots = gameState.bakhmSurpriseSlots || [];
+          const supEls = document.querySelectorAll('[data-support-zone]');
+          for (const el of supEls) {
+            const r = el.getBoundingClientRect();
+            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+              if (el.dataset.supportOwner === 'me') {
+                const hi = parseInt(el.dataset.supportHero);
+                const si = parseInt(el.dataset.supportSlot);
+                const bEntry = bakhmSlots.find(b => b.heroIdx === hi);
+                if (bEntry && bEntry.freeSlots.includes(si)) {
+                  targetHero = hi;
+                  targetBakhmSlot = si;
+                }
+              }
+            }
+          }
+        }
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetBakhmSlot, isSurprise: true });
       } else if (isPlayable && (card.cardType === 'Spell' || card.cardType === 'Attack')) {
         // Spell/Attack drag — target hero zones (hero must have required spell schools)
         let targetHero = -1;
@@ -3569,6 +4116,30 @@ function GameBoard({ gameState, lobby, onLeave }) {
             } else if (eligible.length > 1) {
               // Multiple eligible — show hero selection popup
               setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isHeroAction });
+            }
+          } else if (isSurprisePlayable) {
+            // Click on a Surprise card — find heroes with empty surprise zones
+            const eligible = [];
+            for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+              const hero = me.heroes[hi];
+              if (hero && hero.name && hero.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0) {
+                eligible.push({ idx: hi, name: hero.name });
+              }
+            }
+            // Add Bakhm support zone slots for Surprise Creatures
+            if (card.cardType === 'Creature') {
+              for (const bEntry of (gameState.bakhmSurpriseSlots || [])) {
+                const hero = me.heroes[bEntry.heroIdx];
+                if (!hero?.name) continue;
+                for (const si of bEntry.freeSlots) {
+                  eligible.push({ idx: bEntry.heroIdx, name: `${hero.name} (Zone ${si + 1})`, bakhmSlot: si });
+                }
+              }
+            }
+            if (eligible.length === 1) {
+              socket.emit('play_surprise', { roomId: gameState.roomId, cardName, handIndex: idx, heroIdx: eligible[0].idx, bakhmSlot: eligible[0].bakhmSlot });
+            } else if (eligible.length > 1) {
+              setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isSurprise: true });
             }
           }
         }
@@ -3663,6 +4234,18 @@ function GameBoard({ gameState, lobby, onLeave }) {
             handIndex: prev.idx,
             heroIdx: prev.targetHero,
             zoneSlot: prev.targetSlot, // -1 means auto-place
+          });
+          return null;
+        });
+      } else if (isSurprisePlayable && !isPlayable) {
+        setPlayDrag(prev => {
+          if (!prev || !prev.isSurprise || prev.targetHero < 0) return null;
+          socket.emit('play_surprise', {
+            roomId: gameState.roomId,
+            cardName: prev.cardName,
+            handIndex: prev.idx,
+            heroIdx: prev.targetHero,
+            bakhmSlot: prev.targetBakhmSlot >= 0 ? prev.targetBakhmSlot : undefined,
           });
           return null;
         });
@@ -3805,6 +4388,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const [cameraFlash, setCameraFlash] = useState(false);
   const [toughnessHpChanges, setToughnessHpChanges] = useState([]); // [{id, amount, owner, heroIdx}]
   const toughnessHpSuppressRef = useRef({}); // { 'owner-heroIdx': true } — suppress damage numbers for Toughness HP removal
+  const creatureMoveSuppressRef = useRef({}); // { 'owner-heroIdx-slot': true } — suppress damage numbers when creature moves zones
   const [fightingAtkChanges, setFightingAtkChanges] = useState([]); // [{id, amount, owner, heroIdx}]
 
   // End-turn confirmation
@@ -3873,6 +4457,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
         toughnessHpSuppressRef.current[`${owner}-${heroIdx}`] = true;
       }
     };
+    const onCreatureZoneMove = ({ owner, heroIdx, zoneSlot }) => {
+      creatureMoveSuppressRef.current[`${owner}-${heroIdx}-${zoneSlot}`] = true;
+    };
     const onFightingAtk = ({ owner, heroIdx, amount }) => {
       const entry = { id: Date.now() + Math.random(), amount, owner, heroIdx };
       setFightingAtkChanges(prev => [...prev, entry]);
@@ -3892,6 +4479,8 @@ function GameBoard({ gameState, lobby, onLeave }) {
       let sel;
       if (zoneType === 'ability' && heroIdx >= 0 && zoneSlot >= 0) {
         sel = `[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${zoneSlot}"]`;
+      } else if (zoneType === 'surprise' && heroIdx >= 0) {
+        sel = `[data-surprise-zone][data-surprise-owner="${ownerLabel}"][data-surprise-hero="${heroIdx}"]`;
       } else if (zoneType === 'permanent' && permId) {
         sel = `[data-perm-id="${permId}"][data-perm-owner="${ownerLabel}"]`;
       } else if (zoneSlot >= 0) {
@@ -3961,13 +4550,71 @@ function GameBoard({ gameState, lobby, onLeave }) {
     socket.on('reaction_chain_done', onChainDone);
     socket.on('camera_flash', onCameraFlash);
     socket.on('toughness_hp_change', onToughnessHp);
+    socket.on('creature_zone_move', onCreatureZoneMove);
     socket.on('fighting_atk_change', onFightingAtk);
     socket.on('summon_effect', onSummon);
     socket.on('burn_tick', onBurnTick);
     socket.on('play_zone_animation', onZoneAnim);
+    const onNomuDraw = ({ playerIdx: drawPlayer }) => {
+      const ownerLabel = drawPlayer === myIdx ? 'me' : 'opp';
+      const handEl = ownerLabel === 'me' ? document.querySelector('.hand-container')
+        : document.querySelector('.board-row'); // fallback
+      if (!handEl) return;
+      const r = handEl.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      // Spawn purple particles
+      for (let i = 0; i < 12; i++) {
+        const spark = document.createElement('div');
+        spark.className = 'nomu-particle';
+        const angle = (i / 12) * 360 + Math.random() * 30;
+        const dist = 20 + Math.random() * 40;
+        spark.style.cssText = `
+          position:fixed; left:${cx}px; top:${cy}px; width:${4+Math.random()*4}px; height:${4+Math.random()*4}px;
+          border-radius:50%; background:rgba(160,80,255,0.9); pointer-events:none; z-index:9999;
+          box-shadow: 0 0 6px rgba(180,100,255,0.8), 0 0 12px rgba(140,60,220,0.4);
+          animation: nomuSparkle 0.7s ease-out ${i*30}ms forwards;
+          --np-x: ${Math.cos(angle*Math.PI/180)*dist}px;
+          --np-y: ${Math.sin(angle*Math.PI/180)*dist - 30}px;
+        `;
+        document.body.appendChild(spark);
+        setTimeout(() => spark.remove(), 1000);
+      }
+    };
+    socket.on('nomu_draw', onNomuDraw);
     socket.on('level_change', onLevelChange);
     socket.on('ability_activated', onAbilityActivated);
     socket.on('play_beam_animation', onBeamAnimation);
+    const onSurpriseFlip = ({ owner, heroIdx, cardName, isBakhmSlot, bakhmZoneSlot }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      let el;
+      if (isBakhmSlot && bakhmZoneSlot >= 0) {
+        el = document.querySelector(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${bakhmZoneSlot}"]`);
+      } else {
+        el = document.querySelector(`[data-surprise-zone][data-surprise-owner="${ownerLabel}"][data-surprise-hero="${heroIdx}"]`);
+      }
+      if (el) {
+        el.classList.add('surprise-flipping');
+        playAnimation('explosion', el, { duration: 1000 });
+        setTimeout(() => el.classList.remove('surprise-flipping'), 1200);
+      }
+    };
+    socket.on('surprise_flip', onSurpriseFlip);
+    const onSurpriseReset = ({ owner, heroIdx, cardName, isBakhmSlot, zoneSlot }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      let el;
+      if (isBakhmSlot && zoneSlot >= 0) {
+        el = document.querySelector(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
+      } else {
+        el = document.querySelector(`[data-surprise-zone][data-surprise-owner="${ownerLabel}"][data-surprise-hero="${heroIdx}"]`);
+      }
+      if (el) {
+        el.classList.add('surprise-resetting');
+        playAnimation('sand_reset', el, { duration: 1200 });
+        setTimeout(() => el.classList.remove('surprise-resetting'), 1400);
+      }
+    };
+    socket.on('surprise_reset', onSurpriseReset);
     const onPermanentAnim = ({ owner, permId, type }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-perm-id="${permId}"][data-perm-owner="${ownerLabel}"]`);
@@ -4150,11 +4797,14 @@ function GameBoard({ gameState, lobby, onLeave }) {
       socket.off('reaction_chain_update', onChainUpdate); socket.off('reaction_chain_resolving_start', onChainResolvingStart);
       socket.off('reaction_chain_link_resolving', onChainLinkResolving); socket.off('reaction_chain_link_resolved', onChainLinkResolved);
       socket.off('reaction_chain_link_negated', onChainLinkNegated); socket.off('reaction_chain_done', onChainDone);
-      socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('fighting_atk_change', onFightingAtk);
+      socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('creature_zone_move', onCreatureZoneMove); socket.off('fighting_atk_change', onFightingAtk);
       socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick);
       socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange);
+      socket.off('nomu_draw', onNomuDraw);
       socket.off('ability_activated', onAbilityActivated); socket.off('play_beam_animation', onBeamAnimation);
       socket.off('play_permanent_animation', onPermanentAnim);
+      socket.off('surprise_flip', onSurpriseFlip);
+      socket.off('surprise_reset', onSurpriseReset);
       socket.off('play_ram_animation', onRamAnimation);
       socket.off('play_card_transfer', onCardTransfer);
       socket.off('play_projectile_animation', onProjectileAnimation);
@@ -4601,6 +5251,11 @@ function GameBoard({ gameState, lobby, onLeave }) {
       // Detect lethal damage: creature existed last frame but is now gone (destroyed)
       for (const [key, prevHp] of Object.entries(prevCreatureHpRef.current)) {
         if (!(key in currentCreatureHp) && prevHp > 0) {
+          // Skip if creature moved zones (not destroyed)
+          if (creatureMoveSuppressRef.current[key]) {
+            delete creatureMoveSuppressRef.current[key];
+            continue;
+          }
           const [ownerStr, heroIdxStr, slotStr] = key.split('-');
           const ownerIdx = parseInt(ownerStr);
           newCreatureDmg.push({
@@ -4711,6 +5366,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
   // ── Potion targeting helpers ──
   const pt = gameState.potionTargeting;
   const isTargeting = !isSpectator && !result && pt && pt.ownerIdx === myIdx;
+  // Generic lock: blocks ALL effect activations (hero effects, abilities, creature effects)
+  // whenever ANY targeting/prompt overlay is active
+  const isEffectLocked = !!(isTargeting || gameState.effectPrompt || gameState.surprisePending || gameState.mulliganPending || gameState.heroEffectPending || spellHeroPick || pendingAdditionalPlay || pendingAbilityActivation || showSurrender || showEndTurnConfirm);
   const validTargetIds = isTargeting ? new Set((pt.validTargets || []).map(t => t.id)) : new Set();
   const selectedSet = new Set(potionSelection);
 
@@ -4747,7 +5405,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
       }
       // Check global max total
       const maxTotal = config.maxTotal ?? Infinity;
-      if (prev.length >= maxTotal) return prev; // At global limit — can't add more
+      if (prev.length >= maxTotal) {
+        // At global limit — swap: replace with new selection
+        return [targetId];
+      }
       return [...prev, targetId];
     });
   };
@@ -4913,6 +5574,15 @@ function GameBoard({ gameState, lobby, onLeave }) {
       if (t === 'ability_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} activated {cName(entry.card)} (Lv{entry.level})!</span>; }
       if (t === 'hero_effect_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} activated their effect!</span>; }
       if (t === 'creature_effect_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {cName(entry.card)} activated its effect!</span>; }
+      if (t === 'surprise_set') { const p = playerByName(entry.player); return <span>🎭 {pName(p.name, p.color)} set a Surprise on {entry.hero}.</span>; }
+      if (t === 'surprise_activated') { const p = playerByName(entry.player); return <span>💥 {pName(p.name, p.color)} activated {cName(entry.card)} on {entry.hero}!</span>; }
+      if (t === 'surprise_reset') { const p = playerByName(entry.player); return <span>🎭 {cName(entry.card)} returned to Surprise position.</span>; }
+      if (t === 'surprise_negate') { const p = playerByName(entry.player); return <span>🚫 {cName(entry.card)} negated the effect!</span>; }
+      if (t === 'surprise_destroyed') { const p = playerByName(entry.player); return <span>🌊 {pName(p.name, p.color)} destroyed {cName(entry.card)}!</span>; }
+      if (t === 'terror_triggered') { const p = playerByName(entry.player); return <span>😱 Terror! {pName(p.name, p.color)} resolved {entry.count} effects — turn ends!</span>; }
+      if (t === 'ushabti_entomb') { const p = playerByName(entry.player); return <span>🏺 {cName(entry.card)} was entombed in {entry.hero}'s Surprise Zone!</span>; }
+      if (t === 'nomu_draw') { const p = playerByName(entry.player); return <span>🌌 {pName(p.name, p.color)}'s Nomu drew an extra card!</span>; }
+      if (t === 'gate_activated') { const p = playerByName(entry.player); return <span>🛡️ {pName(p.name, p.color)} activated {cName(entry.card)}! Support Zones protected!</span>; }
       if (t === 'token_placed') { const p = playerByName(entry.player); return <span>{cName(entry.card)} placed on {pName(p.name, p.color)}'s {entry.hero}.</span>; }
       if (t === 'damage') { return <span className="log-damage">{cName(entry.source)} dealt <span className="log-amount">{entry.amount}</span> to {entry.target}!</span>; }
       if (t === 'creature_damage') { return <span className="log-damage">{cName(entry.source)} dealt <span className="log-amount">{entry.amount}</span> to {cName(entry.target)}!</span>; }
@@ -5206,6 +5876,17 @@ function GameBoard({ gameState, lobby, onLeave }) {
           })();
           const isCharmedByMe = isOpp && hero?.charmedBy === myIdx;
           const spellAttackIneligible = (!isOpp || isCharmedByMe) && playDrag && !playDrag.isEquip && (playDrag.card?.cardType === 'Spell' || playDrag.card?.cardType === 'Attack') && !canHeroPlayCard(p, i, playDrag.card);
+          const surpriseIneligible = !isOpp && playDrag?.isSurprise && (() => {
+            if (!hero || !hero.name || hero.hp <= 0) return true;
+            if (((surZones[i] || []).length === 0)) return false; // Regular surprise zone free
+            // Check Bakhm support zones for Creature surprises
+            if (playDrag.card?.cardType === 'Creature') {
+              const bEntry = (gameState.bakhmSurpriseSlots || []).find(b => b.heroIdx === i);
+              if (bEntry && bEntry.freeSlots.length > 0) return false;
+            }
+            return true;
+          })();
+          const surpriseTarget = !isOpp && playDrag?.isSurprise && playDrag.targetHero === i;
           // During heroAction, dim all heroes except the Coffee hero
           const heroActionDimmed = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx && gameState.effectPrompt?.heroIdx !== i;
           const abilityTarget = !isOpp && abilityDrag && abilityDrag.targetHero === i && abilityDrag.targetZone < 0;
@@ -5229,7 +5910,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
           const isCharmed = !!hero?.statuses?.charmed;
           const charmedByColor = isCharmed ? (hero.charmedBy === myIdx ? me.color : opp.color) : null;
           const isRamming = ramAnims.some(r => r.srcOwner === pi && r.srcHeroIdx === i);
-          const onHeroClick = isHeroEffectActive && !isValidHeroTarget
+          const onHeroClick = (isHeroEffectActive && !isEffectLocked && !isValidHeroTarget)
             ? () => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: i, charmedOwner: heroEffectEntry?.charmedOwner })
             : (isValidHeroTarget ? () => togglePotionTarget(heroTargetId) : undefined);
           const heroGroup = (
@@ -5238,7 +5919,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || heroActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '')}
+              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || heroActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
                 style={zsMerge('hero', (isHeroEffectActive || isValidHeroTarget) ? { cursor: 'pointer' } : undefined, isCharmed ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined)}>
@@ -5256,9 +5937,15 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
                 {hero?.name && isHealReversed && <HealReversedOverlay />}
-                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isHealReversed) && <StatusBadges statuses={hero.statuses} isHero={true} />}
+                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isHealReversed) && <StatusBadges statuses={hero.statuses} isHero={true} player={p} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
+                {hero?.name && (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Mummy Token')) && (
+                  <div className="mummified-icon"
+                    onMouseEnter={e => showGameTooltip(e, "This Hero's effect has been replaced by a Mummy Token's.")}
+                    onMouseLeave={hideGameTooltip}
+                  >🧟</div>
+                )}
                 {hero?.name && hero.buffs && <BuffColumn buffs={hero.buffs} />}
                 {!isOpp && gameState.bonusActions?.heroIdx === i && gameState.bonusActions.remaining > 0 && (
                   <div className="bonus-action-counter"
@@ -5268,7 +5955,55 @@ function GameBoard({ gameState, lobby, onLeave }) {
                   </div>
                 )}
               </div>
-              <div data-surprise-zone="1" data-surprise-hero={i} data-surprise-owner={ownerLabel}><BoardZone type="surprise" cards={surZones[i] || []} label="Surprise" style={zs('surprise')} /></div>
+              <div data-surprise-zone="1" data-surprise-hero={i} data-surprise-owner={ownerLabel}
+                className={(() => {
+                  const cards = surZones[i] || [];
+                  const zoneEmpty = cards.length === 0;
+                  const hero2 = heroes[i];
+                  const heroAlive = hero2 && hero2.name && hero2.hp > 0;
+                  const isFaceDown = (p.surpriseFaceDown || [])[i];
+                  const isKnownSurprise = (p.surpriseKnown || [])[i];
+                  let cls = '';
+                  // Own face-down surprise: semi-transparent indicator
+                  if (!isOpp && !zoneEmpty && isFaceDown) cls += ' surprise-own-facedown';
+                  // Opponent's known re-set surprise: semi-transparent, face-up
+                  if (isOpp && !zoneEmpty && isKnownSurprise) cls += ' surprise-known-facedown';
+                  // Targeting highlight for Mizune etc.
+                  const surpriseTargetId = `surprise-${pi}-${i}`;
+                  if (isTargeting && validTargetIds.has(surpriseTargetId)) cls += ' potion-target-valid';
+                  if (isTargeting && selectedSet.has(surpriseTargetId)) cls += ' potion-target-selected';
+                  // Drag highlight logic
+                  if (!isOpp && playDrag?.isSurprise) {
+                    const isEligible = zoneEmpty && heroAlive;
+                    const isActive = playDrag.targetHero === i;
+                    if (isActive && isEligible) cls += ' surprise-drop-active';
+                    else if (isEligible) cls += ' surprise-drop-eligible';
+                    else cls += ' surprise-drop-ineligible';
+                  }
+                  // Ushabti summon highlight
+                  const ushabtiEntry = !isOpp && (gameState.ushabtiSummonable || []).find(u => u.heroIdx === i);
+                  if (ushabtiEntry && !isEffectLocked) cls += ' zone-creature-activatable';
+                  return cls;
+                })()}
+                onClick={(() => {
+                  const surpriseTargetId = `surprise-${pi}-${i}`;
+                  if (isTargeting && validTargetIds.has(surpriseTargetId)) return () => togglePotionTarget(surpriseTargetId);
+                  // Ushabti summon
+                  const ushabtiEntry = !isOpp && (gameState.ushabtiSummonable || []).find(u => u.heroIdx === i);
+                  if (ushabtiEntry && !isEffectLocked) return () => {
+                    socket.emit('summon_ushabti', { roomId: gameState.roomId, heroIdx: i });
+                  };
+                  return undefined;
+                })()}
+                style={(() => {
+                  const surpriseTargetId = `surprise-${pi}-${i}`;
+                  if (isTargeting && validTargetIds.has(surpriseTargetId)) return { cursor: 'pointer' };
+                  const ushabtiEntry = !isOpp && (gameState.ushabtiSummonable || []).find(u => u.heroIdx === i);
+                  if (ushabtiEntry && !isEffectLocked) return { cursor: 'pointer' };
+                  return undefined;
+                })()}>
+                <BoardZone type="surprise" cards={surZones[i] || []} faceDown={isOpp && !(p.surpriseKnown || [])[i] && (surZones[i] || []).every(c => c === '?')} label="Surprise" style={zs('surprise')} />
+              </div>
               {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxRight }).map((_, s) => (
                 <div key={'rpad-'+s} className="board-zone-spacer" />
               ))}
@@ -5339,7 +6074,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 const isFriendshipActive = !isOpp && cards.includes('Friendship') && (gameState.additionalActions || []).some(aa =>
                   aa.typeId.startsWith('friendship_support') && aa.eligibleHandCards.length > 0 && aa.providers.some(p => p.heroIdx === i)
                 );
-                const onAbilityClick = canActivate ? () => {
+                const onAbilityClick = (canActivate && !isEffectLocked) ? () => {
                   if (isFreeActivatable) {
                     // Free activation — no confirmation needed, activate directly
                     socket.emit('activate_free_ability', { roomId: gameState.roomId, heroIdx: i, zoneIdx: z, charmedOwner: freeAbilityEntry?.charmedOwner });
@@ -5356,6 +6091,39 @@ function GameBoard({ gameState, lobby, onLeave }) {
                     {cards.length > 0 ? (
                       <>
                         <AbilityStack cards={cards} />
+                        {cards[0] === 'Terror' && gameState.terrorThreshold != null && (() => {
+                          const count = gameState.terrorCount || 0;
+                          const threshold = gameState.terrorThreshold;
+                          const progress = Math.min(count / threshold, 1);
+                          const isActive = gameState.activePlayer != null;
+                          const fontSize = 18 + progress * 12;
+                          const glowSize = 2 + progress * 10;
+                          const pulseSpeed = Math.max(0.3, 1.2 - progress * 0.9);
+                          const r = Math.round(180 + progress * 75);
+                          const g = Math.round(60 - progress * 60);
+                          const color = `rgb(${r},${g},0)`;
+                          const shadow = `0 0 ${glowSize}px ${color}, 0 0 ${glowSize * 2}px rgba(${r},${g},0,0.4)`;
+                          return isActive ? (
+                            <div style={{
+                              position: 'absolute', inset: 0, display: 'flex',
+                              alignItems: 'center', justifyContent: 'center',
+                              pointerEvents: 'none', zIndex: 5,
+                            }}>
+                              <div style={{
+                                fontSize, fontWeight: 900, color,
+                                textShadow: shadow + ', -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000',
+                                WebkitTextStroke: '1.5px #000',
+                                animation: progress >= 0.7 ? `terrorPulse ${pulseSpeed}s ease-in-out infinite` : 'none',
+                                opacity: progress < 0.1 ? 0.5 : 0.95,
+                                letterSpacing: '-1px',
+                                fontFamily: 'monospace',
+                                lineHeight: 1,
+                              }}>
+                                {count}<span style={{ fontSize: fontSize * 0.6, opacity: 0.6 }}>/{threshold}</span>
+                              </div>
+                            </div>
+                          ) : null;
+                        })()}
                         {isAbilityHandLockBlocked && <div className="hand-lock-indicator" style={{ fontSize: 32 }}>⦸</div>}
                       </>
                     ) : (
@@ -5419,7 +6187,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
               const isSummonGlow = summonGlow && summonGlow.owner === pi && summonGlow.heroIdx === i && summonGlow.zoneSlot === z;
               const isZonePickTarget = !isOpp && zonePickSet.has(`${pi}-${i}-${z}`);
               // During creature drag: highlight valid zones, dim invalid ones
-              const isDraggingCreature = !isOpp && playDrag && playDrag.card?.cardType === 'Creature' && !playDrag.isEquip;
+              const isDraggingCreature = !isOpp && playDrag && playDrag.card?.cardType === 'Creature' && !playDrag.isEquip && !playDrag.isSurprise;
               const heroActionActive = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx;
               const heroActionHeroIdx = heroActionActive ? gameState.effectPrompt.heroIdx : undefined;
               const isDragValidZone = isDraggingCreature && cards.length === 0 && canHeroPlayCard(me, i, playDrag.card) && z < ((me.supportZones[i] || []).length || 3) && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
@@ -5434,10 +6202,14 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 c.heroIdx === i && c.zoneSlot === z && ((!isOpp && !c.charmedOwner) || (isOpp && c.charmedOwner === pi))
               );
               const isCreatureActivatable = creatureEffectEntry?.canActivate === true;
+              // Bakhm surprise drag highlight
+              const isBakhmSurpriseTarget = !isOpp && playDrag?.isSurprise && playDrag.card?.cardType === 'Creature' && cards.length === 0
+                && (gameState.bakhmSurpriseSlots || []).some(b => b.heroIdx === i && b.freeSlots.includes(z));
+              const isBakhmSurpriseActive = isBakhmSurpriseTarget && playDrag.targetHero === i && playDrag.targetBakhmSlot === z;
               return (
-                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'}
-                  onClick={isCreatureActivatable ? () => {
+                  onClick={(isCreatureActivatable && !isEffectLocked) ? () => {
                     socket.emit('activate_creature_effect', { roomId: gameState.roomId, heroIdx: i, zoneSlot: z, charmedOwner: creatureEffectEntry?.charmedOwner });
                   } : isProviderZone ? () => {
                     const provider = pendingAdditionalPlay.providers.find(p => p.heroIdx === i && p.zoneSlot === z);
@@ -5459,7 +6231,22 @@ function GameBoard({ gameState, lobby, onLeave }) {
                   ) : (isOpp && oppPendingPlacement && oppPendingPlacement.heroIdx === i && oppPendingPlacement.zoneSlot === z) ? (
                     <BoardCard cardName={oppPendingPlacement.cardName} hp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} maxHp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
                   ) : cards.length > 0 ? (
-                    (() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey]; const isCreature = CARDS_BY_NAME[cards[cards.length-1]]?.cardType === 'Creature'; return !isCreature ? (
+                    (() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey];
+                    // Unknown face-down surprise (opponent/spectator sees '?')
+                    if (cards[0] === '?') {
+                      return <BoardCard cardName="?" faceDown={true} style={{ opacity: 0.6 }} />;
+                    }
+                    // Face-down surprise creature in Bakhm's support zone
+                    if (cc?.faceDown) {
+                      if (isOpp) {
+                        // Opponent sees known re-set surprise: face-up, semi-transparent
+                        return <BoardCard cardName={cards[0]} style={{ opacity: 0.6, filter: 'sepia(0.3)' }} />;
+                      } else {
+                        // Owner sees own face-down surprise: face-up, semi-transparent (like surprise zones)
+                        return <BoardCard cardName={cards[0]} style={{ opacity: 0.6 }} />;
+                      }
+                    }
+                    const isCreature = CARDS_BY_NAME[cards[cards.length-1]]?.cardType === 'Creature'; return !isCreature ? (
                       <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} />
                     ) : (
                     <>
@@ -5475,11 +6262,15 @@ function GameBoard({ gameState, lobby, onLeave }) {
                       onMouseEnter={() => { window._aaTooltipKey = cKey; window.dispatchEvent(new Event('aaHover')); }}
                       onMouseLeave={() => { window._aaTooltipKey = null; window.dispatchEvent(new Event('aaHover')); }}
                     >⚡</div> : null; })()}
+                    {cc?.summoningSickness ? <div className="summoning-sickness-icon"
+                      onMouseEnter={e => showGameTooltip(e, 'This Creature cannot act the turn it was summoned.')}
+                      onMouseLeave={hideGameTooltip}
+                    >🌀</div> : null}
                     {cc?.burned ? <BurnedOverlay /> : null}
                     {cc?.frozen ? <FrozenOverlay /> : null}
                     {cc?.negated ? <NegatedOverlay /> : null}
                     {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
-                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated) ? <StatusBadges counters={cc} isHero={false} /> : null}
+                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated) ? <StatusBadges counters={cc} isHero={false} player={p} /> : null}
                     {cc?.buffs ? <BuffColumn buffs={cc.buffs} /> : null}
                     </>
                     ); })()
@@ -5504,7 +6295,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
   return (
     <div className="screen-full" style={{ background: '#0c0c14' }}>
-      <div className="top-bar" style={{ justifyContent: 'space-between' }}>
+      <div className="top-bar" style={{ justifyContent: 'space-between', position: 'relative' }}>
         {isSpectator ? (
           <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={handleLeave}>
             ✕ LEAVE
@@ -5514,13 +6305,15 @@ function GameBoard({ gameState, lobby, onLeave }) {
             {result ? '✕ LEAVE' : '⚑ SURRENDER'}
           </button>
         )}
-        <h2 className="orbit-font" style={{ fontSize: 14, color: isSpectator ? 'var(--text2)' : 'var(--accent)' }}>
+        <h2 className="orbit-font" style={{ fontSize: 14, color: isSpectator ? 'var(--text2)' : 'var(--accent)', position: 'absolute', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
           {isSpectator ? '👁 SPECTATING' : 'PIXEL PARTIES'}
         </h2>
-        <span className="badge" style={{ background: lobby?.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby?.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
-          {lobby?.type?.toUpperCase() || 'GAME'}
-        </span>
-        <VolumeControl />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="badge" style={{ background: lobby?.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby?.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+            {lobby?.type?.toUpperCase() || 'GAME'}
+          </span>
+          <VolumeControl />
+        </div>
       </div>
 
       <div className="game-layout">
@@ -6038,6 +6831,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         // Token mapping — cards that create tokens show the token tooltip alongside
         const CARD_TOKEN_MAP = {
           'Pyroblast': ['Pollution Token'],
+          'Mummy Maker Machine': ['Mummy Token'],
         };
         const relatedTokens = CARD_TOKEN_MAP[tooltipCard.name] || [];
         return (
@@ -6204,19 +6998,36 @@ function GameBoard({ gameState, lobby, onLeave }) {
 
       {/* ── Effect Prompt: Confirm Dialog ── */}
       {isMyEffectPrompt && ep.type === 'confirm' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Confirm'}</div>
-          <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{ep.message}</div>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-            <button className="btn btn-success" style={{ padding: '10px 24px', fontSize: 13 }}
-              onClick={() => respondToPrompt({ confirmed: true })}>
-              {ep.confirmLabel || 'Yes'}
-            </button>
-            <button className="btn" style={{ padding: '10px 24px', fontSize: 13, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-              onClick={() => respondToPrompt({ cancelled: true })}>
-              {ep.cancelLabel || 'No'}
-            </button>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Confirm'}</div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{ep.message}</div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button className="btn btn-success" style={{ padding: '10px 24px', fontSize: 13 }}
+                onClick={() => respondToPrompt({ confirmed: true })}>
+                {ep.confirmLabel || 'Yes'}
+              </button>
+              <button className="btn" style={{ padding: '10px 24px', fontSize: 13, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                onClick={() => respondToPrompt({ cancelled: true })}>
+                {ep.cancelLabel || 'No'}
+              </button>
+            </div>
           </div>
+          {ep.showCard && CARDS_BY_NAME[ep.showCard] && (() => {
+            const showCardData = CARDS_BY_NAME[ep.showCard];
+            const showCardImg = cardImageUrl(ep.showCard);
+            return (
+              <div className="board-card" style={{ width: 100, minHeight: 130, flexShrink: 0, borderRadius: 6, overflow: 'hidden', border: '2px solid var(--bg4)', background: 'var(--bg3)' }}
+                onMouseEnter={() => { _boardTooltipLocked = true; setBoardTooltip(showCardData); }}
+                onMouseLeave={() => { _boardTooltipLocked = false; setBoardTooltip(null); }}>
+                {showCardImg ? (
+                  <img src={showCardImg} alt={ep.showCard} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, textAlign: 'center', fontSize: 11, color: 'var(--text2)' }}>{ep.showCard}</div>
+                )}
+              </div>
+            );
+          })()}
         </DraggablePanel>
       )}
 
@@ -6419,16 +7230,22 @@ function GameBoard({ gameState, lobby, onLeave }) {
       {spellHeroPick && !result && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>
-            {spellHeroPick.card?.cardType === 'Attack' ? '⚔️' : '✦'} Play {spellHeroPick.cardName}
+            {spellHeroPick.isSurprise ? '🎭' : spellHeroPick.card?.cardType === 'Attack' ? '⚔️' : '✦'} {spellHeroPick.isSurprise ? 'Set' : 'Play'} {spellHeroPick.cardName}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>Choose a Hero to play this card:</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>{spellHeroPick.isSurprise ? 'Choose a Hero to set this Surprise face-down:' : 'Choose a Hero to play this card:'}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {spellHeroPick.eligible.map(h => (
               <button key={(h.charmedOwner != null ? 'c' : '') + h.idx} className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: h.charmedOwner != null ? '#ff69b4' : 'var(--accent)', color: h.charmedOwner != null ? '#ff69b4' : 'var(--accent)', textAlign: 'left' }}
                 onClick={() => {
                   const pick = spellHeroPick;
                   setSpellHeroPick(null);
-                  if (pick.isHeroAction) {
+                  if (pick.isSurprise) {
+                    socket.emit('play_surprise', {
+                      roomId: gameState.roomId, cardName: pick.cardName,
+                      handIndex: pick.handIndex, heroIdx: h.idx,
+                      bakhmSlot: h.bakhmSlot,
+                    });
+                  } else if (pick.isHeroAction) {
                     socket.emit('effect_prompt_response', {
                       roomId: gameState.roomId,
                       response: { cardName: pick.cardName, handIndex: pick.handIndex, heroIdx: h.idx },

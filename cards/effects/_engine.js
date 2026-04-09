@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const { v4: uuidv4 } = require('uuid');
-const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType } = require('./_hooks');
+const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
 const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
@@ -225,6 +225,8 @@ class GameEngine {
       }
       // Creature-level negation/freeze/stun (Dark Gear, Necromancy, Slimes, etc.)
       if (c.zone === 'support' && (c.counters?.negated || c.counters?.frozen || c.counters?.stunned)) return false;
+      // Face-down surprise creatures (Bakhm slots) don't fire hooks
+      if (c.faceDown) return false;
       return true;
     });
 
@@ -271,6 +273,24 @@ class GameEngine {
     // After hooks resolve, check for reaction cards (unless suppressed)
     if (!this._inReactionCheck && !hookCtx._skipReactionCheck && !hookCtx._isReaction) {
       await this._checkReactionCards(hookName, hookCtx);
+    }
+
+    // After hooks, check for equip/summon/ability-triggered surprises
+    if (hookName === 'onCardEnterZone' && !this._inSurpriseResolution && !hookCtx._skipReactionCheck) {
+      const enteringCard = hookCtx.enteringCard;
+      const toZone = hookCtx.toZone;
+      if (enteringCard && toZone === 'support') {
+        const cd = this._getCardDB()[enteringCard.name];
+        if (cd && !hasCardType(cd, 'Creature')) {
+          await this._checkSurpriseOnEquip(enteringCard.controller ?? enteringCard.owner, enteringCard.heroIdx, enteringCard);
+        }
+        if (cd && hasCardType(cd, 'Creature')) {
+          await this._checkSurpriseOnSummon(enteringCard.controller ?? enteringCard.owner, enteringCard);
+        }
+      }
+      if (enteringCard && toZone === 'ability') {
+        await this._checkSurpriseOnAbility(enteringCard.controller ?? enteringCard.owner, enteringCard.heroIdx, enteringCard);
+      }
     }
 
     return hookCtx;
@@ -361,8 +381,8 @@ class GameEngine {
       decreaseMaxHp(target, amount) {
         return engine.decreaseMaxHp(target, amount);
       },
-      async drawCards(playerIdx, count) {
-        return engine.actionDrawCards(playerIdx, count);
+      async drawCards(playerIdx, count, opts) {
+        return engine.actionDrawCards(playerIdx, count, opts);
       },
       async destroyCard(targetCard) {
         return engine.actionDestroyCard(cardInstance, targetCard);
@@ -867,8 +887,9 @@ class GameEngine {
               const cd = cardDB[creatureName];
               if (!cd || !hasCardType(cd, 'Creature')) continue;
               const inst = engine.cardInstances.find(c =>
-                c.owner === playerIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
+                (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
               );
+              if (inst?.faceDown) continue; // Face-down Bakhm surprises are not targetable
               const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst };
               if (config.condition && !config.condition(t, engine)) continue;
               targets.push(t);
@@ -945,6 +966,19 @@ class GameEngine {
           }
         }
 
+        // ── Surprise window check ──
+        // After target is confirmed (and possibly redirected), check if the targeted
+        // hero has a face-down Surprise that should trigger.
+        if (selected && selected.type === 'hero' && !config._skipSurpriseCheck) {
+          const surpriseResult = await engine._checkSurpriseWindow(
+            [selected], cardInstance
+          );
+          if (surpriseResult?.effectNegated) {
+            // Effect fully negated by surprise — don't set _spellCancelled (spell is consumed)
+            return null;
+          }
+        }
+
         return selected;
       },
 
@@ -992,8 +1026,9 @@ class GameEngine {
               const cd = cardDB[creatureName];
               if (!cd || !hasCardType(cd, 'Creature')) continue;
               const inst2 = engine.cardInstances.find(c =>
-                c.owner === playerIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
+                (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
               );
+              if (inst2?.faceDown) continue; // Face-down Bakhm surprises are not targetable
               const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst2 };
               if (config.condition && !config.condition(t, engine)) continue;
               targets.push(t);
@@ -1045,6 +1080,18 @@ class GameEngine {
         if (gs._spellDamageLog) {
           for (const t of result) gs._spellDamageLog.push({ ...t });
         }
+
+        // ── Surprise window check ──
+        if (!config._skipSurpriseCheck) {
+          const heroTargets = result.filter(t => t.type === 'hero');
+          if (heroTargets.length > 0) {
+            const surpriseResult = await engine._checkSurpriseWindow(heroTargets, cardInstance);
+            if (surpriseResult?.effectNegated) {
+              return []; // Effect fully negated — don't set _spellCancelled
+            }
+          }
+        }
+
         return result;
       },
     };
@@ -1330,6 +1377,38 @@ class GameEngine {
   // Each action fires before/after hooks and logs itself.
 
   async actionDealDamage(source, target, amount, type) {
+    // ── Surprise window for direct damage (creature effects, etc.) ──
+    // Only fires for hero targets with a card source, skips status/self damage and recursive calls
+    const SURPRISE_SKIP_TYPES = new Set(['status', 'burn', 'poison', 'recoil']);
+    if (
+      !this._inSurpriseResolution &&
+      target && target.hp !== undefined &&
+      amount > 0 &&
+      source?.owner >= 0 && source?.heroIdx >= 0 &&
+      !SURPRISE_SKIP_TYPES.has(type)
+    ) {
+      // Find target hero's owner + index
+      const tgtOwner = this._findHeroOwner(target);
+      if (tgtOwner >= 0) {
+        const tgtPs = this.gs.players[tgtOwner];
+        const tgtHeroIdx = (tgtPs?.heroes || []).indexOf(target);
+        if (tgtHeroIdx >= 0 && (tgtPs.surpriseZones?.[tgtHeroIdx] || []).length > 0) {
+          // Build source for the surprise window — use full CardInstance if available
+          const syntheticSource = source.cardInstance
+            || (source.id && source.zone ? source : null)  // source IS a CardInstance
+            || { name: source.name, controller: source.owner, owner: source.owner,
+                 heroIdx: source.heroIdx, zone: source.zone || 'hand' };
+          const surpriseResult = await this._checkSurpriseWindow(
+            [{ type: 'hero', owner: tgtOwner, heroIdx: tgtHeroIdx, cardName: target.name }],
+            syntheticSource
+          );
+          if (surpriseResult?.effectNegated) {
+            return { dealt: 0, cancelled: true, surpriseNegated: true };
+          }
+        }
+      }
+    }
+
     const hookCtx = { source, target, amount, type: type || 'normal', sourceHeroIdx: source?.heroIdx ?? -1, cancelled: false };
     await this.runHooks(HOOKS.BEFORE_DAMAGE, hookCtx);
     if (hookCtx.cancelled) return { dealt: 0, cancelled: true };
@@ -1538,6 +1617,7 @@ class GameEngine {
    */
   async actionHealCreature(source, target, amount) {
     if (!target || !target.counters) return;
+    if (target.faceDown) return; // Face-down surprises cannot be healed
     const cd = this._getCardDB()[target.name];
     const baseHp = cd?.hp || 0;
     if (baseHp <= 0) return;
@@ -1662,10 +1742,16 @@ class GameEngine {
     return effective;
   }
 
-  async actionDrawCards(playerIdx, count) {
+  async actionDrawCards(playerIdx, count, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
     if (ps.handLocked) return [];
+
+    // Nomu check: if drawing exactly 1 card, auto-draw 1 extra from main deck
+    let nomuExtraDraw = false;
+    if (count === 1 && !opts._nomuBypass && !this._inNomuResolution) {
+      nomuExtraDraw = this._hasActiveNomu(playerIdx);
+    }
 
     const drawn = [];
     for (let i = 0; i < count; i++) {
@@ -1695,9 +1781,58 @@ class GameEngine {
       await this.runHooks(HOOKS.ON_DRAW, { playerIdx, card: inst, cardName });
     }
 
+    // Nomu extra draw: auto-draw 1 additional card from main deck
+    if (nomuExtraDraw && drawn.length > 0 && ps.mainDeck.length > 0) {
+      this._inNomuResolution = true;
+      try {
+        const extraCard = ps.mainDeck.shift();
+        ps.hand.push(extraCard);
+        const extraInst = this._trackCard(extraCard, playerIdx, ZONES.HAND);
+        drawn.push(extraInst);
+        this.log('draw', { player: ps.username, card: extraCard });
+        this._broadcastEvent('nomu_draw', { playerIdx, cardName: extraCard });
+        await this.runHooks(HOOKS.ON_DRAW, { playerIdx, card: extraInst, cardName: extraCard });
+
+        // Find Nomu hero for logging
+        const nomuHero = (ps.heroes || []).find(h => h?.name && h.hp > 0 && loadCardEffect(h.name)?.isNomuHero);
+        this.log('nomu_draw', { player: ps.username, hero: nomuHero?.name || 'Nomu' });
+      } finally {
+        this._inNomuResolution = false;
+      }
+    }
+
     // After all draws, check reactive hand limits (Pollution Tokens, etc.)
     if (drawn.length > 0) await this._checkReactiveHandLimits(playerIdx);
 
+    // Accumulate draws for batched surprise check (flushed after effect resolution)
+    if (drawn.length > 0 && this.gs.currentPhase !== PHASES.RESOURCE && !this._inSurpriseResolution) {
+      if (!this._pendingSurpriseDraws) this._pendingSurpriseDraws = {};
+      this._pendingSurpriseDraws[playerIdx] = (this._pendingSurpriseDraws[playerIdx] || 0) + drawn.length;
+    }
+
+    return drawn;
+  }
+
+  /**
+   * Draw cards from a player's Potion Deck. Triggers surprise draw checks
+   * (e.g. Pure Advantage Camel) just like regular draws.
+   */
+  async actionDrawFromPotionDeck(playerIdx, count) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+    const drawn = [];
+    for (let i = 0; i < count; i++) {
+      if ((ps.potionDeck || []).length === 0) break;
+      const cardName = ps.potionDeck.shift();
+      ps.hand.push(cardName);
+      drawn.push(cardName);
+      this.log('potion_draw', { player: ps.username, card: cardName });
+    }
+    // Accumulate for surprise draw checks (same as regular draws)
+    if (drawn.length > 0 && this.gs.currentPhase !== PHASES.RESOURCE && !this._inSurpriseResolution) {
+      if (!this._pendingSurpriseDraws) this._pendingSurpriseDraws = {};
+      this._pendingSurpriseDraws[playerIdx] = (this._pendingSurpriseDraws[playerIdx] || 0) + drawn.length;
+    }
     return drawn;
   }
 
@@ -1769,13 +1904,21 @@ class GameEngine {
     this.sync();
   }
 
-  async actionDestroyCard(source, targetCard) {
+  async actionDestroyCard(source, targetCard, opts = {}) {
     if (!targetCard) return;
     if (targetCard.counters?.immovable) return; // Cannot be destroyed or removed
     // First-turn protection: cards belonging to the protected player cannot be destroyed
     if (this.gs.firstTurnProtectedPlayer != null && targetCard.owner === this.gs.firstTurnProtectedPlayer) {
       this.log('destroy_blocked', { card: targetCard.name, reason: 'first-turn protection' });
       return;
+    }
+    // Defending the Gate: protect support zone cards
+    if (!opts.ignoreGateShield && targetCard.zone === 'support') {
+      await this._triggerGateCheck(targetCard.controller ?? targetCard.owner);
+      if (this._isGateShielded(targetCard.controller ?? targetCard.owner)) {
+        this.log('destroy_blocked', { card: targetCard.name, reason: 'Defending the Gate' });
+        return;
+      }
     }
     // Monia-style creature protection
     if (targetCard.zone === 'support') {
@@ -1793,11 +1936,20 @@ class GameEngine {
     await this.actionMoveCard(targetCard, ZONES.DISCARD);
   }
 
-  async actionMoveCard(cardInstance, toZone, toHeroIdx, toSlot) {
+  async actionMoveCard(cardInstance, toZone, toHeroIdx, toSlot, opts = {}) {
     // Immovable cards cannot leave their zone
     if (cardInstance.counters?.immovable && toZone !== cardInstance.zone) return;
     const fromZone = cardInstance.zone;
     const fromHeroIdx = cardInstance.heroIdx;
+
+    // Defending the Gate: protect support zone cards
+    if (!opts.ignoreGateShield && fromZone === 'support' && this._isGateShielded(cardInstance.controller ?? cardInstance.owner)) {
+      return;
+    }
+    if (!opts.ignoreGateShield && fromZone === 'support' && toZone !== 'support') {
+      await this._triggerGateCheck(cardInstance.controller ?? cardInstance.owner);
+      if (this._isGateShielded(cardInstance.controller ?? cardInstance.owner)) return;
+    }
 
     // Monia-style creature protection for control changes (not destruction — that's handled in actionDestroyCard)
     if (fromZone === 'support' && toZone !== ZONES.DISCARD && toZone !== ZONES.DELETED) {
@@ -1874,6 +2026,20 @@ class GameEngine {
     if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
 
     let actualSlot = zoneSlot;
+
+    // Auto-find first free slot when no specific slot requested
+    if (actualSlot < 0) {
+      for (let z = 0; z < 3; z++) {
+        if (((ps.supportZones[heroIdx][z] || []).length === 0)) {
+          actualSlot = z;
+          break;
+        }
+      }
+      if (actualSlot < 0) {
+        this.log('support_zone_full', { card: cardName, heroIdx, reason: 'no_free_zone' });
+        return null;
+      }
+    }
 
     // Check if desired slot is occupied
     if ((ps.supportZones[heroIdx][actualSlot] || []).length > 0) {
@@ -1980,6 +2146,9 @@ class GameEngine {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
 
+    // Nomu bypasses hand size limits entirely
+    if (this._hasActiveNomu(playerIdx)) return;
+
     // Compute effective max hand size
     let maxSize = opts.maxSize;
     if (maxSize === undefined) {
@@ -2054,6 +2223,8 @@ class GameEngine {
   async _checkReactiveHandLimits(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
+    // Nomu bypasses hand size limits and Pollution Tokens
+    if (this._hasActiveNomu(playerIdx)) return;
     let reduction = 0;
     for (const inst of this.cardInstances) {
       if (inst.owner === playerIdx && inst.zone === ZONES.SUPPORT) {
@@ -2169,6 +2340,8 @@ class GameEngine {
    */
   async actionAddCreatureBuff(inst, buffName, opts = {}) {
     if (!inst || inst.zone !== ZONES.SUPPORT) return false;
+    if (inst.faceDown) return false; // Face-down surprises cannot be buffed
+    if (!opts.ignoreGateShield && this._isGateShielded(inst.controller ?? inst.owner)) return false; // Defending the Gate
     if (!inst.counters.buffs) inst.counters.buffs = {};
     const buffDef = BUFF_EFFECTS[buffName] || {};
     inst.counters.buffs[buffName] = {
@@ -2203,6 +2376,8 @@ class GameEngine {
    */
   async actionRemoveCreatureBuff(inst, buffName, opts = {}) {
     if (!inst?.counters?.buffs?.[buffName]) return;
+    if (inst.faceDown) return; // Face-down surprises cannot be debuffed
+    if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner)) return; // Defending the Gate
     const buffData = inst.counters.buffs[buffName];
     // Clear associated counters on expiry (e.g. dark_gear_negated clears negated)
     if (buffData.clearCountersOnExpire) {
@@ -2312,6 +2487,8 @@ class GameEngine {
    */
   actionNegateCreature(inst, source, opts = {}) {
     if (!inst) return;
+    if (inst.faceDown) return; // Face-down surprises cannot be negated
+    if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner)) return; // Defending the Gate
     inst.counters.negated = 1;
     if (!inst.counters.buffs) inst.counters.buffs = {};
     const buffKey = opts.buffKey || `${source.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_negated`;
@@ -2371,8 +2548,10 @@ class GameEngine {
    * @param {string} statusName - e.g. 'frozen', 'burned', 'poisoned'
    * @returns {boolean} true if the status CAN be applied
    */
-  canApplyCreatureStatus(inst, statusName, source) {
+  canApplyCreatureStatus(inst, statusName, source, opts = {}) {
     if (!inst) return false;
+    if (inst.faceDown) return false; // Face-down surprises cannot receive statuses
+    if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner)) return false; // Defending the Gate
     const immuneKey = statusName + '_immune';
     if (inst.counters[immuneKey]) return false;
     // Monia-style creature protection (synchronous check via _moniaShieldActive)
@@ -2390,6 +2569,7 @@ class GameEngine {
    */
   isCreatureImmune(inst, immuneType) {
     if (!inst) return false;
+    if (inst.faceDown) return true; // Face-down surprises are immune to everything
     // Check creature's own immunity counter
     if (inst.counters[immuneType]) return true;
     // First-turn protection grants targeting + control immunity
@@ -2727,6 +2907,7 @@ class GameEngine {
     // Reset per-turn flags
     const activePs = this.gs.players[this.gs.activePlayer];
     if (activePs) activePs.abilityGivenThisTurn = [false, false, false];
+    this._resetTerrorTracking();
     // Clear summon lock for both players (it's a per-turn restriction)
     for (const ps of this.gs.players) {
       if (ps) {
@@ -2781,6 +2962,7 @@ class GameEngine {
     const phaseName = PHASE_NAMES[phase];
     this.log('phase_start', { phase: phaseName });
     await this.runHooks(HOOKS.ON_PHASE_START, { phase: phaseName, phaseIndex: phase });
+    await this._flushSurpriseDrawChecks();
     this.sync();
 
     switch (phase) {
@@ -2827,6 +3009,7 @@ class GameEngine {
         // Automatic phase — process status expiry, hooks, then switch turn
         await this.processStatusExpiry('END');
         await this.runHooks(HOOKS.ON_PHASE_END, { phase: phaseName, phaseIndex: phase });
+        await this._flushSurpriseDrawChecks();
         // Process forced kills (Golden Ankh, etc.) — un-negatable
         await this._processForceKills();
         await this._delay(300);
@@ -3039,7 +3222,7 @@ class GameEngine {
         }
       }
       if (script?.spellPlayCondition) {
-        if (!script.spellPlayCondition(this.gs, playerIdx)) blocked.push(cardName);
+        if (!script.spellPlayCondition(this.gs, playerIdx, this)) blocked.push(cardName);
       }
     }
     return blocked;
@@ -3059,7 +3242,7 @@ class GameEngine {
       seen.add(cardName);
       const script = loadCardEffect(cardName);
       if (script?.canActivate && (script.isTargetingArtifact || script.isPotion || script.resolve)) {
-        if (!script.canActivate(this.gs, playerIdx)) blocked.push(cardName);
+        if (!script.canActivate(this.gs, playerIdx, this)) blocked.push(cardName);
       }
       // Reaction cards: check reactionCondition
       if (script?.isReaction && script.reactionCondition) {
@@ -3160,6 +3343,98 @@ class GameEngine {
     if (!pending) return;
     delete this.gs._pendingPlayLog;
     this.log(pending.type, pending.data);
+    // Track for Terror: extract card name from log data
+    const cardName = pending.data?.card || pending.data?.hero;
+    if (cardName) {
+      const playerName = pending.data?.player;
+      const pi = this.gs.players.findIndex(p => p.username === playerName);
+      if (pi >= 0) this._trackTerrorResolvedEffect(pi, cardName);
+    }
+  }
+
+  /**
+   * Track a resolved effect for Terror's counter.
+   * Called after spells, attacks, artifacts, creatures, abilities, hero effects,
+   * creature effects, potions, and permanent effects resolve.
+   * @param {number} playerIdx - The player who resolved the effect
+   * @param {string} cardName - The name of the card/effect resolved
+   */
+  _trackTerrorResolvedEffect(playerIdx, cardName) {
+    if (!this.gs._terrorTracking) this.gs._terrorTracking = { 0: [], 1: [] };
+    const set = this.gs._terrorTracking[playerIdx] || [];
+    if (set.includes(cardName)) return; // Already tracked this card name this turn
+    set.push(cardName);
+    this.gs._terrorTracking[playerIdx] = set;
+
+    // Check Terror threshold
+    this._checkTerrorThreshold(playerIdx);
+  }
+
+  /**
+   * Check if any Terror ability's threshold is reached.
+   * If so, set a flag to force the turn to End Phase.
+   */
+  _checkTerrorThreshold(playerIdx) {
+    const count = (this.gs._terrorTracking?.[playerIdx] || []).length;
+    if (count === 0) return;
+
+    // Find the lowest threshold from all Terror instances in play
+    let threshold = Infinity;
+    const cardDB = this._getCardDB();
+    for (let pi = 0; pi < 2; pi++) {
+      const ps = this.gs.players[pi];
+      if (!ps) continue;
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        const hero = ps.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.statuses?.negated) continue;
+        const abZones = ps.abilityZones[hi] || [];
+        // Count Terror copies on this hero
+        let terrorCount = 0;
+        for (const zone of abZones) {
+          for (const name of (zone || [])) {
+            if (name === 'Terror') terrorCount++;
+          }
+        }
+        if (terrorCount > 0) {
+          const t = 10 - terrorCount; // 1 copy = 9, 2 copies = 8, 3 copies = 7
+          if (t < threshold) threshold = t;
+        }
+      }
+    }
+
+    if (count >= threshold && !this.gs._terrorForceEndTurn) {
+      this.gs._terrorForceEndTurn = playerIdx;
+      this.log('terror_triggered', {
+        player: this.gs.players[playerIdx]?.username,
+        count,
+        threshold,
+      });
+    }
+  }
+
+  /**
+   * Reset Terror tracking for a player (called at turn start).
+   */
+  _resetTerrorTracking() {
+    this.gs._terrorTracking = { 0: [], 1: [] };
+    delete this.gs._terrorForceEndTurn;
+  }
+
+  /**
+   * Check if a player has an active (alive, non-incapacitated) Nomu hero.
+   */
+  _hasActiveNomu(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return false;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+      const script = loadCardEffect(hero.name);
+      if (script?.isNomuHero) return true;
+    }
+    return false;
   }
 
   /**
@@ -3313,6 +3588,688 @@ class GameEngine {
     return true;
   }
 
+  // ─── SURPRISE SYSTEM ─────────────────────
+
+  /**
+   * Check face-down Surprises in targeted heroes' Surprise Zones.
+   * For each matching Surprise, prompt the owner to activate it.
+   * Returns { effectNegated: true } if the triggering effect should be fully negated.
+   *
+   * @param {Array} targetedHeroes - [{ type:'hero', owner, heroIdx, cardName }]
+   * @param {CardInstance} sourceCard - The card that is targeting these heroes
+  /**
+   * Check if any opponent Surprise cards trigger on equip/attachment.
+   * Called from runHooks after onCardEnterZone for non-Creature support zone entries.
+   * @param {number} equipOwnerIdx - The player who equipped/attached
+   * @param {number} equipHeroIdx - Hero that received the equip
+   * @param {object} equipCard - The card instance that was equipped
+   */
+  // ─── DEFENDING THE GATE SHIELD SYSTEM ───────────
+  
+  /**
+   * Check if Defending the Gate should trigger for this player's support zones.
+   * Returns true if shield is active (existing or newly activated).
+   * Call this from async contexts before opponent effects modify support zones.
+   */
+  async _triggerGateCheck(targetOwnerIdx) {
+    // Already shielded this resolution
+    if (this.gs._gateShieldActive === targetOwnerIdx) return true;
+    
+    if (this._inGateCheck) return false;
+    
+    const ps = this.gs.players[targetOwnerIdx];
+    if (!ps) return false;
+    
+    // Find a Defending the Gate surprise
+    let gateHeroIdx = -1;
+    let gateName = null;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+      const sz = ps.surpriseZones?.[hi] || [];
+      if (sz.length === 0) continue;
+      const script = loadCardEffect(sz[0]);
+      if (script?.isDefendingGate) {
+        if (!this._canHeroActivateSurprise(targetOwnerIdx, hi, sz[0])) continue;
+        gateHeroIdx = hi;
+        gateName = sz[0];
+        break;
+      }
+    }
+    if (gateHeroIdx < 0) return false;
+    
+    this._inGateCheck = true;
+    this.gs._surprisePendingCount = (this.gs._surprisePendingCount || 0) + 1;
+    this.gs.surprisePending = true;
+    try {
+      const heroName = ps.heroes[gateHeroIdx]?.name || 'Hero';
+      const confirmed = await this.promptGeneric(targetOwnerIdx, {
+        type: 'confirm',
+        title: gateName,
+        message: `Your Support Zone cards are about to be affected! Activate ${gateName} on ${heroName} to protect them?`,
+        showCard: gateName,
+        confirmLabel: '🛡️ Defend!',
+        cancelLabel: 'No',
+        cancellable: true,
+      });
+      
+      if (!confirmed) return false;
+      
+      // Use centralized _activateSurprise — handles flip, logging, hooks (Bakhm), discard
+      const script = loadCardEffect(gateName);
+      await this._activateSurprise(targetOwnerIdx, gateHeroIdx, gateName, {}, script);
+      
+      return this.gs._gateShieldActive === targetOwnerIdx;
+    } finally {
+      this._inGateCheck = false;
+      this.gs._surprisePendingCount = Math.max(0, (this.gs._surprisePendingCount || 1) - 1);
+      if (this.gs._surprisePendingCount === 0) this.gs.surprisePending = false;
+    }
+  }
+  
+  /**
+   * Sync check: is this player's support zone currently shielded by Defending the Gate?
+   */
+  _isGateShielded(targetOwnerIdx) {
+    return this.gs._gateShieldActive === targetOwnerIdx;
+  }
+
+  async _checkSurpriseOnEquip(equipOwnerIdx, equipHeroIdx, equipCard) {
+    if (this._inSurpriseResolution) return null;
+    const opponentIdx = equipOwnerIdx === 0 ? 1 : 0;
+    const equipInfo = { equipOwner: equipOwnerIdx, equipHeroIdx, cardName: equipCard?.name, cardInstance: equipCard };
+    const equipPlayerName = this.gs.players[equipOwnerIdx]?.username || 'Opponent';
+    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseEquipTrigger', equipInfo, {
+      message: () => `${equipPlayerName} equipped ${equipCard?.name || 'a card'}!`,
+      showCard: equipCard?.name,
+    });
+  }
+
+  /**
+   * Check if any Surprise cards trigger on creature summons.
+   * Unlike equip/draw triggers, summon triggers can fire for EITHER player's surprises.
+   * @param {number} summonerIdx - The player who summoned
+   * @param {object} summonedCard - The card instance that was summoned
+   */
+  /**
+   * Check if any opponent Surprise cards trigger on ability attachment.
+   * @param {number} attachOwnerIdx - The player who attached the ability
+   * @param {number} attachHeroIdx - Hero that received the ability
+   * @param {object} attachCard - The card instance that was attached
+   */
+  /**
+   * Check if any opponent Surprise cards trigger on hero effect activation.
+   * Called from server.js before the hero effect resolves.
+   * @param {number} activatorIdx - The player who activated the hero effect
+   * @param {number} heroIdx - The hero that used the effect
+   * @param {string} effectName - Name of the effect being used
+   * @returns {object|null} { negateEffect: true, tokenPlacedOnHeroIdx } or null
+   */
+  /**
+   * Get all surprise entries for a player — both regular surprise zones
+   * AND Bakhm's support zones (face-down surprise creatures).
+   * Returns array of { heroIdx, cardName, isBakhmSlot, zoneSlot }
+   */
+  _getAllSurpriseEntries(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+    const entries = [];
+
+    // Regular surprise zones
+    for (let heroIdx = 0; heroIdx < (ps.heroes || []).length; heroIdx++) {
+      const surpriseZone = ps.surpriseZones?.[heroIdx] || [];
+      if (surpriseZone.length > 0) {
+        entries.push({
+          heroIdx,
+          cardName: surpriseZone[0],
+          isBakhmSlot: false,
+          zoneSlot: -1,
+        });
+      }
+    }
+
+    // Bakhm's support zones — face-down surprise creatures
+    for (let heroIdx = 0; heroIdx < (ps.heroes || []).length; heroIdx++) {
+      const hero = ps.heroes[heroIdx];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+      // Check if this hero is Bakhm
+      const heroScript = loadCardEffect(hero.name);
+      if (!heroScript?.isBakhmHero) continue;
+      // Scan support zones for face-down surprise creatures
+      for (let si = 0; si < (ps.supportZones[heroIdx] || []).length; si++) {
+        const slot = (ps.supportZones[heroIdx] || [])[si] || [];
+        if (slot.length === 0) continue;
+        const cardName = slot[0];
+        const inst = this.cardInstances.find(c =>
+          c.owner === playerIdx && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === si && c.name === cardName
+        );
+        if (!inst?.faceDown) continue;
+        const cardScript = loadCardEffect(cardName);
+        if (!cardScript?.isSurprise) continue;
+        entries.push({
+          heroIdx,
+          cardName,
+          isBakhmSlot: true,
+          zoneSlot: si,
+        });
+      }
+    }
+
+    return entries;
+  }
+
+  /**
+   * Generic scanner: iterate over all surprise entries (regular + Bakhm) for a player,
+   * check a specific trigger flag, prompt, and activate. Returns the result of the first
+   * activated surprise, or null.
+   * @param {number} playerIdx - Player whose surprises to scan
+   * @param {string} triggerFlag - Script flag to check (e.g. 'surpriseDrawTrigger')
+   * @param {object} triggerInfo - Info passed to surpriseTrigger()
+   * @param {object} promptConfig - { title, message, showCard, confirmLabel }
+   * @returns {object|null} Result from _activateSurprise
+   */
+  async _scanSurpriseEntriesForPlayer(playerIdx, triggerFlag, triggerInfo, promptConfig) {
+    const entries = this._getAllSurpriseEntries(playerIdx);
+    this.gs._surprisePendingCount = (this.gs._surprisePendingCount || 0) + 1;
+    this.gs.surprisePending = true;
+    try {
+    for (const entry of entries) {
+      const script = loadCardEffect(entry.cardName);
+      if (!script?.isSurprise || !script[triggerFlag]) continue;
+
+      if (script.surpriseTrigger && !script.surpriseTrigger(this.gs, playerIdx, entry.heroIdx, triggerInfo, this)) continue;
+
+      const canActivateOpts = entry.isBakhmSlot ? { isBakhmSlot: true } : {};
+      if (!this._canHeroActivateSurprise(playerIdx, entry.heroIdx, entry.cardName, canActivateOpts)) continue;
+
+      const heroName = this.gs.players[playerIdx]?.heroes?.[entry.heroIdx]?.name || 'Hero';
+      const msg = typeof promptConfig.message === 'function'
+        ? promptConfig.message(heroName, entry.cardName)
+        : promptConfig.message;
+
+      const confirmed = await this.promptGeneric(playerIdx, {
+        type: 'confirm',
+        title: entry.cardName,
+        message: `${msg} Activate ${entry.cardName} on ${heroName}?`,
+        showCard: promptConfig.showCard || undefined,
+        confirmLabel: promptConfig.confirmLabel || '💥 Activate Surprise!',
+        cancelLabel: 'No',
+        cancellable: true,
+      });
+
+      if (!confirmed) continue;
+
+      const activateOpts = entry.isBakhmSlot ? { isBakhmSlot: true, bakhmZoneSlot: entry.zoneSlot } : {};
+      const result = await this._activateSurprise(playerIdx, entry.heroIdx, entry.cardName, triggerInfo, script, activateOpts);
+
+      // For summon triggers: check if newly placed creature triggers more surprises
+      if (triggerFlag === 'surpriseSummonTrigger') {
+        const newCreatureInst = this.cardInstances.find(c =>
+          c.name === entry.cardName && c.owner === playerIdx && c.zone === 'support'
+        );
+        if (newCreatureInst) {
+          await this._checkSurpriseOnSummon(playerIdx, newCreatureInst);
+        }
+      }
+
+      if (result) return result;
+    }
+    return null;
+    } finally {
+      this.gs._surprisePendingCount = Math.max(0, (this.gs._surprisePendingCount || 1) - 1);
+      if (this.gs._surprisePendingCount === 0) this.gs.surprisePending = false;
+    }
+  }
+
+  async _checkSurpriseOnHeroEffect(activatorIdx, heroIdx, effectName) {
+    if (this._inSurpriseResolution) return null;
+    const opponentIdx = activatorIdx === 0 ? 1 : 0;
+    const heroEffectInfo = { activatorIdx, heroIdx, effectName };
+    const activatorName = this.gs.players[activatorIdx]?.username || 'Opponent';
+    const effectHeroName = this.gs.players[activatorIdx]?.heroes?.[heroIdx]?.name || 'a Hero';
+    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseHeroEffectTrigger', heroEffectInfo, {
+      message: () => `${activatorName}'s ${effectHeroName} activated its Hero Effect!`,
+    });
+  }
+
+  async _checkSurpriseOnAbility(attachOwnerIdx, attachHeroIdx, attachCard) {
+    if (this._inSurpriseResolution) return null;
+    const opponentIdx = attachOwnerIdx === 0 ? 1 : 0;
+    const abilityInfo = { attachOwner: attachOwnerIdx, attachHeroIdx, cardName: attachCard?.name, cardInstance: attachCard };
+    const attachPlayerName = this.gs.players[attachOwnerIdx]?.username || 'Opponent';
+    const targetHeroName = this.gs.players[attachOwnerIdx]?.heroes?.[attachHeroIdx]?.name || 'a Hero';
+    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseAbilityTrigger', abilityInfo, {
+      message: () => `${attachPlayerName} attached ${attachCard?.name || 'an Ability'} to ${targetHeroName}!`,
+      showCard: attachCard?.name,
+    });
+  }
+
+  async _checkSurpriseOnSummon(summonerIdx, summonedCard) {
+    if (this._inSurpriseResolution) return null;
+    const summonInfo = { summonerIdx, cardName: summonedCard?.name, cardInstance: summonedCard, heroIdx: summonedCard?.heroIdx };
+    const summonerName = this.gs.players[summonerIdx]?.username || 'A player';
+    // Summon triggers can fire for EITHER player's surprises
+    for (let checkPlayer = 0; checkPlayer < 2; checkPlayer++) {
+      const result = await this._scanSurpriseEntriesForPlayer(checkPlayer, 'surpriseSummonTrigger', summonInfo, {
+        message: () => `${summonerName} summoned ${summonedCard?.name || 'a Creature'}!`,
+        showCard: summonedCard?.name,
+      });
+      if (result) return result;
+    }
+    return null;
+  }
+
+  async _checkSurpriseOnStatus(targetOwnerIdx, targetHeroIdx, statusName, opts) {
+    if (this._inSurpriseResolution) return null;
+    const statusInfo = { targetOwner: targetOwnerIdx, targetHeroIdx, statusName, opts };
+    const targetName = this.gs.players[targetOwnerIdx]?.heroes?.[targetHeroIdx]?.name || 'Target';
+    const statusLabel = STATUS_EFFECTS[statusName]?.label || statusName;
+    const result = await this._scanSurpriseEntriesForPlayer(targetOwnerIdx, 'surpriseStatusTrigger', statusInfo, {
+      message: () => `${targetName} is about to be ${statusLabel}!`,
+      confirmLabel: '🌵 Activate Surprise!',
+    });
+    if (result?.redirect) return result.redirect;
+    return null;
+  }
+
+  /**
+   * Check if any opponent Surprise cards trigger on draws outside Resource Phase.
+   * Called from actionDrawCards when draws occur outside Resource Phase.
+   * @param {number} drawingPlayerIdx - The player who drew cards
+   * @param {number} drawnCount - How many cards were drawn
+   */
+  async _checkSurpriseOnDraw(drawingPlayerIdx, drawnCount) {
+    if (this._inSurpriseResolution) return null;
+    const opponentIdx = drawingPlayerIdx === 0 ? 1 : 0;
+    const drawPlayerName = this.gs.players[drawingPlayerIdx]?.username || 'Opponent';
+    const drawInfo = { drawingPlayer: drawingPlayerIdx, count: drawnCount, phase: this.gs.currentPhase };
+    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseDrawTrigger', drawInfo, {
+      message: () => `${drawPlayerName} drew ${drawnCount} card${drawnCount > 1 ? 's' : ''} outside the Resource Phase!`,
+      confirmLabel: '🐪 Activate Surprise!',
+    });
+  }
+
+  /**
+   * Flush accumulated surprise draw checks. Called after effect resolution
+   * so that multiple draws from a single effect (e.g. Wheels drawing 3 one-at-a-time)
+   * produce only ONE surprise prompt with the total count.
+   */
+  async _flushSurpriseDrawChecks() {
+    // Clear Defending the Gate shield at end of effect resolution
+    delete this.gs._gateShieldActive;
+    
+    if (!this._pendingSurpriseDraws) return;
+    if (this._inSurpriseResolution) return;
+    const pending = this._pendingSurpriseDraws;
+    this._pendingSurpriseDraws = null;
+    for (const [piStr, count] of Object.entries(pending)) {
+      await this._checkSurpriseOnDraw(parseInt(piStr), count);
+    }
+  }
+
+  /**
+   * @returns {object|null} { effectNegated: boolean } or null
+   */
+  async _checkSurpriseWindow(targetedHeroes, sourceCard) {
+    if (!targetedHeroes || targetedHeroes.length === 0) return null;
+    // Prevent recursive/double surprise prompts
+    if (this._inSurpriseResolution) return null;
+
+    this.gs._surprisePendingCount = (this.gs._surprisePendingCount || 0) + 1;
+    this.gs.surprisePending = true;
+    try {
+
+    for (const target of targetedHeroes) {
+      if (target.type !== 'hero') continue;
+      const tOwner = target.owner;
+      const tHeroIdx = target.heroIdx;
+      const ps = this.gs.players[tOwner];
+      if (!ps) continue;
+
+      const surpriseZone = ps.surpriseZones?.[tHeroIdx] || [];
+      if (surpriseZone.length === 0) continue;
+
+      const surpriseCardName = surpriseZone[0];
+      const script = loadCardEffect(surpriseCardName);
+      if (!script?.isSurprise) continue;
+      if (!script.onSurpriseActivate) continue;
+      // Skip surprises that have their own dedicated trigger systems
+      if (script.surpriseDrawTrigger || script.surpriseSummonTrigger || script.surpriseEquipTrigger ||
+          script.surpriseStatusTrigger || script.surpriseHeroEffectTrigger || script.surpriseAbilityTrigger ||
+          script.isDefendingGate) continue;
+
+      // Build source info for the trigger check
+      const sourceInfo = {
+        cardName: sourceCard?.name,
+        owner: sourceCard?.controller ?? sourceCard?.owner ?? -1,
+        heroIdx: sourceCard?.heroIdx ?? -1,
+        cardInstance: sourceCard,
+      };
+
+      // Check surprise trigger condition
+      if (script.surpriseTrigger && !script.surpriseTrigger(this.gs, tOwner, tHeroIdx, sourceInfo, this)) continue;
+
+      // Check if hero can activate (alive, not frozen/stunned, meets ability requirements)
+      if (!this._canHeroActivateSurprise(tOwner, tHeroIdx, surpriseCardName)) continue;
+
+      // Prompt the owner to activate
+      const heroName = ps.heroes[tHeroIdx]?.name || 'Hero';
+
+      // Build descriptive prompt showing WHO is attacking with WHAT
+      let promptMsg;
+      const srcCardName = sourceInfo.cardName || 'An effect';
+      const srcOwnerPs = this.gs.players[sourceInfo.owner];
+      const srcHero = srcOwnerPs?.heroes?.[sourceInfo.heroIdx];
+      const srcHeroName = srcHero?.name;
+      if (srcHeroName) {
+        // Check if source is a creature (card in support zone) vs spell/attack from a hero
+        const isCreatureSource = sourceInfo.cardInstance?.zone === ZONES.SUPPORT;
+        if (isCreatureSource) {
+          promptMsg = `${srcHeroName}'s ${srcCardName} is targeting ${heroName}!`;
+        } else {
+          promptMsg = `${srcHeroName}'s ${srcCardName} is targeting ${heroName}!`;
+        }
+      } else {
+        promptMsg = `${srcCardName} is targeting ${heroName}!`;
+      }
+
+      const confirmed = await this.promptGeneric(tOwner, {
+        type: 'confirm',
+        title: surpriseCardName,
+        message: `${promptMsg} Activate ${surpriseCardName}?`,
+        showCard: srcCardName,
+        confirmLabel: '💥 Activate Surprise!',
+        cancelLabel: 'No',
+        cancellable: true,
+      });
+
+      if (!confirmed) continue;
+
+      // Activate the surprise
+      const result = await this._activateSurprise(tOwner, tHeroIdx, surpriseCardName, sourceInfo, script);
+      if (result?.effectNegated) {
+        return { effectNegated: true };
+      }
+    }
+
+    return null;
+    } finally {
+      this.gs._surprisePendingCount = Math.max(0, (this.gs._surprisePendingCount || 1) - 1);
+      if (this.gs._surprisePendingCount === 0) this.gs.surprisePending = false;
+    }
+  }
+
+  /**
+   * Check if a hero can activate a face-down Surprise.
+   * Requires: hero alive, not frozen/stunned, meets spell school & level requirements.
+   * For Creature surprises: also requires a free Support Zone.
+   */
+  _canHeroActivateSurprise(playerIdx, heroIdx, cardName, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    const hero = ps?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
+
+    const cardData = this._getCardDB()[cardName];
+    if (!cardData) return false;
+
+    // Check spell school / level requirements
+    const level = cardData.level || 0;
+    if (level > 0 || cardData.spellSchool1) {
+      const abZones = hero.statuses?.negated ? [] : (ps.abilityZones[heroIdx] || []);
+      if (cardData.spellSchool1 && this.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) return false;
+      if (cardData.spellSchool2 && this.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) return false;
+    }
+
+    // Creature surprises need a free Support Zone (skip for Bakhm slots — already in support)
+    if (!opts.isBakhmSlot && hasCardType(cardData, 'Creature')) {
+      let hasFreeSlot = false;
+      for (let si = 0; si < 3; si++) {
+        if (((ps.supportZones[heroIdx] || [])[si] || []).length === 0) { hasFreeSlot = true; break; }
+      }
+      if (!hasFreeSlot) return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Activate a face-down Surprise: flip face-up, reveal to opponent,
+   * execute its effect, then discard (or place as creature).
+   *
+   * @returns {object|null} Result from the surprise's onSurpriseActivate
+   */
+  /**
+   * Generic re-set for surprise creatures. Detects whether the creature is on
+   * a Bakhm hero (flip face-down in place) or a regular hero (move to surprise zone).
+   * Returns true if reset succeeded, false if cancelled/failed.
+   */
+  async surpriseCreatureReset(ctx) {
+    const inst = ctx.card;
+    const heroOwner = ctx.cardHeroOwner;
+    const heroIdx = ctx.cardHeroIdx;
+    const ps = this.gs.players[heroOwner];
+    const cardName = inst.name;
+    const zoneSlot = inst.zoneSlot;
+
+    // Check if this creature is on a Bakhm hero
+    const hero = ps?.heroes?.[heroIdx];
+    const heroScript = hero ? loadCardEffect(hero.name) : null;
+    const isBakhmHero = !!(heroScript?.isBakhmHero);
+
+    // Confirmation prompt
+    const confirmed = await this.promptGeneric(heroOwner, {
+      type: 'confirm',
+      title: cardName,
+      message: isBakhmHero
+        ? `Flip ${cardName} face-down on ${hero.name}'s Support Zone?`
+        : `Place ${cardName} into ${hero?.name || 'your Hero'}'s Surprise Zone?`,
+      confirmLabel: '🎭 Set Surprise',
+      cancelLabel: 'Cancel',
+      cancellable: true,
+    });
+
+    if (!confirmed) return false;
+
+    // Sand animation
+    this._broadcastEvent('play_zone_animation', {
+      type: 'sand_reset', owner: heroOwner, heroIdx, zoneSlot,
+    });
+    this._broadcastEvent('creature_zone_move', { owner: heroOwner, heroIdx, zoneSlot });
+    await this._delay(200);
+
+    if (isBakhmHero) {
+      // Bakhm slot: just flip face-down in place
+      inst.faceDown = true;
+      inst.knownToOpponent = true;
+
+      this._broadcastEvent('surprise_reset', { owner: heroOwner, heroIdx, cardName, isBakhmSlot: true, zoneSlot });
+      this.log('surprise_reset', { card: cardName, player: ps.username, hero: hero.name, bakhmSlot: true });
+    } else {
+      // Regular: move from support zone to surprise zone
+      const supportSlot = ps.supportZones[heroIdx]?.[zoneSlot];
+      if (supportSlot) {
+        const idx = supportSlot.indexOf(cardName);
+        if (idx >= 0) supportSlot.splice(idx, 1);
+      }
+
+      await this.runHooks('onCardLeaveZone', {
+        leavingCard: inst, fromZone: 'support', fromHeroIdx: heroIdx,
+        _skipReactionCheck: true,
+      });
+
+      if (!ps.surpriseZones[heroIdx]) ps.surpriseZones[heroIdx] = [];
+      ps.surpriseZones[heroIdx] = [cardName];
+
+      inst.zone = 'surprise';
+      inst.heroIdx = heroIdx;
+      inst.zoneSlot = 0;
+      inst.faceDown = true;
+      inst.knownToOpponent = true;
+
+      this._broadcastEvent('surprise_reset', { owner: heroOwner, heroIdx, cardName });
+      this.log('surprise_reset', { card: cardName, player: ps.username, hero: hero.name });
+
+      await this.runHooks('onCardEnterZone', {
+        enteringCard: inst, toZone: 'surprise', toHeroIdx: heroIdx,
+        _skipReactionCheck: true,
+      });
+    }
+
+    this.sync();
+    await this._delay(150);
+    return true;
+  }
+
+  /**
+   * Check if a surprise creature can re-set (go back face-down).
+   * Works for both regular surprise zones and Bakhm support zones.
+   */
+  canSurpriseCreatureReset(ctx) {
+    const heroOwner = ctx.cardHeroOwner;
+    const heroIdx = ctx.cardHeroIdx;
+    const ps = ctx._engine.gs.players[heroOwner];
+    const hero = ps?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+
+    // Check if on Bakhm hero — can always reset if card is face-up
+    const heroScript = loadCardEffect(hero.name);
+    if (heroScript?.isBakhmHero) {
+      // Already in support zone — just needs to be face-up
+      return !ctx.card.faceDown;
+    }
+
+    // Regular: surprise zone must be empty
+    const surpriseZone = ps.surpriseZones?.[heroIdx] || [];
+    return surpriseZone.length === 0;
+  }
+
+  async _activateSurprise(playerIdx, heroIdx, cardName, sourceInfo, script, opts = {}) {
+    this._surpriseResolutionDepth = (this._surpriseResolutionDepth || 0) + 1;
+    this._inSurpriseResolution = true;
+    try {
+    const ps = this.gs.players[playerIdx];
+    const hero = ps.heroes[heroIdx];
+    const isBakhmSlot = opts.isBakhmSlot || false;
+    const bakhmZoneSlot = opts.bakhmZoneSlot ?? -1;
+
+    // Find and update the CardInstance — flip face-up
+    let inst;
+    if (isBakhmSlot) {
+      inst = this.cardInstances.find(c =>
+        c.owner === playerIdx && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === bakhmZoneSlot && c.name === cardName
+      );
+    } else {
+      inst = this.cardInstances.find(c =>
+        c.owner === playerIdx && c.zone === ZONES.SURPRISE && c.heroIdx === heroIdx && c.name === cardName
+      );
+    }
+    if (inst) inst.faceDown = false;
+
+    // Broadcast surprise flip animation
+    this._broadcastEvent('surprise_flip', { owner: playerIdx, heroIdx, cardName, isBakhmSlot, bakhmZoneSlot });
+
+    // Reveal card to opponent and spectators
+    const oi = playerIdx === 0 ? 1 : 0;
+    const oppSid = this.gs.players[oi]?.socketId;
+    if (oppSid) this.io.to(oppSid).emit('card_reveal', { cardName });
+    if (this.room.spectators) {
+      for (const spec of this.room.spectators) {
+        if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName });
+      }
+    }
+
+    this.log('surprise_activated', { card: cardName, player: ps.username, hero: hero.name });
+    // Sync with card still face-up in the surprise zone
+    this.sync();
+    await this._delay(800);
+
+    // Fire onSurpriseActivated hook
+    await this.runHooks('onSurpriseActivated', {
+      surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
+      sourceInfo, _skipReactionCheck: true,
+    });
+
+    // Execute the surprise's effect
+    let result = null;
+    if (script.onSurpriseActivate && inst) {
+      const ctx = this._createContext(inst, { sourceInfo });
+      result = await script.onSurpriseActivate(ctx, sourceInfo);
+    }
+
+    // Brief pause after effect resolution before placement
+    this.sync();
+    await this._delay(500);
+
+    if (isBakhmSlot) {
+      // Bakhm slot: creature is already in the support zone — just stays face-up
+      if (inst) {
+        this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: bakhmZoneSlot, cardName });
+        this._broadcastEvent('play_zone_animation', {
+          type: 'gold_sparkle', owner: playerIdx, heroIdx, zoneSlot: bakhmZoneSlot,
+        });
+        await this._delay(200);
+        await this.runHooks('onSurpriseCreaturePlaced', {
+          surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
+          zoneSlot: bakhmZoneSlot, cardInstance: inst,
+        });
+      }
+    } else {
+    // NOW remove from surprise zone
+    const surpriseZone = ps.surpriseZones[heroIdx];
+    const szIdx = surpriseZone.indexOf(cardName);
+    if (szIdx >= 0) surpriseZone.splice(szIdx, 1);
+
+    // After resolution: place creature or discard
+    const cardData = this._getCardDB()[cardName];
+    if (hasCardType(cardData, 'Creature')) {
+      // Place face-up as permanent creature in first free support zone
+      const placed = this.safePlaceInSupport(cardName, playerIdx, heroIdx, -1);
+      if (placed && inst) {
+        inst.zone = ZONES.SUPPORT;
+        inst.heroIdx = heroIdx;
+        inst.zoneSlot = placed.actualSlot;
+        this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: placed.actualSlot, cardName });
+        // Extra flashy animation for surprise creature summon
+        this._broadcastEvent('play_zone_animation', {
+          type: 'gold_sparkle', owner: playerIdx, heroIdx, zoneSlot: placed.actualSlot,
+        });
+        await this._delay(200);
+        await this.runHooks('onPlay', {
+          _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: placed.actualSlot,
+          _skipReactionCheck: true,
+        });
+        await this.runHooks('onCardEnterZone', {
+          enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
+          _skipReactionCheck: true,
+        });
+        // Fire hook for Bakhm's 80-damage chain
+        await this.runHooks('onSurpriseCreaturePlaced', {
+          surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
+          zoneSlot: placed.actualSlot, cardInstance: inst,
+        });
+      } else {
+        // No free slots — discard
+        ps.discardPile.push(cardName);
+        if (inst) this._untrackCard(inst.id);
+      }
+    } else {
+      // Non-creature surprise → discard
+      ps.discardPile.push(cardName);
+      if (inst) this._untrackCard(inst.id);
+    }
+    } // end if/else isBakhmSlot
+
+    this.sync();
+    return result;
+    } finally {
+      this._surpriseResolutionDepth = Math.max(0, (this._surpriseResolutionDepth || 1) - 1);
+      if (this._surpriseResolutionDepth === 0) this._inSurpriseResolution = false;
+    }
+  }
+
   // ─── REACTION CHAIN SYSTEM ─────────────────
 
   /** Human-readable descriptions for hook events (for reaction prompts) */
@@ -3340,6 +4297,7 @@ class GameEngine {
     'beforeDamage', 'beforeLevelChange',
     'onResourceSpend', 'onReactionActivated', 'onCardActivation',
     'onActionUsed', 'onAdditionalActionUsed',
+    'onHeroTargeted', 'onSurpriseActivated',
   ]);
 
   /**
@@ -3385,6 +4343,7 @@ class GameEngine {
       };
     } finally {
       this._inReactionCheck = false;
+      await this._flushSurpriseDrawChecks();
     }
   }
 
@@ -3826,7 +4785,7 @@ class GameEngine {
         const cd = cardDB[slot[0]];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
         const inst = this.cardInstances.find(c =>
-          c.owner === playerIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
+          (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
         );
         targets.push({
           id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx,
@@ -4075,6 +5034,7 @@ class GameEngine {
             c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
           );
           if (!inst) continue;
+          if (inst.faceDown) continue; // Face-down Bakhm surprises can't activate creature effects
 
           // Summoning sickness: creatures cannot activate on the turn they were summoned
           const hasSummoningSickness = inst.turnPlayed === (this.gs.turn || 0);
@@ -4369,6 +5329,33 @@ class GameEngine {
     if (!hero || !hero.name) return;
     if (!hero.statuses) hero.statuses = {};
 
+    // Check for status-redirect surprises (Cactus Creature) — only for negative statuses
+    const statusDef = STATUS_EFFECTS[statusName];
+    if (statusDef?.negative && !opts._fromSurpriseRedirect && !this._inSurpriseResolution) {
+      const redirect = await this._checkSurpriseOnStatus(playerIdx, heroIdx, statusName, opts);
+      if (redirect) {
+        if (redirect.type === 'hero') {
+          await this.addHeroStatus(redirect.owner, redirect.heroIdx, statusName, { ...opts, _fromSurpriseRedirect: true });
+        } else if (redirect.type === 'equip' && redirect.cardInstance) {
+          // Apply status to creature via counters (matching format used by other effects)
+          const ci = redirect.cardInstance;
+          if (!ci.counters) ci.counters = {};
+          ci.counters[statusName] = 1;
+          if (statusName === 'burned') ci.counters.burnAppliedBy = opts.appliedBy ?? -1;
+          if (statusName === 'poisoned') {
+            ci.counters.poisonStacks = opts.stacks || opts.addStacks || 1;
+            ci.counters.poisonAppliedBy = opts.appliedBy ?? -1;
+          }
+          if (statusName === 'frozen') ci.counters.frozenAppliedBy = opts.appliedBy ?? -1;
+          if (statusName === 'stunned') ci.counters.stunnedAppliedBy = opts.appliedBy ?? -1;
+          if (statusName === 'negated') ci.counters.negatedAppliedBy = opts.appliedBy ?? -1;
+          this.log('status_add', { target: ci.name, status: statusName, owner: redirect.owner });
+          this.sync();
+        }
+        return;
+      }
+    }
+
     // Helper: play the animation even when blocked (the effect visually "hits" but doesn't stick)
     const playBlockedAnim = () => {
       if (opts.animationType) {
@@ -4401,7 +5388,6 @@ class GameEngine {
     const CC_STATUSES = ['frozen', 'stunned', 'negated'];
 
     // Universal negative status immunity (Divine Gift of Coolness, etc.)
-    const statusDef = STATUS_EFFECTS[statusName];
     if (statusDef?.negative && hero.buffs?.negative_status_immune) {
       this.log('status_blocked', { target: hero.name, status: statusName, reason: 'negative_status_immune' });
       playBlockedAnim();
@@ -4617,7 +5603,8 @@ class GameEngine {
     if (types.includes('creature')) {
       for (const tpi of targetPlayers) {
         for (const inst of this.cardInstances) {
-          if (inst.owner !== tpi || inst.zone !== 'support') continue;
+          if ((inst.owner !== tpi && inst.controller !== tpi) || inst.zone !== 'support') continue;
+          if (inst.faceDown) continue; // Face-down surprises are immune to AOE
           const cd = cardDB[inst.name];
           if (!cd || !hasCardType(cd, 'Creature')) continue;
           // HP threshold filters
@@ -4635,6 +5622,17 @@ class GameEngine {
             animType: animationType,
           });
         }
+      }
+    }
+
+    // ── Surprise window check (AoE) ──
+    if (!config._skipSurpriseCheck && hitHeroes.length > 0) {
+      const aoeTargets = hitHeroes.map(h => ({
+        type: 'hero', owner: h.owner, heroIdx: h.heroIdx, cardName: h.hero.name,
+      }));
+      const surpriseResult = await this._checkSurpriseWindow(aoeTargets, cardInst);
+      if (surpriseResult?.effectNegated) {
+        return { heroes: [], creatures: [], wasSingleTarget: false, cancelled: true };
       }
     }
 
@@ -4703,6 +5701,10 @@ class GameEngine {
   async processCreatureDamageBatch(entries) {
     if (!entries || entries.length === 0) return;
 
+    // Filter out face-down surprise creatures — they cannot be damaged
+    entries = entries.filter(e => !e.inst?.faceDown);
+    if (entries.length === 0) return;
+
     // Annotate entries with cancelled flag and init HP
     const cardDB = this._getCardDB();
     for (const e of entries) {
@@ -4721,6 +5723,26 @@ class GameEngine {
       entries,
       _skipReactionCheck: true,
     });
+
+    // Defending the Gate: check if any entries would hit an opponent's support zones
+    const gateCheckedPlayers = new Set();
+    for (const e of entries) {
+      if (e.cancelled) continue;
+      const controllerIdx = e.inst.controller ?? e.inst.owner;
+      if (gateCheckedPlayers.has(controllerIdx)) continue;
+      gateCheckedPlayers.add(controllerIdx);
+      await this._triggerGateCheck(controllerIdx);
+    }
+    // Cancel entries for gate-shielded players
+    for (const e of entries) {
+      if (e.cancelled) continue;
+      if (e.canBeNegated === false) continue; // Un-negatable damage pierces gate shield
+      const controllerIdx = e.inst.controller ?? e.inst.owner;
+      if (this._isGateShielded(controllerIdx)) {
+        e.cancelled = true;
+        e._gateBlocked = true;
+      }
+    }
 
     // Flame Avalanche lock: if source player's damageLocked is true,
     // ALL damage to opponent's creatures becomes 0 (ABSOLUTE — overrides everything)
@@ -4852,6 +5874,7 @@ class GameEngine {
     const burnCardDB = this._getCardDB();
     for (const inst of this.cardInstances) {
       if (inst.owner !== ap || inst.zone !== 'support') continue;
+      if (inst.faceDown) continue; // Face-down surprises are immune
       if (!inst.counters.burned) continue;
       const cd = burnCardDB[inst.name];
       if (!cd || !hasCardType(cd, 'Creature')) continue;
@@ -4869,8 +5892,8 @@ class GameEngine {
     for (const { owner, heroIdx, heroName } of burnedHeroes) {
       const hero = ps.heroes[heroIdx];
       if (!hero || hero.hp <= 0) continue; // May have died from a previous burn this loop
-      this.log('burn_damage', { target: heroName, amount: 60, owner });
-      await this.actionDealDamage({ name: 'Burn' }, hero, 60, 'fire');
+      this.log('burn_damage', { target: heroName, amount: BURN_BASE_DAMAGE, owner });
+      await this.actionDealDamage({ name: 'Burn' }, hero, BURN_BASE_DAMAGE, 'fire');
       this.sync();
       await this._delay(200);
     }
@@ -4879,7 +5902,7 @@ class GameEngine {
     if (burnedCreatures.length > 0) {
       const entries = burnedCreatures.map(inst => ({
         inst,
-        amount: 60,
+        amount: BURN_BASE_DAMAGE,
         type: 'fire',
         source: { name: 'Burn' },
         sourceOwner: inst.counters.burnAppliedBy ?? -1,
@@ -4893,7 +5916,7 @@ class GameEngine {
 
   /**
    * Deal poison damage to all poisoned heroes/creatures of the active player.
-   * Damage = 30 × poison stacks. Called at start of turn before hooks.
+   * Damage = POISON_BASE_DAMAGE × poison stacks (modified by hooks). Called at start of turn before hooks.
    */
   async processPoisonDamage() {
     const ap = this.gs.activePlayer;
@@ -4927,7 +5950,7 @@ class GameEngine {
     for (const { owner, heroIdx, heroName, stacks } of poisonedHeroes) {
       const hero = ps.heroes[heroIdx];
       if (!hero || hero.hp <= 0) continue;
-      const damage = 30 * stacks;
+      const damage = await this.calculatePoisonDamage(ap, stacks);
       this._broadcastEvent('play_zone_animation', { type: 'poison_tick', owner: ap, heroIdx, zoneSlot: -1 });
       await this._delay(300);
       this.log('poison_damage', { target: heroName, amount: damage, stacks, owner });
@@ -4938,18 +5961,64 @@ class GameEngine {
 
     // Process creature poison via generic batch system
     if (poisonedCreatures.length > 0) {
+      const baseDamage = await this.calculatePoisonDamage(ap, 1);
       const entries = poisonedCreatures.map(({ inst, stacks }) => ({
         inst,
-        amount: 30 * stacks,
+        amount: baseDamage * stacks,
         type: 'poison',
         source: { name: 'Poison' },
-        sourceOwner: -1, // Poison source owner not tracked on creatures currently
+        sourceOwner: -1,
         canBeNegated: true,
         isStatusDamage: true,
         animType: 'poison_tick',
       }));
       await this.processCreatureDamageBatch(entries);
     }
+  }
+
+  /**
+   * Calculate poison damage per tick for a specific player.
+   * Fires MODIFY_POISON_DAMAGE hooks so hero effects can alter the amount.
+   * @param {number} playerIdx - The player taking poison damage
+   * @param {number} stacks - Number of poison stacks
+   * @returns {number} Final damage amount
+   */
+  async calculatePoisonDamage(playerIdx, stacks) {
+    const hookCtx = { amount: POISON_BASE_DAMAGE * stacks, baseDamage: POISON_BASE_DAMAGE, stacks, playerIdx };
+    await this.runHooks(HOOKS.MODIFY_POISON_DAMAGE, hookCtx);
+    return Math.max(0, hookCtx.amount);
+  }
+
+  /**
+   * Get the current poison damage per stack for a player (for tooltip sync).
+   * Runs MODIFY_POISON_DAMAGE hooks synchronously-style with 1 stack.
+   * @param {number} playerIdx
+   * @returns {number}
+   */
+  getPoisonDamagePerStack(playerIdx) {
+    // Build a simple hookCtx and run hooks synchronously
+    // Since modifyPoisonDamage hooks should be sync (just math), we run them inline
+    const hookCtx = { amount: POISON_BASE_DAMAGE, baseDamage: POISON_BASE_DAMAGE, stacks: 1, playerIdx };
+    // Manually iterate hook cards and apply sync modifications
+    for (const inst of this.cardInstances) {
+      if (!inst.name) continue;
+      const script = loadCardEffect(inst.name);
+      if (!script?.hooks?.modifyPoisonDamage) continue;
+      try {
+        script.hooks.modifyPoisonDamage({
+          ...hookCtx,
+          card: inst, cardName: inst.name,
+          cardOwner: inst.owner, cardController: inst.controller,
+          cardHeroIdx: inst.heroIdx,
+          attachedHero: inst.heroIdx >= 0 ? this.gs.players[inst.owner]?.heroes?.[inst.heroIdx] : null,
+          players: this.gs.players,
+          _engine: this,
+          modifyAmount(delta) { hookCtx.amount += delta; },
+          setAmount(val) { hookCtx.amount = val; },
+        });
+      } catch (e) { /* ignore errors in tooltip calc */ }
+    }
+    return Math.max(0, hookCtx.amount);
   }
 
   // ─── WIN CONDITION ─────────────────────────

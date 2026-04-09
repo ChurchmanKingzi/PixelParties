@@ -49,7 +49,7 @@ module.exports = {
           }
         }
         for (const { inst } of result.creatures) {
-          if (inst && !inst.counters.burned) {
+          if (inst && !inst.counters.burned && !inst.faceDown) {
             inst.counters.burned = true;
             engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: 'Divine Gift of Fire' });
           }
@@ -99,7 +99,7 @@ module.exports = {
 
       // Apply Burned to all collected creatures
       for (const { inst } of result.creatures) {
-        if (inst.counters.burned) continue;
+        if (inst.counters.burned || inst.faceDown) continue;
         inst.counters.burned = true;
         engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: 'Divine Gift of Fire' });
       }

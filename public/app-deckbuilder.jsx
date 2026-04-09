@@ -784,8 +784,6 @@ function DeckBuilder() {
   const onDeckCardMouseDown = useCallback((e, section, fromIdx, cardName) => {
     if (e.type === 'mousedown' && e.button !== 0) return;
     if (e.cancelable) e.preventDefault();
-    // Cancel any long-press tooltip timer so it doesn't fire during drag
-    clearTimeout(window._longPressTimer);
     const _startPt = window.getPointerXY(e);
     const startX = _startPt.x, startY = _startPt.y;
     let dragging = false;

@@ -66,17 +66,17 @@ module.exports = {
     return [...heroes, ...creatures];
   },
 
-  targetingConfig: {
+  targetingConfig: (gs, pi, cost) => ({
     description: 'Select targets to cleanse.',
     confirmLabel: '🍺 Drink!',
     confirmClass: 'btn-success',
     cancellable: true,
     alwaysConfirmable: true,
     greenSelect: true,
-    dynamicCostPerTarget: 4,
+    dynamicCostPerTarget: cost,
     exclusiveTypes: false,
     maxPerType: { hero: 99, equip: 99 },
-  },
+  }),
 
   validateSelection: () => true, // 0+ targets always valid
 
@@ -87,7 +87,7 @@ module.exports = {
   resolve: async (engine, pi, selectedIds, validTargets) => {
     if (!selectedIds || selectedIds.length === 0) return; // 0 targets — nothing happens
 
-    const baseCost = 4;
+    const baseCost = engine._getCardDB()['Beer']?.cost || 4;
     const totalCost = baseCost * selectedIds.length;
     const ps = engine.gs.players[pi];
 

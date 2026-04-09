@@ -69,10 +69,21 @@ const HOOKS = {
   ON_CARD_ACTIVATION:    'onCardActivation',      // Fires before a card's effect resolves (for reaction window)
   AFTER_SPELL_RESOLVED:  'afterSpellResolved',    // Fires after a spell/attack's onPlay completes (for Bartas, etc.)
 
+  // ── Surprise system ──
+  ON_HERO_TARGETED:      'onHeroTargeted',        // Fires after a hero is confirmed as a target (surprise window)
+  ON_SURPRISE_ACTIVATED: 'onSurpriseActivated',   // Fires when a surprise card is flipped face-up
+
   // ── Actions ──
   ON_ACTION_USED:            'onActionUsed',            // Fires when any action is consumed (spell, creature, ability activation, etc.)
   ON_ADDITIONAL_ACTION_USED: 'onAdditionalActionUsed',  // Fires when an additional action is consumed (Necromancy summon, Slime Rancher, etc.)
+
+  // ── Status damage modification ──
+  MODIFY_POISON_DAMAGE: 'modifyPoisonDamage',  // Fires before each poison tick; hookCtx.amount can be modified
 };
+
+// ── Status damage base values ──
+const POISON_BASE_DAMAGE = 30;
+const BURN_BASE_DAMAGE = 60;
 
 // Phases (indices match the frontend phase tracker)
 const PHASES = {
@@ -149,7 +160,10 @@ const BUFF_EFFECTS = {
 function hasCardType(cd, type) {
   if (!cd?.cardType) return false;
   if (cd.cardType === type) return true; // Fast path for single-type cards
-  return cd.cardType.split('/').some(t => t.trim() === type);
+  if (cd.cardType.split('/').some(t => t.trim() === type)) return true;
+  // Also check subtype (e.g. Token with subtype 'Creature' counts as Creature)
+  if (cd.subtype && cd.subtype.split('/').some(t => t.trim() === type)) return true;
+  return false;
 }
 
-module.exports = { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType };
+module.exports = { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE };

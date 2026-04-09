@@ -45,6 +45,7 @@ At least one of these must be present, or the loader will ignore the file.
 | `isReaction` | `bool` | Reaction/Surprise card (chains onto other effects) |
 | `heroEffect` | `bool` | Hero with an activatable Main Phase effect |
 | `isTargetRedirect` | `bool` | Surprise that redirects incoming targeting |
+| `isSurprise` | `bool` | Surprise card (face-down placement, triggered activation) |
 
 ---
 
@@ -121,6 +122,46 @@ At least one of these must be present, or the loader will ignore the file.
 |--------|-----------|-------------|
 | `canRedirect` | `(ctx, target, validTargets) → bool` | Can this card redirect the incoming targeting? |
 | `onRedirect` | `async (ctx, target, validTargets) → target` | Execute the redirect, return the new target. |
+
+### Surprises
+
+Surprises are cards (Spell/Attack/Creature with `subtype: 'Surprise'` in cards.json) that can be placed face-down in a Hero's Surprise Zone during Main Phase. When their trigger condition is met, the owner is prompted to activate. On activation the card flips face-up, its effect resolves, and it goes to discard (or enters a Support Zone for Creatures).
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `isSurprise` | `bool` | **Required.** Marks this card as a Surprise. |
+| `surpriseTrigger` | `(gs, ownerIdx, heroIdx, sourceInfo, engine) → bool` | Trigger condition. `sourceInfo`: `{ cardName, owner, heroIdx, cardInstance }`. Return `true` to prompt activation. |
+| `onSurpriseActivate` | `async (ctx, sourceInfo) → result` | Called when the owner confirms activation. Return `{ effectNegated: true }` to fully negate the triggering effect. |
+
+**Placement:** Any Surprise can be placed face-down by its owner during Main Phase 1 or 2 into a living Hero's empty Surprise Zone. No ability/level check is required for placement (bluffs are allowed).
+
+**Activation check:** The engine verifies the Hero can activate (alive, not Frozen/Stunned, meets spell school & level requirements). For Creature surprises, a free Support Zone is also required.
+
+**Timing:** The surprise window fires after a hero is confirmed as a target of a Spell, Attack, or Creature effect, after the card is revealed to the opponent, but before the effect resolves.
+
+```js
+// Example: booby-trap.js
+module.exports = {
+  isSurprise: true,
+  surpriseTrigger: (gs, ownerIdx, heroIdx, sourceInfo, engine) => {
+    const attacker = gs.players[sourceInfo.owner]?.heroes?.[sourceInfo.heroIdx];
+    return attacker && attacker.hp > 0;
+  },
+  onSurpriseActivate: async (ctx, sourceInfo) => {
+    const engine = ctx._engine;
+    const attacker = engine.gs.players[sourceInfo.owner]?.heroes?.[sourceInfo.heroIdx];
+    if (!attacker) return null;
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'explosion', owner: sourceInfo.owner,
+      heroIdx: sourceInfo.heroIdx, zoneSlot: -1,
+    });
+    await engine._delay(600);
+    await ctx.dealDamage(attacker, 100, 'destruction_spell');
+    if (attacker.hp <= 0) return { effectNegated: true };
+    return null;
+  },
+};
+```
 
 ---
 

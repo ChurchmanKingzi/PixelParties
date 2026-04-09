@@ -58,9 +58,7 @@ module.exports = {
 
     // Draw 1 from potion deck
     if ((ps.potionDeck || []).length === 0) return false; // Safety
-    const cardName = ps.potionDeck.shift();
-    ps.hand.push(cardName);
-    engine.log('potion_draw', { player: ps.username, card: cardName });
+    await engine.actionDrawFromPotionDeck(pi, 1);
 
     engine.sync();
     return true;

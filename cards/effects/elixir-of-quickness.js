@@ -14,7 +14,7 @@ module.exports = {
     // Draw 3 cards one by one
     for (let i = 0; i < 3; i++) {
       if ((ps.mainDeck || []).length === 0) break;
-      await engine.actionDrawCards(pi, 1);
+      await engine.actionDrawCards(pi, 1, { _nomuBypass: true });
       engine.sync();
       await engine._delay(300);
     }

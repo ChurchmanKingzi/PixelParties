@@ -1183,12 +1183,55 @@ function sendGameState(room, playerIdx, extra) {
   if (!p?.socketId) return;
   const gs = room.gameState;
   if (!gs) return;
+
+  // Terror: force end turn if threshold reached
+  if (gs._terrorForceEndTurn != null && !gs._terrorProcessing && room.engine) {
+    const phase = gs.currentPhase;
+    // Only force during playable phases (Main1, Action, Main2)
+    if (phase >= 2 && phase <= 4) {
+      gs._terrorProcessing = true;
+      const terrorPi = gs._terrorForceEndTurn;
+      delete gs._terrorForceEndTurn;
+      setTimeout(() => {
+        gs._terrorProcessing = false;
+        room.engine.runPhase(5).then(() => { // PHASES.END = 5
+          for (let i = 0; i < 2; i++) sendGameState(room, i);
+          sendSpectatorGameState(room);
+        }).catch(err => console.error('[Terror] force end error:', err.message));
+      }, 500);
+    }
+  }
   const state = {
     myIndex: playerIdx, roomId: room.id,
     players: gs.players.map((ps, pi) => ({
       username: ps.username, color: ps.color, avatar: ps.avatar, cardback: ps.cardback || null, board: ps.board || null,
       heroes: ps.heroes, abilityZones: ps.abilityZones,
-      surpriseZones: ps.surpriseZones, supportZones: ps.supportZones,
+      surpriseZones: pi === playerIdx ? ps.surpriseZones : ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
+        // Face-up surprises (activated) are visible to opponent
+        const inst = room.engine?.cardInstances.find(c => c.owner === pi && c.zone === 'surprise' && c.heroIdx === hi && c.name === cn);
+        if (inst && !inst.faceDown) return cn;
+        // Known surprises (re-set) are visible but marked as known
+        if (inst && inst.knownToOpponent) return cn;
+        return '?';
+      })),
+      surpriseFaceDown: ps.surpriseZones.map((sz, hi) => {
+        if (!sz || sz.length === 0) return null;
+        const inst = room.engine?.cardInstances.find(c => c.owner === pi && c.zone === 'surprise' && c.heroIdx === hi && c.name === sz[0]);
+        return inst ? inst.faceDown : true;
+      }),
+      surpriseKnown: ps.surpriseZones.map((sz, hi) => {
+        if (!sz || sz.length === 0) return false;
+        const inst = room.engine?.cardInstances.find(c => c.owner === pi && c.zone === 'surprise' && c.heroIdx === hi && c.name === sz[0]);
+        return !!(inst && inst.faceDown && inst.knownToOpponent);
+      }),
+      supportZones: pi === playerIdx ? ps.supportZones : ps.supportZones.map((heroSlots, hi) => (heroSlots || []).map((slot, si) => {
+        if (!slot || slot.length === 0) return slot;
+        const inst = room.engine?.cardInstances.find(c =>
+          c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si && c.faceDown
+        );
+        if (inst?.faceDown && !inst.knownToOpponent) return ['?']; // Unknown face-down: show cardback
+        return slot;
+      })),
       islandZoneCount: ps.islandZoneCount || [0,0,0],
       hand: pi === playerIdx ? ps.hand : [], handCount: ps.hand.length,
       mainDeckCards: pi === playerIdx ? ps.mainDeck : [], deckCount: ps.mainDeck.length,
@@ -1201,6 +1244,7 @@ function sendGameState(room, playerIdx, extra) {
       damageLocked: ps.damageLocked || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
+      poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
       handLocked: ps.handLocked || false,
       handLockBlockedCards: (ps.handLocked && pi === playerIdx) ? (() => {
         const blocked = new Set();
@@ -1221,6 +1265,7 @@ function sendGameState(room, playerIdx, extra) {
       oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
       resolvingCard: ps._resolvingCard || null,
       deckSkins: ps.deckSkins || {},
+      poisonDmgPerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
     })),
     areaZones: gs.areaZones, turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
@@ -1228,17 +1273,43 @@ function sendGameState(room, playerIdx, extra) {
     summonBlocked: gs.summonBlocked || [],
     customPlacementCards: gs.customPlacementCards || [],
     awaitingFirstChoice: gs.awaitingFirstChoice || false,
+    terrorCount: gs.activePlayer != null ? (gs._terrorTracking?.[gs.activePlayer] || []).length : 0,
+    terrorThreshold: room.engine ? (() => {
+      let threshold = Infinity;
+      for (let sp = 0; sp < 2; sp++) {
+        const sps = gs.players[sp]; if (!sps) continue;
+        for (let hi = 0; hi < (sps.heroes || []).length; hi++) {
+          const h = sps.heroes[hi];
+          if (!h?.name || h.hp <= 0 || h.statuses?.negated) continue;
+          let tc = 0; for (const z of (sps.abilityZones[hi] || [])) for (const n of (z || [])) if (n === 'Terror') tc++;
+          if (tc > 0) { const t = 10 - tc; if (t < threshold) threshold = t; }
+        }
+      }
+      return threshold === Infinity ? null : threshold;
+    })() : null,
     bonusActions: gs.players[playerIdx]?.bonusActions || null,
     mulliganPending: gs.mulliganPending || false,
     handReturnToDeck: gs.handReturnToDeck || false,
     potionTargeting: gs.potionTargeting || null,
     effectPrompt: gs.effectPrompt || null,
+    surprisePending: gs.surprisePending || false,
     heroEffectPending: gs.heroEffectPending || null,
     creatureCounters: room.engine ? (() => {
       const cc = {};
+      const currentTurn = gs.turn || 0;
       for (const inst of room.engine.cardInstances) {
-        if (inst.zone === 'support' && Object.keys(inst.counters).length > 0) {
-          cc[`${inst.controller}-${inst.heroIdx}-${inst.zoneSlot}`] = { ...inst.counters };
+        if (inst.zone !== 'support') continue;
+        const key = `${inst.controller}-${inst.heroIdx}-${inst.zoneSlot}`;
+        const hasCounters = Object.keys(inst.counters).length > 0;
+        const hasSummoningSickness = inst.turnPlayed === currentTurn && (() => {
+          const script = loadCardEffect(inst.name);
+          return !!(script?.creatureEffect);
+        })();
+        const isFaceDown = !!inst.faceDown;
+        if (hasCounters || hasSummoningSickness || isFaceDown) {
+          cc[key] = { ...inst.counters };
+          if (hasSummoningSickness) cc[key].summoningSickness = true;
+          if (isFaceDown) cc[key].faceDown = true;
         }
       }
       return cc;
@@ -1292,6 +1363,59 @@ function sendGameState(room, playerIdx, extra) {
     freeActivatableAbilities: room.engine ? room.engine.getFreeActivatableAbilities(playerIdx) : [],
     activeHeroEffects: room.engine ? room.engine.getActiveHeroEffects(playerIdx) : [],
     activatableCreatures: room.engine ? room.engine.getActivatableCreatures(playerIdx) : [],
+    bakhmSurpriseSlots: room.engine ? (() => {
+      const result = [];
+      const ps2 = gs.players[playerIdx];
+      for (let hi = 0; hi < (ps2?.heroes || []).length; hi++) {
+        const hero = ps2.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+        const heroScript = loadCardEffect(hero.name);
+        if (!heroScript?.isBakhmHero) continue;
+        const freeSlots = [];
+        for (let si = 0; si < 3; si++) {
+          if (((ps2.supportZones[hi] || [])[si] || []).length === 0) freeSlots.push(si);
+        }
+        result.push({ heroIdx: hi, freeSlots });
+      }
+      return result;
+    })() : [],
+    ushabtiSummonable: room.engine ? (() => {
+      if (playerIdx !== gs.activePlayer) return [];
+      const currentTurn = gs.turn || 0;
+      const ps2 = gs.players[playerIdx];
+      const result = [];
+      for (const inst of room.engine.cardInstances) {
+        if (inst.owner !== playerIdx || inst.zone !== 'surprise' || !inst.ushabtiPlaced) continue;
+        if (inst.ushabtiTurn >= currentTurn) continue; // Can't summon same turn
+        const hi = inst.heroIdx;
+        const hero = ps2?.heroes?.[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+        // Check abilities
+        const cardData = getCardDB()[inst.name];
+        if (!cardData) continue;
+        const level = cardData.level || 0;
+        if (level > 0 || cardData.spellSchool1) {
+          const abZones = ps2.abilityZones?.[hi] || [];
+          let ok = true;
+          if (cardData.spellSchool1 && room.engine.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) ok = false;
+          if (cardData.spellSchool2 && room.engine.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) ok = false;
+          if (!ok) continue;
+        }
+        // Check free support zone
+        let hasFreeSlot = false;
+        for (let si = 0; si < 3; si++) {
+          if (((ps2.supportZones[hi] || [])[si] || []).length === 0) { hasFreeSlot = true; break; }
+        }
+        if (!hasFreeSlot) continue;
+        // Check custom summon conditions
+        const script = loadCardEffect(inst.name);
+        if (script?.canSummon && !script.canSummon({ _engine: room.engine, cardOwner: playerIdx, cardHeroIdx: hi })) continue;
+        result.push({ heroIdx: hi, cardName: inst.name });
+      }
+      return result;
+    })() : [],
     roomParticipants: {
       players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: ps.avatar })),
       spectators: (room.spectators || []).map(s => ({ username: s.username, color: s.color || '#888', avatar: s.avatar || null })),
@@ -1324,10 +1448,28 @@ function sendSpectatorGameState(room) {
     isSpectator: true,
     myIndex: 0, // Player 0 at bottom, Player 1 at top (host = bottom)
     roomId: room.id,
-    players: gs.players.map((ps) => ({
+    players: gs.players.map((ps, spi) => ({
       username: ps.username, color: ps.color, avatar: ps.avatar, cardback: ps.cardback || null, board: ps.board || null,
       heroes: ps.heroes, abilityZones: ps.abilityZones,
-      surpriseZones: ps.surpriseZones, supportZones: ps.supportZones,
+      surpriseZones: ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
+        const inst = room.engine?.cardInstances.find(c => c.owner === spi && c.zone === 'surprise' && c.heroIdx === hi && c.name === cn);
+        if (inst && !inst.faceDown) return cn;
+        if (inst && inst.knownToOpponent) return cn;
+        return '?';
+      })),
+      surpriseKnown: ps.surpriseZones.map((sz, hi) => {
+        if (!sz || sz.length === 0) return false;
+        const inst = room.engine?.cardInstances.find(c => c.owner === spi && c.zone === 'surprise' && c.heroIdx === hi && c.name === sz[0]);
+        return !!(inst && inst.faceDown && inst.knownToOpponent);
+      }),
+      supportZones: ps.supportZones.map((heroSlots, hi) => (heroSlots || []).map((slot, si) => {
+        if (!slot || slot.length === 0) return slot;
+        const inst = room.engine?.cardInstances.find(c =>
+          c.owner === spi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si && c.faceDown
+        );
+        if (inst?.faceDown && !inst.knownToOpponent) return ['?'];
+        return slot;
+      })),
       islandZoneCount: ps.islandZoneCount || [0, 0, 0],
       hand: [], handCount: ps.hand.length,
       mainDeckCards: [], deckCount: ps.mainDeck.length,
@@ -1340,12 +1482,14 @@ function sendSpectatorGameState(room) {
       damageLocked: ps.damageLocked || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
+      poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
       handLocked: ps.handLocked || false,
       supportSpellLocked: ps.supportSpellLocked || false,
       permanents: ps.permanents || [],
       oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
       resolvingCard: ps._resolvingCard || null,
       deckSkins: ps.deckSkins || {},
+      poisonDmgPerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
     })),
     areaZones: gs.areaZones, turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
@@ -1364,12 +1508,24 @@ function sendSpectatorGameState(room) {
       validTargets: gs.potionTargeting.validTargets,
     } : null,
     effectPrompt: gs.effectPrompt || null,
+    surprisePending: gs.surprisePending || false,
     heroEffectPending: gs.heroEffectPending || null,
     creatureCounters: room.engine ? (() => {
       const cc = {};
+      const currentTurn = gs.turn || 0;
       for (const inst of room.engine.cardInstances) {
-        if (inst.zone === 'support' && Object.keys(inst.counters).length > 0) {
-          cc[`${inst.controller}-${inst.heroIdx}-${inst.zoneSlot}`] = { ...inst.counters };
+        if (inst.zone !== 'support') continue;
+        const key = `${inst.controller}-${inst.heroIdx}-${inst.zoneSlot}`;
+        const hasCounters = Object.keys(inst.counters).length > 0;
+        const hasSummoningSickness = inst.turnPlayed === currentTurn && (() => {
+          const script = loadCardEffect(inst.name);
+          return !!(script?.creatureEffect);
+        })();
+        const isFaceDown = !!inst.faceDown;
+        if (hasCounters || hasSummoningSickness || isFaceDown) {
+          cc[key] = { ...inst.counters };
+          if (hasSummoningSickness) cc[key].summoningSickness = true;
+          if (isFaceDown) cc[key].faceDown = true;
         }
       }
       return cc;
@@ -1535,7 +1691,9 @@ async function setupGameState(room) {
     });
     const abilityZones = heroes.map(h => {
       const z=[[],[],[]];
-      if(h.ability1&&h.ability2&&h.ability1===h.ability2){z[0]=[h.ability1,h.ability2];}
+      if(h.ability1&&h.ability2&&h.ability1===h.ability2){z[1]=[h.ability1,h.ability2];}
+      else if(h.ability1&&!h.ability2){z[1]=[h.ability1];}
+      else if(!h.ability1&&h.ability2){z[1]=[h.ability2];}
       else{if(h.ability1)z[0]=[h.ability1];if(h.ability2)z[1]=[h.ability2];}
       return z;
     });
@@ -1544,7 +1702,7 @@ async function setupGameState(room) {
     playerStates.push({ userId:p.userId, username:p.username, socketId:p.socketId,
       color:usr?.color||'#00f0ff', avatar:usr?.avatar||null, cardback:usr?.cardback||null, board:usr?.board||null,
       heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
-      hand:[], mainDeck, potionDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:99,
+      hand:[], mainDeck, potionDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
       abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0],
       damageLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
       permanents:[], _oncePerGameUsed: new Set(), _resolvingCard: null, deckSkins: deck?.skins || {} });
@@ -1918,6 +2076,182 @@ io.on('connection', (socket) => {
     })();
   });
 
+  // ── Place a Surprise card face-down into a Hero's Surprise Zone ──
+  socket.on('play_surprise', ({ roomId, cardName, handIndex, heroIdx, bakhmSlot }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.engine || !room.gameState) return;
+    const gs = room.gameState;
+    const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0 || pi !== gs.activePlayer) return;
+    if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return; // Main Phase 1 or 2
+
+    const ps = gs.players[pi];
+    if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
+
+    // Card must have a Surprise script
+    const script = loadCardEffect(cardName);
+    if (!script?.isSurprise) return;
+
+    // Also verify the card data has the Surprise subtype
+    const cardData = getCardDB()[cardName];
+    if (!cardData || (cardData.subtype || '').toLowerCase() !== 'surprise') return;
+
+    // Hero must be alive
+    const hero = ps.heroes[heroIdx];
+    if (!hero || !hero.name || hero.hp <= 0) return;
+
+    // Bakhm support zone placement
+    if (bakhmSlot != null && bakhmSlot >= 0) {
+      // Bakhm must not be incapacitated
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
+      // Verify hero is Bakhm
+      const heroScript = loadCardEffect(hero.name);
+      if (!heroScript?.isBakhmHero) return;
+      // Only Surprise Creatures allowed in Bakhm slots
+      if (cardData.cardType !== 'Creature') return;
+      // Support zone must be empty
+      if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
+      if ((ps.supportZones[heroIdx][bakhmSlot] || []).length > 0) return;
+
+      // Place face-down in support zone
+      ps.supportZones[heroIdx][bakhmSlot] = [cardName];
+      ps.hand.splice(handIndex, 1);
+      if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+
+      const inst = room.engine._trackCard(cardName, pi, 'support', heroIdx, bakhmSlot);
+      inst.faceDown = true;
+
+      room.engine.log('surprise_set', { player: ps.username, hero: hero.name, bakhmSlot: true });
+
+      (async () => {
+        try {
+          await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _skipReactionCheck: true });
+        } catch (err) {
+          console.error('[Engine] play_surprise bakhm hooks error:', err.message);
+        }
+        for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      })();
+      return;
+    }
+
+    // Regular surprise zone placement
+    // Surprise zone must be empty
+    if ((ps.surpriseZones[heroIdx] || []).length > 0) return;
+
+    // Place face-down — no ability check required for placement
+    if (!ps.surpriseZones[heroIdx]) ps.surpriseZones[heroIdx] = [];
+    ps.surpriseZones[heroIdx] = [cardName];
+    ps.hand.splice(handIndex, 1);
+    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+
+    // Track in engine
+    const inst = room.engine._trackCard(cardName, pi, 'surprise', heroIdx, 0);
+    inst.faceDown = true;
+
+    room.engine.log('surprise_set', { player: ps.username, hero: hero.name });
+
+    // Run hooks (card entering zone)
+    (async () => {
+      try {
+        await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'surprise', toHeroIdx: heroIdx, _skipReactionCheck: true });
+      } catch (err) {
+        console.error('[Engine] play_surprise hooks error:', err.message);
+      }
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    })();
+  });
+
+  // Summon a creature placed by Ushabti from surprise zone
+  socket.on('summon_ushabti', ({ roomId, heroIdx }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.engine || !room.gameState) return;
+    const gs = room.gameState;
+    const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0 || pi !== gs.activePlayer) return;
+    if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return; // Main Phase only
+
+    const ps = gs.players[pi];
+    const sz = ps.surpriseZones?.[heroIdx] || [];
+    if (sz.length === 0) return;
+    const cardName = sz[0];
+    const inst = room.engine.cardInstances.find(c =>
+      c.owner === pi && c.zone === 'surprise' && c.heroIdx === heroIdx && c.ushabtiPlaced
+    );
+    if (!inst) return;
+    const currentTurn = gs.turn || 0;
+    if (inst.ushabtiTurn >= currentTurn) return; // Can't summon same turn
+
+    const hero = ps.heroes[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return;
+    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
+
+    // Check abilities
+    const cardData = getCardDB()[cardName];
+    if (!cardData) return;
+    const level = cardData.level || 0;
+    if (level > 0 || cardData.spellSchool1) {
+      const abZones = ps.abilityZones?.[heroIdx] || [];
+      if (cardData.spellSchool1 && room.engine.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) return;
+      if (cardData.spellSchool2 && room.engine.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) return;
+    }
+
+    // Find free support zone slot
+    let freeSlot = -1;
+    for (let si = 0; si < 3; si++) {
+      if (((ps.supportZones[heroIdx] || [])[si] || []).length === 0) { freeSlot = si; break; }
+    }
+    if (freeSlot < 0) return;
+
+    // Check custom summon conditions
+    const script = loadCardEffect(cardName);
+    if (script?.canSummon && !script.canSummon({ _engine: room.engine, cardOwner: pi, cardHeroIdx: heroIdx })) return;
+
+    // Remove from surprise zone
+    const szIdx = sz.indexOf(cardName);
+    if (szIdx >= 0) sz.splice(szIdx, 1);
+
+    // Place in support zone
+    if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
+    ps.supportZones[heroIdx][freeSlot] = [cardName];
+
+    // Update instance
+    inst.zone = 'support';
+    inst.heroIdx = heroIdx;
+    inst.zoneSlot = freeSlot;
+    inst.faceDown = false;
+    delete inst.ushabtiPlaced;
+    delete inst.ushabtiTurn;
+    inst.turnPlayed = currentTurn;
+
+    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+    room.engine.log('creature_summoned', { player: ps.username, card: cardName, hero: hero.name });
+    room.engine._trackTerrorResolvedEffect(pi, cardName);
+    room.engine._broadcastEvent('summon_effect', { owner: pi, heroIdx, zoneSlot: freeSlot, cardName });
+    room.engine._broadcastEvent('play_zone_animation', {
+      type: 'gold_sparkle', owner: pi, heroIdx, zoneSlot: freeSlot,
+    });
+
+    (async () => {
+      try {
+        await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: freeSlot, _skipReactionCheck: true });
+        await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _skipReactionCheck: true });
+        // Fire Bakhm's onSurpriseCreaturePlaced for surprise creature summons
+        await room.engine.runHooks('onSurpriseCreaturePlaced', {
+          surpriseCardName: cardName, surpriseOwner: pi, heroIdx,
+          zoneSlot: freeSlot, cardInstance: inst,
+        });
+        await room.engine._flushSurpriseDrawChecks();
+        // Check summon triggers
+        await room.engine._checkSurpriseOnSummon(pi, inst);
+      } catch (err) {
+        console.error('[Engine] summon_ushabti hooks error:', err.message);
+      }
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    })();
+  });
+
   // Activate an action-costing ability on the board
   socket.on('activate_ability', ({ roomId, heroIdx, zoneIdx, charmedOwner }) => {
     if (!currentUser) return;
@@ -1926,6 +2260,7 @@ io.on('connection', (socket) => {
     const gs = room.gameState;
     const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0 || pi !== gs.activePlayer) return;
+    if (gs.potionTargeting) return;
 
     // Determine which player's heroes to look at
     const heroOwner = charmedOwner != null ? charmedOwner : pi;
@@ -2091,6 +2426,7 @@ io.on('connection', (socket) => {
     const gs = room.gameState;
     const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0 || pi !== gs.activePlayer) return;
+    if (gs.potionTargeting) return;
     const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
     const isActionPhase = gs.currentPhase === 3;
     if (!isMainPhase && !isActionPhase) return; // Main or Action Phase
@@ -2168,6 +2504,7 @@ io.on('connection', (socket) => {
         const ctx = room.engine._createContext(inst, {});
         // onFreeActivate returns true if the effect resolved (HOPT should be claimed)
         const resolved = await script.onFreeActivate(ctx, level);
+        await room.engine._flushSurpriseDrawChecks();
 
         // Restore original controller/owner
         if (charmedOwner != null) {
@@ -2215,6 +2552,7 @@ io.on('connection', (socket) => {
     const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0 || pi !== gs.activePlayer) return;
     if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return;
+    if (gs.potionTargeting) return;
 
     const heroOwner = charmedOwner != null ? charmedOwner : pi;
     const ps = gs.players[heroOwner];
@@ -2231,8 +2569,33 @@ io.on('connection', (socket) => {
     const availableEffects = [];
 
     // Hero's own effect
+    // Check if hero has a Mummy Token — replaces hero's own effect
+    const hasMummyToken = (ps.supportZones[heroIdx] || []).some(slot => (slot || []).includes('Mummy Token'));
+    const mummyTokenScript = hasMummyToken ? loadCardEffect('Mummy Token') : null;
+
     const ownScript = loadCardEffect(hero.name);
-    if (ownScript?.heroEffect && ownScript?.onHeroEffect) {
+    if (hasMummyToken && mummyTokenScript?.heroEffect && mummyTokenScript?.onHeroEffect) {
+      // Mummy Token replaces the hero's own effect
+      const mummyInst = room.engine.cardInstances.find(c =>
+        c.owner === heroOwner && c.zone === 'support' && c.heroIdx === heroIdx && c.name === 'Mummy Token'
+      );
+      const hoptKey = `hero-effect:MummyToken:${pi}:${heroIdx}`;
+      if (gs.hoptUsed?.[hoptKey] !== gs.turn && mummyInst) {
+        let canActivate = true;
+        if (mummyTokenScript.canActivateHeroEffect) {
+          const ctx = room.engine._createContext(mummyInst, { event: 'canHeroEffectCheck' });
+          canActivate = mummyTokenScript.canActivateHeroEffect(ctx);
+        }
+        if (canActivate) {
+          availableEffects.push({
+            name: 'Mummy Token',
+            script: mummyTokenScript,
+            inst: mummyInst,
+            hoptKey,
+          });
+        }
+      }
+    } else if (ownScript?.heroEffect && ownScript?.onHeroEffect) {
       const hoptKey = `hero-effect:${hero.name}:${pi}:${heroIdx}`;
       if (gs.hoptUsed?.[hoptKey] !== gs.turn) {
         let canActivate = true;
@@ -2325,6 +2688,16 @@ io.on('connection', (socket) => {
           return;
         }
 
+        // Check for hero-effect-triggered surprises (Mummy Maker Machine)
+        const heroEffectSurprise = await room.engine._checkSurpriseOnHeroEffect(pi, heroIdx, chosen.name);
+        if (heroEffectSurprise?.negateEffect) {
+          // Surprise negated the hero effect — do NOT consume HOPT so the new effect can be used
+          delete gs._pendingCardReveal;
+          delete gs._pendingPlayLog;
+          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+          return;
+        }
+
         // For charmed heroes: temporarily set controller to the charming player
         const origController2 = chosen.inst.controller;
         const origOwner2 = chosen.inst.owner;
@@ -2339,6 +2712,7 @@ io.on('connection', (socket) => {
 
         const ctx = room.engine._createContext(chosen.inst, {});
         const resolved = await chosen.script.onHeroEffect(ctx);
+        await room.engine._flushSurpriseDrawChecks();
 
         // Restore original controller/owner
         if (charmedOwner != null) {
@@ -2375,6 +2749,7 @@ io.on('connection', (socket) => {
     const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0 || pi !== gs.activePlayer) return;
     if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return;
+    if (gs.potionTargeting) return;
 
     const heroOwner = charmedOwner != null ? charmedOwner : pi;
     const ps = gs.players[heroOwner];
@@ -2446,6 +2821,8 @@ io.on('connection', (socket) => {
           delete gs._pendingCardReveal;
           delete gs._pendingPlayLog;
         }
+        // Flush any accumulated surprise draw checks
+        await room.engine._flushSurpriseDrawChecks();
       } catch (err) {
         console.error('[Engine] activate_creature_effect error:', err.message, err.stack);
       }
@@ -2515,6 +2892,7 @@ io.on('connection', (socket) => {
     sendToSpectators(room, 'summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
 
     room.engine.log('creature_summoned', { player: ps.username, card: cardName, hero: gs.players[pi].heroes[heroIdx]?.name });
+    room.engine._trackTerrorResolvedEffect(pi, cardName);
 
     // Fire hooks, wait for resolution, then advance phase (only if NOT using additional action)
     (async () => {
@@ -2630,6 +3008,7 @@ io.on('connection', (socket) => {
 
         // Fire onPlay hook (spell resolves here)
         await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
+        await room.engine._flushSurpriseDrawChecks();
 
         // If spell was cancelled (player backed out of target selection), unmark and keep in hand
         if (gs._spellCancelled) {
@@ -2808,6 +3187,7 @@ io.on('connection', (socket) => {
       if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
 
       room.engine.log('artifact_equipped', { player: ps.username, card: cardName, hero: hero.name, cost });
+      room.engine._trackTerrorResolvedEffect(pi, cardName);
 
       (async () => {
         try {
@@ -3098,6 +3478,7 @@ io.on('connection', (socket) => {
       gs.potionTargeting = null;
 
       room.engine.log('card_played', { player: ps.username, card: potionName, cardType: cardType, cost: goldCost || 0 });
+      room.engine._trackTerrorResolvedEffect(pi, potionName);
 
       // Mark this specific card instance as resolving
       const nth = ps.hand.slice(0, handIndex + 1).filter(c => c === potionName).length;

@@ -46,7 +46,7 @@ module.exports = {
 
       // Draw cards 1 by 1 with small delays
       for (let i = 0; i < count; i++) {
-        await engine.actionDrawCards(pi, 1);
+        await engine.actionDrawCards(pi, 1, { _nomuBypass: true });
         engine.sync();
         if (i < count - 1) await engine._delay(250);
       }

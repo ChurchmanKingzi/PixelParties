@@ -91,7 +91,7 @@ module.exports = {
     const totalDraw = count + bonusDraw;
     for (let i = 0; i < totalDraw; i++) {
       if ((ps.mainDeck || []).length === 0) break;
-      await engine.actionDrawCards(pi, 1);
+      await engine.actionDrawCards(pi, 1, { _nomuBypass: true });
       engine.sync();
       await engine._delay(200);
     }
