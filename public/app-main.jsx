@@ -141,7 +141,7 @@ function PlayScreen() {
 
   // === GAME BOARD VIEW ===
   if (gameState) {
-    return <GameBoard gameState={gameState} lobby={lobby} onLeave={leaveRoom} />;
+    return <GameBoard gameState={gameState} lobby={lobby} onLeave={leaveRoom} decks={decks} sampleDecks={sampleDecks} selectedDeck={selectedDeck} setSelectedDeck={setSelectedDeck} />;
   }
 
   // === LOBBY VIEW ===

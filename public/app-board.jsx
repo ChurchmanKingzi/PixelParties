@@ -2730,7 +2730,7 @@ function StatusSelectPrompt({ ep, onRespond }) {
   );
 }
 
-function GameBoard({ gameState, lobby, onLeave }) {
+function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck }) {
   const { user, setUser, notify } = useContext(AppContext);
   const isSpectator = gameState.isSpectator || false;
   const myIdx = gameState.myIndex;
@@ -4753,6 +4753,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
       setTimeout(() => angel.remove(), 1200);
     };
     socket.on('play_guardian_angel', onGuardianAngel);
+    const onHeroAnnouncement = ({ text }) => {
+      setAnnouncement({ text, color: 'var(--success)', short: true });
+    };
+    socket.on('hero_announcement', onHeroAnnouncement);
     const onChaosScreen = () => {
       const overlay = document.createElement('div');
       overlay.className = 'chaos-screen-overlay';
@@ -4810,6 +4814,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
       socket.off('play_projectile_animation', onProjectileAnimation);
       socket.off('play_heal_beam', onHealBeam);
       socket.off('play_guardian_angel', onGuardianAngel);
+      socket.off('hero_announcement', onHeroAnnouncement);
       socket.off('play_chaos_screen', onChaosScreen);
       socket.off('play_gold_coins', onGoldCoins);
       socket.off('deck_to_deleted', onDeckToDeleted);
@@ -4952,6 +4957,20 @@ function GameBoard({ gameState, lobby, onLeave }) {
     socket.emit('request_rematch', { roomId: gameState.roomId });
   };
 
+  // Keyboard shortcuts on game-over screen: Escape=Leave, Enter/Space=Rematch
+  const showGameOver = result && (result.setOver || !result.format || result.format === 1 || (result.format > 1 && result.setOver));
+  useEffect(() => {
+    if (!showGameOver) return;
+    const handleKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); handleLeave(); }
+      if ((e.key === 'Enter' || e.key === ' ') && !isSpectator && !oppLeft && !oppDisconnected && !myRematchSent) {
+        e.preventDefault(); handleRematch();
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [showGameOver, isSpectator, oppLeft, oppDisconnected, myRematchSent]);
+
   // Escape closes surrender dialog, deck viewer, cancels potion targeting, cancels effect prompts, declines mulligan — or opens surrender dialog
   useEffect(() => {
     const mulliganActive = gameState.mulliganPending && !mulliganDecided && !isSpectator;
@@ -4973,6 +4992,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
       else if (deckViewer) setDeckViewer(null);
       else if (showSurrender) setShowSurrender(false);
       else if (!gameState.result && !isSpectator) setShowSurrender(true);
+      else if (gameState.result) handleLeave();
     };
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
@@ -7002,11 +7022,17 @@ function GameBoard({ gameState, lobby, onLeave }) {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Confirm'}</div>
             <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{ep.message}</div>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button className="btn btn-success" style={{ padding: '10px 24px', fontSize: 13 }}
                 onClick={() => respondToPrompt({ confirmed: true })}>
                 {ep.confirmLabel || 'Yes'}
               </button>
+              {ep.thirdOption && (
+                <button className="btn btn-info" style={{ padding: '10px 24px', fontSize: 13 }}
+                  onClick={() => respondToPrompt({ option: 'third' })}>
+                  {ep.thirdOption}
+                </button>
+              )}
               <button className="btn" style={{ padding: '10px 24px', fontSize: 13, borderColor: 'var(--danger)', color: 'var(--danger)' }}
                 onClick={() => respondToPrompt({ cancelled: true })}>
                 {ep.cancelLabel || 'No'}
@@ -7524,6 +7550,20 @@ function GameBoard({ gameState, lobby, onLeave }) {
               </div>
             )}
             {renderSCEarned()}
+            {!isSpectator && decks && decks.length > 0 && (
+              <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <label style={{ fontSize: 11, color: 'var(--text2)' }}>🃏 Deck:</label>
+                <select className="select" value={selectedDeck} onChange={e => {
+                  const id = e.target.value;
+                  setSelectedDeck(id);
+                  socket.emit('change_deck', { roomId: gameState.roomId, deckId: id });
+                }} style={{ fontSize: 11, minWidth: 160, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
+                  {(decks||[]).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
+                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
+                </select>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               {isSpectator ? (
                 <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
@@ -7576,6 +7616,20 @@ function GameBoard({ gameState, lobby, onLeave }) {
               </div>
             )}
             {renderSCEarned()}
+            {!isSpectator && decks && decks.length > 0 && (
+              <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <label style={{ fontSize: 11, color: 'var(--text2)' }}>🃏 Deck:</label>
+                <select className="select" value={selectedDeck} onChange={e => {
+                  const id = e.target.value;
+                  setSelectedDeck(id);
+                  socket.emit('change_deck', { roomId: gameState.roomId, deckId: id });
+                }} style={{ fontSize: 11, minWidth: 160, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
+                  {(decks||[]).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
+                  {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
+                </select>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               {isSpectator ? (
                 <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>

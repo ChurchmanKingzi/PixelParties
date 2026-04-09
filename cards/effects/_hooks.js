@@ -79,6 +79,9 @@ const HOOKS = {
 
   // ── Status damage modification ──
   MODIFY_POISON_DAMAGE: 'modifyPoisonDamage',  // Fires before each poison tick; hookCtx.amount can be modified
+
+  // ── Batch draw modification ──
+  BEFORE_DRAW_BATCH: 'beforeDrawBatch',  // Fires once before a batch of draws; hookCtx.amount can be modified or hookCtx.cancelled set
 };
 
 // ── Status damage base values ──

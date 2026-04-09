@@ -1495,7 +1495,7 @@ function sendSpectatorGameState(room) {
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
-    customPlacementCards: [],
+    customPlacementCards: (gs.players[playerIdx]?.hand || []).filter(cn => { const s = loadCardEffect(cn); return s?.customPlacement; }),
     awaitingFirstChoice: gs.awaitingFirstChoice || false,
     choosingPlayerName,
     mulliganPending: gs.mulliganPending || false,
@@ -1733,7 +1733,6 @@ async function startGameEngine(room, roomId, activePlayer) {
     const ps = room.gameState.players[pi];
     const drawn = ps.mainDeck.splice(0, 5);
     ps.hand.push(...drawn);
-
   }
 
   room.gameState.mulliganPending = true;
@@ -1862,6 +1861,15 @@ io.on('connection', (socket) => {
     if (hs) io.to(hs).emit('player_joined', { username: currentUser.username });
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
     io.emit('rooms', getRoomList());
+  });
+
+  socket.on('change_deck', ({ roomId, deckId }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId); if (!room) return;
+    const player = room.players.find(p => p.userId === currentUser.userId);
+    if (!player) return;
+    player.deckId = deckId || null;
+    socket.emit('deck_changed', { deckId: player.deckId });
   });
 
   socket.on('start_game', async ({ roomId }) => {

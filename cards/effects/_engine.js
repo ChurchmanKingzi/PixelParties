@@ -1747,6 +1747,14 @@ class GameEngine {
     if (!ps) return [];
     if (ps.handLocked) return [];
 
+    // Fire batch-level draw hook (Intrude, etc.) — only for effect draws, not Resource Phase
+    if (!opts._skipBatchHook && this.gs.currentPhase !== PHASES.RESOURCE) {
+      const batchCtx = { playerIdx, amount: count, deckType: 'main', _skipReactionCheck: true };
+      await this.runHooks(HOOKS.BEFORE_DRAW_BATCH, batchCtx);
+      count = Math.max(0, batchCtx.amount);
+      if (count === 0) return [];
+    }
+
     // Nomu check: if drawing exactly 1 card, auto-draw 1 extra from main deck
     let nomuExtraDraw = false;
     if (count === 1 && !opts._nomuBypass && !this._inNomuResolution) {
@@ -1820,6 +1828,14 @@ class GameEngine {
   async actionDrawFromPotionDeck(playerIdx, count) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
+
+    // Fire batch-level draw hook (Intrude, etc.)
+    if (this.gs.currentPhase !== PHASES.RESOURCE) {
+      const batchCtx = { playerIdx, amount: count, deckType: 'potion', _skipReactionCheck: true };
+      await this.runHooks(HOOKS.BEFORE_DRAW_BATCH, batchCtx);
+      count = Math.max(0, batchCtx.amount);
+      if (count === 0) return [];
+    }
     const drawn = [];
     for (let i = 0; i < count; i++) {
       if ((ps.potionDeck || []).length === 0) break;
