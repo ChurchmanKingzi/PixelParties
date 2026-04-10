@@ -55,6 +55,7 @@ module.exports = {
       side: 'enemy',
       types: ['hero', 'creature'],
       damageType: 'destruction_spell',
+      baseDamage: damage,
       title: 'Alice, the Puppeteer Girl',
       description: `Deal ${damage} damage (50 × ${creatureCount} Creature${creatureCount !== 1 ? 's' : ''}) to an enemy target.`,
       confirmLabel: `⚡ ${damage} Damage!`,

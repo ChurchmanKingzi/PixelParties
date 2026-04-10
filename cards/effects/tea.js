@@ -189,12 +189,7 @@ module.exports = {
     if (firstTarget.type === 'hero') {
       const hero = engine.gs.players[firstTarget.owner]?.heroes?.[firstTarget.heroIdx];
       if (hero?.statuses) {
-        for (const key of removedStatuses) {
-          if (hero.statuses[key]) {
-            delete hero.statuses[key];
-            engine.log('status_remove', { target: hero.name, status: key, by: 'Tea' });
-          }
-        }
+        engine.cleanseHeroStatuses(hero, firstTarget.owner, firstTarget.heroIdx, removedStatuses, 'Tea');
       }
     } else if (firstTarget.type === 'equip') {
       const inst = engine.cardInstances.find(c =>
@@ -202,13 +197,7 @@ module.exports = {
         c.heroIdx === firstTarget.heroIdx && c.zoneSlot === firstTarget.slotIdx
       );
       if (inst) {
-        for (const key of removedStatuses) {
-          if (inst.counters[key]) {
-            delete inst.counters[key];
-            if (key === 'poisoned') delete inst.counters.poisonStacks;
-            engine.log('status_remove', { target: inst.name, status: key, by: 'Tea' });
-          }
-        }
+        engine.cleanseCreatureStatuses(inst, removedStatuses, 'Tea');
       }
     }
 

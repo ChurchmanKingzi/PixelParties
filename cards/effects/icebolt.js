@@ -20,6 +20,7 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'destruction_spell',
+        baseDamage: 120,
         title: 'Icebolt',
         description: 'Choose a target to deal 120 damage and Freeze.',
         confirmLabel: '❄️ Icebolt! (120)',

@@ -37,6 +37,7 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'attack',
+        baseDamage: baseAtk,
         title: 'Ferocious Tiger Kick',
         description: desc,
         confirmLabel: `🐯 Tiger Kick! (${baseAtk})`,

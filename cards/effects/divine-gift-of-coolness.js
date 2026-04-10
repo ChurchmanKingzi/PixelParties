@@ -161,12 +161,7 @@ module.exports = {
 
       // ── Cleanse all existing negative statuses ──
       const negKeys = getNegativeStatuses();
-      for (const key of negKeys) {
-        if (hero.statuses?.[key]) {
-          delete hero.statuses[key];
-          engine.log('status_remove', { target: hero.name, status: key, by: 'Divine Gift of Coolness' });
-        }
-      }
+      engine.cleanseHeroStatuses(hero, pi, targetHero, negKeys, 'Divine Gift of Coolness');
 
       // Fire zone enter hook
       await engine.runHooks('onCardEnterZone', {

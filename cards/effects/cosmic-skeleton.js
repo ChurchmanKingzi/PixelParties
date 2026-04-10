@@ -51,6 +51,7 @@ module.exports = {
       side: 'any',
       types: ['hero', 'creature'],
       damageType: 'other',
+      baseDamage: 150,
       title: 'Cosmic Skeleton',
       description: 'Deal 150 damage to any target.',
       confirmLabel: '💀 Fire! (150)',

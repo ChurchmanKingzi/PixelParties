@@ -504,9 +504,9 @@ app.get('/api/profile/hero-stats', authMiddleware, async (req, res) => {
 // ===== AVAILABLE CARDS (based on ./cards folder) =====
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
 
-// Build reverse lookup: filename-safe name (no commas) → actual card name
+// Build reverse lookup: filename-safe name (no punctuation) → actual card name
 const nameByStripped = {};
-getCardArray().forEach(c => { nameByStripped[c.name.replace(/,/g, '')] = c.name; });
+getCardArray().forEach(c => { nameByStripped[c.name.replace(/[^a-zA-Z0-9 ]/g, '')] = c.name; });
 
 app.get('/api/cards/available', async (req, res) => {
   const cardsDir = path.join(__dirname, 'cards');
@@ -518,7 +518,8 @@ app.get('/api/cards/available', async (req, res) => {
       .filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
       .forEach(f => {
         const stem = path.basename(f, path.extname(f));
-        const realName = nameByStripped[stem] || stem;
+        const stripped = stem.replace(/[^a-zA-Z0-9 ]/g, '');
+        const realName = nameByStripped[stripped] || stem;
         available[realName] = f;
       });
     res.json({ available });
@@ -1242,6 +1243,7 @@ function sendGameState(room, playerIdx, extra) {
       abilityGivenThisTurn: ps.abilityGivenThisTurn || [false,false,false],
       summonLocked: ps.summonLocked || false,
       damageLocked: ps.damageLocked || false,
+      itemLocked: ps.itemLocked || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
@@ -1261,6 +1263,7 @@ function sendGameState(room, playerIdx, extra) {
       })() : [],
       supportSpellLocked: ps.supportSpellLocked || false,
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
+      heroesActedThisTurn: ps.heroesActedThisTurn || [],
       permanents: ps.permanents || [],
       oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
       resolvingCard: ps._resolvingCard || null,
@@ -1302,7 +1305,7 @@ function sendGameState(room, playerIdx, extra) {
         const key = `${inst.controller}-${inst.heroIdx}-${inst.zoneSlot}`;
         const hasCounters = Object.keys(inst.counters).length > 0;
         const hasSummoningSickness = inst.turnPlayed === currentTurn && (() => {
-          const script = loadCardEffect(inst.name);
+          const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
           return !!(script?.creatureEffect);
         })();
         const isFaceDown = !!inst.faceDown;
@@ -1410,7 +1413,7 @@ function sendGameState(room, playerIdx, extra) {
         }
         if (!hasFreeSlot) continue;
         // Check custom summon conditions
-        const script = loadCardEffect(inst.name);
+        const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
         if (script?.canSummon && !script.canSummon({ _engine: room.engine, cardOwner: playerIdx, cardHeroIdx: hi })) continue;
         result.push({ heroIdx: hi, cardName: inst.name });
       }
@@ -1480,6 +1483,7 @@ function sendSpectatorGameState(room) {
       abilityGivenThisTurn: ps.abilityGivenThisTurn || [false, false, false],
       summonLocked: ps.summonLocked || false,
       damageLocked: ps.damageLocked || false,
+      itemLocked: ps.itemLocked || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
@@ -1518,7 +1522,7 @@ function sendSpectatorGameState(room) {
         const key = `${inst.controller}-${inst.heroIdx}-${inst.zoneSlot}`;
         const hasCounters = Object.keys(inst.counters).length > 0;
         const hasSummoningSickness = inst.turnPlayed === currentTurn && (() => {
-          const script = loadCardEffect(inst.name);
+          const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
           return !!(script?.creatureEffect);
         })();
         const isFaceDown = !!inst.faceDown;
@@ -1626,20 +1630,92 @@ async function endGame(room, winnerIdx, reason) {
 
   // Auto-advance to next round after 4 seconds (if set not over)
   if (!setOver) {
+    // Check if either player has a side deck
+    const hasSideDeck = room._currentDecks && room._currentDecks.some(d => d && (d.sideDeck || []).length > 0);
     room._setAdvanceTimer = setTimeout(async () => {
       delete room._setAdvanceTimer;
-      // Set up fresh game state
-      await setupGameState(room);
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
-      // Ask loser who goes first
-      const loserPs = room.gameState.players[loserIdx];
-      if (loserPs?.socketId) {
-        room._pendingRematch = { roomId: room.id, loserIdx };
-        io.to(loserPs.socketId).emit('rematch_choose_first', {});
+      room._pendingLoserIdx = loserIdx;
+
+      if (hasSideDeck && room.format > 1) {
+        // Enter side-deck phase
+        room._sideDeckDone = [false, false];
+        room._sideDeckPhase = true;
+
+        // Auto-done players with empty side decks
+        for (let i = 0; i < 2; i++) {
+          if ((room._currentDecks[i]?.sideDeck || []).length === 0) {
+            room._sideDeckDone[i] = true;
+          }
+        }
+
+        // Send side-deck state to both players
+        for (let i = 0; i < 2; i++) {
+          const sid = gs.players[i]?.socketId;
+          if (sid) {
+            io.to(sid).emit('side_deck_phase', {
+              currentDeck: room._currentDecks[i],
+              originalDeck: room._originalDecks[i],
+              opponentDone: room._sideDeckDone[i === 0 ? 1 : 0],
+              setScore: [...room.setScore],
+              format: room.format,
+              autoDone: room._sideDeckDone[i],
+            });
+          }
+        }
+
+        // If both auto-done (both have empty side decks), proceed immediately
+        if (room._sideDeckDone[0] && room._sideDeckDone[1]) {
+          room._sideDeckPhase = false;
+          delete room._sideDeckDone;
+          await advanceToNextGame(room, loserIdx);
+        }
       } else {
-        await startGameEngine(room, room.id, loserIdx);
+        // No side decks or bo1 — skip to next game
+        await advanceToNextGame(room, loserIdx);
       }
-    }, 4000);
+    }, 2000);
+  }
+}
+
+/**
+ * Server-side mirror of canCardTypeEnterSection (app-shared.jsx).
+ * Checks if a card's TYPE is compatible with a deck pool.
+ * Only type rules — no copy limits or deck size checks.
+ * IMPORTANT: When adding new card effects that modify deckbuilding rules,
+ * update BOTH this function AND canCardTypeEnterSection() in app-shared.jsx.
+ */
+function canCardTypeEnterPool(cardDB, deck, cardName, pool) {
+  const card = cardDB[cardName];
+  if (!card) return false;
+  const ct = card.cardType;
+  if (ct === 'Token') return false;
+  if (pool === 'main') {
+    if (ct === 'Hero') return false;
+    if (ct === 'Potion') {
+      return (deck.heroes || []).some(h => h?.hero === 'Nicolas, the Hidden Alchemist');
+    }
+    return true;
+  }
+  if (pool === 'potion') return ct === 'Potion';
+  if (pool === 'hero') return ct === 'Hero';
+  if (pool === 'side') return true;
+  return false;
+}
+
+async function advanceToNextGame(room, loserIdx) {
+  await setupGameState(room);
+  // Notify clients that side-deck phase is over
+  for (let i = 0; i < 2; i++) {
+    const sid = room.gameState.players[i]?.socketId;
+    if (sid) io.to(sid).emit('side_deck_complete');
+  }
+  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  const loserPs = room.gameState.players[loserIdx];
+  if (loserPs?.socketId) {
+    room._pendingRematch = { roomId: room.id, loserIdx };
+    io.to(loserPs.socketId).emit('rematch_choose_first', {});
+  } else {
+    await startGameEngine(room, room.id, loserIdx);
   }
 }
 
@@ -1661,29 +1737,46 @@ async function setupGameState(room) {
   const shuffle = (arr) => { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
 
   const playerStates = [];
-  for (const p of room.players) {
+  for (let idx = 0; idx < room.players.length; idx++) {
+    const p = room.players[idx];
     let deck = null;
 
-    // Check if the selected deck is a sample deck
-    if (p.deckId && p.deckId.startsWith('sample-')) {
-      const samples = loadSampleDecks();
-      deck = samples.find(s => s.id === p.deckId) || null;
-    }
-
-    if (!deck) {
-      let deckRow = p.deckId ? await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [p.deckId, p.userId]) : null;
-      if (!deckRow) deckRow = await db.get('SELECT * FROM decks WHERE user_id = ? AND is_default = 1', [p.userId]);
-      if (!deckRow) deckRow = await db.get('SELECT * FROM decks WHERE user_id = ? ORDER BY created_at LIMIT 1', [p.userId]);
-      deck = deckRow ? parseDeck(deckRow) : null;
-    }
-
-    if (!deck || (!deck.mainDeck.length && !deck.heroes.some(h => h.hero))) {
-      const samples = loadSampleDecks();
-      if (samples.length > 0) {
-        const hash = [...p.userId].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0);
-        deck = samples[Math.abs(hash) % samples.length];
+    // Use side-decked override if available (subsequent games in a set)
+    if (room._currentDecks && room._currentDecks[idx]) {
+      deck = room._currentDecks[idx];
+    } else {
+      // Check if the selected deck is a sample deck
+      if (p.deckId && p.deckId.startsWith('sample-')) {
+        const samples = loadSampleDecks();
+        deck = samples.find(s => s.id === p.deckId) || null;
       }
+
+      if (!deck) {
+        let deckRow = p.deckId ? await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [p.deckId, p.userId]) : null;
+        if (!deckRow) deckRow = await db.get('SELECT * FROM decks WHERE user_id = ? AND is_default = 1', [p.userId]);
+        if (!deckRow) deckRow = await db.get('SELECT * FROM decks WHERE user_id = ? ORDER BY created_at LIMIT 1', [p.userId]);
+        deck = deckRow ? parseDeck(deckRow) : null;
+      }
+
+      if (!deck || (!deck.mainDeck.length && !deck.heroes.some(h => h.hero))) {
+        const samples = loadSampleDecks();
+        if (samples.length > 0) {
+          const hash = [...p.userId].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0);
+          deck = samples[Math.abs(hash) % samples.length];
+        }
+      }
+
+      // Save original deck state at match start (for side-deck reset)
+      if (!room._originalDecks) room._originalDecks = [{}, {}];
+      room._originalDecks[idx] = JSON.parse(JSON.stringify({
+        mainDeck: deck?.mainDeck || [], heroes: deck?.heroes || [],
+        potionDeck: deck?.potionDeck || [], sideDeck: deck?.sideDeck || [],
+        skins: deck?.skins || {},
+      }));
+      if (!room._currentDecks) room._currentDecks = [null, null];
+      room._currentDecks[idx] = JSON.parse(JSON.stringify(room._originalDecks[idx]));
     }
+
     const usr = await db.get('SELECT * FROM users WHERE id = ?', [p.userId]);
     const heroes = (deck?.heroes||[]).map(h => {
       const c = h.hero ? cardsByName[h.hero] : null;
@@ -1704,7 +1797,7 @@ async function setupGameState(room) {
       heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
       hand:[], mainDeck, potionDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
       abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0],
-      damageLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
+      damageLocked:false, itemLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
       permanents:[], _oncePerGameUsed: new Set(), _resolvingCard: null, deckSkins: deck?.skins || {} });
   }
   room.gameState = { players:playerStates, areaZones:[[],[]], turn:0, activePlayer:0, currentPhase:0, result:null, rematchRequests:[], awaitingFirstChoice:true,
@@ -1906,23 +1999,41 @@ io.on('connection', (socket) => {
 
     if (accept) {
       const ps = gs.players[pi];
+      const cardDB = getCardDB();
       (async () => {
-        // Return cards to deck one by one (reverse draw animation)
+        // Separate potions from non-potions for routing
         const handSize = ps.hand.length;
+        let potionCount = 0;
+        // Return cards to correct deck one by one (reverse draw animation)
         for (let i = 0; i < handSize; i++) {
           const card = ps.hand.shift();
-          ps.mainDeck.push(card);
+          const cd = cardDB[card];
+          if (cd?.cardType === 'Potion') {
+            ps.potionDeck.push(card);
+            potionCount++;
+          } else {
+            ps.mainDeck.push(card);
+          }
           for (let p = 0; p < 2; p++) sendGameState(room, p); sendSpectatorGameState(room);
           await new Promise(r => setTimeout(r, 180));
         }
         // Wait 1 second
         await new Promise(r => setTimeout(r, 1000));
-        // Shuffle deck
+        // Shuffle both decks
         shuffle(ps.mainDeck);
-        // Draw 5 new cards one by one
-        for (let i = 0; i < 5; i++) {
+        shuffle(ps.potionDeck);
+        // Draw replacements: potions from potion deck, rest from main deck
+        const mainToDraw = handSize - potionCount;
+        for (let i = 0; i < mainToDraw; i++) {
           if (ps.mainDeck.length === 0) break;
           const card = ps.mainDeck.shift();
+          ps.hand.push(card);
+          for (let p = 0; p < 2; p++) sendGameState(room, p); sendSpectatorGameState(room);
+          await new Promise(r => setTimeout(r, 200));
+        }
+        for (let i = 0; i < potionCount; i++) {
+          if (ps.potionDeck.length === 0) break;
+          const card = ps.potionDeck.shift();
           ps.hand.push(card);
           for (let p = 0; p < 2; p++) sendGameState(room, p); sendSpectatorGameState(room);
           await new Promise(r => setTimeout(r, 200));
@@ -2648,10 +2759,8 @@ io.on('connection', (socket) => {
     }
 
     if (availableEffects.length === 0) {
-      console.log(`[HeroEffect] No available effects for hero ${heroIdx} (${hero.name})`);
       return;
     }
-    console.log(`[HeroEffect] ${availableEffects.length} effect(s) for hero ${heroIdx} (${hero.name}):`, availableEffects.map(e => `${e.name}${e.inst?.zone === 'support' ? ' (equipped)' : ' (own)'}`));
 
     (async () => {
       try {
@@ -2770,14 +2879,15 @@ io.on('connection', (socket) => {
     if (slot.length === 0) return;
     const creatureName = slot[0];
 
-    const { loadCardEffect } = require('./cards/effects/_loader');
-    const script = loadCardEffect(creatureName);
-    if (!script?.creatureEffect || !script?.onCreatureEffect) return;
-
     const inst = room.engine.cardInstances.find(c =>
       c.owner === heroOwner && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
     );
     if (!inst) return;
+
+    const { loadCardEffect } = require('./cards/effects/_loader');
+    const effectName = inst.counters?._effectOverride || creatureName;
+    const script = loadCardEffect(effectName);
+    if (!script?.creatureEffect || !script?.onCreatureEffect) return;
 
     // Summoning sickness: cannot activate on the turn summoned
     if (inst.turnPlayed === (gs.turn || 0)) return;
@@ -2857,10 +2967,11 @@ io.on('connection', (socket) => {
     const creatureHero = ps.heroes?.[heroIdx];
     if (creatureHero?.statuses?.charmed) return;
 
-    // Additional action handling — creatures in Main Phase MUST use one
-    const additionalTypeId = room.engine.findAdditionalActionForCard(pi, cardName);
+    // Additional action handling — creatures in Main Phase or Action Phase after normal action MUST use one
+    const additionalTypeId = room.engine.findAdditionalActionForCard(pi, cardName, heroIdx);
     const usingAdditional = !!additionalTypeId;
-    if (isMainPhase && !usingAdditional) return;
+    const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0);
+    if ((isMainPhase || actionAlreadyUsed) && !usingAdditional) return;
 
     // Validate support zone slot is free
     if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
@@ -2926,6 +3037,15 @@ io.on('connection', (socket) => {
         if (isActionPhase && !usingAdditional) {
           await room.engine.advanceToPhase(pi, 4);
         }
+        // After consuming an additional action in Action Phase, auto-advance if none remain
+        if (isActionPhase && usingAdditional) {
+          const hasMore = room.engine.cardInstances.some(c =>
+            c.owner === pi && c.counters.additionalActionAvail
+          );
+          if (!hasMore) {
+            await room.engine.advanceToPhase(pi, 4);
+          }
+        }
       } catch (err) {
         console.error('[Engine] play_creature hooks error:', err.message);
       }
@@ -2934,7 +3054,7 @@ io.on('connection', (socket) => {
   });
 
   // Play a spell or attack from hand (drag onto a hero)
-  socket.on('play_spell', ({ roomId, cardName, handIndex, heroIdx, charmedOwner }) => {
+  socket.on('play_spell', ({ roomId, cardName, handIndex, heroIdx, charmedOwner, attachmentZoneSlot }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine || !room.gameState) return;
@@ -2945,8 +3065,9 @@ io.on('connection', (socket) => {
     if (!v) return;
     const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
 
-    // Check if this needs an additional action (Main Phase play)
-    const needsAdditional = isMainPhase && !isInherentAction;
+    // Check if this needs an additional action (Main Phase play, or Action Phase after normal action used)
+    const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0);
+    const needsAdditional = (isMainPhase && !isInherentAction) || actionAlreadyUsed;
     let additionalConsumed = false;
     let consumedInst = null;
     if (needsAdditional) {
@@ -2973,7 +3094,7 @@ io.on('connection', (socket) => {
 
         // ── Reaction chain window — opponents can chain before spell resolves ──
         const chainResult = await room.engine.executeCardWithChain({
-          cardName, owner: pi, cardType: cardData.cardType, goldCost: 0,
+          cardName, owner: pi, cardType: cardData.cardType, goldCost: 0, heroIdx,
           resolve: null, // Resolution handled by onPlay below
         });
 
@@ -3015,7 +3136,9 @@ io.on('connection', (socket) => {
         }
 
         // Fire onPlay hook (spell resolves here)
+        if (attachmentZoneSlot != null && attachmentZoneSlot >= 0) gs._attachmentZoneSlot = attachmentZoneSlot;
         await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
+        delete gs._attachmentZoneSlot;
         await room.engine._flushSurpriseDrawChecks();
 
         // If spell was cancelled (player backed out of target selection), unmark and keep in hand
@@ -3054,6 +3177,10 @@ io.on('connection', (socket) => {
         for (const t of (gs._spellDamageLog || [])) {
           if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
         }
+
+        // Track which heroes performed actions this turn (BEFORE afterSpellResolved so hooks see updated state)
+        if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
+        if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
 
         // Fire afterSpellResolved hook (Bartas, etc.)
         await room.engine.runHooks('afterSpellResolved', {
@@ -3105,9 +3232,6 @@ io.on('connection', (socket) => {
           if (!ps.heroesAttackedThisTurn) ps.heroesAttackedThisTurn = [];
           if (!ps.heroesAttackedThisTurn.includes(heroIdx)) ps.heroesAttackedThisTurn.push(heroIdx);
         }
-        // Track which heroes performed actions this turn
-        if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
-        if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
 
         // Fire action hooks (only when an action is actually consumed)
         if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction) {
@@ -3130,6 +3254,15 @@ io.on('connection', (socket) => {
         // _preventPhaseAdvance can be set by hooks (Ghuanjun combo) to keep the phase open
         if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction && !gs._preventPhaseAdvance) {
           await room.engine.advanceToPhase(pi, 4);
+        }
+        // After consuming an additional action in Action Phase, auto-advance if none remain
+        if (isActionPhase && additionalConsumed && !gs._preventPhaseAdvance) {
+          const hasMore = room.engine.cardInstances.some(c =>
+            c.owner === pi && c.counters.additionalActionAvail
+          );
+          if (!hasMore) {
+            await room.engine.advanceToPhase(pi, 4);
+          }
         }
         delete gs._preventPhaseAdvance;
 
@@ -3157,6 +3290,7 @@ io.on('connection', (socket) => {
     if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return; // Must be Main Phase
 
     const ps = gs.players[pi];
+    if (ps.itemLocked) return; // Hammer Throw lock
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
 
     const cardData = getCardDB()[cardName];
@@ -3329,8 +3463,16 @@ io.on('connection', (socket) => {
           } else if (chainResult.resolveResult?.placed) {
             checkPotionLock(ps, gs, pi);
           } else {
-            ps.deletedPile.push(cardName);
-            checkPotionLock(ps, gs, pi);
+            // Fire afterPotionUsed hook — Biomancy etc. can intercept and place the potion
+            const potionHookCtx = { potionName: cardName, potionOwner: pi, placed: false, _skipReactionCheck: true };
+            await room.engine.runHooks('afterPotionUsed', potionHookCtx);
+            if (potionHookCtx.placed) {
+              // Potion was converted to a Token and placed on the board
+              checkPotionLock(ps, gs, pi);
+            } else {
+              ps.deletedPile.push(cardName);
+              checkPotionLock(ps, gs, pi);
+            }
           }
         } else {
           // Card was already removed from hand during resolution (e.g. self-discarded)
@@ -3354,12 +3496,14 @@ io.on('connection', (socket) => {
     if (gs.potionTargeting) return;
 
     const ps = gs.players[pi];
+    if (ps.itemLocked) return; // Hammer Throw lock
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
     if (ps._resolvingCard && handIndex === getResolvingHandIndex(ps)) return; // This specific card is resolving
 
     const cardData = getCardDB()[cardName];
     if (!cardData || cardData.cardType !== 'Artifact') return;
     if ((cardData.subtype || '').toLowerCase() === 'equipment') return; // Equips use play_artifact
+    if ((cardData.subtype || '').toLowerCase() === 'reaction') return; // Reaction artifacts are not manually playable
 
     const cost = cardData.cost || 0;
     if ((ps.gold || 0) < cost) return;
@@ -3561,7 +3705,12 @@ io.on('connection', (socket) => {
         if (chainResult.negated) {
           ps.discardPile.push(potionName);
         } else if (cardType === 'Potion') {
-          ps.deletedPile.push(potionName);
+          // Fire afterPotionUsed hook — Biomancy etc. can intercept
+          const potionHookCtx = { potionName, potionOwner: pi, placed: false, _skipReactionCheck: true };
+          await room.engine.runHooks('afterPotionUsed', potionHookCtx);
+          if (!potionHookCtx.placed) {
+            ps.deletedPile.push(potionName);
+          }
           checkPotionLock(ps, gs, pi);
         } else {
           ps.discardPile.push(potionName);
@@ -3766,6 +3915,227 @@ io.on('connection', (socket) => {
       if (ps._resolvingCard && response.handIndex === getResolvingHandIndex(ps)) return;
     }
     room.engine.resolveGenericPrompt(response);
+  });
+
+  // Relay blind-pick selection to the victim so they see highlighted cards
+  socket.on('blind_pick_update', ({ roomId, indices }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.gameState) return;
+    const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+    const oppIdx = pi === 0 ? 1 : 0;
+    const oppSid = room.gameState.players[oppIdx]?.socketId;
+    if (oppSid) io.to(oppSid).emit('blind_pick_highlight', { indices: indices || [] });
+  });
+
+  // ── Side-Deck Phase Handlers (Bo3/Bo5) ──
+
+  socket.on('side_deck_swap', ({ roomId, from, fromIdx, to, toIdx }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room || !room._sideDeckPhase || !room._currentDecks) return;
+    const pi = room.players.findIndex(p => p.userId === currentUser.userId);
+    if (pi < 0 || room._sideDeckDone?.[pi]) return;
+
+    const deck = room._currentDecks[pi];
+    if (!deck) return;
+
+    const getPool = (key) => {
+      if (key === 'main') return deck.mainDeck;
+      if (key === 'potion') return deck.potionDeck;
+      if (key === 'side') return deck.sideDeck;
+      if (key === 'hero') return null; // handled separately
+      return null;
+    };
+
+    // Hero swap: swap entire hero slot with a hero from side deck
+    if (from === 'hero' || to === 'hero') {
+      const heroKey = from === 'hero' ? from : to;
+      const sideKey = from === 'hero' ? to : from;
+      const heroSlotIdx = from === 'hero' ? fromIdx : toIdx;
+      const sideIdx = from === 'hero' ? toIdx : fromIdx;
+      if (sideKey !== 'side') return;
+      if (heroSlotIdx < 0 || heroSlotIdx >= (deck.heroes || []).length) return;
+      if (sideIdx < 0 || sideIdx >= (deck.sideDeck || []).length) return;
+
+      const cardDB = getCardDB();
+      const sideCardName = deck.sideDeck[sideIdx];
+
+      // Side card must be a Hero
+      if (!canCardTypeEnterPool(cardDB, deck, sideCardName, 'hero')) return;
+
+      const oldHero = deck.heroes[heroSlotIdx];
+      const oldHeroName = oldHero?.hero;
+
+      // Simulate deck state after swap to check Nicolas-dependent rules
+      const simHeroes = (deck.heroes || []).map((h, i) =>
+        i === heroSlotIdx ? { hero: sideCardName } : h
+      );
+      const simDeck = { ...deck, heroes: simHeroes };
+      // If main deck has potions, Nicolas must still be present after swap
+      const mainPotions = (deck.mainDeck || []).filter(n => cardDB[n]?.cardType === 'Potion');
+      if (mainPotions.length > 0 && !simDeck.heroes.some(h => h?.hero === 'Nicolas, the Hidden Alchemist')) return;
+
+      // Find starting abilities for the new hero from card data
+      const newHeroData = cardDB[sideCardName];
+      const newAbility1 = newHeroData.startingAbility1 || null;
+      const newAbility2 = newHeroData.startingAbility2 || null;
+
+      // Swap hero into side deck, side card into hero slot
+      deck.heroes[heroSlotIdx] = { hero: sideCardName, ability1: newAbility1, ability2: newAbility2 };
+      deck.sideDeck[sideIdx] = oldHeroName || '';
+      // Remove empty strings from side deck
+      deck.sideDeck = deck.sideDeck.filter(c => c);
+      if (oldHeroName) deck.sideDeck.push(oldHeroName);
+    } else {
+      // Card swap between main/potion ↔ side
+      const fromPool = getPool(from);
+      const toPool = getPool(to);
+      if (!fromPool || !toPool) return;
+      if (fromIdx < 0 || fromIdx >= fromPool.length) return;
+      if (toIdx < 0 || toIdx >= toPool.length) return;
+
+      // No direct main↔potion
+      if ((from === 'main' && to === 'potion') || (from === 'potion' && to === 'main')) return;
+
+      const cardDB = getCardDB();
+      const fromCardName = fromPool[fromIdx];
+      const toCardName = toPool[toIdx];
+
+      // Simulate deck state after swap for Nicolas-dependent checks
+      const simDeck = { ...deck, heroes: [...(deck.heroes || [])] };
+
+      // Validate both directions using shared type rules
+      if (!canCardTypeEnterPool(cardDB, simDeck, fromCardName, to)) return;
+      if (!canCardTypeEnterPool(cardDB, simDeck, toCardName, from)) return;
+
+      // Swap the cards
+      const tmp = fromPool[fromIdx];
+      fromPool[fromIdx] = toPool[toIdx];
+      toPool[toIdx] = tmp;
+    }
+
+    // Send updated deck back to the player
+    const sid = room.gameState?.players[pi]?.socketId;
+    if (sid) {
+      io.to(sid).emit('side_deck_update', {
+        currentDeck: deck,
+        opponentDone: room._sideDeckDone[pi === 0 ? 1 : 0] || false,
+      });
+    }
+  });
+
+  // Move a card from one pool to another (not swap — add/remove)
+  socket.on('side_deck_move', ({ roomId, from, fromIdx, to }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room || !room._sideDeckPhase || !room._currentDecks) return;
+    const pi = room.players.findIndex(p => p.userId === currentUser.userId);
+    if (pi < 0 || room._sideDeckDone?.[pi]) return;
+
+    const deck = room._currentDecks[pi];
+    if (!deck) return;
+
+    const getPool = (key) => {
+      if (key === 'main') return deck.mainDeck;
+      if (key === 'potion') return deck.potionDeck;
+      if (key === 'side') return deck.sideDeck;
+      return null;
+    };
+
+    const fromPool = getPool(from);
+    const toPool = getPool(to);
+    if (!fromPool || !toPool || from === to) return;
+    if (fromIdx < 0 || fromIdx >= fromPool.length) return;
+
+    const cardDB = getCardDB();
+    const cardName = fromPool[fromIdx];
+
+    // No direct main↔potion
+    if ((from === 'main' && to === 'potion') || (from === 'potion' && to === 'main')) return;
+    // Validate using shared type rules
+    if (!canCardTypeEnterPool(cardDB, deck, cardName, to)) return;
+
+    const card = fromPool.splice(fromIdx, 1)[0];
+    toPool.push(card);
+
+    const sid = room.gameState?.players[pi]?.socketId;
+    if (sid) {
+      io.to(sid).emit('side_deck_update', {
+        currentDeck: deck,
+        opponentDone: room._sideDeckDone[pi === 0 ? 1 : 0] || false,
+      });
+    }
+  });
+
+  socket.on('side_deck_reset', ({ roomId }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room || !room._sideDeckPhase || !room._originalDecks || !room._currentDecks) return;
+    const pi = room.players.findIndex(p => p.userId === currentUser.userId);
+    if (pi < 0 || room._sideDeckDone?.[pi]) return;
+
+    // Deep clone original back to current
+    room._currentDecks[pi] = JSON.parse(JSON.stringify(room._originalDecks[pi]));
+
+    const sid = room.gameState?.players[pi]?.socketId;
+    if (sid) {
+      io.to(sid).emit('side_deck_update', {
+        currentDeck: room._currentDecks[pi],
+        opponentDone: room._sideDeckDone[pi === 0 ? 1 : 0] || false,
+      });
+    }
+  });
+
+  socket.on('side_deck_done', async ({ roomId }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room || !room._sideDeckPhase || !room._sideDeckDone) return;
+    const pi = room.players.findIndex(p => p.userId === currentUser.userId);
+    if (pi < 0) return;
+
+    room._sideDeckDone[pi] = true;
+
+    // Notify opponent
+    const oi = pi === 0 ? 1 : 0;
+    const oppSid = room.gameState?.players[oi]?.socketId;
+    if (oppSid) io.to(oppSid).emit('side_deck_opponent_done');
+
+    // If both done, proceed to next game
+    if (room._sideDeckDone[0] && room._sideDeckDone[1]) {
+      room._sideDeckPhase = false;
+      delete room._sideDeckDone;
+      const loserIdx = room._pendingLoserIdx ?? 0;
+      delete room._pendingLoserIdx;
+      await advanceToNextGame(room, loserIdx);
+    }
+  });
+
+  // ── Surrender Game vs Surrender Match (Bo3/Bo5) ──
+
+  socket.on('surrender_game', async ({ roomId }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.gameState || room.gameState.result) return;
+    const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+    // Surrender just this game (set continues)
+    await endGame(room, pi === 0 ? 1 : 0, 'surrender');
+  });
+
+  socket.on('surrender_match', async ({ roomId }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.gameState) return;
+    const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+    const winnerIdx = pi === 0 ? 1 : 0;
+    // Set the winner's score to winsNeeded to end the set
+    room.setScore[winnerIdx] = room.winsNeeded;
+    if (!room.gameState.result) {
+      await endGame(room, winnerIdx, 'surrender');
+    }
   });
 
   socket.on('request_rematch', async ({ roomId }) => {

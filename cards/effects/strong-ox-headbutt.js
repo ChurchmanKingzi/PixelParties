@@ -34,6 +34,7 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'attack',
+        baseDamage: baseAtk,
         title: 'Strong Ox Headbutt',
         description: desc,
         confirmLabel: `𖤍 Headbutt! (${baseAtk})`,

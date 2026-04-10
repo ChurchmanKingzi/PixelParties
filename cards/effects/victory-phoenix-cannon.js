@@ -33,6 +33,7 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'destruction_spell',
+        baseDamage: 200,
         title: 'Victory Phoenix Cannon',
         description: 'Deal 200 damage to any target.',
         confirmLabel: '💥 200 Damage!',

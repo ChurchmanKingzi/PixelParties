@@ -276,11 +276,12 @@ function PlayScreen() {
               <div key={r.id} className="room-card" onClick={() => joinRoom(r, false)}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontWeight: 700 }}>{r.host}</span>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.08)', color: 'var(--text2)' }}>Bo{r.format}</span>}
-                    <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: r.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.1)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,255,255,.2)', letterSpacing: 1 }}>Bo{r.format}</span>}
+                    <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(255,170,0,.18)' : 'rgba(0,240,255,.15)', color: r.type === 'ranked' ? '#ffbb33' : '#00f0ff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: r.type === 'ranked' ? '1px solid rgba(255,170,0,.35)' : '1px solid rgba(0,240,255,.3)', textTransform: 'uppercase', letterSpacing: 1 }}>
                       {r.type}
                     </span>
+                    {r.format <= 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text2)', fontSize: 11, padding: '3px 10px' }}>Bo1</span>}
                   </div>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2 }}>
@@ -302,8 +303,9 @@ function PlayScreen() {
               <div key={r.id} className="room-card" onClick={() => joinRoom(r, true)}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontWeight: 700 }}>{r.players.join(' vs ')}</span>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.08)', color: 'var(--text2)' }}>Bo{r.format}</span>}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.1)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,255,255,.2)', letterSpacing: 1 }}>Bo{r.format}</span>}
+                    {r.format <= 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text2)', fontSize: 11, padding: '3px 10px' }}>Bo1</span>}
                     <span className="badge" style={{ background: 'rgba(255,0,170,.12)', color: 'var(--accent2)' }}>LIVE</span>
                   </div>
                 </div>

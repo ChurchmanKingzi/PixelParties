@@ -86,14 +86,9 @@ async function doCure(engine, pi, target) {
     });
     await engine._delay(400);
 
-    // Remove all negative statuses
-    for (const key of negKeys) {
-      if (hero.statuses[key]) {
-        delete hero.statuses[key];
-        engine.log('status_remove', { target: hero.name, status: key, by: 'Cure' });
-        removed++;
-      }
-    }
+    // Remove all negative statuses (centralized — skips unhealable)
+    const removedKeys = engine.cleanseHeroStatuses(hero, target.owner, target.heroIdx, negKeys, 'Cure');
+    removed = removedKeys.length;
 
     // Heal 100 × removed
     if (removed > 0 && hero.hp > 0) {
@@ -117,14 +112,9 @@ async function doCure(engine, pi, target) {
     });
     await engine._delay(400);
 
-    // Remove all negative statuses from creature
-    for (const key of negKeys) {
-      if (inst.counters[key]) {
-        delete inst.counters[key];
-        engine.log('status_remove', { target: inst.name, status: key, by: 'Cure' });
-        removed++;
-      }
-    }
+    // Remove all negative statuses from creature (centralized — skips unhealable)
+    const removedCreatureKeys = engine.cleanseCreatureStatuses(inst, negKeys, 'Cure');
+    removed += removedCreatureKeys.length;
 
     // Heal creature 100 × removed
     if (removed > 0) {
@@ -146,7 +136,16 @@ module.exports = {
   includesHealing: true,
 
   reactionCondition: (gs, pi, engine) => {
-    return getValidTargets(gs, engine).length > 0;
+    if (getValidTargets(gs, engine).length === 0) return false;
+    // At least 1 hero must be able to cast this (Support Magic Lv1)
+    if (engine) {
+      const ps = gs.players[pi];
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        if (engine._canHeroActivateSurprise(pi, hi, 'Cure')) return true;
+      }
+      return false;
+    }
+    return true;
   },
 
   spellPlayCondition(gs, pi) {

@@ -60,6 +60,7 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'artifact',
+        baseDamage: 100,
         title: 'Shield of Death',
         description: `${ctx.attachedHero?.name || 'Hero'} survived damage! Choose a target to deal 100 damage.`,
         confirmLabel: '💀 Retaliate! (100)',

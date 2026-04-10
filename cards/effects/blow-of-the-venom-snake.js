@@ -31,6 +31,7 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'attack',
+        baseDamage: baseAtk,
         title: 'Blow of the Venom Snake',
         description: desc,
         confirmLabel: `🐍 Strike! (${baseAtk})`,

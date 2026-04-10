@@ -42,6 +42,8 @@ module.exports = {
       const target = await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
+        damageType: 'attack',
+        baseDamage: 100,
         title: 'Bakhm, the Desert Digger',
         description: 'A Surprise was activated! Deal 100 damage to a target.',
         confirmLabel: '🌪️ Strike! (100)',

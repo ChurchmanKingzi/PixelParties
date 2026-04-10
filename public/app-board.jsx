@@ -744,7 +744,8 @@ function StatusBadges({ statuses, counters, isHero, player }) {
   if (s.poisoned || c.poisoned) {
     const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
     const perStack = player?.poisonDamagePerStack || 30;
-    badges.push({ key: 'poisoned', icon: '☠️', tooltip: `Poisoned: Takes ${perStack * stacks} damage at the start of each of its owner's turns.` });
+    const isUnhealable = s.poisoned?.unhealable || c.poisonedUnhealable;
+    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: `${isUnhealable ? 'Unhealable ' : ''}Poisoned: Takes ${perStack * stacks} damage at the start of each of its owner's turns.${isUnhealable ? ' Cannot be removed.' : ''}`, className: isUnhealable ? 'status-unhealable' : '' });
   }
   if (s.negated || c.negated) badges.push({ key: 'negated', icon: '🚫', tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.') + dur(s.negated || c.negated) });
   if (s.immune) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
@@ -967,6 +968,58 @@ function SpiderAvalancheEffect({ x, y, w, h }) {
   );
 }
 
+function VenomFogEffect({ x, y, w, h }) {
+  const particles = useMemo(() => Array.from({ length: 20 }, (_, i) => ({
+    dx: -30 + Math.random() * 60,
+    dy: -20 + Math.random() * 40,
+    size: 30 + Math.random() * 40,
+    delay: i * 40 + Math.random() * 80,
+    dur: 800 + Math.random() * 600,
+    opacity: 0.4 + Math.random() * 0.4,
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      {particles.map((p, i) => (
+        <div key={i} className="anim-venom-fog-particle" style={{
+          '--vdx': p.dx + 'px', '--vdy': p.dy + 'px', '--vsize': p.size + 'px', '--vopacity': p.opacity,
+          animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+function PoisonedWellEffect({ x, y, w, h }) {
+  const bubbles = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+    dx: -25 + Math.random() * 50,
+    size: 8 + Math.random() * 16,
+    delay: i * 50 + Math.random() * 100,
+    dur: 600 + Math.random() * 500,
+  })), []);
+  const steam = useMemo(() => Array.from({ length: 10 }, (_, i) => ({
+    dx: -20 + Math.random() * 40,
+    size: 20 + Math.random() * 30,
+    delay: 200 + i * 60 + Math.random() * 100,
+    dur: 700 + Math.random() * 400,
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      {bubbles.map((b, i) => (
+        <div key={'b'+i} className="anim-well-bubble" style={{
+          '--wdx': b.dx + 'px', '--wsize': b.size + 'px',
+          animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+        }} />
+      ))}
+      {steam.map((s, i) => (
+        <div key={'s'+i} className="anim-well-steam" style={{
+          '--sdx': s.dx + 'px', '--ssize': s.size + 'px',
+          animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
 const ANIM_REGISTRY = {
   explosion: ExplosionEffect,
   creature_death: CreatureDeathEffect,
@@ -975,6 +1028,81 @@ const ANIM_REGISTRY = {
   spider_avalanche: SpiderAvalancheEffect,
   electric_strike: ElectricStrikeEffect,
   flame_strike: FlameStrikeEffect,
+  venom_fog: VenomFogEffect,
+  poisoned_well: PoisonedWellEffect,
+  plague_smoke: (() => {
+    return function PlagueSmokeEffect({ x, y }) {
+      const clouds = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+        dx: -30 + Math.random() * 60,
+        dy: -15 + Math.random() * 30,
+        size: 25 + Math.random() * 35,
+        delay: i * 35 + Math.random() * 80,
+        dur: 700 + Math.random() * 500,
+        opacity: 0.5 + Math.random() * 0.4,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {clouds.map((c, i) => (
+            <div key={i} className="anim-plague-smoke" style={{
+              '--pdx': c.dx + 'px', '--pdy': c.dy + 'px', '--psize': c.size + 'px', '--popacity': c.opacity,
+              animationDelay: c.delay + 'ms', animationDuration: c.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  biomancy_bloom: (() => {
+    return function BiomancyBloomEffect({ x, y }) {
+      const flowers = useMemo(() => Array.from({ length: 16 }, (_, i) => {
+        const angle = (i / 16) * Math.PI * 2;
+        return {
+          dx: Math.cos(angle) * (15 + Math.random() * 25),
+          dy: Math.sin(angle) * (10 + Math.random() * 20),
+          size: 10 + Math.random() * 14,
+          delay: i * 40 + Math.random() * 60,
+          dur: 600 + Math.random() * 400,
+          emoji: ['🌸', '🌺', '🌼', '🍀', '🌿', '☘️'][Math.floor(Math.random() * 6)],
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {flowers.map((f, i) => (
+            <span key={i} className="anim-biomancy-flower" style={{
+              '--bdx': f.dx + 'px', '--bdy': f.dy + 'px', fontSize: f.size + 'px',
+              animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
+            }}>{f.emoji}</span>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  biomancy_vines: (() => {
+    return function BiomancyVinesEffect({ x, y }) {
+      const vines = useMemo(() => Array.from({ length: 12 }, (_, i) => {
+        const angle = (i / 12) * Math.PI * 2;
+        return {
+          dx: Math.cos(angle) * 30,
+          dy: Math.sin(angle) * 20,
+          rot: (angle * 180 / Math.PI) + 90,
+          delay: i * 30 + Math.random() * 50,
+          dur: 500 + Math.random() * 300,
+          emoji: ['🌿', '🌱', '☘️', '🍃', '🌾'][Math.floor(Math.random() * 5)],
+          size: 12 + Math.random() * 10,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {vines.map((v, i) => (
+            <span key={i} className="anim-biomancy-vine" style={{
+              '--vdx': v.dx + 'px', '--vdy': v.dy + 'px', '--vrot': v.rot + 'deg', fontSize: v.size + 'px',
+              animationDelay: v.delay + 'ms', animationDuration: v.dur + 'ms',
+            }}>{v.emoji}</span>
+          ))}
+        </div>
+      );
+    };
+  })(),
   stranglehold_squeeze: (() => {
     return function StrangleholdSqueezeEffect({ x, y }) {
       useEffect(() => {
@@ -2491,6 +2619,195 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  quick_slash: (() => {
+    return function QuickSlashEffect({ x, y }) {
+      const sparks = useMemo(() => Array.from({ length: 10 }, () => ({
+        angle: -60 + Math.random() * 120,
+        dist: 15 + Math.random() * 30,
+        size: 2 + Math.random() * 4,
+        delay: 50 + Math.random() * 100,
+        dur: 200 + Math.random() * 200,
+        color: ['#ffffff','#ffffcc','#ffeeaa','#ccddff'][Math.floor(Math.random() * 4)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute', left: -40, top: -40, width: 80, height: 80,
+            background: 'radial-gradient(circle, rgba(255,255,255,.9) 0%, rgba(255,255,255,0) 70%)',
+            animation: 'slashFlash 250ms ease-out forwards',
+          }} />
+          <div style={{
+            position: 'absolute', left: -30, top: 0, width: 60, height: 3,
+            background: 'linear-gradient(90deg, transparent, #fff, #ffffaa, #fff, transparent)',
+            transform: 'rotate(-35deg)', transformOrigin: 'center',
+            animation: 'slashStrike1 180ms ease-out forwards',
+            boxShadow: '0 0 8px 2px rgba(255,255,200,.8)',
+          }} />
+          <div style={{
+            position: 'absolute', left: -25, top: 2, width: 50, height: 2,
+            background: 'linear-gradient(90deg, transparent, #fff, #ffddaa, #fff, transparent)',
+            transform: 'rotate(25deg)', transformOrigin: 'center',
+            animation: 'slashStrike2 200ms ease-out 40ms forwards',
+            boxShadow: '0 0 6px 1px rgba(255,255,180,.6)',
+          }} />
+          {sparks.map((s, i) => {
+            const rad = (s.angle * Math.PI) / 180;
+            const tx = Math.cos(rad) * s.dist;
+            const ty = Math.sin(rad) * s.dist;
+            return (
+              <div key={i} style={{
+                position: 'absolute', width: s.size, height: s.size, borderRadius: '50%',
+                background: s.color, boxShadow: `0 0 4px ${s.color}`,
+                left: -s.size / 2, top: -s.size / 2, opacity: 0,
+                animation: `slashSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
+                '--spark-tx': `${tx}px`, '--spark-ty': `${ty}px`,
+              }} />
+            );
+          })}
+          <style>{`
+            @keyframes slashFlash {
+              0% { opacity: 0; transform: scale(0.3); }
+              30% { opacity: 1; transform: scale(1.2); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+            @keyframes slashStrike1 {
+              0% { opacity: 0; transform: rotate(-35deg) scaleX(0); }
+              40% { opacity: 1; transform: rotate(-35deg) scaleX(1.3); }
+              100% { opacity: 0; transform: rotate(-35deg) scaleX(0.5); }
+            }
+            @keyframes slashStrike2 {
+              0% { opacity: 0; transform: rotate(25deg) scaleX(0); }
+              40% { opacity: 1; transform: rotate(25deg) scaleX(1.3); }
+              100% { opacity: 0; transform: rotate(25deg) scaleX(0.5); }
+            }
+            @keyframes slashSpark {
+              0% { opacity: 0; transform: translate(0,0) scale(1); }
+              20% { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--spark-tx), var(--spark-ty)) scale(0.2); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  poison_pollen_rain: (() => {
+    return function PoisonPollenRainEffect({ x, y }) {
+      const spores = useMemo(() => Array.from({ length: 24 }, () => ({
+        xOff: -35 + Math.random() * 70,
+        size: 4 + Math.random() * 7,
+        delay: Math.random() * 300,
+        dur: 500 + Math.random() * 400,
+        color: Math.random() < 0.5
+          ? ['#9933cc','#7722aa','#bb55ee','#aa44dd'][Math.floor(Math.random() * 4)]
+          : ['#ddcc33','#ccbb22','#eedd55','#bbaa11'][Math.floor(Math.random() * 4)],
+        wobble: -6 + Math.random() * 12,
+        emoji: Math.random() < 0.2 ? (Math.random() < 0.5 ? '🍄' : '✨') : null,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute', left: -30, top: -30, width: 60, height: 60,
+            background: 'radial-gradient(circle, rgba(150,50,200,.5) 0%, rgba(200,180,40,.3) 40%, transparent 70%)',
+            animation: 'pollenFlash 400ms ease-out forwards',
+          }} />
+          {spores.map((s, i) => (
+            s.emoji ? (
+              <span key={i} style={{
+                position: 'absolute', fontSize: s.size + 4,
+                left: s.xOff - s.size / 2, top: -40, opacity: 0,
+                animation: `pollenFall ${s.dur}ms ease-in ${s.delay}ms forwards`,
+                '--pollen-drift': `${s.wobble}px`,
+              }}>{s.emoji}</span>
+            ) : (
+              <div key={i} style={{
+                position: 'absolute', width: s.size, height: s.size, borderRadius: '50%',
+                background: s.color, filter: 'blur(1px)',
+                boxShadow: `0 0 4px ${s.color}`,
+                left: s.xOff - s.size / 2, top: -40, opacity: 0,
+                animation: `pollenFall ${s.dur}ms ease-in ${s.delay}ms forwards`,
+                '--pollen-drift': `${s.wobble}px`,
+              }} />
+            )
+          ))}
+          <style>{`
+            @keyframes pollenFlash {
+              0% { opacity: 0; transform: scale(0.5); }
+              30% { opacity: 0.8; transform: scale(1.2); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+            @keyframes pollenFall {
+              0% { opacity: 0; transform: translate(0, 0) scale(0.5); }
+              15% { opacity: 0.9; transform: translate(calc(var(--pollen-drift) * 0.3), 8px) scale(1); }
+              70% { opacity: 0.7; transform: translate(var(--pollen-drift), 35px) scale(0.9); }
+              100% { opacity: 0; transform: translate(calc(var(--pollen-drift) * 1.3), 55px) scale(0.4); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  snake_devour: (() => {
+    return function SnakeDevourEffect({ x, y }) {
+      const coils = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
+        angle: i * 60 + Math.random() * 20,
+        dist: 20 + Math.random() * 15,
+        delay: i * 60,
+        dur: 600 + Math.random() * 200,
+        size: 20 + Math.random() * 10,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Central snake head */}
+          <span style={{
+            position: 'absolute', left: -16, top: -50, fontSize: 36,
+            animation: 'snakeStrike 700ms ease-in-out forwards',
+          }}>🐍</span>
+          {/* Dark vortex */}
+          <div style={{
+            position: 'absolute', left: -35, top: -35, width: 70, height: 70,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(30,0,50,.9) 0%, rgba(80,20,120,.5) 40%, transparent 70%)',
+            animation: 'snakeVortex 800ms ease-in forwards',
+          }} />
+          {/* Coiling segments */}
+          {coils.map((c, i) => {
+            const rad = (c.angle * Math.PI) / 180;
+            return (
+              <span key={i} style={{
+                position: 'absolute', fontSize: c.size,
+                left: Math.cos(rad) * c.dist - c.size / 2,
+                top: Math.sin(rad) * c.dist - c.size / 2,
+                opacity: 0,
+                animation: `snakeCoil ${c.dur}ms ease-in ${c.delay}ms forwards`,
+                '--coil-x': `${-Math.cos(rad) * c.dist}px`,
+                '--coil-y': `${-Math.sin(rad) * c.dist}px`,
+              }}>🐍</span>
+            );
+          })}
+          <style>{`
+            @keyframes snakeStrike {
+              0% { opacity: 0; transform: translate(0, -20px) scale(0.5) rotate(-30deg); }
+              30% { opacity: 1; transform: translate(0, 5px) scale(1.3) rotate(10deg); }
+              60% { opacity: 1; transform: translate(0, 0) scale(1.1) rotate(-5deg); }
+              100% { opacity: 0; transform: translate(0, 10px) scale(0.3) rotate(0deg); }
+            }
+            @keyframes snakeVortex {
+              0% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+              30% { opacity: 0.9; transform: scale(1.2) rotate(90deg); }
+              70% { opacity: 0.7; transform: scale(1.0) rotate(200deg); }
+              100% { opacity: 0; transform: scale(0.1) rotate(360deg); }
+            }
+            @keyframes snakeCoil {
+              0% { opacity: 0; transform: translate(0,0) scale(1) rotate(0deg); }
+              30% { opacity: 0.8; transform: translate(calc(var(--coil-x)*0.3), calc(var(--coil-y)*0.3)) scale(0.8) rotate(120deg); }
+              70% { opacity: 0.6; transform: translate(calc(var(--coil-x)*0.8), calc(var(--coil-y)*0.8)) scale(0.5) rotate(240deg); }
+              100% { opacity: 0; transform: translate(var(--coil-x), var(--coil-y)) scale(0.1) rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
 };
 
 function IceEncaseEffect({ x, y }) {
@@ -2908,25 +3225,37 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setHand(newHand);
       // Clear tooltip in case a hovered card was removed from hand
       setBoardTooltip(null);
+      // Clear stale steal-hidden indices when hand state changes (sync arrived)
+      if (stealHiddenMe.size > 0) setStealHiddenMe(new Set());
       // Detect newly drawn cards (added at end of hand)
-      if (newHand.length > prevLen) {
+      if (newHand.length > prevLen && !stealInProgressRef.current) {
+        // If cards arrived via steal, skip draw animation for them
+        const skipCount = stealSkipDrawRef.current;
+        if (skipCount > 0) {
+          stealSkipDrawRef.current = 0;
+        } else {
         const deckEl = document.querySelector('[data-my-deck]');
         const deckRect = deckEl?.getBoundingClientRect();
+        const potionDeckEl = document.querySelector('[data-my-potion-deck]');
+        const potionRect = potionDeckEl?.getBoundingClientRect();
         if (deckRect) {
           const newAnims = [];
           for (let i = prevLen; i < newHand.length; i++) {
+            const isPotion = CARDS_BY_NAME[newHand[i]]?.cardType === 'Potion';
+            const srcRect = (isPotion && potionRect) ? potionRect : deckRect;
             newAnims.push({
               id: Date.now() + Math.random() + i,
               cardName: newHand[i],
               origIdx: i,
-              startX: deckRect.left + deckRect.width / 2 - 32,
-              startY: deckRect.top + deckRect.height / 2 - 45,
+              startX: srcRect.left + srcRect.width / 2 - 32,
+              startY: srcRect.top + srcRect.height / 2 - 45,
             });
           }
           setDrawAnimCards(prev => [...prev, ...newAnims]);
           setTimeout(() => {
             setDrawAnimCards(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
           }, 500);
+        }
         }
       }
       prevHandLenRef.current = newHand.length;
@@ -2940,8 +3269,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   useEffect(() => {
     const newCount = opp.handCount || 0;
     const prevCount = prevOppHandCountRef.current;
-    if (newCount > prevCount) {
-      // Hide new cards immediately (visibility:hidden preserves layout for position reading)
+    if (newCount > prevCount && !stealInProgressRef.current) {
       const hiddenIdxs = new Set();
       for (let i = prevCount; i < newCount; i++) hiddenIdxs.add(i);
       setOppDrawHidden(prev => new Set([...prev, ...hiddenIdxs]));
@@ -2999,6 +3327,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       });
     }
+    // Clear stale steal-hidden indices when opp hand state changes (sync arrived)
+    if (newCount !== prevCount && stealHiddenOpp.size > 0) setStealHiddenOpp(new Set());
     prevOppHandCountRef.current = newCount;
   }, [opp.handCount]);
 
@@ -3013,6 +3343,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [chatView, setChatView] = useState('main'); // 'main' | 'players' | 'private:username'
   const [chatInput, setChatInput] = useState('');
   const [actionLog, setActionLog] = useState([]);
+  // Clear action log when a new game starts (rematch) to prevent ID collisions
+  const prevMulliganRef = useRef(false);
+  useEffect(() => {
+    if (gameState.mulliganPending && !prevMulliganRef.current) {
+      setActionLog([]);
+      setSideDeckPhase(null);
+      setSideDeckDone(false);
+    }
+    prevMulliganRef.current = !!gameState.mulliganPending;
+  }, [gameState.mulliganPending]);
   const [pingFlash, setPingFlash] = useState(null); // { color }
   const chatBodyRef = useRef(null);
   const actionLogRef = useRef(null);
@@ -3260,17 +3600,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const deckEl = document.querySelector('[data-my-deck]');
       const deckR = deckEl?.getBoundingClientRect();
       const deckTarget = deckR ? { x: deckR.left + deckR.width / 2 - 32, y: deckR.top + deckR.height / 2 - 45 } : null;
-      if (deckTarget) {
-        const returnAnims = [];
-        for (const r of removed) {
-          const sr = storedRects[r.handIdx];
-          if (!sr) continue;
-          returnAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
-        }
-        if (returnAnims.length > 0) {
-          setDiscardAnims(prev => [...prev, ...returnAnims]);
-          setTimeout(() => setDiscardAnims(prev => prev.filter(a => !returnAnims.some(n => n.id === a.id))), 500);
-        }
+      const potionDeckEl = document.querySelector('[data-my-potion-deck]');
+      const potionR = potionDeckEl?.getBoundingClientRect();
+      const potionTarget = potionR ? { x: potionR.left + potionR.width / 2 - 32, y: potionR.top + potionR.height / 2 - 45 } : null;
+      const returnAnims = [];
+      for (const r of removed) {
+        const sr = storedRects[r.handIdx];
+        if (!sr) continue;
+        const isPotion = CARDS_BY_NAME[r.cardName]?.cardType === 'Potion';
+        const target = (isPotion && potionTarget) ? potionTarget : deckTarget;
+        if (!target) continue;
+        returnAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: target.x, endY: target.y, dest: isPotion ? 'potion' : 'deck' });
+      }
+      if (returnAnims.length > 0) {
+        setDiscardAnims(prev => [...prev, ...returnAnims]);
+        setTimeout(() => setDiscardAnims(prev => prev.filter(a => !returnAnims.some(n => n.id === a.id))), 500);
       }
     }
 
@@ -3483,8 +3827,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const canPlaySomewhere = [0,1,2].some(hi => canHeroReceiveAbility(me, hi, cardName));
         if (!canPlaySomewhere) return true;
       }
-      // Gray out Artifacts if not enough gold
+      // Gray out Artifacts if not enough gold or item-locked
       if (card.cardType === 'Artifact') {
+        if (me.itemLocked) return true;
         if ((me.gold || 0) < (card.cost || 0)) return true;
         // Gray out Equip artifacts if no hero has a free base support zone
         const isEquip = (card.subtype || '').toLowerCase() === 'equipment';
@@ -3650,6 +3995,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
     // Combo lock: only the locked hero can act
     if (playerData.comboLockHeroIdx != null && playerData.comboLockHeroIdx !== heroIdx) return false;
+
+    // Hero-restricted additional actions: after normal action used in Action Phase,
+    // all plays need an additional action — block heroes without providers
+    if (currentPhase === 3 && (playerData.heroesActedThisTurn?.length > 0)) {
+      const isActionType = ACTION_TYPES.includes(card.cardType);
+      if (isActionType) {
+        const categoryMap = { Creature: 'creature', Spell: 'spell', Attack: 'attack' };
+        const cardCategory = categoryMap[card.cardType];
+        const additionalForCard = (gameState.additionalActions || []).filter(aa =>
+          aa.eligibleHandCards.includes(card.name) ||
+          (aa.allowedCategories?.includes(cardCategory))
+        );
+        if (additionalForCard.length === 0) return false; // No additional action covers this card
+        if (additionalForCard.every(aa => aa.heroRestricted)) {
+          const heroHasProvider = additionalForCard.some(aa => aa.providers.some(p => p.heroIdx === heroIdx));
+          if (!heroHasProvider) return false;
+        }
+      }
+    }
+
     // Main Phase: per-hero inherent action restrictions (Muscle Training, etc.)
     // If a card is playable ONLY via inherent action and this hero isn't eligible, block it.
     if (currentPhase === 2 || currentPhase === 4) {
@@ -3663,17 +4028,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           return true;
         });
         if (!hasAdditional && !inherentHeroes.includes(heroIdx)) return false;
-      } else {
-        // Card has no inherent action — check if it's only playable via additional action
-        const isActionType = ACTION_TYPES.includes(card.cardType);
-        if (isActionType) {
-          const additionalForCard = (gameState.additionalActions || []).filter(aa => aa.eligibleHandCards.includes(card.name));
-          if (additionalForCard.length > 0 && additionalForCard.every(aa => aa.heroRestricted)) {
-            // All additional actions for this card are hero-restricted — check if this hero has a provider
-            const heroHasProvider = additionalForCard.some(aa => aa.providers.some(p => p.heroIdx === heroIdx));
-            if (!heroHasProvider) return false;
-          }
-        }
       }
     }
     // Bonus actions: only allowed card types during active bonus
@@ -3837,7 +4191,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const isEquipPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Artifact'
       && (card.subtype || '').toLowerCase() === 'equipment' && (me.gold || 0) >= (card.cost || 0);
     const isArtifactActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
-      && card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment';
+      && card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment' && (card.subtype || '').toLowerCase() !== 'reaction';
     const isPotionActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Potion';
     const isSurprisePlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
       && (card.subtype || '').toLowerCase() === 'surprise'
@@ -4051,8 +4405,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else if (isPlayable && (card.cardType === 'Spell' || card.cardType === 'Attack')) {
         // Spell/Attack drag — target hero zones (hero must have required spell schools)
         let targetHero = -1;
+        let targetSlot = -1;
         let targetCharmedOwner = undefined;
         const heroActionHeroIdx2 = heroActionPrompt?.heroIdx;
+        const isAttachmentCard = (card.subtype || '').toLowerCase() === 'attachment';
+
+        // Attachment spells/attacks: also check support zones (like creatures/equipment)
+        if (isAttachmentCard) {
+          const supEls = document.querySelectorAll('[data-support-zone]');
+          for (const el of supEls) {
+            const r = el.getBoundingClientRect();
+            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+              const hi = parseInt(el.dataset.supportHero);
+              const si = parseInt(el.dataset.supportSlot);
+              const isOwn = el.dataset.supportOwner === 'me';
+              const isIsland = el.dataset.supportIsland === 'true';
+              if (isOwn && !isIsland && si < 3 && canHeroPlayCard(me, hi, card)) {
+                const slotCards = (me.supportZones[hi] || [])[si] || [];
+                if (slotCards.length === 0) { targetHero = hi; targetSlot = si; }
+              }
+            }
+          }
+        }
+
+        // Check hero zones (all spells/attacks, including attachments for auto-place)
+        if (targetHero < 0) {
         const heroEls2 = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls2) {
           const r = el.getBoundingClientRect();
@@ -4060,7 +4437,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const hi = parseInt(el.dataset.heroIdx);
             if (el.dataset.heroOwner === 'me') {
               if (heroActionHeroIdx2 !== undefined && hi !== heroActionHeroIdx2) continue;
-              if (canHeroPlayCard(me, hi, card)) targetHero = hi;
+              if (canHeroPlayCard(me, hi, card)) {
+                if (isAttachmentCard) {
+                  // Auto-place: only if hero has a free support zone
+                  const supZones = me.supportZones[hi] || [];
+                  if ([0,1,2].some(z => (supZones[z] || []).length === 0)) targetHero = hi;
+                } else {
+                  targetHero = hi;
+                }
+              }
             } else if (el.dataset.heroOwner === 'opp') {
               // Check if this is a charmed hero we control
               const oppHero = opp.heroes?.[hi];
@@ -4071,7 +4456,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot: -1, isSpell: true, charmedOwner: targetCharmedOwner });
+        }
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot: targetSlot, isSpell: true, charmedOwner: targetCharmedOwner });
       } else {
         // Non-playable card outside hand zone — show floating card (no reorder gap)
         setPlayDrag(null);
@@ -4268,6 +4654,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             handIndex: prev.idx,
             heroIdx: prev.targetHero,
             charmedOwner: prev.charmedOwner,
+            attachmentZoneSlot: prev.targetSlot >= 0 ? prev.targetSlot : undefined,
           });
           return null;
         });
@@ -4317,6 +4704,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   }, [hand, handDrag, playDrag, abilityDrag]);
 
   const [showSurrender, setShowSurrender] = useState(false);
+  const [sideDeckPhase, setSideDeckPhase] = useState(null); // { currentDeck, originalDeck, opponentDone, setScore, format }
+  const [sideDeckDone, setSideDeckDone] = useState(false);
+  const [sideDeckSel, setSideDeckSel] = useState(null); // { pool: 'main'|'potion'|'side'|'hero', idx: number }
   const [scEarned, setScEarned] = useState(null); // { rewards: [{id,title,amount,description}], total }
 
   // Listen for SC earned event + profile stats update
@@ -4342,8 +4732,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [pileViewer, setPileViewer] = useState(null); // { title, cards } | null
   const [hoveredPileCard, setHoveredPileCard] = useState(null); // card name for pile tooltip
   const [handPickSelected, setHandPickSelected] = useState(new Set()); // hand indices selected for handPick prompt
+  const [blindPickSelected, setBlindPickSelected] = useState(new Set()); // opp hand indices selected for blindHandPick prompt
+  const [stealMarkedMe, setStealMarkedMe] = useState(new Set()); // own hand indices marked for stealing (victim's screen)
+  const [stealHiddenMe, setStealHiddenMe] = useState(new Set()); // own hand indices hidden during steal flight (victim)
+  const [stealHiddenOpp, setStealHiddenOpp] = useState(new Set()); // opp hand indices hidden during steal flight (stealer)
+  const [stealAnims, setStealAnims] = useState([]); // flying card elements [{id, cardName, startX, startY, endX, endY}]
+  const stealInProgressRef = useRef(false); // suppress draw animations during steals
+  const stealSkipDrawRef = useRef(0); // number of new hand cards to skip draw-anim for after steal
+  const stealExpectedOppCountRef = useRef(-1); // opp hand count when stealHiddenOpp was set
+  const stealExpectedMeCountRef = useRef(-1); // my hand count when stealHiddenMe was set
+  const [stealHighlightMe, setStealHighlightMe] = useState(new Set()); // hand indices highlighted by opponent's blind pick selection
   // Clear stale hoveredPileCard when force-discard prompt ends
-  useEffect(() => { setHoveredPileCard(null); setHandPickSelected(new Set()); }, [gameState.effectPrompt]);
+  useEffect(() => { setHoveredPileCard(null); setHandPickSelected(new Set()); setBlindPickSelected(new Set()); setStealHighlightMe(new Set()); }, [gameState.effectPrompt]);
+  // Broadcast blind-pick selection to opponent so they see highlighted cards
+  useEffect(() => {
+    if (gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx) {
+      socket.emit('blind_pick_update', { roomId: gameState.roomId, indices: [...blindPickSelected] });
+    }
+  }, [blindPickSelected]);
   const [immuneTooltip, setImmuneTooltip] = useState(null); // hero name for immune tooltip
   const [immuneTooltipType, setImmuneTooltipType] = useState(null); // 'immune' or 'shielded'
 
@@ -4709,6 +5115,142 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + 200);
     };
     socket.on('play_projectile_animation', onProjectileAnimation);
+    const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration }) => {
+      stealInProgressRef.current = true;
+      const iAmVictim = fromPlayer === myIdx;
+      const fromLabel = fromPlayer === myIdx ? 'me' : 'opp';
+      const toLabel = fromPlayer === myIdx ? 'opp' : 'me';
+      const dur = duration || 800;
+      const stealIndices = indices || [];
+      const names = cardNames || [];
+
+      // Phase 1: Highlight the stolen cards (800ms)
+      if (iAmVictim) {
+        setStealMarkedMe(new Set(stealIndices));
+      } else {
+        stealIndices.forEach(idx => {
+          const el = document.querySelector(`.game-hand-opp [data-hand-idx="${idx}"]`);
+          if (el) {
+            el.style.outline = '3px solid rgba(255,150,50,.95)';
+            el.style.filter = 'brightness(1.4) drop-shadow(0 0 10px rgba(255,150,50,.7))';
+          }
+        });
+      }
+
+      // Phase 2: After highlight, hide source cards and fly face-up clones
+      setTimeout(() => {
+        if (iAmVictim) {
+          setStealMarkedMe(new Set());
+          setStealHiddenMe(new Set(stealIndices));
+          stealExpectedMeCountRef.current = (document.querySelectorAll('.game-hand-me .hand-slot') || []).length;
+        } else {
+          setStealHiddenOpp(new Set(stealIndices));
+          stealExpectedOppCountRef.current = count > 0 ? document.querySelectorAll('.game-hand-opp .game-hand-cards .hand-card').length : -1;
+          stealIndices.forEach(idx => {
+            const el = document.querySelector(`.game-hand-opp [data-hand-idx="${idx}"]`);
+            if (el) { el.style.outline = ''; el.style.filter = ''; }
+          });
+        }
+
+        // Find source card positions
+        const sourceRects = [];
+        stealIndices.forEach(idx => {
+          const sel = fromLabel === 'me'
+            ? `.game-hand-me .hand-slot[data-hand-idx="${idx}"]`
+            : `.game-hand-opp [data-hand-idx="${idx}"]`;
+          const el = document.querySelector(sel);
+          sourceRects.push(el ? el.getBoundingClientRect() : null);
+        });
+
+        // Find target position: just right of last visible card in destination hand
+        const toHandCards = document.querySelectorAll(`.game-hand-${toLabel} .game-hand-cards > *`);
+        const lastCard = toHandCards.length > 0 ? toHandCards[toHandCards.length - 1] : null;
+        const lastRect = lastCard?.getBoundingClientRect();
+        const toHandEl = document.querySelector(`.game-hand-${toLabel} .game-hand-cards`);
+        const toRect = toHandEl?.getBoundingClientRect();
+        const cardW = lastRect?.width || 64;
+
+        stealIndices.forEach((idx, i) => {
+          const sr = sourceRects[i];
+          if (!sr) return;
+          const name = names[i] || '';
+          const targetX = lastRect ? (lastRect.right + i * (cardW * 0.6)) : (toRect ? toRect.right - cardW : sr.left);
+          const targetY = lastRect ? lastRect.top : (toRect ? toRect.top : sr.top);
+          const dx = targetX - sr.left;
+          const dy = targetY - sr.top;
+
+          const flyEl = document.createElement('div');
+          flyEl.style.cssText = `position:fixed;left:${sr.left}px;top:${sr.top}px;width:${sr.width}px;height:${sr.height}px;z-index:10200;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 15px rgba(255,150,50,.8);animation:handStealFly ${dur}ms ease-in-out ${i * 100}ms forwards;--steal-dx:${dx}px;--steal-dy:${dy}px;`;
+          const imgUrl = name ? window.cardImageUrl(name) : null;
+          if (imgUrl) {
+            const img = document.createElement('img');
+            img.src = imgUrl;
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+            img.draggable = false;
+            flyEl.appendChild(img);
+          } else {
+            flyEl.style.background = 'var(--bg3)';
+            flyEl.style.display = 'flex';
+            flyEl.style.alignItems = 'center';
+            flyEl.style.justifyContent = 'center';
+            flyEl.style.fontSize = '9px';
+            flyEl.style.color = 'var(--text2)';
+            flyEl.textContent = name;
+          }
+          document.body.appendChild(flyEl);
+          setTimeout(() => flyEl.remove(), dur + i * 100 + 2200);
+        });
+
+        // Phase 3: Clear hidden states AFTER server sync arrives (~2000ms + latency)
+        setTimeout(() => {
+          setStealHiddenMe(new Set());
+          setStealHiddenOpp(new Set());
+          // If I'm the stealer (toPlayer === myIdx), skip draw anims for incoming cards
+          if (!iAmVictim) stealSkipDrawRef.current = stealIndices.length;
+          stealInProgressRef.current = false;
+        }, 2500);
+      }, 800);
+    };
+    socket.on('play_hand_steal', onHandSteal);
+    const onBlindPickHighlight = ({ indices }) => {
+      setStealHighlightMe(new Set(indices || []));
+    };
+    socket.on('blind_pick_highlight', onBlindPickHighlight);
+    const onCloakVanish = ({ owner, heroIdx, zoneSlot }) => {
+      const label = owner === myIdx ? 'me' : 'opp';
+      let el;
+      if (zoneSlot !== undefined && zoneSlot >= 0) {
+        el = document.querySelector(`[data-support-zone][data-support-owner="${label}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
+      } else {
+        el = document.querySelector(`[data-hero-zone][data-hero-owner="${label}"][data-hero-idx="${heroIdx}"]`);
+      }
+      if (!el) return;
+      // Fade out over 1s
+      el.style.transition = 'opacity 1s ease';
+      el.style.opacity = '0';
+      // Stay invisible for 1s, then fade back in over 1s
+      setTimeout(() => { el.style.transition = 'opacity 1s ease'; el.style.opacity = '1'; }, 2000);
+      setTimeout(() => { el.style.transition = ''; }, 3000);
+    };
+    socket.on('play_cloak_vanish', onCloakVanish);
+    const onSkullBurst = ({ owner, heroIdx }) => {
+      const label = owner === myIdx ? 'me' : 'opp';
+      const el = document.querySelector(`[data-hero-zone][data-hero-owner="${label}"][data-hero-idx="${heroIdx}"]`);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const skull = document.createElement('div');
+      skull.textContent = '💀';
+      skull.style.cssText = `position:fixed;left:${cx}px;top:${cy}px;z-index:10200;pointer-events:none;font-size:40px;transform:translate(-50%,-50%) scale(1);opacity:1;transition:transform 1s ease-out, opacity 0.8s ease-in 0.2s;`;
+      document.body.appendChild(skull);
+      requestAnimationFrame(() => {
+        skull.style.transform = 'translate(-50%,-50%) scale(12)';
+        skull.style.opacity = '0';
+      });
+      setTimeout(() => skull.remove(), 1200);
+    };
+    socket.on('play_skull_burst', onSkullBurst);
     const onHealBeam = ({ phase, sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot }) => {
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
@@ -4812,6 +5354,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_ram_animation', onRamAnimation);
       socket.off('play_card_transfer', onCardTransfer);
       socket.off('play_projectile_animation', onProjectileAnimation);
+      socket.off('play_hand_steal', onHandSteal);
+      socket.off('blind_pick_highlight', onBlindPickHighlight);
+      socket.off('play_cloak_vanish', onCloakVanish);
+      socket.off('play_skull_burst', onSkullBurst);
       socket.off('play_heal_beam', onHealBeam);
       socket.off('play_guardian_angel', onGuardianAngel);
       socket.off('hero_announcement', onHeroAnnouncement);
@@ -4938,6 +5484,39 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const onChooseFirst = () => setShowFirstChoice(true);
     socket.on('rematch_choose_first', onChooseFirst);
     return () => socket.off('rematch_choose_first', onChooseFirst);
+  }, []);
+
+  // Listen for side-deck phase events (Bo3/Bo5)
+  useEffect(() => {
+    const onSideDeckPhase = (data) => {
+      setSideDeckPhase(data);
+      // Auto-done if player has no side deck
+      if (data.autoDone) {
+        setSideDeckDone(true);
+      } else {
+        setSideDeckDone(false);
+      }
+    };
+    const onSideDeckUpdate = (data) => {
+      setSideDeckPhase(prev => prev ? { ...prev, currentDeck: data.currentDeck, opponentDone: data.opponentDone } : null);
+    };
+    const onSideDeckOppDone = () => {
+      setSideDeckPhase(prev => prev ? { ...prev, opponentDone: true } : null);
+    };
+    const onSideDeckComplete = () => {
+      setSideDeckPhase(null);
+      setSideDeckDone(false);
+    };
+    socket.on('side_deck_phase', onSideDeckPhase);
+    socket.on('side_deck_update', onSideDeckUpdate);
+    socket.on('side_deck_opponent_done', onSideDeckOppDone);
+    socket.on('side_deck_complete', onSideDeckComplete);
+    return () => {
+      socket.off('side_deck_phase', onSideDeckPhase);
+      socket.off('side_deck_update', onSideDeckUpdate);
+      socket.off('side_deck_opponent_done', onSideDeckOppDone);
+      socket.off('side_deck_complete', onSideDeckComplete);
+    };
   }, []);
 
   const handleLeave = () => {
@@ -5243,8 +5822,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (slot.length === 0) continue;
           const cKey = `${pi}-${hi}-${si}`;
           const counters = (gameState.creatureCounters || {})[cKey];
-          // Use currentHp from counters if available, otherwise max HP from card DB
-          const maxHp = CARDS_BY_NAME[slot[0]]?.hp;
+          // Use currentHp from counters if available, otherwise max HP from card DB or override
+          const maxHp = counters?.maxHp ?? counters?._cardDataOverride?.hp ?? CARDS_BY_NAME[slot[0]]?.hp;
           if (maxHp != null) {
             currentCreatureHp[cKey] = counters?.currentHp ?? maxHp;
           }
@@ -5350,11 +5929,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const prev = prevStatusRef.current[key] || {};
         const [pi, hi] = key.split('-').map(Number);
         const ownerLabel = pi === myIdx ? 'me' : 'opp';
-        // Gained frozen or stunned → freeze animation
-        if ((cur.frozen && !prev.frozen) || (cur.stunned && !prev.stunned)) {
+        // Gained frozen → freeze animation
+        if (cur.frozen && !prev.frozen) {
           const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
-          const animType = cur.frozen?.animationType || cur.stunned?.animationType || 'freeze';
+          const animType = cur.frozen?.animationType || 'freeze';
           setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);
+        }
+        // Gained stunned → stun animation (only if not also gaining frozen)
+        if (cur.stunned && !prev.stunned && !(cur.frozen && !prev.frozen)) {
+          const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
+          const animType = cur.stunned?.animationType;
+          if (animType) setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);
         }
         // Gained negated → electric strike animation
         if (cur.negated && !prev.negated) {
@@ -5704,6 +6289,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'bill_equip') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s Bill equipped {cName(entry.equip)} to {entry.hero}!</span>; }
       if (t === 'kazena_storm') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s Kazena drew {entry.drawn} card{entry.drawn!==1?'s':''}!</span>; }
       if (t === 'tharx_draw') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s Tharx drew {entry.drawn} card{entry.drawn!==1?'s':''} ({entry.creatures} creature{entry.creatures!==1?'s':''})!</span>; }
+      if (t === 'venom_infusion') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} poisoned {entry.target}{entry.unhealable ? ' with Unhealable Poison' : ''}!</span>; }
+      if (t === 'poisoned_well') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} poisoned {entry.targets} target{entry.targets !== 1 ? 's' : ''} with Poisoned Well!</span>; }
+      if (t === 'zsos_ssar_cost') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} inflicted Poison on {entry.target} (Serpent's Cost).</span>; }
+      if (t === 'zsos_ssar_boost') { return <span className="log-damage">{entry.hero}'s damage boosted by <span className="log-amount">+{entry.bonus}</span> ({entry.poisonedCount} poisoned target{entry.poisonedCount !== 1 ? 's' : ''})!</span>; }
+      if (t === 'peszet_plague') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} poisoned {entry.target} ({cName(entry.trigger)} summoned).</span>; }
+      if (t === 'biomancy_token_created') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {entry.hero} converted {cName(entry.potion)} into a Biomancy Token ({entry.hp} HP)!</span>; }
+      if (t === 'biomancy_token_attack') { const p = playerByName(entry.player); return <span className="log-damage">Biomancy Token dealt <span className="log-amount">{entry.damage}</span> damage to {entry.target}!</span>; }
+      if (t === 'intrude_placed') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} attached {cName('Intrude')} to {entry.hero}.</span>; }
+      if (t === 'intrude_negate') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s Intrude negated {entry.target}'s draw of {entry.blocked} card{entry.blocked!==1?'s':''}!</span>; }
+      if (t === 'intrude_copy') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s Intrude copied {entry.from}'s draw — drew {entry.copied} card{entry.copied!==1?'s':''}!</span>; }
     } catch(e) {}
     return null;
   };
@@ -5909,6 +6504,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const surpriseTarget = !isOpp && playDrag?.isSurprise && playDrag.targetHero === i;
           // During heroAction, dim all heroes except the Coffee hero
           const heroActionDimmed = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx && gameState.effectPrompt?.heroIdx !== i;
+          // Dim heroes that can't use hero-restricted additional actions (e.g. Reiza's extra action)
+          const additionalActionDimmed = !isOpp && !isDead && isMyTurn && currentPhase === 3 && (me.heroesActedThisTurn?.length > 0) && (() => {
+            const aas = gameState.additionalActions || [];
+            if (aas.length === 0) return false;
+            // If all additional actions are hero-restricted, dim heroes without providers
+            const hasAnyAvail = aas.some(aa => aa.providers?.length > 0);
+            if (!hasAnyAvail) return false;
+            if (aas.every(aa => aa.heroRestricted)) {
+              return !aas.some(aa => aa.providers.some(p => p.heroIdx === i));
+            }
+            return false;
+          })();
           const abilityTarget = !isOpp && abilityDrag && abilityDrag.targetHero === i && abilityDrag.targetZone < 0;
           const equipTarget = !isOpp && playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1;
           const spellTarget = playDrag && playDrag.isSpell && playDrag.targetHero === i && (playDrag.charmedOwner != null ? isOpp : !isOpp);
@@ -5939,7 +6546,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || heroActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '')}
+              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || heroActionDimmed || additionalActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
                 style={zsMerge('hero', (isHeroEffectActive || isValidHeroTarget) ? { cursor: 'pointer' } : undefined, isCharmed ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined)}>
@@ -6208,12 +6815,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const isZonePickTarget = !isOpp && zonePickSet.has(`${pi}-${i}-${z}`);
               // During creature drag: highlight valid zones, dim invalid ones
               const isDraggingCreature = !isOpp && playDrag && playDrag.card?.cardType === 'Creature' && !playDrag.isEquip && !playDrag.isSurprise;
+              const isDraggingAttachment = !isOpp && playDrag && playDrag.isSpell && (playDrag.card?.subtype || '').toLowerCase() === 'attachment';
               const heroActionActive = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx;
               const heroActionHeroIdx = heroActionActive ? gameState.effectPrompt.heroIdx : undefined;
-              const isDragValidZone = isDraggingCreature && cards.length === 0 && canHeroPlayCard(me, i, playDrag.card) && z < ((me.supportZones[i] || []).length || 3) && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
-              const isDragInvalidZone = isDraggingCreature && !isDragValidZone;
+              const isDragValidZone = (isDraggingCreature || isDraggingAttachment) && cards.length === 0 && canHeroPlayCard(me, i, playDrag.card) && z < ((me.supportZones[i] || []).length || 3) && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
+              const isDragInvalidZone = (isDraggingCreature || isDraggingAttachment) && !isDragValidZone;
               // heroAction: dim zones for non-Coffee heroes
-              const isHeroActionZoneDimmed = heroActionActive && !isDraggingCreature && i !== heroActionHeroIdx;
+              const isHeroActionZoneDimmed = heroActionActive && !isDraggingCreature && !isDraggingAttachment && i !== heroActionHeroIdx;
               // Additional Action provider selection highlight
               const isProviderZone = !isOpp && pendingAdditionalPlay && pendingAdditionalPlay.providers.some(p => p.heroIdx === i && p.zoneSlot === z);
               const isProviderSelectionActive = !isOpp && !!pendingAdditionalPlay;
@@ -6266,15 +6874,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         return <BoardCard cardName={cards[0]} style={{ opacity: 0.6 }} />;
                       }
                     }
-                    const isCreature = CARDS_BY_NAME[cards[cards.length-1]]?.cardType === 'Creature'; return !isCreature ? (
+                    const isCreature = (cc?._cardDataOverride?.cardType || CARDS_BY_NAME[cards[cards.length-1]]?.cardType || '').split('/').some(t => t.trim() === 'Creature'); return !isCreature ? (
                       <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} />
                     ) : (
                     <>
                     {cards.length === 1 ? (
-                      (() => { const curHp = cc?.currentHp ?? CARDS_BY_NAME[cards[0]]?.hp; return <BoardCard cardName={cards[0]} hp={curHp} maxHp={CARDS_BY_NAME[cards[0]]?.hp} hpPosition="creature" skins={gameSkins} />; })()
+                      (() => { const curHp = cc?.currentHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp; const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp; return <BoardCard cardName={cards[0]} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} />; })()
                     ) : (
                       <div className="board-stack">
-                        {(() => { const curHp = cc?.currentHp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; return <BoardCard cardName={cards[cards.length-1]} hp={curHp} maxHp={CARDS_BY_NAME[cards[cards.length-1]]?.hp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />; })()}
+                        {(() => { const curHp = cc?.currentHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; return <BoardCard cardName={cards[cards.length-1]} hp={curHp} maxHp={mHp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />; })()}
                       </div>
                     )}
                     {(() => { const lvl = cc?.level; return lvl ? <div className="creature-level">Lv{lvl}</div> : null; })()}
@@ -6344,12 +6952,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <span className="orbit-font" style={{ fontSize: 18, fontWeight: 800, color: opp.color }}>{opp.username}</span>
             {oppDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
           </div>
-          <div className="game-hand-cards">
-            {Array.from({ length: opp.handCount || 0 }).map((_, i) => (
-              <div key={i} className="board-card face-down hand-card" data-hand-idx={i} style={oppDrawHidden.has(i) ? { visibility: 'hidden' } : undefined}>
-                <img src={opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
-              </div>
-            ))}
+          <div className={"game-hand-cards" + (gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')}>
+            {Array.from({ length: opp.handCount || 0 }).map((_, i) => {
+              const isBlindPick = gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx;
+              const isSelected = isBlindPick && blindPickSelected.has(i);
+              const maxSelect = isBlindPick ? (gameState.effectPrompt.maxSelect || 2) : 0;
+              const isFull = isBlindPick && !isSelected && blindPickSelected.size >= maxSelect;
+              return (
+                <div key={i}
+                  className={'board-card face-down hand-card' + (isSelected ? ' blind-pick-selected' : '') + (isBlindPick && !isSelected && !isFull ? ' blind-pick-eligible' : '') + (isFull ? ' hand-card-dimmed' : '')}
+                  data-hand-idx={i} style={(oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current)) ? { visibility: 'hidden' } : (isBlindPick ? { cursor: 'pointer' } : undefined)}
+                  onClick={isBlindPick ? () => {
+                    setBlindPickSelected(prev => {
+                      const next = new Set(prev);
+                      if (next.has(i)) { next.delete(i); } else if (next.size < maxSelect) { next.add(i); }
+                      return next;
+                    });
+                  } : undefined}>
+                  <img src={opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                </div>
+              );
+            })}
           </div>
           <div className="game-gold-display">
             <span className="game-gold-icon">🪙</span>
@@ -6358,6 +6981,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </div>
         {/* Board */}
         <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '')}>
+          {/* ── Generic Player Debuff Warnings (top of battlefield) ── */}
+          {(() => {
+            const debuffs = [];
+            if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#ff6644' });
+            if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#cc8800' });
+            if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#ff4444' });
+            if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal any more damage to your targets this turn!`, color: '#ff8844' });
+            if (me.potionLocked) debuffs.push({ key: 'potion-me', icon: '🧪', text: 'You cannot play any more Potions this turn!', color: '#aa44ff' });
+            if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${opp.username} cannot play any more Potions this turn!`, color: '#8844cc' });
+            if (me.supportSpellLocked) debuffs.push({ key: 'support-me', icon: '💚', text: 'You cannot use another Support Spell this turn.', color: '#ff4444' });
+            if (opp.supportSpellLocked) debuffs.push({ key: 'support-opp', icon: '💚', text: `Your opponent cannot use another Support Spell this turn.`, color: '#ff8844' });
+            if (me.itemLocked) debuffs.push({ key: 'item-me', icon: '🔨', text: 'You cannot use Artifacts this turn!', color: '#ff6633' });
+            if (opp.itemLocked) debuffs.push({ key: 'item-opp', icon: '🔨', text: `${opp.username} cannot use Artifacts this turn!`, color: '#cc5522' });
+            if (debuffs.length === 0) return null;
+            return (
+              <div className="phase-debuffs">
+                {debuffs.map(d => (
+                  <div key={d.key} className="phase-debuff-item" style={{ color: d.color }}>
+                    {d.icon ? d.icon + ' ' : ''}{d.text}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           <div className="board-util board-util-left">
             <div className="board-util-side">
               <div data-opp-discard="1"><BoardZone type="discard" cards={oppDiscardHidden > 0 ? opp.discardPile.slice(0, -oppDiscardHidden) : opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} /></div>
@@ -6419,23 +7066,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
           <div className="board-center-spacer" />
           <div className="board-center" ref={boardCenterRef} style={{ position: 'relative' }}>
-            {/* ── Generic Player Debuff Warnings ── */}
-            {(() => {
-              const debuffs = [];
-              if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#ff6644' });
-              if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#cc8800' });
-              if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#ff4444' });
-              if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal any more damage to your targets this turn!`, color: '#ff8844' });
-              if (me.potionLocked) debuffs.push({ key: 'potion-me', icon: '🧪', text: 'You cannot play any more Potions this turn!', color: '#aa44ff' });
-              if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${opp.username} cannot play any more Potions this turn!`, color: '#8844cc' });
-              if (me.supportSpellLocked) debuffs.push({ key: 'support-me', icon: '💚', text: 'You cannot use another Support Spell this turn.', color: '#ff4444' });
-              if (opp.supportSpellLocked) debuffs.push({ key: 'support-opp', icon: '💚', text: `Your opponent cannot use another Support Spell this turn.`, color: '#ff8844' });
-              return debuffs.map(d => (
-                <div key={d.key} className="summon-lock-warning" style={{ color: d.color }}>
-                  {d.icon ? d.icon + ' ' : ''}{d.text}
-                </div>
-              ));
-            })()}
             {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
             <div className="board-area-zones-center">
@@ -6511,7 +7141,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div className="board-util-mid" />
             <div className="board-util-side">
               <div className="board-util-spacer" />
-              <div onClick={() => !isSpectator && me.potionDeckCount > 0 && setDeckViewer('potion')} style={{ cursor: !isSpectator && me.potionDeckCount > 0 ? 'pointer' : 'default' }}>
+              <div onClick={() => !isSpectator && me.potionDeckCount > 0 && setDeckViewer('potion')} style={{ cursor: !isSpectator && me.potionDeckCount > 0 ? 'pointer' : 'default' }} data-my-potion-deck="1">
               <BoardZone type="potion" label="Potions" faceDown style={myBoardZone('potion')}>
                 {me.potionDeckCount > 0 && <div className="board-card face-down"><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.potionDeckCount}</div></div>}
               </BoardZone>
@@ -6541,7 +7171,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               ))}
             </div>
           ) : (
-            <div className="game-hand-cards">
+            <div className={"game-hand-cards" + (stealHighlightMe.size > 0 ? ' hand-steal-highlight-active' : '')}>
               {displayHand.map((item, i) => {
                 if (item.isGap) return <div key="gap" className="hand-drop-gap" />;
                 const isBeingDragged = (handDrag && handDrag.idx === item.origIdx) || (playDrag && playDrag.idx === item.origIdx) || (abilityDrag && abilityDrag.idx === item.origIdx);
@@ -6570,10 +7200,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   return selectedOfType >= typeLimits[thisType];
                 })();
                 const isHandPickMaxed = isHandPick && !isHandPickSelected && handPickSelected.size >= (gameState.effectPrompt.maxSelect || 3);
+                const isStealMarked = stealMarkedMe.has(item.origIdx);
+                const isStealHighlighted = stealHighlightMe.has(item.origIdx);
+                const isStealHidden = stealHiddenMe.has(item.origIdx) && hand.length === stealExpectedMeCountRef.current;
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard ? ' hand-discard-target' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed) ? ' hand-card-dimmed' : '')}
-                    style={(isDrawAnim || isPendingPlay) ? { visibility: 'hidden' } : undefined}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard ? ' hand-discard-target' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed) ? ' hand-card-dimmed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '')}
+                    style={(isDrawAnim || isPendingPlay || isStealHidden) ? { visibility: 'hidden' } : undefined}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
@@ -6924,19 +7557,275 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         );
       })}
 
+      {/* ── Side-Deck Phase Overlay (Bo3/Bo5) ── */}
+      {sideDeckPhase && !isSpectator && (() => {
+        const dk = sideDeckPhase.currentDeck;
+        if (!dk) return null;
+        const sel = sideDeckSel;
+        const heroes = dk.heroes || [];
+        const mainCards = dk.mainDeck || [];
+        const potionCards = dk.potionDeck || [];
+        const sideCards = dk.sideDeck || [];
+        const oppDone = sideDeckPhase.opponentDone;
+
+        const getCardType = (pool, idx) => {
+          let name;
+          if (pool === 'main') name = mainCards[idx];
+          else if (pool === 'potion') name = potionCards[idx];
+          else if (pool === 'side') name = sideCards[idx];
+          else if (pool === 'hero') return 'Hero';
+          else return null;
+          return CARDS_BY_NAME[name]?.cardType || null;
+        };
+
+        const canSwap = (fromPool, fromIdx, toPool, toIdx) => {
+          // No same-pool swaps, no direct main↔potion
+          if (fromPool === toPool) return false;
+          if ((fromPool === 'main' && toPool === 'potion') || (fromPool === 'potion' && toPool === 'main')) return false;
+
+          // Get card names for the swap
+          const getCardName = (pool, idx) => {
+            if (pool === 'main') return mainCards[idx];
+            if (pool === 'potion') return potionCards[idx];
+            if (pool === 'side') return sideCards[idx];
+            if (pool === 'hero') return heroes[idx]?.hero;
+            return null;
+          };
+          const fromName = getCardName(fromPool, fromIdx);
+          const toName = getCardName(toPool, toIdx);
+          if (!fromName || !toName) return false;
+
+          // Simulate deck state after swap for Nicolas checks
+          const simDeck = {
+            mainDeck: [...mainCards], potionDeck: [...potionCards], sideDeck: [...sideCards],
+            heroes: heroes.map(h => h ? { ...h } : h),
+          };
+          // Perform the simulated swap
+          if (fromPool === 'hero' && toPool === 'side') {
+            simDeck.heroes[fromIdx] = { hero: toName, ability1: null, ability2: null };
+            simDeck.sideDeck[toIdx] = fromName;
+          } else if (fromPool === 'side' && toPool === 'hero') {
+            simDeck.heroes[toIdx] = { hero: fromName, ability1: null, ability2: null };
+            simDeck.sideDeck[fromIdx] = toName;
+          }
+          // Use canCardTypeEnterSection to validate both directions
+          const canEnter = window.canCardTypeEnterSection;
+          if (!canEnter(simDeck, fromName, toPool)) return false;
+          if (!canEnter(simDeck, toName, fromPool)) return false;
+
+          // For hero swaps: also check that swapping out Nicolas doesn't leave potions stranded in main
+          if ((fromPool === 'hero' || toPool === 'hero') && (fromPool === 'side' || toPool === 'side')) {
+            // After swap, if main has potions but no Nicolas, block it
+            const mainPotions = simDeck.mainDeck.some(n => CARDS_BY_NAME[n]?.cardType === 'Potion');
+            if (mainPotions && !simDeck.heroes.some(h => h?.hero === 'Nicolas, the Hidden Alchemist')) return false;
+          }
+
+          return true;
+        };
+
+        // Simplified pool-level check for highlighting (without specific indices)
+        const canSwapPool = (fromPool, toPool) => {
+          if (fromPool === 'hero' || toPool === 'hero') return (fromPool === 'side' || toPool === 'side');
+          if ((fromPool === 'main' && toPool === 'potion') || (fromPool === 'potion' && toPool === 'main')) return false;
+          return (fromPool === 'side' || toPool === 'side');
+        };
+
+        const handleCardClick = (pool, idx) => {
+          if (sideDeckDone) return;
+          if (!sel) {
+            setSideDeckSel({ pool, idx });
+          } else if (sel.pool === pool && sel.idx === idx) {
+            setSideDeckSel(null);
+          } else if (canSwap(sel.pool, sel.idx, pool, idx)) {
+            socket.emit('side_deck_swap', { roomId: gameState.roomId, from: sel.pool, fromIdx: sel.idx, to: pool, toIdx: idx });
+            setSideDeckSel(null);
+          } else if (sel.pool === pool) {
+            // Click different card in same pool — reselect
+            setSideDeckSel({ pool, idx });
+          } else {
+            setSideDeckSel({ pool, idx });
+          }
+        };
+
+        const renderCard = (name, pool, idx) => {
+          const card = CARDS_BY_NAME[name];
+          const imgUrl = card ? cardImageUrl(name) : null;
+          const isSelected = sel?.pool === pool && sel?.idx === idx;
+          const isSwapTarget = sel && canSwapPool(sel.pool, pool) && !(sel.pool === pool && sel.idx === idx);
+          // For hero targets, only highlight if side card is a Hero
+          const isValidHeroTarget = pool === 'hero' && sel?.pool === 'side' && (() => {
+            const sideCard = CARDS_BY_NAME[sideCards[sel.idx]];
+            return sideCard?.cardType === 'Hero';
+          })();
+          const isValidSideForHero = pool === 'side' && sel?.pool === 'hero';
+
+          return (
+            <div key={pool + '-' + idx} onClick={() => handleCardClick(pool, idx)}
+              onMouseEnter={() => card && setBoardTooltip(card)} onMouseLeave={() => setBoardTooltip(null)}
+              style={{
+                width: 64, height: 90, borderRadius: 4, overflow: 'hidden', cursor: sideDeckDone ? 'default' : 'pointer',
+                border: isSelected ? '2px solid #ffaa00' : (isSwapTarget && (pool !== 'hero' || isValidHeroTarget) || isValidSideForHero) ? '2px solid rgba(100,255,100,.6)' : '2px solid transparent',
+                opacity: sideDeckDone ? 0.5 : 1,
+                boxShadow: isSelected ? '0 0 12px rgba(255,170,0,.6)' : undefined,
+                transition: 'border .15s, box-shadow .15s',
+                flexShrink: 0,
+              }}>
+              {imgUrl ? (
+                <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+              ) : (
+                <div style={{ width: '100%', height: '100%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: 'var(--text2)', textAlign: 'center', padding: 2 }}>{name}</div>
+              )}
+            </div>
+          );
+        };
+
+        const renderHeroSlot = (h, idx) => {
+          const card = h?.hero ? CARDS_BY_NAME[h.hero] : null;
+          const isSelected = sel?.pool === 'hero' && sel?.idx === idx;
+          const isSwapTarget = sel?.pool === 'side' && (() => {
+            const sc = CARDS_BY_NAME[sideCards[sel.idx]];
+            return sc?.cardType === 'Hero';
+          })();
+          return (
+            <div key={'hero-' + idx} onClick={() => h?.hero && handleCardClick('hero', idx)}
+              onMouseEnter={() => card && setBoardTooltip(card)} onMouseLeave={() => setBoardTooltip(null)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                padding: 6, borderRadius: 6, cursor: h?.hero && !sideDeckDone ? 'pointer' : 'default',
+                border: isSelected ? '2px solid #ffaa00' : isSwapTarget ? '2px solid rgba(100,255,100,.6)' : '2px solid var(--bg4)',
+                background: 'var(--bg2)', minWidth: 90,
+                opacity: sideDeckDone ? 0.5 : 1,
+                boxShadow: isSelected ? '0 0 12px rgba(255,170,0,.6)' : undefined,
+              }}>
+              <div style={{ width: 72, height: 100, borderRadius: 4, overflow: 'hidden' }}>
+                {card ? (
+                  <img src={cardImageUrl(h.hero)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text2)', fontSize: 10 }}>Empty</div>
+                )}
+              </div>
+              <div style={{ fontSize: 9, color: 'var(--text2)', textAlign: 'center' }}>
+                {h?.ability1 && <span style={{ color: '#88ccff' }}>{h.ability1}</span>}
+                {h?.ability1 && h?.ability2 && ' / '}
+                {h?.ability2 && <span style={{ color: '#88ccff' }}>{h.ability2}</span>}
+              </div>
+            </div>
+          );
+        };
+
+        const sectionStyle = { marginBottom: 12 };
+        const labelStyle = { fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 4, fontFamily: "'Orbitron', sans-serif" };
+        const cardRowStyle = { display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 200, overflowY: 'auto', padding: 4, background: 'var(--bg2)', borderRadius: 6, border: '1px solid var(--bg4)' };
+
+        return (
+          <div className="modal-overlay" style={{ zIndex: 10200, background: 'rgba(0,0,0,.85)' }}>
+            <div className="animate-in" style={{ width: '90vw', maxWidth: 900, maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg1)', borderRadius: 12, padding: 24, border: '1px solid var(--bg4)' }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div>
+                  <div className="pixel-font" style={{ fontSize: 16, color: 'var(--accent)' }}>SIDE DECKING</div>
+                  <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
+                    Best of {sideDeckPhase.format} — Score: {(sideDeckPhase.setScore || [0, 0]).join(' – ')}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {oppDone && <span style={{ fontSize: 18, color: '#44ff44' }} title="Opponent is done">✅</span>}
+                  <span style={{ fontSize: 11, color: oppDone ? '#44ff44' : 'var(--text2)' }}>
+                    {oppDone ? 'Opponent ready' : 'Opponent siding...'}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12, lineHeight: 1.5 }}>
+                Click a card to select it, then click a card in the Side Deck (or vice versa) to swap them. Heroes can only be swapped with Side Deck Heroes.
+              </div>
+
+              {/* Heroes */}
+              <div style={sectionStyle}>
+                <div style={labelStyle}>HEROES</div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                  {heroes.map((h, i) => renderHeroSlot(h, i))}
+                </div>
+              </div>
+
+              {/* Main Deck */}
+              <div style={sectionStyle}>
+                <div style={labelStyle}>MAIN DECK ({mainCards.length})</div>
+                <div style={cardRowStyle}>
+                  {mainCards.length === 0 ? <div style={{ color: 'var(--text2)', fontSize: 11, padding: 8 }}>Empty</div> : mainCards.map((c, i) => renderCard(c, 'main', i))}
+                </div>
+              </div>
+
+              {/* Potion Deck */}
+              <div style={sectionStyle}>
+                <div style={labelStyle}>POTION DECK ({potionCards.length})</div>
+                <div style={cardRowStyle}>
+                  {potionCards.length === 0 ? <div style={{ color: 'var(--text2)', fontSize: 11, padding: 8 }}>Empty</div> : potionCards.map((c, i) => renderCard(c, 'potion', i))}
+                </div>
+              </div>
+
+              {/* Side Deck */}
+              <div style={sectionStyle}>
+                <div style={{ ...labelStyle, color: '#ffaa00' }}>SIDE DECK ({sideCards.length})</div>
+                <div style={{ ...cardRowStyle, borderColor: 'rgba(255,170,0,.3)' }}>
+                  {sideCards.length === 0 ? <div style={{ color: 'var(--text2)', fontSize: 11, padding: 8 }}>No side deck cards</div> : sideCards.map((c, i) => renderCard(c, 'side', i))}
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16 }}>
+                <button className="btn" style={{ padding: '10px 24px', fontSize: 12, borderColor: 'var(--text2)', color: 'var(--text2)' }}
+                  disabled={sideDeckDone}
+                  onClick={() => {
+                    socket.emit('side_deck_reset', { roomId: gameState.roomId });
+                    setSideDeckSel(null);
+                  }}>
+                  🔄 Reset
+                </button>
+                <button className={'btn' + (sideDeckDone ? '' : ' btn-success')} style={{ padding: '10px 24px', fontSize: 12 }}
+                  disabled={sideDeckDone}
+                  onClick={() => {
+                    setSideDeckDone(true);
+                    setSideDeckSel(null);
+                    socket.emit('side_deck_done', { roomId: gameState.roomId });
+                  }}>
+                  {sideDeckDone ? '✅ Waiting for opponent...' : '✔ Done Siding'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Surrender confirmation */}
-      {showSurrender && (
+      {showSurrender && (() => {
+        const isBestOf = (gameState.format || 1) > 1;
+        return (
         <div className="modal-overlay" onClick={() => setShowSurrender(false)}>
-          <div className="modal animate-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 340, textAlign: 'center' }}>
+          <div className="modal animate-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 380, textAlign: 'center' }}>
             <div className="pixel-font" style={{ fontSize: 14, color: 'var(--danger)', marginBottom: 16 }}>SURRENDER?</div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>Do you really want to give up?</div>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button className="btn btn-danger" style={{ padding: '10px 28px', fontSize: 13 }} onClick={handleSurrender}>YES</button>
-              <button className="btn" style={{ padding: '10px 28px', fontSize: 13 }} onClick={() => setShowSurrender(false)}>NO</button>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
+              {isBestOf ? `Best of ${gameState.format} — Score: ${(gameState.setScore||[0,0]).join(' – ')}` : 'Do you really want to give up?'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: isBestOf ? 'column' : 'row', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
+              {isBestOf ? (<>
+                <button className="btn btn-danger" style={{ padding: '10px 28px', fontSize: 13, width: 220 }} onClick={() => {
+                  setShowSurrender(false);
+                  socket.emit('surrender_game', { roomId: gameState.roomId });
+                }}>Surrender Game</button>
+                <button className="btn" style={{ padding: '10px 28px', fontSize: 13, width: 220, borderColor: '#ff2222', color: '#ff2222' }} onClick={() => {
+                  setShowSurrender(false);
+                  socket.emit('surrender_match', { roomId: gameState.roomId });
+                }}>Surrender Match</button>
+                <button className="btn" style={{ padding: '10px 28px', fontSize: 13, width: 220 }} onClick={() => setShowSurrender(false)}>Cancel</button>
+              </>) : (<>
+                <button className="btn btn-danger" style={{ padding: '10px 28px', fontSize: 13 }} onClick={handleSurrender}>YES</button>
+                <button className="btn" style={{ padding: '10px 28px', fontSize: 13 }} onClick={() => setShowSurrender(false)}>Cancel</button>
+              </>)}
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* End Turn confirmation */}
       {showEndTurnConfirm && (
@@ -7197,6 +8086,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'optionPicker' ? '🤔 Opponent is deciding...' :
              ep.type === 'forceDiscard' || ep.type === 'forceDiscardCancellable' ? (ep.opponentTitle || '🗑 Opponent is discarding...') :
              ep.type === 'abilityAttach' ? '⚡ Opponent is equipping...' :
+             ep.type === 'blindHandPick' ? '🫳 Opponent is stealing...' :
              '⏳ Waiting for opponent...'}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text2)' }}>
@@ -7212,6 +8102,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'playerPicker' ? 'Waiting for opponent to pick a player...' :
              ep.type === 'statusSelect' ? 'Waiting for opponent to choose a status...' :
              ep.type === 'abilityAttach' ? 'Waiting for opponent to attach an ability...' :
+             ep.type === 'blindHandPick' ? 'Opponent is choosing cards from your hand...' :
              ep.type === 'deckSearchReveal' ? 'Waiting for opponent to dismiss search result...' :
              'Waiting for opponent...'}
           </div>
@@ -7334,6 +8225,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
                 onClick={() => respondToPrompt({ cancelled: true })}>Cancel</button>
             </div>
+          </DraggablePanel>
+        );
+      })()}
+
+      {/* ── Blind Hand Pick Prompt (Loot the Leftovers, etc.) ── */}
+      {isMyEffectPrompt && ep.type === 'blindHandPick' && (() => {
+        const maxSel = ep.maxSelect || 2;
+        const canConfirm = blindPickSelected.size >= maxSel;
+        return (
+          <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(255,150,50,.85)' }}>
+            <div className="orbit-font" style={{ fontSize: 13, color: '#ff9933', marginBottom: 4 }}>{ep.title || 'Steal Cards'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description || `Click ${maxSel} face-down cards from your opponent's hand.`}</div>
+            <div style={{ fontSize: 11, color: '#ff9933', opacity: .8, marginBottom: 8 }}>
+              Selected: {blindPickSelected.size}/{maxSel}
+            </div>
+            <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: canConfirm ? '#ff9933' : '#555', color: canConfirm ? '#ff9933' : '#555' }}
+              disabled={!canConfirm}
+              onClick={() => {
+                respondToPrompt({ selectedIndices: [...blindPickSelected] });
+              }}>{ep.confirmLabel || '🫳 Steal!'}</button>
           </DraggablePanel>
         );
       })()}
@@ -7485,7 +8396,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* Win/Loss overlay — round result (non-final) */}
-      {result && !showFirstChoice && !result.setOver && result.format > 1 && (
+      {result && !showFirstChoice && !result.setOver && result.format > 1 && !sideDeckPhase && (
         <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.65)' }}>
           <div className="animate-in" style={{ textAlign: 'center' }}>
             <div className="pixel-font" style={{

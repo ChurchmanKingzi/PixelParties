@@ -220,8 +220,8 @@ class GameEngine {
         const hero = this.gs.players[c.controller ?? c.owner]?.heroes?.[c.heroIdx];
         if (!hero || !hero.name) return false; // Empty hero slot
         if (hero.hp <= 0 && !hookCtx._bypassDeadHeroFilter) return false;
-        if ((hero.statuses?.frozen || hero.statuses?.stunned) && (c.zone === 'hero' || c.zone === 'ability')) return false;
-        if (hero.statuses?.negated && (c.zone === 'hero' || c.zone === 'ability')) return false;
+        if ((hero.statuses?.frozen || hero.statuses?.stunned) && (c.zone === 'hero' || c.zone === 'ability') && !loadCardEffect(c.name)?.bypassStatusFilter) return false;
+        if (hero.statuses?.negated && (c.zone === 'hero' || c.zone === 'ability') && !loadCardEffect(c.name)?.bypassStatusFilter) return false;
       }
       // Creature-level negation/freeze/stun (Dark Gear, Necromancy, Slimes, etc.)
       if (c.zone === 'support' && (c.counters?.negated || c.counters?.frozen || c.counters?.stunned)) return false;
@@ -419,6 +419,26 @@ class GameEngine {
       },
       async removeStatus(target, statusName) {
         return engine.actionRemoveStatus(target, statusName);
+      },
+      /** Remove multiple statuses from a hero (centralized cleanse). Skips unhealable. */
+      cleanseHeroStatuses(hero, playerIdx, heroIdx, statusKeys, source) {
+        return engine.cleanseHeroStatuses(hero, playerIdx, heroIdx, statusKeys, source);
+      },
+      /** Remove multiple statuses from a creature (centralized cleanse). Skips unhealable. */
+      cleanseCreatureStatuses(inst, statusKeys, source) {
+        return engine.cleanseCreatureStatuses(inst, statusKeys, source);
+      },
+      /** Get removable (non-unhealable) negative statuses from a hero. */
+      getRemovableHeroStatuses(hero) {
+        return engine.getRemovableHeroStatuses(hero);
+      },
+      /** Get removable (non-unhealable) negative statuses from a creature. */
+      getRemovableCreatureStatuses(inst) {
+        return engine.getRemovableCreatureStatuses(inst);
+      },
+      /** Estimate effective damage including hero-level bonuses (for preview). */
+      estimateDamage(baseDamage, damageType) {
+        return engine.estimateDamage(effectiveOwner, cardInstance.heroIdx, baseDamage, damageType || 'normal');
       },
       /** Add a buff to a hero. */
       async addBuff(hero, playerIdx, heroIdx, buffName, opts) {
@@ -861,6 +881,18 @@ class GameEngine {
         const side = config.side || 'any';
         const types = config.types || ['hero', 'creature'];
 
+        // Auto-compute damage preview with hero-level bonuses
+        if (config.baseDamage != null && config.baseDamage > 0) {
+          const estDmg = engine.estimateDamage(pi, cardInstance.heroIdx, config.baseDamage, config.damageType || 'normal');
+          if (estDmg !== config.baseDamage) {
+            const base = String(config.baseDamage);
+            const est = String(estDmg);
+            const bonusNote = ` (${base}+${estDmg - config.baseDamage})`;
+            if (config.description) config.description = config.description.split(base).join(est + bonusNote);
+            if (config.confirmLabel) config.confirmLabel = config.confirmLabel.split(base).join(est);
+          }
+        }
+
         const addHeroes = (playerIdx) => {
           const ps2 = gs.players[playerIdx];
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
@@ -883,12 +915,12 @@ class GameEngine {
               const slot = (ps2.supportZones[hi] || [])[si] || [];
               if (slot.length === 0) continue;
               const creatureName = slot[0];
-              // Only actual Creatures are targetable — not Equipment, Heroes, etc.
-              const cd = cardDB[creatureName];
-              if (!cd || !hasCardType(cd, 'Creature')) continue;
               const inst = engine.cardInstances.find(c =>
                 (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
               );
+              // Only actual Creatures are targetable — not Equipment, Heroes, etc.
+              const cd = (inst ? engine.getEffectiveCardData(inst) : null) || cardDB[creatureName];
+              if (!cd || !hasCardType(cd, 'Creature')) continue;
               if (inst?.faceDown) continue; // Face-down Bakhm surprises are not targetable
               const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst };
               if (config.condition && !config.condition(t, engine)) continue;
@@ -979,6 +1011,37 @@ class GameEngine {
           }
         }
 
+        // ── Post-target hand reaction check ──
+        // After surprises, check if any player has a hand reaction that fires
+        // after targeting (e.g. Divine Gift of Sacrifice, Invisibility Cloak).
+        if (selected && !config._skipPostTargetReactions) {
+          const ptResult = await engine._checkPostTargetHandReactions([selected], cardInstance);
+
+          // Effect fully negated (Invisibility Cloak)
+          if (ptResult?.effectNegated) {
+            // Remove the target from damage log — spell never connected
+            if (gs._spellDamageLog) {
+              const negIdx = gs._spellDamageLog.findIndex(t => t.id === selected.id);
+              if (negIdx >= 0) gs._spellDamageLog.splice(negIdx, 1);
+            }
+            return null;
+          }
+
+          // If the selected target died during the reaction, force retarget
+          if (selected.type === 'hero') {
+            const tgtHero = gs.players[selected.owner]?.heroes?.[selected.heroIdx];
+            if (!tgtHero || tgtHero.hp <= 0) {
+              // Remove dead target from damage log
+              if (gs._spellDamageLog) {
+                const deadIdx = gs._spellDamageLog.findIndex(t => t.id === selected.id);
+                if (deadIdx >= 0) gs._spellDamageLog.splice(deadIdx, 1);
+              }
+              // Recursive retarget — rebuild targets, dead hero excluded naturally
+              return ctx.promptDamageTarget({ ...config, _skipPostTargetReactions: false });
+            }
+          }
+        }
+
         return selected;
       },
 
@@ -1022,12 +1085,12 @@ class GameEngine {
               const slot = (ps2.supportZones[hi] || [])[si] || [];
               if (slot.length === 0) continue;
               const creatureName = slot[0];
-              // Only actual Creatures are targetable — not Equipment, Tokens, Spells, etc.
-              const cd = cardDB[creatureName];
-              if (!cd || !hasCardType(cd, 'Creature')) continue;
               const inst2 = engine.cardInstances.find(c =>
                 (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
               );
+              // Only actual Creatures are targetable — not Equipment, Tokens, Spells, etc.
+              const cd = (inst2 ? engine.getEffectiveCardData(inst2) : null) || cardDB[creatureName];
+              if (!cd || !hasCardType(cd, 'Creature')) continue;
               if (inst2?.faceDown) continue; // Face-down Bakhm surprises are not targetable
               const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst2 };
               if (config.condition && !config.condition(t, engine)) continue;
@@ -1089,6 +1152,21 @@ class GameEngine {
             if (surpriseResult?.effectNegated) {
               return []; // Effect fully negated — don't set _spellCancelled
             }
+          }
+        }
+
+        // ── Post-target hand reaction check (Invisibility Cloak, etc.) ──
+        if (!config._skipPostTargetReactions) {
+          const ptResult = await engine._checkPostTargetHandReactions(result, cardInstance);
+          if (ptResult?.effectNegated) {
+            // Clear damage log entries for negated targets
+            if (gs._spellDamageLog) {
+              for (const t of result) {
+                const idx = gs._spellDamageLog.findIndex(e => e.id === t.id);
+                if (idx >= 0) gs._spellDamageLog.splice(idx, 1);
+              }
+            }
+            return [];
           }
         }
 
@@ -1538,7 +1616,11 @@ class GameEngine {
     if (target && target.hp !== undefined && target.hp <= 0) {
       target.diedOnTurn = this.gs.turn;
       this.log('hero_ko', { hero: this._heroLabel(target), source: source?.name || 'damage' });
+      // Store KO context for reaction cards (Loot the Leftovers, etc.)
+      const targetOwner = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
+      this.gs._heroKOContext = { hero: target, source, heroOwner: targetOwner, killerOwner: source?.owner ?? -1 };
       await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, _bypassDeadHeroFilter: true });
+      delete this.gs._heroKOContext;
 
       // If a hook (Guardian Angel) restored HP, skip death processing
       if (target.hp > 0) {
@@ -1619,7 +1701,7 @@ class GameEngine {
     if (!target || !target.counters) return;
     if (target.faceDown) return; // Face-down surprises cannot be healed
     const cd = this._getCardDB()[target.name];
-    const baseHp = cd?.hp || 0;
+    const baseHp = target.counters.maxHp ?? cd?.hp ?? 0;
     if (baseHp <= 0) return;
 
     // Monia-style creature protection
@@ -2317,10 +2399,108 @@ class GameEngine {
   }
 
   async actionRemoveStatus(target, statusName) {
-    if (!target?.statuses?.[statusName]) return;
+    if (!target?.statuses?.[statusName]) return false;
+    // Unhealable statuses cannot be removed by any effect
+    if (target.statuses[statusName]?.unhealable) return false;
     delete target.statuses[statusName];
     this.log('status_remove', { target: target.name || this._heroLabel(target), status: statusName });
     await this.runHooks(HOOKS.ON_STATUS_REMOVED, { target, status: statusName });
+    return true;
+  }
+
+  /**
+   * Remove multiple statuses from a hero, skipping unhealable ones.
+   * Centralized cleanse function — ALL cards that remove statuses should use this.
+   * @param {object} hero - Hero object
+   * @param {number} playerIdx - Owner index
+   * @param {number} heroIdx - Hero index
+   * @param {string[]} statusKeys - Array of status keys to remove
+   * @param {string} source - Card name for logging (e.g. 'Beer', 'Cure')
+   * @returns {string[]} Array of actually removed status keys
+   */
+  cleanseHeroStatuses(hero, playerIdx, heroIdx, statusKeys, source) {
+    if (!hero?.statuses) return [];
+    const removed = [];
+    for (const key of statusKeys) {
+      if (!hero.statuses[key]) continue;
+      if (hero.statuses[key]?.unhealable) continue;
+      delete hero.statuses[key];
+      this.log('status_remove', { target: hero.name, status: key, by: source });
+      removed.push(key);
+    }
+    return removed;
+  }
+
+  /**
+   * Remove multiple statuses from a creature, skipping unhealable ones.
+   * Centralized cleanse function — ALL cards that remove creature statuses should use this.
+   * @param {object} inst - Card instance
+   * @param {string[]} statusKeys - Array of status counter keys to remove (e.g. ['poisoned', 'stunned'])
+   * @param {string} source - Card name for logging
+   * @returns {string[]} Array of actually removed status keys
+   */
+  cleanseCreatureStatuses(inst, statusKeys, source) {
+    if (!inst) return [];
+    const removed = [];
+    for (const key of statusKeys) {
+      if (!inst.counters[key]) continue;
+      // Creature unhealable: stored as separate counter flag
+      if (inst.counters[key + 'Unhealable']) continue;
+      delete inst.counters[key];
+      delete inst.counters[key + 'Stacks'];
+      delete inst.counters[key + 'AppliedBy'];
+      this.log('status_remove', { target: inst.name, status: key, by: source });
+      removed.push(key);
+    }
+    return removed;
+  }
+
+  /**
+   * Get removable (non-unhealable) negative status keys from a hero.
+   * Use this to build cleanse target lists for cards like Beer, Coffee, Juice.
+   * @param {object} hero - Hero object
+   * @returns {string[]} Array of removable negative status keys
+   */
+  getRemovableHeroStatuses(hero) {
+    if (!hero?.statuses) return [];
+    const negativeKeys = getNegativeStatuses();
+    return negativeKeys.filter(key =>
+      hero.statuses[key] && !hero.statuses[key]?.unhealable
+    );
+  }
+
+  /**
+   * Get removable (non-unhealable) negative status keys from a creature.
+   * @param {object} inst - Card instance
+   * @returns {string[]} Array of removable negative status counter keys
+   */
+  getRemovableCreatureStatuses(inst) {
+    if (!inst) return [];
+    const negativeKeys = getNegativeStatuses();
+    return negativeKeys.filter(key =>
+      inst.counters[key] && !inst.counters[key + 'Unhealable']
+    );
+  }
+
+  /**
+   * Estimate effective damage from a source hero, including hero-level bonuses.
+   * Used for damage preview in targeting prompts.
+   * Card effects can export estimateDamageBonus(engine, playerIdx, heroIdx, baseDamage, damageType)
+   * to participate in the preview calculation.
+   * @returns {number} Estimated damage after source-side modifiers
+   */
+  estimateDamage(playerIdx, heroIdx, baseDamage, damageType) {
+    let damage = baseDamage;
+    for (const inst of this.cardInstances) {
+      if (inst.owner !== playerIdx) continue;
+      if (inst.heroIdx !== heroIdx) continue;
+      if (!inst.isActiveIn(inst.zone)) continue;
+      const script = loadCardEffect(inst.name);
+      if (script?.estimateDamageBonus) {
+        damage = script.estimateDamageBonus(this, playerIdx, heroIdx, damage, damageType);
+      }
+    }
+    return damage;
   }
 
   // ─── BUFF SYSTEM ──────────────────────────
@@ -2748,10 +2928,20 @@ class GameEngine {
     const hero = ps.heroes[heroIdx];
     if (!hero?.name || hero.hp <= 0) return { played: false };
 
-    const eligible = this.getHeroEligibleActionCards(playerIdx, heroIdx);
+    let eligible = this.getHeroEligibleActionCards(playerIdx, heroIdx);
 
-    // Also check for activatable abilities on this hero
+    // Optional card type filter (e.g. ['Attack', 'Spell'] for Invisibility Cloak)
+    if (config.allowedCardTypes) {
+      const cardDB = this._getCardDB();
+      eligible = eligible.filter(name => {
+        const cd = cardDB[name];
+        return cd && config.allowedCardTypes.includes(cd.cardType);
+      });
+    }
+
+    // Also check for activatable abilities on this hero (unless skipped)
     const activatableAbilities = [];
+    if (!config.skipAbilities) {
     for (let zi = 0; zi < (ps.abilityZones[heroIdx] || []).length; zi++) {
       const slot = (ps.abilityZones[heroIdx] || [])[zi] || [];
       if (slot.length === 0) continue;
@@ -2763,6 +2953,7 @@ class GameEngine {
       if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
       activatableAbilities.push({ heroIdx, zoneIdx: zi, abilityName, level: slot.length });
     }
+    } // end skipAbilities check
 
     if (eligible.length === 0 && activatableAbilities.length === 0) return { played: false };
 
@@ -2845,7 +3036,10 @@ class GameEngine {
       ps.hand.splice(handIndex, 1);
       const inst = this._trackCard(cardName, playerIdx, 'hand', heroIdx, -1);
       this.gs._immediateActionContext = true;
+      // Apply target exclusion if configured (Invisibility Cloak, etc.)
+      if (config.excludeTargets) this.gs._spellExcludeTargets = config.excludeTargets;
       await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
+      if (config.excludeTargets) delete this.gs._spellExcludeTargets;
       delete this.gs._immediateActionContext;
       ps.discardPile.push(cardName);
       this._untrackCard(inst.id);
@@ -3145,6 +3339,10 @@ class GameEngine {
    */
   async switchTurn() {
     await this.runHooks(HOOKS.ON_TURN_END, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
+    // Clear itemLocked for the player whose turn is ending
+    // (it lasts from when it's applied until after the afflicted player's own turn)
+    const endingPs = this.gs.players[this.gs.activePlayer];
+    if (endingPs) endingPs.itemLocked = false;
     // Clear first-turn full protection after the starting player's turn ends
     if (this.gs.firstTurnProtectedPlayer != null) {
       delete this.gs.firstTurnProtectedPlayer;
@@ -4018,7 +4216,112 @@ class GameEngine {
   }
 
   /**
-   * Check if a hero can activate a face-down Surprise.
+   * Check for hand reaction cards that fire AFTER targeting but BEFORE resolution.
+   * Used by cards like Divine Gift of Sacrifice that react to opponent targeting.
+   * Unlike surprises (face-down on board), these are in the player's hand.
+   *
+   * @param {Array} targetedHeroes - Array of target objects (from promptDamageTarget)
+   * @param {object} sourceCard - The card instance doing the targeting
+   */
+  async _checkPostTargetHandReactions(targetedHeroes, sourceCard) {
+    if (!targetedHeroes || targetedHeroes.length === 0) return null;
+    if (this._inPostTargetReaction) return null;
+
+    const sourceOwner = sourceCard?.controller ?? sourceCard?.owner ?? -1;
+    const allCards = this._getCardDB();
+
+    // Check both players, defender (targeted player) first
+    const targetOwners = [...new Set(targetedHeroes.map(t => t.owner))];
+    const checkOrder = [...targetOwners, ...([0, 1].filter(i => !targetOwners.includes(i)))];
+
+    for (const pi of checkOrder) {
+      const ps = this.gs.players[pi];
+      if (!ps) continue;
+
+      for (let hi = 0; hi < ps.hand.length; hi++) {
+        const cardName = ps.hand[hi];
+        const script = loadCardEffect(cardName);
+        if (!script?.isPostTargetReaction) continue;
+
+        const cardData = allCards[cardName];
+
+        // Gold check for artifacts
+        const cost = cardData?.cost || 0;
+        if (cost > 0 && (ps.gold || 0) < cost) continue;
+
+        // Once-per-game check
+        if (script.oncePerGame || script.oncePerGameKey) {
+          const opgKey = script.oncePerGameKey || cardName;
+          if (ps._oncePerGameUsed?.has(opgKey)) continue;
+        }
+
+        // Check post-target condition
+        if (script.postTargetCondition &&
+            !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard)) continue;
+
+        // Spell/Attack reactions: at least 1 hero must be able to cast it
+        // Artifacts: skip hero check (only need gold)
+        const isArtifact = cardData?.cardType === 'Artifact';
+        if (!isArtifact) {
+          let canCast = false;
+          for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
+            if (this._canHeroActivateSurprise(pi, heroI, cardName)) {
+              canCast = true;
+              break;
+            }
+          }
+          if (!canCast) continue;
+        }
+
+        // Build prompt message
+        const targetNames = targetedHeroes.map(t => t.cardName).join(', ');
+        const srcName = sourceCard?.name || 'An effect';
+
+        const confirmed = await this.promptGeneric(pi, {
+          type: 'confirm',
+          title: cardName,
+          message: `${srcName} is targeting ${targetNames}! Activate ${cardName}?`,
+          showCard: cardName,
+          confirmLabel: '✨ Activate!',
+          cancelLabel: 'No',
+          cancellable: true,
+        });
+
+        if (!confirmed) continue;
+
+        // Activate: remove from hand, deduct gold, discard after resolve
+        ps.hand.splice(hi, 1);
+        if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+        if (this.gs._scTracking && pi >= 0 && pi < 2) this.gs._scTracking[pi].cardsPlayedFromHand++;
+
+        // Reveal card
+        this._broadcastEvent('card_reveal', { cardName, playerIdx: pi });
+        await this._delay(300);
+
+        this.log('post_target_reaction', { card: cardName, player: ps.username });
+
+        this._inPostTargetReaction = true;
+        let resolveResult = null;
+        try {
+          if (script.postTargetResolve) {
+            resolveResult = await script.postTargetResolve(this, pi, targetedHeroes, sourceCard);
+          }
+        } finally {
+          this._inPostTargetReaction = false;
+        }
+
+        // Discard the card
+        ps.discardPile.push(cardName);
+        this.sync();
+
+        // Return result (e.g. { effectNegated: true } for Invisibility Cloak)
+        return resolveResult || null;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Requires: hero alive, not frozen/stunned, meets spell school & level requirements.
    * For Creature surprises: also requires a free Support Zone.
    */
@@ -4325,11 +4628,11 @@ class GameEngine {
    * @returns {{ negated: boolean, chainFormed: boolean, resolveResult: any }}
    */
   async executeCardWithChain(cardInfo) {
-    const { cardName, owner, cardType, resolve, goldCost } = cardInfo;
+    const { cardName, owner, cardType, resolve, goldCost, heroIdx } = cardInfo;
 
     const initialLink = {
       id: uuidv4().substring(0, 12),
-      cardName, owner,
+      cardName, owner, heroIdx: heroIdx ?? -1,
       cardType: cardType || 'Unknown',
       goldCost: goldCost || 0,
       isInitialCard: true,
@@ -4748,6 +5051,18 @@ class GameEngine {
   }
 
   /**
+   * Get effective card data for a card instance, respecting per-instance overrides.
+   * Cards like Biomancy Tokens store a _cardDataOverride on their counters to
+   * change their cardType/hp/effect while keeping the original card name/image.
+   * @param {CardInstance} inst - Card instance
+   * @returns {object|null} Card data (possibly overridden)
+   */
+  getEffectiveCardData(inst) {
+    if (inst?.counters?._cardDataOverride) return inst.counters._cardDataOverride;
+    return this._getCardDB()[inst?.name] || null;
+  }
+
+  /**
    * Check if a card in a support zone should be treated as an Equipment Artifact.
    * Centralises equip detection so all cards use consistent logic.
    * Detects: script.isEquip, DB subtype 'Equipment', treatAsEquip counter
@@ -4798,11 +5113,11 @@ class GameEngine {
       for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
         const slot = (ps.supportZones[hi] || [])[si] || [];
         if (slot.length === 0) continue;
-        const cd = cardDB[slot[0]];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
         const inst = this.cardInstances.find(c =>
           (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
         );
+        const cd = (inst ? this.getEffectiveCardData(inst) : null) || cardDB[slot[0]];
+        if (!cd || !hasCardType(cd, 'Creature')) continue;
         targets.push({
           id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx,
           heroIdx: hi, slotIdx: si, cardName: slot[0], cardInstance: inst || null,
@@ -5040,17 +5355,18 @@ class GameEngine {
           const slot = (scanPs.supportZones[hi] || [])[zi] || [];
           if (slot.length === 0) continue;
           const creatureName = slot[0];
-          const cd = cardDB[creatureName];
-          if (!cd || !hasCardType(cd, 'Creature')) continue;
-
-          const script = loadCardEffect(creatureName);
-          if (!script?.creatureEffect) continue;
-
           const inst = this.cardInstances.find(c =>
             c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
           );
           if (!inst) continue;
           if (inst.faceDown) continue; // Face-down Bakhm surprises can't activate creature effects
+
+          const cd = this.getEffectiveCardData(inst) || cardDB[creatureName];
+          if (!cd || !hasCardType(cd, 'Creature')) continue;
+
+          const effectName = inst.counters?._effectOverride || creatureName;
+          const script = loadCardEffect(effectName);
+          if (!script?.creatureEffect) continue;
 
           // Summoning sickness: creatures cannot activate on the turn they were summoned
           const hasSummoningSickness = inst.turnPlayed === (this.gs.turn || 0);
@@ -5434,6 +5750,8 @@ class GameEngine {
         newStacks = (hero.statuses.poisoned.stacks || 1) + 1; // Default: +1
       }
       hero.statuses.poisoned.stacks = newStacks;
+      // Carry over unhealable flag (once unhealable, always unhealable; new unhealable upgrades existing)
+      if (opts.unhealable) hero.statuses.poisoned.unhealable = true;
       this.log('status_add', { target: hero.name, status: 'poisoned', stacks: newStacks, owner: playerIdx });
       await this.runHooks(HOOKS.ON_STATUS_APPLIED, { target: hero, heroOwner: playerIdx, heroIdx, statusName, _skipReactionCheck: opts._skipReactionCheck });
       this.sync();
@@ -5455,6 +5773,7 @@ class GameEngine {
   async removeHeroStatus(playerIdx, heroIdx, statusName) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero || !hero.name || !hero.statuses?.[statusName]) return;
+    if (hero.statuses[statusName]?.unhealable) return;
     delete hero.statuses[statusName];
     this.log('status_remove', { target: hero.name, status: statusName, owner: playerIdx });
     await this.runHooks(HOOKS.ON_STATUS_REMOVED, { target: hero, heroOwner: playerIdx, heroIdx, statusName });
@@ -5621,7 +5940,7 @@ class GameEngine {
         for (const inst of this.cardInstances) {
           if ((inst.owner !== tpi && inst.controller !== tpi) || inst.zone !== 'support') continue;
           if (inst.faceDown) continue; // Face-down surprises are immune to AOE
-          const cd = cardDB[inst.name];
+          const cd = this.getEffectiveCardData(inst) || cardDB[inst.name];
           if (!cd || !hasCardType(cd, 'Creature')) continue;
           // HP threshold filters
           const currentHp = inst.counters.currentHp ?? (cd.hp || 0);
@@ -5726,7 +6045,7 @@ class GameEngine {
     for (const e of entries) {
       e.cancelled = false;
       const cd = cardDB[e.inst.name];
-      const maxHp = cd?.hp || 0;
+      const maxHp = e.inst.counters.maxHp ?? cd?.hp ?? 0;
       if (!e.inst.counters.currentHp) e.inst.counters.currentHp = maxHp;
       // Store original card level for Effect 1 type checks
       e.originalLevel = cd?.level ?? 0;
@@ -5821,7 +6140,7 @@ class GameEngine {
       // ── SC tracking: creature overkill ──
       if (this.gs._scTracking && e.sourceOwner >= 0 && e.sourceOwner < 2) {
         const cd = cardDB[e.inst.name];
-        const creatureMaxHp = cd?.hp || 0;
+        const creatureMaxHp = e.inst.counters.maxHp ?? cd?.hp ?? 0;
         if (creatureMaxHp > 0 && actualAmount >= creatureMaxHp * 2) {
           this.gs._scTracking[e.sourceOwner].creatureOverkill = true;
         }
@@ -5837,9 +6156,16 @@ class GameEngine {
           const idx = supSlot.indexOf(e.inst.name);
           if (idx >= 0) supSlot.splice(idx, 1);
         }
-        // Cards return to their ORIGINAL owner's discard pile
+        // Cards return to their ORIGINAL owner's discard pile (Tokens go to deleted pile)
         const creatureDiscardPs = this.gs.players[e.inst.originalOwner];
-        if (creatureDiscardPs) creatureDiscardPs.discardPile.push(e.inst.name);
+        if (creatureDiscardPs) {
+          const effectiveCd = this.getEffectiveCardData(e.inst);
+          if (effectiveCd && hasCardType(effectiveCd, 'Token')) {
+            creatureDiscardPs.deletedPile.push(e.inst.name);
+          } else {
+            creatureDiscardPs.discardPile.push(e.inst.name);
+          }
+        }
         this._untrackCard(e.inst.id);
         await this.runHooks('onCardLeaveZone', { card: e.inst, fromZone: 'support', fromHeroIdx: e.inst.heroIdx, _skipReactionCheck: true });
         await this.runHooks(HOOKS.ON_CREATURE_DEATH, { creature: deathInfo, source: e.source, _skipReactionCheck: true });
@@ -5892,7 +6218,7 @@ class GameEngine {
       if (inst.owner !== ap || inst.zone !== 'support') continue;
       if (inst.faceDown) continue; // Face-down surprises are immune
       if (!inst.counters.burned) continue;
-      const cd = burnCardDB[inst.name];
+      const cd = this.getEffectiveCardData(inst) || burnCardDB[inst.name];
       if (!cd || !hasCardType(cd, 'Creature')) continue;
       burnedCreatures.push(inst);
     }
@@ -5954,7 +6280,7 @@ class GameEngine {
     for (const inst of this.cardInstances) {
       if (inst.owner !== ap || inst.zone !== 'support') continue;
       if (!inst.counters.poisoned) continue;
-      const cd = poisonCardDB[inst.name];
+      const cd = this.getEffectiveCardData(inst) || poisonCardDB[inst.name];
       if (!cd || !hasCardType(cd, 'Creature')) continue;
       const stacks = inst.counters.poisonStacks || 1;
       poisonedCreatures.push({ inst, stacks });
@@ -6078,9 +6404,16 @@ class GameEngine {
           const idx = (supZones[zi] || []).indexOf(inst.name);
           if (idx >= 0) { supZones[zi].splice(idx, 1); break; }
         }
-        // Cards return to their ORIGINAL owner's discard pile
+        // Cards return to their ORIGINAL owner's discard pile (Tokens go to deleted pile)
         const discardPs = this.gs.players[inst.originalOwner];
-        if (discardPs) discardPs.discardPile.push(inst.name);
+        if (discardPs) {
+          const effectiveCd = this.getEffectiveCardData(inst);
+          if (effectiveCd && hasCardType(effectiveCd, 'Token')) {
+            discardPs.deletedPile.push(inst.name);
+          } else {
+            discardPs.discardPile.push(inst.name);
+          }
+        }
         this.cardInstances = this.cardInstances.filter(c => c.id !== inst.id);
       }
       break;
@@ -6219,9 +6552,16 @@ class GameEngine {
   _addCardToState(inst) {
     switch (inst.zone) {
       case ZONES.DISCARD: {
-        // Cards always return to their ORIGINAL owner's discard pile
+        // Cards always return to their ORIGINAL owner's discard pile (Tokens → deleted pile)
         const discardPs = this.gs.players[inst.originalOwner];
-        if (discardPs) discardPs.discardPile.push(inst.name);
+        if (discardPs) {
+          const effectiveCd = this.getEffectiveCardData(inst);
+          if (effectiveCd && hasCardType(effectiveCd, 'Token')) {
+            discardPs.deletedPile.push(inst.name);
+          } else {
+            discardPs.discardPile.push(inst.name);
+          }
+        }
         return;
       }
       case ZONES.DELETED: {

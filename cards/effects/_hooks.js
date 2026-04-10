@@ -68,6 +68,7 @@ const HOOKS = {
   ON_REACTION_ACTIVATED: 'onReactionActivated',  // Fires when a reaction card is added to the chain
   ON_CARD_ACTIVATION:    'onCardActivation',      // Fires before a card's effect resolves (for reaction window)
   AFTER_SPELL_RESOLVED:  'afterSpellResolved',    // Fires after a spell/attack's onPlay completes (for Bartas, etc.)
+  AFTER_POTION_USED:     'afterPotionUsed',       // Fires after a potion resolves; hookCtx.placed can be set to prevent deletion
 
   // ── Surprise system ──
   ON_HERO_TARGETED:      'onHeroTargeted',        // Fires after a hero is confirmed as a target (surprise window)

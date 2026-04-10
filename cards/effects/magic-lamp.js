@@ -12,6 +12,8 @@ module.exports = {
   deferBroadcast: true, // Broadcast after selections, not before
 
   canActivate(gs, pi) {
+    // Not usable on the very first turn of the game
+    if ((gs.turn || 1) <= 1) return false;
     const ps = gs.players[pi];
     // Need 3+ cards with different names in deck
     const uniqueNames = new Set(ps.mainDeck || []);

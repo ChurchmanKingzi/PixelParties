@@ -60,6 +60,7 @@ module.exports = {
         side: 'enemy',
         types: ['hero', 'creature'],
         damageType: 'artifact',
+        baseDamage: damage,
         title: 'Lifeforce Howitzer',
         description: `${hero.name} was healed for ${healedAmount} HP! Deal ${damage} damage to an opponent's target?`,
         confirmLabel: `💥 Fire! (${damage})`,

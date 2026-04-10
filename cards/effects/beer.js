@@ -151,8 +151,7 @@ module.exports = {
         if (hero?.statuses) {
           for (const key of statuses) {
             if (hero.statuses[key]) {
-              delete hero.statuses[key];
-              engine.log('status_remove', { target: hero.name, status: key, by: 'Beer' });
+              engine.cleanseHeroStatuses(hero, target.owner, target.heroIdx, [key], 'Beer');
             }
           }
         }
@@ -166,12 +165,7 @@ module.exports = {
           c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst) {
-          for (const key of statuses) {
-            if (inst.counters[key]) {
-              delete inst.counters[key];
-              engine.log('status_remove', { target: inst.name, status: key, by: 'Beer' });
-            }
-          }
+          engine.cleanseCreatureStatuses(inst, statuses, 'Beer');
         }
         engine._broadcastEvent('play_zone_animation', { type: 'beer_bubbles', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx });
       }

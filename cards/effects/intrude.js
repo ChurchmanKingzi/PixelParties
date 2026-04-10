@@ -16,7 +16,7 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
-  activeIn: ['support'],
+  activeIn: ['hand', 'support'],
 
   /**
    * Block play if:
@@ -59,14 +59,23 @@ module.exports = {
       const heroIdx = ctx.cardHeroIdx;
       const ps = gs.players[pi];
 
-      // Find first free support zone, preferring caster hero
+      // Find target support zone — use specific slot if provided, else auto-find
       let targetHero = -1;
       let targetSlot = -1;
 
-      // Try caster hero first
+      // Specific zone from drag-drop
+      if (gs._attachmentZoneSlot != null && gs._attachmentZoneSlot >= 0) {
+        const si = gs._attachmentZoneSlot;
+        const slot = (ps.supportZones[heroIdx] || [])[si] || [];
+        if (slot.length === 0) { targetHero = heroIdx; targetSlot = si; }
+      }
+
+      // Auto-find: try caster hero first
+      if (targetSlot < 0) {
       const casterSup = ps.supportZones[heroIdx] || [[], [], []];
       for (let si = 0; si < casterSup.length; si++) {
         if ((casterSup[si] || []).length === 0) { targetHero = heroIdx; targetSlot = si; break; }
+      }
       }
 
       // Fallback: any other hero
@@ -117,6 +126,9 @@ module.exports = {
 
     // ── Core effect: intercept opponent's effect draws ──
     beforeDrawBatch: async (ctx) => {
+      // Only active from support zone (not from hand)
+      if (ctx.card.zone !== 'support') return;
+
       const engine = ctx._engine;
       const gs = engine.gs;
       const intrudeOwner = ctx.cardOwner;
@@ -169,6 +181,11 @@ module.exports = {
         // Cancel — do nothing
         return;
       }
+
+      // Stream card image to both players only on actual activation
+      engine._broadcastEvent('card_reveal', {
+        cardName: 'Intrude', playerIdx: intrudeOwner,
+      });
 
       if (result.confirmed) {
         // Negate — block the draw entirely

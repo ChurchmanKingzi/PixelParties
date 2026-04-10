@@ -56,13 +56,21 @@ module.exports = {
     // Sort indices descending so splicing doesn't shift later indices
     const sortedByIdx = [...selectedCards].sort((a, b) => b.handIndex - a.handIndex);
 
-    // Shuffle selected cards back into deck (with slide animation)
+    // Shuffle selected cards back into correct deck (with slide animation)
+    const cardDB = engine._getCardDB();
+    let potionCount = 0;
     gs.handReturnToDeck = true;
     for (const sel of sortedByIdx) {
       const idx = ps.hand.indexOf(sel.cardName);
       if (idx >= 0) {
         ps.hand.splice(idx, 1);
-        ps.mainDeck.push(sel.cardName);
+        const cd = cardDB[sel.cardName];
+        if (cd?.cardType === 'Potion') {
+          ps.potionDeck.push(sel.cardName);
+          potionCount++;
+        } else {
+          ps.mainDeck.push(sel.cardName);
+        }
         // Untrack hand instance
         const inst = engine.cardInstances.find(c =>
           c.owner === pi && c.zone === 'hand' && c.name === sel.cardName
@@ -74,11 +82,16 @@ module.exports = {
     }
     gs.handReturnToDeck = false;
 
-    // Shuffle deck (Fisher-Yates)
+    // Shuffle both decks (Fisher-Yates)
     const deck = ps.mainDeck;
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    const pDeck = ps.potionDeck;
+    for (let i = pDeck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pDeck[i], pDeck[j]] = [pDeck[j], pDeck[i]];
     }
 
     engine.log('leadership_shuffle', {
@@ -87,11 +100,18 @@ module.exports = {
     engine.sync();
     await engine._delay(400);
 
-    // Draw replacement cards + bonus
-    const totalDraw = count + bonusDraw;
-    for (let i = 0; i < totalDraw; i++) {
+    // Draw replacement cards: non-potions from main deck, potions from potion deck, + bonus from main
+    const mainToDraw = count - potionCount + bonusDraw;
+    for (let i = 0; i < mainToDraw; i++) {
       if ((ps.mainDeck || []).length === 0) break;
       await engine.actionDrawCards(pi, 1, { _nomuBypass: true });
+      engine.sync();
+      await engine._delay(200);
+    }
+    for (let i = 0; i < potionCount; i++) {
+      if ((ps.potionDeck || []).length === 0) break;
+      const potionCard = ps.potionDeck.shift();
+      ps.hand.push(potionCard);
       engine.sync();
       await engine._delay(200);
     }

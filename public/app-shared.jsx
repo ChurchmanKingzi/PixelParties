@@ -647,6 +647,37 @@ window.isDeckLegal = isDeckLegal;
 window.countInDeck = countInDeck;
 window.hasNicolasHero = hasNicolasHero;
 window.canAddCard = canAddCard;
+
+/**
+ * Check if a card's TYPE is compatible with a deck section.
+ * Only checks type rules (Hero→hero, Potion→potion/main-with-Nicolas, Token→nowhere).
+ * Does NOT check copy limits, deck size, or other quantity constraints.
+ * Used by both the deck builder and side-deck phase for rule validation.
+ * When adding new card effects that modify deckbuilding rules, update THIS function
+ * AND the server-side mirror: canCardTypeEnterPool() in server.js.
+ */
+function canCardTypeEnterSection(deck, cardName, section) {
+  const card = window.CARDS_BY_NAME[cardName];
+  if (!card) return false;
+  const ct = card.cardType;
+  if (ct === 'Token') return false;
+  if (section === 'main') {
+    if (ct === 'Hero') return false;
+    if (ct === 'Potion') return hasNicolasHero(deck);
+    return true;
+  }
+  if (section === 'potion') {
+    return ct === 'Potion';
+  }
+  if (section === 'hero') {
+    return ct === 'Hero';
+  }
+  if (section === 'side') {
+    return true; // Any non-token card can be in side deck
+  }
+  return false;
+}
+window.canCardTypeEnterSection = canCardTypeEnterSection;
 window.typeColor = typeColor;
 window.typeClass = typeClass;
 window.sortDeckCards = sortDeckCards;

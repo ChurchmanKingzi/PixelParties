@@ -51,6 +51,8 @@ module.exports = {
       await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
+        damageType: 'attack',
+        baseDamage: 100,
         title: 'Booby Trap',
         description: 'Deal 100 damage to any target.',
         confirmLabel: '💥 100 Damage!',

@@ -18,6 +18,7 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'destruction_spell',
+        baseDamage: 300,
         title: 'Magic Hammer',
         description: 'Choose a target to deal 300 damage.',
         confirmLabel: '🔨 Smash! (300)',

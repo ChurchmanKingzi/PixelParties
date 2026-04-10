@@ -46,6 +46,7 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'destruction_spell',
+        baseDamage: damage,
         title: 'Phoenix Tackle',
         description: `Deal ${damage} damage to a target. You take ${recoil} recoil damage.`,
         confirmLabel: `🔥 ${damage} Tackle!`,

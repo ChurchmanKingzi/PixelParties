@@ -160,13 +160,15 @@ module.exports = {
 
       // Step 6: move statuses
       for (const sName of src.statuses) {
-        // Remove from source
+        // Remove from source (respects unhealable)
         if (src.isHero) {
           const hero = ps.heroes[src.heroIdx];
-          if (hero?.statuses?.[sName]) delete hero.statuses[sName];
+          const removed = engine.cleanseHeroStatuses(hero, pi, src.heroIdx, [sName], 'Cactus Creature');
+          if (removed.length === 0) continue; // Unhealable — skip this status
         } else {
           const inst = src.cardInstance;
-          if (inst?.counters?.[sName]) delete inst.counters[sName];
+          const removed = engine.cleanseCreatureStatuses(inst, [sName], 'Cactus Creature');
+          if (removed.length === 0) continue;
         }
         // Apply to target (if eligible)
         if (tgt.type === 'hero') {

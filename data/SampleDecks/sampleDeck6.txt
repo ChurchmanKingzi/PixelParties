@@ -1,0 +1,34 @@
+=== PIXEL PARTIES DECK ===
+Name: Sample Deck: Poison Torture
+
+== HEROES ==
+Fiona, the Princess of Blackport
+Reiza, the Chief Tormentor
+Medea, the Swamp Witch
+
+== MAIN DECK ==
+4x Adventurousness
+2x Dark Gear
+1x Divine Gift of Sacrifice
+3x Fighting
+4x Hammer Throw
+3x Intrude
+4x Invisibility Cloak
+9x Leadership
+4x Loot the Leftovers
+4x Magnetic Glove
+2x Poison Pollen
+4x Quick Attack
+4x Sickly Cheese
+4x Tea
+2x The Yeeting
+2x Toxic Trap
+4x Wheels
+
+== POTION DECK ==
+1x Elixir of Immortality
+2x Elixir of Quickness
+2x Poison Vial
+1x Resuscitation Potion
+
+== SIDE DECK ==

@@ -109,6 +109,7 @@ module.exports = {
         side: 'enemy',
         types: ['hero', 'creature'],
         damageType: 'destruction_spell',
+        baseDamage: 100,
         title: 'Fire Bolts',
         description: 'Choose an enemy target to deal 100 damage.',
         confirmLabel: '🔥 100 Damage!',
