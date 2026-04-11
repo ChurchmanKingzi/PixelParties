@@ -41,11 +41,7 @@ module.exports = {
 
     if (choice.optionId === 'draw3') {
       // ── Mode A: Draw 3, Discard 1 ──
-      for (let i = 0; i < 3; i++) {
-        await engine.actionDrawCards(pi, 1, { _nomuBypass: true });
-        engine.sync();
-        if (i < 2) await engine._delay(250);
-      }
+      await engine.actionDrawCards(pi, 3);
 
       if ((ps.hand || []).length === 0) return;
 
@@ -67,11 +63,7 @@ module.exports = {
 
     } else if (choice.optionId === 'draw4') {
       // ── Mode B: Draw 4, Delete 2 ──
-      for (let i = 0; i < 4; i++) {
-        await engine.actionDrawCards(pi, 1, { _nomuBypass: true });
-        engine.sync();
-        if (i < 3) await engine._delay(250);
-      }
+      await engine.actionDrawCards(pi, 4);
 
       for (let d = 0; d < 2; d++) {
         if ((ps.hand || []).length === 0) break;

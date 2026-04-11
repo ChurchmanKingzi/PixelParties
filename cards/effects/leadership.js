@@ -102,12 +102,7 @@ module.exports = {
 
     // Draw replacement cards: non-potions from main deck, potions from potion deck, + bonus from main
     const mainToDraw = count - potionCount + bonusDraw;
-    for (let i = 0; i < mainToDraw; i++) {
-      if ((ps.mainDeck || []).length === 0) break;
-      await engine.actionDrawCards(pi, 1, { _nomuBypass: true });
-      engine.sync();
-      await engine._delay(200);
-    }
+    await engine.actionDrawCards(pi, mainToDraw);
     for (let i = 0; i < potionCount; i++) {
       if ((ps.potionDeck || []).length === 0) break;
       const potionCard = ps.potionDeck.shift();

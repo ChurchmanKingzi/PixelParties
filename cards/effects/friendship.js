@@ -64,9 +64,7 @@ function buildFilter(engine, pi, heroIdx) {
       const hero = ps.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return false;
       if (hero.statuses?.negated || hero.statuses?.frozen || hero.statuses?.stunned) return false;
-      const abZones = ps.abilityZones[heroIdx] || [];
-      if (engine.countAbilitiesForSchool(cardData.spellSchool1, abZones) < spellLevel) return false;
-      if (cardData.spellSchool2 && engine.countAbilitiesForSchool(cardData.spellSchool2, abZones) < spellLevel) return false;
+      if (!engine.heroMeetsLevelReq(pi, heroIdx, cardData)) return false;
     }
 
     return true;
@@ -165,13 +163,8 @@ module.exports = {
       }
       await engine._delay(300);
 
-      // Draw cards one by one
-      for (let i = 0; i < drawCount; i++) {
-        if ((ps.mainDeck || []).length === 0) break;
-        await engine.actionDrawCards(pi, 1, { _nomuBypass: true });
-        engine.sync();
-        if (i < drawCount - 1) await engine._delay(200);
-      }
+      // Draw cards
+      await engine.actionDrawCards(pi, drawCount);
 
       engine.log('friendship_draw', { player: ps.username, hero: ps.heroes[heroIdx]?.name, cards: drawCount, level });
     },

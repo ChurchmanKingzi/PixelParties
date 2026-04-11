@@ -13,6 +13,7 @@
 module.exports = {
   activeIn: ['hero'],
   isNomuHero: true,
+  bypassHandLimit: true,
 
   // Purely passive — the engine handles the draw bonus
   // via _hasActiveNomu() in actionDrawCards() and

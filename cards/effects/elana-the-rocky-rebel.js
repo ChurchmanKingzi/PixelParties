@@ -81,13 +81,7 @@ module.exports = {
 
     await engine._delay(300);
 
-    // Draw drawCount cards one by one (uses engine primitive for proper hooks)
-    for (let i = 0; i < drawCount; i++) {
-      if ((ps.mainDeck || []).length === 0) break;
-      await engine.actionDrawCards(pi, 1);
-      engine.sync();
-      await engine._delay(200);
-    }
+    await engine.actionDrawCards(pi, drawCount);
 
     engine.sync();
     return true;

@@ -1,0 +1,40 @@
+=== PIXEL PARTIES DECK ===
+Name: Sample Deck: Dance of the Butterflies
+
+== HEROES ==
+Alleria, the Queen of Spiders
+Beato, the Butterfly Witch
+Willy, the Valiant Leprechaun
+
+== MAIN DECK ==
+3x Aggressive Town Guard
+3x Alchemic Journal
+6x Alchemy
+3x Anti Magic Shield
+2x Beato, the Eternal Butterfly
+1x Booby Trap
+4x Brilliant Idea
+3x Burning Finger
+1x Cardinal Beast Baihu
+1x Cardinal Beast Qinglong
+1x Cardinal Beast Xuanwu
+1x Cardinal Beast Zhuque
+4x Controlled Attack
+2x Cute Cheese
+2x Divine Gift of Creation
+2x Fireshield
+4x Graveyard Gathering
+4x Juice
+2x Jumpscare
+3x Magnetic Glove
+2x Pure Advantage Camel
+2x Slippery Skates
+2x Torchure
+2x Wheels
+
+== POTION DECK ==
+2x Elixir of Quickness
+2x Magnetic Potion
+1x Resuscitation Potion
+
+== SIDE DECK ==

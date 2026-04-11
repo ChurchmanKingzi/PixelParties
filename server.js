@@ -1235,6 +1235,21 @@ function sendGameState(room, playerIdx, extra) {
       })),
       islandZoneCount: ps.islandZoneCount || [0,0,0],
       hand: pi === playerIdx ? ps.hand : [], handCount: ps.hand.length,
+      revealedHandCards: pi !== playerIdx ? (() => {
+        const counts = ps._revealedCardCounts;
+        if (!counts || Object.keys(counts).length === 0) return [];
+        if (ps._revealedCardExpiry && Date.now() >= ps._revealedCardExpiry) return [];
+        const remaining = { ...counts };
+        const result = [];
+        for (let i = ps.hand.length - 1; i >= 0; i--) {
+          const name = ps.hand[i];
+          if (remaining[name] > 0) {
+            result.push({ index: i, name });
+            remaining[name]--;
+          }
+        }
+        return result;
+      })() : [],
       mainDeckCards: pi === playerIdx ? ps.mainDeck : [], deckCount: ps.mainDeck.length,
       potionDeckCards: pi === playerIdx ? ps.potionDeck : [], potionDeckCount: ps.potionDeck.length,
       discardPile: ps.discardPile, deletedPile: ps.deletedPile,
@@ -1248,6 +1263,7 @@ function sendGameState(room, playerIdx, extra) {
       potionLocked: ps.potionLocked || false,
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
       handLocked: ps.handLocked || false,
+      creationLockedNames: (pi === playerIdx && ps._creationLockedNames) ? [...ps._creationLockedNames] : [],
       handLockBlockedCards: (ps.handLocked && pi === playerIdx) ? (() => {
         const blocked = new Set();
         const handCardDB = getCardDB();
@@ -1291,6 +1307,7 @@ function sendGameState(room, playerIdx, extra) {
       return threshold === Infinity ? null : threshold;
     })() : null,
     bonusActions: gs.players[playerIdx]?.bonusActions || null,
+    bonusMainActions: gs.players[playerIdx]?._bonusMainActions || 0,
     mulliganPending: gs.mulliganPending || false,
     handReturnToDeck: gs.handReturnToDeck || false,
     potionTargeting: gs.potionTargeting || null,
@@ -1366,6 +1383,7 @@ function sendGameState(room, playerIdx, extra) {
     freeActivatableAbilities: room.engine ? room.engine.getFreeActivatableAbilities(playerIdx) : [],
     activeHeroEffects: room.engine ? room.engine.getActiveHeroEffects(playerIdx) : [],
     activatableCreatures: room.engine ? room.engine.getActivatableCreatures(playerIdx) : [],
+    activatableEquips: room.engine ? room.engine.getActivatableEquips(playerIdx) : [],
     bakhmSurpriseSlots: room.engine ? (() => {
       const result = [];
       const ps2 = gs.players[playerIdx];
@@ -1542,6 +1560,7 @@ function sendSpectatorGameState(room) {
     freeActivatableAbilities: [],
     activeHeroEffects: [],
     activatableCreatures: [],
+    activatableEquips: [],
     roomParticipants: {
       players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: ps.avatar })),
       spectators: (room.spectators || []).map(s => ({ username: s.username, color: s.color || '#888', avatar: s.avatar || null })),
@@ -1826,6 +1845,7 @@ async function startGameEngine(room, roomId, activePlayer) {
     const ps = room.gameState.players[pi];
     const drawn = ps.mainDeck.splice(0, 5);
     ps.hand.push(...drawn);
+
   }
 
   room.gameState.mulliganPending = true;
@@ -2186,6 +2206,26 @@ io.on('connection', (socket) => {
     // Fire hooks and WAIT for them to resolve (including damage effects) before syncing
     (async () => {
       try {
+        // ── Reaction chain window BEFORE hooks ──
+        // Lets reactions (e.g. The Master's Plan) negate the ability attachment.
+        const chainResult = await room.engine.executeCardWithChain({
+          cardName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0,
+        });
+
+        if (chainResult.negated) {
+          // Ability was negated — remove from zone, put in discard
+          const abZones2 = ps.abilityZones[heroIdx] || [];
+          for (let z = 0; z < abZones2.length; z++) {
+            const idx = abZones2[z].lastIndexOf(cardName);
+            if (idx >= 0) { abZones2[z].splice(idx, 1); break; }
+          }
+          ps.discardPile.push(cardName);
+          ps.abilityGivenThisTurn[heroIdx] = false; // Refund the slot
+          room.engine.log('ability_negated', { card: cardName, player: ps.username });
+          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+          return;
+        }
+
         await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'ability', heroIdx });
         await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'ability', toHeroIdx: heroIdx });
       } catch (err) {
@@ -2346,6 +2386,7 @@ io.on('connection', (socket) => {
 
     if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
     room.engine.log('creature_summoned', { player: ps.username, card: cardName, hero: hero.name });
+    ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
     room.engine._trackTerrorResolvedEffect(pi, cardName);
     room.engine._broadcastEvent('summon_effect', { owner: pi, heroIdx, zoneSlot: freeSlot, cardName });
     room.engine._broadcastEvent('play_zone_animation', {
@@ -2388,7 +2429,7 @@ io.on('connection', (socket) => {
     if (!hero?.name || hero.hp <= 0) return;
 
     // If charmedOwner is set, verify the hero is actually charmed by this player
-    if (charmedOwner != null && hero.charmedBy !== pi) return;
+    if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return;
 
     // Combo lock: if a hero has an exclusive combo active, only that hero can act
     if (charmedOwner == null && gs.players[pi].comboLockHeroIdx != null && gs.players[pi].comboLockHeroIdx !== heroIdx) return;
@@ -2558,7 +2599,7 @@ io.on('connection', (socket) => {
     if (hero.statuses?.frozen || hero.statuses?.stunned) return;
 
     // If charmedOwner is set, verify the hero is actually charmed by this player
-    if (charmedOwner != null && hero.charmedBy !== pi) return;
+    if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return;
 
     const abilitySlot = ps.abilityZones?.[heroIdx]?.[zoneIdx];
     if (!abilitySlot || abilitySlot.length === 0) return;
@@ -2680,7 +2721,7 @@ io.on('connection', (socket) => {
     if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
     // If charmedOwner is set, verify the hero is actually charmed by this player
-    if (charmedOwner != null && hero.charmedBy !== pi) return;
+    if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return;
 
     const { loadCardEffect } = require('./cards/effects/_loader');
 
@@ -2872,8 +2913,7 @@ io.on('connection', (socket) => {
     const ps = gs.players[heroOwner];
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return;
-    if (hero.statuses?.frozen || hero.statuses?.stunned) return;
-    if (charmedOwner != null && hero.charmedBy !== pi) return;
+    if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return;
 
     const slot = (ps.supportZones[heroIdx] || [])[zoneSlot] || [];
     if (slot.length === 0) return;
@@ -2941,8 +2981,77 @@ io.on('connection', (socket) => {
         }
         // Flush any accumulated surprise draw checks
         await room.engine._flushSurpriseDrawChecks();
+        // Execute deferred surprises (Jumpscare, etc.)
+        await room.engine._executeDeferredSurprises();
       } catch (err) {
         console.error('[Engine] activate_creature_effect error:', err.message, err.stack);
+      }
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    })();
+  });
+
+  // Activate an equipped card's active effect (Slippery Skates, etc.)
+  socket.on('activate_equip_effect', ({ roomId, heroIdx, zoneSlot }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.engine || !room.gameState) return;
+    const gs = room.gameState;
+    const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0 || pi !== gs.activePlayer) return;
+    if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return;
+    if (gs.potionTargeting) return;
+
+    const ps = gs.players[pi];
+    const hero = ps.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return;
+    if (hero.statuses?.frozen || hero.statuses?.stunned) return;
+
+    const slot = (ps.supportZones[heroIdx] || [])[zoneSlot] || [];
+    if (slot.length === 0) return;
+    const cardName = slot[0];
+
+    const inst = room.engine.cardInstances.find(c =>
+      c.owner === pi && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
+    );
+    if (!inst) return;
+
+    const { loadCardEffect } = require('./cards/effects/_loader');
+    const script = loadCardEffect(cardName);
+    if (!script?.equipEffect || !script?.onEquipEffect) return;
+
+    // Soft HOPT per equip instance
+    const hoptKey = `equip-effect:${inst.id}`;
+    if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
+
+    // Check activation condition
+    if (script.canActivateEquipEffect) {
+      const ctx = room.engine._createContext(inst, { event: 'canEquipEffectCheck' });
+      if (!script.canActivateEquipEffect(ctx)) return;
+    }
+
+    room.engine._setPendingPlayLog('equip_effect_activated', { player: gs.players[pi].username, card: cardName, hero: hero.name });
+
+    (async () => {
+      try {
+        gs._pendingCardReveal = { cardName, ownerIdx: pi };
+
+        const ctx = room.engine._createContext(inst, {});
+        const resolved = await script.onEquipEffect(ctx);
+
+        if (resolved !== false) {
+          if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
+          else room.engine._firePendingPlayLog();
+
+          if (!gs.hoptUsed) gs.hoptUsed = {};
+          gs.hoptUsed[hoptKey] = gs.turn;
+        } else {
+          delete gs._pendingCardReveal;
+          delete gs._pendingPlayLog;
+        }
+        await room.engine._flushSurpriseDrawChecks();
+        await room.engine._executeDeferredSurprises();
+      } catch (err) {
+        console.error('[Engine] activate_equip_effect error:', err.message, err.stack);
       }
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     })();
@@ -2958,7 +3067,7 @@ io.on('connection', (socket) => {
 
     const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Creature']);
     if (!v) return;
-    const { ps, cardData, isActionPhase, isMainPhase } = v;
+    const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
 
     // Creature-specific checks
     if (ps.summonLocked) return;
@@ -2968,10 +3077,11 @@ io.on('connection', (socket) => {
     if (creatureHero?.statuses?.charmed) return;
 
     // Additional action handling — creatures in Main Phase or Action Phase after normal action MUST use one
-    const additionalTypeId = room.engine.findAdditionalActionForCard(pi, cardName, heroIdx);
+    // UNLESS the creature itself is an inherent additional action
+    const additionalTypeId = !isInherentAction ? room.engine.findAdditionalActionForCard(pi, cardName, heroIdx) : null;
     const usingAdditional = !!additionalTypeId;
     const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0);
-    if ((isMainPhase || actionAlreadyUsed) && !usingAdditional) return;
+    if ((isMainPhase || actionAlreadyUsed) && !usingAdditional && !isInherentAction) return;
 
     // Validate support zone slot is free
     if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
@@ -2985,43 +3095,62 @@ io.on('connection', (socket) => {
       if (!consumed) return; // Failed to consume — shouldn't happen
     }
 
-    // Execute: remove from hand, add to support zone
+    // Execute: remove from hand
     ps.hand.splice(handIndex, 1);
     if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
 
-    // Safe placement — handles zone-occupied fallback
-    const placeResult = room.engine.safePlaceInSupport(cardName, pi, heroIdx, zoneSlot);
-    if (!placeResult) {
-      // No free zones — creature fizzles, goes to discard (action still consumed)
-      ps.discardPile.push(cardName);
-      room.engine.log('creature_fizzle', { card: cardName, reason: 'zone_occupied' });
-      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
-      return;
-    }
-    const actualZoneSlot = placeResult.actualSlot;
-
-    // Track card instance in engine
-    const inst = placeResult.inst;
-
-    // Emit summon effect highlight to both players for every creature
-    for (let i = 0; i < 2; i++) {
-      const sid = gs.players[i]?.socketId;
-      if (sid) io.to(sid).emit('summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
-    }
-    sendToSpectators(room, 'summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
-
-    room.engine.log('creature_summoned', { player: ps.username, card: cardName, hero: gs.players[pi].heroes[heroIdx]?.name });
     room.engine._trackTerrorResolvedEffect(pi, cardName);
 
     // Fire hooks, wait for resolution, then advance phase (only if NOT using additional action)
     (async () => {
       try {
+        // ── Reaction chain window BEFORE placement ──
+        // This lets reactions (e.g. The Master's Plan) negate the creature
+        // before it ever enters the board or triggers onCardEnterZone hooks.
+        const chainResult = await room.engine.executeCardWithChain({
+          cardName, owner: pi, heroIdx, cardType: 'Creature', goldCost: 0,
+        });
+
+        if (chainResult.negated) {
+          // Creature was negated — goes to discard, action still consumed
+          ps.discardPile.push(cardName);
+          room.engine.log('creature_negated', { card: cardName, player: ps.username });
+          if (isActionPhase && !usingAdditional) {
+            await room.engine.advanceToPhase(pi, 4);
+          }
+          if (isActionPhase && usingAdditional) {
+            const hasMore = room.engine.cardInstances.some(c =>
+              c.owner === pi && c.counters.additionalActionAvail
+            );
+            if (!hasMore) await room.engine.advanceToPhase(pi, 4);
+          }
+          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+          return;
+        }
+
+        // Not negated — place creature in support zone
+        const placeResult = room.engine.safePlaceInSupport(cardName, pi, heroIdx, zoneSlot);
+        if (!placeResult) {
+          ps.discardPile.push(cardName);
+          room.engine.log('creature_fizzle', { card: cardName, reason: 'zone_occupied' });
+          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+          return;
+        }
+        const actualZoneSlot = placeResult.actualSlot;
+        const inst = placeResult.inst;
+
+        // Emit summon effect highlight to both players
+        for (let i = 0; i < 2; i++) {
+          const sid = gs.players[i]?.socketId;
+          if (sid) io.to(sid).emit('summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
+        }
+        sendToSpectators(room, 'summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
+
+        room.engine.log('creature_summoned', { player: ps.username, card: cardName, hero: gs.players[pi].heroes[heroIdx]?.name });
+        ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
+
         await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualZoneSlot });
         await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
-        // Trigger reaction check for creature summon (with creature as initial card in chain)
-        await room.engine._checkReactionCards('onCreatureSummoned', {
-          _initialCard: { cardName, owner: pi, cardType: 'Creature' },
-        });
         // Fire action hooks
         await room.engine.runHooks('onActionUsed', {
           actionType: 'creature', playerIdx: pi, cardName, heroIdx,
@@ -3033,8 +3162,8 @@ io.on('connection', (socket) => {
             _skipReactionCheck: true,
           });
         }
-        // Only advance phase if this was a "real" action (not additional) during Action Phase
-        if (isActionPhase && !usingAdditional) {
+        // Only advance phase if this was a "real" action (not additional, not inherent) during Action Phase
+        if (isActionPhase && !usingAdditional && !isInherentAction) {
           await room.engine.advanceToPhase(pi, 4);
         }
         // After consuming an additional action in Action Phase, auto-advance if none remain
@@ -3117,7 +3246,7 @@ io.on('connection', (socket) => {
             if (hero.ghuanjunAttacksUsed && !hero.ghuanjunAttacksUsed.includes(cardName)) hero.ghuanjunAttacksUsed.push(cardName);
           }
           if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
-          if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+          if (!isInherentAction && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
           if (isActionPhase && !additionalConsumed && !isInherentAction) {
             await room.engine.advanceToPhase(pi, 4);
           }
@@ -3180,7 +3309,7 @@ io.on('connection', (socket) => {
 
         // Track which heroes performed actions this turn (BEFORE afterSpellResolved so hooks see updated state)
         if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
-        if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+        if (!isInherentAction && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
 
         // Fire afterSpellResolved hook (Bartas, etc.)
         await room.engine.runHooks('afterSpellResolved', {
@@ -3189,10 +3318,15 @@ io.on('connection', (socket) => {
           _skipReactionCheck: true,
         });
 
+        // Execute deferred surprises (Jumpscare, etc.) that trigger after resolution
+        await room.engine._executeDeferredSurprises();
+
         // Clean up tracking
         delete gs._spellDamageLog;
         delete gs._spellExcludeTargets;
         delete gs._bartasSecondCast;
+        delete gs._spellNegatedByEffect;
+        delete gs._surpriseCheckedHeroes;
 
         // Move to discard (unless the spell placed itself on the board as an attachment)
         const resolveHi = getResolvingHandIndex(ps);
@@ -3390,6 +3524,7 @@ io.on('connection', (socket) => {
 
     const ps = gs.players[pi];
     if (ps.potionLocked) return; // Potion lock active (hero ability threshold reached)
+    if (ps._creationLockedNames?.has(cardName)) return; // Locked by Alchemic Journal / Divine Gift of Creation
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
     if (ps._resolvingCard && handIndex === getResolvingHandIndex(ps)) return; // This specific card is resolving
 
@@ -3497,6 +3632,7 @@ io.on('connection', (socket) => {
 
     const ps = gs.players[pi];
     if (ps.itemLocked) return; // Hammer Throw lock
+    if (ps._creationLockedNames?.has(cardName)) return; // Locked by Alchemic Journal / Divine Gift of Creation
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
     if (ps._resolvingCard && handIndex === getResolvingHandIndex(ps)) return; // This specific card is resolving
 
@@ -4110,6 +4246,33 @@ io.on('connection', (socket) => {
       delete room._pendingLoserIdx;
       await advanceToNextGame(room, loserIdx);
     }
+  });
+
+  // ── Hero Ascension ──
+
+  socket.on('ascend_hero', async ({ roomId, heroIdx, cardName, handIndex }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.gameState || room.gameState.result) return;
+    const gs = room.gameState;
+    const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+    // Must be active player during Main Phase 1 or 2
+    if (pi !== gs.activePlayer) return;
+    if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return; // MAIN1=2, MAIN2=4
+    // Perform ascension via engine
+    try {
+      const result = await room.engine.performAscension(pi, heroIdx, cardName, handIndex);
+      if (!result.success) return;
+      // Skip to End Phase if required
+      if (result.skipEndPhase) {
+        await room.engine.advanceToPhase(pi, 5); // PHASES.END = 5
+      }
+    } catch (err) {
+      console.error('[Engine] ascend_hero error:', err.message, err.stack);
+    }
+    for (let i = 0; i < 2; i++) sendGameState(room, i);
+    sendSpectatorGameState(room);
   });
 
   // ── Surrender Game vs Surrender Match (Bo3/Bo5) ──

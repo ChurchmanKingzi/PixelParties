@@ -53,14 +53,8 @@ module.exports = {
     await engine._delay(400);
 
     // Draw cards one by one for visual feedback
-    let totalDrawn = 0;
-    for (let i = 0; i < drawCount; i++) {
-      if ((ps.mainDeck || []).length === 0) break;
-      const drawn = await engine.actionDrawCards(pi, 1);
-      if (drawn.length > 0) totalDrawn++;
-      engine.sync();
-      await engine._delay(200);
-    }
+    const drawn = await engine.actionDrawCards(pi, drawCount);
+    const totalDrawn = drawn.length;
 
     // "If you do" — only lock if at least one card was drawn
     if (totalDrawn > 0) {

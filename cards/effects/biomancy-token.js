@@ -53,7 +53,7 @@ module.exports = {
       }
     }
 
-    if (targets.length === 0) return;
+    if (targets.length === 0) return false;
 
     const selectedIds = await engine.promptEffectTarget(pi, targets, {
       title: 'Biomancy Token',
@@ -64,10 +64,10 @@ module.exports = {
       maxTotal: 1,
     });
 
-    if (!selectedIds || selectedIds.length === 0) return;
+    if (!selectedIds || selectedIds.length === 0) return false;
 
     const picked = targets.find(t => t.id === selectedIds[0]);
-    if (!picked) return;
+    if (!picked) return false;
 
     // Play vine animation
     engine._broadcastEvent('play_zone_animation', {

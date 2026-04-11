@@ -44,12 +44,8 @@ module.exports = {
 
       engine.log('shiny_draw', { player: ps.username, count, creatures: [...uniqueNames] });
 
-      // Draw cards 1 by 1 with small delays
-      for (let i = 0; i < count; i++) {
-        await engine.actionDrawCards(pi, 1, { _nomuBypass: true });
-        engine.sync();
-        if (i < count - 1) await engine._delay(250);
-      }
+      // Draw cards
+      await engine.actionDrawCards(pi, count);
     },
 
     onTurnStart: async (ctx) => {

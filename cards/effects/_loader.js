@@ -43,7 +43,7 @@ function loadCardEffect(cardName) {
       mod = require(filePath);
 
       // Validate minimum structure
-      if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
+      if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
         console.warn(`[Loader] Card "${cardName}" (${normalized}.js) has no hooks, effects, or card type flags — ignored.`);
         mod = null;
       }

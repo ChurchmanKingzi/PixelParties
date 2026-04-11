@@ -134,11 +134,7 @@ module.exports = {
         // No requirement — always qualifies
         drawCount++;
       } else if (level > 0 || cardData.spellSchool1) {
-        const abZones = hero.statuses?.negated ? [] : (ps.abilityZones?.[heroIdx] || []);
-        let qualifies = true;
-        if (cardData.spellSchool1 && engine.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) qualifies = false;
-        if (cardData.spellSchool2 && engine.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) qualifies = false;
-        if (qualifies) drawCount++;
+        if (engine.heroMeetsLevelReq(pi, heroIdx, cardData)) drawCount++;
       }
     }
 

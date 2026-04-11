@@ -16,6 +16,10 @@ module.exports = {
   isSurprise: true,
 
   canTelekinesisActivate(engine, ownerIdx) {
+    // Hard once per turn
+    const hoptKey = `spider_avalanche:${ownerIdx}`;
+    if (engine.gs.hoptUsed?.[hoptKey] === engine.gs.turn) return false;
+
     const cardDB = engine._getCardDB();
     for (const inst of engine.cardInstances) {
       if (inst.controller !== ownerIdx || inst.zone !== 'support') continue;
@@ -28,8 +32,13 @@ module.exports = {
   /**
    * Trigger: when host hero is targeted by any opponent's effect.
    * Must have a valid source and the source must belong to the opponent.
+   * Hard once per turn.
    */
   surpriseTrigger: (gs, ownerIdx, heroIdx, sourceInfo, engine) => {
+    // Hard once per turn
+    const hoptKey = `spider_avalanche:${ownerIdx}`;
+    if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
+
     if (sourceInfo.owner < 0 || sourceInfo.heroIdx < 0) return false;
     // Only triggers against OPPONENT effects
     if (sourceInfo.owner === ownerIdx) return false;
@@ -44,8 +53,11 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const oppIdx = pi === 0 ? 1 : 0;
     const cardDB = engine._getCardDB();
+
+    // Claim hard once per turn
+    if (!gs.hoptUsed) gs.hoptUsed = {};
+    gs.hoptUsed[`spider_avalanche:${pi}`] = gs.turn;
 
     // Count creatures the activating player controls
     let creatureCount = 0;
@@ -66,51 +78,16 @@ module.exports = {
       creatures: creatureCount, damage,
     });
 
-    // Collect all opponent targets: heroes + creatures
-    const oppPs = gs.players[oppIdx];
-    const hitHeroes = [];
-    const creatureBatch = [];
-
-    for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-      const hero = oppPs.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      hitHeroes.push({ hero, heroIdx: hi });
-    }
-
-    for (const inst of engine.cardInstances) {
-      if ((inst.owner !== oppIdx && inst.controller !== oppIdx) || inst.zone !== 'support') continue;
-      const cd = cardDB[inst.name];
-      if (!cd || !hasCardType(cd, 'Creature')) continue;
-      creatureBatch.push({
-        inst, amount: damage, type: 'destruction_spell',
-        source: { name: 'Spider Avalanche', owner: pi, heroIdx: ctx.cardHeroIdx },
-        sourceOwner: pi, canBeNegated: true,
-        isStatusDamage: false, animType: 'spider_avalanche',
-      });
-    }
-
-    // Play spider avalanche animation on ALL hero targets simultaneously
-    for (const { heroIdx: hi } of hitHeroes) {
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'spider_avalanche', owner: oppIdx,
-        heroIdx: hi, zoneSlot: -1,
-      });
-    }
-    // Creature animations handled by processCreatureDamageBatch's animType
-
-    await engine._delay(500);
-
-    // Deal damage to all opponent heroes
-    for (const { hero, heroIdx: hi } of hitHeroes) {
-      if (hero.hp > 0) {
-        await ctx.dealDamage(hero, damage, 'destruction_spell');
-      }
-    }
-
-    // Deal damage to all opponent creatures as a batch
-    if (creatureBatch.length > 0) {
-      await engine.processCreatureDamageBatch(creatureBatch);
-    }
+    // Use aoeHit — automatically handles Ida's forcesSingleTarget for destruction_spell
+    const result = await ctx.aoeHit({
+      side: 'enemy',
+      types: ['hero', 'creature'],
+      damage,
+      damageType: 'destruction_spell',
+      sourceName: 'Spider Avalanche',
+      animationType: 'spider_avalanche',
+      animDelay: 500,
+    });
 
     engine.sync();
     await engine._delay(400);

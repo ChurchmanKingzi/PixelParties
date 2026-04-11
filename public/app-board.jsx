@@ -14,6 +14,7 @@ const { api, emitSocket, socket, AppContext, CardMini, FoilOverlay, useFoilBands
 //  Eliminates orphan portal tooltips.
 // ═══════════════════════════════════════════
 let _boardTooltipSetter = null;
+let _activeLuckTooltipTarget = null;
 let _boardTooltipLocked = false;
 function setBoardTooltip(card) {
   // When locked (prompt card hovered), ignore external clears
@@ -740,6 +741,7 @@ function StatusBadges({ statuses, counters, isHero, player }) {
   };
   if (s.frozen || c.frozen) badges.push({ key: 'frozen', icon: '❄️', tooltip: 'Frozen: Cannot act and has its effects and Abilities negated.' + (isHero ? ' Cannot be equipped with Artifacts.' : '') + dur(s.frozen || c.frozen) });
   if (s.stunned || c.stunned) badges.push({ key: 'stunned', icon: '⚡', tooltip: 'Stunned: Cannot act and has its effects and Abilities negated.' + dur(s.stunned || c.stunned) });
+  if (c._baihuStunned) badges.push({ key: 'petrified', icon: '🪨', tooltip: `Petrified: Stunned and immune to all damage. Lasts for ${c._baihuStunned.duration || 1} of its owner's turns.` });
   if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
   if (s.poisoned || c.poisoned) {
     const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
@@ -2808,6 +2810,106 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  warlord_bite: (() => {
+    return function WarlordBiteEffect({ x, y }) {
+      const [phase, setPhase] = useState('open');
+      useEffect(() => {
+        const t = setTimeout(() => setPhase('shut'), 350);
+        return () => clearTimeout(t);
+      }, []);
+      const fangStyle = (side) => ({
+        position: 'absolute',
+        left: side === 'left' ? -18 : 6,
+        fontSize: 0, width: 0, height: 0,
+        borderLeft: '8px solid transparent',
+        borderRight: '8px solid transparent',
+        borderTop: side === 'left' ? '22px solid #e8e0d0' : '22px solid #d8d0c0',
+        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,.6))',
+        transition: 'transform 0.25s ease-in',
+        transform: phase === 'open'
+          ? (side === 'left' ? 'translateY(-30px) rotate(-15deg)' : 'translateY(-30px) rotate(15deg)')
+          : (side === 'left' ? 'translateY(0) rotate(-5deg)' : 'translateY(0) rotate(5deg)'),
+      });
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Upper jaw */}
+          <div style={{ position: 'absolute', top: -20, left: -12,
+            transition: 'transform 0.25s ease-in',
+            transform: phase === 'open' ? 'translateY(-18px)' : 'translateY(0)' }}>
+            <div style={fangStyle('left')} />
+            <div style={fangStyle('right')} />
+          </div>
+          {/* Lower jaw */}
+          <div style={{ position: 'absolute', top: 8, left: -12,
+            transition: 'transform 0.25s ease-in',
+            transform: phase === 'open' ? 'translateY(18px) scaleY(-1)' : 'translateY(0) scaleY(-1)' }}>
+            <div style={fangStyle('left')} />
+            <div style={fangStyle('right')} />
+          </div>
+          {/* Impact flash on bite */}
+          {phase === 'shut' && <div style={{
+            position: 'absolute', left: -20, top: -20, width: 40, height: 40,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(200,120,255,.7), transparent 70%)',
+            animation: 'warlordBiteFlash .5s ease-out forwards',
+          }} />}
+          <style>{`
+            @keyframes warlordBiteFlash {
+              0% { opacity: 1; transform: scale(0.5); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  poison_ooze: (() => {
+    return function PoisonOozeEffect({ x, y }) {
+      const drips = useMemo(() => Array.from({ length: 14 }, () => ({
+        dx: -30 + Math.random() * 60,
+        delay: Math.random() * 400,
+        dur: 600 + Math.random() * 500,
+        size: 6 + Math.random() * 10,
+        opacity: 0.5 + Math.random() * 0.4,
+        endY: 20 + Math.random() * 50,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {drips.map((d, i) => (
+            <div key={i} style={{
+              position: 'absolute', left: d.dx, top: -10,
+              width: d.size, height: d.size, borderRadius: '50% 50% 50% 20%',
+              background: 'radial-gradient(circle at 35% 35%, rgba(180,60,255,.8), rgba(100,0,180,.5))',
+              boxShadow: '0 0 6px rgba(150,30,220,.6)',
+              opacity: 0,
+              animation: `poisonDrip ${d.dur}ms ease-in ${d.delay}ms forwards`,
+              '--dripEndY': d.endY + 'px',
+            }} />
+          ))}
+          {/* Purple pool spreading at center */}
+          <div style={{
+            position: 'absolute', left: -25, top: 5, width: 50, height: 20,
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(150,30,220,.6), rgba(100,0,160,.2) 70%, transparent)',
+            animation: 'poisonPoolSpread 0.8s ease-out 300ms forwards',
+            opacity: 0,
+          }} />
+          <style>{`
+            @keyframes poisonDrip {
+              0% { opacity: 0; transform: translateY(-5px) scale(0.5); }
+              20% { opacity: var(--popacity, 0.7); transform: translateY(0) scale(1); }
+              100% { opacity: 0; transform: translateY(var(--dripEndY, 40px)) scale(0.6); }
+            }
+            @keyframes poisonPoolSpread {
+              0% { opacity: 0; transform: scale(0.3); }
+              40% { opacity: 0.7; }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
 };
 
 function IceEncaseEffect({ x, y }) {
@@ -2890,6 +2992,60 @@ function AbilityStack({ cards }) {
   );
 }
 
+// Card name picker prompt component (for Luck, etc.) — must be a proper component to preserve state across re-renders
+const CARD_NAME_TYPE_COLORS = { Hero:'#aa44ff', 'Ascended Hero':'#7722cc', Ability:'#4488ff', Artifact:'#ddaa22', Creature:'#44bb44', Attack:'#ff4444', Spell:'#ff4444', Potion:'#8B4513' };
+function CardNamePickerPrompt({ ep, onRespond }) {
+  const [filter, setFilter] = useState('');
+  // Only show cards that have images (exist in AVAILABLE_MAP), exclude Tokens
+  const names = useMemo(() => {
+    const avMap = window.AVAILABLE_MAP || {};
+    return Object.keys(avMap).filter(n => {
+      const cd = CARDS_BY_NAME[n];
+      return cd && cd.cardType !== 'Token';
+    }).sort((a, b) => a.localeCompare(b));
+  }, []);
+  const filtered = filter ? names.filter(n => n.toLowerCase().includes(filter.toLowerCase())) : names;
+  return (
+    <div className="modal-overlay" onClick={ep.cancellable !== false ? () => onRespond({ cancelled: true }) : undefined}>
+      <DraggablePanel className="modal animate-in" style={{ maxWidth: 380, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+        <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>{ep.title || 'Declare a Card'}</div>
+        {ep.description && <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
+        <input type="text" value={filter} onChange={e => setFilter(e.target.value)} autoFocus
+          placeholder="Type to search..." style={{
+            width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 8,
+            background: 'var(--bg2)', border: '1px solid var(--bg4)', borderRadius: 6,
+            color: 'var(--text1)', outline: 'none', boxSizing: 'border-box',
+          }} />
+        <div style={{ flex: 1, maxHeight: 400, overflowY: 'auto', border: '1px solid var(--bg4)', borderRadius: 6, background: 'var(--bg2)' }}>
+          {filtered.length === 0 && <div style={{ padding: 12, color: 'var(--text2)', fontSize: 11, textAlign: 'center' }}>No cards found</div>}
+          {filtered.map(name => {
+            const card = CARDS_BY_NAME[name];
+            const tc = CARD_NAME_TYPE_COLORS[card?.cardType] || 'var(--text2)';
+            return (
+              <div key={name} className="card-name-picker-row"
+                style={{ padding: '5px 10px', cursor: 'pointer', fontSize: 12,
+                  borderBottom: '1px solid var(--bg3)', display: 'flex', alignItems: 'center', gap: 8,
+                }}
+                onMouseEnter={() => { if (card) _boardTooltipSetter?.(card); }}
+                onMouseLeave={() => { _boardTooltipSetter?.(null); }}
+                onClick={() => { _boardTooltipSetter?.(null); onRespond({ cardName: name }); }}>
+                <span style={{ color: tc, fontWeight: 600, fontSize: 8, minWidth: 48, textTransform: 'uppercase' }}>
+                  {card?.cardType || '?'}
+                </span>
+                <span style={{ color: 'var(--text1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+              </div>
+            );
+          })}
+        </div>
+        {ep.cancellable !== false && (
+          <button className="btn" style={{ padding: '6px 14px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 10, width: '100%' }}
+            onClick={() => onRespond({ cancelled: true })}>Cancel</button>
+        )}
+      </DraggablePanel>
+    </div>
+  );
+}
+
 // Status select prompt component (for Beer, etc.) — must be a proper component for hooks
 function CardGalleryMultiPrompt({ ep, onRespond }) {
   const cards = ep.cards || [];
@@ -2942,8 +3098,8 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
 
   return (
     <div className="modal-overlay" onClick={ep.cancellable !== false ? () => onRespond({ cancelled: true }) : undefined}>
-      <div className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+      <div className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600, display: 'flex', flexDirection: 'column', maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexShrink: 0 }}>
           <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
             {ep.title || 'Select Cards'}
           </span>
@@ -2952,7 +3108,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
               onClick={() => onRespond({ cancelled: true })}>✕ CANCEL</button>
           )}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12, flexShrink: 0 }}>
           {ep.description}
           {maxBudget != null && (
             <span style={{ marginLeft: 8, color: totalCost > maxBudget * 0.8 ? '#ffaa33' : 'var(--accent)', fontWeight: 600 }}>
@@ -2960,30 +3116,32 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
             </span>
           )}
         </div>
-        <div className="deck-viewer-grid">
-          {cards.map((entry, i) => {
-            const card = CARDS_BY_NAME[entry.name];
-            if (!card) return null;
-            const isSel = selected.includes(entry.name);
-            const entryCost = entry[costKey] || 0;
-            const wouldExceedBudget = maxBudget != null && !isSel && totalCost + entryCost > maxBudget;
-            const atMax = !isSel && selected.length >= maxSelect;
-            const dimmed = wouldExceedBudget || atMax;
-            return (
-              <div key={entry.name + '-' + i} style={{ position: 'relative' }}>
-                <CardMini card={card}
-                  onClick={dimmed ? undefined : () => toggleCard(entry.name)}
-                  style={{ width: '100%', height: 120, cursor: dimmed ? 'not-allowed' : 'pointer',
-                    outline: isSel ? '3px solid var(--accent)' : 'none',
-                    filter: isSel ? 'brightness(1.2)' : (dimmed ? 'brightness(0.4) saturate(0.3)' : 'none'),
-                  }} />
-                {isSel && <div style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 3, zIndex: 5 }}>✓</div>}
-                {maxBudget != null && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd700', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
-              </div>
-            );
-          })}
+        <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+          <div className="deck-viewer-grid">
+            {cards.map((entry, i) => {
+              const card = CARDS_BY_NAME[entry.name];
+              if (!card) return null;
+              const isSel = selected.includes(entry.name);
+              const entryCost = entry[costKey] || 0;
+              const wouldExceedBudget = maxBudget != null && !isSel && totalCost + entryCost > maxBudget;
+              const atMax = !isSel && selected.length >= maxSelect;
+              const dimmed = wouldExceedBudget || atMax;
+              return (
+                <div key={entry.name + '-' + i} style={{ position: 'relative' }}>
+                  <CardMini card={card}
+                    onClick={dimmed ? undefined : () => toggleCard(entry.name)}
+                    style={{ width: '100%', height: 120, cursor: dimmed ? 'not-allowed' : 'pointer',
+                      outline: isSel ? '3px solid var(--accent)' : 'none',
+                      filter: isSel ? 'brightness(1.2)' : (dimmed ? 'brightness(0.4) saturate(0.3)' : 'none'),
+                    }} />
+                  {isSel && <div style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 3, zIndex: 5 }}>✓</div>}
+                  {maxBudget != null && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd700', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <div style={{ textAlign: 'center', marginTop: 12 }}>
+        <div style={{ textAlign: 'center', marginTop: 12, flexShrink: 0 }}>
           <button className={'btn ' + (ep.confirmClass || '')} style={{ padding: '8px 24px', fontSize: 12 }}
             disabled={!canConfirm}
             onClick={() => onRespond({ selectedCards: selected })}>
@@ -3084,7 +3242,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // On touch devices, tooltip stays until explicitly dismissed by tap
     if (window._isTouchDevice) return;
     const check = () => {
-      if (!document.querySelector('.board-card:hover, .card-reveal-entry:hover, .card-mini:hover')) {
+      if (!document.querySelector('.board-card:hover, .card-reveal-entry:hover, .card-mini:hover, .card-name-picker-row:hover, .revealed-hand-card:hover')) {
         setTooltipCard(null);
       }
     };
@@ -3170,9 +3328,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [specMeDrawAnims, setSpecMeDrawAnims] = useState([]);
   const [specMeDrawHidden, setSpecMeDrawHidden] = useState(new Set());
   const prevSpecMeHandCountRef = useRef(me.handCount || 0);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isSpectator) {
-      // Spectator mode: use handCount-based detection (same as opponent draw)
       const newCount = me.handCount || 0;
       const prevCount = prevSpecMeHandCountRef.current;
       if (newCount > prevCount) {
@@ -3791,6 +3948,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Hand-lock: dim non-Ability cards that are blocked by handLock
     if (me.handLocked && card.cardType !== 'Ability' && (me.handLockBlockedCards || []).includes(cardName)) return true;
 
+    // Divine Gift of Creation lock: dim cards with locked names
+    if ((me.creationLockedNames || []).includes(cardName)) return true;
+
     const isActionType = ACTION_TYPES.includes(card.cardType);
     const isSurprise = (card.subtype || '').toLowerCase() === 'surprise';
     if (currentPhase === 2 || currentPhase === 4) {
@@ -3854,6 +4014,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       // Gray out spells/attacks with custom play conditions that aren't met (Flame Avalanche, etc.)
       if ((gameState.blockedSpells || []).includes(cardName)) return true;
+      // Gray out Ascended Heroes if no eligible base hero exists
+      if (card.cardType === 'Ascended Hero') {
+        const hasEligible = (me.heroes || []).some(h => h?.name && h.hp > 0 && h.ascensionReady && h.ascensionTarget === cardName);
+        return !hasEligible;
+      }
       return false;
     } else if (currentPhase === 3) {
       // Action Phase: gray out non-action types, and check playability
@@ -4053,8 +4218,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       return count;
     };
-    if (card.spellSchool1 && countAbility(card.spellSchool1) < level) return false;
-    if (card.spellSchool2 && countAbility(card.spellSchool2) < level) return false;
+    let levelFail = false;
+    if (card.spellSchool1 && countAbility(card.spellSchool1) < level) levelFail = true;
+    if (card.spellSchool2 && countAbility(card.spellSchool2) < level) levelFail = true;
+    if (levelFail) {
+      const blr = hero.bypassLevelReq;
+      if (!blr || level > blr.maxLevel || !blr.types.includes(card.cardType)) return false;
+    }
     return true;
   };
 
@@ -4197,6 +4367,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       && (card.subtype || '').toLowerCase() === 'surprise'
       && ([0,1,2].some(hi => { const h = me.heroes[hi]; return h && h.name && h.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0; })
         || (card.cardType === 'Creature' && (gameState.bakhmSurpriseSlots || []).some(b => b.freeSlots.length > 0)));
+    const isAscensionPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
+      && card.cardType === 'Ascended Hero'
+      && (me.heroes || []).some((h) => h?.name && h.hp > 0 && h.ascensionReady && h.ascensionTarget === cardName);
     const _startPt = window.getPointerXY(e);
     const startX = _startPt.x, startY = _startPt.y;
     let dragging = false;
@@ -4458,6 +4631,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
         }
         setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot: targetSlot, isSpell: true, charmedOwner: targetCharmedOwner });
+      } else if (isAscensionPlayable) {
+        // Ascended Hero drag — target hero zones with eligible base heroes
+        let targetHero = -1;
+        const heroEls4 = document.querySelectorAll('[data-hero-zone]');
+        for (const el of heroEls4) {
+          const r = el.getBoundingClientRect();
+          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+            if (el.dataset.heroOwner === 'me') {
+              const hi = parseInt(el.dataset.heroIdx);
+              const hero = me.heroes[hi];
+              if (hero?.name && hero.hp > 0 && hero.ascensionReady && hero.ascensionTarget === cardName) {
+                targetHero = hi;
+              }
+            }
+          }
+        }
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, isAscension: true });
       } else {
         // Non-playable card outside hand zone — show floating card (no reorder gap)
         setPlayDrag(null);
@@ -4502,6 +4692,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             } else if (eligible.length > 1) {
               // Multiple eligible — show hero selection popup
               setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isHeroAction });
+            }
+          } else if (isAscensionPlayable) {
+            // Click on Ascended Hero — find eligible base heroes
+            const eligible = [];
+            for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+              const h = me.heroes[hi];
+              if (h?.name && h.hp > 0 && h.ascensionReady && h.ascensionTarget === cardName) {
+                eligible.push({ idx: hi, name: h.name });
+              }
+            }
+            if (eligible.length === 1) {
+              socket.emit('ascend_hero', { roomId: gameState.roomId, heroIdx: eligible[0].idx, cardName, handIndex: idx });
+            } else if (eligible.length > 1) {
+              setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isAscension: true });
             }
           } else if (isSurprisePlayable) {
             // Click on a Surprise card — find heroes with empty surprise zones
@@ -4661,6 +4865,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else if (isArtifactActivatable) {
         // Non-equip artifact dragged outside hand — activate
         socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx });
+      } else if (isAscensionPlayable) {
+        // Ascended Hero dropped on eligible base hero
+        setPlayDrag(prev => {
+          if (!prev || prev.targetHero < 0 || !prev.isAscension) return null;
+          socket.emit('ascend_hero', {
+            roomId: gameState.roomId, heroIdx: prev.targetHero,
+            cardName: prev.cardName, handIndex: prev.idx,
+          });
+          return null;
+        });
       } else if (isPotionActivatable) {
         // Potion dragged outside hand — activate
         socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx });
@@ -4991,6 +5205,482 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('level_change', onLevelChange);
     socket.on('ability_activated', onAbilityActivated);
     socket.on('play_beam_animation', onBeamAnimation);
+    const onHeroAscension = ({ owner, heroIdx, oldHero, newHero }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+
+      // Phase 1: radial light burst overlay
+      const burst = document.createElement('div');
+      burst.className = 'ascension-burst';
+      burst.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;z-index:9999;pointer-events:none;`;
+      document.body.appendChild(burst);
+      setTimeout(() => burst.remove(), 2200);
+
+      // Phase 2: spiraling particles rising from the hero
+      const colors = ['#ff44aa','#aa44ff','#4488ff','#44ff88','#ffdd44','#ff4444','#ffffff'];
+      for (let i = 0; i < 40; i++) {
+        const p = document.createElement('div');
+        const c = colors[i % colors.length];
+        const size = 3 + Math.random() * 5;
+        const angle = (i / 40) * 720 + Math.random() * 60;
+        const dist = 30 + Math.random() * 80;
+        const rise = 60 + Math.random() * 120;
+        const delay = Math.random() * 600;
+        p.style.cssText = `
+          position:fixed;left:${cx}px;top:${cy}px;width:${size}px;height:${size}px;
+          border-radius:50%;background:${c};pointer-events:none;z-index:10000;opacity:0;
+          box-shadow:0 0 ${size*2}px ${c};
+          animation:ascensionParticle 1.4s ease-out ${delay}ms forwards;
+          --ap-x:${Math.cos(angle*Math.PI/180)*dist}px;
+          --ap-y:${-rise}px;
+        `;
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 2200);
+      }
+
+      // Phase 3: firework bursts at staggered heights
+      const fireworkColors = ['#ff44aa','#aa44ff','#ffdd44','#44ff88','#4488ff'];
+      for (let f = 0; f < 5; f++) {
+        const fx = cx + (Math.random() - 0.5) * r.width * 2;
+        const fy = cy - 40 - Math.random() * 120;
+        const fDelay = 300 + f * 200 + Math.random() * 150;
+        const fc = fireworkColors[f % fireworkColors.length];
+        for (let s = 0; s < 14; s++) {
+          const sp = document.createElement('div');
+          const sa = (s / 14) * 360;
+          const sd = 15 + Math.random() * 35;
+          const ss = 2 + Math.random() * 3;
+          sp.style.cssText = `
+            position:fixed;left:${fx}px;top:${fy}px;width:${ss}px;height:${ss}px;
+            border-radius:50%;background:${fc};pointer-events:none;z-index:10001;opacity:0;
+            box-shadow:0 0 ${ss*3}px ${fc}, 0 0 ${ss*6}px ${fc}44;
+            animation:fireworkSpark .9s ease-out ${fDelay}ms forwards;
+            --fw-x:${Math.cos(sa*Math.PI/180)*sd}px;
+            --fw-y:${Math.sin(sa*Math.PI/180)*sd}px;
+          `;
+          document.body.appendChild(sp);
+          setTimeout(() => sp.remove(), fDelay + 1200);
+        }
+      }
+
+      // Phase 4: golden ring expanding from hero
+      const ring = document.createElement('div');
+      ring.style.cssText = `
+        position:fixed;left:${cx}px;top:${cy}px;width:0;height:0;
+        border:3px solid rgba(255,220,100,.9);border-radius:50%;pointer-events:none;z-index:10002;
+        transform:translate(-50%,-50%);box-shadow:0 0 20px rgba(255,200,50,.6),inset 0 0 20px rgba(255,200,50,.3);
+        animation:ascensionRing 1.2s ease-out 200ms forwards;
+      `;
+      document.body.appendChild(ring);
+      setTimeout(() => ring.remove(), 1600);
+    };
+    socket.on('hero_ascension', onHeroAscension);
+    const onWillyLeprechaun = ({ owner, heroIdx }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const symbols = ['🍀','🌈','🪙','🫕','☘️','💰','🌈','🍀','🪙','💰','☘️','🫕'];
+      for (let i = 0; i < 24; i++) {
+        const p = document.createElement('div');
+        const sym = symbols[i % symbols.length];
+        const angle = (i / 24) * 360 + Math.random() * 30;
+        const dist = 25 + Math.random() * 60;
+        const rise = 20 + Math.random() * 80;
+        const delay = Math.random() * 500;
+        const size = 12 + Math.random() * 10;
+        p.textContent = sym;
+        p.style.cssText = `
+          position:fixed;left:${cx}px;top:${cy}px;font-size:${size}px;
+          pointer-events:none;z-index:10000;opacity:0;
+          animation:willyParticle 1.6s ease-out ${delay}ms forwards;
+          --wp-x:${Math.cos(angle*Math.PI/180)*dist}px;
+          --wp-y:${-rise}px;
+        `;
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 2300);
+      }
+      // Golden glow burst
+      const glow = document.createElement('div');
+      glow.style.cssText = `
+        position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;
+        border-radius:8px;z-index:9999;pointer-events:none;
+        background:radial-gradient(ellipse at center, rgba(255,215,0,.8) 0%, rgba(50,200,50,.4) 40%, transparent 70%);
+        animation:ascensionBurstAnim 1.8s ease-out forwards;
+      `;
+      document.body.appendChild(glow);
+      setTimeout(() => glow.remove(), 2000);
+    };
+    socket.on('willy_leprechaun', onWillyLeprechaun);
+    const onAlleriaSpiderRedirect = ({ srcOwner, srcHeroIdx, tgtOwner, tgtHeroIdx, alleriaOwner, alleriaHeroIdx }) => {
+      const srcLabel = srcOwner === myIdx ? 'me' : 'opp';
+      const tgtLabel = tgtOwner === myIdx ? 'me' : 'opp';
+      const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${srcHeroIdx}"]`);
+      const tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${tgtHeroIdx}"]`);
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const sx = sr.left + sr.width / 2, sy = sr.top + sr.height / 2;
+      const tx = tr.left + tr.width / 2, ty = tr.top + tr.height / 2;
+      const dx = tx - sx, dy = ty - sy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+      // Spider thread line
+      const thread = document.createElement('div');
+      thread.style.cssText = `
+        position:fixed;left:${sx}px;top:${sy}px;width:0;height:2px;
+        background:linear-gradient(90deg, rgba(180,180,180,.9), rgba(220,220,220,.6));
+        transform-origin:0 50%;transform:rotate(${angle}deg);
+        pointer-events:none;z-index:10000;box-shadow:0 0 4px rgba(200,200,200,.5);
+        animation:spiderThread .4s ease-out forwards;--thread-len:${dist}px;
+      `;
+      document.body.appendChild(thread);
+
+      // Spiders running along the thread
+      const spiderEmoji = '🕷️';
+      for (let s = 0; s < 6; s++) {
+        const spider = document.createElement('div');
+        const delay = 300 + s * 120;
+        spider.textContent = spiderEmoji;
+        spider.style.cssText = `
+          position:fixed;left:${sx}px;top:${sy - 8}px;font-size:14px;
+          pointer-events:none;z-index:10001;opacity:0;
+          animation:spiderRun 0.7s ease-in-out ${delay}ms forwards;
+          --sr-x:${dx}px;--sr-y:${dy}px;
+        `;
+        document.body.appendChild(spider);
+        setTimeout(() => spider.remove(), delay + 900);
+      }
+
+      // Cleanup thread after spiders finish
+      setTimeout(() => {
+        thread.style.animation = 'spiderThreadFade .3s ease-out forwards';
+        setTimeout(() => thread.remove(), 400);
+      }, 1200);
+    };
+    socket.on('alleria_spider_redirect', onAlleriaSpiderRedirect);
+    const onDarkControl = ({ owner, heroIdx }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      // Dark tendrils radiating inward
+      for (let i = 0; i < 16; i++) {
+        const tendril = document.createElement('div');
+        const angle = (i / 16) * Math.PI * 2;
+        const dist = 60 + Math.random() * 40;
+        const sx = Math.cos(angle) * dist, sy = Math.sin(angle) * dist;
+        tendril.style.cssText = `
+          position:fixed;left:${cx + sx}px;top:${cy + sy}px;
+          width:3px;height:3px;border-radius:50%;
+          background:radial-gradient(circle,#9b30ff,#4b0082);
+          box-shadow:0 0 6px #9b30ff,0 0 12px #4b0082;
+          pointer-events:none;z-index:10000;opacity:0;
+          animation:darkTendril .7s ease-in ${i * 40}ms forwards;
+          --dt-x:${-sx}px;--dt-y:${-sy}px;
+        `;
+        document.body.appendChild(tendril);
+        setTimeout(() => tendril.remove(), 700 + i * 40 + 100);
+      }
+      // Central dark pulse
+      const pulse = document.createElement('div');
+      pulse.style.cssText = `
+        position:fixed;left:${cx - 30}px;top:${cy - 30}px;
+        width:60px;height:60px;border-radius:50%;
+        border:2px solid #9b30ff;
+        pointer-events:none;z-index:10000;opacity:0;
+        animation:darkControlPulse .6s ease-out .5s forwards;
+      `;
+      document.body.appendChild(pulse);
+      setTimeout(() => pulse.remove(), 1200);
+      // Dark eye symbol
+      const eye = document.createElement('div');
+      eye.textContent = '👁️';
+      eye.style.cssText = `
+        position:fixed;left:${cx - 12}px;top:${cy - 12}px;
+        font-size:24px;pointer-events:none;z-index:10001;opacity:0;
+        animation:darkEyeAppear .8s ease-out .4s forwards;
+      `;
+      document.body.appendChild(eye);
+      setTimeout(() => eye.remove(), 1300);
+    };
+    socket.on('dark_control', onDarkControl);
+    const onBurningFingerSlash = ({ owner, heroIdx, zoneSlot }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const sel = zoneSlot >= 0
+        ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
+        : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
+      const el = document.querySelector(sel);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      // Fiery slash line
+      const slash = document.createElement('div');
+      slash.style.cssText = `
+        position:fixed;left:${cx - 50}px;top:${cy - 4}px;width:100px;height:8px;
+        background:linear-gradient(90deg,transparent,#ff6600,#ffcc00,#ff6600,transparent);
+        border-radius:4px;pointer-events:none;z-index:10000;opacity:0;
+        transform:rotate(-30deg);
+        animation:fierySlash .35s ease-out forwards;
+        box-shadow:0 0 16px #ff6600,0 0 30px #ff4400;
+      `;
+      document.body.appendChild(slash);
+      // Sparks
+      for (let i = 0; i < 10; i++) {
+        const spark = document.createElement('div');
+        const sx = (Math.random() - 0.5) * 60, sy = (Math.random() - 0.5) * 40;
+        const hue = 20 + Math.random() * 30;
+        spark.style.cssText = `
+          position:fixed;left:${cx}px;top:${cy}px;
+          width:4px;height:4px;border-radius:50%;
+          background:hsl(${hue},100%,60%);
+          box-shadow:0 0 4px hsl(${hue},100%,50%);
+          pointer-events:none;z-index:10001;opacity:0;
+          animation:fireSpark .5s ease-out ${80 + i * 30}ms forwards;
+          --fs-x:${sx}px;--fs-y:${sy - 20}px;
+        `;
+        document.body.appendChild(spark);
+        setTimeout(() => spark.remove(), 650 + i * 30);
+      }
+      setTimeout(() => slash.remove(), 500);
+    };
+    socket.on('burning_finger_slash', onBurningFingerSlash);
+    const onPunchImpact = ({ owner, heroIdx, zoneSlot }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const sel = zoneSlot >= 0
+        ? `[data-equip-zone][data-equip-owner="${ownerLabel}"][data-equip-hero="${heroIdx}"][data-equip-slot="${zoneSlot}"]`
+        : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
+      const el = document.querySelector(sel);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      // Fist emoji
+      const fist = document.createElement('div');
+      fist.textContent = '👊';
+      fist.style.cssText = `
+        position:fixed;left:${cx - 16}px;top:${cy - 16}px;font-size:32px;
+        pointer-events:none;z-index:10001;opacity:0;
+        animation:punchStrike .35s ease-out forwards;
+      `;
+      document.body.appendChild(fist);
+      // Impact ring
+      const ring = document.createElement('div');
+      ring.style.cssText = `
+        position:fixed;left:${cx - 20}px;top:${cy - 20}px;width:40px;height:40px;
+        border-radius:50%;border:3px solid #ffcc00;
+        pointer-events:none;z-index:10000;opacity:0;
+        animation:punchRing .4s ease-out .1s forwards;
+        box-shadow:0 0 10px #ffcc00;
+      `;
+      document.body.appendChild(ring);
+      // Impact lines
+      for (let i = 0; i < 6; i++) {
+        const line = document.createElement('div');
+        const angle = (i / 6) * Math.PI * 2;
+        const len = 20 + Math.random() * 15;
+        line.style.cssText = `
+          position:fixed;left:${cx}px;top:${cy}px;
+          width:${len}px;height:3px;border-radius:2px;
+          background:#ffcc00;pointer-events:none;z-index:10000;opacity:0;
+          transform-origin:0 50%;transform:rotate(${angle}rad);
+          animation:punchLine .3s ease-out .05s forwards;
+        `;
+        document.body.appendChild(line);
+        setTimeout(() => line.remove(), 400);
+      }
+      setTimeout(() => { fist.remove(); ring.remove(); }, 500);
+    };
+    socket.on('punch_impact', onPunchImpact);
+    const onBaihuPetrify = ({ owner, heroIdx }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      const stone = document.createElement('div');
+      stone.style.cssText = `position:fixed;left:${cx-35}px;top:${cy-35}px;width:70px;height:70px;border-radius:8px;background:rgba(140,140,140,.6);pointer-events:none;z-index:10000;opacity:0;animation:petrifyFlash .8s ease-out forwards;border:2px solid rgba(180,180,180,.5);`;
+      document.body.appendChild(stone);
+      setTimeout(() => stone.remove(), 900);
+    };
+    socket.on('baihu_petrify', onBaihuPetrify);
+    const onCardinalBeastWin = ({ owner }) => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:20000;pointer-events:none;overflow:hidden;';
+      // Animals: Tiger, Dragon, Turtle, Phoenix
+      const animals = ['🐅', '🐉', '🐢', '🐦‍🔥'];
+      const animalColors = ['#ffaa00', '#00ccff', '#00cc66', '#ff4444'];
+      const animalAnims = ['cardinalAnimalRight', 'cardinalAnimalDown', 'cardinalAnimalLeft', 'cardinalAnimalUp'];
+      // Center burst with 4 animals spiraling outward
+      for (let a = 0; a < 4; a++) {
+        const el = document.createElement('div');
+        el.style.cssText = `position:absolute;left:50%;top:50%;font-size:60px;transform:translate(-50%,-50%);z-index:20002;animation:${animalAnims[a]} 2.5s ease-out forwards;text-shadow:0 0 20px ${animalColors[a]};`;
+        el.textContent = animals[a];
+        overlay.appendChild(el);
+      }
+      // Fireworks
+      for (let i = 0; i < 30; i++) {
+        const fw = document.createElement('div');
+        const x = 10 + Math.random() * 80;
+        const y = 10 + Math.random() * 70;
+        const delay = Math.random() * 2;
+        const color = animalColors[Math.floor(Math.random() * 4)];
+        const size = 6 + Math.random() * 8;
+        fw.style.cssText = `position:absolute;left:${x}%;top:${y}%;width:${size}px;height:${size}px;border-radius:50%;background:${color};opacity:0;animation:cardinalFirework 1s ${delay}s ease-out forwards;box-shadow:0 0 ${size*2}px ${color};`;
+        overlay.appendChild(fw);
+      }
+      // Title text
+      const title = document.createElement('div');
+      title.style.cssText = 'position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);font-size:28px;font-weight:900;color:#ffd700;text-shadow:0 0 30px #ffd700,0 0 60px #ff8800;opacity:0;animation:cardinalTitle 3s 0.3s ease-out forwards;white-space:nowrap;font-family:var(--font-orbit),sans-serif;';
+      title.textContent = '⭐ CARDINAL BEASTS ASSEMBLED ⭐';
+      overlay.appendChild(title);
+      document.body.appendChild(overlay);
+      setTimeout(() => overlay.remove(), 3600);
+    };
+    socket.on('cardinal_beast_win', onCardinalBeastWin);
+    const onQinglongLightning = ({ srcOwner, srcHeroIdx, srcZoneSlot, tgtOwner, tgtHeroIdx, tgtZoneSlot, step }) => {
+      const sLabel = srcOwner === myIdx ? 'me' : 'opp';
+      const tLabel = tgtOwner === myIdx ? 'me' : 'opp';
+      const srcSel = srcZoneSlot >= 0
+        ? `[data-support-zone][data-support-owner="${sLabel}"][data-support-hero="${srcHeroIdx}"][data-support-slot="${srcZoneSlot}"]`
+        : `[data-hero-zone][data-hero-owner="${sLabel}"][data-hero-idx="${srcHeroIdx}"]`;
+      const tgtSel = tgtZoneSlot >= 0
+        ? `[data-support-zone][data-support-owner="${tLabel}"][data-support-hero="${tgtHeroIdx}"][data-support-slot="${tgtZoneSlot}"]`
+        : `[data-hero-zone][data-hero-owner="${tLabel}"][data-hero-idx="${tgtHeroIdx}"]`;
+      const srcEl = document.querySelector(srcSel);
+      const tgtEl = document.querySelector(tgtSel);
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const sx = sr.left+sr.width/2, sy = sr.top+sr.height/2;
+      const tx = tr.left+tr.width/2, ty = tr.top+tr.height/2;
+      const dx = tx-sx, dy = ty-sy;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      const angle = Math.atan2(dy,dx)*180/Math.PI;
+      const bolt = document.createElement('div');
+      bolt.style.cssText = `position:fixed;left:${sx}px;top:${sy-2}px;width:0;height:4px;background:linear-gradient(90deg,#00ccff,#ffffff,#00ccff);border-radius:2px;transform-origin:0 50%;transform:rotate(${angle}deg);pointer-events:none;z-index:10000;box-shadow:0 0 12px #00ccff,0 0 24px #0088ff;animation:lightningBolt .3s ease-out forwards;--bolt-len:${dist}px;`;
+      document.body.appendChild(bolt);
+      setTimeout(() => bolt.remove(), 400);
+    };
+    socket.on('qinglong_lightning', onQinglongLightning);
+    const onJumpscareBox = ({ owner, heroIdx }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      // Box base
+      const box = document.createElement('div');
+      box.textContent = '🎁';
+      box.style.cssText = `
+        position:fixed;left:${cx - 16}px;top:${cy}px;font-size:32px;
+        pointer-events:none;z-index:10000;
+        animation:jumpscareBoxShake .4s ease-in-out forwards;
+      `;
+      document.body.appendChild(box);
+      // Spring out after shake
+      setTimeout(() => {
+        const spring = document.createElement('div');
+        spring.textContent = '🤡';
+        spring.style.cssText = `
+          position:fixed;left:${cx - 18}px;top:${cy - 10}px;font-size:36px;
+          pointer-events:none;z-index:10001;opacity:0;
+          animation:jumpscareSpring .5s ease-out forwards;
+        `;
+        document.body.appendChild(spring);
+        // Scare stars
+        for (let i = 0; i < 6; i++) {
+          const star = document.createElement('div');
+          star.textContent = '⭐';
+          const angle = (i / 6) * Math.PI * 2;
+          const dist = 30 + Math.random() * 20;
+          star.style.cssText = `
+            position:fixed;left:${cx}px;top:${cy - 20}px;font-size:12px;
+            pointer-events:none;z-index:10001;opacity:0;
+            animation:jumpscareStars .5s ease-out ${i * 50}ms forwards;
+            --js-x:${Math.cos(angle) * dist}px;--js-y:${Math.sin(angle) * dist - 15}px;
+          `;
+          document.body.appendChild(star);
+          setTimeout(() => star.remove(), 600 + i * 50);
+        }
+        setTimeout(() => spring.remove(), 600);
+      }, 350);
+      setTimeout(() => box.remove(), 800);
+    };
+    socket.on('jumpscare_box', onJumpscareBox);
+    const onAntiMagicBubble = ({ owner, heroIdx }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      const bubble = document.createElement('div');
+      bubble.style.cssText = `
+        position:fixed;left:${cx - 35}px;top:${cy - 35}px;width:70px;height:70px;
+        border-radius:50%;border:3px solid rgba(100,180,255,.6);
+        background:radial-gradient(circle at 30% 30%, rgba(180,220,255,.3), rgba(100,160,255,.1));
+        pointer-events:none;z-index:10000;opacity:0;
+        animation:magicBubble 1s ease-out forwards;
+        box-shadow:0 0 20px rgba(100,180,255,.4), inset 0 0 15px rgba(150,200,255,.2);
+      `;
+      document.body.appendChild(bubble);
+      // Shine highlight
+      const shine = document.createElement('div');
+      shine.style.cssText = `
+        position:fixed;left:${cx - 12}px;top:${cy - 20}px;width:10px;height:6px;
+        border-radius:50%;background:rgba(255,255,255,.6);
+        pointer-events:none;z-index:10001;opacity:0;
+        animation:magicBubbleShine 1s ease-out .1s forwards;
+        transform:rotate(-30deg);
+      `;
+      document.body.appendChild(shine);
+      setTimeout(() => { bubble.remove(); shine.remove(); }, 1100);
+    };
+    socket.on('anti_magic_bubble', onAntiMagicBubble);
+    const onFireshieldCorona = ({ owner, heroIdx }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      // Flame corona ring
+      for (let i = 0; i < 14; i++) {
+        const flame = document.createElement('div');
+        const angle = (i / 14) * Math.PI * 2;
+        const dist = 35 + Math.random() * 10;
+        const fx = Math.cos(angle) * dist, fy = Math.sin(angle) * dist;
+        const hue = 10 + Math.random() * 30;
+        flame.style.cssText = `
+          position:fixed;left:${cx + fx - 5}px;top:${cy + fy - 8}px;
+          width:10px;height:16px;border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
+          background:radial-gradient(ellipse, hsl(${hue},100%,65%), hsl(${hue-10},100%,45%));
+          pointer-events:none;z-index:10000;opacity:0;
+          transform:rotate(${angle + Math.PI}rad);
+          animation:fireshieldFlame .7s ease-out ${i * 30}ms forwards;
+          box-shadow:0 0 8px hsl(${hue},100%,50%);
+        `;
+        document.body.appendChild(flame);
+        setTimeout(() => flame.remove(), 750 + i * 30);
+      }
+      // Central glow
+      const glow = document.createElement('div');
+      glow.style.cssText = `
+        position:fixed;left:${cx - 40}px;top:${cy - 40}px;width:80px;height:80px;
+        border-radius:50%;pointer-events:none;z-index:9999;opacity:0;
+        background:radial-gradient(circle, rgba(255,120,0,.4), transparent 70%);
+        animation:fireshieldGlow .8s ease-out forwards;
+      `;
+      document.body.appendChild(glow);
+      setTimeout(() => glow.remove(), 900);
+    };
+    socket.on('fireshield_corona', onFireshieldCorona);
     const onSurpriseFlip = ({ owner, heroIdx, cardName, isBakhmSlot, bakhmZoneSlot }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       let el;
@@ -5348,6 +6038,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange);
       socket.off('nomu_draw', onNomuDraw);
       socket.off('ability_activated', onAbilityActivated); socket.off('play_beam_animation', onBeamAnimation);
+      socket.off('hero_ascension', onHeroAscension);
+      socket.off('willy_leprechaun', onWillyLeprechaun);
+      socket.off('alleria_spider_redirect', onAlleriaSpiderRedirect);
+      socket.off('dark_control', onDarkControl);
+      socket.off('burning_finger_slash', onBurningFingerSlash);
+      socket.off('punch_impact', onPunchImpact);
+      socket.off('baihu_petrify', onBaihuPetrify);
+      socket.off('cardinal_beast_win', onCardinalBeastWin);
+      socket.off('qinglong_lightning', onQinglongLightning);
+      socket.off('jumpscare_box', onJumpscareBox);
+      socket.off('anti_magic_bubble', onAntiMagicBubble);
+      socket.off('fireshield_corona', onFireshieldCorona);
       socket.off('play_permanent_animation', onPermanentAnim);
       socket.off('surprise_flip', onSurpriseFlip);
       socket.off('surprise_reset', onSurpriseReset);
@@ -6035,6 +6737,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       zonePickSet.add(`${myIdx}-${z.heroIdx}-${z.slotIdx}`);
     }
   }
+  // ── Slippery Skates two-step move ──
+  const [skatesSelected, setSkatesSelected] = useState(null); // selected creature zoneSlot or null
+  const skatesCreatureSet = new Set();
+  const skatesDestSet = new Set();
+  if (isMyEffectPrompt && ep.type === 'skatesMove') {
+    for (const c of (ep.creatures || [])) {
+      skatesCreatureSet.add(`${myIdx}-${ep.heroIdx}-${c.zoneSlot}`);
+    }
+    if (skatesSelected != null) {
+      for (const z of (ep.destZones || [])) {
+        skatesDestSet.add(`${myIdx}-${z.heroIdx}-${z.slotIdx}`);
+      }
+    }
+  }
+  // Reset skatesSelected when prompt changes
+  useEffect(() => {
+    if (!isMyEffectPrompt || ep?.type !== 'skatesMove') setSkatesSelected(null);
+  }, [ep?.type]);
   const respondToPrompt = (response) => {
     socket.emit('effect_prompt_response', { roomId: gameState.roomId, response });
   };
@@ -6047,6 +6767,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (e.key === 'Escape') {
         e.stopImmediatePropagation();
         respondToPrompt({ confirmed: true });
+      }
+    };
+    window.addEventListener('keydown', handleEsc, true);
+    return () => window.removeEventListener('keydown', handleEsc, true);
+  }, [gameState.effectPrompt]);
+
+  // Escape key cancels skatesMove prompt
+  useEffect(() => {
+    const ep = gameState.effectPrompt;
+    if (!ep || ep.type !== 'skatesMove' || ep.ownerIdx !== myIdx) return;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        setSkatesSelected(null);
+        respondToPrompt({ cancelled: true });
       }
     };
     window.addEventListener('keydown', handleEsc, true);
@@ -6174,6 +6909,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         return <span>{pName(p.name, p.color)} {verb} {cName(entry.card)}!</span>;
       }
       if (t === 'creature_summoned') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} summoned {cName(entry.card)}!</span>; }
+      if (t === 'hero_ascension') { const p = playerByName(entry.player); return <span>🦋 {pName(p.name, p.color)}'s {entry.oldHero} ascended into {cName(entry.newHero)}!</span>; }
+      if (t === 'torchure_poison') { const p = playerByName(entry.player); return <span>☠️ {pName(p.name, p.color)} torchured {entry.hero}!</span>; }
+      if (t === 'willy_draw') { const p = playerByName(entry.player); return <span>🍀 {pName(p.name, p.color)}'s Willy drew {entry.count} cards!</span>; }
+      if (t === 'willy_gold') { const p = playerByName(entry.player); return <span>💰 {pName(p.name, p.color)}'s Willy granted {entry.amount} Gold!</span>; }
+      if (t === 'luck_declare') { const p = playerByName(entry.player); return <span>🍀 {pName(p.name, p.color)} declared {cName(entry.card)} with Luck (Lv{entry.level})!</span>; }
+      if (t === 'luck_trigger') { const p = playerByName(entry.player); return <span>🌈 {pName(p.name, p.color)}'s Luck triggered on {cName(entry.card)}! Drew {entry.drawn} cards.</span>; }
+      if (t === 'alleria_surprise_draw') { const p = playerByName(entry.player); return <span>🕸️ {pName(p.name, p.color)}'s Alleria drew 1 card from Surprise activation!</span>; }
+      if (t === 'trapping_set') { const p = playerByName(entry.player); return <span>🪤 {pName(p.name, p.color)}'s {entry.hero} set {cName(entry.card)} via Trapping!</span>; }
+      if (t === 'controlled_attack') { const p = playerByName(entry.player); return <span>🔮 {pName(p.name, p.color)} took control of {entry.target}'s abilities!</span>; }
+      if (t === 'jumpscare_stun') { const p = playerByName(entry.player); return <span>😱 {pName(p.name, p.color)}'s Jumpscare stunned {entry.target}!</span>; }
+      if (t === 'slippery_skates_move') { const p = playerByName(entry.player); return <span>⛸️ {pName(p.name, p.color)} slid {cName(entry.card)} from {entry.fromHero} to {entry.toHero}!</span>; }
+      if (t === 'anti_magic_shield') { const p = playerByName(entry.player); return <span>🛡️ {pName(p.name, p.color)}'s Anti Magic Shield negated {cName(entry.negated)}!</span>; }
+      if (t === 'fireshield_recoil') { const p = playerByName(entry.player); return <span>🔥 {pName(p.name, p.color)}'s {entry.hero} reflected {entry.recoil} damage{entry.fullDamage ? ' (full!)' : ''} back to {entry.attacker}!</span>; }
+      if (t === 'creation_lock') { const p = playerByName(entry.player); return <span>✨ {pName(p.name, p.color)} locked {entry.cards.map(c => cName(c)).reduce((a, b, i) => i === 0 ? [b] : [...a, ', ', b], [])} for the turn.</span>; }
+      if (t === 'alchemic_journal_draw') { const p = playerByName(entry.player); return <span>📓 {pName(p.name, p.color)} drew a Potion via Alchemic Journal!</span>; }
+      if (t === 'alchemic_journal_choose') { const p = playerByName(entry.player); return <span>📓 {pName(p.name, p.color)} chose {cName(entry.card)} via Alchemic Journal!</span>; }
+      if (t === 'baihu_petrify') { const p = playerByName(entry.player); return <span>🐅 {pName(p.name, p.color)}'s Baihu petrified {entry.target}!</span>; }
+      if (t === 'xuanwu_revive') { const p = playerByName(entry.player); return <span>🐢 {pName(p.name, p.color)}'s Xuanwu revived {cName(entry.card)} with {entry.hp} HP!</span>; }
+      if (t === 'zhuque_burn') { const p = playerByName(entry.player); return <span>🐦 {pName(p.name, p.color)}'s Zhuque burned {entry.target}!</span>; }
+      if (t === 'cardinal_win') { const p = playerByName(entry.player); return <span>🏆 {pName(p.name, p.color)} controls all 4 Cardinal Beasts! VICTORY!</span>; }
       if (t === 'ability_attached') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} attached {cName(entry.card)} to {entry.hero}.</span>; }
       if (t === 'artifact_equipped') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} equipped {cName(entry.card)} to {entry.hero}{entry.cost ? ` (${entry.cost}G)` : ''}.</span>; }
       if (t === 'ability_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} activated {cName(entry.card)} (Lv{entry.level})!</span>; }
@@ -6502,8 +7257,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             return true;
           })();
           const surpriseTarget = !isOpp && playDrag?.isSurprise && playDrag.targetHero === i;
+          const ascensionIneligible = !isOpp && playDrag?.isAscension && (() => {
+            const h = heroes[i];
+            return !(h?.name && h.hp > 0 && h.ascensionReady && h.ascensionTarget === playDrag.cardName);
+          })();
+          const ascensionTarget = !isOpp && playDrag?.isAscension && playDrag.targetHero === i;
           // During heroAction, dim all heroes except the Coffee hero
-          const heroActionDimmed = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx && gameState.effectPrompt?.heroIdx !== i;
+          const heroActionDimmed = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx && gameState.effectPrompt?.heroIdx !== undefined && gameState.effectPrompt?.heroIdx !== i;
           // Dim heroes that can't use hero-restricted additional actions (e.g. Reiza's extra action)
           const additionalActionDimmed = !isOpp && !isDead && isMyTurn && currentPhase === 3 && (me.heroesActedThisTurn?.length > 0) && (() => {
             const aas = gameState.additionalActions || [];
@@ -6535,7 +7295,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const heroEffectEntry = (gameState.activeHeroEffects || []).find(e => e.heroIdx === i && ((!isOpp && !e.charmedOwner) || (isOpp && e.charmedOwner === pi)));
           const isHeroEffectActive = !!heroEffectEntry;
           const isCharmed = !!hero?.statuses?.charmed;
-          const charmedByColor = isCharmed ? (hero.charmedBy === myIdx ? me.color : opp.color) : null;
+          const isControlled = hero?.controlledBy != null && !isCharmed;
+          const charmedByColor = isCharmed ? (hero.charmedBy === myIdx ? me.color : opp.color)
+            : isControlled ? (hero.controlledBy === myIdx ? me.color : opp.color)
+            : null;
           const isRamming = ramAnims.some(r => r.srcOwner === pi && r.srcHeroIdx === i);
           const onHeroClick = (isHeroEffectActive && !isEffectLocked && !isValidHeroTarget)
             ? () => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: i, charmedOwner: heroEffectEntry?.charmedOwner })
@@ -6546,12 +7309,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || heroActionDimmed || additionalActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '')}
+              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
-                style={zsMerge('hero', (isHeroEffectActive || isValidHeroTarget) ? { cursor: 'pointer' } : undefined, isCharmed ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined)}>
+                style={zsMerge('hero', { ...((isHeroEffectActive || isValidHeroTarget) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
                 {hero?.name && !isRamming ? (
-                  <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={gameSkins} />
+                  <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={gameSkins}
+                    style={isStunned?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' } : undefined} />
                 ) : hero?.name && isRamming ? (
                   <div className="board-zone-empty" style={{ opacity: 0.3 }}>{hero.name.split(',')[0]}</div>
                 ) : (
@@ -6559,7 +7323,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 )}
                 {isDead && hero?.name && <div className="hero-dead-marker">🪦</div>}
                 {hero?.name && isFrozen && <FrozenOverlay />}
-                {hero?.name && isStunned && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
+                {hero?.name && isStunned && !isStunned._baihuPetrify && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
+                {hero?.name && isStunned?._baihuPetrify && <div className="baihu-petrify-overlay" />}
                 {hero?.name && isNegated && <NegatedOverlay />}
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
@@ -6574,6 +7339,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   >🧟</div>
                 )}
                 {hero?.name && hero.buffs && <BuffColumn buffs={hero.buffs} />}
+                {/* ── Ascension Orbs ── */}
+                {hero?.name && hero.ascensionOrbs && (
+                  <div className="ascension-orbs-container"
+                    onMouseEnter={e => showGameTooltip(e, hero.ascensionReady ? 'All schools collected — ready to Ascend!' : 'Collect all spell school orbs to Ascend')}
+                    onMouseLeave={hideGameTooltip}>
+                    {hero.ascensionOrbs.map((orb, oi) => {
+                      const count = hero.ascensionOrbs.length;
+                      const angle = (oi / count) * 2 * Math.PI - Math.PI / 2;
+                      const radius = 22;
+                      const cx = 50 + Math.cos(angle) * radius;
+                      const cy = 50 + Math.sin(angle) * radius;
+                      return (
+                        <div key={oi} className={'ascension-orb' + (orb.collected ? ' ascension-orb-collected' : '')}
+                          style={{
+                            left: cx + '%', top: cy + '%',
+                            background: orb.collected ? orb.color : 'rgba(60,60,60,.7)',
+                            boxShadow: orb.collected ? `0 0 8px ${orb.color}, 0 0 16px ${orb.color}55` : 'none',
+                          }}
+                          onMouseEnter={e => { e.stopPropagation(); showGameTooltip(e, `${orb.school}${orb.collected ? ' ✓' : ''}`); }}
+                          onMouseLeave={hideGameTooltip}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+                {/* ── Ascension drag highlight ── */}
+                {!isOpp && playDrag?.isAscension && playDrag.targetHero === i && (
+                  <div className="ascension-drop-glow" />
+                )}
                 {!isOpp && gameState.bonusActions?.heroIdx === i && gameState.bonusActions.remaining > 0 && (
                   <div className="bonus-action-counter"
                     onMouseEnter={e => showGameTooltip(e, `${gameState.bonusActions.remaining} bonus Action${gameState.bonusActions.remaining > 1 ? 's' : ''} remaining`)}
@@ -6714,6 +7508,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     className={'board-zone board-zone-ability' + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget ? ' board-zone-play-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '')}
                     data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel}
                     onClick={onAbilityClick}
+                    onMouseEnter={() => {
+                      // Track hovered Luck's declared target for tooltip
+                      if (cards[0] === 'Luck') {
+                        const h = heroes[i];
+                        const entry = h?._luckDeclared?.[z];
+                        _activeLuckTooltipTarget = entry?.target || null;
+                      }
+                    }}
+                    onMouseLeave={() => { _activeLuckTooltipTarget = null; }}
                     style={zsMerge('ability', canActivate ? { cursor: 'pointer' } : (isValidPotionTarget ? { cursor: 'pointer' } : undefined))}>
                     {cards.length > 0 ? (
                       <>
@@ -6830,15 +7633,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 c.heroIdx === i && c.zoneSlot === z && ((!isOpp && !c.charmedOwner) || (isOpp && c.charmedOwner === pi))
               );
               const isCreatureActivatable = creatureEffectEntry?.canActivate === true;
+              const equipEffectEntry = cards.length > 0 && !isCreatureActivatable && (gameState.activatableEquips || []).find(c =>
+                c.heroIdx === i && c.zoneSlot === z && !isOpp
+              );
+              const isEquipActivatable = equipEffectEntry?.canActivate === true;
               // Bakhm surprise drag highlight
               const isBakhmSurpriseTarget = !isOpp && playDrag?.isSurprise && playDrag.card?.cardType === 'Creature' && cards.length === 0
                 && (gameState.bakhmSurpriseSlots || []).some(b => b.heroIdx === i && b.freeSlots.includes(z));
               const isBakhmSurpriseActive = isBakhmSurpriseTarget && playDrag.targetHero === i && playDrag.targetBakhmSlot === z;
+              // Slippery Skates move
+              const isSkatesCreature = skatesCreatureSet.has(`${pi}-${i}-${z}`);
+              const isSkatesCreatureSelected = isSkatesCreature && skatesSelected === z;
+              const isSkatesDest = skatesDestSet.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'}
-                  onClick={(isCreatureActivatable && !isEffectLocked) ? () => {
+                  onClick={isSkatesCreature ? () => {
+                    setSkatesSelected(prev => prev === z ? null : z);
+                  } : isSkatesDest ? () => {
+                    respondToPrompt({ creatureSlot: skatesSelected, destHeroIdx: i, destSlot: z });
+                    setSkatesSelected(null);
+                  } : (isCreatureActivatable && !isEffectLocked) ? () => {
                     socket.emit('activate_creature_effect', { roomId: gameState.roomId, heroIdx: i, zoneSlot: z, charmedOwner: creatureEffectEntry?.charmedOwner });
+                  } : (isEquipActivatable && !isEffectLocked) ? () => {
+                    socket.emit('activate_equip_effect', { roomId: gameState.roomId, heroIdx: i, zoneSlot: z });
                   } : isProviderZone ? () => {
                     const provider = pendingAdditionalPlay.providers.find(p => p.heroIdx === i && p.zoneSlot === z);
                     if (provider) {
@@ -6851,7 +7669,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       socket.emit('pending_placement_clear', { roomId: gameState.roomId });
                     }
                   } : isZonePickTarget ? () => respondToPrompt({ heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
-                  style={zsMerge('support', (isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable) ? { cursor: 'pointer' } : undefined)}>
+                  style={zsMerge('support', (isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest) ? { cursor: 'pointer' } : undefined)}>
                   {(isPlayTarget || isAutoTarget) && playDrag.card ? (
                     <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
                   ) : (!isOpp && pendingAdditionalPlay && pendingAdditionalPlay.heroIdx === i && pendingAdditionalPlay.zoneSlot === z) ? (
@@ -6874,12 +7692,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         return <BoardCard cardName={cards[0]} style={{ opacity: 0.6 }} />;
                       }
                     }
-                    const isCreature = (cc?._cardDataOverride?.cardType || CARDS_BY_NAME[cards[cards.length-1]]?.cardType || '').split('/').some(t => t.trim() === 'Creature'); return !isCreature ? (
+                    const isCreature = (cc?._cardDataOverride?.cardType || CARDS_BY_NAME[cards[cards.length-1]]?.cardType || '').split('/').some(t => t.trim() === 'Creature'); const creatureStyle = cc?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' } : cc?._xuanwuRevived ? { filter: 'sepia(0.2) hue-rotate(180deg) brightness(1.1)', opacity: 0.75 } : undefined; return !isCreature ? (
                       <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} />
                     ) : (
                     <>
                     {cards.length === 1 ? (
-                      (() => { const curHp = cc?.currentHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp; const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp; return <BoardCard cardName={cards[0]} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} />; })()
+                      (() => { const curHp = cc?.currentHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp; const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp; return <BoardCard cardName={cards[0]} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={creatureStyle} />; })()
                     ) : (
                       <div className="board-stack">
                         {(() => { const curHp = cc?.currentHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; return <BoardCard cardName={cards[cards.length-1]} hp={curHp} maxHp={mHp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />; })()}
@@ -6898,7 +7716,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     {cc?.frozen ? <FrozenOverlay /> : null}
                     {cc?.negated ? <NegatedOverlay /> : null}
                     {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
-                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated) ? <StatusBadges counters={cc} isHero={false} player={p} /> : null}
+                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated || cc?._baihuStunned) ? <StatusBadges counters={cc} isHero={false} player={p} /> : null}
                     {cc?.buffs ? <BuffColumn buffs={cc.buffs} /> : null}
                     </>
                     ); })()
@@ -6958,9 +7776,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const isSelected = isBlindPick && blindPickSelected.has(i);
               const maxSelect = isBlindPick ? (gameState.effectPrompt.maxSelect || 2) : 0;
               const isFull = isBlindPick && !isSelected && blindPickSelected.size >= maxSelect;
+              const revealEntry = (opp.revealedHandCards || []).find(r => r.index === i);
               return (
                 <div key={i}
-                  className={'board-card face-down hand-card' + (isSelected ? ' blind-pick-selected' : '') + (isBlindPick && !isSelected && !isFull ? ' blind-pick-eligible' : '') + (isFull ? ' hand-card-dimmed' : '')}
+                  className={'board-card hand-card' + (revealEntry ? ' revealed-hand-card' : ' face-down') + (isSelected ? ' blind-pick-selected' : '') + (isBlindPick && !isSelected && !isFull ? ' blind-pick-eligible' : '') + (isFull ? ' hand-card-dimmed' : '')}
                   data-hand-idx={i} style={(oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current)) ? { visibility: 'hidden' } : (isBlindPick ? { cursor: 'pointer' } : undefined)}
                   onClick={isBlindPick ? () => {
                     setBlindPickSelected(prev => {
@@ -6969,7 +7788,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       return next;
                     });
                   } : undefined}>
-                  <img src={opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                  {revealEntry ? (
+                    <img src={cardImageUrl(revealEntry.name)} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} draggable={false}
+                      onMouseEnter={() => { const c = CARDS_BY_NAME[revealEntry.name]; if (c) setBoardTooltip(c); }}
+                      onMouseLeave={() => setBoardTooltip(null)} />
+                  ) : (
+                    <img src={opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                  )}
                 </div>
               );
             })}
@@ -7486,7 +8311,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           'Pyroblast': ['Pollution Token'],
           'Mummy Maker Machine': ['Mummy Token'],
         };
-        const relatedTokens = CARD_TOKEN_MAP[tooltipCard.name] || [];
+        const relatedTokens = [...(CARD_TOKEN_MAP[tooltipCard.name] || [])];
+        // Luck declared target — show the declared card alongside ONLY for the specific hovered Luck
+        if (tooltipCard.name === 'Luck' && _activeLuckTooltipTarget) {
+          if (!relatedTokens.includes(_activeLuckTooltipTarget)) relatedTokens.push(_activeLuckTooltipTarget);
+        }
         return (
           <>
             {relatedTokens.map(tokenName => {
@@ -7995,6 +8824,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </DraggablePanel>
       )}
 
+      {/* ── Effect Prompt: Card Name Picker (Luck, etc.) ── */}
+      {/* ── Effect Prompt: Card Name Picker (Luck, etc.) ── */}
+      {isMyEffectPrompt && ep.type === 'cardNamePicker' && (
+        <CardNamePickerPrompt ep={ep} onRespond={respondToPrompt} />
+      )}
+
       {/* ── Effect Prompt: Card Gallery Picker ── */}
       {isMyEffectPrompt && ep.type === 'cardGallery' && (() => {
         const cards = ep.cards || [];
@@ -8061,6 +8896,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </DraggablePanel>
       )}
 
+      {/* ── Effect Prompt: Slippery Skates Move ── */}
+      {isMyEffectPrompt && ep.type === 'skatesMove' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#00ccff' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#00ccff', marginBottom: 8 }}>⛸️ Slippery Skates</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
+            {skatesSelected != null
+              ? 'Now click a highlighted zone to move the Creature there.'
+              : 'Click a Creature to select it for moving.'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7 }}>Press Escape to cancel.</div>
+          <button className="btn" style={{ marginTop: 10, padding: '6px 16px', fontSize: 11 }}
+            onClick={() => { setSkatesSelected(null); respondToPrompt({ cancelled: true }); }}>✕ Cancel</button>
+        </DraggablePanel>
+      )}
+
       {/* ── Effect Prompt: Status Select (Beer, etc.) ── */}
       {isMyEffectPrompt && ep.type === 'statusSelect' && (
         <StatusSelectPrompt key={ep.title} ep={ep} onRespond={respondToPrompt} />
@@ -8069,11 +8919,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Effect Prompt: Hero Action (Coffee) ── */}
       {isMyEffectPrompt && ep.type === 'heroAction' && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#8b6b4a' }}>
-          <div className="orbit-font" style={{ fontSize: 13, color: '#cc9966', marginBottom: 4 }}>☕ {ep.title}</div>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#cc9966', marginBottom: 4 }}>{ep.title}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
-          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>Drag a highlighted card onto {ep.heroName}'s zones to play it.</div>
-          <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>{ep.heroName ? `Drag a highlighted card onto ${ep.heroName}'s zones to play it.` : 'Drag a highlighted card onto any Hero\'s zones to play it.'}</div>
+          {ep.cancellable !== false && <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>}
         </DraggablePanel>
       )}
 
@@ -8087,6 +8937,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'forceDiscard' || ep.type === 'forceDiscardCancellable' ? (ep.opponentTitle || '🗑 Opponent is discarding...') :
              ep.type === 'abilityAttach' ? '⚡ Opponent is equipping...' :
              ep.type === 'blindHandPick' ? '🫳 Opponent is stealing...' :
+             ep.type === 'cardNamePicker' ? '🍀 Opponent is declaring...' :
              '⏳ Waiting for opponent...'}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text2)' }}>
@@ -8094,6 +8945,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'cardGalleryMulti' ? 'Waiting for opponent to select cards...' :
              ep.type === 'confirm' ? 'Waiting for opponent to confirm...' :
              ep.type === 'zonePick' ? 'Waiting for opponent to select a zone...' :
+             ep.type === 'skatesMove' ? 'Waiting for opponent to move a creature...' :
              ep.type === 'heroAction' ? 'Waiting for opponent to play a card...' :
              ep.type === 'forceDiscard' ? (ep.opponentSubtitle || 'Waiting for opponent to discard a card...') :
              ep.type === 'forceDiscardCancellable' ? 'Waiting for opponent to discard or pass...' :
@@ -8104,6 +8956,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'abilityAttach' ? 'Waiting for opponent to attach an ability...' :
              ep.type === 'blindHandPick' ? 'Opponent is choosing cards from your hand...' :
              ep.type === 'deckSearchReveal' ? 'Waiting for opponent to dismiss search result...' :
+             ep.type === 'cardNamePicker' ? 'Waiting for opponent to declare a card name...' :
              'Waiting for opponent...'}
           </div>
         </DraggablePanel>
@@ -8147,9 +9000,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {spellHeroPick && !result && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>
-            {spellHeroPick.isSurprise ? '🎭' : spellHeroPick.card?.cardType === 'Attack' ? '⚔️' : '✦'} {spellHeroPick.isSurprise ? 'Set' : 'Play'} {spellHeroPick.cardName}
+            {spellHeroPick.isSurprise ? '🎭' : spellHeroPick.isAscension ? '🦋' : spellHeroPick.card?.cardType === 'Attack' ? '⚔️' : '✦'} {spellHeroPick.isSurprise ? 'Set' : spellHeroPick.isAscension ? 'Ascend' : 'Play'} {spellHeroPick.cardName}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>{spellHeroPick.isSurprise ? 'Choose a Hero to set this Surprise face-down:' : 'Choose a Hero to play this card:'}</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>{spellHeroPick.isSurprise ? 'Choose a Hero to set this Surprise face-down:' : spellHeroPick.isAscension ? 'Choose a Hero to Ascend:' : 'Choose a Hero to play this card:'}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {spellHeroPick.eligible.map(h => (
               <button key={(h.charmedOwner != null ? 'c' : '') + h.idx} className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: h.charmedOwner != null ? '#ff69b4' : 'var(--accent)', color: h.charmedOwner != null ? '#ff69b4' : 'var(--accent)', textAlign: 'left' }}
@@ -8161,6 +9014,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       roomId: gameState.roomId, cardName: pick.cardName,
                       handIndex: pick.handIndex, heroIdx: h.idx,
                       bakhmSlot: h.bakhmSlot,
+                    });
+                  } else if (pick.isAscension) {
+                    socket.emit('ascend_hero', {
+                      roomId: gameState.roomId, cardName: pick.cardName,
+                      handIndex: pick.handIndex, heroIdx: h.idx,
                     });
                   } else if (pick.isHeroAction) {
                     socket.emit('effect_prompt_response', {

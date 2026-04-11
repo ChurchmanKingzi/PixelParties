@@ -44,13 +44,8 @@ module.exports = {
     });
     await engine._delay(400);
 
-    // Draw cards one by one
-    for (let i = 0; i < drawCount; i++) {
-      if ((ps.mainDeck || []).length === 0) break;
-      await engine.actionDrawCards(pi, 1);
-      engine.sync();
-      if (i < drawCount - 1) await engine._delay(200);
-    }
+    // Draw cards
+    await engine.actionDrawCards(pi, drawCount);
 
     engine.log('tharx_draw', { player: ps.username, creatures: creatureCount, drawn: drawCount });
     engine.sync();

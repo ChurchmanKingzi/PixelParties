@@ -72,12 +72,7 @@ module.exports = {
       engine.sync();
       await engine._delay(350);
 
-      for (let i = 0; i < creativityLevel; i++) {
-        if ((ps.mainDeck || []).length === 0) break;
-        await engine.actionDrawCards(pi, 1, { _nomuBypass: true });
-        engine.sync();
-        await engine._delay(250);
-      }
+      await engine.actionDrawCards(pi, creativityLevel);
     },
   },
 };

@@ -971,7 +971,7 @@ class GameEngine {
           if (!config.noSpellCancel) gs._spellCancelled = true;
           return null;
         }
-        const selected = filteredTargets.find(t => t.id === selectedIds[0]) || null;
+        let selected = filteredTargets.find(t => t.id === selectedIds[0]) || null;
         // Spell target tracking (for Bartas, etc.) — records at selection time,
         // not damage time, so protected/shielded targets still count as "hit"
         if (selected && gs._spellDamageLog) {
@@ -993,7 +993,8 @@ class GameEngine {
               if (gs._spellDamageLog && gs._spellDamageLog.length > 0) {
                 gs._spellDamageLog[gs._spellDamageLog.length - 1] = { ...redirected };
               }
-              return redirected;
+              // Continue with redirected target (surprise window + post-target reactions still run)
+              selected = redirected;
             }
           }
         }
@@ -1002,11 +1003,15 @@ class GameEngine {
         // After target is confirmed (and possibly redirected), check if the targeted
         // hero has a face-down Surprise that should trigger.
         if (selected && selected.type === 'hero' && !config._skipSurpriseCheck) {
+          // Mark this hero as surprise-checked so actionDealDamage doesn't re-check
+          if (!gs._surpriseCheckedHeroes) gs._surpriseCheckedHeroes = new Set();
+          gs._surpriseCheckedHeroes.add(`${selected.owner}-${selected.heroIdx}`);
           const surpriseResult = await engine._checkSurpriseWindow(
             [selected], cardInstance
           );
           if (surpriseResult?.effectNegated) {
             // Effect fully negated by surprise — don't set _spellCancelled (spell is consumed)
+            gs._spellNegatedByEffect = true;
             return null;
           }
         }
@@ -1019,6 +1024,7 @@ class GameEngine {
 
           // Effect fully negated (Invisibility Cloak)
           if (ptResult?.effectNegated) {
+            gs._spellNegatedByEffect = true;
             // Remove the target from damage log — spell never connected
             if (gs._spellDamageLog) {
               const negIdx = gs._spellDamageLog.findIndex(t => t.id === selected.id);
@@ -1150,6 +1156,7 @@ class GameEngine {
           if (heroTargets.length > 0) {
             const surpriseResult = await engine._checkSurpriseWindow(heroTargets, cardInstance);
             if (surpriseResult?.effectNegated) {
+              gs._spellNegatedByEffect = true;
               return []; // Effect fully negated — don't set _spellCancelled
             }
           }
@@ -1159,6 +1166,7 @@ class GameEngine {
         if (!config._skipPostTargetReactions) {
           const ptResult = await engine._checkPostTargetHandReactions(result, cardInstance);
           if (ptResult?.effectNegated) {
+            gs._spellNegatedByEffect = true;
             // Clear damage log entries for negated targets
             if (gs._spellDamageLog) {
               for (const t of result) {
@@ -1454,12 +1462,14 @@ class GameEngine {
   // ─── GAME ACTIONS ─────────────────────────
   // Each action fires before/after hooks and logs itself.
 
-  async actionDealDamage(source, target, amount, type) {
+  async actionDealDamage(source, target, amount, type, opts) {
     // ── Surprise window for direct damage (creature effects, etc.) ──
     // Only fires for hero targets with a card source, skips status/self damage and recursive calls
-    const SURPRISE_SKIP_TYPES = new Set(['status', 'burn', 'poison', 'recoil']);
+    // Also skips if the caller already ran the surprise window (e.g. via promptDamageTarget)
+    const SURPRISE_SKIP_TYPES = new Set(['status', 'burn', 'poison', 'recoil', 'other']);
     if (
       !this._inSurpriseResolution &&
+      !opts?.skipSurpriseCheck &&
       target && target.hp !== undefined &&
       amount > 0 &&
       source?.owner >= 0 && source?.heroIdx >= 0 &&
@@ -1471,6 +1481,11 @@ class GameEngine {
         const tgtPs = this.gs.players[tgtOwner];
         const tgtHeroIdx = (tgtPs?.heroes || []).indexOf(target);
         if (tgtHeroIdx >= 0 && (tgtPs.surpriseZones?.[tgtHeroIdx] || []).length > 0) {
+          // Skip if this hero was already surprise-checked by promptDamageTarget
+          const heroKey = `${tgtOwner}-${tgtHeroIdx}`;
+          if (this.gs._surpriseCheckedHeroes?.has(heroKey)) {
+            this.gs._surpriseCheckedHeroes.delete(heroKey);
+          } else {
           // Build source for the surprise window — use full CardInstance if available
           const syntheticSource = source.cardInstance
             || (source.id && source.zone ? source : null)  // source IS a CardInstance
@@ -1483,11 +1498,18 @@ class GameEngine {
           if (surpriseResult?.effectNegated) {
             return { dealt: 0, cancelled: true, surpriseNegated: true };
           }
+          }
         }
       }
     }
 
     const hookCtx = { source, target, amount, type: type || 'normal', sourceHeroIdx: source?.heroIdx ?? -1, cancelled: false };
+    // Alleria redirect: damage cannot be reduced/negated except by Surprises
+    if (this.gs._redirectedOnlyReducibleBySurprise) {
+      hookCtx.cannotBeNegated = true;
+      hookCtx.onlyReducibleBySurprise = true;
+      delete this.gs._redirectedOnlyReducibleBySurprise;
+    }
     await this.runHooks(HOOKS.BEFORE_DAMAGE, hookCtx);
     if (hookCtx.cancelled) return { dealt: 0, cancelled: true };
 
@@ -1513,6 +1535,12 @@ class GameEngine {
     // Charmed heroes are immune to all damage (Charme Lv3)
     if (target?.statuses?.charmed && target.hp !== undefined) {
       this.log('damage_blocked', { target: this._heroLabel(target), reason: 'charmed' });
+      return { dealt: 0, cancelled: true };
+    }
+
+    // Baihu petrify: stunned heroes with _baihuPetrify are immune to all damage
+    if (target?.statuses?.stunned?._baihuPetrify && target.hp !== undefined) {
+      this.log('damage_blocked', { target: this._heroLabel(target), reason: 'petrified' });
       return { dealt: 0, cancelled: true };
     }
 
@@ -1568,6 +1596,12 @@ class GameEngine {
 
     this.log('damage', { source: source?.name, target: this._heroLabel(target), amount: actualAmount, damageType: type });
     await this.runHooks(HOOKS.AFTER_DAMAGE, { source, target, amount: actualAmount, type, sourceHeroIdx: source?.heroIdx ?? -1 });
+
+    // ── After-damage hand reaction check (Fireshield, etc.) ──
+    // Only fires if target survived and damage was actually dealt
+    if (actualAmount > 0 && target && target.hp > 0 && target.hp !== undefined) {
+      await this._checkAfterDamageHandReactions(target, source, actualAmount, type);
+    }
 
     // ── SC tracking ──
     if (actualAmount > 0 && this.gs._scTracking) {
@@ -1824,6 +1858,34 @@ class GameEngine {
     return effective;
   }
 
+  /**
+   * Standard reveal pattern for cards added from deck/discard search.
+   * Shows each card to the opponent one by one, waiting for confirmation.
+   * @param {number} playerIdx - Player who searched
+   * @param {string[]} cardNames - Card names to reveal
+   * @param {string} title - Title for the reveal prompt (e.g. 'Divine Gift of Creation')
+   */
+  async revealSearchedCards(playerIdx, cardNames, title) {
+    if (!cardNames || cardNames.length === 0) return;
+    const ps = this.gs.players[playerIdx];
+    const oppIdx = playerIdx === 0 ? 1 : 0;
+    const searcherName = ps?.username || 'Opponent';
+
+    for (const cardName of cardNames) {
+      this._broadcastEvent('deck_search_add', { cardName, playerIdx });
+      this.log('deck_search', { player: searcherName, card: cardName, by: title });
+      this.sync();
+      await this._delay(500);
+      await this.promptGeneric(oppIdx, {
+        type: 'deckSearchReveal',
+        cardName,
+        searcherName,
+        title,
+        cancellable: false,
+      });
+    }
+  }
+
   async actionDrawCards(playerIdx, count, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
@@ -1838,12 +1900,18 @@ class GameEngine {
     }
 
     // Nomu check: if drawing exactly 1 card, auto-draw 1 extra from main deck
+    // Capped at 3 bonus draws per turn per player.
     let nomuExtraDraw = false;
     if (count === 1 && !opts._nomuBypass && !this._inNomuResolution) {
-      nomuExtraDraw = this._hasActiveNomu(playerIdx);
+      const nomuKey = `nomu_draws:${playerIdx}`;
+      const nomuDrawsThisTurn = this.gs._nomuDrawCount?.[nomuKey] || 0;
+      if (nomuDrawsThisTurn < 3) {
+        nomuExtraDraw = this._hasActiveNomu(playerIdx);
+      }
     }
 
     const drawn = [];
+    const drawDelay = count > 1 ? (opts.drawDelay ?? 300) : 0;
     for (let i = 0; i < count; i++) {
       const hookCtx = { playerIdx, cancelled: false };
       await this.runHooks(HOOKS.BEFORE_DRAW, hookCtx);
@@ -1869,12 +1937,22 @@ class GameEngine {
 
       this.log('draw', { player: ps.username, card: cardName });
       await this.runHooks(HOOKS.ON_DRAW, { playerIdx, card: inst, cardName });
+
+      // Visual pacing: sync + delay between draws so cards appear one by one
+      if (drawDelay > 0 && i < count - 1) {
+        this.sync();
+        await this._delay(drawDelay);
+      }
     }
 
     // Nomu extra draw: auto-draw 1 additional card from main deck
     if (nomuExtraDraw && drawn.length > 0 && ps.mainDeck.length > 0) {
       this._inNomuResolution = true;
       try {
+        // Increment Nomu draw counter for this turn
+        const nomuKey = `nomu_draws:${playerIdx}`;
+        if (!this.gs._nomuDrawCount) this.gs._nomuDrawCount = {};
+        this.gs._nomuDrawCount[nomuKey] = (this.gs._nomuDrawCount[nomuKey] || 0) + 1;
         const extraCard = ps.mainDeck.shift();
         ps.hand.push(extraCard);
         const extraInst = this._trackCard(extraCard, playerIdx, ZONES.HAND);
@@ -2005,6 +2083,7 @@ class GameEngine {
   async actionDestroyCard(source, targetCard, opts = {}) {
     if (!targetCard) return;
     if (targetCard.counters?.immovable) return; // Cannot be destroyed or removed
+    if (targetCard.counters?._cardinalImmune) return; // Cardinal Beast immunity
     // First-turn protection: cards belonging to the protected player cannot be destroyed
     if (this.gs.firstTurnProtectedPlayer != null && targetCard.owner === this.gs.firstTurnProtectedPlayer) {
       this.log('destroy_blocked', { card: targetCard.name, reason: 'first-turn protection' });
@@ -2037,6 +2116,7 @@ class GameEngine {
   async actionMoveCard(cardInstance, toZone, toHeroIdx, toSlot, opts = {}) {
     // Immovable cards cannot leave their zone
     if (cardInstance.counters?.immovable && toZone !== cardInstance.zone) return;
+    if (cardInstance.counters?._cardinalImmune && toZone !== cardInstance.zone) return; // Cardinal Beast immunity
     const fromZone = cardInstance.zone;
     const fromHeroIdx = cardInstance.heroIdx;
 
@@ -2160,9 +2240,13 @@ class GameEngine {
     if (!ps.supportZones[heroIdx][actualSlot]) ps.supportZones[heroIdx][actualSlot] = [];
     ps.supportZones[heroIdx][actualSlot] = [cardName];
     const inst = this._trackCard(cardName, playerIdx, 'support', heroIdx, actualSlot);
-    // Log token placements
+    // Track creature summons this turn
     const cardDB = this._getCardDB();
     const cd = cardDB[cardName];
+    if (cd && (cd.cardType === 'Creature' || cd.cardType === 'Token')) {
+      ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
+    }
+    // Log token placements
     if (cd && (cd.cardType === 'Token')) {
       const heroName = ps.heroes?.[heroIdx]?.name || 'Hero';
       this.log('token_placed', { player: ps.username, card: cardName, hero: heroName });
@@ -2244,8 +2328,8 @@ class GameEngine {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
 
-    // Nomu bypasses hand size limits entirely
-    if (this._hasActiveNomu(playerIdx)) return;
+    // Generic hand-limit bypass (Nomu, Willy, future cards)
+    if (this._shouldBypassHandLimit(playerIdx)) return;
 
     // Compute effective max hand size
     let maxSize = opts.maxSize;
@@ -2321,8 +2405,8 @@ class GameEngine {
   async _checkReactiveHandLimits(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
-    // Nomu bypasses hand size limits and Pollution Tokens
-    if (this._hasActiveNomu(playerIdx)) return;
+    // Generic hand-limit bypass (Nomu, Willy, future cards)
+    if (this._shouldBypassHandLimit(playerIdx)) return;
     let reduction = 0;
     for (const inst of this.cardInstances) {
       if (inst.owner === playerIdx && inst.zone === ZONES.SUPPORT) {
@@ -2537,6 +2621,7 @@ class GameEngine {
   async actionAddCreatureBuff(inst, buffName, opts = {}) {
     if (!inst || inst.zone !== ZONES.SUPPORT) return false;
     if (inst.faceDown) return false; // Face-down surprises cannot be buffed
+    if (inst.counters?._cardinalImmune) return false; // Cardinal Beast immunity
     if (!opts.ignoreGateShield && this._isGateShielded(inst.controller ?? inst.owner)) return false; // Defending the Gate
     if (!inst.counters.buffs) inst.counters.buffs = {};
     const buffDef = BUFF_EFFECTS[buffName] || {};
@@ -2573,6 +2658,7 @@ class GameEngine {
   async actionRemoveCreatureBuff(inst, buffName, opts = {}) {
     if (!inst?.counters?.buffs?.[buffName]) return;
     if (inst.faceDown) return; // Face-down surprises cannot be debuffed
+    if (inst.counters?._cardinalImmune) return; // Cardinal Beast immunity
     if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner)) return; // Defending the Gate
     const buffData = inst.counters.buffs[buffName];
     // Clear associated counters on expiry (e.g. dark_gear_negated clears negated)
@@ -2799,8 +2885,13 @@ class GameEngine {
       if (level > 0 || cd.spellSchool1) {
         const abZones = ps.abilityZones[heroIdx] || [];
         const countAb = (school) => this.countAbilitiesForSchool(school, abZones);
-        if (cd.spellSchool1 && countAb(cd.spellSchool1) < level) continue;
-        if (cd.spellSchool2 && countAb(cd.spellSchool2) < level) continue;
+        let levelFail = false;
+        if (cd.spellSchool1 && countAb(cd.spellSchool1) < level) levelFail = true;
+        if (cd.spellSchool2 && countAb(cd.spellSchool2) < level) levelFail = true;
+        if (levelFail) {
+          const blr = hero.bypassLevelReq;
+          if (!blr || level > blr.maxLevel || !blr.types.includes(cd.cardType)) continue;
+        }
       }
       // Creatures need a free support zone
       if (hasCardType(cd, 'Creature')) {
@@ -2855,6 +2946,9 @@ class GameEngine {
     const cardData = this._getCardDB()[cardName];
     if (!cardData || !expectedTypes.includes(cardData.cardType)) return null;
 
+    // Divine Gift of Creation lock — cards with locked names can't be played this turn
+    if (ps._creationLockedNames?.has(cardName)) return null;
+
     // Hero validation — charmed heroes are on the opponent's side
     const heroOwner = opts.charmedOwner != null ? opts.charmedOwner : pi;
     const heroPs = gs.players[heroOwner];
@@ -2872,8 +2966,13 @@ class GameEngine {
     const level = cardData.level || 0;
     if (level > 0 || cardData.spellSchool1) {
       const abZones = hero.statuses?.negated ? [] : (heroPs.abilityZones[heroIdx] || []);
-      if (cardData.spellSchool1 && this.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) return null;
-      if (cardData.spellSchool2 && this.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) return null;
+      let levelFail = false;
+      if (cardData.spellSchool1 && this.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) levelFail = true;
+      if (cardData.spellSchool2 && this.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) levelFail = true;
+      if (levelFail) {
+        const blr = hero.bypassLevelReq;
+        if (!blr || level > blr.maxLevel || !blr.types.includes(cardData.cardType)) return null;
+      }
     }
 
     // Load card script
@@ -3061,6 +3160,149 @@ class GameEngine {
     return { played: true, cardName, cardType: cardData.cardType };
   }
 
+  /**
+   * Perform an immediate action with ANY hero. Shows the heroAction UI
+   * without restricting to a single hero — the player drags a card onto
+   * whichever hero they want, just like during the normal Action Phase.
+   * @param {number} playerIdx
+   * @param {object} config - { title, description, allowedCardTypes?, skipAbilities?, cancellable? }
+   * @returns {{ played: boolean, cardName?: string, cardType?: string }}
+   */
+  async performImmediateActionAnyHero(playerIdx, config = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return { played: false };
+    const cardDB = this._getCardDB();
+
+    // Collect eligible cards across ALL alive heroes
+    const eligibleSet = new Set();
+    const activatableAbilities = [];
+
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+
+      let heroEligible = this.getHeroEligibleActionCards(playerIdx, hi);
+      if (config.allowedCardTypes) {
+        heroEligible = heroEligible.filter(name => {
+          const cd = cardDB[name];
+          return cd && config.allowedCardTypes.includes(cd.cardType);
+        });
+      }
+      for (const name of heroEligible) eligibleSet.add(name);
+
+      // Activatable abilities on this hero
+      if (!config.skipAbilities) {
+        if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+        for (let zi = 0; zi < (ps.abilityZones[hi] || []).length; zi++) {
+          const slot = (ps.abilityZones[hi] || [])[zi] || [];
+          if (slot.length === 0) continue;
+          const abilityName = slot[0];
+          const script = loadCardEffect(abilityName);
+          if (!script?.actionCost) continue;
+          const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
+          if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
+          activatableAbilities.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length });
+        }
+      }
+    }
+
+    const eligible = [...eligibleSet];
+    if (eligible.length === 0 && activatableAbilities.length === 0) return { played: false };
+
+    // Show heroAction prompt with no specific hero — player can use any
+    const actionResult = await this.promptGeneric(playerIdx, {
+      type: 'heroAction',
+      // heroIdx intentionally omitted — allows all heroes
+      eligibleCards: eligible,
+      activatableAbilities,
+      title: config.title || 'Immediate Action',
+      description: config.description || 'Use an action with any Hero!',
+      cancellable: config.cancellable !== undefined ? config.cancellable : false,
+    });
+
+    if (!actionResult || actionResult.cancelled) return { played: false };
+
+    // Handle ability activation
+    if (actionResult.abilityActivation) {
+      const { heroIdx: abHeroIdx, zoneIdx } = actionResult;
+      if (abHeroIdx == null) return { played: false };
+      const slot = (ps.abilityZones[abHeroIdx] || [])[zoneIdx] || [];
+      if (slot.length === 0) return { played: false };
+      const abilityName = slot[0];
+      const level = slot.length;
+      const script = loadCardEffect(abilityName);
+      if (!script?.actionCost || !script?.onActivate) return { played: false };
+
+      const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
+      if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
+      this.gs.hoptUsed[hoptKey] = this.gs.turn;
+
+      const inst = this.cardInstances.find(c =>
+        c.owner === playerIdx && c.zone === 'ability' && c.heroIdx === abHeroIdx && c.zoneSlot === zoneIdx
+      );
+      if (!inst) return { played: false };
+
+      this._broadcastEvent('ability_activated', { owner: playerIdx, heroIdx: abHeroIdx, zoneIdx, abilityName });
+      const ctx = this._createContext(inst, {});
+      await script.onActivate(ctx, level);
+      this.sync();
+      return { played: true, cardName: abilityName, cardType: 'Ability' };
+    }
+
+    // Handle card play — heroIdx comes from the client response
+    const { cardName, handIndex, heroIdx: responseHeroIdx, zoneSlot } = actionResult;
+    if (!cardName || responseHeroIdx == null) return { played: false };
+
+    const cardData = cardDB[cardName];
+    if (!cardData) return { played: false };
+    if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return { played: false };
+
+    const hero = ps.heroes[responseHeroIdx];
+    if (!hero?.name || hero.hp <= 0) return { played: false };
+
+    const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
+    if (!ACTION_TYPES.includes(cardData.cardType)) return { played: false };
+
+    if (cardData.cardType === 'Creature') {
+      ps.hand.splice(handIndex, 1);
+      const placeResult = this.safePlaceInSupport(cardName, playerIdx, responseHeroIdx, zoneSlot ?? -1);
+      if (!placeResult) {
+        ps.discardPile.push(cardName);
+        this.log('creature_fizzle', { card: cardName, reason: 'zone_occupied', by: config.title });
+        return { played: false };
+      }
+      const { inst, actualSlot } = placeResult;
+      this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx: responseHeroIdx, zoneSlot: actualSlot, cardName });
+      await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx: responseHeroIdx, zoneSlot: actualSlot, _skipReactionCheck: true });
+      await this.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: responseHeroIdx, _skipReactionCheck: true });
+      this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title });
+    } else {
+      // Spell or Attack
+      ps.hand.splice(handIndex, 1);
+      const inst = this._trackCard(cardName, playerIdx, 'hand', responseHeroIdx, -1);
+      this.gs._immediateActionContext = true;
+      if (config.excludeTargets) this.gs._spellExcludeTargets = config.excludeTargets;
+      await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx: responseHeroIdx, _skipReactionCheck: true });
+      if (config.excludeTargets) delete this.gs._spellExcludeTargets;
+      delete this.gs._immediateActionContext;
+      ps.discardPile.push(cardName);
+      this._untrackCard(inst.id);
+      this.log('immediate_action', { hero: hero.name, card: cardName, cardType: cardData.cardType, by: config.title });
+    }
+
+    this.sync();
+    await this._delay(400);
+
+    if (this.gs._spellFreeAction) {
+      delete this.gs._spellFreeAction;
+      this.log('free_action_refund', { card: cardName, hero: hero.name, by: config.title });
+      const another = await this.performImmediateActionAnyHero(playerIdx, config);
+      return { played: true, cardName, cardType: cardData.cardType, chainedAction: another };
+    }
+
+    return { played: true, cardName, cardType: cardData.cardType };
+  }
+
   // ─── TURN / PHASE MANAGEMENT ───────────────
 
   /**
@@ -3110,6 +3352,10 @@ class GameEngine {
           if (hero.statuses?.charmed) delete hero.statuses.charmed;
           this.log('charme_revert', { hero: hero.name });
         }
+        // Revert Controlled Attack
+        if (hero?.controlledBy != null) {
+          delete hero.controlledBy;
+        }
       }
     }
     delete this.gs._charmedSupportLocked;
@@ -3133,9 +3379,15 @@ class GameEngine {
         ps.comboLockHeroIdx = null;
         ps.heroesActedThisTurn = [];
         ps.heroesAttackedThisTurn = [];
+        ps._creaturesSummonedThisTurn = 0;
+        delete ps._creationLockedNames;
+        delete ps._revealedCardCounts;
         ps.bonusActions = null;
+        ps._bonusMainActions = 0;
       }
     }
+    // Reset Nomu bonus draw counter each turn
+    this.gs._nomuDrawCount = {};
     this.log('turn_start', { turn: this.gs.turn, activePlayer: this.gs.activePlayer, username: activePs?.username });
 
     // Process status effects FIRST — before any card hooks fire
@@ -3319,6 +3571,17 @@ class GameEngine {
 
     const allowed = legalTransitions[current];
     if (!allowed || !allowed.includes(targetPhase)) return false;
+
+    // Generic bonus action system: if a card granted extra main actions,
+    // skip one Action → Main2 advance per bonus action remaining.
+    if (current === PHASES.ACTION && targetPhase === PHASES.MAIN2) {
+      const ps = this.gs.players[playerIdx];
+      if (ps?._bonusMainActions > 0) {
+        ps._bonusMainActions--;
+        this.sync();
+        return true; // Stay in Action Phase — bonus action available
+      }
+    }
 
     // Clear bonus actions when leaving Action Phase
     if (current === PHASES.ACTION) {
@@ -3652,6 +3915,30 @@ class GameEngine {
   }
 
   /**
+   * Generic hand-limit bypass check.
+   * Returns true if the player should skip hand size enforcement this turn.
+   * Sources:
+   *  - Hero scripts with bypassHandLimit flag (alive, not incapacitated)
+   *  - Per-player _noHandLimitUntilTurn (turn-based bypass, e.g. Willy)
+   */
+  _shouldBypassHandLimit(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return false;
+    // Turn-based bypass (Willy, etc.)
+    if (ps._noHandLimitUntilTurn != null && (this.gs.turn || 1) <= ps._noHandLimitUntilTurn) return true;
+    // Hero-based bypass (alive + not incapacitated)
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+      if (hero.bypassHandLimit) return true;
+      const script = loadCardEffect(hero.name);
+      if (script?.bypassHandLimit) return true;
+    }
+    return false;
+  }
+
+  /**
    * Resolve a pending effect prompt (called by server socket handler).
    */
   resolveEffectPrompt(selectedIds) {
@@ -3740,6 +4027,57 @@ class GameEngine {
 
       this.log('target_redirect', {
         redirectCard: cardName,
+        originalTarget: selected.cardName,
+        newTarget: result.redirectTo.cardName,
+        player: ps.username,
+      });
+
+      return result.redirectTo;
+    }
+
+    // ── Hero-based redirects (Alleria, etc.) ──
+    // Scan heroes for redirect capabilities (heroRedirect flag on script)
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+
+      const heroScript = loadCardEffect(hero.name);
+      if (!heroScript?.heroRedirect) continue;
+
+      // Check card-specific redirect eligibility
+      if (heroScript.canHeroRedirect && !heroScript.canHeroRedirect(this.gs, targetOwnerIdx, hi, selected, validTargets, config, this)) continue;
+
+      // Prompt the target's owner
+      const attackerName = config.title || sourceCard?.name || 'an effect';
+      const confirmed = await this.promptGeneric(targetOwnerIdx, {
+        type: 'confirm',
+        title: hero.name,
+        message: `Redirect ${attackerName}?`,
+        showCard: sourceCard?.name || null,
+        confirmLabel: '🕸️ Redirect!',
+        cancelLabel: 'No',
+        cancellable: true,
+      });
+
+      if (!confirmed) continue;
+
+      // Run the hero's redirect logic (hero selection, animation, etc.)
+      const result = await heroScript.onHeroRedirect(this, targetOwnerIdx, hi, selected, validTargets, config, sourceCard);
+      if (!result?.redirectTo) continue;
+
+      // Reveal hero card
+      const otherIdx = targetOwnerIdx === 0 ? 1 : 0;
+      const otherSid = this.gs.players[otherIdx]?.socketId;
+      if (otherSid) this.io.to(otherSid).emit('card_reveal', { cardName: hero.name });
+      if (this.room.spectators) {
+        for (const spec of this.room.spectators) {
+          if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName: hero.name });
+        }
+      }
+
+      this.log('target_redirect', {
+        redirectCard: hero.name,
         originalTarget: selected.cardName,
         newTarget: result.redirectTo.cardName,
         player: ps.username,
@@ -4124,6 +4462,112 @@ class GameEngine {
   }
 
   /**
+   * Execute any deferred surprise effects (Jumpscare, etc.) that were
+   * queued during surprise activation but need to resolve AFTER the
+   * triggering spell/effect finishes.
+   */
+  async _executeDeferredSurprises() {
+    const deferred = this.gs._deferredSurprises;
+    if (!deferred || deferred.length === 0) return;
+    delete this.gs._deferredSurprises;
+    for (const entry of deferred) {
+      if (this.gs._spellNegatedByEffect) continue; // Skip if effect was negated
+      try {
+        await entry.execute(this);
+      } catch (err) {
+        console.error('[Engine] deferred surprise error:', err.message);
+      }
+    }
+  }
+
+  /**
+   * Check hand cards that react AFTER damage is dealt to a hero (Fireshield, etc.).
+   * Only fires when the hero survived the damage.
+   * @param {object} target - The damaged hero object
+   * @param {object} source - The damage source { name, owner, heroIdx, ... }
+   * @param {number} amount - Actual damage dealt
+   * @param {string} type - Damage type
+   */
+  async _checkAfterDamageHandReactions(target, source, amount, type) {
+    if (this._inAfterDamageReaction) return;
+
+    const srcOwner = source?.owner ?? source?.controller ?? -1;
+    const targetOwner = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
+    if (targetOwner < 0) return;
+    // Only opponent damage
+    if (srcOwner === targetOwner) return;
+
+    const targetHeroIdx = this.gs.players[targetOwner]?.heroes?.indexOf(target);
+    if (targetHeroIdx < 0) return;
+
+    const allCards = this._getCardDB();
+    const ps = this.gs.players[targetOwner];
+    if (!ps) return;
+
+    const seen = new Set();
+    for (let hi = 0; hi < ps.hand.length; hi++) {
+      const cardName = ps.hand[hi];
+      if (seen.has(cardName)) continue;
+      seen.add(cardName);
+
+      const script = loadCardEffect(cardName);
+      if (!script?.isAfterDamageReaction) continue;
+
+      const cardData = allCards[cardName];
+      const cost = cardData?.cost || 0;
+      if (cost > 0 && (ps.gold || 0) < cost) continue;
+
+      // Check condition
+      if (script.afterDamageCondition &&
+          !script.afterDamageCondition(this.gs, targetOwner, this, target, targetHeroIdx, source, amount, type)) continue;
+
+      // Check hero can cast this card
+      if (!this._canHeroActivateSurprise(targetOwner, targetHeroIdx, cardName)) continue;
+
+      // Prompt
+      const srcName = source?.name || 'An effect';
+      const heroName = target.name || 'Hero';
+      const confirmed = await this.promptGeneric(targetOwner, {
+        type: 'confirm',
+        title: cardName,
+        message: `${heroName} took ${amount} damage from ${srcName}! Activate ${cardName}?`,
+        showCard: cardName,
+        confirmLabel: '🔥 Activate!',
+        cancelLabel: 'No',
+        cancellable: true,
+      });
+
+      if (!confirmed) continue;
+
+      // Activate: remove from hand, deduct gold
+      const actualIdx = ps.hand.indexOf(cardName);
+      if (actualIdx < 0) continue;
+      ps.hand.splice(actualIdx, 1);
+      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      if (this.gs._scTracking && targetOwner >= 0 && targetOwner < 2) this.gs._scTracking[targetOwner].cardsPlayedFromHand++;
+
+      // Reveal
+      this._broadcastEvent('card_reveal', { cardName, playerIdx: targetOwner });
+      await this._delay(300);
+
+      this.log('after_damage_reaction', { card: cardName, player: ps.username });
+
+      this._inAfterDamageReaction = true;
+      try {
+        if (script.afterDamageResolve) {
+          await script.afterDamageResolve(this, targetOwner, target, targetHeroIdx, source, amount, type);
+        }
+      } finally {
+        this._inAfterDamageReaction = false;
+      }
+
+      ps.discardPile.push(cardName);
+      this.sync();
+      return; // Only one after-damage reaction per damage instance
+    }
+  }
+
+  /**
    * @returns {object|null} { effectNegated: boolean } or null
    */
   async _checkSurpriseWindow(targetedHeroes, sourceCard) {
@@ -4338,8 +4782,13 @@ class GameEngine {
     const level = cardData.level || 0;
     if (level > 0 || cardData.spellSchool1) {
       const abZones = hero.statuses?.negated ? [] : (ps.abilityZones[heroIdx] || []);
-      if (cardData.spellSchool1 && this.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) return false;
-      if (cardData.spellSchool2 && this.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) return false;
+      let levelFail = false;
+      if (cardData.spellSchool1 && this.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) levelFail = true;
+      if (cardData.spellSchool2 && this.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) levelFail = true;
+      if (levelFail) {
+        const blr = hero.bypassLevelReq;
+        if (!blr || level > blr.maxLevel || !blr.types.includes(cardData.cardType)) return false;
+      }
     }
 
     // Creature surprises need a free Support Zone (skip for Bakhm slots — already in support)
@@ -4613,7 +5062,7 @@ class GameEngine {
   static REACTION_SKIP_HOOKS = new Set([
     'onPlay', 'onCardEnterZone', 'onPhaseStart', 'onGameStart', 'onBeforeHandDraw',
     'onChainStart', 'onChainResolve', 'onEffectNegated',
-    'beforeDamage', 'beforeLevelChange',
+    'beforeDamage', 'afterDamage', 'beforeLevelChange',
     'onResourceSpend', 'onReactionActivated', 'onCardActivation',
     'onActionUsed', 'onAdditionalActionUsed',
     'onHeroTargeted', 'onSurpriseActivated',
@@ -4774,6 +5223,7 @@ class GameEngine {
           type: 'confirm',
           title: cardName,
           message: `${eventDesc}. Activate ${cardName}?`,
+          showCard: chain[0]?.cardName || null,
           confirmLabel: 'Activate!',
           cancelLabel: 'No',
           cancellable: true,
@@ -4786,6 +5236,9 @@ class GameEngine {
         ps.hand.splice(hi, 1);
 
         this.log('reaction_activated', { card: cardName, player: ps.username, chainPosition: chain.length });
+
+        // Reveal the reaction card to the opponent and spectators
+        this._broadcastEvent('card_reveal', { cardName });
 
         const link = {
           id: uuidv4().substring(0, 12),
@@ -5211,6 +5664,31 @@ class GameEngine {
       }
     }
 
+    // Also check controlled opponent heroes (Controlled Attack)
+    if (ops) {
+      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
+        const hero = ops.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.controlledBy !== playerIdx) continue;
+        if (hero.charmedBy != null) continue; // Charme takes priority
+        if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+
+        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
+          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+          if (slot.length === 0) continue;
+          const abilityName = slot[0];
+          const script = loadCardEffect(abilityName);
+          if (!script?.actionCost) continue;
+
+          const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
+          if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
+          if (script.canActivateAction && !script.canActivateAction(this.gs, playerIdx, hi, slot.length, this)) continue;
+
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, charmedOwner: oi });
+        }
+      }
+    }
+
     return result;
   }
 
@@ -5319,6 +5797,36 @@ class GameEngine {
       }
     }
 
+    // Also check controlled opponent heroes (Controlled Attack)
+    if (ops) {
+      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
+        const hero = ops.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.controlledBy !== playerIdx) continue;
+        if (hero.charmedBy != null) continue; // Charme takes priority
+        if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+
+        const script = loadCardEffect(hero.name);
+        if (!script?.heroEffect) continue;
+
+        const hoptKey = `hero-effect:${hero.name}:${playerIdx}:${hi}`;
+        if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
+
+        if (script.canActivateHeroEffect) {
+          try {
+            const inst = this.cardInstances.find(c =>
+              c.owner === oi && c.zone === 'hero' && c.heroIdx === hi
+            );
+            if (!inst) continue;
+            const ctx = this._createContext(inst, { event: 'canHeroEffectCheck' });
+            if (!script.canActivateHeroEffect(ctx)) continue;
+          } catch { continue; }
+        }
+
+        result.push({ heroIdx: hi, heroName: hero.name, charmedOwner: oi });
+      }
+    }
+
     return result;
   }
 
@@ -5349,7 +5857,6 @@ class GameEngine {
         if (!hero?.name || hero.hp <= 0) continue;
         // If scanning charmed heroes, only include those charmed by playerIdx
         if (charmedOwner != null && hero.charmedBy !== playerIdx) continue;
-        if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
 
         for (let zi = 0; zi < (scanPs.supportZones[hi] || []).length; zi++) {
           const slot = (scanPs.supportZones[hi] || [])[zi] || [];
@@ -5359,7 +5866,7 @@ class GameEngine {
             c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
           );
           if (!inst) continue;
-          if (inst.faceDown) continue; // Face-down Bakhm surprises can't activate creature effects
+          if (inst.faceDown) continue;
 
           const cd = this.getEffectiveCardData(inst) || cardDB[creatureName];
           if (!cd || !hasCardType(cd, 'Creature')) continue;
@@ -5400,6 +5907,62 @@ class GameEngine {
     // Charmed opponent heroes' creatures
     const oi = playerIdx === 0 ? 1 : 0;
     scanPlayer(oi, oi);
+
+    return result;
+  }
+
+  // ─── ACTIVE EQUIP EFFECTS ─────────────
+  /**
+   * Get all equipped cards (Artifacts/Equipment) with activatable effects.
+   * Similar to creature effects but NO summoning sickness.
+   * Soft HOPT per equip instance.
+   */
+  getActivatableEquips(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+    if (this.gs.activePlayer !== playerIdx) return [];
+    const currentPhase = this.gs.currentPhase;
+    const isMainPhase = currentPhase === 2 || currentPhase === 4;
+    if (!isMainPhase) return [];
+
+    const result = [];
+
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+
+      for (let zi = 0; zi < (ps.supportZones[hi] || []).length; zi++) {
+        const slot = (ps.supportZones[hi] || [])[zi] || [];
+        if (slot.length === 0) continue;
+        const cardName = slot[0];
+        const inst = this.cardInstances.find(c =>
+          c.owner === playerIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
+        );
+        if (!inst || inst.faceDown) continue;
+
+        const script = loadCardEffect(cardName);
+        if (!script?.equipEffect) continue;
+
+        // Soft HOPT per equip instance
+        const hoptKey = `equip-effect:${inst.id}`;
+        const exhausted = this.gs.hoptUsed?.[hoptKey] === this.gs.turn;
+        let canActivate = !exhausted;
+
+        // Check script's activation condition
+        if (canActivate && script.canActivateEquipEffect) {
+          try {
+            const ctx = this._createContext(inst, { event: 'canEquipEffectCheck' });
+            canActivate = !!script.canActivateEquipEffect(ctx);
+          } catch { canActivate = false; }
+        }
+
+        result.push({
+          owner: playerIdx, heroIdx: hi, zoneSlot: zi,
+          cardName, canActivate, exhausted, instId: inst.id,
+        });
+      }
+    }
 
     return result;
   }
@@ -5484,6 +6047,44 @@ class GameEngine {
         const hero = ops.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
         if (hero.charmedBy !== playerIdx) continue; // Only charmed by this player
+        if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+
+        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
+          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+          if (slot.length === 0) continue;
+          const abilityName = slot[0];
+          const script = loadCardEffect(abilityName);
+          if (!script?.freeActivation) continue;
+
+          const hoptKey = `free-ability:${abilityName}:${playerIdx}`;
+          const exhausted = this.gs.hoptUsed?.[hoptKey] === this.gs.turn;
+          let canActivate = !exhausted && isMainPhase;
+          if (!canActivate && !exhausted && isActionPhase && script.actionPhaseEligible) canActivate = true;
+
+          if (canActivate && script.canFreeActivate) {
+            try {
+              const inst = this.cardInstances.find(c =>
+                c.owner === oi && c.zone === 'ability' && c.heroIdx === hi && c.zoneSlot === zi
+              );
+              if (inst) {
+                const ctx = this._createContext(inst, { event: 'canFreeActivateCheck' });
+                canActivate = !!script.canFreeActivate(ctx, slot.length);
+              } else canActivate = false;
+            } catch { canActivate = false; }
+          }
+
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted, charmedOwner: oi });
+        }
+      }
+    }
+
+    // Also check controlled opponent heroes (Controlled Attack)
+    if (ops) {
+      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
+        const hero = ops.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.controlledBy !== playerIdx) continue;
+        if (hero.charmedBy != null) continue; // Charme takes priority
         if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
 
         for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
@@ -5624,6 +6225,34 @@ class GameEngine {
       }
     }
     return count;
+  }
+
+  /**
+   * Check if a hero meets the spell school / level requirements for a card,
+   * considering the generic bypassLevelReq flag on the hero.
+   * Use this in card modules (reactions, surprises, etc.) instead of manually
+   * checking countAbilitiesForSchool — it respects Ascended Hero bypasses.
+   *
+   * @param {number} playerIdx
+   * @param {number} heroIdx
+   * @param {object} cardData - Card data from cards.json (needs level, spellSchool1, spellSchool2, cardType)
+   * @returns {boolean}
+   */
+  heroMeetsLevelReq(playerIdx, heroIdx, cardData) {
+    const ps = this.gs.players[playerIdx];
+    const hero = ps?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    const level = cardData.level || 0;
+    if (level <= 0 && !cardData.spellSchool1) return true;
+    const abZones = hero.statuses?.negated ? [] : (ps.abilityZones[heroIdx] || []);
+    let levelFail = false;
+    if (cardData.spellSchool1 && this.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) levelFail = true;
+    if (cardData.spellSchool2 && this.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) levelFail = true;
+    if (levelFail) {
+      const blr = hero.bypassLevelReq;
+      return !!(blr && level <= blr.maxLevel && blr.types.includes(cardData.cardType));
+    }
+    return true;
   }
 
   /**
@@ -5795,9 +6424,30 @@ class GameEngine {
         if (!hero?.name || !hero.statuses) continue;
         let clearedCC = false;
         if (hero.statuses.frozen) { await this.removeHeroStatus(ap, hi, 'frozen'); clearedCC = true; }
-        if (hero.statuses.stunned) { await this.removeHeroStatus(ap, hi, 'stunned'); clearedCC = true; }
+        if (hero.statuses.stunned) {
+          const stun = hero.statuses.stunned;
+          if (stun.duration > 1) {
+            // Multi-turn stun: decrement duration, keep stunned
+            stun.duration--;
+            this.log('status_tick', { target: hero.name, status: 'stunned', remaining: stun.duration });
+          } else {
+            await this.removeHeroStatus(ap, hi, 'stunned');
+            clearedCC = true;
+          }
+        }
         if (hero.statuses.negated) { await this.removeHeroStatus(ap, hi, 'negated'); clearedCC = true; }
         if (clearedCC) await this.addHeroStatus(ap, hi, 'immune', {});
+      }
+      // Decrement Baihu creature stun durations
+      for (const inst of this.cardInstances) {
+        if (inst.owner !== ap || inst.zone !== 'support') continue;
+        if (!inst.counters._baihuStunned) continue;
+        if (inst.counters._baihuStunned.duration > 1) {
+          inst.counters._baihuStunned.duration--;
+        } else {
+          delete inst.counters._baihuStunned;
+          delete inst.counters._baihuPetrify;
+        }
       }
     } else if (phaseName === 'START') {
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -5843,10 +6493,22 @@ class GameEngine {
     // ── Ida single-target override check ──
     const flagOwner = cardInst.heroOwner != null ? cardInst.heroOwner : pi;
     const heroFlags = gs.heroFlags?.[`${flagOwner}-${heroIdx}`];
-    const isSingleTarget = !!(heroFlags?.forcesSingleTarget && config.singleTargetPrompt);
+    // Auto-generate singleTargetPrompt for Destruction Spells when Ida's
+    // forcesSingleTarget is active and no explicit prompt was provided.
+    let singleTargetPrompt = config.singleTargetPrompt || null;
+    if (heroFlags?.forcesSingleTarget && !singleTargetPrompt && damageType === 'destruction_spell') {
+      singleTargetPrompt = {
+        title: sourceName,
+        description: `Deal ${damage} damage to a single target.`,
+        confirmLabel: `💥 ${damage} Damage!`,
+        confirmClass: 'btn-danger',
+        cancellable: false,
+      };
+    }
+    const isSingleTarget = !!(heroFlags?.forcesSingleTarget && singleTargetPrompt);
 
     if (isSingleTarget) {
-      const prompt = config.singleTargetPrompt;
+      const prompt = singleTargetPrompt;
       const sideMap = { enemy: 'enemy', own: 'my', both: 'any' };
       const target = await this._createContext(cardInst, {}).promptDamageTarget({
         side: sideMap[config.side] || 'enemy',
@@ -5965,8 +6627,22 @@ class GameEngine {
       const aoeTargets = hitHeroes.map(h => ({
         type: 'hero', owner: h.owner, heroIdx: h.heroIdx, cardName: h.hero.name,
       }));
+      // Mark as AoE so surprises like Jumpscare can distinguish from single-target
+      if (cardInst) cardInst._isAoeCheck = true;
       const surpriseResult = await this._checkSurpriseWindow(aoeTargets, cardInst);
+      if (cardInst) delete cardInst._isAoeCheck;
       if (surpriseResult?.effectNegated) {
+        return { heroes: [], creatures: [], wasSingleTarget: false, cancelled: true };
+      }
+    }
+
+    // ── Post-target hand reaction check (Anti Magic Shield, etc.) ──
+    if (!config._skipSurpriseCheck && hitHeroes.length > 0) {
+      const aoeTargets2 = hitHeroes.map(h => ({
+        type: 'hero', owner: h.owner, heroIdx: h.heroIdx, cardName: h.hero.name,
+      }));
+      const ptResult = await this._checkPostTargetHandReactions(aoeTargets2, cardInst);
+      if (ptResult?.effectNegated) {
         return { heroes: [], creatures: [], wasSingleTarget: false, cancelled: true };
       }
     }
@@ -6040,6 +6716,14 @@ class GameEngine {
     entries = entries.filter(e => !e.inst?.faceDown);
     if (entries.length === 0) return;
 
+    // Mark Cardinal Beast immune and Baihu-petrified creatures — they stay in batch
+    // for animations but damage will be cancelled before HP reduction
+    for (const e of entries) {
+      if (e.inst?.counters?._cardinalImmune || e.inst?.counters?._baihuPetrify) {
+        e._immuneCreature = true;
+      }
+    }
+
     // Annotate entries with cancelled flag and init HP
     const cardDB = this._getCardDB();
     for (const e of entries) {
@@ -6101,6 +6785,8 @@ class GameEngine {
     // Apply damage to non-cancelled entries
     for (const e of entries) {
       if (e.cancelled) continue;
+      // Cardinal/Baihu immune: animation played but damage is blocked
+      if (e._immuneCreature) continue;
       let actualAmount = Math.max(0, e.amount);
       if (actualAmount === 0) continue;
 
@@ -6811,6 +7497,114 @@ class GameEngine {
     if (this.sendSpectatorGameState) {
       this.sendSpectatorGameState(this.room);
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  ASCENSION SYSTEM
+  //  Generic method for ascending a Hero into an Ascended Hero from hand.
+  //  State transfer: HP delta, statuses, buffs, ability zones, support zones.
+  //  Fires ON_ASCENSION hook (reaction window), then the ascended hero's
+  //  onAscensionBonus, then optionally skips to End Phase.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Perform an Ascension: swap a hero's identity to an Ascended Hero from hand.
+   *
+   * @param {number} pi        - Player index
+   * @param {number} heroIdx   - Hero slot being ascended
+   * @param {string} cardName  - Ascended Hero card name
+   * @param {number} handIndex - Index in hand
+   * @param {object} opts      - { cheat: bool } — if true, skip eligibility (unless blocked)
+   * @returns {object}         - { success, skipEndPhase }
+   */
+  async performAscension(pi, heroIdx, cardName, handIndex, opts = {}) {
+    const gs = this.gs;
+    const ps = gs.players[pi];
+    if (!ps) return { success: false };
+
+    const hero = ps.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return { success: false };
+
+    // Validate hand
+    if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return { success: false };
+
+    // Card data lookup
+    const cardDB = this._getCardDB();
+    const newCardData = cardDB[cardName];
+    if (!newCardData || newCardData.cardType !== 'Ascended Hero') return { success: false };
+
+    // Load scripts
+    const oldHeroScript = loadCardEffect(hero.name);
+    const ascendedScript = loadCardEffect(cardName);
+
+    // Cheat check: if cheat mode, verify the base hero doesn't block it
+    if (opts.cheat) {
+      if (oldHeroScript?.cheatAscensionBlocked) return { success: false };
+    } else {
+      // Normal mode: hero must be ascension-ready
+      if (!hero.ascensionReady) return { success: false };
+    }
+
+    // ── Remove from hand ──
+    ps.hand.splice(handIndex, 1);
+    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+
+    // ── State transfer ──
+    const oldName = hero.name;
+    const oldMaxHp = hero.maxHp || cardDB[oldName]?.hp || 0;
+    const hpLost = Math.max(0, oldMaxHp - hero.hp);
+    const newMaxHp = newCardData.hp || oldMaxHp;
+    const newHp = Math.max(1, newMaxHp - hpLost);
+
+    hero.name = cardName;
+    hero.hp = newHp;
+    hero.maxHp = newMaxHp;
+    hero.atk = newCardData.atk || hero.atk;
+
+    // Clean up ascension tracking from old hero
+    delete hero.ascensionOrbs;
+    delete hero.ascensionReady;
+    delete hero.ascensionTarget;
+
+    // ── Update card instance for the hero ──
+    for (const inst of this.cardInstances) {
+      if (inst.owner === pi && inst.heroIdx === heroIdx && inst.zone === 'hero') {
+        inst.name = cardName;
+        break;
+      }
+    }
+
+    // ── Set up new hero's passive (bypassLevelReq, etc.) ──
+    if (ascendedScript?.onAscendSetup) {
+      ascendedScript.onAscendSetup(gs, pi, heroIdx, this);
+    }
+
+    this.log('hero_ascension', { player: ps.username, oldHero: oldName, newHero: cardName });
+    this._broadcastEvent('hero_ascension', { owner: pi, heroIdx, oldHero: oldName, newHero: cardName });
+    this.sync();
+    await this._delay(800);
+
+    // ── Fire ON_ASCENSION hook (reaction window) ──
+    await this.runHooks(HOOKS.ON_ASCENSION, {
+      playerIdx: pi, heroIdx, oldHeroName: oldName, newHeroName: cardName,
+      hero, ascendedCardData: newCardData,
+    });
+
+    // ── Ascension Bonus (card-specific) ──
+    if (ascendedScript?.onAscensionBonus) {
+      await ascendedScript.onAscensionBonus(this, pi, heroIdx);
+    }
+
+    this.sync();
+
+    // ── Determine if turn should skip to End Phase ──
+    let skipEndPhase = false;
+    if (pi === gs.activePlayer) {
+      // Default: skip to End Phase. Ascended hero can block this.
+      skipEndPhase = ascendedScript?.blockEndPhaseOnAscend ? false : true;
+    }
+
+    return { success: true, skipEndPhase };
   }
 
   /** Find which player owns a hero object. */

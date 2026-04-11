@@ -36,13 +36,8 @@ module.exports = {
         return;
       }
 
-      // Draw cards one by one
-      for (let i = 0; i < drawCount; i++) {
-        if ((ps.mainDeck || []).length === 0) break;
-        await engine.actionDrawCards(pi, 1, { _nomuBypass: true });
-        engine.sync();
-        if (i < drawCount - 1) await engine._delay(200);
-      }
+      // Draw cards
+      await engine.actionDrawCards(pi, drawCount);
 
       engine.log('haste', { player: ps.username, drawn: drawCount, smLevel });
       engine.sync();
