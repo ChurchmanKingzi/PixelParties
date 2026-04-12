@@ -50,6 +50,7 @@ function getValidTargets(gs, engine) {
 module.exports = {
   isReaction: true,
   isTargetingArtifact: true,
+  proactivePlay: true,
 
   reactionCondition: (gs, pi, engine) => {
     return getValidTargets(gs, engine).length > 0;

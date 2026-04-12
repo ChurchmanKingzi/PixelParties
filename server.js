@@ -1505,22 +1505,37 @@ function sendSpectatorGameState(room) {
       itemLocked: ps.itemLocked || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
-      poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
+      poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(spi) : 30,
       handLocked: ps.handLocked || false,
       supportSpellLocked: ps.supportSpellLocked || false,
       permanents: ps.permanents || [],
       oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
       resolvingCard: ps._resolvingCard || null,
       deckSkins: ps.deckSkins || {},
-      poisonDmgPerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
+      poisonDmgPerStack: room.engine ? room.engine.getPoisonDamagePerStack(spi) : 30,
+      // Fields that sendGameState includes per-player but spectators don't interact with
+      surpriseFaceDown: ps.surpriseZones.map((sz, hi) => {
+        if (!sz || sz.length === 0) return null;
+        const inst = room.engine?.cardInstances.find(c => c.owner === spi && c.zone === 'surprise' && c.heroIdx === hi && c.name === sz[0]);
+        return inst ? inst.faceDown : true;
+      }),
+      revealedHandCards: [],
+      creationLockedNames: [],
+      handLockBlockedCards: [],
+      comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
+      heroesActedThisTurn: ps.heroesActedThisTurn || [],
     })),
     areaZones: gs.areaZones, turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
-    customPlacementCards: (gs.players[playerIdx]?.hand || []).filter(cn => { const s = loadCardEffect(cn); return s?.customPlacement; }),
+    customPlacementCards: [],
     awaitingFirstChoice: gs.awaitingFirstChoice || false,
     choosingPlayerName,
+    terrorCount: 0,
+    terrorThreshold: null,
+    bonusActions: null,
+    bonusMainActions: 0,
     mulliganPending: gs.mulliganPending || false,
     handReturnToDeck: gs.handReturnToDeck || false,
     potionTargeting: gs.potionTargeting ? {
@@ -1555,6 +1570,7 @@ function sendSpectatorGameState(room) {
     })() : {},
     additionalActions: [],
     inherentActionCards: [],
+    inherentActionHeroes: {},
     unactivatableArtifacts: [],
     blockedSpells: [],
     activatableAbilities: [],
@@ -1563,6 +1579,8 @@ function sendSpectatorGameState(room) {
     activatableCreatures: [],
     activatableEquips: [],
     heroPlayableCards: { own: {}, charmed: {} },
+    bakhmSurpriseSlots: [],
+    ushabtiSummonable: [],
     roomParticipants: {
       players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: ps.avatar })),
       spectators: (room.spectators || []).map(s => ({ username: s.username, color: s.color || '#888', avatar: s.avatar || null })),
@@ -2914,7 +2932,7 @@ io.on('connection', (socket) => {
     const heroOwner = charmedOwner != null ? charmedOwner : pi;
     const ps = gs.players[heroOwner];
     const hero = ps.heroes?.[heroIdx];
-    if (!hero?.name || hero.hp <= 0) return;
+    if (!hero?.name) return;
     if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return;
 
     const slot = (ps.supportZones[heroIdx] || [])[zoneSlot] || [];
@@ -3674,13 +3692,16 @@ io.on('connection', (socket) => {
     const cardData = getCardDB()[cardName];
     if (!cardData || cardData.cardType !== 'Artifact') return;
     if ((cardData.subtype || '').toLowerCase() === 'equipment') return; // Equips use play_artifact
-    if ((cardData.subtype || '').toLowerCase() === 'reaction') return; // Reaction artifacts are not manually playable
 
     const cost = cardData.cost || 0;
     if ((ps.gold || 0) < cost) return;
 
     const script = loadCardEffect(cardName);
     if (!script) return;
+
+    // Reaction artifacts are only manually playable if they opt in with proactivePlay
+    if ((cardData.subtype || '').toLowerCase() === 'reaction' && !script.proactivePlay) return;
+
     if (script.canActivate && !script.canActivate(gs, pi)) return;
 
     // Generic draw/search lock

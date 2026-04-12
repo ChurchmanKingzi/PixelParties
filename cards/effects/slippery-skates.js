@@ -166,7 +166,7 @@ function _getAdjacentFreeZones(ps, heroIdx) {
   const result = [];
   for (const hi of adjacent) {
     const hero = ps.heroes?.[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
+    if (!hero?.name) continue;
     for (let zi = 0; zi < 3; zi++) {
       if (((ps.supportZones[hi] || [])[zi] || []).length === 0) {
         result.push({ heroIdx: hi, slotIdx: zi });

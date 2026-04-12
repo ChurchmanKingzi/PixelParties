@@ -761,10 +761,10 @@ function DeckBuilder() {
     if (f.cardType) result = result.filter(c => c.cardType === f.cardType);
     if (f.subtype) result = result.filter(c => c.subtype === f.subtype);
     if (f.archetype) result = result.filter(c => c.archetype === f.archetype);
-    if (f.sa1) result = result.filter(c => c.startingAbility1 === f.sa1);
-    if (f.sa2) result = result.filter(c => c.startingAbility2 === f.sa2);
-    if (f.ss1) result = result.filter(c => c.spellSchool1 === f.ss1);
-    if (f.ss2) result = result.filter(c => c.spellSchool2 === f.ss2);
+    if (f.sa1) result = result.filter(c => c.startingAbility1 === f.sa1 || c.startingAbility2 === f.sa1);
+    if (f.sa2) result = result.filter(c => c.startingAbility1 === f.sa2 || c.startingAbility2 === f.sa2);
+    if (f.ss1) result = result.filter(c => c.spellSchool1 === f.ss1 || c.spellSchool2 === f.ss1);
+    if (f.ss2) result = result.filter(c => c.spellSchool1 === f.ss2 || c.spellSchool2 === f.ss2);
     if (f.level !== '') result = result.filter(c => c.level != null && c.level === parseInt(f.level));
     if (f.cost !== '') result = result.filter(c => c.cost != null && c.cost === parseInt(f.cost));
     if (f.hp !== '') result = result.filter(c => c.hp != null && c.hp === parseInt(f.hp));

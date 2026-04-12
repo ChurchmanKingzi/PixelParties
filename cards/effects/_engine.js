@@ -6069,7 +6069,7 @@ class GameEngine {
 
       for (let hi = 0; hi < (scanPs.heroes || []).length; hi++) {
         const hero = scanPs.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
+        if (!hero?.name) continue;
         // If scanning charmed heroes, only include those charmed by playerIdx
         if (charmedOwner != null && hero.charmedBy !== playerIdx) continue;
 

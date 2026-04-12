@@ -4412,7 +4412,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const isEquipPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Artifact'
       && (card.subtype || '').toLowerCase() === 'equipment' && (me.gold || 0) >= (card.cost || 0);
     const isArtifactActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
-      && card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment' && (card.subtype || '').toLowerCase() !== 'reaction';
+      && card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment';
     const isPotionActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Potion';
     const isSurprisePlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
       && (card.subtype || '').toLowerCase() === 'surprise'

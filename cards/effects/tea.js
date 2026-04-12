@@ -17,6 +17,8 @@ function getTargetStatuses(target, engine) {
       .map(k => {
         const s = { key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon };
         if (k === 'poisoned') s.stacks = hero.statuses.poisoned.stacks || 1;
+        // Capture full status properties (duration, _baihuPetrify, unhealable, etc.)
+        s.statusData = { ...hero.statuses[k] };
         return s;
       });
   }
@@ -230,12 +232,23 @@ module.exports = {
     if (!secondTarget) return;
 
     // Step 5: Apply statuses to second target (as many as possible)
+    // Build lookup for captured status properties (duration, _baihuPetrify, etc.)
+    const statusDataMap = {};
+    for (const s of statuses) statusDataMap[s.key] = s.statusData || {};
+
     for (const key of removedStatuses) {
       if (secondTarget.type === 'hero') {
         if (key === 'poisoned') {
           await engine.addHeroStatus(secondTarget.owner, secondTarget.heroIdx, 'poisoned', { stacks: poisonStacks, appliedBy: pi });
         } else {
-          await engine.addHeroStatus(secondTarget.owner, secondTarget.heroIdx, key, { appliedBy: pi });
+          // Preserve special properties (Baihu duration, _baihuPetrify, unhealable, etc.)
+          const origData = statusDataMap[key] || {};
+          const opts = {};
+          if (origData.duration) opts.duration = origData.duration;
+          if (origData._baihuPetrify) opts._baihuPetrify = true;
+          if (origData.unhealable) opts.unhealable = true;
+          opts.appliedBy = pi;
+          await engine.addHeroStatus(secondTarget.owner, secondTarget.heroIdx, key, opts);
         }
       } else if (secondTarget.type === 'equip') {
         const inst = engine.cardInstances.find(c =>
