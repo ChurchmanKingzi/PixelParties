@@ -1,0 +1,38 @@
+=== PIXEL PARTIES DECK ===
+Name: Sample Deck: Lightning Caller
+
+== HEROES ==
+Fiona, the Princess of Blackport
+Sol Rym, the Thunder Djinn
+Nicolas, the Hidden Alchemist
+
+== MAIN DECK ==
+2x Acid Vial
+4x Butterfly Cloud
+4x Chain Lightning
+2x Cloud in a Bottle
+4x Dark Gear
+1x Divine Gift of Rain
+1x Elixir of Immortality
+4x Golden Ankh
+1x Healing Potion
+8x Leadership
+4x Magnetic Glove
+1x MOE Bomb
+2x Punch in the Box
+3x Renewable Energy
+1x Resuscitation Potion
+2x Smug Coin
+4x Snow Cannon
+3x Tea
+1x Tears of Creation
+2x The Yeeting
+2x Tool Freezer
+4x Wheels
+
+== POTION DECK ==
+2x Elixir of Quickness
+1x Horn in a Bottle
+2x Magnetic Potion
+
+== SIDE DECK ==

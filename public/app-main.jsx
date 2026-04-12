@@ -547,7 +547,7 @@ function App() {
   // Escape key → return to main menu from any sub-screen (except play — handled by PlayScreen/GameBoard)
   useEffect(() => {
     const handleEsc = (e) => {
-      if (e.key === 'Escape' && user && screen !== 'menu' && screen !== 'play') {
+      if (e.key === 'Escape' && !e.defaultPrevented && user && screen !== 'menu' && screen !== 'play' && screen !== 'deckbuilder') {
         setScreen('menu');
       }
     };

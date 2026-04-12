@@ -1384,6 +1384,7 @@ function sendGameState(room, playerIdx, extra) {
     activeHeroEffects: room.engine ? room.engine.getActiveHeroEffects(playerIdx) : [],
     activatableCreatures: room.engine ? room.engine.getActivatableCreatures(playerIdx) : [],
     activatableEquips: room.engine ? room.engine.getActivatableEquips(playerIdx) : [],
+    heroPlayableCards: room.engine ? room.engine.getHeroPlayableCards(playerIdx) : { own: {}, charmed: {} },
     bakhmSurpriseSlots: room.engine ? (() => {
       const result = [];
       const ps2 = gs.players[playerIdx];
@@ -1561,6 +1562,7 @@ function sendSpectatorGameState(room) {
     activeHeroEffects: [],
     activatableCreatures: [],
     activatableEquips: [],
+    heroPlayableCards: { own: {}, charmed: {} },
     roomParticipants: {
       players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: ps.avatar })),
       spectators: (room.spectators || []).map(s => ({ username: s.username, color: s.color || '#888', avatar: s.avatar || null })),
@@ -3148,6 +3150,7 @@ io.on('connection', (socket) => {
 
         room.engine.log('creature_summoned', { player: ps.username, card: cardName, hero: gs.players[pi].heroes[heroIdx]?.name });
         ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
+        if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
 
         await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualZoneSlot });
         await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
@@ -3193,6 +3196,10 @@ io.on('connection', (socket) => {
     const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Spell', 'Attack'], { charmedOwner });
     if (!v) return;
     const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
+
+    // Wisdom discard cost — computed before the spell resolves, enforced after
+    const heroOwner = charmedOwner != null ? charmedOwner : pi;
+    const wisdomDiscardCost = room.engine.getWisdomDiscardCost(heroOwner, heroIdx, cardData);
 
     // Check if this needs an additional action (Main Phase play, or Action Phase after normal action used)
     const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0);
@@ -3247,8 +3254,15 @@ io.on('connection', (socket) => {
           }
           if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
           if (!isInherentAction && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+          if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
           if (isActionPhase && !additionalConsumed && !isInherentAction) {
             await room.engine.advanceToPhase(pi, 4);
+          }
+          // Wisdom discard cost — still applies even when negated
+          if (wisdomDiscardCost > 0) {
+            await room.engine.actionPromptForceDiscard(pi, wisdomDiscardCost, {
+              title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+            });
           }
           for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
           return;
@@ -3310,6 +3324,7 @@ io.on('connection', (socket) => {
         // Track which heroes performed actions this turn (BEFORE afterSpellResolved so hooks see updated state)
         if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
         if (!isInherentAction && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+        if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
 
         // Fire afterSpellResolved hook (Bartas, etc.)
         await room.engine.runHooks('afterSpellResolved', {
@@ -3406,6 +3421,13 @@ io.on('connection', (socket) => {
           if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
           ps._oncePerGameUsed.add(opgKey);
         }
+
+        // Wisdom discard cost — applies regardless of spell outcome
+        if (wisdomDiscardCost > 0) {
+          await room.engine.actionPromptForceDiscard(pi, wisdomDiscardCost, {
+            title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+          });
+        }
       } catch (err) {
         console.error('[Engine] play_spell error:', err.message, err.stack);
       }
@@ -3444,6 +3466,12 @@ io.on('connection', (socket) => {
       // Per-card equip restrictions (e.g. Lifeforce Howitzer 1-per-hero)
       const equipScript = loadCardEffect(cardName);
       if (equipScript?.canEquipToHero && !equipScript.canEquipToHero(gs, pi, heroIdx, room.engine)) return;
+
+      // Once-per-game check (Smug Coin, etc.)
+      if (equipScript?.oncePerGame) {
+        const opgKey = equipScript.oncePerGameKey || cardName;
+        if (ps._oncePerGameUsed?.has(opgKey)) return;
+      }
 
       if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
       // Auto-find free support zone if zoneSlot is -1 (dropped on hero)
@@ -3493,6 +3521,13 @@ io.on('connection', (socket) => {
               const { inst, actualSlot } = result;
               await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualSlot });
               await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
+
+              // Mark once-per-game equips as used (Smug Coin, etc.)
+              if (equipScript?.oncePerGame) {
+                const opgKey = equipScript.oncePerGameKey || cardName;
+                if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+                ps._oncePerGameUsed.add(opgKey);
+              }
               return true;
             },
           });

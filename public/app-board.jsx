@@ -111,11 +111,23 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
 function DamageNumber({ amount, heroName }) {
   const [pos, setPos] = useState(null);
   useEffect(() => {
-    const el = document.querySelector(`[data-hero-name="${CSS.escape(heroName)}"]`);
-    if (el) {
-      const r = el.getBoundingClientRect();
-      setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
-    } else {
+    const ownerLabels = ['me', 'opp'];
+    for (const ol of ownerLabels) {
+      for (let hi = 0; hi < 3; hi++) {
+        const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ol}"][data-hero-idx="${hi}"]`);
+        if (!el) continue;
+        const nameEl = el.querySelector('.board-card-name, .card-name');
+        const heroEl = el;
+        const rect = heroEl.getBoundingClientRect();
+        const nameText = heroEl.getAttribute('data-hero-name') || el.textContent;
+        if (nameText && nameText.includes(heroName.split(',')[0])) {
+          setPos({ x: rect.left + rect.width / 2, y: rect.top + rect.height * 0.3 });
+          return;
+        }
+      }
+    }
+    // Fallback: center of screen
+    if (!pos) {
       setPos({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
     }
   }, [heroName]);
@@ -124,6 +136,25 @@ function DamageNumber({ amount, heroName }) {
   return (
     <div className="damage-number" style={{ left: pos.x, top: pos.y }}>
       -{amount}
+    </div>
+  );
+}
+
+// Floating heal number for heroes (green, rising)
+function HealNumber({ amount, ownerLabel, heroIdx }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
+    }
+  }, [ownerLabel, heroIdx]);
+
+  if (!pos) return null;
+  return (
+    <div className="damage-number heal-number" style={{ left: pos.x, top: pos.y }}>
+      +{amount}
     </div>
   );
 }
@@ -752,6 +783,7 @@ function StatusBadges({ statuses, counters, isHero, player }) {
   if (s.negated || c.negated) badges.push({ key: 'negated', icon: '🚫', tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.') + dur(s.negated || c.negated) });
   if (s.immune) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
   if (s.shielded) badges.push({ key: 'shielded', icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + durStart(s.shielded) });
+  if (s.untargetable) badges.push({ key: 'untargetable', icon: '🦋', tooltip: 'Untargetable: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen.' });
   if (s.healReversed) badges.push({ key: 'healReversed', icon: '💀', tooltip: 'Overheal Shock: Takes any healing as damage.' });
   if (badges.length === 0) return null;
   return (
@@ -1637,6 +1669,35 @@ const ANIM_REGISTRY = {
               opacity: 0,
               '--endX': p.endX + 'px', '--endY': p.endY + 'px',
             }}>☁</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  healing_hearts: (() => {
+    return function HealingHeartsEffect({ x, y }) {
+      const particles = useMemo(() => Array.from({ length: 20 }, () => {
+        const isHeart = Math.random() > 0.4;
+        return {
+          char: isHeart ? (Math.random() > 0.5 ? '❤️' : '💚') : '✚',
+          xOff: -40 + Math.random() * 80,
+          delay: Math.random() * 500,
+          dur: 600 + Math.random() * 600,
+          size: isHeart ? (12 + Math.random() * 14) : (10 + Math.random() * 12),
+          color: isHeart ? undefined : (Math.random() > 0.5 ? '#ff4466' : '#44cc66'),
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(100,255,120,.7) 0%, rgba(50,200,80,.3) 40%, transparent 70%)' }} />
+          {particles.map((p, i) => (
+            <div key={'hh'+i} style={{
+              position: 'absolute', left: p.xOff, top: 10,
+              fontSize: p.size, color: p.color,
+              filter: `drop-shadow(0 0 4px ${p.color || 'rgba(100,255,120,0.6)'})`,
+              animation: `holySparkleRise ${p.dur}ms ease-out ${p.delay}ms forwards`,
+              opacity: 0,
+            }}>{p.char}</div>
           ))}
         </div>
       );
@@ -3890,7 +3951,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Check if a creature can be played on ANY hero (level/spell school reqs + free zone)
   const canCreatureBePlayed = (card) => {
     if (!card || card.cardType !== 'Creature') return false;
-    return [0,1,2].some(hi => canHeroPlayCard(me, hi, card) && findFreeSupportSlot(me, hi) >= 0);
+    // heroPlayableCards already includes free support zone check for creatures
+    return [0,1,2].some(hi => canHeroPlayCard(me, hi, card));
   };
 
   // Check if a Spell or Attack can be used by ANY hero (level/spell school reqs, no zone needed)
@@ -3991,6 +4053,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (card.cardType === 'Artifact') {
         if (me.itemLocked) return true;
         if ((me.gold || 0) < (card.cost || 0)) return true;
+        // Once-per-game artifacts (Smug Coin, etc.)
+        if ((me.oncePerGameUsed || []).includes(cardName)) return true;
         // Gray out Equip artifacts if no hero has a free base support zone
         const isEquip = (card.subtype || '').toLowerCase() === 'equipment';
         if (isEquip) {
@@ -4150,20 +4214,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return abZones.some(slot => (slot || []).length === 0);
   };
 
-  // Check if a hero can play a card (spell school + level check)
+  // Check if a hero can play a card (server-driven constraint check + client-side phase checks)
   const canHeroPlayCard = (playerData, heroIdx, card) => {
-    const hero = playerData.heroes[heroIdx];
-    if (!hero || !hero.name || hero.hp <= 0) return false;
-    // Frozen/stunned heroes can't perform any actions
-    if (card.cardType !== 'Ability') {
-      if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
-    }
-    // Combo lock: only the locked hero can act
-    if (playerData.comboLockHeroIdx != null && playerData.comboLockHeroIdx !== heroIdx) return false;
+    // ── Server-driven hero constraint check ──
+    // heroPlayableCards covers: alive, frozen/stunned, combo lock, action limit,
+    // level/school (with all overrides), hero script restrictions (Ghuanjun, etc.),
+    // equip restrictions, and creature support zone availability.
+    const isOwn = playerData === me;
+    const playableMap = isOwn
+      ? (gameState.heroPlayableCards?.own || {})
+      : (gameState.heroPlayableCards?.charmed || {});
+    const playableList = playableMap[heroIdx] || [];
+    if (!playableList.includes(card.name)) return false;
 
-    // Hero-restricted additional actions: after normal action used in Action Phase,
-    // all plays need an additional action — block heroes without providers
-    if (currentPhase === 3 && (playerData.heroesActedThisTurn?.length > 0)) {
+    // ── Phase-related checks (client-side, driven by other server-computed fields) ──
+
+    // Action Phase: after normal action used, all plays need an additional action provider
+    if (currentPhase === 3 && isOwn && (playerData.heroesActedThisTurn?.length > 0)) {
       const isActionType = ACTION_TYPES.includes(card.cardType);
       if (isActionType) {
         const categoryMap = { Creature: 'creature', Spell: 'spell', Attack: 'attack' };
@@ -4172,7 +4239,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           aa.eligibleHandCards.includes(card.name) ||
           (aa.allowedCategories?.includes(cardCategory))
         );
-        if (additionalForCard.length === 0) return false; // No additional action covers this card
+        if (additionalForCard.length === 0) return false;
         if (additionalForCard.every(aa => aa.heroRestricted)) {
           const heroHasProvider = additionalForCard.some(aa => aa.providers.some(p => p.heroIdx === heroIdx));
           if (!heroHasProvider) return false;
@@ -4181,50 +4248,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
 
     // Main Phase: per-hero inherent action restrictions (Muscle Training, etc.)
-    // If a card is playable ONLY via inherent action and this hero isn't eligible, block it.
-    if (currentPhase === 2 || currentPhase === 4) {
+    if ((currentPhase === 2 || currentPhase === 4) && isOwn) {
       const inherentHeroes = gameState.inherentActionHeroes?.[card.name];
       if (inherentHeroes !== undefined) {
-        // Check if any additional action covers this card AND is available for this hero
         const hasAdditional = (gameState.additionalActions || []).some(aa => {
           if (!aa.eligibleHandCards.includes(card.name)) return false;
-          // Hero-restricted actions: provider must be on this hero
           if (aa.heroRestricted) return aa.providers.some(p => p.heroIdx === heroIdx);
           return true;
         });
         if (!hasAdditional && !inherentHeroes.includes(heroIdx)) return false;
       }
     }
+
     // Bonus actions: only allowed card types during active bonus
-    if (playerData.bonusActions?.heroIdx === heroIdx && playerData.bonusActions.remaining > 0) {
+    if (isOwn && playerData.bonusActions?.heroIdx === heroIdx && playerData.bonusActions.remaining > 0) {
       const allowed = playerData.bonusActions.allowedTypes || [];
       if (allowed.length > 0 && !allowed.includes(card.cardType)) return false;
     }
-    // Per-hero duplicate Attack ban (Ghuanjun)
-    if (card.cardType === 'Attack' && hero.ghuanjunAttacksUsed?.includes(card.name)) return false;
-    const level = card.level || 0;
-    if (level === 0 && !card.spellSchool1) return true; // No requirements
-    // Negated heroes have their abilities silenced — treat as empty for level checks
-    const abZones = hero.statuses?.negated ? [] : (playerData.abilityZones[heroIdx] || []);
-    const countAbility = (school) => {
-      let count = 0;
-      for (const slot of abZones) {
-        if (!slot || slot.length === 0) continue;
-        const baseAbility = slot[0]; // Performance transforms into this
-        for (const abName of slot) {
-          if (abName === school) count++;
-          else if (abName === 'Performance' && baseAbility === school) count++;
-        }
-      }
-      return count;
-    };
-    let levelFail = false;
-    if (card.spellSchool1 && countAbility(card.spellSchool1) < level) levelFail = true;
-    if (card.spellSchool2 && countAbility(card.spellSchool2) < level) levelFail = true;
-    if (levelFail) {
-      const blr = hero.bypassLevelReq;
-      if (!blr || level > blr.maxLevel || !blr.types.includes(card.cardType)) return false;
-    }
+
     return true;
   };
 
@@ -4268,6 +4309,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     }
   }, [gameState.turn, gameState.awaitingFirstChoice]);
+
+  // Clear Divine Rain overlay when the turn changes
+  useEffect(() => {
+    const overlay = document.getElementById('divine-rain-overlay');
+    if (overlay && overlay.dataset.rainTurn !== String(gameState.turn)) {
+      overlay.style.transition = 'opacity 1s';
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 1100);
+    }
+  }, [gameState.turn]);
 
   const [mulliganDecided, setMulliganDecided] = useState(false);
   // Reset mulligan state when a new game starts
@@ -5564,10 +5615,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const dx = tx-sx, dy = ty-sy;
       const dist = Math.sqrt(dx*dx+dy*dy);
       const angle = Math.atan2(dy,dx)*180/Math.PI;
-      const bolt = document.createElement('div');
-      bolt.style.cssText = `position:fixed;left:${sx}px;top:${sy-2}px;width:0;height:4px;background:linear-gradient(90deg,#00ccff,#ffffff,#00ccff);border-radius:2px;transform-origin:0 50%;transform:rotate(${angle}deg);pointer-events:none;z-index:10000;box-shadow:0 0 12px #00ccff,0 0 24px #0088ff;animation:lightningBolt .3s ease-out forwards;--bolt-len:${dist}px;`;
-      document.body.appendChild(bolt);
-      setTimeout(() => bolt.remove(), 400);
+      // Spawn 3 erratic bolts with slight offsets
+      for (let b = 0; b < 3; b++) {
+        const bolt = document.createElement('div');
+        const yOff = (b - 1) * (4 + Math.random() * 4);
+        const h = 5 + Math.random() * 4;
+        const delay = b * 40;
+        bolt.style.cssText = `position:fixed;left:${sx}px;top:${sy-h/2+yOff}px;width:0;height:${h}px;`
+          + `background:linear-gradient(90deg,transparent,#ffee55,#ffffff,#ffee55,transparent);`
+          + `border-radius:${h/2}px;transform-origin:0 50%;transform:rotate(${angle + (Math.random()-0.5)*4}deg);`
+          + `pointer-events:none;z-index:10000;`
+          + `box-shadow:0 0 14px #ffcc00,0 0 30px #ffaa00,0 0 50px rgba(255,200,0,.4);`
+          + `animation:lightningBolt .35s ${delay}ms ease-out forwards;--bolt-len:${dist}px;`;
+        document.body.appendChild(bolt);
+        setTimeout(() => bolt.remove(), 450 + delay);
+      }
+      // Impact flash on target
+      const flash = document.createElement('div');
+      flash.style.cssText = `position:fixed;left:${tx-20}px;top:${ty-20}px;width:40px;height:40px;border-radius:50%;`
+        + `background:radial-gradient(circle,rgba(255,255,200,.9),rgba(255,220,50,.5),transparent);`
+        + `pointer-events:none;z-index:10001;animation:petrifyFlash .4s 100ms ease-out forwards;`;
+      document.body.appendChild(flash);
+      setTimeout(() => flash.remove(), 550);
     };
     socket.on('qinglong_lightning', onQinglongLightning);
     const onJumpscareBox = ({ owner, heroIdx }) => {
@@ -5805,6 +5874,626 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + 200);
     };
     socket.on('play_projectile_animation', onProjectileAnimation);
+    const onButterflyCloud = ({ sourceOwner, sourceHeroIdx, targets }) => {
+      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
+      const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
+      if (!srcEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const srcX = sr.left + sr.width / 2;
+      const srcY = sr.top + sr.height / 2;
+
+      // Resolve target element positions
+      const tgtPositions = [];
+      for (const t of (targets || [])) {
+        const tLabel = t.owner === myIdx ? 'me' : 'opp';
+        let el;
+        if (t.type === 'creature' && t.zoneSlot != null) {
+          el = document.querySelector(`[data-support-zone][data-support-owner="${tLabel}"][data-support-hero="${t.heroIdx}"][data-support-slot="${t.zoneSlot}"]`);
+        } else {
+          el = document.querySelector(`[data-hero-zone][data-hero-owner="${tLabel}"][data-hero-idx="${t.heroIdx}"]`);
+        }
+        if (el) {
+          const r = el.getBoundingClientRect();
+          tgtPositions.push({ x: r.left + r.width / 2, y: r.top + r.height / 2, el });
+        }
+      }
+      if (tgtPositions.length === 0) return;
+
+      // Inject keyframes once
+      if (!document.getElementById('butterfly-cloud-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'butterfly-cloud-keyframes';
+        style.textContent = `
+          @keyframes butterflyFly {
+            0% { transform: translate(0,0) scale(0.3) rotate(0deg); opacity: 0; }
+            15% { opacity: 1; transform: translate(calc(var(--bfDx)*0.15 + var(--bfWobble1)), calc(var(--bfDy)*0.15 + var(--bfWobble2))) scale(0.8) rotate(var(--bfSpin1)); }
+            50% { transform: translate(calc(var(--bfDx)*0.5 + var(--bfWobble2)*1.5), calc(var(--bfDy)*0.5 + var(--bfWobble1)*-1)) scale(1) rotate(var(--bfSpin2)); }
+            85% { opacity: 1; transform: translate(calc(var(--bfDx)*0.85 + var(--bfWobble1)*-0.5), calc(var(--bfDy)*0.85 + var(--bfWobble2)*0.5)) scale(0.9) rotate(var(--bfSpin3)); }
+            100% { transform: translate(var(--bfDx), var(--bfDy)) scale(0.4) rotate(var(--bfSpin4)); opacity: 0; }
+          }
+          @keyframes butterflyBurst {
+            0% { transform: scale(0); opacity: 0.9; }
+            50% { transform: scale(1.5); opacity: 0.7; }
+            100% { transform: scale(2.5); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      // Spawn butterflies from source to each target
+      const totalButterflies = Math.min(120, tgtPositions.length * 30);
+      const perTarget = Math.floor(totalButterflies / tgtPositions.length);
+      const butterflyChars = ['🦋'];
+      const colors = ['#ffd700','#ffec80','#fff4cc','#f0c040','#ffe066'];
+
+      for (let ti = 0; ti < tgtPositions.length; ti++) {
+        const tgt = tgtPositions[ti];
+        const dx = tgt.x - srcX;
+        const dy = tgt.y - srcY;
+
+        for (let i = 0; i < perTarget; i++) {
+          const bf = document.createElement('div');
+          const delay = Math.random() * 500;
+          const dur = 700 + Math.random() * 500;
+          const wobble1 = -30 + Math.random() * 60;
+          const wobble2 = -25 + Math.random() * 50;
+          const spin1 = -40 + Math.random() * 80;
+          const spin2 = -60 + Math.random() * 120;
+          const spin3 = -30 + Math.random() * 60;
+          const spin4 = Math.random() * 360;
+          const size = 10 + Math.random() * 10;
+          const color = colors[Math.floor(Math.random() * colors.length)];
+
+          bf.textContent = butterflyChars[0];
+          bf.style.cssText = `
+            position:fixed; left:${srcX}px; top:${srcY}px; z-index:10200; pointer-events:none;
+            font-size:${size}px; filter:drop-shadow(0 0 4px ${color}) drop-shadow(0 0 8px rgba(255,215,0,0.5));
+            --bfDx:${dx + (-15 + Math.random()*30)}px; --bfDy:${dy + (-15 + Math.random()*30)}px;
+            --bfWobble1:${wobble1}px; --bfWobble2:${wobble2}px;
+            --bfSpin1:${spin1}deg; --bfSpin2:${spin2}deg; --bfSpin3:${spin3}deg; --bfSpin4:${spin4}deg;
+            animation: butterflyFly ${dur}ms ease-in-out ${delay}ms forwards;
+            opacity: 0;
+          `;
+          document.body.appendChild(bf);
+          setTimeout(() => bf.remove(), delay + dur + 100);
+        }
+
+        // Golden burst at target on impact
+        setTimeout(() => {
+          const burst = document.createElement('div');
+          burst.style.cssText = `
+            position:fixed; left:${tgt.x - 40}px; top:${tgt.y - 40}px; width:80px; height:80px;
+            z-index:10201; pointer-events:none; border-radius:50%;
+            background: radial-gradient(circle, rgba(255,215,0,0.9) 0%, rgba(255,236,128,0.5) 40%, transparent 70%);
+            animation: butterflyBurst 500ms ease-out forwards;
+          `;
+          document.body.appendChild(burst);
+          setTimeout(() => burst.remove(), 600);
+        }, 900);
+      }
+    };
+    socket.on('butterfly_cloud_animation', onButterflyCloud);
+    const onSmugCoinSave = ({ owner, heroIdx }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const heroEl = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+      if (!heroEl) return;
+      const hr = heroEl.getBoundingClientRect();
+      const cx = hr.left + hr.width / 2;
+      const cy = hr.top + hr.height / 2;
+
+      // Inject keyframes once
+      if (!document.getElementById('smug-coin-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'smug-coin-keyframes';
+        style.textContent = `
+          @keyframes smugCoinFall {
+            0% { transform: translateY(var(--scStartY)) rotate(var(--scRot1)) scale(0.6); opacity: 0; }
+            10% { opacity: 1; }
+            70% { opacity: 1; transform: translateY(var(--scMidY)) rotate(var(--scRot2)) scale(1); }
+            100% { transform: translateY(var(--scEndY)) rotate(var(--scRot3)) scale(0.8); opacity: 0; }
+          }
+          @keyframes smugCoinFlash {
+            0% { transform: scale(0); opacity: 0.9; }
+            40% { transform: scale(1.8); opacity: 0.6; }
+            100% { transform: scale(3); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      // Golden flash on hero
+      const flash = document.createElement('div');
+      flash.style.cssText = `
+        position:fixed; left:${cx - 50}px; top:${cy - 50}px; width:100px; height:100px;
+        z-index:10201; pointer-events:none; border-radius:50%;
+        background: radial-gradient(circle, rgba(255,200,50,0.95) 0%, rgba(255,170,0,0.5) 40%, transparent 70%);
+        animation: smugCoinFlash 600ms ease-out forwards;
+      `;
+      document.body.appendChild(flash);
+      setTimeout(() => flash.remove(), 700);
+
+      // Rain ~100 sc.png coins from above onto the hero
+      const coinCount = 100;
+      for (let i = 0; i < coinCount; i++) {
+        const coin = document.createElement('img');
+        coin.src = '/data/sc.png';
+        const size = 16 + Math.random() * 16;
+        const xOff = -70 + Math.random() * 140;
+        const startY = -120 - Math.random() * 200;
+        const midY = -10 + Math.random() * 20;
+        const endY = 30 + Math.random() * 40;
+        const rot1 = Math.random() * 360;
+        const rot2 = rot1 + (-180 + Math.random() * 360);
+        const rot3 = rot2 + (-90 + Math.random() * 180);
+        const delay = Math.random() * 800;
+        const dur = 600 + Math.random() * 500;
+
+        coin.style.cssText = `
+          position:fixed; left:${cx + xOff - size/2}px; top:${cy - size/2}px;
+          width:${size}px; height:${size}px; z-index:10200; pointer-events:none;
+          object-fit:contain;
+          filter: drop-shadow(0 0 3px rgba(255,200,50,0.8)) drop-shadow(0 0 6px rgba(255,170,0,0.4));
+          --scStartY:${startY}px; --scMidY:${midY}px; --scEndY:${endY}px;
+          --scRot1:${rot1}deg; --scRot2:${rot2}deg; --scRot3:${rot3}deg;
+          animation: smugCoinFall ${dur}ms ease-in ${delay}ms forwards;
+          opacity: 0;
+        `;
+        document.body.appendChild(coin);
+        setTimeout(() => coin.remove(), delay + dur + 100);
+      }
+    };
+    socket.on('smug_coin_save', onSmugCoinSave);
+    const onDivineRainStart = ({ turn }) => {
+      // Remove any existing rain overlay
+      const existing = document.getElementById('divine-rain-overlay');
+      if (existing) existing.remove();
+
+      // Inject keyframes once
+      if (!document.getElementById('divine-rain-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'divine-rain-keyframes';
+        style.textContent = `
+          @keyframes rainDrop {
+            0% { transform: translateY(-20px) translateX(0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 0.7; }
+            100% { transform: translateY(110vh) translateX(-30px); opacity: 0; }
+          }
+          @keyframes rainFlash {
+            0% { opacity: 0; }
+            5% { opacity: 0.15; }
+            10% { opacity: 0; }
+            100% { opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      const overlay = document.createElement('div');
+      overlay.id = 'divine-rain-overlay';
+      overlay.dataset.rainTurn = turn;
+      overlay.style.cssText = `
+        position:fixed; top:0; left:0; width:100vw; height:100vh;
+        z-index:9500; pointer-events:none; overflow:hidden;
+      `;
+
+      // Flash on start
+      const flash = document.createElement('div');
+      flash.style.cssText = `
+        position:absolute; top:0; left:0; width:100%; height:100%;
+        background: rgba(100,150,255,0.15);
+        animation: rainFlash 2s ease-out forwards;
+      `;
+      overlay.appendChild(flash);
+
+      // Spawn rain drops in waves
+      const dropCount = 200;
+      for (let i = 0; i < dropCount; i++) {
+        const drop = document.createElement('div');
+        const x = Math.random() * 110 - 5;
+        const dur = 0.5 + Math.random() * 0.6;
+        const delay = Math.random() * 2;
+        const width = 1 + Math.random() * 1.5;
+        const height = 12 + Math.random() * 18;
+        const opacity = 0.15 + Math.random() * 0.35;
+
+        drop.style.cssText = `
+          position:absolute; left:${x}%; top:-20px;
+          width:${width}px; height:${height}px;
+          background: linear-gradient(to bottom, rgba(140,180,255,0), rgba(140,180,255,${opacity}), rgba(180,210,255,${opacity * 0.5}));
+          border-radius: 0 0 2px 2px;
+          animation: rainDrop ${dur}s linear ${delay}s infinite;
+          transform: rotate(-5deg);
+        `;
+        overlay.appendChild(drop);
+      }
+
+      document.body.appendChild(overlay);
+    };
+    socket.on('divine_rain_start', onDivineRainStart);
+    const onMoeBomb = () => {
+      // Inject keyframes once
+      if (!document.getElementById('moe-bomb-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'moe-bomb-keyframes';
+        style.textContent = `
+          @keyframes moePulse {
+            0% { transform: scale(0); opacity: 0; }
+            15% { transform: scale(1); opacity: 1; }
+            25% { transform: scale(1.3); }
+            35% { transform: scale(0.95); }
+            50% { transform: scale(1.5); }
+            60% { transform: scale(1.0); }
+            75% { transform: scale(1.8); filter: brightness(1.5) drop-shadow(0 0 30px rgba(255,50,80,0.9)); }
+            85% { transform: scale(1.6); }
+            95% { transform: scale(2.2); filter: brightness(2) drop-shadow(0 0 60px rgba(255,50,80,1)); }
+            100% { transform: scale(6); opacity: 0; filter: brightness(3) drop-shadow(0 0 100px white); }
+          }
+          @keyframes moeFlash {
+            0% { opacity: 0; }
+            30% { opacity: 0.7; }
+            100% { opacity: 0; }
+          }
+          @keyframes moePart {
+            0% { transform: translate(0,0) rotate(0deg) scale(1); opacity: 1; }
+            60% { opacity: 1; }
+            100% { transform: translate(var(--mpDx), var(--mpDy)) rotate(var(--mpRot)) scale(var(--mpScale)); opacity: 0; }
+          }
+          @keyframes moeConfetti {
+            0% { transform: translateY(0) rotateZ(0deg) rotateX(0deg); opacity: 1; }
+            100% { transform: translateY(var(--mcFall)) rotateZ(var(--mcSpin)) rotateX(720deg); opacity: 0; }
+          }
+          @keyframes moeGlitter {
+            0% { transform: translate(0,0) scale(0); opacity: 1; }
+            50% { opacity: 1; transform: translate(var(--mgDx2), var(--mgDy2)) scale(1.2); }
+            100% { transform: translate(var(--mgDx), var(--mgDy)) scale(0); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+
+      // Container
+      const container = document.createElement('div');
+      container.style.cssText = `position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:10300;pointer-events:none;overflow:hidden;`;
+      document.body.appendChild(container);
+
+      // Giant pulsating heart — centered via wrapper so animation scale doesn't break position
+      const heartWrap = document.createElement('div');
+      heartWrap.style.cssText = `
+        position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+        display:flex; align-items:center; justify-content:center;
+      `;
+      const heart = document.createElement('div');
+      heart.textContent = '❤️';
+      heart.style.cssText = `
+        font-size:180px; line-height:1;
+        animation: moePulse 2.8s ease-in-out forwards;
+        filter: drop-shadow(0 0 30px rgba(255,50,80,0.8));
+      `;
+      heartWrap.appendChild(heart);
+      container.appendChild(heartWrap);
+
+      // Explosion at ~2.6s
+      setTimeout(() => {
+        // White flash
+        const flash = document.createElement('div');
+        flash.style.cssText = `
+          position:absolute; top:0; left:0; width:100%; height:100%;
+          background: radial-gradient(circle at 50% 50%, rgba(255,200,220,0.9) 0%, rgba(255,100,150,0.4) 30%, transparent 60%);
+          animation: moeFlash 800ms ease-out forwards;
+        `;
+        container.appendChild(flash);
+
+        // Exploding hearts
+        const heartEmojis = ['❤️','💖','💗','💕','💘','💝','💓','🩷','🩵','💜'];
+        for (let i = 0; i < 60; i++) {
+          const p = document.createElement('div');
+          const angle = (i / 60) * 360 + Math.random() * 20;
+          const dist = 150 + Math.random() * 350;
+          const dx = Math.cos(angle * Math.PI / 180) * dist;
+          const dy = Math.sin(angle * Math.PI / 180) * dist;
+          const size = 16 + Math.random() * 32;
+          const dur = 800 + Math.random() * 600;
+          const rot = -360 + Math.random() * 720;
+          const sc = 0.2 + Math.random() * 0.5;
+          p.textContent = heartEmojis[Math.floor(Math.random() * heartEmojis.length)];
+          p.style.cssText = `
+            position:absolute; left:${cx}px; top:${cy}px; font-size:${size}px;
+            --mpDx:${dx}px; --mpDy:${dy}px; --mpRot:${rot}deg; --mpScale:${sc};
+            animation: moePart ${dur}ms ease-out forwards;
+            pointer-events:none;
+          `;
+          container.appendChild(p);
+        }
+
+        // Glitter sparkles
+        const glitterColors = ['#ff69b4','#ffd700','#ff1493','#ff6eb4','#fff','#ffc0cb','#ff85a2','#ffb7d5','#87ceeb','#dda0dd'];
+        for (let i = 0; i < 80; i++) {
+          const g = document.createElement('div');
+          const angle = Math.random() * 360;
+          const dist = 80 + Math.random() * 400;
+          const dx = Math.cos(angle * Math.PI / 180) * dist;
+          const dy = Math.sin(angle * Math.PI / 180) * dist;
+          const dx2 = dx * 0.4 + (-20 + Math.random() * 40);
+          const dy2 = dy * 0.4 + (-20 + Math.random() * 40);
+          const size = 3 + Math.random() * 7;
+          const dur = 600 + Math.random() * 800;
+          const delay = Math.random() * 200;
+          const color = glitterColors[Math.floor(Math.random() * glitterColors.length)];
+          g.style.cssText = `
+            position:absolute; left:${cx}px; top:${cy}px;
+            width:${size}px; height:${size}px; border-radius:50%;
+            background:${color}; box-shadow: 0 0 ${size}px ${color};
+            --mgDx:${dx}px; --mgDy:${dy}px; --mgDx2:${dx2}px; --mgDy2:${dy2}px;
+            animation: moeGlitter ${dur}ms ease-out ${delay}ms forwards;
+            opacity:0; pointer-events:none;
+          `;
+          container.appendChild(g);
+        }
+
+        // Confetti ribbons
+        const confettiColors = ['#ff1493','#ff69b4','#ffd700','#ff4500','#ff6eb4','#87ceeb','#dda0dd','#98fb98','#ffc0cb'];
+        for (let i = 0; i < 50; i++) {
+          const c = document.createElement('div');
+          const x = Math.random() * window.innerWidth;
+          const fall = 200 + Math.random() * 400;
+          const spin = 360 + Math.random() * 720;
+          const dur = 1200 + Math.random() * 1000;
+          const delay = Math.random() * 400;
+          const w = 6 + Math.random() * 8;
+          const h = 12 + Math.random() * 16;
+          const color = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+          c.style.cssText = `
+            position:absolute; left:${x}px; top:${cy - 100 - Math.random() * 200}px;
+            width:${w}px; height:${h}px; background:${color};
+            border-radius:2px;
+            --mcFall:${fall}px; --mcSpin:${spin}deg;
+            animation: moeConfetti ${dur}ms ease-in ${delay}ms forwards;
+            pointer-events:none;
+          `;
+          container.appendChild(c);
+        }
+      }, 2500);
+
+      // Cleanup
+      setTimeout(() => container.remove(), 5000);
+    };
+    socket.on('moe_bomb_animation', onMoeBomb);
+    const onDiscardToDeck = ({ owner, cardNames }) => {
+      const isMe = owner === myIdx;
+      const discardSel = isMe ? '[data-my-discard]' : '[data-opp-discard]';
+      const deckSel = isMe ? '[data-my-deck]' : '[data-opp-deck]';
+      const srcEl = document.querySelector(discardSel);
+      const tgtEl = document.querySelector(deckSel);
+      if (!srcEl || !tgtEl || !cardNames || cardNames.length === 0) return;
+
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const srcX = sr.left + sr.width / 2;
+      const srcY = sr.top + sr.height / 2;
+      const tgtX = tr.left + tr.width / 2;
+      const tgtY = tr.top + tr.height / 2;
+      const dx = tgtX - srcX;
+      const dy = tgtY - srcY;
+
+      // Inject keyframes once
+      if (!document.getElementById('discard-to-deck-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'discard-to-deck-keyframes';
+        style.textContent = `
+          @keyframes discardToDeck {
+            0% { transform: translate(0,0) scale(1); opacity: 1; }
+            20% { transform: translate(0, -20px) scale(1.1); opacity: 1; }
+            80% { transform: translate(var(--dtdDx), calc(var(--dtdDy) - 10px)) scale(0.9); opacity: 1; }
+            100% { transform: translate(var(--dtdDx), var(--dtdDy)) scale(0.7); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      for (let i = 0; i < cardNames.length; i++) {
+        const card = document.createElement('div');
+        const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardNames[i]) : null;
+        const delay = i * 200;
+        card.style.cssText = `
+          position:fixed; left:${srcX - 32}px; top:${srcY - 44}px;
+          width:64px; height:88px; z-index:10200; pointer-events:none;
+          border-radius:4px; overflow:hidden;
+          box-shadow: 0 0 12px rgba(100,255,150,0.7), 0 0 4px rgba(50,200,100,0.5);
+          --dtdDx:${dx}px; --dtdDy:${dy}px;
+          animation: discardToDeck 700ms ease-in-out ${delay}ms forwards;
+          opacity: 0;
+        `;
+        if (imgUrl) {
+          const img = document.createElement('img');
+          img.src = imgUrl;
+          img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+          img.draggable = false;
+          card.appendChild(img);
+          card.style.opacity = '1';
+        } else {
+          card.style.background = 'linear-gradient(135deg, #2a5a3a, #1a3a2a)';
+          card.style.opacity = '1';
+          card.innerHTML = `<div style="color:#8f8;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardNames[i]}</div>`;
+        }
+        document.body.appendChild(card);
+        setTimeout(() => card.remove(), delay + 800);
+      }
+    };
+    socket.on('discard_to_deck_animation', onDiscardToDeck);
+    const onPunchBox = ({ targetOwner, targetHeroIdx, targetZoneSlot }) => {
+      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      let tgtEl;
+      if (targetZoneSlot >= 0) {
+        tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
+      } else {
+        tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
+      }
+      if (!tgtEl) return;
+      const tr = tgtEl.getBoundingClientRect();
+      const cx = tr.left + tr.width / 2;
+      const cy = tr.top + tr.height / 2;
+
+      // Inject keyframes once
+      if (!document.getElementById('punch-box-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'punch-box-keyframes';
+        style.textContent = `
+          @keyframes punchSwing {
+            0% { transform: translateX(-250px) rotate(15deg) scale(0.5); opacity: 0; }
+            20% { opacity: 1; transform: translateX(-180px) rotate(10deg) scale(0.9); }
+            45% { transform: translateX(0px) rotate(-5deg) scale(1.3); }
+            55% { transform: translateX(-10px) rotate(0deg) scale(1.1); }
+            70% { transform: translateX(0px) scale(1.0); opacity: 1; }
+            100% { transform: translateX(30px) scale(0.6); opacity: 0; }
+          }
+          @keyframes punchImpact {
+            0% { transform: scale(0) rotate(0deg); opacity: 1; }
+            30% { transform: scale(1.5) rotate(10deg); opacity: 1; }
+            100% { transform: scale(2.5) rotate(-5deg); opacity: 0; }
+          }
+          @keyframes punchStar {
+            0% { transform: translate(0,0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--psDx), var(--psDy)) scale(0.3); opacity: 0; }
+          }
+          @keyframes punchShake {
+            0%, 100% { transform: translate(0,0); }
+            15% { transform: translate(-6px, 3px); }
+            30% { transform: translate(5px, -4px); }
+            45% { transform: translate(-4px, 2px); }
+            60% { transform: translate(3px, -2px); }
+            75% { transform: translate(-2px, 1px); }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      // Screen shake
+      document.body.style.animation = 'punchShake 400ms ease-out 350ms';
+      setTimeout(() => { document.body.style.animation = ''; }, 800);
+
+      // Boxing glove from the left — wrapper flips horizontally, animation handles position
+      const gloveWrap = document.createElement('div');
+      gloveWrap.style.cssText = `
+        position:fixed; left:${cx - 40}px; top:${cy - 40}px;
+        z-index:10300; pointer-events:none;
+        animation: punchSwing 700ms ease-out forwards;
+      `;
+      const glove = document.createElement('div');
+      glove.textContent = '🥊';
+      glove.style.cssText = `font-size:80px; line-height:1; transform:rotate(90deg); filter:drop-shadow(0 0 10px rgba(255,50,0,0.6));`;
+      gloveWrap.appendChild(glove);
+      document.body.appendChild(gloveWrap);
+      setTimeout(() => gloveWrap.remove(), 800);
+
+      // Impact burst at ~350ms
+      setTimeout(() => {
+        // "POW!" text
+        const pow = document.createElement('div');
+        pow.textContent = 'POW!';
+        pow.style.cssText = `
+          position:fixed; left:${cx - 50}px; top:${cy - 60}px;
+          font-size:48px; font-weight:900; color:#ff3300; z-index:10301;
+          pointer-events:none; text-shadow: 3px 3px 0 #ffcc00, -2px -2px 0 #ff6600;
+          font-family: 'Comic Sans MS', cursive, sans-serif;
+          animation: punchImpact 500ms ease-out forwards;
+        `;
+        document.body.appendChild(pow);
+        setTimeout(() => pow.remove(), 600);
+
+        // Impact starburst
+        const burstColors = ['#ff3300','#ffcc00','#ff6600','#fff','#ff9900'];
+        const stars = ['⭐','💥','✦','★','⚡'];
+        for (let i = 0; i < 15; i++) {
+          const s = document.createElement('div');
+          const angle = (i / 15) * 360 + Math.random() * 20;
+          const dist = 40 + Math.random() * 80;
+          const dx = Math.cos(angle * Math.PI / 180) * dist;
+          const dy = Math.sin(angle * Math.PI / 180) * dist;
+          const size = 14 + Math.random() * 18;
+          const dur = 400 + Math.random() * 300;
+          s.textContent = stars[Math.floor(Math.random() * stars.length)];
+          s.style.cssText = `
+            position:fixed; left:${cx}px; top:${cy}px; font-size:${size}px;
+            z-index:10301; pointer-events:none;
+            color:${burstColors[Math.floor(Math.random() * burstColors.length)]};
+            --psDx:${dx}px; --psDy:${dy}px;
+            animation: punchStar ${dur}ms ease-out forwards;
+          `;
+          document.body.appendChild(s);
+          setTimeout(() => s.remove(), dur + 50);
+        }
+      }, 350);
+    };
+    socket.on('punch_box_animation', onPunchBox);
+    const onTearsOfCreation = ({ owner, targets }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const goldEl = document.querySelector(`[data-gold-player="${owner}"]`);
+      if (!goldEl || !targets || targets.length === 0) return;
+      const gr = goldEl.getBoundingClientRect();
+      const goldX = gr.left + gr.width / 2;
+      const goldY = gr.top + gr.height / 2;
+
+      // Inject keyframes once
+      if (!document.getElementById('tears-creation-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'tears-creation-keyframes';
+        style.textContent = `
+          @keyframes tearsSparkle {
+            0% { transform: translate(0,0) scale(0.3); opacity: 0; }
+            15% { opacity: 1; transform: translate(var(--tcMidX), var(--tcMidY)) scale(1); }
+            50% { opacity: 1; transform: translate(calc(var(--tcDx)*0.6 + var(--tcMidX)*0.4), calc(var(--tcDy)*0.6 + var(--tcMidY)*0.3)) scale(0.8); }
+            100% { transform: translate(var(--tcDx), var(--tcDy)) scale(0.3); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      const colors = ['#ffd700','#ffec80','#fff4cc','#f0c040','#ffe066','#fff'];
+      const perTarget = 25;
+
+      for (const t of targets) {
+        const tLabel = t.owner === myIdx ? 'me' : 'opp';
+        let srcEl;
+        if (t.zoneSlot >= 0) {
+          srcEl = document.querySelector(`[data-support-zone][data-support-owner="${tLabel}"][data-support-hero="${t.heroIdx}"][data-support-slot="${t.zoneSlot}"]`);
+        } else {
+          srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tLabel}"][data-hero-idx="${t.heroIdx}"]`);
+        }
+        if (!srcEl) continue;
+        const sr = srcEl.getBoundingClientRect();
+        const srcX = sr.left + sr.width / 2;
+        const srcY = sr.top + sr.height / 2;
+        const dx = goldX - srcX;
+        const dy = goldY - srcY;
+
+        for (let i = 0; i < perTarget; i++) {
+          const p = document.createElement('div');
+          const size = 3 + Math.random() * 5;
+          const color = colors[Math.floor(Math.random() * colors.length)];
+          const delay = Math.random() * 600;
+          const dur = 500 + Math.random() * 500;
+          const midX = -20 + Math.random() * 40;
+          const midY = -30 - Math.random() * 30;
+
+          p.style.cssText = `
+            position:fixed; left:${srcX}px; top:${srcY}px;
+            width:${size}px; height:${size}px; border-radius:50%;
+            background:${color}; z-index:10200; pointer-events:none;
+            box-shadow: 0 0 ${size + 2}px ${color}, 0 0 ${size * 2}px rgba(255,215,0,0.3);
+            --tcDx:${dx}px; --tcDy:${dy}px; --tcMidX:${midX}px; --tcMidY:${midY}px;
+            animation: tearsSparkle ${dur}ms ease-in ${delay}ms forwards;
+            opacity:0;
+          `;
+          document.body.appendChild(p);
+          setTimeout(() => p.remove(), delay + dur + 100);
+        }
+      }
+    };
+    socket.on('tears_of_creation_animation', onTearsOfCreation);
     const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration }) => {
       stealInProgressRef.current = true;
       const iAmVictim = fromPlayer === myIdx;
@@ -6056,6 +6745,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_ram_animation', onRamAnimation);
       socket.off('play_card_transfer', onCardTransfer);
       socket.off('play_projectile_animation', onProjectileAnimation);
+      socket.off('butterfly_cloud_animation', onButterflyCloud);
+      socket.off('smug_coin_save', onSmugCoinSave);
+      socket.off('divine_rain_start', onDivineRainStart);
+      socket.off('moe_bomb_animation', onMoeBomb);
+      socket.off('discard_to_deck_animation', onDiscardToDeck);
+      socket.off('punch_box_animation', onPunchBox);
+      socket.off('tears_of_creation_animation', onTearsOfCreation);
       socket.off('play_hand_steal', onHandSteal);
       socket.off('blind_pick_highlight', onBlindPickHighlight);
       socket.off('play_cloak_vanish', onCloakVanish);
@@ -6272,6 +6968,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       else if (pendingAdditionalPlay) { setPendingAdditionalPlay(null); socket.emit('pending_placement_clear', { roomId: gameState.roomId }); }
       else if (deckViewer) setDeckViewer(null);
       else if (showSurrender) setShowSurrender(false);
+      else if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx) return; // Non-cancellable prompt active — ignore Escape
       else if (!gameState.result && !isSpectator) setShowSurrender(true);
       else if (gameState.result) handleLeave();
     };
@@ -6472,6 +7169,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // Damage number + Gold gain animations — detect changes from game state
   const [damageNumbers, setDamageNumbers] = useState([]);
+  const [healNumbers, setHealNumbers] = useState([]);
   const [creatureDamageNumbers, setCreatureDamageNumbers] = useState([]);
   const [goldGains, setGoldGains] = useState([]);
   const [goldLosses, setGoldLosses] = useState([]);
@@ -6508,6 +7206,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setDamageNumbers(prev => [...prev, ...newDmgNums]);
         setTimeout(() => {
           setDamageNumbers(prev => prev.filter(d => !newDmgNums.some(n => n.id === d.id)));
+        }, 1800);
+      }
+      // Detect HP increases (healing)
+      const newHealNums = [];
+      for (const [key, cur] of Object.entries(currentHp)) {
+        const prev = prevHpRef.current[key];
+        if (prev && cur.hp > prev.hp && prev.hp > 0) {
+          const healed = cur.hp - prev.hp;
+          const [piStr, hiStr] = key.split('-');
+          newHealNums.push({ id: Date.now() + Math.random(), amount: healed, ownerLabel: cur.owner, heroIdx: parseInt(hiStr) });
+        }
+      }
+      if (newHealNums.length > 0) {
+        setHealNumbers(prev => [...prev, ...newHealNums]);
+        setTimeout(() => {
+          setHealNumbers(prev => prev.filter(d => !newHealNums.some(n => n.id === d.id)));
         }, 1800);
       }
     }
@@ -6731,6 +7445,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const ep = gameState.effectPrompt;
   const isMyEffectPrompt = !isSpectator && !result && ep && ep.ownerIdx === myIdx;
   const isOppEffectPrompt = !isSpectator && !result && ep && ep.ownerIdx !== myIdx && ep.ownerIdx !== (gameState.activePlayer ?? -1);
+  const isActivePlayerPromptForOpp = !isSpectator && !result && ep && ep.ownerIdx !== myIdx && ep.ownerIdx === (gameState.activePlayer ?? -1) && ep.showOpponentWaiting;
   const zonePickSet = new Set();
   if (isMyEffectPrompt && ep.type === 'zonePick') {
     for (const z of (ep.zones || [])) {
@@ -6755,6 +7470,59 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   useEffect(() => {
     if (!isMyEffectPrompt || ep?.type !== 'skatesMove') setSkatesSelected(null);
   }, [ep?.type]);
+
+  // ── Chain Target Pick (Chain Lightning / Qinglong / Bottled Lightning) ──
+  const [chainPickSelected, setChainPickSelected] = useState([]); // [{id, type, owner, heroIdx, slotIdx?, cardName}]
+  useEffect(() => {
+    if (!ep || ep.type !== 'chainTargetPick') setChainPickSelected([]);
+  }, [ep?.type, ep?.title]);
+
+  const chainPickData = (isMyEffectPrompt && ep?.type === 'chainTargetPick') ? ep : null;
+  const chainPickValidIds = new Set();
+  const chainPickSelectedIds = new Set(chainPickSelected.map(t => t.id));
+  const chainPickDamages = chainPickData?.damages || [];
+  const chainPickMaxTargets = chainPickDamages.length;
+  const chainPickHeroesFirst = chainPickData?.heroesFirst || false;
+  if (chainPickData) {
+    const allTargets = chainPickData.targets || [];
+    // Determine which targets are valid for the current step
+    const step = chainPickSelected.length;
+    if (step < chainPickMaxTargets) {
+      for (const t of allTargets) {
+        if (chainPickSelectedIds.has(t.id)) continue;
+        // Heroes-first: if there are unselected heroes, only heroes are valid
+        if (chainPickHeroesFirst) {
+          const unselectedHeroes = allTargets.filter(x => x.type === 'hero' && !chainPickSelectedIds.has(x.id));
+          if (unselectedHeroes.length > 0 && t.type !== 'hero') continue;
+        }
+        chainPickValidIds.add(t.id);
+      }
+    }
+  }
+  const chainPickIsFinal = !!(chainPickData && chainPickSelected.length > 0 && (
+    chainPickSelected.length >= chainPickMaxTargets || chainPickValidIds.size === 0
+  ));
+  const chainPickCanConfirm = chainPickIsFinal;
+
+  // Escape removes last selection, Enter confirms chain
+  useEffect(() => {
+    if (!chainPickData) return;
+    const handleKey = (e) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        if (chainPickSelected.length > 0) {
+          setChainPickSelected(prev => prev.slice(0, -1));
+        }
+      } else if ((e.key === 'Enter' || e.code === 'Space') && chainPickCanConfirm) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        respondToPrompt({ selectedTargets: chainPickSelected });
+        setChainPickSelected([]);
+      }
+    };
+    window.addEventListener('keydown', handleKey, true);
+    return () => window.removeEventListener('keydown', handleKey, true);
+  }, [chainPickData, chainPickSelected.length, chainPickCanConfirm]);
   const respondToPrompt = (response) => {
     socket.emit('effect_prompt_response', { roomId: gameState.roomId, response });
   };
@@ -6929,6 +7697,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'xuanwu_revive') { const p = playerByName(entry.player); return <span>🐢 {pName(p.name, p.color)}'s Xuanwu revived {cName(entry.card)} with {entry.hp} HP!</span>; }
       if (t === 'zhuque_burn') { const p = playerByName(entry.player); return <span>🐦 {pName(p.name, p.color)}'s Zhuque burned {entry.target}!</span>; }
       if (t === 'cardinal_win') { const p = playerByName(entry.player); return <span>🏆 {pName(p.name, p.color)} controls all 4 Cardinal Beasts! VICTORY!</span>; }
+      if (t === 'bottled_discard') { const p = playerByName(entry.player); return <span>🗑️ {pName(p.name, p.color)} discarded {cName(entry.card)} ({entry.by}).</span>; }
+      if (t === 'bottled_take') { const p = playerByName(entry.player); return <span>💥 {pName(p.name, p.color)} takes the {cName(entry.potion)} effect!</span>; }
       if (t === 'ability_attached') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} attached {cName(entry.card)} to {entry.hero}.</span>; }
       if (t === 'artifact_equipped') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} equipped {cName(entry.card)} to {entry.hero}{entry.cost ? ` (${entry.cost}G)` : ''}.</span>; }
       if (t === 'ability_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} activated {cName(entry.card)} (Lv{entry.level})!</span>; }
@@ -7291,6 +8061,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const isPoisoned = hero?.statuses?.poisoned;
           const isShielded = hero?.statuses?.shielded;
           const isHealReversed = hero?.statuses?.healReversed;
+          const isUntargetable = hero?.statuses?.untargetable;
           // Check if this hero has an active hero effect
           const heroEffectEntry = (gameState.activeHeroEffects || []).find(e => e.heroIdx === i && ((!isOpp && !e.charmedOwner) || (isOpp && e.charmedOwner === pi)));
           const isHeroEffectActive = !!heroEffectEntry;
@@ -7300,7 +8071,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             : isControlled ? (hero.controlledBy === myIdx ? me.color : opp.color)
             : null;
           const isRamming = ramAnims.some(r => r.srcOwner === pi && r.srcHeroIdx === i);
-          const onHeroClick = (isHeroEffectActive && !isEffectLocked && !isValidHeroTarget)
+          // Chain target pick
+          const isChainPickValid = chainPickValidIds.has(heroTargetId);
+          const isChainPickSelected = chainPickSelectedIds.has(heroTargetId);
+          const chainPickStep = chainPickSelected.findIndex(t => t.id === heroTargetId);
+          const onHeroClick = isChainPickValid
+            ? () => {
+                const tgt = (chainPickData?.targets || []).find(t => t.id === heroTargetId);
+                if (tgt) setChainPickSelected(prev => [...prev, tgt]);
+              }
+            : (isHeroEffectActive && !isEffectLocked && !isValidHeroTarget)
             ? () => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: i, charmedOwner: heroEffectEntry?.charmedOwner })
             : (isValidHeroTarget ? () => togglePotionTarget(heroTargetId) : undefined);
           const heroGroup = (
@@ -7309,10 +8089,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '')}
+              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
-                style={zsMerge('hero', { ...((isHeroEffectActive || isValidHeroTarget) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
+                style={zsMerge('hero', { ...((isHeroEffectActive || isValidHeroTarget || isChainPickValid) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
+                {isChainPickSelected && <div className="chain-pick-number">{chainPickStep + 1}</div>}
                 {hero?.name && !isRamming ? (
                   <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={gameSkins}
                     style={isStunned?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' } : undefined} />
@@ -7329,7 +8110,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
                 {hero?.name && isHealReversed && <HealReversedOverlay />}
-                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isHealReversed) && <StatusBadges statuses={hero.statuses} isHero={true} player={p} />}
+                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isHealReversed || isUntargetable) && <StatusBadges statuses={hero.statuses} isHero={true} player={p} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
                 {hero?.name && (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Mummy Token')) && (
@@ -7645,10 +8426,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const isSkatesCreature = skatesCreatureSet.has(`${pi}-${i}-${z}`);
               const isSkatesCreatureSelected = isSkatesCreature && skatesSelected === z;
               const isSkatesDest = skatesDestSet.has(`${pi}-${i}-${z}`);
+              // Chain target pick for creatures
+              const creatureChainId = `equip-${pi}-${i}-${z}`;
+              const isChainPickCreatureValid = chainPickValidIds.has(creatureChainId);
+              const isChainPickCreatureSelected = chainPickSelectedIds.has(creatureChainId);
+              const chainPickCreatureStep = chainPickSelected.findIndex(t => t.id === creatureChainId);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'}
-                  onClick={isSkatesCreature ? () => {
+                  onClick={isChainPickCreatureValid ? () => {
+                    const tgt = (chainPickData?.targets || []).find(t => t.id === creatureChainId);
+                    if (tgt) setChainPickSelected(prev => [...prev, tgt]);
+                  } : isSkatesCreature ? () => {
                     setSkatesSelected(prev => prev === z ? null : z);
                   } : isSkatesDest ? () => {
                     respondToPrompt({ creatureSlot: skatesSelected, destHeroIdx: i, destSlot: z });
@@ -7669,7 +8458,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       socket.emit('pending_placement_clear', { roomId: gameState.roomId });
                     }
                   } : isZonePickTarget ? () => respondToPrompt({ heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
-                  style={zsMerge('support', (isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest) ? { cursor: 'pointer' } : undefined)}>
+                  style={zsMerge('support', (isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined)}>
+                  {isChainPickCreatureSelected && <div className="chain-pick-number">{chainPickCreatureStep + 1}</div>}
                   {(isPlayTarget || isAutoTarget) && playDrag.card ? (
                     <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
                   ) : (!isOpp && pendingAdditionalPlay && pendingAdditionalPlay.heroIdx === i && pendingAdditionalPlay.zoneSlot === z) ? (
@@ -7996,7 +8786,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               ))}
             </div>
           ) : (
-            <div className={"game-hand-cards" + (stealHighlightMe.size > 0 ? ' hand-steal-highlight-active' : '')}>
+            <div className={"game-hand-cards" + (stealHighlightMe.size > 0 ? ' hand-steal-highlight-active' : '') + (gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')}>
               {displayHand.map((item, i) => {
                 if (item.isGap) return <div key="gap" className="hand-drop-gap" />;
                 const isBeingDragged = (handDrag && handDrag.idx === item.origIdx) || (playDrag && playDrag.idx === item.origIdx) || (abilityDrag && abilityDrag.idx === item.origIdx);
@@ -8099,6 +8889,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Damage numbers */}
       {damageNumbers.map(d => (
         <DamageNumber key={d.id} amount={d.amount} heroName={d.heroName} />
+      ))}
+      {healNumbers.map(d => (
+        <HealNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} />
       ))}
       {creatureDamageNumbers.map(d => (
         <CreatureDamageNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} zoneSlot={d.zoneSlot} />
@@ -8896,6 +9689,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </DraggablePanel>
       )}
 
+      {/* ── Effect Prompt: Chain Target Pick (Chain Lightning / Qinglong / Bottled Lightning) ── */}
+      {isMyEffectPrompt && ep.type === 'chainTargetPick' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#ffcc00' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#ffcc00', marginBottom: 8 }}>⚡ {ep.title || 'Chain Lightning'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
+            {chainPickSelected.length < chainPickMaxTargets && chainPickValidIds.size > 0
+              ? `Click target #${chainPickSelected.length + 1} (${chainPickDamages[chainPickSelected.length]} dmg).`
+              : 'Confirm the chain!'}
+          </div>
+          {chainPickSelected.length > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8 }}>
+              {chainPickSelected.map((t, i) => (
+                <span key={String(t.id)} style={{ display: 'block', color: '#ffcc00' }}>#{i+1} {String(t.cardName || '?')} → {chainPickDamages[i] || 0} dmg</span>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            {chainPickSelected.length > 0 && (
+              <button className="btn" style={{ padding: '6px 14px', fontSize: 11 }}
+                onClick={() => setChainPickSelected(prev => prev.slice(0, -1))}>↩ Undo</button>
+            )}
+            {chainPickCanConfirm && (
+              <button className="btn btn-danger" style={{ padding: '6px 16px', fontSize: 11 }}
+                onClick={() => { respondToPrompt({ selectedTargets: chainPickSelected }); setChainPickSelected([]); }}>⚡ Confirm Chain!</button>
+            )}
+          </div>
+        </DraggablePanel>
+      )}
+
       {/* ── Effect Prompt: Slippery Skates Move ── */}
       {isMyEffectPrompt && ep.type === 'skatesMove' && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#00ccff' }}>
@@ -8928,7 +9750,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* ── Waiting for opponent (when they have an active effect prompt) ── */}
-      {isOppEffectPrompt && !gameState.potionTargeting && (
+      {(isOppEffectPrompt || isActivePlayerPromptForOpp) && !gameState.potionTargeting && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 260 }}>
           <div className="orbit-font" style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>
             {ep.type === 'cardGallery' || ep.type === 'cardGalleryMulti' ? '🔍 Opponent is choosing...' :
@@ -8946,6 +9768,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'confirm' ? 'Waiting for opponent to confirm...' :
              ep.type === 'zonePick' ? 'Waiting for opponent to select a zone...' :
              ep.type === 'skatesMove' ? 'Waiting for opponent to move a creature...' :
+             ep.type === 'chainTargetPick' ? 'Waiting for opponent to select targets...' :
              ep.type === 'heroAction' ? 'Waiting for opponent to play a card...' :
              ep.type === 'forceDiscard' ? (ep.opponentSubtitle || 'Waiting for opponent to discard a card...') :
              ep.type === 'forceDiscardCancellable' ? 'Waiting for opponent to discard or pass...' :
@@ -9058,13 +9881,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
           <div style={{ fontSize: 11, color: 'var(--danger)', opacity: .8, marginBottom: 12 }}>{ep.instruction || 'Click a card in your hand to discard it.'}</div>
           <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+            onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || 'Cancel (Esc)'}</button>
         </DraggablePanel>
       )}
 
       {/* ── Hand Pick Prompt (Shard of Chaos) ── */}
       {isMyEffectPrompt && ep.type === 'handPick' && (() => {
-        const minSel = ep.minSelect || 1;
+        const minSel = ep.minSelect ?? 1;
         const canConfirm = handPickSelected.size >= minSel;
         return (
           <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(200,100,255,.85)' }}>

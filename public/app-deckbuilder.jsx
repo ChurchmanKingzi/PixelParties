@@ -110,6 +110,7 @@ function DeckBuilder() {
   const [renaming, setRenaming] = useState(false);
   const [renameVal, setRenameVal] = useState('');
   const [ctxMenu, setCtxMenu] = useState(null);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [historyTick, setHistoryTick] = useState(0);
 
   // Per-section undo/redo history
@@ -150,17 +151,23 @@ function DeckBuilder() {
     return () => { window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close); };
   }, []);
 
-  // Escape closes context menu / skin gallery before navigating away
+  // Ref to track latest state for Escape handler (avoids stale closures)
+  const escStateRef = useRef({});
+
+  // Escape closes context menu / skin gallery, or checks unsaved before navigating away
   useEffect(() => {
     const handleEsc = (e) => {
-      if (e.key === 'Escape') {
-        if (skinGallery) { e.stopImmediatePropagation(); setSkinGallery(null); return; }
-        if (ctxMenu) { e.stopImmediatePropagation(); setCtxMenu(null); return; }
-      }
+      if (e.key !== 'Escape') return;
+      const s = escStateRef.current;
+      if (s.showLeaveConfirm) { e.preventDefault(); e.stopImmediatePropagation(); setShowLeaveConfirm(false); setScreen('menu'); return; }
+      if (s.skinGallery) { e.preventDefault(); e.stopImmediatePropagation(); setSkinGallery(null); return; }
+      if (s.ctxMenu) { e.preventDefault(); e.stopImmediatePropagation(); setCtxMenu(null); return; }
+      if (s.hasUnsaved && !s.isSampleMode) { e.preventDefault(); e.stopImmediatePropagation(); setShowLeaveConfirm(true); return; }
+      setScreen('menu');
     };
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
-  }, [ctxMenu, skinGallery]);
+  }, []);
 
   // Current deck with unsaved overlay
   const currentDeck = useMemo(() => {
@@ -623,6 +630,9 @@ function DeckBuilder() {
       items.push({ label: 'Add to Heroes', icon: '👑', color: '#ffd700', disabled: !canAddCard(currentDeck, cardName, 'hero'), action: () => addCardTo(cardName, 'hero') });
     } else if (card.cardType === 'Potion') {
       items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#44ffaa', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
+      if (hasNicolasHero(currentDeck)) {
+        items.push({ label: 'Add to Main Deck', icon: '📋', color: '#44aaff', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
+      }
     } else {
       items.push({ label: 'Add to Main Deck', icon: '📋', color: '#44aaff', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
     }
@@ -768,6 +778,7 @@ function DeckBuilder() {
 
   const validation = currentDeck ? isDeckLegal(currentDeck) : { legal: false, reasons: [] };
   const hasUnsaved = currentDeck && unsaved[currentDeck.id];
+  escStateRef.current = { showLeaveConfirm, skinGallery, ctxMenu, hasUnsaved, isSampleMode };
   const heroes = currentDeck?.heroes || [{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null }];
 
   const importFileRef = useRef(null);
@@ -1065,9 +1076,13 @@ function DeckBuilder() {
     <div className="screen-full">
       {/* ── TOP BAR ── */}
       <div className="top-bar">
-        <button className="btn" style={{ padding: '4px 10px', fontSize: 9 }} onClick={() => setScreen('menu')}>← MENU</button>
+        <button className="btn" style={{ padding: '4px 10px', fontSize: 9 }} onClick={() => hasUnsaved && !isSampleMode ? setShowLeaveConfirm(true) : setScreen('menu')}>← MENU</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', margin: '0 8px' }}>DECK BUILDER</h2>
         <div style={{ flex: 1 }} />
+        <button className="btn" style={{ padding: '4px 10px', fontSize: 9 }}
+          disabled={!hasUnsaved || isSampleMode}
+          onClick={() => { if (!currentDeck) return; const id = currentDeck.id; setUnsaved(prev => { const n = { ...prev }; delete n[id]; return n; }); delete shRef.current[id]; setHistoryTick(t => t + 1); }}>
+          ↩ RESET</button>
         <button className={'btn' + (hasUnsaved && !isSampleMode ? ' btn-flash-save' : '')} style={{ padding: '4px 10px', fontSize: 9 }} onClick={saveCurrent} disabled={!hasUnsaved || isSampleMode}
           title={isSampleMode ? 'Cannot save sample decks — use Save As or Rename' : ''}>💾 SAVE</button>
         <button className="btn btn-accent2" style={{ padding: '4px 10px', fontSize: 9 }} onClick={saveAs}>SAVE AS</button>
@@ -1327,6 +1342,31 @@ function DeckBuilder() {
       </div>
 
       {ctxMenu && <CtxMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />}
+
+      {/* Unsaved changes confirmation */}
+      {showLeaveConfirm && (
+        <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.7)', zIndex: 10001 }}>
+          <div className="animate-in" style={{
+            background: 'var(--bg2)', border: '2px solid var(--danger)', borderRadius: 12,
+            padding: '24px 32px', textAlign: 'center', maxWidth: 320,
+          }}>
+            <div className="orbit-font" style={{ fontSize: 15, color: 'var(--danger)', marginBottom: 12 }}>
+              You have unsaved changes!
+            </div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button className="btn btn-success" style={{ padding: '8px 24px', fontSize: 12 }}
+                onClick={async () => { await saveCurrent(); setShowLeaveConfirm(false); setScreen('menu'); }}>
+                💾 Save
+              </button>
+              <button className="btn btn-danger" style={{ padding: '8px 24px', fontSize: 12 }}
+                onClick={() => { setShowLeaveConfirm(false); setScreen('menu'); }}>
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {skinGallery && (
         <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.7)', zIndex: 10000 }} onClick={() => setSkinGallery(null)}>
           <div className="skin-gallery-panel animate-in" onClick={e => e.stopPropagation()}>

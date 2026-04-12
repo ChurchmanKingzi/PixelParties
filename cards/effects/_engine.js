@@ -951,6 +951,38 @@ class GameEngine {
 
         if (targets.length === 0) return null;
 
+        // ── Untargetable filter ──
+        // Heroes with the untargetable status can't be chosen by the opponent,
+        // UNLESS all other heroes on that side are also untargetable or dead.
+        if (!config.ignoreUntargetable) {
+          const heroTargets = targets.filter(t => t.type === 'hero');
+          const untargetableIds = new Set();
+          // Group by owner to check per-side
+          const byOwner = {};
+          for (const t of heroTargets) {
+            if (!byOwner[t.owner]) byOwner[t.owner] = [];
+            byOwner[t.owner].push(t);
+          }
+          for (const [ownerStr, group] of Object.entries(byOwner)) {
+            const owner = parseInt(ownerStr);
+            if (owner === pi) continue; // Own heroes — untargetable doesn't block self-targeting
+            const targetable = group.filter(t => !gs.players[t.owner]?.heroes?.[t.heroIdx]?.statuses?.untargetable);
+            if (targetable.length > 0) {
+              // Has non-untargetable heroes — mark untargetable ones for removal
+              for (const t of group) {
+                if (gs.players[t.owner]?.heroes?.[t.heroIdx]?.statuses?.untargetable) untargetableIds.add(t.id);
+              }
+            }
+            // If ALL are untargetable, keep them all (untargetable does nothing)
+          }
+          if (untargetableIds.size > 0) {
+            for (let i = targets.length - 1; i >= 0; i--) {
+              if (untargetableIds.has(targets[i].id)) targets.splice(i, 1);
+            }
+            if (targets.length === 0) return null;
+          }
+        }
+
         // Filter out excluded targets (Bartas second-cast, etc.)
         const excludeIds = gs._spellExcludeTargets || [];
         const filteredTargets = excludeIds.length > 0 ? targets.filter(t => !excludeIds.includes(t.id)) : targets;
@@ -1589,6 +1621,37 @@ class GameEngine {
       }
     }
 
+    // ── Smug Coin: lethal damage protection (opponent/status sources only) ──
+    if (target?.hp > 0 && target.hp !== undefined && hookCtx.amount >= target.hp) {
+      const targetOwner = this._findHeroOwner(target);
+      if (targetOwner >= 0) {
+        const dmgSrcOwner = source?.owner ?? source?.controller ?? -1;
+        const isOpponentDamage = dmgSrcOwner >= 0 && dmgSrcOwner !== targetOwner;
+        const isStatusDamage = dmgSrcOwner < 0 && (type === 'fire' || type === 'poison' || source?.name === 'Burn' || source?.name === 'Poison');
+        if (isOpponentDamage || isStatusDamage) {
+          const heroIdx = this.gs.players[targetOwner].heroes.indexOf(target);
+          if (heroIdx >= 0) {
+            const smugCoinInst = this.cardInstances.find(c =>
+              c.name === 'Smug Coin' && c.owner === targetOwner && c.zone === 'support' && c.heroIdx === heroIdx
+            );
+            if (smugCoinInst) {
+              hookCtx.amount = Math.max(0, target.hp - 1);
+              this.log('smug_coin_save', { target: this._heroLabel(target), player: this.gs.players[targetOwner]?.username });
+              // Broadcast coin rain animation
+              this._broadcastEvent('smug_coin_save', { owner: targetOwner, heroIdx });
+              // Delete the Smug Coin (remove from zone + untrack)
+              const ps = this.gs.players[targetOwner];
+              if (ps.supportZones[heroIdx]?.[smugCoinInst.zoneSlot]) {
+                ps.supportZones[heroIdx][smugCoinInst.zoneSlot] = [];
+              }
+              this._untrackCard(smugCoinInst.id);
+              this.log('card_deleted', { card: 'Smug Coin', player: ps.username });
+            }
+          }
+        }
+      }
+    }
+
     const actualAmount = Math.max(0, hookCtx.amount);
     if (target && target.hp !== undefined) {
       target.hp = Math.max(0, target.hp - actualAmount);
@@ -1865,6 +1928,39 @@ class GameEngine {
    * @param {string[]} cardNames - Card names to reveal
    * @param {string} title - Title for the reveal prompt (e.g. 'Divine Gift of Creation')
    */
+  /**
+   * Standard chain lightning target picker.
+   * Shows all valid targets, player clicks to select in order.
+   * Auto-confirms non-final clicks, confirm button for last target.
+   * @param {number} playerIdx - Player who picks targets
+   * @param {object[]} targets - Array of target objects with id, type, owner, heroIdx, slotIdx?, cardName
+   * @param {number[]} damages - Damage per step, e.g. [200, 150, 100]
+   * @param {object} opts - { title, heroesFirst }
+   * @returns {object[]} Selected targets in order, or empty array if none
+   */
+  async promptChainTargets(playerIdx, targets, damages, opts = {}) {
+    if (!targets || targets.length === 0) return [];
+
+    // Strip cardInstance references for serialization
+    const clientTargets = targets.map(t => {
+      const { cardInstance, ...rest } = t;
+      return rest;
+    });
+
+    const result = await this.promptGeneric(playerIdx, {
+      type: 'chainTargetPick',
+      title: opts.title || 'Chain Lightning',
+      targets: clientTargets,
+      damages,
+      heroesFirst: opts.heroesFirst || false,
+      cancellable: false,
+    });
+
+    if (!result || !result.selectedTargets || result.selectedTargets.length === 0) return [];
+    // Re-match targets by id to get full data (cardInstance etc.)
+    return result.selectedTargets.map(sel => targets.find(t => t.id === sel.id)).filter(Boolean);
+  }
+
   async revealSearchedCards(playerIdx, cardNames, title) {
     if (!cardNames || cardNames.length === 0) return;
     const ps = this.gs.players[playerIdx];
@@ -2870,6 +2966,10 @@ class GameEngine {
   getHeroEligibleActionCards(playerIdx, heroIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
+    const hero = ps.heroes[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return [];
+    // Per-hero action limit (Sol Rym, etc.)
+    if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) return [];
     const cardDB = this._getCardDB();
     const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
     const eligible = [];
@@ -2878,21 +2978,8 @@ class GameEngine {
       if (seen.has(cardName)) continue;
       const cd = cardDB[cardName];
       if (!cd || !ACTION_TYPES.includes(cd.cardType)) continue;
-      // Check spell school / level requirements
-      const hero = ps.heroes[heroIdx];
-      if (!hero?.name || hero.hp <= 0) continue;
-      const level = cd.level || 0;
-      if (level > 0 || cd.spellSchool1) {
-        const abZones = ps.abilityZones[heroIdx] || [];
-        const countAb = (school) => this.countAbilitiesForSchool(school, abZones);
-        let levelFail = false;
-        if (cd.spellSchool1 && countAb(cd.spellSchool1) < level) levelFail = true;
-        if (cd.spellSchool2 && countAb(cd.spellSchool2) < level) levelFail = true;
-        if (levelFail) {
-          const blr = hero.bypassLevelReq;
-          if (!blr || level > blr.maxLevel || !blr.types.includes(cd.cardType)) continue;
-        }
-      }
+      // Check spell school / level requirements (centralized)
+      if (!this.heroMeetsLevelReq(playerIdx, heroIdx, cd)) continue;
       // Creatures need a free support zone
       if (hasCardType(cd, 'Creature')) {
         const supZones = ps.supportZones[heroIdx] || [];
@@ -2913,6 +3000,144 @@ class GameEngine {
       eligible.push(cardName);
     }
     return eligible;
+  }
+
+  /**
+   * Compute per-hero playable action cards for the client.
+   * Returns a map of hero indices → card names that the hero can play,
+   * considering ALL hero-specific constraints: level/school, frozen/stunned,
+   * combo lock, per-hero action limit, hero script restrictions (Ghuanjun, etc.),
+   * equip restrictions, and creature support zone availability.
+   *
+   * This is sent in the game state so the client never needs to duplicate
+   * level/school/constraint logic — it just does a lookup.
+   *
+   * @param {number} playerIdx
+   * @returns {{ own: Object<number, string[]>, charmed: Object<number, string[]> }}
+   */
+  getHeroPlayableCards(playerIdx) {
+    const gs = this.gs;
+    const ps = gs.players[playerIdx];
+    if (!ps) return { own: {}, charmed: {} };
+
+    const cardDB = this._getCardDB();
+    const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
+
+    // Collect unique action cards from hand
+    const handCards = [];
+    const seen = new Set();
+    for (const cardName of (ps.hand || [])) {
+      if (seen.has(cardName)) continue;
+      const cd = cardDB[cardName];
+      if (!cd || !ACTION_TYPES.includes(cd.cardType)) continue;
+      seen.add(cardName);
+      handCards.push(cd);
+    }
+
+    const own = {};
+
+    // ── Own heroes ──
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      const playable = [];
+
+      // Hero-wide blocks: dead, frozen, stunned, combo-locked out, action limit
+      if (!hero?.name || hero.hp <= 0) { own[hi] = playable; continue; }
+      if (hero.statuses?.frozen || hero.statuses?.stunned) { own[hi] = playable; continue; }
+      if (ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== hi) { own[hi] = playable; continue; }
+      if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) { own[hi] = playable; continue; }
+
+      // Pre-load hero script and equip scripts for per-card checks
+      const heroScript = loadCardEffect(hero.name);
+      const equipScripts = [];
+      for (const inst of this.cardInstances) {
+        if (inst.owner !== playerIdx || inst.zone !== 'support' || inst.heroIdx !== hi) continue;
+        if (!inst.counters?.treatAsEquip) continue;
+        const eScript = loadCardEffect(inst.name);
+        if (eScript?.canPlayCard) equipScripts.push(eScript);
+      }
+
+      for (const cd of handCards) {
+        // Level/school requirements (handles levelOverrideCards, bypassLevelReq, negation, Performance, Wisdom)
+        if (!this.heroMeetsLevelReq(playerIdx, hi, cd)) continue;
+        // Wisdom hand-size check: player must have enough cards to pay the discard cost
+        if (cd.cardType === 'Spell') {
+          const wisdomCost = this.getWisdomDiscardCost(playerIdx, hi, cd);
+          if (wisdomCost > 0 && (ps.hand.length - 1) < wisdomCost) continue;
+        }
+        // Hero script card restriction (e.g. Ghuanjun duplicate attack ban)
+        if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, playerIdx, hi, cd, this)) continue;
+        // Equipped card restrictions (treatAsEquip cards in support zones)
+        let equipBlocked = false;
+        for (const es of equipScripts) {
+          if (!es.canPlayCard(gs, playerIdx, hi, cd, this)) { equipBlocked = true; break; }
+        }
+        if (equipBlocked) continue;
+        // Creature-specific: need a free support zone and not summon-locked
+        if (hasCardType(cd, 'Creature')) {
+          if (ps.summonLocked) continue;
+          const supZones = ps.supportZones[hi] || [];
+          let hasFree = false;
+          for (let z = 0; z < 3; z++) { if ((supZones[z] || []).length === 0) { hasFree = true; break; } }
+          if (!hasFree) continue;
+        }
+        playable.push(cd.name);
+      }
+      own[hi] = playable;
+    }
+
+    // ── Charmed opponent heroes ──
+    const charmed = {};
+    const oppIdx = 1 - playerIdx;
+    const oppPs = gs.players[oppIdx];
+    if (oppPs) {
+      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
+        const hero = oppPs.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.charmedBy !== playerIdx) continue;
+        if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+        // Combo lock does NOT apply to charmed heroes
+        if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) continue;
+
+        const heroScript = loadCardEffect(hero.name);
+        const equipScripts = [];
+        for (const inst of this.cardInstances) {
+          if (inst.owner !== oppIdx || inst.zone !== 'support' || inst.heroIdx !== hi) continue;
+          if (!inst.counters?.treatAsEquip) continue;
+          const eScript = loadCardEffect(inst.name);
+          if (eScript?.canPlayCard) equipScripts.push(eScript);
+        }
+
+        const playable = [];
+        for (const cd of handCards) {
+          // Level/school check uses opponent's ability zones (where the charmed hero lives)
+          if (!this.heroMeetsLevelReq(oppIdx, hi, cd)) continue;
+          // Wisdom hand-size check: acting player (ps) must have enough cards to pay
+          if (cd.cardType === 'Spell') {
+            const wisdomCost = this.getWisdomDiscardCost(oppIdx, hi, cd);
+            if (wisdomCost > 0 && (ps.hand.length - 1) < wisdomCost) continue;
+          }
+          if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, oppIdx, hi, cd, this)) continue;
+          let equipBlocked = false;
+          for (const es of equipScripts) {
+            if (!es.canPlayCard(gs, oppIdx, hi, cd, this)) { equipBlocked = true; break; }
+          }
+          if (equipBlocked) continue;
+          // Creature checks: summonLocked is on the acting player, support zones on the hero owner
+          if (hasCardType(cd, 'Creature')) {
+            if (ps.summonLocked) continue;
+            const supZones = oppPs.supportZones[hi] || [];
+            let hasFree = false;
+            for (let z = 0; z < 3; z++) { if ((supZones[z] || []).length === 0) { hasFree = true; break; } }
+            if (!hasFree) continue;
+          }
+          playable.push(cd.name);
+        }
+        if (playable.length > 0) charmed[hi] = playable;
+      }
+    }
+
+    return { own, charmed };
   }
 
   /**
@@ -2962,18 +3187,11 @@ class GameEngine {
     // Combo lock (only for own heroes)
     if (opts.charmedOwner == null && ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== heroIdx) return null;
 
-    // Spell school / level requirements — use the charmed hero's ability zones
-    const level = cardData.level || 0;
-    if (level > 0 || cardData.spellSchool1) {
-      const abZones = hero.statuses?.negated ? [] : (heroPs.abilityZones[heroIdx] || []);
-      let levelFail = false;
-      if (cardData.spellSchool1 && this.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) levelFail = true;
-      if (cardData.spellSchool2 && this.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) levelFail = true;
-      if (levelFail) {
-        const blr = hero.bypassLevelReq;
-        if (!blr || level > blr.maxLevel || !blr.types.includes(cardData.cardType)) return null;
-      }
-    }
+    // Per-hero action limit (Sol Rym, etc.)
+    if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) return null;
+
+    // Spell school / level requirements — centralized check (handles levelOverrideCards, bypassLevelReq, negation)
+    if (!this.heroMeetsLevelReq(heroOwner, heroIdx, cardData)) return null;
 
     // Load card script
     const script = loadCardEffect(cardName);
@@ -3010,7 +3228,7 @@ class GameEngine {
       ? script.inherentAction(gs, pi, heroIdx, this)
       : script?.inherentAction === true;
 
-    return { ps, cardData, hero, script, level, isActionPhase, isMainPhase, isInherentAction };
+    return { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction };
   }
 
   /**
@@ -3384,6 +3602,10 @@ class GameEngine {
         delete ps._revealedCardCounts;
         ps.bonusActions = null;
         ps._bonusMainActions = 0;
+        // Reset per-hero action counters (Sol Rym, etc.)
+        for (const hero of (ps.heroes || [])) {
+          if (hero?._actionsThisTurn) hero._actionsThisTurn = 0;
+        }
       }
     }
     // Reset Nomu bonus draw counter each turn
@@ -4494,8 +4716,6 @@ class GameEngine {
     const srcOwner = source?.owner ?? source?.controller ?? -1;
     const targetOwner = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
     if (targetOwner < 0) return;
-    // Only opponent damage
-    if (srcOwner === targetOwner) return;
 
     const targetHeroIdx = this.gs.players[targetOwner]?.heroes?.indexOf(target);
     if (targetHeroIdx < 0) return;
@@ -4561,7 +4781,12 @@ class GameEngine {
         this._inAfterDamageReaction = false;
       }
 
-      ps.discardPile.push(cardName);
+      // Potions and deleteOnUse cards go to deleted pile; everything else to discard
+      if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
+        ps.deletedPile.push(cardName);
+      } else {
+        ps.discardPile.push(cardName);
+      }
       this.sync();
       return; // Only one after-damage reaction per damage instance
     }
@@ -4778,18 +5003,8 @@ class GameEngine {
     const cardData = this._getCardDB()[cardName];
     if (!cardData) return false;
 
-    // Check spell school / level requirements
-    const level = cardData.level || 0;
-    if (level > 0 || cardData.spellSchool1) {
-      const abZones = hero.statuses?.negated ? [] : (ps.abilityZones[heroIdx] || []);
-      let levelFail = false;
-      if (cardData.spellSchool1 && this.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) levelFail = true;
-      if (cardData.spellSchool2 && this.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) levelFail = true;
-      if (levelFail) {
-        const blr = hero.bypassLevelReq;
-        if (!blr || level > blr.maxLevel || !blr.types.includes(cardData.cardType)) return false;
-      }
-    }
+    // Check spell school / level requirements (centralized)
+    if (!this.heroMeetsLevelReq(playerIdx, heroIdx, cardData)) return false;
 
     // Creature surprises need a free Support Zone (skip for Bakhm slots — already in support)
     if (!opts.isBakhmSlot && hasCardType(cardData, 'Creature')) {
@@ -6242,7 +6457,11 @@ class GameEngine {
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
-    const level = cardData.level || 0;
+    let level = cardData.level || 0;
+    // Per-card level override (e.g. Sol Rym treats Chain Lightning as level 0)
+    if (hero.levelOverrideCards && cardData.name && hero.levelOverrideCards[cardData.name] != null) {
+      level = hero.levelOverrideCards[cardData.name];
+    }
     if (level <= 0 && !cardData.spellSchool1) return true;
     const abZones = hero.statuses?.negated ? [] : (ps.abilityZones[heroIdx] || []);
     let levelFail = false;
@@ -6250,9 +6469,81 @@ class GameEngine {
     if (cardData.spellSchool2 && this.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) levelFail = true;
     if (levelFail) {
       const blr = hero.bypassLevelReq;
-      return !!(blr && level <= blr.maxLevel && blr.types.includes(cardData.cardType));
+      if (blr && level <= blr.maxLevel && blr.types.includes(cardData.cardType)) return true;
+
+      // Wisdom — only for Spells: allows casting spells [Wisdom level] higher than normal
+      if (cardData.cardType === 'Spell') {
+        const wisdomLevel = this.countAbilitiesForSchool('Wisdom', abZones);
+        if (wisdomLevel > 0) {
+          let maxGap = 0;
+          if (cardData.spellSchool1) {
+            const has = this.countAbilitiesForSchool(cardData.spellSchool1, abZones);
+            if (has < level) maxGap = Math.max(maxGap, level - has);
+          }
+          if (cardData.spellSchool2) {
+            const has = this.countAbilitiesForSchool(cardData.spellSchool2, abZones);
+            if (has < level) maxGap = Math.max(maxGap, level - has);
+          }
+          if (maxGap > 0 && wisdomLevel >= maxGap) return true;
+        }
+      }
+
+      return false;
     }
     return true;
+  }
+
+  /**
+   * Calculate the Wisdom discard cost for playing a Spell with a given hero.
+   * Returns 0 if the Spell is playable without Wisdom (or is not a Spell).
+   * Returns the number of cards the player must discard if Wisdom is needed.
+   * Returns -1 if the Spell is not playable even with Wisdom.
+   *
+   * @param {number} playerIdx - Owner of the hero (may differ from acting player for charmed heroes)
+   * @param {number} heroIdx
+   * @param {object} cardData - Card data from cards.json
+   * @returns {number}
+   */
+  getWisdomDiscardCost(playerIdx, heroIdx, cardData) {
+    if (cardData.cardType !== 'Spell') return 0;
+    const ps = this.gs.players[playerIdx];
+    const hero = ps?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return 0;
+
+    let level = cardData.level || 0;
+    if (hero.levelOverrideCards && cardData.name && hero.levelOverrideCards[cardData.name] != null) {
+      level = hero.levelOverrideCards[cardData.name];
+    }
+    if (level <= 0 && !cardData.spellSchool1) return 0;
+
+    const abZones = hero.statuses?.negated ? [] : (ps.abilityZones[heroIdx] || []);
+
+    // Check if the card is already playable without Wisdom
+    let levelFail = false;
+    if (cardData.spellSchool1 && this.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) levelFail = true;
+    if (cardData.spellSchool2 && this.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) levelFail = true;
+    if (!levelFail) return 0; // Playable without Wisdom
+
+    // Check if bypassLevelReq covers it (no Wisdom cost)
+    const blr = hero.bypassLevelReq;
+    if (blr && level <= blr.maxLevel && blr.types.includes(cardData.cardType)) return 0;
+
+    // Calculate the max gap across all required schools
+    let maxGap = 0;
+    if (cardData.spellSchool1) {
+      const has = this.countAbilitiesForSchool(cardData.spellSchool1, abZones);
+      if (has < level) maxGap = Math.max(maxGap, level - has);
+    }
+    if (cardData.spellSchool2) {
+      const has = this.countAbilitiesForSchool(cardData.spellSchool2, abZones);
+      if (has < level) maxGap = Math.max(maxGap, level - has);
+    }
+
+    // Check if Wisdom covers the gap
+    const wisdomLevel = this.countAbilitiesForSchool('Wisdom', abZones);
+    if (wisdomLevel >= maxGap && maxGap > 0) return maxGap;
+
+    return -1; // Not playable even with Wisdom
   }
 
   /**
@@ -6455,6 +6746,18 @@ class GameEngine {
         if (!hero?.name || !hero.statuses) continue;
         if (hero.statuses.shielded) await this.removeHeroStatus(ap, hi, 'shielded');
         if (hero.statuses.immune) await this.removeHeroStatus(ap, hi, 'immune');
+        // Untargetable expires at the start of the caster's next turn
+        if (hero.statuses.untargetable) {
+          delete hero.statuses.untargetable;
+          this.log('status_removed', { target: hero.name, status: 'untargetable' });
+        }
+      }
+      // Butterfly Cloud cooldown: rotate flags each turn
+      // _butterflyCloudUsedThisTurn (set during play) → _butterflyCooldown (blocks next turn) → cleared
+      if (ps._butterflyCooldown) delete ps._butterflyCooldown;
+      if (ps._butterflyCloudUsedThisTurn) {
+        ps._butterflyCooldown = true;
+        delete ps._butterflyCloudUsedThisTurn;
       }
     }
   }
@@ -6636,11 +6939,17 @@ class GameEngine {
       }
     }
 
-    // ── Post-target hand reaction check (Anti Magic Shield, etc.) ──
-    if (!config._skipSurpriseCheck && hitHeroes.length > 0) {
-      const aoeTargets2 = hitHeroes.map(h => ({
-        type: 'hero', owner: h.owner, heroIdx: h.heroIdx, cardName: h.hero.name,
-      }));
+    // ── Post-target hand reaction check (Anti Magic Shield, Divine Gift of Rain, etc.) ──
+    if (!config._skipSurpriseCheck && (hitHeroes.length > 0 || creatureEntries.length > 0)) {
+      const aoeTargets2 = [
+        ...hitHeroes.map(h => ({
+          type: 'hero', owner: h.owner, heroIdx: h.heroIdx, cardName: h.hero.name,
+        })),
+        ...creatureEntries.map(e => ({
+          type: 'creature', owner: e.inst.owner, heroIdx: e.inst.heroIdx,
+          slotIdx: e.inst.zoneSlot, cardName: e.inst.name,
+        })),
+      ];
       const ptResult = await this._checkPostTargetHandReactions(aoeTargets2, cardInst);
       if (ptResult?.effectNegated) {
         return { heroes: [], creatures: [], wasSingleTarget: false, cancelled: true };

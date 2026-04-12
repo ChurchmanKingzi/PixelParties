@@ -1883,6 +1883,10 @@ body {
   pointer-events: none;
   animation: damageFloat 1.6s ease-out forwards;
 }
+.damage-number.heal-number {
+  color: #33dd55;
+  text-shadow: 0 0 8px rgba(50,220,80,.7), 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
 
 /* Gold gain numbers */
 @keyframes goldFloat {
@@ -4113,10 +4117,35 @@ body:has(.reaction-chain-overlay) .board-tooltip {
   50%      { box-shadow: 0 0 14px 4px rgba(0,255,100,.7); }
 }
 
-/* ── Cardinal Beast Qinglong Lightning ── */
+/* ── Chain Target Pick highlighting ── */
+.chain-pick-valid {
+  box-shadow: 0 0 12px 3px rgba(255,200,0,.6) !important;
+  animation: chainPickPulse 1s ease-in-out infinite;
+}
+.chain-pick-selected {
+  box-shadow: 0 0 14px 4px rgba(255,220,50,.8) !important;
+  outline: 2px solid rgba(255,220,50,.9);
+}
+.chain-pick-number {
+  position: absolute; top: 3px; left: 3px; z-index: 8;
+  background: #ffcc00; color: #000; font-size: 11px; font-weight: 900;
+  width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 8px rgba(255,200,0,.6);
+  pointer-events: none;
+}
+@keyframes chainPickPulse {
+  0%, 100% { box-shadow: 0 0 10px 2px rgba(255,200,0,.4); }
+  50%      { box-shadow: 0 0 18px 5px rgba(255,200,0,.8); }
+}
+
+/* ── Chain Lightning Animation ── */
 @keyframes lightningBolt {
   0%   { width: 0; opacity: 0; }
-  20%  { opacity: 1; }
+  10%  { opacity: 1; }
+  40%  { width: var(--bolt-len); opacity: 1; }
+  60%  { opacity: .7; }
+  80%  { opacity: 1; }
   100% { width: var(--bolt-len); opacity: 0; }
 }
 

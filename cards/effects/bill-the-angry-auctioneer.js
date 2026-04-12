@@ -1,10 +1,10 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Bill, the Angry Auctioneer"
 //  Hero — Before starting hands are drawn,
-//  search deck for up to 2 Equipment Artifacts
-//  with combined cost ≤ 20 and equip them to
-//  other Heroes (not Bill). Each Hero gets at
-//  most 1 Artifact from this effect.
+//  search deck for up to 2 different Equipment
+//  Artifacts with combined cost ≤ 20 and equip
+//  them to other Heroes (not Bill). Each Hero
+//  gets at most 1 Artifact from this effect.
 //  Max equips = number of other living Heroes.
 //  No gold cost.
 // ═══════════════════════════════════════════
@@ -68,7 +68,7 @@ module.exports = {
       // Multi-select gallery with budget constraint
       const selection = await ctx.promptCardGalleryMulti(eligibleCards, {
         title: 'Bill, the Angry Auctioneer',
-        description: `Select up to ${maxEquips} Equipment Artifact${maxEquips > 1 ? 's' : ''} to equip.`,
+        description: `Select up to ${maxEquips} different Equipment Artifact${maxEquips > 1 ? 's' : ''} to equip.`,
         selectCount: maxEquips,
         minSelect: 1,
         maxBudget: 20,
