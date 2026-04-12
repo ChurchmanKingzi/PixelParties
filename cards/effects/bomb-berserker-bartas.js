@@ -31,6 +31,11 @@ module.exports = {
       // Don't trigger on a second cast (prevent infinite loop)
       if (ctx.isSecondCast) return;
 
+      // Don't trigger if the spell was negated by a surprise or post-target reaction
+      if (gs._spellNegatedByEffect) {
+        return;
+      }
+
       // Check Bartas is still alive and capable
       const ps = gs.players[pi];
       const hero = ps.heroes?.[heroIdx];

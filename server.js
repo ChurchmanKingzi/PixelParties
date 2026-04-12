@@ -1263,6 +1263,7 @@ function sendGameState(room, playerIdx, extra) {
       potionLocked: ps.potionLocked || false,
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
       handLocked: ps.handLocked || false,
+      forsaken: ps._discardToDeleteActive || false,
       creationLockedNames: (pi === playerIdx && ps._creationLockedNames) ? [...ps._creationLockedNames] : [],
       handLockBlockedCards: (ps.handLocked && pi === playerIdx) ? (() => {
         const blocked = new Set();
@@ -1291,6 +1292,15 @@ function sendGameState(room, playerIdx, extra) {
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     customPlacementCards: gs.customPlacementCards || [],
+    ascendedOnlyAbilities: (() => {
+      const ps2 = gs.players[playerIdx];
+      const names = new Set();
+      for (const cn of (ps2?.hand || [])) {
+        const s = loadCardEffect(cn);
+        if (s?.ascendedHeroOnly) names.add(cn);
+      }
+      return [...names];
+    })(),
     awaitingFirstChoice: gs.awaitingFirstChoice || false,
     terrorCount: gs.activePlayer != null ? (gs._terrorTracking?.[gs.activePlayer] || []).length : 0,
     terrorThreshold: room.engine ? (() => {
@@ -1507,6 +1517,7 @@ function sendSpectatorGameState(room) {
       potionLocked: ps.potionLocked || false,
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(spi) : 30,
       handLocked: ps.handLocked || false,
+      forsaken: ps._discardToDeleteActive || false,
       supportSpellLocked: ps.supportSpellLocked || false,
       permanents: ps.permanents || [],
       oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
@@ -1530,6 +1541,7 @@ function sendSpectatorGameState(room) {
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     customPlacementCards: [],
+    ascendedOnlyAbilities: [],
     awaitingFirstChoice: gs.awaitingFirstChoice || false,
     choosingPlayerName,
     terrorCount: 0,
@@ -2173,6 +2185,10 @@ io.on('connection', (socket) => {
 
     // Check for custom placement (e.g. Performance)
     const script = loadCardEffect(cardName);
+
+    // Hero-level placement restriction (e.g. Smugness: Ascended Hero only)
+    if (script?.canAttachToHero && !script.canAttachToHero(gs, pi, heroIdx, room.engine)) return;
+
     if (script?.customPlacement) {
       // Custom placement — must target a specific zone
       if (zoneSlot < 0 || zoneSlot >= 3) return;
@@ -2940,7 +2956,7 @@ io.on('connection', (socket) => {
     const creatureName = slot[0];
 
     const inst = room.engine.cardInstances.find(c =>
-      c.owner === heroOwner && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
+      (c.owner === heroOwner || c.controller === heroOwner) && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
     );
     if (!inst) return;
 
@@ -3031,7 +3047,7 @@ io.on('connection', (socket) => {
     const cardName = slot[0];
 
     const inst = room.engine.cardInstances.find(c =>
-      c.owner === pi && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
+      (c.owner === pi || c.controller === pi) && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
     );
     if (!inst) return;
 
@@ -3148,8 +3164,8 @@ io.on('connection', (socket) => {
           return;
         }
 
-        // Not negated — place creature in support zone
-        const placeResult = room.engine.safePlaceInSupport(cardName, pi, heroIdx, zoneSlot);
+        // Not negated — place creature in support zone via centralized summon
+        const placeResult = room.engine.summonCreature(cardName, pi, heroIdx, zoneSlot);
         if (!placeResult) {
           ps.discardPile.push(cardName);
           room.engine.log('creature_fizzle', { card: cardName, reason: 'zone_occupied' });
@@ -3166,8 +3182,6 @@ io.on('connection', (socket) => {
         }
         sendToSpectators(room, 'summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
 
-        room.engine.log('creature_summoned', { player: ps.username, card: cardName, hero: gs.players[pi].heroes[heroIdx]?.name });
-        ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
         if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
 
         await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualZoneSlot });
@@ -3344,12 +3358,17 @@ io.on('connection', (socket) => {
         if (!isInherentAction && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
         if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
 
-        // Fire afterSpellResolved hook (Bartas, etc.)
-        await room.engine.runHooks('afterSpellResolved', {
-          spellName: cardName, spellCardData: cardData, heroIdx, casterIdx: pi,
-          damageTargets: uniqueTargets, isSecondCast: !!gs._bartasSecondCast,
-          _skipReactionCheck: true,
-        });
+        // Fire afterSpellResolved hook (Bartas, etc.) — skip if spell was negated during resolution
+        if (!gs._spellNegatedByEffect) {
+          await room.engine.runHooks('afterSpellResolved', {
+            spellName: cardName, spellCardData: cardData, heroIdx, casterIdx: pi,
+            damageTargets: uniqueTargets, isSecondCast: !!gs._bartasSecondCast,
+            _skipReactionCheck: true,
+          });
+        }
+
+        // Resolve deferred recoil (Fire Bolts, etc.) — AFTER all casts complete
+        await room.engine.resolveDeferredRecoil();
 
         // Execute deferred surprises (Jumpscare, etc.) that trigger after resolution
         await room.engine._executeDeferredSurprises();
@@ -3360,6 +3379,7 @@ io.on('connection', (socket) => {
         delete gs._bartasSecondCast;
         delete gs._spellNegatedByEffect;
         delete gs._surpriseCheckedHeroes;
+        delete gs._deferredRecoil;
 
         // Move to discard (unless the spell placed itself on the board as an attachment)
         const resolveHi = getResolvingHandIndex(ps);

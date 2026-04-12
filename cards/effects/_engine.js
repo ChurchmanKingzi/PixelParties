@@ -414,6 +414,16 @@ class GameEngine {
       safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot) {
         return engine.safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot);
       },
+      /**
+       * Centralized creature summoning — guarantees summoning sickness, tracking, and counting.
+       * Use summonCreatureWithHooks for full lifecycle including onPlay/onCardEnterZone hooks.
+       */
+      summonCreature(cardName, playerIdx, heroIdx, zoneSlot, opts) {
+        return engine.summonCreature(cardName, playerIdx, heroIdx, zoneSlot, opts);
+      },
+      async summonCreatureWithHooks(cardName, playerIdx, heroIdx, zoneSlot, opts) {
+        return engine.summonCreatureWithHooks(cardName, playerIdx, heroIdx, zoneSlot, opts);
+      },
       async addStatus(target, statusName, opts) {
         return engine.actionAddStatus(target, statusName, opts);
       },
@@ -1006,7 +1016,7 @@ class GameEngine {
         let selected = filteredTargets.find(t => t.id === selectedIds[0]) || null;
         // Spell target tracking (for Bartas, etc.) — records at selection time,
         // not damage time, so protected/shielded targets still count as "hit"
-        if (selected && gs._spellDamageLog) {
+        if (selected && gs._spellDamageLog && !config._skipDamageLog) {
           gs._spellDamageLog.push({ ...selected });
         }
 
@@ -1044,6 +1054,11 @@ class GameEngine {
           if (surpriseResult?.effectNegated) {
             // Effect fully negated by surprise — don't set _spellCancelled (spell is consumed)
             gs._spellNegatedByEffect = true;
+            // Remove the target from damage log — spell never connected
+            if (gs._spellDamageLog) {
+              const negIdx = gs._spellDamageLog.findIndex(t => t.id === selected.id);
+              if (negIdx >= 0) gs._spellDamageLog.splice(negIdx, 1);
+            }
             return null;
           }
         }
@@ -1189,6 +1204,13 @@ class GameEngine {
             const surpriseResult = await engine._checkSurpriseWindow(heroTargets, cardInstance);
             if (surpriseResult?.effectNegated) {
               gs._spellNegatedByEffect = true;
+              // Clear damage log entries for negated targets
+              if (gs._spellDamageLog) {
+                for (const t of result) {
+                  const idx = gs._spellDamageLog.findIndex(e => e.id === t.id);
+                  if (idx >= 0) gs._spellDamageLog.splice(idx, 1);
+                }
+              }
               return []; // Effect fully negated — don't set _spellCancelled
             }
           }
@@ -2351,6 +2373,170 @@ class GameEngine {
   }
 
   /**
+   * Centralized creature/token summoning. ALL summon paths should route through this.
+   * Guarantees: zone placement, instance tracking (turnPlayed = current turn → summoning
+   * sickness), _creaturesSummonedThisTurn increment, onPlay + onCardEnterZone hooks, logging.
+   *
+   * @param {string} cardName - Name of the creature/token to summon
+   * @param {number} playerIdx - Controlling player
+   * @param {number} heroIdx - Hero column to summon into
+   * @param {number} [zoneSlot=-1] - Specific slot (-1 = auto-find)
+   * @param {object} [opts={}] - Options:
+   *   {boolean} skipHooks - Skip onPlay/onCardEnterZone hooks (caller fires them manually)
+   *   {boolean} skipLog - Skip the summon log entry
+   *   {boolean} skipReactionCheck - Pass _skipReactionCheck to hooks
+   *   {string} source - Source card name for logging (e.g. 'Necromancy')
+   *   {object} hookExtras - Extra fields merged into hook context
+   * @returns {{ inst: CardInstance, actualSlot: number } | null}
+   */
+  summonCreature(cardName, playerIdx, heroIdx, zoneSlot = -1, opts = {}) {
+    const placeResult = this.safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot);
+    if (!placeResult) return null;
+
+    const { inst, actualSlot } = placeResult;
+
+    // Enforce summoning sickness — belt-and-suspenders with _trackCard
+    inst.turnPlayed = this.gs.turn || 0;
+
+    // Log
+    if (!opts.skipLog) {
+      const ps = this.gs.players[playerIdx];
+      const heroName = ps?.heroes?.[heroIdx]?.name || '?';
+      this.log('creature_summoned', {
+        player: ps?.username, card: cardName, hero: heroName,
+        source: opts.source || null,
+      });
+    }
+
+    return { inst, actualSlot };
+  }
+
+  /**
+   * Async companion to summonCreature — places the creature AND fires onPlay + onCardEnterZone hooks.
+   * Use this when you want the full summon lifecycle including hooks.
+   */
+  async summonCreatureWithHooks(cardName, playerIdx, heroIdx, zoneSlot = -1, opts = {}) {
+    const result = this.summonCreature(cardName, playerIdx, heroIdx, zoneSlot, { ...opts, skipLog: opts.skipLog });
+    if (!result) return null;
+
+    const { inst, actualSlot } = result;
+
+    if (!opts.skipHooks) {
+      const hookCtx = {
+        _onlyCard: inst, playedCard: inst, cardName,
+        zone: 'support', heroIdx, zoneSlot: actualSlot,
+        _skipReactionCheck: opts.skipReactionCheck !== false,
+        ...(opts.hookExtras || {}),
+      };
+      await this.runHooks('onPlay', hookCtx);
+      await this.runHooks('onCardEnterZone', {
+        enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
+        _skipReactionCheck: opts.skipReactionCheck !== false,
+      });
+    }
+
+    return { inst, actualSlot };
+  }
+
+  /**
+   * Resolve deferred spell recoil (Fire Bolts, etc.).
+   * Called by the server after afterSpellResolved completes, so recoil
+   * happens after all spell casts (including Bartas second cast).
+   */
+  async resolveDeferredRecoil() {
+    const recoil = this.gs._deferredRecoil;
+    if (!recoil) return;
+    delete this.gs._deferredRecoil;
+
+    const { cardName, ownerIdx, heroIdx, damage, enhanced, damageType } = recoil;
+
+    // Build own targets for recoil prompt
+    const targets = [];
+    const ps = this.gs.players[ownerIdx];
+    if (!ps) return;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      targets.push({ id: `hero-${ownerIdx}-${hi}`, type: 'hero', owner: ownerIdx, heroIdx: hi, cardName: hero.name });
+    }
+    const cardDB = this._getCardDB();
+    for (const inst of this.cardInstances) {
+      if ((inst.owner !== ownerIdx && inst.controller !== ownerIdx) || inst.zone !== 'support' || inst.faceDown) continue;
+      const cd = cardDB[inst.name];
+      if (!cd || cd.cardType !== 'Creature') continue;
+      targets.push({ id: `equip-${ownerIdx}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: ownerIdx, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst });
+    }
+    if (targets.length === 0) return;
+
+    const selected = await this.promptEffectTarget(ownerIdx, targets, {
+      title: `${cardName} — Recoil`,
+      description: `Choose one of your targets to take ${damage} recoil damage.`,
+      confirmLabel: `🔥 ${damage} Recoil!`,
+      confirmClass: 'btn-danger',
+      cancellable: false,
+      exclusiveTypes: true,
+      maxPerType: { hero: 1, equip: 1 },
+    });
+
+    if (!selected || selected.length === 0) return;
+    const target = targets.find(t => t.id === selected[0]);
+    if (!target) return;
+
+    const animType = enhanced ? 'flame_avalanche' : 'flame_strike';
+    const zoneSlot = target.type === 'equip' ? target.slotIdx : -1;
+    this._broadcastEvent('play_zone_animation', {
+      type: animType, owner: target.owner, heroIdx: target.heroIdx, zoneSlot,
+    });
+    await this._delay(enhanced ? 600 : 400);
+
+    if (target.type === 'hero') {
+      const hero = this.gs.players[target.owner]?.heroes?.[target.heroIdx];
+      if (hero && hero.hp > 0) {
+        await this.actionDealDamage({ name: cardName, owner: ownerIdx, heroIdx }, hero, damage, damageType);
+      }
+    } else if (target.cardInstance) {
+      await this.actionDealCreatureDamage(
+        { name: cardName, owner: ownerIdx, heroIdx },
+        target.cardInstance, damage, damageType,
+        { sourceOwner: ownerIdx, canBeNegated: true },
+      );
+    }
+
+    this.log('recoil', { card: cardName, player: ps.username, damage, target: target.cardName });
+    this.sync();
+  }
+
+  /**
+   * Enable discard-to-delete redirect for a player.
+   * All cards that would go to discardPile via .push() are routed to deletedPile instead.
+   * Cleared automatically on turn start.
+   * @param {number} playerIdx
+   */
+  enableDiscardToDelete(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || ps._discardToDeleteActive) return;
+    ps._discardToDeleteActive = true;
+    const originalPush = Array.prototype.push;
+    const pile = ps.discardPile;
+    const deleted = ps.deletedPile;
+    pile.push = function (...cards) {
+      return originalPush.apply(deleted, cards);
+    };
+  }
+
+  /**
+   * Disable discard-to-delete redirect for a player.
+   * Restores normal discardPile.push behaviour.
+   * @param {number} playerIdx
+   */
+  disableDiscardToDelete(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !ps._discardToDeleteActive) return;
+    delete ps._discardToDeleteActive;
+    delete ps.discardPile.push; // Remove instance override, restoring Array.prototype.push
+  }
+
+  /**
    * Prompt a player to choose cards to discard from their hand.
    * Uses the standard forceDiscard UI.
    * @param {number} playerIdx - The player who must discard
@@ -3332,8 +3518,8 @@ class GameEngine {
 
       ps.hand.splice(handIndex, 1);
 
-      // Safe placement — handles zone-occupied fallback
-      const placeResult = this.safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot);
+      // Centralized creature summon — handles placement, tracking, summoning sickness
+      const placeResult = this.summonCreature(cardName, playerIdx, heroIdx, zoneSlot, { source: config.title });
       if (!placeResult) {
         ps.discardPile.push(cardName);
         this.log('creature_fizzle', { card: cardName, reason: 'zone_occupied', by: config.title });
@@ -3600,6 +3786,8 @@ class GameEngine {
         ps._creaturesSummonedThisTurn = 0;
         delete ps._creationLockedNames;
         delete ps._revealedCardCounts;
+        // Clear discard-to-delete redirect (Madaga's Forsaken, etc.)
+        if (ps._discardToDeleteActive) this.disableDiscardToDelete(this.gs.players.indexOf(ps));
         ps.bonusActions = null;
         ps._bonusMainActions = 0;
         // Reset per-hero action counters (Sol Rym, etc.)
@@ -4912,6 +5100,7 @@ class GameEngine {
         const script = loadCardEffect(cardName);
         if (!script?.isPostTargetReaction) continue;
 
+
         const cardData = allCards[cardName];
 
         // Gold check for artifacts
@@ -5189,6 +5378,7 @@ class GameEngine {
     if (isBakhmSlot) {
       // Bakhm slot: creature is already in the support zone — just stays face-up
       if (inst) {
+        inst.turnPlayed = this.gs.turn || 0; // Enforce summoning sickness on flip
         this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: bakhmZoneSlot, cardName });
         this._broadcastEvent('play_zone_animation', {
           type: 'gold_sparkle', owner: playerIdx, heroIdx, zoneSlot: bakhmZoneSlot,
@@ -5211,9 +5401,13 @@ class GameEngine {
       // Place face-up as permanent creature in first free support zone
       const placed = this.safePlaceInSupport(cardName, playerIdx, heroIdx, -1);
       if (placed && inst) {
+        // safePlaceInSupport created a new instance — remove it, reuse original
+        this._untrackCard(placed.inst.id);
         inst.zone = ZONES.SUPPORT;
         inst.heroIdx = heroIdx;
         inst.zoneSlot = placed.actualSlot;
+        inst.faceDown = false;
+        inst.turnPlayed = this.gs.turn || 0; // Enforce summoning sickness
         this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: placed.actualSlot, cardName });
         // Extra flashy animation for surprise creature summon
         this._broadcastEvent('play_zone_animation', {
@@ -6078,7 +6272,7 @@ class GameEngine {
           if (slot.length === 0) continue;
           const creatureName = slot[0];
           const inst = this.cardInstances.find(c =>
-            c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
+            (c.owner === pi || c.controller === pi) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
           );
           if (!inst) continue;
           if (inst.faceDown) continue;
@@ -6152,7 +6346,7 @@ class GameEngine {
         if (slot.length === 0) continue;
         const cardName = slot[0];
         const inst = this.cardInstances.find(c =>
-          c.owner === playerIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
+          (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
         );
         if (!inst || inst.faceDown) continue;
 

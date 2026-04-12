@@ -3777,6 +3777,20 @@ body:has(.reaction-chain-overlay) .board-tooltip {
   100% { transform: scale(1.15); filter: brightness(1.2); }
 }
 
+/* ===== RACCOON PROJECTILE (Smugness) ===== */
+.projectile-raccoon-trail {
+  position: absolute;
+  inset: -24px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(139,90,43,.7) 0%, rgba(180,120,60,.3) 40%, transparent 70%);
+  animation: raccoonTrailPulse 100ms ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes raccoonTrailPulse {
+  0%   { opacity: .7; transform: scale(.9); }
+  100% { opacity: 1; transform: scale(1.15); }
+}
+
 /* ===== DARK ENERGY DELETION ANIMATION ===== */
 
 .discard-anim-deleted {
@@ -5026,12 +5040,12 @@ body:has(.reaction-chain-overlay) .board-tooltip {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-width: calc(200px * var(--board-scale));
+  max-width: calc(280px * var(--board-scale));
   z-index: 100;
   pointer-events: none;
 }
 .phase-debuff-item {
-  font-size: calc(10px * var(--board-scale));
+  font-size: calc(13px * var(--board-scale));
   font-weight: 700;
   text-shadow: 0 0 6px rgba(255,0,0,.3), 1px 1px 0 #000;
   line-height: 1.3;

@@ -7927,7 +7927,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Choose a target your opponent controls and deal 100 damage to it. Then, choose a target you control and deal 50 damage to it. If the user has Destruction Magic 3 and this is the first Destruction Magic Spell you use this turn, you may increase the damage to your own target to 200, and if you do, this counts as an additional Action.",
+    "effect": "If the user has Destruction Magic 3 and this is the first Destruction Magic Spell you use this turn, you may increase the recoil damage this Spell inflicts to 200, and if you do, this counts as an additional Action. Choose a target your opponent controls and deal 100 damage to it. Then, choose a target you control and deal 50 damage to it.",
     "archetype": "",
     "setID": "PP MBS1",
     "banned": "Banned",
@@ -13734,7 +13734,7 @@
     "foil": "secret_rare"
   },
   {
-    "name": "Madaga, the Foresaken Seafarer",
+    "name": "Madaga, the Forsaken Seafarer",
     "cardType": "Hero",
     "subtype": "",
     "level": null,

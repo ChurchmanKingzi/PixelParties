@@ -108,29 +108,15 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
 }
 
 // Floating damage number that finds its target hero and animates above it
-function DamageNumber({ amount, heroName }) {
+function DamageNumber({ amount, ownerLabel, heroIdx }) {
   const [pos, setPos] = useState(null);
   useEffect(() => {
-    const ownerLabels = ['me', 'opp'];
-    for (const ol of ownerLabels) {
-      for (let hi = 0; hi < 3; hi++) {
-        const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ol}"][data-hero-idx="${hi}"]`);
-        if (!el) continue;
-        const nameEl = el.querySelector('.board-card-name, .card-name');
-        const heroEl = el;
-        const rect = heroEl.getBoundingClientRect();
-        const nameText = heroEl.getAttribute('data-hero-name') || el.textContent;
-        if (nameText && nameText.includes(heroName.split(',')[0])) {
-          setPos({ x: rect.left + rect.width / 2, y: rect.top + rect.height * 0.3 });
-          return;
-        }
-      }
+    const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
     }
-    // Fallback: center of screen
-    if (!pos) {
-      setPos({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
-    }
-  }, [heroName]);
+  }, [ownerLabel, heroIdx]);
 
   if (!pos) return null;
   return (
@@ -4192,10 +4178,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   useEffect(() => { setSpellHeroPick(null); }, [gameState.activePlayer, gameState.currentPhase, gameState.effectPrompt, gameState.turn]);
 
   // Check if a hero can receive a specific ability
-  const canHeroReceiveAbility = (playerData, heroIdx, abilityName) => {
+  const canHeroReceiveAbility = (playerData, heroIdx, abilityName, opts = {}) => {
     const hero = playerData.heroes[heroIdx];
     if (!hero || !hero.name || hero.hp <= 0) return false;
-    if ((playerData.abilityGivenThisTurn || [])[heroIdx]) return false;
+    if (!opts.skipAbilityGiven && (playerData.abilityGivenThisTurn || [])[heroIdx]) return false;
+
+    // Ascended Hero restriction (Smugness, etc.)
+    if ((gameState.ascendedOnlyAbilities || []).includes(abilityName)) {
+      const heroData = CARDS_BY_NAME[hero.name];
+      if (heroData?.cardType !== 'Ascended Hero') return false;
+    }
+
     const abZones = playerData.abilityZones[heroIdx] || [[], [], []];
     const isCustom = (gameState.customPlacementCards || []).includes(abilityName);
 
@@ -4341,6 +4334,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const forceDiscardActive = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt.ownerIdx === myIdx;
     if (forceDiscardActive) {
       if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return; // Can't discard the resolving card
+      const eligible = gameState.effectPrompt.eligibleIndices;
+      if (eligible && !eligible.includes(idx)) return; // Not an eligible card for this discard
       if (e.cancelable) e.preventDefault();
       socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
       return;
@@ -4458,15 +4453,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const skipAbilityGiven = !!abilityAttachPrompt;
         const canReceive = (hi, cn) => {
           if (attachHeroOnly >= 0 && hi !== attachHeroOnly) return false;
-          // Custom canHeroReceiveAbility that optionally skips abilityGivenThisTurn
-          const hero2 = me.heroes[hi];
-          if (!hero2 || !hero2.name || hero2.hp <= 0) return false;
-          if (!skipAbilityGiven && (me.abilityGivenThisTurn || [])[hi]) return false;
-          const abZ = me.abilityZones[hi] || [[], [], []];
-          const isCust = (gameState.customPlacementCards || []).includes(cn);
-          if (isCust) return abZ.some(sl => (sl||[]).length > 0 && (sl||[]).length < 3);
-          for (const sl of abZ) { if ((sl||[]).length > 0 && sl[0] === cn) return sl.length < 3; }
-          return abZ.some(sl => (sl||[]).length === 0);
+          return canHeroReceiveAbility(me, hi, cn, { skipAbilityGiven });
         };
         // Check hero zones
         const heroEls = document.querySelectorAll('[data-hero-zone]');
@@ -4754,7 +4741,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               }
             }
             if (eligible.length === 1) {
-              socket.emit('ascend_hero', { roomId: gameState.roomId, heroIdx: eligible[0].idx, cardName, handIndex: idx });
+              hideGameTooltip(); socket.emit('ascend_hero', { roomId: gameState.roomId, heroIdx: eligible[0].idx, cardName, handIndex: idx });
             } else if (eligible.length > 1) {
               setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isAscension: true });
             }
@@ -4920,7 +4907,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Ascended Hero dropped on eligible base hero
         setPlayDrag(prev => {
           if (!prev || prev.targetHero < 0 || !prev.isAscension) return null;
-          socket.emit('ascend_hero', {
+          hideGameTooltip(); socket.emit('ascend_hero', {
             roomId: gameState.roomId, heroIdx: prev.targetHero,
             cardName: prev.cardName, handIndex: prev.idx,
           });
@@ -4969,6 +4956,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   }, [hand, handDrag, playDrag, abilityDrag]);
 
   const [showSurrender, setShowSurrender] = useState(false);
+  const surrenderOpenedAt = React.useRef(0);
   const [sideDeckPhase, setSideDeckPhase] = useState(null); // { currentDeck, originalDeck, opponentDone, setScore, format }
   const [sideDeckDone, setSideDeckDone] = useState(false);
   const [sideDeckSel, setSideDeckSel] = useState(null); // { pool: 'main'|'potion'|'side'|'hero', idx: number }
@@ -6967,9 +6955,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else if (pileViewer) setPileViewer(null);
       else if (pendingAdditionalPlay) { setPendingAdditionalPlay(null); socket.emit('pending_placement_clear', { roomId: gameState.roomId }); }
       else if (deckViewer) setDeckViewer(null);
-      else if (showSurrender) setShowSurrender(false);
+      else if (showSurrender) {
+        if (Date.now() - surrenderOpenedAt.current < 400) return; // Prevent accidental instant close
+        setShowSurrender(false);
+      }
       else if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx) return; // Non-cancellable prompt active — ignore Escape
-      else if (!gameState.result && !isSpectator) setShowSurrender(true);
+      else if (!gameState.result && !isSpectator) { setShowSurrender(true); surrenderOpenedAt.current = Date.now(); }
       else if (gameState.result) handleLeave();
     };
     window.addEventListener('keydown', handleEsc, true);
@@ -7199,7 +7190,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             continue;
           }
           const dmg = prev.hp - cur.hp;
-          newDmgNums.push({ id: Date.now() + Math.random(), amount: dmg, heroName: cur.name });
+          const [, hiStr] = key.split('-');
+          newDmgNums.push({ id: Date.now() + Math.random(), amount: dmg, ownerLabel: cur.owner, heroIdx: parseInt(hiStr) });
         }
       }
       if (newDmgNums.length > 0) {
@@ -7987,17 +7979,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const abilityAttachActive = !isOpp && gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
           const abilityIneligible = !isOpp && abilityDrag && (() => {
             if (abilityAttachActive) {
-              // During abilityAttach: only the specified hero is eligible, skip abilityGivenThisTurn
               if (i !== gameState.effectPrompt.heroIdx) return true;
-              const hero2 = heroes[i];
-              if (!hero2 || !hero2.name || hero2.hp <= 0) return true;
-              // Check ability zone capacity without abilityGivenThisTurn
-              const abZ = abZones[i] || [[], [], []];
-              const cn = abilityDrag.cardName;
-              const isCust = (gameState.customPlacementCards || []).includes(cn);
-              if (isCust) return !abZ.some(sl => (sl||[]).length > 0 && (sl||[]).length < 3);
-              for (const sl of abZ) { if ((sl||[]).length > 0 && sl[0] === cn) return sl.length >= 3; }
-              return !abZ.some(sl => (sl||[]).length === 0);
+              return !canHeroReceiveAbility(p, i, abilityDrag.cardName, { skipAbilityGiven: true });
             }
             return !canHeroReceiveAbility(p, i, abilityDrag.cardName);
           })();
@@ -8229,14 +8212,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const heroIneligible = !isOpp && abilityDrag && (() => {
             if (abilityAttachActive2) {
               if (i !== gameState.effectPrompt.heroIdx) return true;
-              const hero2 = heroes[i];
-              if (!hero2 || !hero2.name || hero2.hp <= 0) return true;
-              const abZ = abZones[i] || [[], [], []];
-              const cn = abilityDrag.cardName;
-              const isCust = (gameState.customPlacementCards || []).includes(cn);
-              if (isCust) return !abZ.some(sl => (sl||[]).length > 0 && (sl||[]).length < 3);
-              for (const sl of abZ) { if ((sl||[]).length > 0 && sl[0] === cn) return sl.length >= 3; }
-              return !abZ.some(sl => (sl||[]).length === 0);
+              return !canHeroReceiveAbility(p, i, abilityDrag.cardName, { skipAbilityGiven: true });
             }
             return !canHeroReceiveAbility(p, i, abilityDrag.cardName);
           })();
@@ -8609,6 +8585,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (opp.supportSpellLocked) debuffs.push({ key: 'support-opp', icon: '💚', text: `Your opponent cannot use another Support Spell this turn.`, color: '#ff8844' });
             if (me.itemLocked) debuffs.push({ key: 'item-me', icon: '🔨', text: 'You cannot use Artifacts this turn!', color: '#ff6633' });
             if (opp.itemLocked) debuffs.push({ key: 'item-opp', icon: '🔨', text: `${opp.username} cannot use Artifacts this turn!`, color: '#cc5522' });
+            if (me.forsaken) debuffs.push({ key: 'forsaken-me', icon: '🏴‍☠️', text: 'All cards that would go to your discard pile are deleted for the rest of the turn.', color: '#8888aa' });
+            if (opp.forsaken) debuffs.push({ key: 'forsaken-opp', icon: '🏴‍☠️', text: `All cards that would go to ${opp.username}'s discard pile are deleted for the rest of the turn.`, color: '#6666aa' });
+            if (me.handLocked) debuffs.push({ key: 'hand-me', icon: '🔒', text: 'You cannot draw or search any more cards this turn!', color: '#ff6644' });
+            if (opp.handLocked) debuffs.push({ key: 'hand-opp', icon: '🔒', text: `${opp.username} cannot draw or search any more cards this turn!`, color: '#cc8800' });
             if (debuffs.length === 0) return null;
             return (
               <div className="phase-debuffs">
@@ -8799,6 +8779,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isAbilityAttach = gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
                 const isAttachEligible = isAbilityAttach && (gameState.effectPrompt.eligibleCards || []).includes(item.card);
                 const isAnyDiscard = isForceDiscard || isForceDiscardCancellable;
+                const forceDiscardEligible = isForceDiscard && gameState.effectPrompt.eligibleIndices;
+                const isForceDiscardEligible = !forceDiscardEligible || gameState.effectPrompt.eligibleIndices.includes(item.origIdx);
                 const isHandPick = gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt?.ownerIdx === myIdx;
                 const isHandPickSelected = isHandPick && handPickSelected.has(item.origIdx);
                 const isHandPickEligible = isHandPick && (gameState.effectPrompt.eligibleIndices || []).includes(item.origIdx);
@@ -8820,7 +8802,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isStealHidden = stealHiddenMe.has(item.origIdx) && hand.length === stealExpectedMeCountRef.current;
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard ? ' hand-discard-target' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed) ? ' hand-card-dimmed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '')}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed) ? ' hand-card-dimmed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '')}
                     style={(isDrawAnim || isPendingPlay || isStealHidden) ? { visibility: 'hidden' } : undefined}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
@@ -8888,7 +8870,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* Damage numbers */}
       {damageNumbers.map(d => (
-        <DamageNumber key={d.id} amount={d.amount} heroName={d.heroName} />
+        <DamageNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} />
       ))}
       {healNumbers.map(d => (
         <HealNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} />
@@ -9839,7 +9821,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       bakhmSlot: h.bakhmSlot,
                     });
                   } else if (pick.isAscension) {
-                    socket.emit('ascend_hero', {
+                    hideGameTooltip(); socket.emit('ascend_hero', {
                       roomId: gameState.roomId, cardName: pick.cardName,
                       handIndex: pick.handIndex, heroIdx: h.idx,
                     });

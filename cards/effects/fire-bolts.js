@@ -104,7 +104,40 @@ module.exports = {
       const heroIdx = ctx.cardHeroIdx;
       const oppIdx = pi === 0 ? 1 : 0;
 
-      // ── Step 1: Select enemy target and deal 100 damage ──
+      // ── Step 1: Determine enhanced mode BEFORE targeting ──
+      // Must check before promptDamageTarget, which fires the pending play log
+      // (isFirstDMSpellThisTurn would see Fire Bolts itself and fail)
+      const enhancedAvailable = canEnhance(gs, engine, pi, heroIdx);
+      let recoilDamage = 50;
+      let enhanced = false;
+
+      if (enhancedAvailable) {
+        const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
+        const isImmediate = !!gs._immediateActionContext;
+
+        if (isMainPhase && !isImmediate) {
+          // Main Phase self-providing play → auto-enhanced (no prompt)
+          enhanced = true;
+          recoilDamage = 200;
+        } else {
+          // Action Phase or immediate action → prompt the player
+          const confirmed = await engine.promptGeneric(pi, {
+            type: 'confirm',
+            title: 'Fire Bolts — Enhanced Mode',
+            message: 'Increase recoil damage to 200 to make Fire Bolts an additional Action?',
+            confirmLabel: '🔥 200 Recoil — Free Action!',
+            cancelLabel: 'No (50 Recoil)',
+            cancellable: true,
+          });
+
+          if (confirmed && !confirmed.cancelled) {
+            enhanced = true;
+            recoilDamage = 200;
+          }
+        }
+      }
+
+      // ── Step 2: Select enemy target and deal 100 damage ──
       const enemyTarget = await ctx.promptDamageTarget({
         side: 'enemy',
         types: ['hero', 'creature'],
@@ -117,7 +150,7 @@ module.exports = {
         cancellable: true,
       });
 
-      if (!enemyTarget) return; // Cancelled → _spellCancelled handled by server
+      if (!enemyTarget) return; // Cancelled or negated
 
       // Play fireball animation + deal damage
       if (enemyTarget.type === 'hero') {
@@ -152,80 +185,18 @@ module.exports = {
       engine.sync();
       await engine._delay(300);
 
-      // ── Step 2: Determine enhanced mode ──
-      const enhancedAvailable = canEnhance(gs, engine, pi, heroIdx);
-      let recoilDamage = 50;
-      let enhanced = false;
-
-      if (enhancedAvailable) {
-        const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
-        const isImmediate = !!gs._immediateActionContext;
-
-        if (isMainPhase && !isImmediate) {
-          // Main Phase self-providing play → auto-enhanced (no prompt)
-          enhanced = true;
-          recoilDamage = 200;
-        } else {
-          // Action Phase or immediate action → prompt the player
-          const confirmed = await engine.promptGeneric(pi, {
-            type: 'confirm',
-            title: 'Fire Bolts — Enhanced Mode',
-            message: 'Increase recoil damage to 200 to make Fire Bolts an additional Action?',
-            confirmLabel: '🔥 200 Recoil — Free Action!',
-            cancelLabel: 'No (50 Recoil)',
-            cancellable: true,
-          });
-
-          if (confirmed && !confirmed.cancelled) {
-            enhanced = true;
-            recoilDamage = 200;
-          }
-        }
-      }
-
-      // ── Step 3: Select own target and deal recoil damage ──
-      const allyTarget = await ctx.promptDamageTarget({
-        side: 'my',
-        types: ['hero', 'creature'],
-        damageType: 'destruction_spell',
-        title: 'Fire Bolts — Recoil',
-        description: `Choose one of your targets to take ${recoilDamage} recoil damage.`,
-        confirmLabel: `🔥 ${recoilDamage} Recoil!`,
-        confirmClass: 'btn-danger',
-        cancellable: false,
-      });
-
-      if (allyTarget) {
-        const animType = enhanced ? 'flame_avalanche' : 'flame_strike';
-
-        if (allyTarget.type === 'hero') {
-          engine._broadcastEvent('play_zone_animation', {
-            type: animType, owner: allyTarget.owner,
-            heroIdx: allyTarget.heroIdx, zoneSlot: -1,
-          });
-          await engine._delay(enhanced ? 600 : 400);
-          const hero = gs.players[pi].heroes[allyTarget.heroIdx];
-          if (hero && hero.hp > 0) {
-            await ctx.dealDamage(hero, recoilDamage, 'destruction_spell');
-          }
-        } else if (allyTarget.type === 'equip') {
-          engine._broadcastEvent('play_zone_animation', {
-            type: animType, owner: allyTarget.owner,
-            heroIdx: allyTarget.heroIdx, zoneSlot: allyTarget.slotIdx,
-          });
-          await engine._delay(enhanced ? 600 : 400);
-          const inst = allyTarget.cardInstance || engine.cardInstances.find(c =>
-            c.owner === allyTarget.owner && c.zone === 'support' &&
-            c.heroIdx === allyTarget.heroIdx && c.zoneSlot === allyTarget.slotIdx
-          );
-          if (inst) {
-            await engine.actionDealCreatureDamage(
-              { name: 'Fire Bolts', owner: pi, heroIdx },
-              inst, recoilDamage, 'destruction_spell',
-              { sourceOwner: pi, canBeNegated: true },
-            );
-          }
-        }
+      // ── Step 3: Defer recoil to after afterSpellResolved ──
+      // This ensures recoil happens AFTER Bartas's second cast (if any).
+      // Second cast skips recoil entirely — only one recoil per Fire Bolts play.
+      if (!gs._bartasSecondCast) {
+        gs._deferredRecoil = {
+          cardName: 'Fire Bolts',
+          ownerIdx: pi,
+          heroIdx,
+          damage: recoilDamage,
+          enhanced,
+          damageType: 'destruction_spell',
+        };
       }
 
       // ── Step 4: Set free action flag if enhanced ──
@@ -239,7 +210,6 @@ module.exports = {
         enhanced,
         recoilDamage,
         enemyTarget: enemyTarget?.cardName,
-        allyTarget: allyTarget?.cardName,
       });
 
       engine.sync();
