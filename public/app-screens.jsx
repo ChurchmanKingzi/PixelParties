@@ -63,6 +63,7 @@ function AuthScreen() {
 // ═══════════════════════════════════════════
 function MainMenu() {
   const { user, setScreen, setUser, notify } = useContext(AppContext);
+  const [puzzleOpen, setPuzzleOpen] = useState(false);
   const logout = async () => {
     try { await api('/auth/logout', { method: 'POST' }); } catch {}
     window.AUTH_TOKEN = null;
@@ -85,6 +86,13 @@ function MainMenu() {
           <button className="btn btn-big btn-accent2" onClick={() => setScreen('deckbuilder')} style={{ fontSize: 16 }}>✦ EDIT DECK</button>
           <button className="btn btn-big" onClick={() => setScreen('shop')} style={{ fontSize: 16, borderColor: '#ffd700', color: '#ffd700', background: 'rgba(255,215,0,.08)' }}>✦ SHOP</button>
           <button className="btn btn-big btn-success" onClick={() => setScreen('profile')} style={{ fontSize: 16 }}>♛ VIEW PROFILE</button>
+          <button className="btn btn-big" onClick={() => setPuzzleOpen(!puzzleOpen)} style={{ fontSize: 16, borderColor: '#ff8800', color: '#ff8800', background: 'rgba(255,136,0,.08)' }}>🧩 PUZZLE MODE {puzzleOpen ? '▲' : '▼'}</button>
+          {puzzleOpen && (
+            <div style={{ display: 'flex', gap: 8, marginTop: -4 }}>
+              <button className="btn" onClick={() => notify('Attempt Puzzle coming soon!', 'info')} style={{ flex: 1, padding: '10px 0', fontSize: 13, borderColor: '#ff8800', color: '#ff8800', background: 'rgba(255,136,0,.06)' }}>⚡ Attempt</button>
+              <button className="btn" onClick={() => setScreen('puzzle-create')} style={{ flex: 1, padding: '10px 0', fontSize: 13, borderColor: '#ff8800', color: '#ff8800', background: 'rgba(255,136,0,.06)' }}>🔧 Create</button>
+            </div>
+          )}
           <button className="btn btn-big" onClick={() => setScreen('rules')} style={{ fontSize: 16, borderColor: 'var(--text2)', color: 'var(--text2)', background: 'rgba(255,255,255,.03)' }}>📜 RULES</button>
         </div>
         <div className="menu-user-info">

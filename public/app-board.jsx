@@ -13,13 +13,12 @@ const { api, emitSocket, socket, AppContext, CardMini, FoilOverlay, useFoilBands
 //  by mouse events from BoardCard / CardRevealEntry.
 //  Eliminates orphan portal tooltips.
 // ═══════════════════════════════════════════
-let _boardTooltipSetter = null;
 let _activeLuckTooltipTarget = null;
 let _boardTooltipLocked = false;
 function setBoardTooltip(card) {
   // When locked (prompt card hovered), ignore external clears
   if (!card && _boardTooltipLocked) return;
-  _boardTooltipSetter?.(card);
+  window._boardTooltipSetter?.(card);
 }
 
 function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins }) {
@@ -714,96 +713,15 @@ function HealReversedOverlay() {
 
 // ═══ GENERIC GAME TOOLTIP ═══
 // Global tooltip system — renders at top level, escapes overflow:hidden.
-// Usage: onMouseEnter={e => showGameTooltip(e, 'text')} onMouseLeave={hideGameTooltip}
-function showGameTooltip(e, text) {
-  const r = e.currentTarget.getBoundingClientRect();
-  window._gameTooltip = { text, x: r.right + 6, y: r.top + r.height / 2 };
-  window.dispatchEvent(new Event('gameTooltip'));
-}
-function hideGameTooltip() {
-  window._gameTooltip = null;
-  window.dispatchEvent(new Event('gameTooltip'));
-}
-function GameTooltip() {
-  const [tip, setTip] = useState(null);
-  useEffect(() => {
-    const handler = () => setTip(window._gameTooltip ? { ...window._gameTooltip } : null);
-    window.addEventListener('gameTooltip', handler);
-    return () => window.removeEventListener('gameTooltip', handler);
-  }, []);
-  if (!tip) return null;
-  return (
-    <div className="game-tooltip" style={{ position: 'fixed', left: tip.x, top: tip.y, transform: 'translateY(-50%)', zIndex: 9990 }}>
-      {tip.text}
-    </div>
-  );
-}
+// Game tooltip, StatusBadges, BuffColumn — use shared versions from app-shared.jsx
+const showGameTooltip = window.showGameTooltip;
+const hideGameTooltip = window.hideGameTooltip;
+const GameTooltip = window.GameTooltip;
+const StatusBadges = window.StatusBadges;
+const BuffColumn = window.BuffColumn;
 
 // Status badges — small icons showing active negative statuses at a glance
-function StatusBadges({ statuses, counters, isHero, player }) {
-  const badges = [];
-  const s = statuses || {};
-  const c = counters || {};
-  // Helper: build duration text from status data
-  const dur = (statusData) => {
-    if (!statusData || typeof statusData !== 'object') return ' Wears off at the end of its owner\'s turn.';
-    if (statusData.duration != null && statusData.duration > 1) {
-      return ` Lasts for ${statusData.duration} of its owner's turns.`;
-    }
-    return ' Wears off at the end of its owner\'s turn.';
-  };
-  const durStart = (statusData) => {
-    if (!statusData || typeof statusData !== 'object') return ' Wears off at the start of its owner\'s turn.';
-    return ' Wears off at the start of its owner\'s turn.';
-  };
-  if (s.frozen || c.frozen) badges.push({ key: 'frozen', icon: '❄️', tooltip: 'Frozen: Cannot act and has its effects and Abilities negated.' + (isHero ? ' Cannot be equipped with Artifacts.' : '') + dur(s.frozen || c.frozen) });
-  if (s.stunned || c.stunned) badges.push({ key: 'stunned', icon: '⚡', tooltip: 'Stunned: Cannot act and has its effects and Abilities negated.' + dur(s.stunned || c.stunned) });
-  if (c._baihuStunned) badges.push({ key: 'petrified', icon: '🪨', tooltip: `Petrified: Stunned and immune to all damage. Lasts for ${c._baihuStunned.duration || 1} of its owner's turns.` });
-  if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
-  if (s.poisoned || c.poisoned) {
-    const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
-    const perStack = player?.poisonDamagePerStack || 30;
-    const isUnhealable = s.poisoned?.unhealable || c.poisonedUnhealable;
-    badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: `${isUnhealable ? 'Unhealable ' : ''}Poisoned: Takes ${perStack * stacks} damage at the start of each of its owner's turns.${isUnhealable ? ' Cannot be removed.' : ''}`, className: isUnhealable ? 'status-unhealable' : '' });
-  }
-  if (s.negated || c.negated) badges.push({ key: 'negated', icon: '🚫', tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.') + dur(s.negated || c.negated) });
-  if (s.immune) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
-  if (s.shielded) badges.push({ key: 'shielded', icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + durStart(s.shielded) });
-  if (s.untargetable) badges.push({ key: 'untargetable', icon: '🦋', tooltip: 'Untargetable: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen.' });
-  if (s.healReversed) badges.push({ key: 'healReversed', icon: '💀', tooltip: 'Overheal Shock: Takes any healing as damage.' });
-  if (badges.length === 0) return null;
-  return (
-    <div className="status-badges-row">
-      {badges.map(b => (
-        <div key={b.key} className="status-badge"
-          onMouseEnter={e => showGameTooltip(e, b.tooltip)}
-          onMouseLeave={hideGameTooltip}>
-          {b.icon}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Buff column — displays positive buff icons on heroes/creatures
-function BuffColumn({ buffs }) {
-  if (!buffs || Object.keys(buffs).length === 0) return null;
-  const BUFF_ICONS = { cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' } };
-  return (
-    <div className="buff-column">
-      {Object.entries(buffs).map(([key]) => {
-        const def = BUFF_ICONS[key] || { icon: '✦', tooltip: key };
-        return (
-          <div key={key} className="buff-icon"
-            onMouseEnter={e => showGameTooltip(e, def.tooltip)}
-            onMouseLeave={hideGameTooltip}>
-            {def.icon}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+// StatusBadges and BuffColumn — now defined in app-shared.jsx
 
 // Wind swirl — gentle wind particles spiraling around target
 function WindEffect({ x, y }) {
@@ -3316,34 +3234,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const myRematchSent = !isSpectator && (gameState.rematchRequests || []).includes(user.id);
 
   // ── Shared board tooltip (single instance, driven by BoardCard/CardRevealEntry) ──
-  const [tooltipCard, setTooltipCard] = useState(null);
-  useEffect(() => {
-    _boardTooltipSetter = setTooltipCard;
-    return () => { _boardTooltipSetter = null; };
-  }, []);
-  // Sync: when global tap-tooltip clears, also clear board tooltip
-  useEffect(() => {
-    if (!window._isTouchDevice) return;
-    const sync = (activeCard) => {
-      if (!activeCard) setTooltipCard(null);
-    };
-    window._tapTooltipSetters.add(sync);
-    return () => window._tapTooltipSetters.delete(sync);
-  }, []);
-  // Safety: if the mouse isn't over any board-card element, clear the tooltip.
-  // Catches cases where the source element was removed (overlay dismissed, card reveal expired).
-  useEffect(() => {
-    if (!tooltipCard) return;
-    // On touch devices, tooltip stays until explicitly dismissed by tap
-    if (window._isTouchDevice) return;
-    const check = () => {
-      if (!document.querySelector('.board-card:hover, .card-reveal-entry:hover, .card-mini:hover, .card-name-picker-row:hover, .revealed-hand-card:hover')) {
-        setTooltipCard(null);
-      }
-    };
-    const id = setInterval(check, 300);
-    return () => clearInterval(id);
-  }, [tooltipCard]);
+  const { tooltipCard, setTooltipCard } = useCardTooltip({
+    hoverSelectors: '.board-card:hover, .card-reveal-entry:hover, .card-mini:hover, .card-name-picker-row:hover, .revealed-hand-card:hover',
+  });
 
   // Board skin helpers — construct zone background style from board ID
   const boardZoneStyle = (boardId, zoneType) => {
@@ -9142,9 +9035,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* Board card hover tooltip (shared single instance) */}
       {tooltipCard && !hoveredPileCard && (() => {
-        const imgUrl = cardImageUrl(tooltipCard.name);
-        const foilType = tooltipCard.foil || null;
-        const isFoil = foilType === 'secret_rare' || foilType === 'diamond_rare';
         // Token mapping — cards that create tokens show the token tooltip alongside
         const CARD_TOKEN_MAP = {
           'Pyroblast': ['Pollution Token'],
@@ -9160,51 +9050,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {relatedTokens.map(tokenName => {
               const tokenCard = CARDS_BY_NAME[tokenName];
               if (!tokenCard) return null;
-              const tokenImg = cardImageUrl(tokenCard.name);
               return (
                 <div key={tokenName} className="board-tooltip board-tooltip-token">
-                  {tokenImg && (
-                    <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
-                      <img src={tokenImg} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block' }} />
-                    </div>
-                  )}
-                  <div style={{ padding: '10px 12px' }}>
-                    <div style={{ fontWeight: 700, fontSize: 18, color: typeColor(tokenCard.cardType), marginBottom: 5 }}>{tokenCard.name}</div>
-                    <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>
-                      {tokenCard.cardType}{tokenCard.subtype ? ' · ' + tokenCard.subtype : ''}
-                    </div>
-                    {tokenCard.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5 }}>{tokenCard.effect}</div>}
-                    <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
-                      {tokenCard.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {tokenCard.hp}</span>}
-                      {tokenCard.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {tokenCard.atk}</span>}
-                      {tokenCard.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {tokenCard.cost}</span>}
-                      {tokenCard.level != null && <span>Lv{tokenCard.level}</span>}
-                    </div>
-                  </div>
+                  <CardTooltipContent card={tokenCard} />
                 </div>
               );
             })}
             <div className="board-tooltip">
-              {imgUrl && (
-                <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
-                  <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-                    border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none' }} />
-                  {isFoil && <FoilOverlay bands={[]} shimmerOffset="0ms" sparkleDelays={[]} foilType={foilType} />}
-                </div>
-              )}
-              <div style={{ padding: '10px 12px' }}>
-                <div style={{ fontWeight: 700, fontSize: 18, color: typeColor(tooltipCard.cardType), marginBottom: 5 }}>{tooltipCard.name}</div>
-                <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>
-                  {tooltipCard.cardType}{tooltipCard.subtype ? ' · ' + tooltipCard.subtype : ''}{tooltipCard.archetype ? ' · ' + tooltipCard.archetype : ''}
-                </div>
-                {tooltipCard.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5 }}>{tooltipCard.effect}</div>}
-                <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
-                  {tooltipCard.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {tooltipCard.hp}</span>}
-                  {tooltipCard.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {tooltipCard.atk}</span>}
-                  {tooltipCard.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {tooltipCard.cost}</span>}
-                  {tooltipCard.level != null && <span>Lv{tooltipCard.level}</span>}
-                </div>
-              </div>
+              <CardTooltipContent card={tooltipCard} />
             </div>
           </>
         );
@@ -10297,3 +10150,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 // ===== CROSS-FILE EXPORTS =====
 window.BoardCard = BoardCard;
 window.GameBoard = GameBoard;
+window.FrozenOverlay = FrozenOverlay;
+window.NegatedOverlay = NegatedOverlay;
+window.BurnedOverlay = BurnedOverlay;
+window.PoisonedOverlay = PoisonedOverlay;
+window.HealReversedOverlay = HealReversedOverlay;
+window.ImmuneIcon = ImmuneIcon;

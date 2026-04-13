@@ -5,7 +5,7 @@
 const { useState, useEffect, useRef, useCallback, useContext } = React;
 const { api, socket, AppContext, Notification, CardMini, loadCardDB,
         isDeckLegal, emitSocket } = window;
-const { AuthScreen, MainMenu, ProfileScreen, ShopScreen, RulesScreen } = window;
+const { AuthScreen, MainMenu, ProfileScreen, ShopScreen, RulesScreen, PuzzleCreator } = window;
 const { DeckBuilder } = window;
 const { GameBoard } = window;
 let _pendingGameState = null;
@@ -582,6 +582,7 @@ function App() {
         screen === 'shop' ? <ShopScreen /> :
         screen === 'profile' ? <ProfileScreen /> :
         screen === 'rules' ? <RulesScreen /> :
+        screen === 'puzzle-create' ? <PuzzleCreator /> :
         <MainMenu />}
     </AppContext.Provider>
   );
