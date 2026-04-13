@@ -147,6 +147,7 @@ async function doSacrifice(engine, pi) {
 module.exports = {
   // Post-target reaction: fires AFTER opponent's spell/attack selects a target
   isPostTargetReaction: true,
+  proactivePlay: true,
 
   // Also playable proactively during own turn
   inherentAction: true,

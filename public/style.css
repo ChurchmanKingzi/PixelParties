@@ -2090,6 +2090,26 @@ body {
   0%, 100% { box-shadow: 0 0 12px rgba(255,215,0,.2), inset 0 0 8px rgba(255,215,0,.1); }
   50% { box-shadow: 0 0 20px rgba(255,215,0,.35), inset 0 0 12px rgba(255,215,0,.15); }
 }
+.zone-permanent-activatable {
+  border-color: rgba(255,215,0,.9) !important;
+  box-shadow: 0 0 16px rgba(255,215,0,.8), 0 0 32px rgba(255,180,0,.4), inset 0 0 12px rgba(255,215,0,.3) !important;
+  animation: permanentActivatablePulse 1s ease-in-out infinite !important;
+}
+.zone-permanent-activatable::after {
+  content: '⚖';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 14px;
+  color: #ffd700;
+  filter: drop-shadow(0 0 4px rgba(255,215,0,.9));
+  animation: abilityBoltBounce 0.8s ease-in-out infinite alternate;
+  z-index: 10;
+}
+@keyframes permanentActivatablePulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(255,215,0,.8), 0 0 32px rgba(255,180,0,.4), inset 0 0 12px rgba(255,215,0,.3); border-color: rgba(255,215,0,.9); }
+  50% { box-shadow: 0 0 24px rgba(255,215,0,1), 0 0 48px rgba(255,180,0,.6), inset 0 0 18px rgba(255,215,0,.5); border-color: rgba(255,230,100,1); }
+}
 .board-row {
   display: flex;
   justify-content: center;
@@ -3343,6 +3363,24 @@ body {
 @keyframes overheal-pulse {
   0%, 100% { opacity: 0.7; }
   50% { opacity: 1; }
+}
+.board-card-guardian-shield {
+  position: absolute;
+  top: 3%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(56px * var(--board-scale));
+  height: calc(56px * var(--board-scale));
+  border: calc(3px * var(--board-scale)) solid rgba(255, 60, 60, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgba(255, 40, 40, 0.5), inset 0 0 10px rgba(255, 60, 60, 0.2);
+  z-index: 5;
+  pointer-events: none;
+  animation: guardian-pulse 2s ease-in-out infinite;
+}
+@keyframes guardian-pulse {
+  0%, 100% { opacity: 0.7; box-shadow: 0 0 12px rgba(255, 40, 40, 0.5), inset 0 0 10px rgba(255, 60, 60, 0.2); }
+  50% { opacity: 1; box-shadow: 0 0 20px rgba(255, 40, 40, 0.7), inset 0 0 14px rgba(255, 60, 60, 0.35); }
 }
 
 /* Heal beam (Heal spell orbital strike) */

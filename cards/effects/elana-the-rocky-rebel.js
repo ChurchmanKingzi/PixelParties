@@ -49,35 +49,13 @@ module.exports = {
     });
     await engine._delay(400);
 
-    // Return all hand cards to deck one by one (reverse draw animation)
-    const cardsToReturn = handSize;
-    engine.gs.handReturnToDeck = true; // Signal frontend to animate cards flying to deck
-    for (let i = 0; i < cardsToReturn; i++) {
-      if ((ps.hand || []).length === 0) break;
-      const cardName = ps.hand.shift();
-      ps.mainDeck.push(cardName);
-
-      // Untrack the hand card instance
-      const handInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.zone === 'hand' && c.name === cardName
-      );
-      if (handInst) engine._untrackCard(handInst.id);
-
-      engine.sync();
-      await engine._delay(150);
-    }
-    engine.gs.handReturnToDeck = false;
+    // Return all hand cards to deck
+    const cardNamesToReturn = [...ps.hand];
+    await engine.actionMulliganCards(pi, cardNamesToReturn);
 
     await engine._delay(400);
 
-    // Shuffle the deck (Fisher-Yates)
-    const deck = ps.mainDeck;
-    for (let i = deck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-
-    engine.log('elana_shuffle', { player: ps.username, returned: cardsToReturn, drawing: drawCount });
+    engine.log('elana_shuffle', { player: ps.username, returned: cardNamesToReturn.length, drawing: drawCount });
 
     await engine._delay(300);
 

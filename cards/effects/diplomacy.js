@@ -198,50 +198,19 @@ module.exports = {
     engine.log('gold_spent', { player: ps.username, amount: cost, reason: 'Diplomacy' });
     engine._broadcastEvent('gold_change', { owner: pi, amount: -cost });
 
-    // ── Move creature (same pattern as Dark Gear) ──
+    // ── Move creature (centralized transfer) ──
     const inst = target.cardInstance || engine.cardInstances.find(c =>
       c.owner === target.owner && c.zone === 'support' &&
       c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
     );
     if (!inst) return false;
 
-    // Remove from opponent's support zone
-    const oppPs = gs.players[oppIdx];
-    const srcSlot = (oppPs.supportZones[target.heroIdx] || [])[target.slotIdx] || [];
-    const srcIdx = srcSlot.indexOf(target.cardName);
-    if (srcIdx >= 0) srcSlot.splice(srcIdx, 1);
-
-    engine.sync();
-
-    // Fire leave zone hook
-    await engine.runHooks('onCardLeaveZone', {
-      _onlyCard: inst, card: inst,
-      fromZone: 'support', fromHeroIdx: target.heroIdx,
-      _skipReactionCheck: true,
-    });
-
-    // Card transfer animation
-    engine._broadcastEvent('play_card_transfer', {
-      sourceOwner: oppIdx, sourceHeroIdx: target.heroIdx, sourceZoneSlot: target.slotIdx,
-      targetOwner: pi, targetHeroIdx: chosenZone.heroIdx, targetZoneSlot: chosenZone.slotIdx,
-      cardName: target.cardName, duration: 800,
-    });
-    await engine._delay(900);
-
-    // Place into player's support zone
     const destHi = chosenZone.heroIdx;
     const destSi = chosenZone.slotIdx;
-    if (!ps.supportZones[destHi]) ps.supportZones[destHi] = [[], [], []];
-    if (!ps.supportZones[destHi][destSi]) ps.supportZones[destHi][destSi] = [];
-    ps.supportZones[destHi][destSi].push(target.cardName);
 
-    // Update card instance — transfer control permanently
-    inst.controller = pi;
-    inst.zone = 'support';
-    inst.heroIdx = destHi;
-    inst.zoneSlot = destSi;
-
-    engine.sync();
+    // Transfer creature to player's control (handles zone move, animation, hooks, guardian sync)
+    const transferResult = await engine.actionTransferCreature(inst, pi, destHi, destSi);
+    if (!transferResult.success) return false;
 
     // Apply negation until end of turn (same as Dark Gear)
     engine.actionNegateCreature(inst, 'Diplomacy', {
@@ -253,7 +222,7 @@ module.exports = {
       player: ps.username,
       creature: target.cardName,
       cost,
-      fromHero: oppPs.heroes[target.heroIdx]?.name,
+      fromHero: gs.players[oppIdx]?.heroes[target.heroIdx]?.name,
       toHero: ps.heroes[destHi]?.name,
     });
 

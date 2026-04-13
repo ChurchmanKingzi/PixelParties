@@ -124,6 +124,11 @@ async function api(path, opts = {}) {
 const socket = io();
 function emitSocket(event, data) { socket.emit(event, data); }
 
+// Handle session superseded by another tab
+socket.on('superseded', ({ reason }) => {
+  document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1a1a2e;color:#fff;font-family:sans-serif;text-align:center;padding:20px"><div><h2 style="color:#ff6644">⚠️ Session Taken Over</h2><p style="color:#aaa;max-width:400px">${reason || 'This session was opened in another tab.'}</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#4488ff;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px">Reload</button></div></div>`;
+});
+
 // ===== CARD DB =====
 window.ALL_CARDS = [];          // every card from cards.json (for rule lookups)
 window.CARDS_BY_NAME = {};      // name → card object (full DB, needed for deck validation)

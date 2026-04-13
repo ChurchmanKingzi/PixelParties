@@ -87,21 +87,15 @@ module.exports = {
         }
       }
 
-      // Apply Itemlock to target's controller (not on turn 1, every-other-turn cooldown)
-      // If we're inside onPlay, the effect was not negated by the chain
+      // Apply Itemlock to target's controller (not on turn 1)
       if ((gs.turn || 1) > 1) {
         const oppIdx = tgtOwner;
         const oppPs = gs.players[oppIdx];
         if (oppPs) {
-          // Cooldown: can only be affected every other turn
-          const lastLocked = oppPs._itemLockedLastTurn;
-          if (lastLocked == null || gs.turn - lastLocked >= 2) {
-            oppPs.itemLocked = true;
-            oppPs._itemLockedLastTurn = gs.turn;
-            engine.log('item_locked', {
-              player: oppPs.username, by: 'Hammer Throw',
-            });
-          }
+          oppPs.itemLocked = true;
+          engine.log('item_locked', {
+            player: oppPs.username, by: 'Hammer Throw',
+          });
         }
       }
 

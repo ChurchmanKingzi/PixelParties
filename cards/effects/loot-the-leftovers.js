@@ -109,6 +109,15 @@ module.exports = {
       oppPs.hand.splice(idx, 1);
       ps.hand.push(cardName);
       stolenCards.push(cardName);
+
+      // Update tracked instance: owner changes to holder, originalOwner preserved
+      const inst = engine.cardInstances.find(c =>
+        c.owner === oppIdx && c.zone === 'hand' && c.name === cardName
+      );
+      if (inst) {
+        inst.owner = pi;
+        inst.controller = pi;
+      }
     }
 
     if (stolenCards.length === 0) return;

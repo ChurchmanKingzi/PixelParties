@@ -2957,6 +2957,54 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  golden_scale: (() => {
+    return function GoldenScaleEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, transform: 'translate(-50%, -50%)' }}>
+          <div style={{
+            fontSize: 64,
+            filter: 'drop-shadow(0 0 16px rgba(255,215,0,.9)) drop-shadow(0 0 32px rgba(255,180,0,.6))',
+            animation: 'goldenScaleGrow 800ms ease-out forwards',
+          }}>⚖️</div>
+          <style>{`
+            @keyframes goldenScaleGrow {
+              0% { transform: scale(0.3); opacity: 0; }
+              30% { transform: scale(1.3); opacity: 1; }
+              60% { transform: scale(1.1); opacity: 1; }
+              100% { transform: scale(2); opacity: 0; }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  guardian_shield: (() => {
+    return function GuardianShieldEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, transform: 'translate(-50%, -50%)' }}>
+          <div style={{
+            width: 70, height: 70, borderRadius: '50%',
+            border: '3px solid rgba(255,60,60,.9)',
+            boxShadow: '0 0 20px rgba(255,40,40,.6), inset 0 0 14px rgba(255,60,60,.3)',
+            animation: 'guardianShieldFlash 1000ms ease-out forwards',
+          }} />
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            fontSize: 32, filter: 'drop-shadow(0 0 8px rgba(255,40,40,.8))',
+            animation: 'guardianShieldFlash 1000ms ease-out forwards',
+          }}>🛡️</div>
+          <style>{`
+            @keyframes guardianShieldFlash {
+              0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+              25% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+              60% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+              100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
 };
 
 function IceEncaseEffect({ x, y }) {
@@ -3807,14 +3855,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const potionDeckEl = document.querySelector('[data-my-potion-deck]');
       const potionR = potionDeckEl?.getBoundingClientRect();
       const potionTarget = potionR ? { x: potionR.left + potionR.width / 2 - 32, y: potionR.top + potionR.height / 2 - 45 } : null;
+      const oppCards = gameState.handReturnToOppCards || [];
+      const oppDeckEl = document.querySelector('[data-opp-deck]');
+      const oppDeckR = oppDeckEl?.getBoundingClientRect();
+      const oppDeckTarget = oppDeckR ? { x: oppDeckR.left + oppDeckR.width / 2 - 32, y: oppDeckR.top + oppDeckR.height / 2 - 45 } : null;
       const returnAnims = [];
       for (const r of removed) {
         const sr = storedRects[r.handIdx];
         if (!sr) continue;
+        const isToOpp = oppCards.includes(r.cardName);
         const isPotion = CARDS_BY_NAME[r.cardName]?.cardType === 'Potion';
-        const target = (isPotion && potionTarget) ? potionTarget : deckTarget;
+        const target = isToOpp ? (oppDeckTarget || deckTarget)
+          : (isPotion && potionTarget) ? potionTarget : deckTarget;
         if (!target) continue;
-        returnAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: target.x, endY: target.y, dest: isPotion ? 'potion' : 'deck' });
+        returnAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: target.x, endY: target.y, dest: isToOpp ? 'opp-deck' : isPotion ? 'potion' : 'deck' });
       }
       if (returnAnims.length > 0) {
         setDiscardAnims(prev => [...prev, ...returnAnims]);
@@ -4037,7 +4091,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       // Gray out Artifacts if not enough gold or item-locked
       if (card.cardType === 'Artifact') {
-        if (me.itemLocked) return true;
+        if (me.itemLocked && (me.hand || []).length < 2) return true;
         if ((me.gold || 0) < (card.cost || 0)) return true;
         // Once-per-game artifacts (Smug Coin, etc.)
         if ((me.oncePerGameUsed || []).includes(cardName)) return true;
@@ -7791,6 +7845,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'shard_delete') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} deleted {(entry.deleted||[]).length} card{(entry.deleted||[]).length!==1?'s':''}.</span>; }
       if (t === 'creature_revived') { const p = playerByName(entry.player); return <span className="log-heal">{cName(entry.card)} was revived{entry.by ? <> by {cName(entry.by)}</> : ''}!</span>; }
       if (t === 'permanent_placed') { const p = playerByName(entry.player); return <span className="log-info">{cName(entry.card)} entered play for {pName(p.name, p.color)}.</span>; }
+      if (t === 'permanent_activated') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} activated {cName(entry.card)}!</span>; }
       if (t === 'permanent_removed') { const p = playerByName(entry.player); return <span className="log-info">{cName(entry.card)} left play for {pName(p.name, p.color)}.</span>; }
       if (t === 'monia_protect') {
         if (entry.protectedCreature) return <span className="log-status">{entry.hero} protected {cName(entry.protectedCreature)}!</span>;
@@ -8484,6 +8539,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
                     {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated || cc?._baihuStunned) ? <StatusBadges counters={cc} isHero={false} player={p} /> : null}
                     {cc?.buffs ? <BuffColumn buffs={cc.buffs} /> : null}
+                    {cc?._guardianImmune ? <div className="board-card-guardian-shield" /> : null}
                     </>
                     ); })()
                   ) : (
@@ -8583,8 +8639,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${opp.username} cannot play any more Potions this turn!`, color: '#8844cc' });
             if (me.supportSpellLocked) debuffs.push({ key: 'support-me', icon: '💚', text: 'You cannot use another Support Spell this turn.', color: '#ff4444' });
             if (opp.supportSpellLocked) debuffs.push({ key: 'support-opp', icon: '💚', text: `Your opponent cannot use another Support Spell this turn.`, color: '#ff8844' });
-            if (me.itemLocked) debuffs.push({ key: 'item-me', icon: '🔨', text: 'You cannot use Artifacts this turn!', color: '#ff6633' });
-            if (opp.itemLocked) debuffs.push({ key: 'item-opp', icon: '🔨', text: `${opp.username} cannot use Artifacts this turn!`, color: '#cc5522' });
+            if (me.itemLocked) debuffs.push({ key: 'item-me', icon: '🔨', text: 'You must delete 1 card from your hand to use an Artifact!', color: '#ff6633' });
+            if (opp.itemLocked) debuffs.push({ key: 'item-opp', icon: '🔨', text: `${opp.username} must delete 1 card from their hand to use an Artifact!`, color: '#cc5522' });
             if (me.forsaken) debuffs.push({ key: 'forsaken-me', icon: '🏴‍☠️', text: 'All cards that would go to your discard pile are deleted for the rest of the turn.', color: '#8888aa' });
             if (opp.forsaken) debuffs.push({ key: 'forsaken-opp', icon: '🏴‍☠️', text: `All cards that would go to ${opp.username}'s discard pile are deleted for the rest of the turn.`, color: '#6666aa' });
             if (me.handLocked) debuffs.push({ key: 'hand-me', icon: '🔒', text: 'You cannot draw or search any more cards this turn!', color: '#ff6644' });
@@ -8686,12 +8742,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   const permTargetId = `perm-${oppIdx}-${perm.id}`;
                   const isValidPermTarget = isTargeting && validTargetIds.has(permTargetId);
                   const isSelectedPermTarget = selectedSet.has(permTargetId);
+                  const isActivatable = !isSpectator && (gameState.activatablePermanents || []).some(a => a.permId === perm.id && a.ownerIdx === oppIdx);
+                  const handlePermClick = isValidPermTarget ? () => togglePotionTarget(permTargetId)
+                    : isActivatable ? () => socket.emit('activate_permanent', { roomId: gameState.roomId, permId: perm.id, ownerIdx: oppIdx })
+                    : undefined;
                   return (
                     <div key={perm.id}
-                      className={'board-permanent-slot' + (isValidPermTarget ? ' potion-target-valid' : '') + (isSelectedPermTarget ? ' potion-target-selected' : '')}
+                      className={'board-permanent-slot' + (isValidPermTarget ? ' potion-target-valid' : '') + (isSelectedPermTarget ? ' potion-target-selected' : '') + (isActivatable ? ' zone-permanent-activatable' : '')}
                       data-perm-id={perm.id} data-perm-owner="opp"
-                      onClick={isValidPermTarget ? () => togglePotionTarget(permTargetId) : undefined}
-                      style={isValidPermTarget ? { cursor: 'pointer' } : undefined}>
+                      onClick={handlePermClick}
+                      style={(isValidPermTarget || isActivatable) ? { cursor: 'pointer' } : undefined}>
                       <BoardCard cardName={perm.name} />
                     </div>
                   );
@@ -8704,12 +8764,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   const permTargetId = `perm-${myIdx}-${perm.id}`;
                   const isValidPermTarget = isTargeting && validTargetIds.has(permTargetId);
                   const isSelectedPermTarget = selectedSet.has(permTargetId);
+                  const isActivatable = !isSpectator && (gameState.activatablePermanents || []).some(a => a.permId === perm.id && a.ownerIdx === myIdx);
+                  const handlePermClick = isValidPermTarget ? () => togglePotionTarget(permTargetId)
+                    : isActivatable ? () => socket.emit('activate_permanent', { roomId: gameState.roomId, permId: perm.id, ownerIdx: myIdx })
+                    : undefined;
                   return (
                     <div key={perm.id}
-                      className={'board-permanent-slot' + (isValidPermTarget ? ' potion-target-valid' : '') + (isSelectedPermTarget ? ' potion-target-selected' : '')}
+                      className={'board-permanent-slot' + (isValidPermTarget ? ' potion-target-valid' : '') + (isSelectedPermTarget ? ' potion-target-selected' : '') + (isActivatable ? ' zone-permanent-activatable' : '')}
                       data-perm-id={perm.id} data-perm-owner="me"
-                      onClick={isValidPermTarget ? () => togglePotionTarget(permTargetId) : undefined}
-                      style={isValidPermTarget ? { cursor: 'pointer' } : undefined}>
+                      onClick={handlePermClick}
+                      style={(isValidPermTarget || isActivatable) ? { cursor: 'pointer' } : undefined}>
                       <BoardCard cardName={perm.name} />
                     </div>
                   );

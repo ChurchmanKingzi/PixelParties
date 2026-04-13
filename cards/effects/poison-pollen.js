@@ -93,9 +93,9 @@ module.exports = {
               duration: 1, appliedBy: pi,
             });
           } else if (stunnedOnly) {
-            // Poison 1 stack
+            // Poison 1 stack (fresh application)
             await engine.addHeroStatus(t.owner, t.heroIdx, 'poisoned', {
-              addStacks: 1, appliedBy: pi,
+              stacks: 1, appliedBy: pi,
             });
           }
         } else if (t.type === 'creature') {

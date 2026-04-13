@@ -466,6 +466,14 @@ class GameEngine {
       async removeCreatureBuff(inst, buffName, opts) {
         return engine.actionRemoveCreatureBuff(inst, buffName, opts);
       },
+      /** Sync guardian immunity on a creature to match its controller's side. */
+      syncGuardianImmunity(inst, controllerIdx) {
+        return engine._syncGuardianImmunity(inst, controllerIdx);
+      },
+      /** Transfer a creature from one player's control to another. */
+      async transferCreature(inst, toPlayerIdx, destHeroIdx, destSlotIdx, opts) {
+        return engine.actionTransferCreature(inst, toPlayerIdx, destHeroIdx, destSlotIdx, opts);
+      },
       /**
        * Change a creature's level by delta. Fires BEFORE/AFTER_LEVEL_CHANGE hooks.
        * If no target specified, changes THIS card's level.
@@ -2389,6 +2397,31 @@ class GameEngine {
    *   {object} hookExtras - Extra fields merged into hook context
    * @returns {{ inst: CardInstance, actualSlot: number } | null}
    */
+  /**
+   * Sync guardian immunity on a creature to match its controller's side.
+   * Adds immunity if siblings have it, removes if they don't.
+   * Called on summon (propagate) and on control change (equalize).
+   */
+  _syncGuardianImmunity(inst, controllerIdx) {
+    const existing = this.cardInstances.find(c =>
+      c.id !== inst.id && c.zone === ZONES.SUPPORT &&
+      (c.controller ?? c.owner) === controllerIdx &&
+      c.counters?._guardianImmune && c.counters?.buffs?.guardian
+    );
+    if (existing) {
+      // New side has guardian — propagate
+      inst.counters._guardianImmune = true;
+      if (!inst.counters.buffs) inst.counters.buffs = {};
+      inst.counters.buffs.guardian = { ...existing.counters.buffs.guardian };
+    } else {
+      // New side has no guardian — remove if present
+      if (inst.counters._guardianImmune) {
+        delete inst.counters._guardianImmune;
+        if (inst.counters.buffs?.guardian) delete inst.counters.buffs.guardian;
+      }
+    }
+  }
+
   summonCreature(cardName, playerIdx, heroIdx, zoneSlot = -1, opts = {}) {
     const placeResult = this.safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot);
     if (!placeResult) return null;
@@ -2397,6 +2430,9 @@ class GameEngine {
 
     // Enforce summoning sickness — belt-and-suspenders with _trackCard
     inst.turnPlayed = this.gs.turn || 0;
+
+    // Propagate guardian immunity to newly summoned creatures
+    this._syncGuardianImmunity(inst, playerIdx);
 
     // Log
     if (!opts.skipLog) {
@@ -2436,6 +2472,72 @@ class GameEngine {
     }
 
     return { inst, actualSlot };
+  }
+
+  /**
+   * Transfer a creature from one player's control to another.
+   * Handles: remove from source zone, onCardLeaveZone hook, transfer animation,
+   * place at destination, update instance controller/position, guardian immunity sync.
+   *
+   * @param {CardInstance} inst - The creature's tracked card instance
+   * @param {number} toPlayerIdx - Player index receiving control
+   * @param {number} destHeroIdx - Destination hero index
+   * @param {number} destSlotIdx - Destination support zone slot
+   * @param {object} [opts] - { animDuration, skipAnimation, source }
+   * @returns {{ success: boolean }}
+   */
+  async actionTransferCreature(inst, toPlayerIdx, destHeroIdx, destSlotIdx, opts = {}) {
+    const gs = this.gs;
+    const fromPlayerIdx = inst.controller ?? inst.owner;
+    const fromPs = gs.players[fromPlayerIdx];
+    const toPs = gs.players[toPlayerIdx];
+    if (!fromPs || !toPs || !inst) return { success: false };
+
+    const cardName = inst.name;
+    const srcHeroIdx = inst.heroIdx;
+    const srcSlotIdx = inst.zoneSlot;
+
+    // Remove from source support zone
+    const srcSlot = (fromPs.supportZones[srcHeroIdx] || [])[srcSlotIdx] || [];
+    const srcIdx = srcSlot.indexOf(cardName);
+    if (srcIdx >= 0) srcSlot.splice(srcIdx, 1);
+
+    this.sync();
+
+    // Fire leave zone hook
+    await this.runHooks('onCardLeaveZone', {
+      _onlyCard: inst, card: inst,
+      fromZone: 'support', fromHeroIdx: srcHeroIdx,
+      _skipReactionCheck: true,
+    });
+
+    // Transfer animation
+    if (!opts.skipAnimation) {
+      const dur = opts.animDuration || 800;
+      this._broadcastEvent('play_card_transfer', {
+        sourceOwner: fromPlayerIdx, sourceHeroIdx: srcHeroIdx, sourceZoneSlot: srcSlotIdx,
+        targetOwner: toPlayerIdx, targetHeroIdx: destHeroIdx, targetZoneSlot: destSlotIdx,
+        cardName, duration: dur,
+      });
+      await this._delay(dur + 100);
+    }
+
+    // Place into destination support zone
+    if (!toPs.supportZones[destHeroIdx]) toPs.supportZones[destHeroIdx] = [[], [], []];
+    if (!toPs.supportZones[destHeroIdx][destSlotIdx]) toPs.supportZones[destHeroIdx][destSlotIdx] = [];
+    toPs.supportZones[destHeroIdx][destSlotIdx].push(cardName);
+
+    // Update card instance — controller changes, owner stays (tracks original ownership)
+    inst.controller = toPlayerIdx;
+    inst.zone = ZONES.SUPPORT;
+    inst.heroIdx = destHeroIdx;
+    inst.zoneSlot = destSlotIdx;
+
+    // Sync guardian immunity to match new controller's side
+    this._syncGuardianImmunity(inst, toPlayerIdx);
+
+    this.sync();
+    return { success: true };
   }
 
   /**
@@ -2537,11 +2639,108 @@ class GameEngine {
   }
 
   /**
+   * Return a card from a player's hand to its original owner's deck.
+   * Stolen cards go back to the opponent's deck; owned cards go to own deck.
+   * Potions route to potionDeck, others to mainDeck.
+   * @param {number} holderIdx - Player currently holding the card
+   * @param {string} cardName - Name of the card to return
+   * @returns {{ returnedToOwner: number, isPotion: boolean }} or null if card not found
+   */
+  returnHandCardToDeck(holderIdx, cardName) {
+    const ps = this.gs.players[holderIdx];
+    if (!ps) return null;
+
+    const handIdx = ps.hand.indexOf(cardName);
+    if (handIdx < 0) return null;
+
+    // Find tracked instance to determine original owner
+    // Primary: instance owned by holder
+    let inst = this.cardInstances.find(c =>
+      c.owner === holderIdx && c.zone === 'hand' && c.name === cardName
+    );
+    // Fallback: stolen card — instance owner differs from holder (e.g. Loot the Leftovers)
+    if (!inst) {
+      inst = this.cardInstances.find(c =>
+        c.zone === 'hand' && c.name === cardName && c.owner !== holderIdx
+      );
+    }
+    const originalOwner = inst?.originalOwner ?? holderIdx;
+    const ownerPs = this.gs.players[originalOwner];
+    if (!ownerPs) return null;
+
+    // Remove from hand
+    ps.hand.splice(handIdx, 1);
+
+    // Route to correct deck (always the original owner's)
+    const cardDB = this._getCardDB();
+    const cd = cardDB[cardName];
+    const isPotion = cd?.cardType === 'Potion';
+    if (isPotion) {
+      ownerPs.potionDeck.push(cardName);
+    } else {
+      ownerPs.mainDeck.push(cardName);
+    }
+
+    // Untrack
+    if (inst) this._untrackCard(inst.id);
+
+    return { returnedToOwner: originalOwner, isPotion };
+  }
+
+  /**
+   * Mulligan cards from a player's hand back to their original owner's deck.
+   * Handles animation flags, per-card return, opponent tracking, and deck shuffling.
+   *
+   * @param {number} playerIdx - The player whose hand cards are being returned
+   * @param {string[]} cardNames - Card names to return (order preserved)
+   * @returns {{ potionCount: number }} - Number of potions returned (for draw routing)
+   */
+  async actionMulliganCards(playerIdx, cardNames) {
+    const gs = this.gs;
+    let potionCount = 0;
+
+    gs.handReturnToDeck = true;
+    gs.handReturnToOppCards = [];
+
+    for (const cardName of cardNames) {
+      const result = this.returnHandCardToDeck(playerIdx, cardName);
+      if (result) {
+        if (result.isPotion) potionCount++;
+        if (result.returnedToOwner !== playerIdx) gs.handReturnToOppCards.push(cardName);
+      } else {
+        // Fallback: remove manually if instance not found
+        const idx = gs.players[playerIdx]?.hand?.indexOf(cardName);
+        if (idx >= 0) gs.players[playerIdx].hand.splice(idx, 1);
+      }
+      this.sync();
+      await this._delay(150);
+    }
+
+    gs.handReturnToDeck = false;
+    delete gs.handReturnToOppCards;
+
+    // Shuffle all players' decks (returned cards may have gone to opponent's deck)
+    for (const ps of gs.players) {
+      if (!ps) continue;
+      const shuffle = (arr) => {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+      };
+      shuffle(ps.mainDeck);
+      if (ps.potionDeck) shuffle(ps.potionDeck);
+    }
+
+    return { potionCount };
+  }
+
+  /**
    * Prompt a player to choose cards to discard from their hand.
    * Uses the standard forceDiscard UI.
    * @param {number} playerIdx - The player who must discard
    * @param {number} count - Number of cards to discard
-   * @param {object} opts - { title, source }
+   * @param {object} opts - { title, source, deleteMode, selfInflicted, eligibleIndices }
    */
   async actionPromptForceDiscard(playerIdx, count, opts = {}) {
     // First-turn protection blocks forced discard (but not self-inflicted costs)
@@ -2552,6 +2751,13 @@ class GameEngine {
     const ps = this.gs.players[playerIdx];
     if (!ps || (ps.hand || []).length === 0) return;
 
+    const deleteMode = !!opts.deleteMode;
+    const pileKey = deleteMode ? 'deletedPile' : 'discardPile';
+    const logEvent = deleteMode ? 'forced_delete' : 'forced_discard';
+    const destZone = deleteMode ? ZONES.DELETED : ZONES.DISCARD;
+    const hookName = deleteMode ? HOOKS.ON_DELETE : HOOKS.ON_DISCARD;
+    const verb = deleteMode ? 'delete' : 'discard';
+
     const toDiscard = Math.min(count, ps.hand.length);
     for (let i = 0; i < toDiscard; i++) {
       if ((ps.hand || []).length === 0) break;
@@ -2559,8 +2765,9 @@ class GameEngine {
       const result = await this.promptGeneric(playerIdx, {
         type: 'forceDiscard',
         count: 1,
-        title: opts.title || opts.source || 'Forced Discard',
-        description: `You must discard ${toDiscard - i} more card${toDiscard - i > 1 ? 's' : ''}.`,
+        title: opts.title || opts.source || (deleteMode ? 'Forced Delete' : 'Forced Discard'),
+        description: opts.description || `You must ${verb} ${toDiscard - i} more card${toDiscard - i > 1 ? 's' : ''}.`,
+        eligibleIndices: opts.eligibleIndices,
         cancellable: false,
       });
 
@@ -2568,8 +2775,8 @@ class GameEngine {
         // Safety fallback: auto-pop
         const cardName = ps.hand.pop();
         if (cardName) {
-          ps.discardPile.push(cardName);
-          this.log('forced_discard', { player: ps.username, card: cardName, source: opts.source });
+          ps[pileKey].push(cardName);
+          this.log(logEvent, { player: ps.username, card: cardName, source: opts.source });
         }
       } else {
         const handIdx = result.handIndex;
@@ -2580,14 +2787,14 @@ class GameEngine {
           if (fallbackIdx >= 0) ps.hand.splice(fallbackIdx, 1);
           else continue;
         }
-        ps.discardPile.push(result.cardName);
-        this.log('forced_discard', { player: ps.username, card: result.cardName, source: opts.source });
+        ps[pileKey].push(result.cardName);
+        this.log(logEvent, { player: ps.username, card: result.cardName, source: opts.source });
       }
 
       const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: result?.cardName })[0];
       if (inst) {
-        inst.zone = ZONES.DISCARD;
-        await this.runHooks(HOOKS.ON_DISCARD, { playerIdx, card: inst, cardName: result.cardName, _skipReactionCheck: true });
+        inst.zone = destZone;
+        await this.runHooks(hookName, { playerIdx, card: inst, cardName: result.cardName, _skipReactionCheck: true });
       }
       this.sync();
     }
@@ -3244,6 +3451,11 @@ class GameEngine {
       }
 
       for (const cd of handCards) {
+        // Reaction subtype: not proactively playable unless script opts in
+        if ((cd.subtype || '').toLowerCase() === 'reaction') {
+          const s = loadCardEffect(cd.name);
+          if (!s?.proactivePlay) continue;
+        }
         // Level/school requirements (handles levelOverrideCards, bypassLevelReq, negation, Performance, Wisdom)
         if (!this.heroMeetsLevelReq(playerIdx, hi, cd)) continue;
         // Wisdom hand-size check: player must have enough cards to pay the discard cost
@@ -3296,6 +3508,11 @@ class GameEngine {
 
         const playable = [];
         for (const cd of handCards) {
+          // Reaction subtype: not proactively playable unless script opts in
+          if ((cd.subtype || '').toLowerCase() === 'reaction') {
+            const s = loadCardEffect(cd.name);
+            if (!s?.proactivePlay) continue;
+          }
           // Level/school check uses opponent's ability zones (where the charmed hero lives)
           if (!this.heroMeetsLevelReq(oppIdx, hi, cd)) continue;
           // Wisdom hand-size check: acting player (ps) must have enough cards to pay
@@ -3381,6 +3598,9 @@ class GameEngine {
 
     // Load card script
     const script = loadCardEffect(cardName);
+
+    // Reaction subtype: not proactively playable unless script opts in
+    if ((cardData.subtype || '').toLowerCase() === 'reaction' && !script?.proactivePlay) return null;
 
     // Once-per-game check
     if (script?.oncePerGame) {
@@ -3676,6 +3896,8 @@ class GameEngine {
         return { played: false };
       }
       const { inst, actualSlot } = placeResult;
+      // Propagate guardian immunity to newly placed creatures
+      this._syncGuardianImmunity(inst, playerIdx);
       this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx: responseHeroIdx, zoneSlot: actualSlot, cardName });
       await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx: responseHeroIdx, zoneSlot: actualSlot, _skipReactionCheck: true });
       await this.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: responseHeroIdx, _skipReactionCheck: true });
@@ -3862,8 +4084,6 @@ class GameEngine {
 
       case PHASES.MAIN1:
       case PHASES.MAIN2:
-        // Compute which ability cards have custom placement
-        this.gs.customPlacementCards = this.getCustomPlacementCards(this.gs.activePlayer);
         // Compute which targeting artifacts/potions have no valid targets
         this.gs.unactivatableArtifacts = this.getUnactivatableArtifacts(this.gs.activePlayer);
         // Player-controlled phase — wait for manual advance
@@ -5408,6 +5628,7 @@ class GameEngine {
         inst.zoneSlot = placed.actualSlot;
         inst.faceDown = false;
         inst.turnPlayed = this.gs.turn || 0; // Enforce summoning sickness
+        this._syncGuardianImmunity(inst, playerIdx);
         this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: placed.actualSlot, cardName });
         // Extra flashy animation for surprise creature summon
         this._broadcastEvent('play_zone_animation', {
@@ -6376,6 +6597,34 @@ class GameEngine {
     return result;
   }
 
+  // ─── PERMANENT ACTIVATION ─────────────
+  /**
+   * Get all permanents on the board that can be activated by the given player.
+   * Checks ALL players' permanents (some permanents like Divine Gift of Balance
+   * allow activation by either player on their turn).
+   *
+   * Returns array of { permId, permName, ownerIdx }
+   */
+  getActivatablePermanents(playerIdx) {
+    if (this.gs.activePlayer !== playerIdx) return [];
+    const currentPhase = this.gs.currentPhase;
+    if (currentPhase !== 2 && currentPhase !== 3 && currentPhase !== 4) return [];
+
+    const result = [];
+    for (let pOwner = 0; pOwner < 2; pOwner++) {
+      const ps = this.gs.players[pOwner];
+      if (!ps) continue;
+      for (const perm of (ps.permanents || [])) {
+        const script = loadCardEffect(perm.name);
+        if (!script?.canActivatePermanent) continue;
+        if (script.canActivatePermanent(this.gs, playerIdx, pOwner, this)) {
+          result.push({ permId: perm.id, permName: perm.name, ownerIdx: pOwner });
+        }
+      }
+    }
+    return result;
+  }
+
   // ─── FREE ABILITY ACTIVATION ─────────────
   /**
    * Get all abilities on the board that have freeActivation (no action cost,
@@ -7219,10 +7468,13 @@ class GameEngine {
     entries = entries.filter(e => !e.inst?.faceDown);
     if (entries.length === 0) return;
 
-    // Mark Cardinal Beast immune and Baihu-petrified creatures — they stay in batch
-    // for animations but damage will be cancelled before HP reduction
+    // Mark Cardinal Beast immune, Baihu-petrified, and Guardian-shielded creatures
+    // — they stay in batch for animations but damage will be cancelled before HP reduction
+    // Guardian immunity is pierced by true damage (canBeNegated: false)
     for (const e of entries) {
       if (e.inst?.counters?._cardinalImmune || e.inst?.counters?._baihuPetrify) {
+        e._immuneCreature = true;
+      } else if (e.inst?.counters?._guardianImmune && e.canBeNegated !== false) {
         e._immuneCreature = true;
       }
     }

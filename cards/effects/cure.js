@@ -132,6 +132,7 @@ async function doCure(engine, pi, target) {
 
 module.exports = {
   isReaction: true,
+  proactivePlay: true,
   inherentAction: true,
   includesHealing: true,
 

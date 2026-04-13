@@ -1291,7 +1291,16 @@ function sendGameState(room, playerIdx, extra) {
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
-    customPlacementCards: gs.customPlacementCards || [],
+    customPlacementCards: (() => {
+      const ps2 = gs.players[playerIdx];
+      const names = new Set();
+      for (const cn of (ps2?.hand || [])) {
+        if (names.has(cn)) continue;
+        const s = loadCardEffect(cn);
+        if (s?.customPlacement) names.add(cn);
+      }
+      return [...names];
+    })(),
     ascendedOnlyAbilities: (() => {
       const ps2 = gs.players[playerIdx];
       const names = new Set();
@@ -1320,6 +1329,7 @@ function sendGameState(room, playerIdx, extra) {
     bonusMainActions: gs.players[playerIdx]?._bonusMainActions || 0,
     mulliganPending: gs.mulliganPending || false,
     handReturnToDeck: gs.handReturnToDeck || false,
+    handReturnToOppCards: gs.handReturnToOppCards || [],
     potionTargeting: gs.potionTargeting || null,
     effectPrompt: gs.effectPrompt || null,
     surprisePending: gs.surprisePending || false,
@@ -1394,6 +1404,7 @@ function sendGameState(room, playerIdx, extra) {
     activeHeroEffects: room.engine ? room.engine.getActiveHeroEffects(playerIdx) : [],
     activatableCreatures: room.engine ? room.engine.getActivatableCreatures(playerIdx) : [],
     activatableEquips: room.engine ? room.engine.getActivatableEquips(playerIdx) : [],
+    activatablePermanents: room.engine ? room.engine.getActivatablePermanents(playerIdx) : [],
     heroPlayableCards: room.engine ? room.engine.getHeroPlayableCards(playerIdx) : { own: {}, charmed: {} },
     bakhmSurpriseSlots: room.engine ? (() => {
       const result = [];
@@ -1550,6 +1561,7 @@ function sendSpectatorGameState(room) {
     bonusMainActions: 0,
     mulliganPending: gs.mulliganPending || false,
     handReturnToDeck: gs.handReturnToDeck || false,
+    handReturnToOppCards: gs.handReturnToOppCards || [],
     potionTargeting: gs.potionTargeting ? {
       potionName: gs.potionTargeting.potionName,
       ownerIdx: gs.potionTargeting.ownerIdx,
@@ -1590,6 +1602,7 @@ function sendSpectatorGameState(room) {
     activeHeroEffects: [],
     activatableCreatures: [],
     activatableEquips: [],
+    activatablePermanents: [],
     heroPlayableCards: { own: {}, charmed: {} },
     bakhmSurpriseSlots: [],
     ushabtiSummonable: [],
@@ -1905,6 +1918,16 @@ io.on('connection', (socket) => {
           if (t) { clearTimeout(t); disconnectTimers.delete(session.userId); }
           const pi = room.gameState.players.findIndex(ps => ps.userId === session.userId);
           if (pi >= 0) {
+            // Disconnect previous socket for this user (prevents dual-tab issues)
+            const oldSocketId = room.players[pi]?.socketId;
+            if (oldSocketId && oldSocketId !== socket.id) {
+              const oldSocket = io.sockets.sockets.get(oldSocketId);
+              if (oldSocket) {
+                oldSocket.leave('room:' + activeRoomId);
+                oldSocket.emit('superseded', { reason: 'This session was opened in another tab.' });
+                oldSocket.disconnect(true);
+              }
+            }
             if (room.players[pi]) room.players[pi].socketId = socket.id;
             room.gameState.players[pi].socketId = socket.id;
             room.gameState.players[pi].disconnected = false;
@@ -1954,7 +1977,19 @@ io.on('connection', (socket) => {
       if (isSpec && room.status === 'playing' && room.gameState) {
         // Update the spectator's socketId (they may have reconnected)
         const specEntry = room.spectators.find(s => s.username === currentUser.username);
-        if (specEntry) specEntry.socketId = socket.id;
+        if (specEntry) {
+          // Disconnect previous socket for this spectator (prevents dual-tab issues)
+          const oldSpecSocketId = specEntry.socketId;
+          if (oldSpecSocketId && oldSpecSocketId !== socket.id) {
+            const oldSocket = io.sockets.sockets.get(oldSpecSocketId);
+            if (oldSocket) {
+              oldSocket.leave('room:' + roomId);
+              oldSocket.emit('superseded', { reason: 'This session was opened in another tab.' });
+              oldSocket.disconnect(true);
+            }
+          }
+          specEntry.socketId = socket.id;
+        }
         sendSpectatorGameState(room);
         if (room.chatHistory?.length || Object.keys(room.privateChatHistory || {}).length) {
           socket.emit('chat_history', { main: room.chatHistory || [], private: room.privateChatHistory || {} });
@@ -3093,6 +3128,47 @@ io.on('connection', (socket) => {
     })();
   });
 
+  // Activate a permanent card's effect
+  socket.on('activate_permanent', ({ roomId, permId, ownerIdx }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.engine || !room.gameState) return;
+    const gs = room.gameState;
+    const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0 || pi !== gs.activePlayer) return;
+    if (gs.currentPhase !== 2 && gs.currentPhase !== 3 && gs.currentPhase !== 4) return;
+    if (gs.potionTargeting) return;
+
+    const permOwner = ownerIdx;
+    const ownerPs = gs.players[permOwner];
+    if (!ownerPs) return;
+
+    const perm = (ownerPs.permanents || []).find(p => p.id === permId);
+    if (!perm) return;
+
+    const { loadCardEffect } = require('./cards/effects/_loader');
+    const script = loadCardEffect(perm.name);
+    if (!script?.canActivatePermanent || !script?.onActivatePermanent) return;
+    if (!script.canActivatePermanent(gs, pi, permOwner, room.engine)) return;
+
+    (async () => {
+      try {
+        // Stream card image to opponent
+        const oi = pi === 0 ? 1 : 0;
+        const oppSid = gs.players[oi]?.socketId;
+        if (oppSid) io.to(oppSid).emit('card_reveal', { cardName: perm.name });
+        sendToSpectators(room, 'card_reveal', { cardName: perm.name });
+
+        room.engine.log('permanent_activated', { card: perm.name, player: gs.players[pi].username });
+
+        await script.onActivatePermanent(room.engine, pi, permOwner, perm);
+      } catch (err) {
+        console.error('[Engine] activate_permanent error:', err.message, err.stack);
+      }
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    })();
+  });
+
   // Play a creature from hand to support zone
   socket.on('play_creature', ({ roomId, cardName, handIndex, heroIdx, zoneSlot, additionalActionProvider }) => {
     if (!currentUser) return;
@@ -3484,7 +3560,7 @@ io.on('connection', (socket) => {
     if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return; // Must be Main Phase
 
     const ps = gs.players[pi];
-    if (ps.itemLocked) return; // Hammer Throw lock
+    if (ps.itemLocked && (ps.hand || []).length < 2) return; // Need 1+ other cards to delete
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
 
     const cardData = getCardDB()[cardName];
@@ -3539,6 +3615,17 @@ io.on('connection', (socket) => {
           if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
           sendToSpectators(room, 'card_reveal', { cardName });
           await new Promise(r => setTimeout(r, 100));
+
+          // Item lock cost: delete 1 card from hand after reveal
+          if (ps.itemLocked && (ps.hand || []).length > 0) {
+            await room.engine.actionPromptForceDiscard(pi, 1, {
+              title: 'Item Lock Cost',
+              description: 'You must delete 1 card from your hand to use an Artifact.',
+              source: 'Item Lock',
+              deleteMode: true,
+              selfInflicted: true,
+            });
+          }
 
           // Execute with reaction window (Tool Freezer can react to this)
           const chainResult = await room.engine.executeCardWithChain({
@@ -3704,7 +3791,7 @@ io.on('connection', (socket) => {
     if (gs.potionTargeting) return;
 
     const ps = gs.players[pi];
-    if (ps.itemLocked) return; // Hammer Throw lock
+    if (ps.itemLocked && (ps.hand || []).length < 2) return; // Need 1+ other cards to delete
     if (ps._creationLockedNames?.has(cardName)) return; // Locked by Alchemic Journal / Divine Gift of Creation
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return;
     if (ps._resolvingCard && handIndex === getResolvingHandIndex(ps)) return; // This specific card is resolving
@@ -3759,6 +3846,18 @@ io.on('connection', (socket) => {
         }
 
         room.engine._setPendingPlayLog('card_played', { player: ps.username, card: cardName, cardType: 'Artifact', cost: cost || 0 });
+
+        // Item lock cost: fire reveal immediately, then delete 1 card
+        if (ps.itemLocked && (ps.hand || []).length > 0) {
+          if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
+          await room.engine.actionPromptForceDiscard(pi, 1, {
+            title: 'Item Lock Cost',
+            description: 'You must delete 1 card from your hand to use an Artifact.',
+            source: 'Item Lock',
+            deleteMode: true,
+            selfInflicted: true,
+          });
+        }
 
         let chainResult;
         try {
@@ -3854,6 +3953,17 @@ io.on('connection', (socket) => {
       if (oppSid) io.to(oppSid).emit('card_reveal', { cardName: potionName });
       sendToSpectators(room, 'card_reveal', { cardName: potionName });
       await new Promise(r => setTimeout(r, 100));
+
+      // Item lock cost for artifacts: delete 1 card from hand after reveal
+      if (cardType === 'Artifact' && ps.itemLocked && (ps.hand || []).length > 0) {
+        await room.engine.actionPromptForceDiscard(pi, 1, {
+          title: 'Item Lock Cost',
+          description: 'You must delete 1 card from your hand to use an Artifact.',
+          source: 'Item Lock',
+          deleteMode: true,
+          selfInflicted: true,
+        });
+      }
 
       // Execute with reaction window — defers resolve until chain resolves (if chain forms)
       let chainResult;
@@ -4425,6 +4535,9 @@ io.on('connection', (socket) => {
       if (room?.gameState && !room.gameState.result) {
         const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
         if (pi >= 0) {
+          // Ignore if this socket was superseded by a newer connection (dual-tab)
+          if (room.players[pi]?.socketId !== socket.id) return;
+
           room.gameState.players[pi].disconnected = true;
           const oi = pi===0?1:0;
           sendGameState(room, oi);

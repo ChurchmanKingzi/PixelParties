@@ -63,44 +63,10 @@ module.exports = {
     if (count > 0) {
       // Sort indices descending so splicing doesn't shift later indices
       const sortedByIdx = [...selectedCards].sort((a, b) => b.handIndex - a.handIndex);
+      const cardNamesToReturn = sortedByIdx.map(s => s.cardName);
 
-      // Shuffle selected cards back into correct deck (with slide animation)
-      const cardDB = engine._getCardDB();
-      let potionCount = 0;
-      gs.handReturnToDeck = true;
-      for (const sel of sortedByIdx) {
-        const idx = ps.hand.indexOf(sel.cardName);
-        if (idx >= 0) {
-          ps.hand.splice(idx, 1);
-          const cd = cardDB[sel.cardName];
-          if (cd?.cardType === 'Potion') {
-            ps.potionDeck.push(sel.cardName);
-            potionCount++;
-          } else {
-            ps.mainDeck.push(sel.cardName);
-          }
-          // Untrack hand instance
-          const inst = engine.cardInstances.find(c =>
-            c.owner === pi && c.zone === 'hand' && c.name === sel.cardName
-          );
-          if (inst) engine._untrackCard(inst.id);
-          engine.sync();
-          await engine._delay(150);
-        }
-      }
-      gs.handReturnToDeck = false;
-
-      // Shuffle both decks (Fisher-Yates)
-      const deck = ps.mainDeck;
-      for (let i = deck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [deck[i], deck[j]] = [deck[j], deck[i]];
-      }
-      const pDeck = ps.potionDeck;
-      for (let i = pDeck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [pDeck[i], pDeck[j]] = [pDeck[j], pDeck[i]];
-      }
+      // Mulligan cards back to deck (handles animation, opponent routing, shuffling)
+      const { potionCount } = await engine.actionMulliganCards(pi, cardNamesToReturn);
 
       engine.sync();
       await engine._delay(400);

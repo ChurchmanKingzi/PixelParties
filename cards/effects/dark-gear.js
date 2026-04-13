@@ -185,45 +185,12 @@ module.exports = {
     );
     if (!inst) return;
 
-    // Remove from opponent's support zone
-    const oppPs = gs.players[oppIdx];
-    const srcSlot = (oppPs.supportZones[target.heroIdx] || [])[target.slotIdx] || [];
-    const srcIdx = srcSlot.indexOf(target.cardName);
-    if (srcIdx >= 0) srcSlot.splice(srcIdx, 1);
-
-    // Sync so creature visibly disappears from source before transfer animation
-    engine.sync();
-
-    // Fire leave zone hook
-    await engine.runHooks('onCardLeaveZone', {
-      _onlyCard: inst, card: inst,
-      fromZone: 'support', fromHeroIdx: target.heroIdx,
-      _skipReactionCheck: true,
-    });
-
-    // ── Card transfer animation ──
-    engine._broadcastEvent('play_card_transfer', {
-      sourceOwner: oppIdx, sourceHeroIdx: target.heroIdx, sourceZoneSlot: target.slotIdx,
-      targetOwner: pi, targetHeroIdx: chosenZone.heroIdx, targetZoneSlot: chosenZone.slotIdx,
-      cardName: target.cardName, duration: 800,
-    });
-    await engine._delay(900);
-
-    // Place into player's support zone
     const destHi = chosenZone.heroIdx;
     const destSi = chosenZone.slotIdx;
-    if (!ps.supportZones[destHi]) ps.supportZones[destHi] = [[], [], []];
-    if (!ps.supportZones[destHi][destSi]) ps.supportZones[destHi][destSi] = [];
-    ps.supportZones[destHi][destSi].push(target.cardName);
 
-    // Update card instance — transfer control permanently
-    inst.controller = pi;
-    inst.zone = 'support';
-    inst.heroIdx = destHi;
-    inst.zoneSlot = destSi;
-    // owner stays as oppIdx (tracks original ownership for condition checks)
-
-    engine.sync();
+    // Transfer creature to player's control (handles zone move, animation, hooks, guardian sync)
+    const transferResult = await engine.actionTransferCreature(inst, pi, destHi, destSi);
+    if (!transferResult.success) return;
 
     // ── Animation phase 2: Gear spin CCW on destination ──
     engine._broadcastEvent('play_zone_animation', {
