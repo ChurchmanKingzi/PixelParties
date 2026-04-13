@@ -62,7 +62,7 @@ function AuthScreen() {
 //  MAIN MENU
 // ═══════════════════════════════════════════
 function MainMenu() {
-  const { user, setScreen, setUser } = useContext(AppContext);
+  const { user, setScreen, setUser, notify } = useContext(AppContext);
   const logout = async () => {
     try { await api('/auth/logout', { method: 'POST' }); } catch {}
     window.AUTH_TOKEN = null;
@@ -78,10 +78,14 @@ function MainMenu() {
       <div className="orbit-font menu-subtitle" style={{ fontSize: 12, color: 'var(--text2)', letterSpacing: 3 }}>TRADING CARD GAME</div>
       <div className="menu-body">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 280 }} className="animate-in menu-buttons">
+          {!user.hide_tutorial && (
+            <button className="btn btn-big" onClick={() => notify('Tutorial coming soon!', 'info')} style={{ fontSize: 16, borderColor: '#ff44cc', color: '#ff44cc', background: 'rgba(255,68,204,.08)' }}>📖 TUTORIAL</button>
+          )}
           <button className="btn btn-big" onClick={() => setScreen('play')} style={{ fontSize: 16 }}>⚔ PLAY</button>
           <button className="btn btn-big btn-accent2" onClick={() => setScreen('deckbuilder')} style={{ fontSize: 16 }}>✦ EDIT DECK</button>
           <button className="btn btn-big" onClick={() => setScreen('shop')} style={{ fontSize: 16, borderColor: '#ffd700', color: '#ffd700', background: 'rgba(255,215,0,.08)' }}>✦ SHOP</button>
           <button className="btn btn-big btn-success" onClick={() => setScreen('profile')} style={{ fontSize: 16 }}>♛ VIEW PROFILE</button>
+          <button className="btn btn-big" onClick={() => setScreen('rules')} style={{ fontSize: 16, borderColor: 'var(--text2)', color: 'var(--text2)', background: 'rgba(255,255,255,.03)' }}>📜 RULES</button>
         </div>
         <div className="menu-user-info">
           <span style={{ color: user.color || 'var(--accent)', fontWeight: 800, fontSize: 22 }} className="orbit-font">{user.username}</span>
@@ -150,6 +154,9 @@ function ProfileScreen() {
 
   // Top heroes
   const [topHeroes, setTopHeroes] = useState([]);
+
+  // Tutorial visibility toggle
+  const [hideTutorial, setHideTutorial] = useState(!!user.hide_tutorial);
 
   // Dirty tracking — compare against original user values
   const isDirty = color !== (user.color || '#00f0ff')
@@ -316,6 +323,15 @@ function ProfileScreen() {
       setOldPw(''); setNewPw(''); setConfirmPw('');
     } catch (e) { notify(e.message, 'error'); }
     setPwSaving(false);
+  };
+
+  const toggleTutorial = async () => {
+    const newVal = !hideTutorial;
+    setHideTutorial(newVal);
+    try {
+      const data = await api('/profile/hide-tutorial', { method: 'PUT', body: JSON.stringify({ hide_tutorial: newVal }) });
+      setUser(data.user);
+    } catch (e) { notify(e.message, 'error'); setHideTutorial(!newVal); }
   };
 
   // Build card image URL for deck wall
@@ -698,6 +714,30 @@ function ProfileScreen() {
               </div>
             </div>
           )}
+
+          {/* Settings */}
+          <div className="profile-section profile-section-wide">
+            <div className="profile-section-label">SETTINGS</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 12, color: 'var(--text)' }}>
+                <div
+                  onClick={toggleTutorial}
+                  style={{
+                    width: 40, height: 22, borderRadius: 11, background: hideTutorial ? 'var(--accent)' : 'var(--bg4)',
+                    position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0
+                  }}
+                >
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                    position: 'absolute', top: 2, left: hideTutorial ? 20 : 2,
+                    transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.4)'
+                  }} />
+                </div>
+                <span onClick={toggleTutorial}>Hide Tutorial from Main Menu</span>
+              </label>
+              <span style={{ fontSize: 9, color: 'var(--text2)' }}>Toggle off to show the tutorial button again</span>
+            </div>
+          </div>
 
           {/* Change Password */}
           <div className="profile-section profile-section-wide">
@@ -1123,6 +1163,473 @@ function ShopScreen() {
 // ═══════════════════════════════════════════
 //  DECK BUILDER
 // ═══════════════════════════════════════════
+//  RULES SCREEN
+// ═══════════════════════════════════════════
+
+const RULES_SECTIONS = [
+  { id: 'overview',      label: 'How to Play' },
+  { id: 'heroes',        label: 'Heroes' },
+  { id: 'abilities',     label: 'Abilities' },
+  { id: 'attacks-spells', label: 'Attacks, Spells & Creatures' },
+  { id: 'spell-schools', label: 'Spell Schools' },
+  { id: 'artifacts',     label: 'Artifacts' },
+  { id: 'potions',       label: 'Potions' },
+  { id: 'ascended',      label: 'Ascended Heroes' },
+  { id: 'actions',       label: 'Actions' },
+  { id: 'board',         label: 'The Game Board' },
+  { id: 'first-turn',    label: 'First Turn Restrictions' },
+  { id: 'turn',          label: 'Course of a Turn' },
+  { id: 'status',        label: 'Status Effects' },
+  { id: 'deckbuilding',  label: 'Deck Construction' },
+];
+
+function RulesScreen() {
+  const { setScreen } = useContext(AppContext);
+  const contentRef = useRef(null);
+  const [activeSection, setActiveSection] = useState('overview');
+
+  const scrollTo = (id) => {
+    const el = document.getElementById('rules-' + id);
+    if (el && contentRef.current) {
+      contentRef.current.scrollTo({ top: el.offsetTop - contentRef.current.offsetTop - 16, behavior: 'smooth' });
+    }
+  };
+
+  // Track active section on scroll
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container) return;
+    const onScroll = () => {
+      const scrollTop = container.scrollTop + container.offsetTop + 40;
+      let current = RULES_SECTIONS[0].id;
+      for (const s of RULES_SECTIONS) {
+        const el = document.getElementById('rules-' + s.id);
+        if (el && el.offsetTop <= scrollTop) current = s.id;
+      }
+      setActiveSection(current);
+    };
+    container.addEventListener('scroll', onScroll, { passive: true });
+    return () => container.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Escape → back to menu
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') { e.stopImmediatePropagation(); setScreen('menu'); }
+    };
+    window.addEventListener('keydown', handleEsc, true);
+    return () => window.removeEventListener('keydown', handleEsc, true);
+  }, []);
+
+  const Img = ({ src, alt, className, style }) => (
+    <img src={'/rules/' + src} alt={alt || ''} className={'rules-img ' + (className || '')} style={style} draggable={false} />
+  );
+
+  const SectionTitle = ({ id, children }) => (
+    <h2 id={'rules-' + id} className="rules-section-title orbit-font">{children}</h2>
+  );
+
+  const SubTitle = ({ children }) => (
+    <h3 className="rules-sub-title orbit-font">{children}</h3>
+  );
+
+  const IconRow = ({ icons }) => (
+    <div className="rules-icon-row">
+      {icons.map(ic => (
+        <div key={ic.src} className="rules-icon-item">
+          <img src={'/rules/' + ic.src} alt={ic.label} className="rules-icon-img" draggable={false} />
+          <span className="rules-icon-label">{ic.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #10101d 40%, #0a0a12 100%)' }}>
+      <div className="top-bar">
+        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
+        <h2 className="orbit-font" style={{ fontSize: 16, color: 'var(--accent)' }}>📜 RULES</h2>
+        <div style={{ flex: 1 }} />
+        <VolumeControl />
+      </div>
+
+      <div className="rules-layout animate-in">
+        {/* ═══ SIDEBAR NAV ═══ */}
+        <nav className="rules-sidebar">
+          {RULES_SECTIONS.map(s => (
+            <button
+              key={s.id}
+              className={'rules-nav-item' + (activeSection === s.id ? ' active' : '')}
+              onClick={() => scrollTo(s.id)}
+            >
+              {s.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* ═══ CONTENT ═══ */}
+        <div className="rules-content" ref={contentRef}>
+
+          {/* ── HOW TO PLAY ── */}
+          <SectionTitle id="overview">How to Play</SectionTitle>
+          <div className="rules-card-row">
+            <Img src="monia.png" alt="Monia" className="rules-card-img rules-card-img-sm" />
+            <div className="rules-text-block" style={{ flex: 1 }}>
+              <p>In Pixel Parties, players assemble <strong>Parties of three Heroes</strong> each and try to make them the greatest Heroes in the world — by beating up the opponent's Party and asserting dominance!</p>
+              <p><strong>Whoever defeats all enemy Heroes first wins!</strong></p>
+              <p>You'll build up your Heroes over the course of the game by giving them Abilities, hurl Attacks and Spells to take out enemy Heroes one by one, and summon Creatures to do the dirty work. You'll also get to utilize a variety of helpful Artifacts and volatile Potions to support your strategy and be the last Party standing.</p>
+              <p className="rules-flavor" style={{ color: 'var(--accent)' }}>Do you have what it takes to form the strongest Party ever?!</p>
+            </div>
+          </div>
+
+          <div className="rules-divider" />
+
+          {/* ── HEROES ── */}
+          <SectionTitle id="heroes"><span style={{ color: '#aa44ff' }}>Heroes</span></SectionTitle>
+          <div className="rules-card-row">
+            <Img src="hero.png" alt="Hero card example" className="rules-card-img" />
+            <div className="rules-text-block">
+              <p>Heroes are the backbone of your strategy! You start the game with three different ones and have to defeat all enemy Heroes to win.</p>
+              <p>Your deck may contain Hero cards, but you can never play new Heroes from your hand to bolster your party!</p>
+              <p>Each Hero brings a unique effect, two Starting Abilities, and its own stats to the table, so there's a lot to consider when choosing your perfect Party!</p>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#4488ff' }}>Starting Abilities</h3>
+              <p>The two Ability cards specified here are attached to that Hero before the start of the game. They do not come from or count as part of your main deck.</p>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#ff3366' }}>HP</h3>
+              <p>If a Hero's HP drops to 0, it is defeated and grayed out on the board. Its Abilities stay attached to it, and there are ways to revive it, so it is not removed from the board.</p>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#c0c0c0' }}>Attack</h3>
+              <p>A Hero's Attack stat is used to determine the damage it deals with Attack cards. Heroes do <strong>NOT</strong> have the inherent ability to attack targets — an Attack card is always necessary!</p>
+            </div>
+          </div>
+
+          <div className="rules-divider" />
+
+          {/* ── ABILITIES ── */}
+          <SectionTitle id="abilities"><span style={{ color: '#4488ff' }}>Abilities</span></SectionTitle>
+          <div className="rules-card-row">
+            <Img src="ability.png" alt="Ability card example" className="rules-card-img" />
+            <div className="rules-text-block">
+              <p>Abilities are attached to Heroes to empower them. They can grant Heroes new actions, provide passive bonuses, or give you powerful effects to activate once per turn.</p>
+              <p>Each Hero has <strong>three Ability Zones</strong> and can thus have up to three different Abilities attached to it. Additionally, copies of the same Ability on the same Hero are stacked on top of each other in the same Ability Zone, leveling that Ability up. All in all, a Hero can have up to <strong>9 Ability cards</strong> attached to it!</p>
+              <p>A player can only attach <strong>one Ability to each of their Heroes every turn</strong>, and Abilities can be used the turn they are attached.</p>
+              <p>When a Hero is defeated, its Abilities stay attached to it. They remain on the board, but are <strong>negated</strong> and cannot be activated in any way until that Hero is revived.</p>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#4488ff' }}>Effects per Level</h3>
+              <p>What effect an Ability provides depends on its level, meaning the number of copies attached to that Hero. At one copy (level 1), the top effect applies. At two copies (level 2), it's the middle effect, and at three copies (level 3), it's the bottom.</p>
+              <p>If an Ability has a once per turn effect that you can choose to activate during your turn, you can only activate that effect <strong>once during that turn</strong>, even if multiple Heroes have it!</p>
+              <p className="rules-callout">You can not choose to use an Ability at a lower level than it has!</p>
+            </div>
+          </div>
+
+          <div className="rules-divider" />
+
+          {/* ── ATTACKS & SPELLS ── */}
+          <SectionTitle id="attacks-spells"><span style={{ color: '#ff3366' }}>Attacks, Spells and Creatures</span></SectionTitle>
+          <div className="rules-card-row">
+            <Img src="spell.png" alt="Spell card example" className="rules-card-img" />
+            <div className="rules-text-block">
+              <p>Attacks, Spells and Creatures are the main way you will advance the board state. Dealing damage, applying negative status effects, summoning Creatures, but also healing HP, removing status effects or drawing cards — anything can be done by the right Attacks, Spells and Creatures!</p>
+              <p>You can only play an Attack, Spell or Creature as long as you control a Hero that is able to perform it. Attacks, Spells and Creatures have a <strong>Level</strong> and an <strong>Ability</strong> associated with them. This is called its Spell School.</p>
+              <p>For a Hero to be able to use an Attack/Spell/Creature, it must have the associated Ability at the card's Level or higher.</p>
+              <p>When played, an Attack, Spell or Creature's effect is resolved immediately, unless stated otherwise.</p>
+            </div>
+          </div>
+
+          <h3 className="rules-sub-title orbit-font" style={{ color: '#ff3366' }}>Sub-Types</h3>
+          <p style={{ marginBottom: 12, fontSize: 17, lineHeight: 1.7 }}>There are 5 total Sub-Types of Attacks, Spells and Creatures. If a card has no icon at the bottom left, it is a "Normal" type — resolved when played and sent to the discard pile.</p>
+
+          <div className="rules-subtype-grid">
+            <div className="rules-subtype-entry">
+              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-attach.png" className="rules-school-icon" /> <span>Attachments</span></div>
+              <p>Attachments are not sent to the discard pile after use, instead getting attached to a target. Unless stated otherwise, an Attachment can be attached to any Hero, but some specify they can only go to one of your Heroes, an opponent's Hero, or just the user itself. When a Hero is defeated, any Attachments on it are sent to the discard pile.</p>
+            </div>
+            <div className="rules-subtype-entry">
+              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-instant.png" className="rules-school-icon" /> <span>Reactions</span></div>
+              <p>Like Normal cards, Reactions go to the discard pile after resolving. The difference is that they can only be used in reaction to specific triggers. Reactions will always specify when they can be used — they are the <strong>only sub-type that can be played from your hand during an opponent's turn</strong>.</p>
+            </div>
+            <div className="rules-subtype-entry">
+              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-trap.png" className="rules-school-icon" /> <span>Surprises</span></div>
+              <p>Surprises are prepared face-down on your side of the board during your turn and then activated once a specific condition is met by flipping them face-up.</p>
+              <p>To prepare a Surprise, place it face-down into a Hero's Surprise Zone during your turn. Once prepared, you can activate it at any time — during either player's turn — as long as its condition is met and the preparing Hero is able to activate it.</p>
+              <p>To activate a Surprise, the preparing Hero must have the Abilities necessary to activate it and cannot be defeated or otherwise unable to perform an Action (for example by being Stunned). On the other hand, you <strong>can</strong> prepare Surprises with a Hero, even if it does not have the Abilities necessary to activate them.</p>
+              <p>After activation, a Surprise resolves and is then sent to the discard pile.</p>
+            </div>
+            <div className="rules-subtype-entry">
+              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-area.png" className="rules-school-icon" /> <span>Areas</span></div>
+              <p>Areas provide global effects that either affect both players or that both players can activate. Each player has one Zone for an Area. The Area Zone is not directly associated with a Hero — you may play an Area with any of your Heroes (but you still need at least one Hero able to use it).</p>
+              <p>Areas remain in play until they are removed by an effect. You cannot play an Area while you already control an Area.</p>
+            </div>
+          </div>
+
+          <div className="rules-divider" />
+
+          {/* ── SPELL SCHOOLS ── */}
+          <SectionTitle id="spell-schools">Types of Attacks/Spells</SectionTitle>
+
+          <div className="rules-schools-grid">
+            <div className="rules-school-entry">
+              <div className="rules-school-header" style={{ color: '#c0c0c0' }}><img src="/rules/icon-sword.png" className="rules-school-icon" /> <span>Attacks (Fighting)</span></div>
+              <p>Attacks are the only type that isn't a Spell School. They specialize in dealing scaling damage, being the only card type that uses a Hero's Attack stat to determine its damage. As such, Attack-based strategies will excel in picking off individual targets.</p>
+              <p>Attacks can also have a wide variety of secondary utility effects. The distinction between Attacks, Spells and Creatures is important, because many effects interact with specifically one or the other.</p>
+            </div>
+            <div className="rules-school-entry">
+              <div className="rules-school-header" style={{ color: '#ff3366' }}><img src="/rules/icon-destruction.png" className="rules-school-icon" /> <span>Destruction Spells</span></div>
+              <p>Destruction Spells deal a ton of damage. They often have downsides, such as dealing recoil damage to your own Heroes, giving your opponent ways to counteract the damage, or having conditions a target must fulfill before it takes damage. Where Attacks excel at quickly taking out individual targets, Destruction Spells have by far the best <strong>spread damage</strong> options in the game.</p>
+            </div>
+            <div className="rules-school-entry">
+              <div className="rules-school-header" style={{ color: '#aa44ff' }}><img src="/rules/icon-decay.png" className="rules-school-icon" /> <span>Decay Spells</span></div>
+              <p>Decay Spells make life harder for your opponent. Denying resources, applying debuffs, or inflicting status effects. Decks revolving around them will often rely on Poison and Burn to slowly melt away the opponent's HP over time. Decay Magic also has the best <strong>negation Spells</strong> in the game. It's a slower, more control-focused playstyle.</p>
+            </div>
+            <div className="rules-school-entry">
+              <div className="rules-school-header" style={{ color: '#ffdd44' }}><img src="/rules/icon-support.png" className="rules-school-icon" /> <span>Support Spells</span></div>
+              <p>Support Spells excel in healing and buffing your own Heroes. They keep your Heroes alive, make them stronger, generate resources, and may hinder your opponent. Support Spells are particularly good at doing a lot of things in one turn, facilitating a more <strong>combo-oriented</strong> playstyle.</p>
+            </div>
+            <div className="rules-school-entry">
+              <div className="rules-school-header" style={{ color: '#4488ff' }}><img src="/rules/icon-arts.png" className="rules-school-icon" /> <span>Magic Arts Spells</span></div>
+              <p>Magic Arts Spells focus on "changing the rules." Applying buffs or debuffs that affect players themselves, searching cards from the deck, generating resources, extending turns, and situational negation. Unlike other Spell Schools, Magic Arts is not meant to be played by itself — it's an <strong>auxiliary</strong> Spell School.</p>
+            </div>
+            <div className="rules-school-entry rules-school-entry-wide">
+              <div className="rules-school-header" style={{ color: '#44cc44' }}><img src="/rules/icon-summoning.png" className="rules-school-icon" /> <span>Summoning Spells and Creatures</span></div>
+              <div className="rules-card-row" style={{ marginTop: 10 }}>
+                <Img src="creature.png" alt="Creature card example" className="rules-card-img rules-card-img-sm" />
+                <div>
+                  <p>Summoning Spells are all about bringing out, using, and protecting Creatures, a separate card type aside from Attacks and Spells.</p>
+                  <p>Creatures, once summoned, go into a Support Zone of the Hero that summoned them and remain there until they are defeated. A Creature is defeated when its HP is reduced to 0. Even if a Hero is defeated, its Creatures survive by themselves! Creatures also don't care if their corresponding Hero is Frozen, Stunned or otherwise incapacitated.</p>
+                  <p>Creatures have effects that can either be active or passive. Passive effects are always in effect. Active effects can be triggered manually on your turn. They usually start with "Once per turn" (or "Up to X times per turn").</p>
+                  <p className="rules-callout">A Creature cannot activate its active effect the turn it's summoned.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rules-divider" />
+
+          {/* ── ARTIFACTS ── */}
+          <SectionTitle id="artifacts"><span style={{ color: '#ffd700' }}>Artifacts</span></SectionTitle>
+          <div className="rules-card-row">
+            <Img src="artifact.png" alt="Artifact card example" className="rules-card-img" />
+            <div className="rules-text-block">
+              <p>Artifacts, unlike Abilities or Attacks/Spells/Creatures, do not necessarily revolve around a Hero and don't need a Hero to be played. These are your general utility cards that extend your options each turn, but can also be very specific and require certain strategies to be used.</p>
+              <p>They can have the same sub-types as Attacks, Spells and Creatures (except that Attachment Artifacts are called <strong>Equipments</strong> and you equip Artifacts rather than attach them), and they have a <strong>Cost</strong>.</p>
+              <p>At the start of each turn, the turn player generates <strong>Gold</strong>. This Gold is used to pay for the use of Artifacts, meaning you can't play an infinite amount of them.</p>
+            </div>
+          </div>
+
+          <div className="rules-divider" />
+
+          {/* ── POTIONS ── */}
+          <SectionTitle id="potions"><span style={{ color: '#a0724a' }}>Potions</span></SectionTitle>
+          <div className="rules-card-row">
+            <Img src="potion.png" alt="Potion card example" className="rules-card-img" />
+            <div className="rules-text-block">
+              <p>Potions function a lot like Artifacts, except that they have <strong>no Gold Cost</strong>. You just play them from your hand to get their effect!</p>
+              <p>However, they have two key differences. First, they are <strong>deleted</strong> (removed from the game) after resolving instead of going to the discard pile. Thus, they can never be reused.</p>
+              <p>Second, they start the game in a separate deck, the dedicated <strong>Potion Deck</strong>, and you can only draw them through card effects. This makes them a lot harder to access than other cards, but they are also on average a lot more powerful!</p>
+            </div>
+          </div>
+
+          <div className="rules-divider" />
+
+          {/* ── ASCENDED HEROES ── */}
+          <SectionTitle id="ascended"><span style={{ color: '#aa44ff' }}>Ascended Heroes</span></SectionTitle>
+          <div className="rules-card-row">
+            <Img src="ascended.png" alt="Ascended Hero card example" className="rules-card-img" />
+            <div className="rules-text-block">
+              <p>Ascended Heroes are special, more powerful versions of Heroes. You play them in your deck and place them on top of a Hero to Ascend it once a certain condition has been fulfilled.</p>
+              <p className="rules-callout">Ascending a Hero immediately ends your turn!</p>
+              <p>When a Hero Ascends, it gains new stats, but keeps any damage it already had as well as status effects and any other effects that affected it.</p>
+              <h3 className="rules-sub-title orbit-font" style={{ color: '#aa44ff' }}>Ascension Bonus</h3>
+              <p>When a Hero Ascends, its Ascension Bonus is applied. If the bonus specifies Abilities, you may attach them from your hand, deck, or discard pile to the Ascended Hero immediately. You may choose to attach fewer copies than specified. Other Ascension Bonuses apply a different effect instead.</p>
+            </div>
+          </div>
+
+          <div className="rules-divider" />
+
+          {/* ── ACTIONS ── */}
+          <SectionTitle id="actions"><span style={{ color: '#ff3366' }}>Actions</span></SectionTitle>
+          <div className="rules-text-block">
+            <p>Besides Gold, which you passively generate every turn and spend on Artifacts, <strong>Actions</strong> are the other important resource in Pixel Parties. You get a <strong>single Action</strong> every turn, and Attacks, Spells and Creatures cost an Action to use.</p>
+            <p style={{ color: '#ff3366', fontWeight: 700, fontStyle: 'italic' }}>Wait, so you can only use a single Attack/Spell/Creature per turn to advance the game?</p>
+            <p>Not exactly. <strong>Reactions</strong> and <strong>Surprises</strong> do not cost Actions to use. Additionally, there are Attacks, Spells and Creatures that can count as <strong>additional Actions</strong>, either inherently or if you fulfill specific conditions. Additional Actions do not consume your Action per turn.</p>
+            <p>On the other hand, there are also effects on Abilities, Artifacts, and other cards that can cost an Action to activate. If you choose to spend your Action on such an effect, that means you cannot use an Attack/Spell/Creature that turn, unless it's an additional Action, a Reaction, or a Surprise.</p>
+            <p>When a Creature is "placed" into a Support Zone, that always means that it is summoned without costing an Action and without requiring a Hero to actually be able to summon it.</p>
+          </div>
+
+          <div className="rules-divider" />
+
+          {/* ── THE GAME BOARD ── */}
+          <SectionTitle id="board">The Game Board</SectionTitle>
+          <div className="rules-text-block">
+            <p>Pixel Parties has a very rigid game board. Both players have 3 Heroes, which each have 3 Zones for Abilities (Ability Zones) and 3 Zones for Equipments, Attachments and Creatures (Support Zones). A Hero can only summon Creatures into its own Support Zones, so the amount of Creatures a Hero can control at a time is limited to 3!</p>
+          </div>
+          <Img src="board.png" alt="The game board" className="rules-board-img" />
+          <div className="rules-board-legend">
+            <div className="rules-legend-item"><span className="rules-legend-num">1</span> <strong>Hero Zones.</strong> Each player has 3 and starts with a Hero in each. Defeated Heroes remain on the board grayed-out and can be revived later.</div>
+            <div className="rules-legend-item"><span className="rules-legend-num">2</span> <strong>Ability Zones.</strong> Each Hero has 3 — so Heroes can have up to 3 different Abilities, each levelable up to 3.</div>
+            <div className="rules-legend-item"><span className="rules-legend-num">3</span> <strong>Support Zones.</strong> Equipment/Attachment cards and Creatures go here. If all Support Zones of a Hero are full, no more Equipments, Attachments, or Creatures can be added to that Hero.</div>
+            <div className="rules-legend-item"><span className="rules-legend-num">4</span> <strong>Surprise Zones.</strong> Each Hero has only 1 — it can only have 1 Surprise prepared at a time. Surprises cannot be moved between Heroes once placed. You must either activate it or remove it with an effect to free the Zone.</div>
+            <div className="rules-legend-item"><span className="rules-legend-num">5</span> <strong>Deck Zone.</strong> Your deck goes here.</div>
+            <div className="rules-legend-item"><span className="rules-legend-num">6</span> <strong>Potion Deck Zone.</strong> Your Potion Deck goes here (if you have one).</div>
+            <div className="rules-legend-item"><span className="rules-legend-num">7</span> <strong>Discard Pile.</strong> Your discard pile.</div>
+            <div className="rules-legend-item"><span className="rules-legend-num">8</span> <strong>Delete Zone.</strong> The zone for your deleted (expelled/removed) cards.</div>
+            <div className="rules-legend-item"><span className="rules-legend-num">9</span> <strong>Area Zones.</strong> Zones for your and your opponent's Areas. Each player can only use 1 of those 2 zones.</div>
+          </div>
+
+          <div className="rules-divider" />
+
+          {/* ── FIRST TURN RESTRICTIONS ── */}
+          <SectionTitle id="first-turn">First Turn Restrictions</SectionTitle>
+          <div className="rules-text-block">
+            <p>Player 1 has several restrictions on their first turn. They cannot:</p>
+            <div className="rules-restriction-list">
+              <div className="rules-restriction-item">Deal damage to enemy targets</div>
+              <div className="rules-restriction-item">Inflict status effects to enemy targets</div>
+              <div className="rules-restriction-item">Activate effects that would defeat enemy targets</div>
+              <div className="rules-restriction-item">Take control of enemy targets</div>
+              <div className="rules-restriction-item">Force their opponent to discard, delete, or shuffle away cards from their hand</div>
+              <div className="rules-restriction-item">Look at their opponent's hand</div>
+              <div className="rules-restriction-item">Send cards from the opponent's deck to the discard pile or delete them</div>
+              <div className="rules-restriction-item">Equip or attach cards to an opponent's Hero</div>
+              <div className="rules-restriction-item">Give your opponent cards to their hand, deck or any other area</div>
+              <div className="rules-restriction-item">Choose any target your opponent controls with any card or effect</div>
+            </div>
+          </div>
+
+          <div className="rules-divider" />
+
+          {/* ── COURSE OF A TURN ── */}
+          <SectionTitle id="turn">The Course of a Turn</SectionTitle>
+          <div className="rules-text-block">
+            <p>A player's turn is divided into the following Phases:</p>
+          </div>
+
+          <div className="rules-phases">
+            <div className="rules-phase">
+              <div className="rules-phase-header">
+                <span className="rules-phase-num">1</span>
+                <span className="rules-phase-name orbit-font">Start Phase</span>
+              </div>
+              <p>The turn begins. Effects that last "until the beginning of the turn" end and effects that trigger "at the beginning of the turn" activate. The turn player freely decides the order in which effects trigger/end.</p>
+            </div>
+
+            <div className="rules-phase">
+              <div className="rules-phase-header">
+                <span className="rules-phase-num">2</span>
+                <span className="rules-phase-name orbit-font">Resource Phase</span>
+              </div>
+              <p>The turn player draws <strong>1 card</strong> and gains <strong>4 Gold</strong>. Some effects will increase this Gold gain.</p>
+            </div>
+
+            <div className="rules-phase">
+              <div className="rules-phase-header">
+                <span className="rules-phase-num">3</span>
+                <span className="rules-phase-name orbit-font">Main Phase 1</span>
+              </div>
+              <p>The main part of the turn. The turn player may, in any order:</p>
+              <div className="rules-restriction-list">
+                <div className="rules-restriction-item rules-phase-action">Attach up to 1 Ability from their hand to each of their Heroes.</div>
+                <div className="rules-restriction-item rules-phase-action">Play any number of Artifacts from their hand, as long as they can pay their Costs.</div>
+                <div className="rules-restriction-item rules-phase-action">Play any number of Potions from their hand.</div>
+                <div className="rules-restriction-item rules-phase-action">Activate the active effects of any number of cards they control (Heroes, Abilities, Creatures, Equipments, Attachments).</div>
+                <div className="rules-restriction-item rules-phase-action">Play Attacks/Spells/Creatures that "count as an additional Action", including Reactions that are not limited to react to specific actions.</div>
+                <div className="rules-restriction-item rules-phase-action">Set as many Surprises as they have free Zones to do so.</div>
+              </div>
+            </div>
+
+            <div className="rules-phase">
+              <div className="rules-phase-header">
+                <span className="rules-phase-num">4</span>
+                <span className="rules-phase-name orbit-font">Action Phase</span>
+              </div>
+              <p>The turn player may perform a <strong>single Action</strong>. This is usually done by playing an Attack, Spell, or Creature, but there are also effects that require an Action as a cost. After performing a single Action, the Action Phase immediately ends.</p>
+            </div>
+
+            <div className="rules-phase">
+              <div className="rules-phase-header">
+                <span className="rules-phase-num">5</span>
+                <span className="rules-phase-name orbit-font">Main Phase 2</span>
+              </div>
+              <p>You may do the same things as in Main Phase 1. If you already attached an Ability to a Hero during Main Phase 1, you cannot attach another one to the same Hero during Main Phase 2.</p>
+              <p className="rules-callout" style={{ marginTop: 8 }}>You can only enter Main Phase 2 by performing an Action.</p>
+            </div>
+
+            <div className="rules-phase">
+              <div className="rules-phase-header">
+                <span className="rules-phase-num">6</span>
+                <span className="rules-phase-name orbit-font">End Phase</span>
+              </div>
+              <p>The turn ends. Effects that last "until the end of the turn" end and effects that trigger "at the end of the turn" trigger.</p>
+              <p>At the very end of the End Phase, if the turn player has more than <strong>7 cards</strong> in their hand, they must discard cards from their hand until they have 7 cards left.</p>
+            </div>
+          </div>
+
+          <div className="rules-divider" />
+
+          {/* ── STATUS EFFECTS ── */}
+          <SectionTitle id="status">Status Effects</SectionTitle>
+          <div className="rules-text-block">
+            <p>A target can be affected by any number of status effects at a time. Some cards inflict unique special conditions that "count as status effects", while others inflict the following "standard" status effects:</p>
+          </div>
+
+          <div className="rules-status-grid">
+            <div className="rules-status-entry rules-status-stunned">
+              <div className="rules-status-name">Stunned</div>
+              <p>The target cannot perform Actions. Its effects and Abilities (if it is a Hero) are negated.</p>
+            </div>
+            <div className="rules-status-entry rules-status-frozen">
+              <div className="rules-status-name">Frozen</div>
+              <p>The target cannot perform Actions. Its effects and Abilities (if it is a Hero) are negated. Additionally, it cannot be equipped with Artifacts.</p>
+            </div>
+            <div className="rules-status-entry rules-status-blinded">
+              <div className="rules-status-name">Blinded</div>
+              <p>The target cannot choose anything the opponent controls as a target for Attacks, Spells, or effects.</p>
+            </div>
+            <div className="rules-status-entry rules-status-poisoned">
+              <div className="rules-status-name">Poisoned</div>
+              <p>The target takes 30 damage during each of its owner's Start Phases. Poisoning effects usually revolve around stacking multiple instances, increasing its damage.</p>
+            </div>
+            <div className="rules-status-entry rules-status-burned">
+              <div className="rules-status-name">Burned</div>
+              <p>The target takes 60 damage during each of its owner's Start Phases.</p>
+            </div>
+            <div className="rules-status-entry rules-status-bleeding">
+              <div className="rules-status-name">Bleeding</div>
+              <p>The target takes 50 damage whenever it performs an Action, activates its active effect or activates the active effect of one of its Abilities.</p>
+            </div>
+          </div>
+
+          <div className="rules-callout" style={{ marginTop: 16 }}>
+            After recovering from a Freeze, Stun, Blind or any other status effect that includes negating a target's effect or preventing it from performing Actions, that target becomes completely <strong>immune</strong> to the opponent's incapacitating effects for 1 turn (until the beginning of its owner's next turn)!
+          </div>
+
+          <div className="rules-divider" />
+
+          {/* ── DECK CONSTRUCTION ── */}
+          <SectionTitle id="deckbuilding">Deck Construction</SectionTitle>
+          <div className="rules-text-block">
+            <p>Decks consist of <strong>60 cards</strong>, not including your 3 Heroes and their Starting Abilities, so you bring <strong>69 cards total</strong>.</p>
+            <p>If you play a Potion Deck, that has to contain <strong>5–15 cards</strong>.</p>
+            <p>Your Hero lineup has to consist of 3 <strong>DIFFERENT</strong> Heroes. Alternate versions of a Hero with the same name (such as "Cool Rescuer Monia" and "Cool Birthday Girl Monia") still count as the same Hero for this!</p>
+
+            <div className="rules-deck-limits">
+              <div className="rules-deck-limit">
+                <div className="rules-deck-limit-label">Main Deck</div>
+                <div className="rules-deck-limit-desc">Any number of copies of Abilities. Up to <strong>4 copies</strong> of Heroes, Artifacts, Attacks, Spells and Ascended Heroes.</div>
+              </div>
+              <div className="rules-deck-limit">
+                <div className="rules-deck-limit-label">Potion Deck</div>
+                <div className="rules-deck-limit-desc">Up to <strong>2 copies</strong> of each Potion.</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ height: 60 }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════
 
 // Context menu sub-component
 
@@ -1133,3 +1640,4 @@ window.getRank = getRank;
 window.ProfileScreen = ProfileScreen;
 window.PurchaseCelebration = PurchaseCelebration;
 window.ShopScreen = ShopScreen;
+window.RulesScreen = RulesScreen;

@@ -5,7 +5,7 @@
 const { useState, useEffect, useRef, useCallback, useContext } = React;
 const { api, socket, AppContext, Notification, CardMini, loadCardDB,
         isDeckLegal, emitSocket } = window;
-const { AuthScreen, MainMenu, ProfileScreen, ShopScreen } = window;
+const { AuthScreen, MainMenu, ProfileScreen, ShopScreen, RulesScreen } = window;
 const { DeckBuilder } = window;
 const { GameBoard } = window;
 let _pendingGameState = null;
@@ -581,6 +581,7 @@ function App() {
         screen === 'deckbuilder' ? <DeckBuilder /> :
         screen === 'shop' ? <ShopScreen /> :
         screen === 'profile' ? <ProfileScreen /> :
+        screen === 'rules' ? <RulesScreen /> :
         <MainMenu />}
     </AppContext.Provider>
   );
