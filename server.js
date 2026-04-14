@@ -4725,6 +4725,13 @@ io.on('connection', (socket) => {
     room.engine._cpuPlayerIdx = 1;
     room.engine.init();
 
+    // Pre-placed creatures should behave as if summoned last turn (no summoning sickness,
+    // count for Alice's damage, etc.). init() sets turnPlayed = current turn (1), so
+    // backdate all support zone instances to turn 0.
+    for (const inst of room.engine.cardInstances) {
+      if (inst.zone === 'support') inst.turnPlayed = 0;
+    }
+
     // Apply creature custom HP and statuses
     for (let pi = 0; pi < 2; pi++) {
       const pz = puzzleData.players[pi];

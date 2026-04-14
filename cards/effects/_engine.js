@@ -4467,12 +4467,22 @@ class GameEngine {
     // If game already ended (e.g. all heroes dead during End Phase), don't continue
     if (this.gs.result) return;
 
-    // Puzzle mode: the human player's turn just ended without winning → puzzle failed.
-    // CPU/single-player mode: when the CPU's turn would start, auto-skip it.
+    // Puzzle mode: the human player's turn just ended without winning.
+    // Before declaring failure, simulate the opponent's start-of-turn status damage
+    // (burn/poison) — it should be possible to win via lingering status effects.
     if (this._cpuPlayerIdx >= 0) {
       const nextPlayer = this.gs.activePlayer === 0 ? 1 : 0;
       if (this.isPuzzle && nextPlayer === this._cpuPlayerIdx) {
-        // Human's one turn is over — they didn't win
+        // Temporarily switch to opponent to process their burn/poison
+        this.gs.activePlayer = this._cpuPlayerIdx;
+        this.gs.turn++;
+        await this.processBurnDamage();
+        if (this.gs.result) return; // Burn killed all heroes → puzzle success
+        await this.processPoisonDamage();
+        if (this.gs.result) return; // Poison killed all heroes → puzzle success
+        this.sync();
+        await this._delay(300);
+        // Status damage didn't finish them — puzzle failed
         if (this.onGameOver) this.onGameOver(this.room, this._cpuPlayerIdx, 'puzzle_failed');
         return;
       }

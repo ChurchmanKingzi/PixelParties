@@ -5577,18 +5577,46 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
 }
 .pz-search-results {
   flex: 1;
+  height: 100%;
   overflow-y: auto;
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
   align-content: flex-start;
-  scrollbar-width: thin;
-  scrollbar-color: var(--bg4) transparent;
+  scrollbar-width: auto;
+  scrollbar-color: rgba(255,255,255,.25) rgba(255,255,255,.05);
 }
-.pz-search-results::-webkit-scrollbar { width: 8px; }
-.pz-search-results::-webkit-scrollbar-track { background: transparent; }
-.pz-search-results::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 4px; }
+.pz-search-results::-webkit-scrollbar { width: 18px; }
+.pz-search-results::-webkit-scrollbar-track { background: rgba(255,255,255,.05); border-radius: 9px; }
+.pz-search-results::-webkit-scrollbar-thumb { background: rgba(255,255,255,.25); border-radius: 9px; min-height: 40px; }
 .pz-search-results::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+/* Hide native scrollbar on touch devices — custom DOM scrollbar replaces it */
+@media (pointer: coarse) {
+  .pz-search-results::-webkit-scrollbar { display: none; }
+  .pz-search-results { padding-right: 22px; }
+}
+/* ── Custom touch scrollbar (real DOM element for mobile) ── */
+.pz-custom-scrollbar {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  z-index: 10;
+  touch-action: none;
+}
+.pz-custom-scrollbar-thumb {
+  position: absolute;
+  right: 2px;
+  width: 16px;
+  min-height: 40px;
+  background: rgba(255,255,255,.3);
+  border-radius: 8px;
+  touch-action: none;
+}
+.pz-custom-scrollbar-thumb:active {
+  background: var(--accent);
+}
 .pz-search-card {
   width: 68px;
   height: 95px;
@@ -5630,6 +5658,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 6px 16px;
   gap: 2px;
   justify-content: center;
@@ -5648,7 +5677,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 12px;
+  padding: 0 12px;
   border-top: 1px solid var(--bg4);
   background: var(--bg2);
   min-height: 54px;
@@ -5667,6 +5696,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   flex: 1;
   align-items: center;
   min-height: 44px;
+  padding: 8px 2px;
 }
 .pz-hand-card {
   width: 48px;
@@ -5706,8 +5736,21 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
 /* ── Puzzle Creator: mobile tap-to-select highlight ── */
 .pz-hand-card-selected {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 10px rgba(0,240,255,.6);
-  transform: translateY(-4px);
+  box-shadow: 0 0 12px rgba(0,240,255,.7), inset 0 0 8px rgba(0,240,255,.2);
+}
+
+/* ── Puzzle Creator: remove popup ── */
+.pz-remove-popup {
+  background: var(--danger, #ff4444);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.5);
+  pointer-events: auto;
 }
 
 /* ── Puzzle Creator: mobile touch fixes ── */
@@ -5770,6 +5813,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   .pz-gold-input span { font-size: 14px !important; }
   .pz-gold-input input { width: 40px !important; font-size: 13px !important; }
   .pz-side-label { font-size: 7px !important; letter-spacing: 1px !important; }
+  .pz-board-wrap { justify-content: flex-start; }
 }
 
 /* ═══════════════════════════════════════════════════════════════

@@ -3,7 +3,7 @@
 //  Reuses existing board layout classes and
 //  game-engine-compatible data structures.
 // ═══════════════════════════════════════════
-const { useState, useEffect, useRef, useCallback, useMemo, useContext } = React;
+const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useContext } = React;
 const { AppContext, cardImageUrl, VolumeControl, CARDS_BY_NAME, CardTooltipContent, useCardTooltip, StatusBadges, BuffColumn, GameTooltip, socket } = window;
 const { FrozenOverlay, NegatedOverlay, BurnedOverlay, PoisonedOverlay, HealReversedOverlay, ImmuneIcon } = window;
 const { GameBoard } = window;
@@ -48,12 +48,102 @@ function PuzzleCreator() {
   const [dragOverZone, setDragOverZone] = useState(null);
   const [viewPile, setViewPile] = useState(null);
   const boardWrapRef = useRef(null);
-  const dragEntityData = useRef(null); // carries hero/creature metadata during board-to-board drags
+  const dragEntityData = useRef(null);
+  const searchResultsRef = useRef(null);
+  const customScrollRef = useRef(null);
+  const scrollThumbRef = useRef(null);
+  const scrollDragRef = useRef(null);
+  const [removePopupPos, setRemovePopupPos] = useState(null);
 
   // ── Mobile tap-to-place (alternative to drag/drop) ──
   const [mobileSelected, setMobileSelected] = useState(null); // { cardName, handIdx, handSource }
   const isTouchDevice = 'ontouchstart' in window;
   const touchStartRef = useRef(null);
+  const lastTapRef = useRef({ time: 0, handSource: null, handIdx: -1 }); // double-tap detection
+
+  // ── Custom scrollbar for mobile (CSS scrollbars aren't touch-interactive) ──
+  const updateScrollThumb = useCallback(() => {
+    const el = searchResultsRef.current;
+    const thumb = scrollThumbRef.current;
+    const track = customScrollRef.current;
+    if (!el || !thumb || !track) return;
+    const ratio = el.clientHeight / el.scrollHeight;
+    if (ratio >= 1) { track.style.display = 'none'; return; }
+    track.style.display = '';
+    const trackH = track.clientHeight;
+    const thumbH = Math.max(40, trackH * ratio);
+    const scrollRatio = el.scrollTop / (el.scrollHeight - el.clientHeight);
+    thumb.style.height = thumbH + 'px';
+    thumb.style.top = (scrollRatio * (trackH - thumbH)) + 'px';
+  }, []);
+
+  useEffect(() => {
+    const el = searchResultsRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', updateScrollThumb, { passive: true });
+    const ro = new ResizeObserver(updateScrollThumb);
+    ro.observe(el);
+    updateScrollThumb();
+    return () => { el.removeEventListener('scroll', updateScrollThumb); ro.disconnect(); };
+  }, [updateScrollThumb, searchResults]);
+
+  const scrollTrackTouch = useCallback((e) => {
+    e.stopPropagation();
+    const el = searchResultsRef.current;
+    const track = customScrollRef.current;
+    if (!el || !track) return;
+    const t = e.touches[0];
+    const trackRect = track.getBoundingClientRect();
+    const ratio = (t.clientY - trackRect.top) / trackRect.height;
+    el.scrollTop = ratio * (el.scrollHeight - el.clientHeight);
+  }, []);
+
+  const scrollThumbTouchStart = useCallback((e) => {
+    e.stopPropagation();
+    const el = searchResultsRef.current;
+    const track = customScrollRef.current;
+    if (!el || !track) return;
+    const t = e.touches[0];
+    scrollDragRef.current = { startY: t.clientY, startScroll: el.scrollTop, trackH: track.clientHeight, thumbH: scrollThumbRef.current?.clientHeight || 40 };
+  }, []);
+
+  const scrollThumbTouchMove = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const d = scrollDragRef.current;
+    const el = searchResultsRef.current;
+    if (!d || !el) return;
+    const t = e.touches[0];
+    const dy = t.clientY - d.startY;
+    const scrollRange = el.scrollHeight - el.clientHeight;
+    const trackRange = d.trackH - d.thumbH;
+    if (trackRange <= 0) return;
+    el.scrollTop = d.startScroll + (dy / trackRange) * scrollRange;
+  }, []);
+
+  const scrollThumbTouchEnd = useCallback((e) => {
+    e.stopPropagation();
+    scrollDragRef.current = null;
+  }, []);
+
+  // Measure selected card's viewport position after render
+  useLayoutEffect(() => {
+    if (!mobileSelected) { setRemovePopupPos(null); return; }
+    const handEl = document.querySelector(
+      mobileSelected.handSource === 'oppHand' ? '.pz-hand-opp' : '.pz-hand:not(.pz-hand-opp)'
+    );
+    if (!handEl) { setRemovePopupPos(null); return; }
+    const cards = handEl.querySelectorAll('.pz-hand-card');
+    const card = cards[mobileSelected.handIdx];
+    if (!card) { setRemovePopupPos(null); return; }
+    const cardRect = card.getBoundingClientRect();
+    const isOpp = mobileSelected.handSource === 'oppHand';
+    setRemovePopupPos({
+      left: cardRect.left + cardRect.width / 2,
+      top: isOpp ? cardRect.bottom + 4 : cardRect.top - 4,
+      isOpp,
+    });
+  }, [mobileSelected]);
   // Reliable mobile tap: tracks touch start position, only fires on short taps without movement
   const mobileTapHandlers = useCallback((onTap) => {
     if (!isTouchDevice) return {};
@@ -1040,7 +1130,11 @@ function PuzzleCreator() {
         <div className="pz-search-panel">
           <input className="input" style={{ width: '100%', fontSize: 13, padding: '8px 12px' }}
             placeholder="Search cards..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          <div className="pz-search-results" style={dragCardName ? { overflowY: 'hidden' } : undefined}>
+          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+            <div className="pz-search-results" ref={searchResultsRef} style={{
+              ...(dragCardName ? { overflowY: 'hidden' } : {}),
+              ...(isTouchDevice ? { scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } : {}),
+            }}>
             {searchResults.map((c, i) => {
               const img = cardImageUrl(c.name);
               return (
@@ -1065,6 +1159,17 @@ function PuzzleCreator() {
               <div style={{ color: 'var(--text2)', fontSize: 12, textAlign: 'center', padding: 20 }}>No cards found</div>
             )}
           </div>
+          {/* ── Custom touch-draggable scrollbar (mobile) ── */}
+          {isTouchDevice && (
+            <div ref={customScrollRef} className="pz-custom-scrollbar"
+              onTouchStart={scrollTrackTouch} onTouchMove={scrollTrackTouch}>
+              <div ref={scrollThumbRef} className="pz-custom-scrollbar-thumb"
+                onTouchStart={scrollThumbTouchStart}
+                onTouchMove={scrollThumbTouchMove}
+                onTouchEnd={scrollThumbTouchEnd} />
+            </div>
+          )}
+          </div>
         </div>
 
         {/* ── Board ── */}
@@ -1080,6 +1185,7 @@ function PuzzleCreator() {
                 const img = cardImageUrl(cardName);
                 return (
                   <div key={i} className={'pz-hand-card' + (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i ? ' pz-hand-card-selected' : '')}
+                    
                     draggable={!isTouchDevice}
                     onDragStart={(e) => onDragStart(e, cardName, i, null, 'oppHand')} onDragEnd={onDragEnd}
                     onClick={!isTouchDevice ? () => {
@@ -1088,7 +1194,7 @@ function PuzzleCreator() {
                     } : undefined}
                     onTouchStart={(e) => touchDragStart(cardName, i, 'oppHand', null, e)}
                     onTouchMove={touchDragMove}
-                    onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); if (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'oppHand' }); } }}
+                    onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); const now = Date.now(); const lt = lastTapRef.current; if (lt.handSource === 'oppHand' && lt.handIdx === i && now - lt.time < 350) { removeFromOppHand(i); setMobileSelected(null); lastTapRef.current = { time: 0, handSource: null, handIdx: -1 }; } else { lastTapRef.current = { time: now, handSource: 'oppHand', handIdx: i }; if (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'oppHand' }); } } }}
                     onContextMenu={(e) => { e.preventDefault(); removeFromOppHand(i); }}
                     onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                     onMouseLeave={hideTooltip}
@@ -1141,6 +1247,7 @@ function PuzzleCreator() {
             const img = cardImageUrl(cardName);
             return (
               <div key={i} className={'pz-hand-card' + (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i ? ' pz-hand-card-selected' : '')}
+                
                 draggable={!isTouchDevice}
                 onDragStart={(e) => onDragStart(e, cardName, i, null, 'hand')} onDragEnd={onDragEnd}
                 onClick={!isTouchDevice ? () => {
@@ -1149,7 +1256,7 @@ function PuzzleCreator() {
                 } : undefined}
                 onTouchStart={(e) => touchDragStart(cardName, i, 'hand', null, e)}
                 onTouchMove={touchDragMove}
-                onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); if (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'hand' }); } }}
+                onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); const now = Date.now(); const lt = lastTapRef.current; if (lt.handSource === 'hand' && lt.handIdx === i && now - lt.time < 350) { removeFromHand(i); setMobileSelected(null); lastTapRef.current = { time: 0, handSource: null, handIdx: -1 }; } else { lastTapRef.current = { time: now, handSource: 'hand', handIdx: i }; if (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'hand' }); } } }}
                 onContextMenu={(e) => { e.preventDefault(); removeFromHand(i); }}
                 onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                 onMouseLeave={hideTooltip}
@@ -1335,6 +1442,21 @@ function PuzzleCreator() {
         </div>
       )}
       <GameTooltip />
+
+      {/* ── Remove card popup (fixed, above everything) ── */}
+      {mobileSelected && removePopupPos && (
+        <div className="pz-remove-popup" style={{
+          position: 'fixed',
+          left: removePopupPos.left,
+          top: removePopupPos.top,
+          transform: removePopupPos.isOpp ? 'translateX(-50%)' : 'translate(-50%, -100%)',
+          zIndex: 999999,
+        }} onClick={() => {
+          if (mobileSelected.handSource === 'oppHand') removeFromOppHand(mobileSelected.handIdx);
+          else removeFromHand(mobileSelected.handIdx);
+          setMobileSelected(null);
+        }}>✕ Remove</div>
+      )}
     </div>
   );
 }
