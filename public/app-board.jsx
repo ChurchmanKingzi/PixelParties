@@ -4169,7 +4169,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // Game start announcement + turn change announcements
   const [announcement, setAnnouncement] = useState(() => {
-    if (gameState.reconnected || gameState.awaitingFirstChoice) return null;
+    if (gameState.reconnected || gameState.awaitingFirstChoice || gameState.isPuzzle) return null;
     if (isSpectator) {
       const firstPlayer = gameState.players[gameState.activePlayer || 0];
       return { text: `${firstPlayer?.username || 'Player'} goes first!`, color: 'var(--accent)' };
@@ -6824,7 +6824,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (!showGameOver) return;
     const handleKey = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); handleLeave(); }
-      if ((e.key === 'Enter' || e.key === ' ') && !isSpectator && !oppLeft && !oppDisconnected && !myRematchSent) {
+      if ((e.key === 'Enter' || e.key === ' ') && !isSpectator && !oppLeft && !oppDisconnected && !myRematchSent && !result?.isPuzzle) {
         e.preventDefault(); handleRematch();
       }
     };
@@ -10023,8 +10023,44 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </div>
       )}
 
+      {/* ── Puzzle Result Overlay ── */}
+      {result && result.isPuzzle && (
+        <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.8)' }}>
+          <div className="animate-in" style={{ textAlign: 'center' }}>
+            {result.puzzleResult === 'success' ? (
+              <>
+                <div className="pixel-font" style={{ fontSize: 42, marginBottom: 12, color: '#ffd700', textShadow: '0 0 40px rgba(255,215,0,.6)' }}>
+                  🧩 PUZZLE CLEARED! 🧩
+                </div>
+                <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 24 }}>
+                  All enemy heroes defeated in one turn!
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="pixel-font" style={{ fontSize: 36, marginBottom: 12, color: 'var(--danger)', textShadow: '0 0 30px rgba(255,51,102,.5)' }}>
+                  PUZZLE FAILED
+                </div>
+                <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 24 }}>
+                  {result.reason === 'puzzle_failed' ? 'Your turn ended without defeating all enemy heroes.' :
+                   result.reason === 'all_heroes_dead' && result.winnerIdx !== 0 ? 'All your heroes were defeated!' :
+                   result.reason === 'surrender' ? 'You gave up.' : 'Better luck next time!'}
+                </div>
+              </>
+            )}
+            <button className="btn" style={{
+              padding: '12px 32px', fontSize: 14,
+              borderColor: result.puzzleResult === 'success' ? '#ffd700' : 'var(--accent)',
+              color: result.puzzleResult === 'success' ? '#ffd700' : 'var(--accent)',
+            }} onClick={handleLeave}>
+              ← RETURN TO PUZZLE
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Win/Loss overlay — Bo1 or fallback */}
-      {result && !showFirstChoice && (result.setOver || !result.format || result.format === 1) && !(result.format > 1) && (
+      {result && !result.isPuzzle && !showFirstChoice && (result.setOver || !result.format || result.format === 1) && !(result.format > 1) && (
         <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.75)' }}>
           <div className="animate-in" style={{ textAlign: 'center' }}>
             <div className="pixel-font" style={{

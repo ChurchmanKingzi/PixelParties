@@ -4,20 +4,21 @@
 //  game-engine-compatible data structures.
 // ═══════════════════════════════════════════
 const { useState, useEffect, useRef, useCallback, useMemo, useContext } = React;
-const { AppContext, cardImageUrl, VolumeControl, CARDS_BY_NAME, CardTooltipContent, useCardTooltip, StatusBadges, BuffColumn, GameTooltip } = window;
+const { AppContext, cardImageUrl, VolumeControl, CARDS_BY_NAME, CardTooltipContent, useCardTooltip, StatusBadges, BuffColumn, GameTooltip, socket } = window;
 const { FrozenOverlay, NegatedOverlay, BurnedOverlay, PoisonedOverlay, HealReversedOverlay, ImmuneIcon } = window;
+const { GameBoard } = window;
 
 const emptyPlayer = () => ({
   heroes: [null, null, null],
   abilityZones: [[[], [], []], [[], [], []], [[], [], []]],
   supportZones: [[[], [], []], [[], [], []], [[], [], []]],
   surpriseZones: [[], [], []],
-  hand: [], gold: 4, permanents: [], islandZoneCount: [0, 0, 0],
+  hand: [], gold: 0, permanents: [], islandZoneCount: [0, 0, 0],
   mainDeck: [], potionDeck: [], discardPile: [], deletedPile: [],
 });
 
 function PuzzleCreator() {
-  const { user, setScreen, notify } = useContext(AppContext);
+  const { user, setScreen, notify, setInBattle } = useContext(AppContext);
 
   // ── Load saved state from localStorage ──
   const loadSaved = () => {
@@ -32,6 +33,8 @@ function PuzzleCreator() {
   const [players, setPlayers] = useState(saved?.players || [emptyPlayer(), emptyPlayer()]);
   const [areaZones, setAreaZones] = useState(saved?.areaZones || [[], []]);
   const [hand, setHand] = useState(saved?.hand || []);
+  const [oppHand, setOppHand] = useState(saved?.oppHand || []);
+  const [puzzleName, setPuzzleName] = useState(saved?.puzzleName || '');
   const [search, setSearch] = useState('');
   const [validated, setValidated] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -40,21 +43,66 @@ function PuzzleCreator() {
   const [editAtk, setEditAtk] = useState('');
   const [dragCardName, setDragCardName] = useState(null);
   const [dragHandIdx, setDragHandIdx] = useState(null);
+  const [dragHandSource, setDragHandSource] = useState(null); // 'hand' or 'oppHand'
   const [dragSource, setDragSource] = useState(null);
   const [dragOverZone, setDragOverZone] = useState(null);
   const [viewPile, setViewPile] = useState(null);
   const boardWrapRef = useRef(null);
   const dragEntityData = useRef(null); // carries hero/creature metadata during board-to-board drags
 
+  // ── Puzzle Battle State ──
+  const [puzzleGameState, setPuzzleGameState] = useState(null);
+  const puzzleRoomRef = useRef(null); // stores roomId during puzzle battle
+
   // ── Auto-save state to localStorage on every change ──
   useEffect(() => {
-    try { localStorage.setItem('pz-creator-state', JSON.stringify({ players, areaZones, hand })); } catch (_) {}
-  }, [players, areaZones, hand]);
+    try { localStorage.setItem('pz-creator-state', JSON.stringify({ players, areaZones, hand, oppHand, puzzleName })); } catch (_) {}
+  }, [players, areaZones, hand, oppHand, puzzleName]);
+
+  // ── Puzzle Battle: socket listeners ──
+  useEffect(() => {
+    const onGameState = (state) => {
+      if (state.isPuzzle) {
+        puzzleRoomRef.current = state.roomId;
+        setPuzzleGameState(state);
+        setInBattle(true);
+      }
+    };
+    const onPuzzleError = (msg) => {
+      notify('Puzzle error: ' + msg, 'error');
+    };
+    socket.on('game_state', onGameState);
+    socket.on('puzzle_error', onPuzzleError);
+    return () => {
+      socket.off('game_state', onGameState);
+      socket.off('puzzle_error', onPuzzleError);
+    };
+  }, [notify, setInBattle]);
+
+  // ── Puzzle Battle: leave handler ──
+  const onPuzzleLeave = useCallback(() => {
+    const gs = puzzleGameState;
+    const roomId = puzzleRoomRef.current;
+    // Read result before clearing
+    const result = gs?.result;
+    const success = result?.isPuzzle && result?.puzzleResult === 'success';
+    // Clean up server-side
+    if (roomId) socket.emit('leave_game', { roomId });
+    // Return to creator
+    setPuzzleGameState(null);
+    puzzleRoomRef.current = null;
+    setInBattle(false);
+    if (result) {
+      setValidated(success);
+      notify(success ? '🧩 Puzzle validated! Export is now available.' : 'Puzzle not cleared — adjust and try again.', success ? 'success' : 'info');
+    }
+  }, [puzzleGameState, notify, setInBattle]);
 
   const handleReset = useCallback(() => {
     setPlayers([emptyPlayer(), emptyPlayer()]);
     setAreaZones([[], []]);
     setHand([]);
+    setOppHand([]);
     setValidated(false);
     setEditTarget(null);
     setViewPile(null);
@@ -138,6 +186,8 @@ function PuzzleCreator() {
 
   const addToHand = useCallback((card) => setHand(prev => [...prev, card.name]), []);
   const removeFromHand = useCallback((idx) => setHand(prev => prev.filter((_, i) => i !== idx)), []);
+  const addToOppHand = useCallback((card) => setOppHand(prev => [...prev, card.name]), []);
+  const removeFromOppHand = useCallback((idx) => setOppHand(prev => prev.filter((_, i) => i !== idx)), []);
 
   // ── Placement ──
   const placeHero = useCallback((cardName, si, hi) => {
@@ -282,12 +332,12 @@ function PuzzleCreator() {
   }, [getCard, players]);
 
   // ── Drag ──
-  const onDragStart = useCallback((e, cardName, handIdx, source) => {
-    setDragCardName(cardName); setDragHandIdx(handIdx); setDragSource(source || null);
+  const onDragStart = useCallback((e, cardName, handIdx, source, handSource) => {
+    setDragCardName(cardName); setDragHandIdx(handIdx); setDragSource(source || null); setDragHandSource(handSource || null);
     hideTooltip(); // dismiss tooltip during drag
     e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', '');
   }, []);
-  const onDragEnd = useCallback(() => { setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragOverZone(null); dragEntityData.current = null; }, []);
+  const onDragEnd = useCallback(() => { setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null; }, []);
   // Silently clear a zone (no return to hand — used when moving between zones)
   const clearZone = useCallback((zt, si, hi, slot) => {
     if (zt === 'hero') updatePlayer(si, (p) => { p.heroes[hi] = null; p.abilityZones[hi] = [[], [], []]; p.supportZones[hi] = [[], [], []]; p.surpriseZones[hi] = []; if (p.islandZoneCount) p.islandZoneCount[hi] = 0; return p; });
@@ -315,7 +365,7 @@ function PuzzleCreator() {
     const entityData = dragEntityData.current;
     // Remove from source first (board zone or hand)
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
-    if (dragHandIdx != null) removeFromHand(dragHandIdx);
+    if (dragHandIdx != null) { if (dragHandSource === 'oppHand') removeFromOppHand(dragHandIdx); else removeFromHand(dragHandIdx); }
     // Place in target
     if (zt === 'hero') placeHero(dragCardName, si, hi);
     else if (zt === 'ability') placeAbility(dragCardName, si, hi, slot);
@@ -350,27 +400,44 @@ function PuzzleCreator() {
         });
       }
     }
-    setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragOverZone(null); dragEntityData.current = null;
-  }, [dragCardName, dragHandIdx, dragSource, canDrop, clearZone, placeHero, placeAbility, placeSupport, placeSurprise, placeArea, placePermanent, removeFromHand, updatePlayer]);
+    setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null;
+  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, canDrop, clearZone, placeHero, placeAbility, placeSupport, placeSurprise, placeArea, placePermanent, removeFromHand, removeFromOppHand, updatePlayer]);
 
-  // Drop onto hand zone
+  // Drop onto player hand zone
   const handleHandDrop = useCallback((e) => {
     e.preventDefault();
     if (dragCardName == null) return;
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
-    if (dragHandIdx == null) setHand(prev => [...prev, dragCardName]); // from board or gallery → add to hand
-    setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragOverZone(null); dragEntityData.current = null;
-  }, [dragCardName, dragHandIdx, dragSource, clearZone]);
+    // From oppHand → remove from there and add here
+    if (dragHandSource === 'oppHand' && dragHandIdx != null) { removeFromOppHand(dragHandIdx); setHand(prev => [...prev, dragCardName]); }
+    // From board or gallery → add to hand
+    else if (dragHandIdx == null) setHand(prev => [...prev, dragCardName]);
+    // From own hand → no-op (reorder not needed)
+    setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null;
+  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromOppHand]);
+
+  // Drop onto opponent hand zone
+  const handleOppHandDrop = useCallback((e) => {
+    e.preventDefault();
+    if (dragCardName == null) return;
+    if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
+    // From player hand → remove from there and add here
+    if (dragHandSource === 'hand' && dragHandIdx != null) { removeFromHand(dragHandIdx); setOppHand(prev => [...prev, dragCardName]); }
+    // From board or gallery → add to opp hand
+    else if (dragHandIdx == null) setOppHand(prev => [...prev, dragCardName]);
+    // From own oppHand → no-op (reorder not needed)
+    setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null;
+  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromHand]);
 
   // ── Pile zone helpers ──
   const handlePileDrop = useCallback((e, si, key) => {
     e.preventDefault(); setDragOverZone(null);
     if (dragCardName == null) return;
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
-    if (dragHandIdx != null) removeFromHand(dragHandIdx);
+    if (dragHandIdx != null) { if (dragHandSource === 'oppHand') removeFromOppHand(dragHandIdx); else removeFromHand(dragHandIdx); }
     updatePlayer(si, pp => { pp[key].push(dragCardName); return pp; });
-    setDragCardName(null); setDragHandIdx(null); setDragSource(null); dragEntityData.current = null;
-  }, [dragCardName, dragHandIdx, dragSource, clearZone, removeFromHand, updatePlayer]);
+    setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); dragEntityData.current = null;
+  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromHand, removeFromOppHand, updatePlayer]);
 
   const removePileCard = useCallback((si, key, idx) => {
     updatePlayer(si, pp => { pp[key].splice(idx, 1); return pp; });
@@ -454,27 +521,46 @@ function PuzzleCreator() {
 
   const handleVerify = useCallback(() => {
     if (!players[0].heroes.some(Boolean) || !players[1].heroes.some(Boolean)) { notify('Both sides need at least one Hero!', 'error'); return; }
-    // Hand size check: max = max(1, 7 - Pollution Tokens in your Support Zones)
-    const pollutionCount = players[0].supportZones.flat().filter(zone => zone.includes('Pollution Token')).length;
-    const maxHand = Math.max(1, 7 - pollutionCount);
-    if (hand.length > maxHand) { notify('You have too many cards in your hand! (max ' + maxHand + ' with ' + pollutionCount + ' Pollution Token' + (pollutionCount !== 1 ? 's' : '') + ')', 'error'); return; }
-    notify('Verification will integrate with the game engine in a future update. Board looks valid!', 'info');
-    setValidated(true);
-  }, [players, hand, notify]);
+    // Hand size pre-check: max = max(1, 7 - Pollution Tokens in Support Zones). Skipped if 0 Pollution.
+    const pollutionCount0 = players[0].supportZones.flat().filter(zone => zone.includes('Pollution Token')).length;
+    if (pollutionCount0 > 0) {
+      const maxHand0 = Math.max(1, 7 - pollutionCount0);
+      if (hand.length > maxHand0) { notify('Your hand has too many cards! (max ' + maxHand0 + ' with ' + pollutionCount0 + ' Pollution Token' + (pollutionCount0 !== 1 ? 's' : '') + ')', 'error'); return; }
+    }
+    const pollutionCount1 = players[1].supportZones.flat().filter(zone => zone.includes('Pollution Token')).length;
+    if (pollutionCount1 > 0) {
+      const maxHand1 = Math.max(1, 7 - pollutionCount1);
+      if (oppHand.length > maxHand1) { notify('Opponent hand has too many cards! (max ' + maxHand1 + ' with ' + pollutionCount1 + ' Pollution Token' + (pollutionCount1 !== 1 ? 's' : '') + ')', 'error'); return; }
+    }
+    // Send puzzle to server — starts a real battle against a CPU opponent
+    socket.emit('start_puzzle', { players, areaZones, hand, oppHand });
+  }, [players, areaZones, hand, oppHand, notify]);
 
   const handleExport = useCallback(() => {
     if (!validated) return;
-    const data = JSON.stringify({ players, areaZones, version: 1 }, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob); const a = document.createElement('a');
-    a.href = url; a.download = 'puzzle.json'; a.click(); URL.revokeObjectURL(url);
-    notify('Puzzle exported!', 'success');
-  }, [validated, players, areaZones, notify]);
+    const data = { players, areaZones, oppHand, version: 1 };
+    socket.emit('export_puzzle', data);
+  }, [validated, players, areaZones, oppHand]);
+
+  // Listen for encrypted puzzle from server
+  useEffect(() => {
+    const onExported = ({ data }) => {
+      const fileName = (puzzleName.trim() || 'puzzle') + '.json';
+      const blob = new Blob([JSON.stringify({ data })], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName; a.click();
+      URL.revokeObjectURL(url);
+      notify('Puzzle exported!', 'success');
+    };
+    socket.on('puzzle_exported', onExported);
+    return () => socket.off('puzzle_exported', onExported);
+  }, [puzzleName, notify]);
 
   useEffect(() => {
-    const h = (e) => { if (e.key === 'Escape') { if (editTarget) setEditTarget(null); else setScreen('menu'); e.stopImmediatePropagation(); } };
+    const h = (e) => { if (e.key === 'Escape') { if (puzzleGameState) return; if (editTarget) setEditTarget(null); else setScreen('menu'); e.stopImmediatePropagation(); } };
     window.addEventListener('keydown', h, true); return () => window.removeEventListener('keydown', h, true);
-  }, [editTarget]);
+  }, [editTarget, puzzleGameState]);
 
   // ── Surprise eligibility: check if hero has abilities matching the surprise's spell schools ──
   const isSurpriseUsable = useCallback((p, hi, cardName) => {
@@ -625,7 +711,7 @@ function PuzzleCreator() {
                   <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderStyle: 'dashed', borderColor: 'rgba(255,215,0,.3)' }}
                     onDragOver={(e) => { e.preventDefault(); if (dragCardName) setDragOverZone('perm-' + si); }}
                     onDragLeave={() => setDragOverZone(null)}
-                    onDrop={(e) => { e.preventDefault(); setDragOverZone(null); if (dragCardName != null) { if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot); placePermanent(dragCardName, si); if (dragHandIdx != null) removeFromHand(dragHandIdx); setDragCardName(null); setDragHandIdx(null); setDragSource(null); dragEntityData.current = null; } }}>
+                    onDrop={(e) => { e.preventDefault(); setDragOverZone(null); if (dragCardName != null) { if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot); placePermanent(dragCardName, si); if (dragHandIdx != null) { if (dragHandSource === 'oppHand') removeFromOppHand(dragHandIdx); else removeFromHand(dragHandIdx); } setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); dragEntityData.current = null; } }}>
                     <div className="board-zone-empty" style={{ fontSize: 'calc(8px * var(--board-scale))' }}>Perm</div>
                   </div>
                 </div>
@@ -778,14 +864,31 @@ function PuzzleCreator() {
     );
   };
 
+  // ── Puzzle Battle Active: render GameBoard instead of creator UI ──
+  if (puzzleGameState) {
+    return (
+      <GameBoard
+        gameState={puzzleGameState}
+        lobby={{ id: puzzleGameState.roomId }}
+        onLeave={onPuzzleLeave}
+        decks={[]}
+        sampleDecks={[]}
+        selectedDeck={null}
+        setSelectedDeck={() => {}}
+      />
+    );
+  }
+
   return (
     <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #10101d 40%, #0a0a12 100%)' }}>
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: '#ff8800' }}>🔧 PUZZLE CREATOR</h2>
+        <input className="input" value={puzzleName} onChange={(e) => { setPuzzleName(e.target.value); setValidated(false); }}
+          placeholder="Puzzle name..." style={{ width: 180, padding: '4px 10px', fontSize: 11, borderColor: 'rgba(255,136,0,.4)', color: '#ff8800' }} />
         <div style={{ flex: 1 }} />
         <button className="btn btn-danger" onClick={handleReset} style={{ padding: '4px 14px', fontSize: 10 }}>↺ RESET</button>
-        <button className="btn" onClick={handleVerify} style={{ padding: '4px 14px', fontSize: 10, borderColor: 'var(--success)', color: 'var(--success)' }}>✓ VERIFY</button>
+        <button className="btn" onClick={handleVerify} style={{ padding: '4px 14px', fontSize: 10, borderColor: 'var(--success)', color: 'var(--success)' }}>⚔️ TEST PUZZLE</button>
         <button className="btn" onClick={handleExport} disabled={!validated}
           style={{ padding: '4px 14px', fontSize: 10, borderColor: validated ? '#ff8800' : 'var(--bg4)', color: validated ? '#ff8800' : 'var(--text2)', opacity: validated ? 1 : 0.4 }}>↓ EXPORT</button>
         {validated && <span className="badge" style={{ background: 'rgba(51,255,136,.12)', color: 'var(--success)', fontSize: 9, padding: '2px 8px' }}>VALIDATED</span>}
@@ -822,6 +925,38 @@ function PuzzleCreator() {
 
         {/* ── Board ── */}
         <div className="pz-board-wrap" ref={boardWrapRef} style={{ overflowY: dragCardName ? 'hidden' : undefined }}>
+          {/* ── Opponent Hand (always revealed, behind tooltips) ── */}
+          <div className="pz-hand pz-hand-opp" style={{ position: 'relative', zIndex: 1, marginBottom: 'calc(4px * var(--board-scale))' }}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('oppHand'); }}
+            onDragLeave={() => setDragOverZone(null)}
+            onDrop={handleOppHandDrop}>
+            <span className="pz-hand-label orbit-font">OPP HAND ({oppHand.length})</span>
+            <div className="pz-hand-cards" style={dragOverZone === 'oppHand' ? { boxShadow: '0 0 14px rgba(0,240,255,.4) inset' } : undefined}>
+              {oppHand.map((cardName, i) => {
+                const img = cardImageUrl(cardName);
+                return (
+                  <div key={i} className="pz-hand-card" draggable
+                    onDragStart={(e) => onDragStart(e, cardName, i, null, 'oppHand')} onDragEnd={onDragEnd}
+                    onContextMenu={(e) => { e.preventDefault(); removeFromOppHand(i); }}
+                    onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
+                    onMouseLeave={hideTooltip}
+                    title={cardName}>
+                    {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
+                      <div className="pz-hand-card-text"><span>{cardName}</span></div>
+                    )}
+                  </div>
+                );
+              })}
+              {oppHand.length === 0 && <span style={{ color: 'var(--text2)', fontSize: 11 }}>Drag cards here for the opponent's hand.</span>}
+            </div>
+            <div className="pz-gold-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginLeft: 8, flexShrink: 0, alignSelf: 'stretch', padding: '4px 10px', borderLeft: '1px solid rgba(255,215,0,.2)', background: 'rgba(255,215,0,.04)' }}>
+              <span style={{ fontSize: 18, color: '#ffd700' }}>💰</span>
+              <input className="input" type="number" min="0" value={players[1].gold ?? 0}
+                onChange={(e) => { const v = Math.max(0, parseInt(e.target.value) || 0); updatePlayer(1, p => { p.gold = v; return p; }); }}
+                style={{ width: 52, padding: '6px 4px', fontSize: 16, textAlign: 'center', borderColor: 'rgba(255,215,0,.4)', color: '#ffd700', fontWeight: 700 }} />
+            </div>
+          </div>
+
           <div className="pz-side-label orbit-font">OPPONENT</div>
           {renderSide(1, true)}
 
@@ -854,7 +989,7 @@ function PuzzleCreator() {
             const img = cardImageUrl(cardName);
             return (
               <div key={i} className="pz-hand-card" draggable
-                onDragStart={(e) => onDragStart(e, cardName, i, null)} onDragEnd={onDragEnd}
+                onDragStart={(e) => onDragStart(e, cardName, i, null, 'hand')} onDragEnd={onDragEnd}
                 onContextMenu={(e) => { e.preventDefault(); removeFromHand(i); }}
                 onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                 onMouseLeave={hideTooltip}
@@ -866,6 +1001,12 @@ function PuzzleCreator() {
             );
           })}
           {hand.length === 0 && <span style={{ color: 'var(--text2)', fontSize: 11 }}>Search → click to add or drag directly onto the board. Right-click to remove.</span>}
+        </div>
+        <div className="pz-gold-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginLeft: 8, flexShrink: 0, alignSelf: 'stretch', padding: '4px 10px', borderLeft: '1px solid rgba(255,215,0,.2)', background: 'rgba(255,215,0,.04)' }}>
+          <span style={{ fontSize: 18, color: '#ffd700' }}>💰</span>
+          <input className="input" type="number" min="0" value={players[0].gold ?? 0}
+            onChange={(e) => { const v = Math.max(0, parseInt(e.target.value) || 0); updatePlayer(0, p => { p.gold = v; return p; }); }}
+            style={{ width: 52, padding: '6px 4px', fontSize: 16, textAlign: 'center', borderColor: 'rgba(255,215,0,.4)', color: '#ffd700', fontWeight: 700 }} />
         </div>
       </div>
 

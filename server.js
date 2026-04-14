@@ -15,7 +15,27 @@ const { loadCardEffect } = require('./cards/effects/_loader');
 // ===== CONFIG =====
 const PORT = process.env.PORT || 3000;
 const PROFILE_SECRET = process.env.PROFILE_SECRET || 'pxlParties_s3cret_k3y_2025!';
+const PUZZLE_SECRET = process.env.PUZZLE_SECRET || 'pxlParties_puzzl3_k3y_2025!';
 const profileImportUsed = new Set();
+
+// ===== PUZZLE ENCRYPTION =====
+function encryptPuzzle(data) {
+  const iv = crypto.randomBytes(16);
+  const key = crypto.scryptSync(PUZZLE_SECRET, 'pxl-puzzle-salt', 32);
+  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+  let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'base64');
+  encrypted += cipher.final('base64');
+  return iv.toString('base64') + ':' + encrypted;
+}
+function decryptPuzzle(encryptedStr) {
+  const [ivB64, data] = encryptedStr.split(':');
+  const iv = Buffer.from(ivB64, 'base64');
+  const key = crypto.scryptSync(PUZZLE_SECRET, 'pxl-puzzle-salt', 32);
+  const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+  let decrypted = decipher.update(data, 'base64', 'utf8');
+  decrypted += decipher.final('utf8');
+  return JSON.parse(decrypted);
+}
 
 // ===== CARD DATABASE CACHE =====
 // Module-level card DB cache — loaded once, used everywhere.
@@ -143,6 +163,14 @@ async function initDatabase() {
     UNIQUE(user_id, item_type, item_id)
   )`);
   await db.execute('CREATE INDEX IF NOT EXISTS idx_shop_items_user ON user_shop_items(user_id)');
+
+  // Puzzle completions table
+  await db.execute(`CREATE TABLE IF NOT EXISTS puzzle_completions (
+    user_id TEXT NOT NULL,
+    puzzle_id TEXT NOT NULL,
+    completed_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (user_id, puzzle_id)
+  )`);
 
   console.log('[DB] Tables initialized');
 }
@@ -1298,6 +1326,7 @@ function sendGameState(room, playerIdx, extra) {
     })),
     areaZones: gs.areaZones, turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
+    isPuzzle: gs.isPuzzle || false,
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     customPlacementCards: (() => {
@@ -1558,6 +1587,7 @@ function sendSpectatorGameState(room) {
     })),
     areaZones: gs.areaZones, turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
+    isPuzzle: gs.isPuzzle || false,
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     customPlacementCards: [],
@@ -1790,6 +1820,77 @@ async function advanceToNextGame(room, loserIdx) {
   } else {
     await startGameEngine(room, room.id, loserIdx);
   }
+}
+
+/**
+ * Lightweight endGame for puzzle/single-player rooms.
+ * No DB writes (ELO, wins, losses, SC rewards, game history).
+ * Just sets gs.result and syncs to the client.
+ */
+function puzzleEndGame(room, winnerIdx, reason) {
+  const gs = room.gameState;
+  if (!gs || gs.result) return;
+  const loserIdx = winnerIdx === 0 ? 1 : 0;
+  const winner = gs.players[winnerIdx];
+  const loser = gs.players[loserIdx];
+  const puzzleSuccess = reason !== 'puzzle_failed' && winnerIdx === 0;
+
+  console.log(`[Puzzle] Game ended: reason=${reason}, winner=${winnerIdx}, success=${puzzleSuccess}, phase=${gs.currentPhase}`);
+
+  gs.result = {
+    winnerIdx, reason,
+    winnerName: winner?.username || '?',
+    loserName: loser?.username || '?',
+    isRanked: false,
+    eloChanges: null,
+    setScore: [0, 0], setOver: true, format: 1,
+    isPuzzle: true,
+    puzzleResult: puzzleSuccess ? 'success' : 'fail',
+    puzzleAttemptId: gs._puzzleAttemptId || null,
+    puzzleDifficulty: gs._puzzleDifficulty || null,
+    scAwarded: 0,
+  };
+  gs.rematchRequests = [];
+  room.status = 'finished';
+
+  // Award SC for first-time official puzzle completion
+  if (puzzleSuccess && gs._puzzleAttemptId && gs._puzzleDifficulty) {
+    const SC_BY_DIFFICULTY = { easy: 3, medium: 6, hard: 10 };
+    const scAmount = SC_BY_DIFFICULTY[gs._puzzleDifficulty] || 0;
+    const userId = winner?.userId;
+    const puzzleId = gs._puzzleAttemptId;
+
+    if (userId && scAmount > 0) {
+      (async () => {
+        try {
+          // Check if already completed
+          const existing = await db.get(
+            'SELECT puzzle_id FROM puzzle_completions WHERE user_id = ? AND puzzle_id = ?',
+            [userId, puzzleId]
+          );
+          if (!existing) {
+            // First clear — record completion and award SC
+            await db.run(
+              'INSERT INTO puzzle_completions (user_id, puzzle_id) VALUES (?, ?)',
+              [userId, puzzleId]
+            );
+            await db.run('UPDATE users SET sc = sc + ? WHERE id = ?', [scAmount, userId]);
+            gs.result.scAwarded = scAmount;
+            console.log(`[Puzzle] Awarded ${scAmount} SC to ${winner.username} for first clear of ${puzzleId}`);
+          } else {
+            // Already completed — record but no SC
+            console.log(`[Puzzle] ${winner.username} re-cleared ${puzzleId} (no SC)`);
+          }
+        } catch (err) {
+          console.error('[Puzzle] SC award error:', err.message);
+        }
+        // Re-sync with updated scAwarded
+        for (let i = 0; i < 2; i++) sendGameState(room, i);
+      })();
+    }
+  }
+
+  for (let i = 0; i < 2; i++) sendGameState(room, i);
 }
 
 function cleanupRoom(roomId) {
@@ -2151,7 +2252,11 @@ io.on('connection', (socket) => {
     // If game is active and no result yet, surrendering ends the game
     if (room.gameState && !hadResult && room.status === 'playing') {
       const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
-      if (pi >= 0) await endGame(room, pi===0?1:0, 'surrender');
+      if (pi >= 0) {
+        const winnerIdx = pi === 0 ? 1 : 0;
+        if (room.type === 'puzzle') puzzleEndGame(room, winnerIdx, 'surrender');
+        else await endGame(room, winnerIdx, 'surrender');
+      }
       // Don't mark as left — both players should see Rematch/Leave
       return;
     }
@@ -4481,8 +4586,9 @@ io.on('connection', (socket) => {
     if (!room?.gameState || room.gameState.result) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    // Surrender just this game (set continues)
-    await endGame(room, pi === 0 ? 1 : 0, 'surrender');
+    const winnerIdx = pi === 0 ? 1 : 0;
+    if (room.type === 'puzzle') { puzzleEndGame(room, winnerIdx, 'surrender'); return; }
+    await endGame(room, winnerIdx, 'surrender');
   });
 
   socket.on('surrender_match', async ({ roomId }) => {
@@ -4536,6 +4642,241 @@ io.on('connection', (socket) => {
     await startGameEngine(room, roomId, activePlayer);
   });
 
+  // ── Puzzle / Single-Player Battle ──────────────────────────────────
+
+  // Shared function: create and start a puzzle game from puzzle data
+  async function createPuzzleGame(puzzleData, opts = {}) {
+    const roomId = 'pz-' + uuidv4().substring(0, 8);
+    const cardsByName = getCardDB();
+    const usr = await db.get('SELECT color, avatar, cardback, board FROM users WHERE id = ?', [currentUser.userId]);
+
+    const buildPlayerState = (pz, userId, username, socketId, hand) => {
+      const heroes = (pz.heroes || []).map(h => {
+        if (!h || !h.name) return { name: null, hp: 0, maxHp: 0, atk: 0, baseAtk: 0, statuses: {} };
+        return {
+          name: h.name, hp: h.hp ?? 0, maxHp: h.maxHp ?? h.hp ?? 0,
+          atk: h.atk ?? 0, baseAtk: h.baseAtk ?? h.atk ?? 0,
+          statuses: h.statuses ? JSON.parse(JSON.stringify(h.statuses)) : {},
+          buffs: h.buffs ? JSON.parse(JSON.stringify(h.buffs)) : undefined,
+        };
+      });
+      while (heroes.length < 3) heroes.push({ name: null, hp: 0, maxHp: 0, atk: 0, baseAtk: 0, statuses: {} });
+
+      return {
+        userId, username, socketId,
+        color: '#00f0ff', avatar: null, cardback: null, board: null,
+        heroes,
+        abilityZones: (pz.abilityZones || [[], [], []]).map(hz => (hz || [[], [], []]).map(slot => [...(slot || [])])),
+        surpriseZones: (pz.surpriseZones || [[], [], []]).map(sz => [...(sz || [])]),
+        supportZones: (pz.supportZones || [[], [], []]).map(hz => (hz || [[], [], []]).map(slot => [...(slot || [])])),
+        hand: [...(hand || [])],
+        mainDeck: [...(pz.mainDeck || [])],
+        potionDeck: [...(pz.potionDeck || [])],
+        discardPile: [...(pz.discardPile || [])],
+        deletedPile: [...(pz.deletedPile || [])],
+        disconnected: false, left: false,
+        gold: pz.gold ?? 0,
+        abilityGivenThisTurn: [false, false, false],
+        islandZoneCount: [...(pz.islandZoneCount || [0, 0, 0])],
+        damageLocked: false, itemLocked: false,
+        dealtDamageToOpponent: false, potionLocked: false,
+        potionsUsedThisTurn: 0,
+        permanents: (pz.permanents || []).map(pm => ({ name: pm.name, id: pm.id || ('p' + Date.now() + Math.random()) })),
+        _oncePerGameUsed: new Set(),
+        _resolvingCard: null,
+        deckSkins: {},
+      };
+    };
+
+    const p0 = buildPlayerState(puzzleData.players[0], currentUser.userId, currentUser.username, socket.id, puzzleData.hand || []);
+    const p1 = buildPlayerState(puzzleData.players[1], 'cpu-puzzle', 'CPU', null, puzzleData.oppHand || []);
+    if (usr) { p0.color = usr.color || '#00f0ff'; p0.avatar = usr.avatar; p0.cardback = usr.cardback; p0.board = usr.board; }
+
+    const gs = {
+      players: [p0, p1],
+      areaZones: (puzzleData.areaZones || [[], []]).map(az => [...(az || [])]),
+      turn: 1, activePlayer: 0, currentPhase: 0,
+      result: null, rematchRequests: [],
+      awaitingFirstChoice: false,
+      isPuzzle: true,
+      _puzzleAttemptId: opts.puzzleAttemptId || null,
+      _puzzleDifficulty: opts.puzzleDifficulty || null,
+      _gameStartTime: Date.now(),
+      _playerIPs: [getSocketIP(socket), 'cpu'],
+    };
+
+    const room = {
+      id: roomId, host: currentUser.username, hostId: currentUser.userId,
+      type: 'puzzle', format: 1, winsNeeded: 1, setScore: [0, 0],
+      playerPw: null, specPw: null,
+      players: [
+        { username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: null },
+        { username: 'CPU', userId: 'cpu-puzzle', socketId: null, deckId: null },
+      ],
+      spectators: [], status: 'playing', created: Date.now(),
+      gameState: gs, chatHistory: [], privateChatHistory: {},
+    };
+    rooms.set(roomId, room);
+    socket.join('room:' + roomId);
+    activeGames.set(currentUser.userId, roomId);
+
+    room.engine = new GameEngine(room, io, sendGameState, (r, winnerIdx, reason) => puzzleEndGame(r, winnerIdx, reason), sendSpectatorGameState);
+    room.engine.isPuzzle = true;
+    room.engine._cpuPlayerIdx = 1;
+    room.engine.init();
+
+    // Apply creature custom HP and statuses
+    for (let pi = 0; pi < 2; pi++) {
+      const pz = puzzleData.players[pi];
+      if (!pz) continue;
+      for (let hi = 0; hi < (pz.supportZones || []).length; hi++) {
+        for (let slot = 0; slot < (pz.supportZones[hi] || []).length; slot++) {
+          const cards = pz.supportZones[hi][slot] || [];
+          if (cards.length === 0) continue;
+          const inst = room.engine.cardInstances.find(c =>
+            c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === slot
+          );
+          if (!inst) continue;
+          const customHp = pz._customSupportHp?.[hi]?.[slot];
+          if (customHp != null) {
+            inst.counters.currentHp = customHp;
+            const cd = cardsByName[inst.name];
+            if (cd?.hp && customHp !== cd.hp) inst.counters.maxHp = cd.hp;
+          }
+          const cs = pz._creatureStatuses?.[hi + '-' + slot];
+          if (cs) {
+            if (cs.frozen) inst.counters.frozen = 1;
+            if (cs.stunned) inst.counters.stunned = 1;
+            if (cs.burned) inst.counters.burned = 1;
+            if (cs.negated) inst.counters.negated = 1;
+            if (cs.poisoned) { inst.counters.poisoned = 1; inst.counters.poisonStacks = cs.poisoned.stacks || 1; }
+            if (cs.buffs) { if (!inst.counters.buffs) inst.counters.buffs = {}; Object.assign(inst.counters.buffs, cs.buffs); }
+          }
+        }
+      }
+    }
+
+    // Track permanents
+    for (let pi = 0; pi < 2; pi++) {
+      for (const pm of (gs.players[pi].permanents || [])) {
+        room.engine._trackCard(pm.name, pi, 'permanent');
+      }
+    }
+
+    // Start the puzzle game — go directly to Main Phase 1
+    socket.emit('room_joined', { id: roomId, host: currentUser.username, players: room.players.map(p => ({ username: p.username })), spectators: [], status: 'playing', type: 'puzzle' });
+    socket.emit('game_started', { id: roomId, players: room.players.map(p => ({ username: p.username })), status: 'playing', type: 'puzzle' });
+
+    (async () => {
+      try {
+        for (const ps of gs.players) {
+          if (!ps) continue;
+          ps.summonLocked = false; ps.handLocked = false; ps.damageLocked = false;
+          ps.dealtDamageToOpponent = false; ps.potionLocked = false;
+          ps.supportSpellLocked = false; ps.supportSpellUsedThisTurn = false;
+          ps.potionsUsedThisTurn = 0; ps.attacksPlayedThisTurn = 0;
+          ps.comboLockHeroIdx = null; ps.heroesActedThisTurn = []; ps.heroesAttackedThisTurn = [];
+          ps._creaturesSummonedThisTurn = 0; ps.bonusActions = null; ps._bonusMainActions = 0;
+          ps.abilityGivenThisTurn = [false, false, false];
+          for (const hero of (ps.heroes || [])) { if (hero?._actionsThisTurn) hero._actionsThisTurn = 0; }
+        }
+        room.engine._resetTerrorTracking();
+        await room.engine.runHooks('onGameStart', { _skipReactionCheck: true });
+        gs.currentPhase = 2; // PHASES.MAIN1
+        gs.unactivatableArtifacts = room.engine.getUnactivatableArtifacts(0);
+        room.engine.log('phase_start', { phase: 'Main Phase 1' });
+        room.engine.sync();
+      } catch (err) {
+        console.error('[Puzzle] startup error:', err.message, err.stack);
+      }
+    })();
+
+    return roomId;
+  }
+
+  // Creator test: raw puzzle data from client
+  socket.on('start_puzzle', (puzzleData) => {
+    if (!currentUser) return;
+    if (activeGames.has(currentUser.userId)) { socket.emit('puzzle_error', 'Already in a game'); return; }
+    if (!puzzleData?.players?.[0] || !puzzleData?.players?.[1]) { socket.emit('puzzle_error', 'Invalid puzzle data'); return; }
+    createPuzzleGame(puzzleData).catch(err => {
+      console.error('[Puzzle] start_puzzle error:', err.message, err.stack);
+      socket.emit('puzzle_error', 'Failed to start puzzle: ' + err.message);
+    });
+  });
+
+  // Export puzzle: encrypt server-side, send back to client for download
+  socket.on('export_puzzle', (puzzleData) => {
+    if (!currentUser) return;
+    try {
+      const encrypted = encryptPuzzle(puzzleData);
+      socket.emit('puzzle_exported', { data: encrypted });
+    } catch (err) {
+      console.error('[Puzzle] export error:', err.message);
+      socket.emit('puzzle_error', 'Encryption failed: ' + err.message);
+    }
+  });
+
+  // Get puzzle list: read puzzle files, check completions
+  socket.on('get_puzzles', async () => {
+    if (!currentUser) return;
+    try {
+      const puzzlesDir = path.join(__dirname, 'data', 'puzzles');
+      const difficulties = ['easy', 'medium', 'hard'];
+      const puzzles = [];
+
+      for (const diff of difficulties) {
+        const dir = path.join(puzzlesDir, diff);
+        if (!fs.existsSync(dir)) continue;
+        const files = fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort();
+        for (const file of files) {
+          const name = file.replace(/\.json$/, '');
+          const puzzleId = diff + '/' + name;
+          puzzles.push({ name, difficulty: diff, puzzleId });
+        }
+      }
+
+      // Check completions for this user
+      const completions = await db.all(
+        'SELECT puzzle_id FROM puzzle_completions WHERE user_id = ?',
+        [currentUser.userId]
+      );
+      const completedSet = new Set(completions.map(r => r.puzzle_id));
+
+      socket.emit('puzzle_list', puzzles.map(p => ({
+        ...p,
+        completed: completedSet.has(p.puzzleId),
+      })));
+    } catch (err) {
+      console.error('[Puzzle] get_puzzles error:', err.message);
+      socket.emit('puzzle_list', []);
+    }
+  });
+
+  // Attempt an official puzzle: decrypt file, start game
+  socket.on('start_puzzle_attempt', ({ puzzleId, difficulty }) => {
+    if (!currentUser) return;
+    if (activeGames.has(currentUser.userId)) { socket.emit('puzzle_error', 'Already in a game'); return; }
+
+    (async () => {
+      try {
+        const filePath = path.join(__dirname, 'data', 'puzzles', difficulty, puzzleId.split('/')[1] + '.json');
+        if (!fs.existsSync(filePath)) { socket.emit('puzzle_error', 'Puzzle not found'); return; }
+
+        const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        const puzzleData = decryptPuzzle(raw.data);
+
+        await createPuzzleGame(puzzleData, {
+          puzzleAttemptId: puzzleId,
+          puzzleDifficulty: difficulty,
+        });
+      } catch (err) {
+        console.error('[Puzzle] start_puzzle_attempt error:', err.message, err.stack);
+        socket.emit('puzzle_error', 'Failed to load puzzle: ' + err.message);
+      }
+    })();
+  });
+
   socket.on('leave_room', ({ roomId }) => handleLeaveRoom(socket, roomId, currentUser));
 
   // Debug: add a card to a player's hand
@@ -4545,6 +4886,12 @@ io.on('connection', (socket) => {
     if (activeRoomId) {
       const room = rooms.get(activeRoomId);
       if (room?.gameState && !room.gameState.result) {
+        // Puzzle/single-player rooms: just clean up immediately
+        if (room.type === 'puzzle') {
+          activeGames.delete(currentUser.userId);
+          rooms.delete(activeRoomId);
+          return;
+        }
         const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
         if (pi >= 0) {
           // Ignore if this socket was superseded by a newer connection (dual-tab)
@@ -4579,7 +4926,8 @@ function handleLeaveRoom(socket, roomId, user) {
   socket.leave('room:' + roomId);
 
   if (room.hostId === user.userId) {
-    // Host leaves = destroy room
+    // Host leaves = destroy room. Clean up activeGames for all players.
+    for (const p of room.players) activeGames.delete(p.userId);
     rooms.delete(roomId);
     io.to('room:' + roomId).emit('room_closed');
   } else {

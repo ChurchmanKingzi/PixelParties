@@ -64,11 +64,95 @@ function AuthScreen() {
 function MainMenu() {
   const { user, setScreen, setUser, notify } = useContext(AppContext);
   const [puzzleOpen, setPuzzleOpen] = useState(false);
+  const [puzzleBrowserOpen, setPuzzleBrowserOpen] = useState(false);
+  const [puzzleList, setPuzzleList] = useState(null); // null = not loaded, [] = empty
+  const [puzzleAttemptState, setPuzzleAttemptState] = useState(null);
+  const puzzleAttemptRoom = useRef(null);
+
   const logout = async () => {
     try { await api('/auth/logout', { method: 'POST' }); } catch {}
     window.AUTH_TOKEN = null;
     setUser(null);
   };
+
+  // Fetch puzzle list when browser opens
+  useEffect(() => {
+    if (!puzzleBrowserOpen) return;
+    socket.emit('get_puzzles');
+    const onList = (list) => setPuzzleList(list);
+    socket.on('puzzle_list', onList);
+    return () => socket.off('puzzle_list', onList);
+  }, [puzzleBrowserOpen]);
+
+  // Listen for puzzle game state during attempts
+  useEffect(() => {
+    if (!puzzleBrowserOpen) return;
+    const onGameState = (state) => {
+      if (state.isPuzzle) {
+        puzzleAttemptRoom.current = state.roomId;
+        setPuzzleAttemptState(state);
+      }
+    };
+    const onPuzzleError = (msg) => notify('Puzzle error: ' + msg, 'error');
+    socket.on('game_state', onGameState);
+    socket.on('puzzle_error', onPuzzleError);
+    return () => { socket.off('game_state', onGameState); socket.off('puzzle_error', onPuzzleError); };
+  }, [puzzleBrowserOpen, notify]);
+
+  // Escape key: close browser or leave attempt
+  useEffect(() => {
+    if (!puzzleBrowserOpen) return;
+    const h = (e) => {
+      if (e.key === 'Escape') {
+        if (puzzleAttemptState) return; // GameBoard handles its own Escape
+        setPuzzleBrowserOpen(false);
+        e.stopImmediatePropagation();
+      }
+    };
+    window.addEventListener('keydown', h, true);
+    return () => window.removeEventListener('keydown', h, true);
+  }, [puzzleBrowserOpen, puzzleAttemptState]);
+
+  const startPuzzleAttempt = (puzzle) => {
+    socket.emit('start_puzzle_attempt', { puzzleId: puzzle.puzzleId, difficulty: puzzle.difficulty });
+  };
+
+  const onPuzzleAttemptLeave = useCallback(() => {
+    const gs = puzzleAttemptState;
+    const roomId = puzzleAttemptRoom.current;
+    const result = gs?.result;
+    if (roomId) socket.emit('leave_game', { roomId });
+    setPuzzleAttemptState(null);
+    puzzleAttemptRoom.current = null;
+    // Refresh puzzle list to show updated checkmarks
+    socket.emit('get_puzzles');
+    if (result) {
+      const success = result.isPuzzle && result.puzzleResult === 'success';
+      if (success && result.scAwarded > 0) {
+        notify(`🧩 Puzzle cleared! +${result.scAwarded} SC`, 'success');
+      } else if (success) {
+        notify('🧩 Puzzle cleared!', 'success');
+      } else {
+        notify('Puzzle not cleared — try again!', 'info');
+      }
+    }
+  }, [puzzleAttemptState, notify]);
+
+  // Render GameBoard during puzzle attempt
+  if (puzzleAttemptState) {
+    const GameBoard = window.GameBoard;
+    return (
+      <GameBoard
+        gameState={puzzleAttemptState}
+        lobby={{ id: puzzleAttemptState.roomId }}
+        onLeave={onPuzzleAttemptLeave}
+        decks={[]}
+        sampleDecks={[]}
+        selectedDeck={null}
+        setSelectedDeck={() => {}}
+      />
+    );
+  }
   return (
     <div className="screen-center main-menu-screen" style={{ flexDirection: 'column', gap: 20, position: 'relative' }}>
       <div style={{ position: 'absolute', top: 12, right: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -89,7 +173,7 @@ function MainMenu() {
           <button className="btn btn-big" onClick={() => setPuzzleOpen(!puzzleOpen)} style={{ fontSize: 16, borderColor: '#ff8800', color: '#ff8800', background: 'rgba(255,136,0,.08)' }}>🧩 PUZZLE MODE {puzzleOpen ? '▲' : '▼'}</button>
           {puzzleOpen && (
             <div style={{ display: 'flex', gap: 8, marginTop: -4 }}>
-              <button className="btn" onClick={() => notify('Attempt Puzzle coming soon!', 'info')} style={{ flex: 1, padding: '10px 0', fontSize: 13, borderColor: '#ff8800', color: '#ff8800', background: 'rgba(255,136,0,.06)' }}>⚡ Attempt</button>
+              <button className="btn" onClick={() => setPuzzleBrowserOpen(true)} style={{ flex: 1, padding: '10px 0', fontSize: 13, borderColor: '#ff8800', color: '#ff8800', background: 'rgba(255,136,0,.06)' }}>⚡ Attempt</button>
               <button className="btn" onClick={() => setScreen('puzzle-create')} style={{ flex: 1, padding: '10px 0', fontSize: 13, borderColor: '#ff8800', color: '#ff8800', background: 'rgba(255,136,0,.06)' }}>🔧 Create</button>
             </div>
           )}
@@ -105,6 +189,49 @@ function MainMenu() {
           </div>
         </div>
       </div>
+
+      {/* ── Puzzle Browser Modal ── */}
+      {puzzleBrowserOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setPuzzleBrowserOpen(false); }}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid #ff8800', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,136,0,.2)' }}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 className="orbit-font" style={{ fontSize: 16, color: '#ff8800', margin: 0 }}>🧩 PUZZLE LIBRARY</h3>
+              <button className="btn" onClick={() => setPuzzleBrowserOpen(false)} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px 20px' }}>
+              {puzzleList === null ? (
+                <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>Loading puzzles...</div>
+              ) : puzzleList.length === 0 ? (
+                <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>No puzzles available yet.</div>
+              ) : (
+                ['easy', 'medium', 'hard'].map(diff => {
+                  const puzzles = puzzleList.filter(p => p.difficulty === diff);
+                  if (puzzles.length === 0) return null;
+                  const diffColors = { easy: '#33ff88', medium: '#ffaa00', hard: '#ff4444' };
+                  const scReward = { easy: 3, medium: 6, hard: 10 };
+                  return (
+                    <div key={diff} style={{ marginBottom: 16 }}>
+                      <div className="orbit-font" style={{ fontSize: 11, color: diffColors[diff], letterSpacing: 2, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {diff.toUpperCase()}
+                        <span style={{ fontSize: 9, color: 'var(--text2)', letterSpacing: 0 }}>({scReward[diff]} SC)</span>
+                      </div>
+                      {puzzles.map(p => (
+                        <button key={p.puzzleId} className="btn" onClick={() => startPuzzleAttempt(p)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: diffColors[diff] + '44', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start' }}>
+                          <span style={{ color: p.completed ? '#33ff88' : 'var(--bg4)', fontSize: 16, width: 20, textAlign: 'center' }}>{p.completed ? '✓' : '○'}</span>
+                          <span style={{ flex: 1 }}>{p.name}</span>
+                          {p.completed && <span style={{ fontSize: 9, color: 'var(--text2)' }}>CLEARED</span>}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

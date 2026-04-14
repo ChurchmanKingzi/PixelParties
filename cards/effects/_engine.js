@@ -99,9 +99,204 @@ class GameEngine {
 
     // Socket listeners per player (for prompts)
     this._promptResolvers = {};
+
+    // ── CPU / Single-player / Puzzle mode ──
+    // _cpuPlayerIdx: index of the CPU-controlled player (-1 = none).
+    //   Used for puzzle validation, future single-player modes, etc.
+    // isPuzzle: when true, the game ends after the human player's turn.
+    //   If the human hasn't won by switchTurn, the puzzle is failed.
+    this._cpuPlayerIdx = -1;
+    this.isPuzzle = false;
   }
 
   // ─── INITIALIZATION ───────────────────────
+
+  // ─── CPU PLAYER SYSTEM ────────────────────
+  // Handles auto-responses for CPU-controlled players (puzzle mode, future single-player).
+  // Card modules can export a cpuResponse(engine, promptType, promptData) function for
+  // card-specific decision logic. The engine checks for it before falling back to defaults.
+
+  /** Check whether a player index is CPU-controlled. */
+  isCpuPlayer(pi) {
+    return this._cpuPlayerIdx >= 0 && pi === this._cpuPlayerIdx;
+  }
+
+  /**
+   * Generate a CPU response for a generic prompt (confirm, forceDiscard, cardGallery, etc.).
+   * Rule: cancellable prompts → decline (CPU takes no voluntary actions).
+   *       mandatory prompts  → auto-confirm / pick first option.
+   * Card-specific overrides: if a card module exports cpuResponse(), it's checked first.
+   * @param {object} promptData - The prompt data sent to the client
+   * @returns {*} The response value (same shape the client would send)
+   */
+  _getCpuGenericResponse(promptData) {
+    // ── Card-specific handler (extensible per-card CPU logic) ──
+    const cardName = promptData.title || promptData.source;
+    if (cardName) {
+      const script = loadCardEffect(cardName);
+      if (script?.cpuResponse) {
+        const result = script.cpuResponse(this, 'generic', promptData);
+        if (result !== undefined) return result;
+      }
+    }
+
+    // ── Default: cancellable → decline, mandatory → auto-resolve ──
+    if (promptData.cancellable) return null; // Decline optional actions
+
+    const type = promptData.type;
+
+    if (type === 'confirm') return true;
+
+    if (type === 'forceDiscard' || type === 'forceDiscardCancellable') {
+      const ps = this.gs.players[this._cpuPlayerIdx];
+      if (!ps || !ps.hand || ps.hand.length === 0) return null;
+      // Pick first eligible card (respect eligibleIndices if provided)
+      const eligible = promptData.eligibleIndices;
+      const idx = eligible ? eligible[0] : 0;
+      return { cardName: ps.hand[idx], handIndex: idx };
+    }
+
+    if (type === 'cardGallery') {
+      const cards = promptData.cards || [];
+      if (cards.length === 0) return null;
+      return { cardName: cards[0].name, source: cards[0].source };
+    }
+
+    if (type === 'cardGalleryMulti') {
+      const cards = promptData.cards || [];
+      if (cards.length === 0) return { selectedCards: [] };
+      return { selectedCards: [cards[0].name] };
+    }
+
+    if (type === 'zonePick') {
+      const zones = promptData.zones || [];
+      if (zones.length === 0) return null;
+      return { heroIdx: zones[0].heroIdx, slotIdx: zones[0].slotIdx };
+    }
+
+    if (type === 'statusSelect') {
+      return { selectedStatuses: (promptData.statuses || []).map(s => s.key) };
+    }
+
+    if (type === 'handPick') {
+      const eligible = promptData.eligibleIndices || [];
+      if (eligible.length === 0) return null;
+      return { selectedIndex: eligible[0] };
+    }
+
+    if (type === 'heroAction') {
+      // CPU doesn't take optional hero actions
+      return { cancelled: true };
+    }
+
+    if (type === 'chainTargetPick') {
+      // Smart chain target selection:
+      // - Pick highest-HP target each step
+      // - If the damage would KILL the highest-HP target, pick lowest-HP instead
+      // - Each target only selected once
+      // - Respect heroesFirst: prefer heroes while any are available
+      const targets = promptData.targets || [];
+      const damages = promptData.damages || [];
+      const heroesFirst = promptData.heroesFirst || false;
+
+      if (targets.length === 0) return { selectedTargets: [] };
+
+      const getHp = (t) => {
+        if (t.type === 'hero') {
+          const hero = this.gs.players[t.owner]?.heroes?.[t.heroIdx];
+          return hero?.hp || 0;
+        }
+        if (t.type === 'equip') {
+          const inst = this.cardInstances.find(c =>
+            c.owner === t.owner && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx
+          );
+          const cd = this._getCardDB()[t.cardName];
+          return inst?.counters?.currentHp ?? cd?.hp ?? 0;
+        }
+        return 0;
+      };
+
+      const selected = [];
+      const usedIds = new Set();
+      const maxTargets = Math.min(damages.length, targets.length);
+      // Weakest damage that will actually be applied (damages are descending)
+      const minDmg = damages[maxTargets - 1];
+
+      for (let step = 0; step < maxTargets; step++) {
+        const dmg = damages[step];
+        let available = targets.filter(t => !usedIds.has(t.id));
+        if (available.length === 0) break;
+
+        // heroesFirst: prefer heroes while any hero targets remain
+        if (heroesFirst) {
+          const heroes = available.filter(t => t.type === 'hero');
+          if (heroes.length > 0) available = heroes;
+        }
+
+        const remainingSteps = maxTargets - step;
+        let chosen;
+
+        // Optimization: if forced to hit all remaining targets (no spare slots),
+        // and a target would die to even the weakest remaining hit, assign it the
+        // strongest hit (this step) since the damage is wasted on a dead target anyway.
+        if (available.length <= remainingSteps) {
+          const wouldDieAnyway = available.filter(t => getHp(t) <= minDmg);
+          if (wouldDieAnyway.length > 0) {
+            // Pick the lowest-HP doomed target (least wasted overkill)
+            wouldDieAnyway.sort((a, b) => getHp(a) - getHp(b));
+            chosen = wouldDieAnyway[0];
+          }
+        }
+
+        if (!chosen) {
+          // Standard logic: pick highest HP, unless it would die → pick lowest
+          available.sort((a, b) => getHp(b) - getHp(a));
+          const highestHpTarget = available[0];
+          if (dmg >= getHp(highestHpTarget)) {
+            // Would kill highest — pick lowest HP instead
+            chosen = available[available.length - 1];
+          } else {
+            chosen = highestHpTarget;
+          }
+        }
+
+        selected.push(chosen);
+        usedIds.add(chosen.id);
+      }
+
+      return { selectedTargets: selected };
+    }
+
+    // Fallback: confirm
+    return true;
+  }
+
+  /**
+   * Generate a CPU response for an effect target prompt.
+   * Same cancellable logic: if cancellable, decline. Otherwise pick first target(s).
+   * @param {Array} validTargets - Array of valid target objects with .id
+   * @param {object} config - Targeting configuration
+   * @returns {string[]} Array of selected target IDs
+   */
+  _getCpuTargetResponse(validTargets, config = {}) {
+    // Card-specific handler
+    const cardName = config.title;
+    if (cardName) {
+      const script = loadCardEffect(cardName);
+      if (script?.cpuResponse) {
+        const result = script.cpuResponse(this, 'effectTarget', { validTargets, config });
+        if (result !== undefined) return result;
+      }
+    }
+
+    // Cancellable → decline (return empty)
+    if (config.cancellable) return [];
+
+    // Mandatory → pick first valid target
+    if (!validTargets || validTargets.length === 0) return [];
+    return [validTargets[0].id];
+  }
+
 
   /**
    * Initialize card instances from the current game state.
@@ -3967,25 +4162,31 @@ class GameEngine {
    * Start the game's first turn. Call once after init().
    */
   async startGame() {
-    // Track hand cards — starting hand is drawn before engine init,
-    // so hand cards need to be registered here for hand-zone hooks to fire.
-    for (let pi = 0; pi < 2; pi++) {
-      const ps = this.gs.players[pi];
-      for (const cardName of (ps.hand || [])) {
-        this._trackCard(cardName, pi, ZONES.HAND);
+    // Track hand cards — in normal games, starting hands are drawn AFTER init(),
+    // so hand cards need to be registered here. In puzzle/single-player mode,
+    // hands are pre-populated and already tracked by init() — skip to avoid duplicates.
+    if (!this.isPuzzle) {
+      for (let pi = 0; pi < 2; pi++) {
+        const ps = this.gs.players[pi];
+        for (const cardName of (ps.hand || [])) {
+          this._trackCard(cardName, pi, ZONES.HAND);
+        }
       }
     }
 
     // First turn rule: opponent of the starting player is fully shielded
     // (blocks ALL damage, ALL status effects, discard, mill — everything)
-    const oppIdx = this.gs.activePlayer === 0 ? 1 : 0;
-    this.gs.firstTurnProtectedPlayer = oppIdx;
-    const oppPs = this.gs.players[oppIdx];
-    if (oppPs) {
-      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-        const hero = oppPs.heroes[hi];
-        if (hero?.name) {
-          await this.addHeroStatus(oppIdx, hi, 'shielded', {});
+    // Skipped in puzzle mode — the whole point is to kill the opponent in one turn.
+    if (!this.isPuzzle) {
+      const oppIdx = this.gs.activePlayer === 0 ? 1 : 0;
+      this.gs.firstTurnProtectedPlayer = oppIdx;
+      const oppPs = this.gs.players[oppIdx];
+      if (oppPs) {
+        for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
+          const hero = oppPs.heroes[hi];
+          if (hero?.name) {
+            await this.addHeroStatus(oppIdx, hi, 'shielded', {});
+          }
         }
       }
     }
@@ -4263,6 +4464,20 @@ class GameEngine {
    * Switch to the other player's turn.
    */
   async switchTurn() {
+    // If game already ended (e.g. all heroes dead during End Phase), don't continue
+    if (this.gs.result) return;
+
+    // Puzzle mode: the human player's turn just ended without winning → puzzle failed.
+    // CPU/single-player mode: when the CPU's turn would start, auto-skip it.
+    if (this._cpuPlayerIdx >= 0) {
+      const nextPlayer = this.gs.activePlayer === 0 ? 1 : 0;
+      if (this.isPuzzle && nextPlayer === this._cpuPlayerIdx) {
+        // Human's one turn is over — they didn't win
+        if (this.onGameOver) this.onGameOver(this.room, this._cpuPlayerIdx, 'puzzle_failed');
+        return;
+      }
+    }
+
     await this.runHooks(HOOKS.ON_TURN_END, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
     // Clear itemLocked for the player whose turn is ending
     // (it lasts from when it's applied until after the afflicted player's own turn)
@@ -4430,6 +4645,11 @@ class GameEngine {
    */
   async promptEffectTarget(playerIdx, validTargets, config = {}) {
     if (!validTargets || validTargets.length === 0) return [];
+    // CPU auto-response: resolve immediately
+    if (this.isCpuPlayer(playerIdx)) {
+      await this._delay(50);
+      return this._getCpuTargetResponse(validTargets, config);
+    }
     return new Promise((resolve) => {
       this._pendingPrompt = { resolve };
       this.gs.potionTargeting = {
@@ -4760,6 +4980,12 @@ class GameEngine {
    * @param {object} promptData - { type, title, ...typeSpecificData }
    */
   async promptGeneric(playerIdx, promptData) {
+    // CPU auto-response: resolve immediately without socket round-trip
+    if (this.isCpuPlayer(playerIdx)) {
+      await this._delay(50); // Minimal delay to let event loop breathe
+      const response = this._getCpuGenericResponse(promptData);
+      return response;
+    }
     return new Promise((resolve) => {
       this._pendingGenericPrompt = { resolve };
       this.gs.effectPrompt = { ...promptData, ownerIdx: playerIdx };

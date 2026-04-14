@@ -15,6 +15,22 @@ module.exports = {
   heroRedirect: true,
 
   /**
+   * CPU behavior: always redirect when possible, pick first valid target.
+   */
+  cpuResponse(engine, promptType, promptData) {
+    if (promptType === 'generic') {
+      // Confirm the redirect prompt
+      if (promptData.type === 'confirm') return true;
+      // Pick first redirect target from gallery
+      if (promptData.type === 'cardGallery') {
+        const cards = promptData.cards || [];
+        if (cards.length > 0) return { cardName: cards[0].name, source: cards[0].source };
+      }
+    }
+    return undefined; // Fall through to default
+  },
+
+  /**
    * Can this Alleria redirect the incoming effect?
    * Conditions:
    *  - Exactly 1 target on Alleria's side was selected
@@ -79,7 +95,7 @@ module.exports = {
       const result = await engine.promptGeneric(ownerIdx, {
         type: 'cardGallery',
         cards: eligible.map(t => ({ name: t.cardName, source: 'hero', heroIdx: t.heroIdx })),
-        title: 'Alleria — Redirect Target',
+        title: 'Alleria, the Queen of Spiders',
         description: 'Choose a Hero with a Surprise to redirect the effect to:',
         cancellable: true,
       });

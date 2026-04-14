@@ -531,6 +531,11 @@ function App() {
     // Listen for game reconnection
     const onReconnectGame = (state) => {
       if (state.reconnected) {
+        // Puzzle games are ephemeral — don't reconnect, just clean up
+        if (state.isPuzzle) {
+          socket.emit('leave_game', { roomId: state.roomId });
+          return;
+        }
         _pendingGameState = state;
         setScreen('play');
       }
