@@ -50,6 +50,110 @@ function PuzzleCreator() {
   const boardWrapRef = useRef(null);
   const dragEntityData = useRef(null); // carries hero/creature metadata during board-to-board drags
 
+  // ── Mobile tap-to-place (alternative to drag/drop) ──
+  const [mobileSelected, setMobileSelected] = useState(null); // { cardName, handIdx, handSource }
+  const isTouchDevice = 'ontouchstart' in window;
+  const touchStartRef = useRef(null);
+  // Reliable mobile tap: tracks touch start position, only fires on short taps without movement
+  const mobileTapHandlers = useCallback((onTap) => {
+    if (!isTouchDevice) return {};
+    return {
+      onTouchStart: (e) => { const t = e.touches[0]; touchStartRef.current = { x: t.clientX, y: t.clientY, time: Date.now() }; },
+      onTouchEnd: (e) => {
+        const start = touchStartRef.current;
+        if (!start) return;
+        touchStartRef.current = null;
+        const t = e.changedTouches[0];
+        const dx = Math.abs(t.clientX - start.x), dy = Math.abs(t.clientY - start.y);
+        if (dx < 15 && dy < 15 && Date.now() - start.time < 400) {
+          e.preventDefault(); // prevent click from also firing
+          onTap();
+        }
+      },
+    };
+  }, [isTouchDevice]);
+
+  // ── Touch drag system (mobile) ──
+  const touchDragRef = useRef(null); // { cardName, handIdx, handSource, source, ghost }
+  const touchDragStart = useCallback((cardName, handIdx, handSource, sourceZone, e) => {
+    if (!isTouchDevice) return;
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY, time: Date.now() };
+    touchDragRef.current = { cardName, handIdx, handSource, sourceZone, startX: t.clientX, startY: t.clientY, dragging: false, ghost: null };
+  }, [isTouchDevice]);
+
+  const touchDragMove = useCallback((e) => {
+    const td = touchDragRef.current;
+    if (!td) return;
+    const t = e.touches[0];
+    const dx = Math.abs(t.clientX - td.startX), dy = Math.abs(t.clientY - td.startY);
+    // Start dragging after 12px movement threshold
+    if (!td.dragging && (dx > 12 || dy > 12)) {
+      td.dragging = true;
+      touchStartRef.current = null; // cancel tap
+      setMobileSelected(null);
+      // Create ghost
+      const ghost = document.createElement('div');
+      ghost.className = 'pz-touch-drag-ghost';
+      const img = cardImageUrl(td.cardName);
+      ghost.innerHTML = img ? `<img src="${img}" style="width:100%;height:100%;object-fit:cover;border-radius:3px;" />` : `<span style="font-size:8px;color:#fff;">${td.cardName}</span>`;
+      document.body.appendChild(ghost);
+      td.ghost = ghost;
+      setDragCardName(td.cardName);
+    }
+    if (td.dragging) {
+      e.preventDefault(); // prevent scroll while dragging
+      td.ghost.style.left = (t.clientX - 30) + 'px';
+      td.ghost.style.top = (t.clientY - 42) + 'px';
+      // Highlight zone under finger
+      td.ghost.style.display = 'none';
+      const el = document.elementFromPoint(t.clientX, t.clientY);
+      td.ghost.style.display = '';
+      const zoneEl = el?.closest('[data-pz-zone]') || el?.closest('[data-pz-hand]');
+      const zoneKey = zoneEl?.dataset?.pzZone || (zoneEl?.dataset?.pzHand ? 'hand:' + zoneEl.dataset.pzHand : null);
+      setDragOverZone(zoneKey || null);
+    }
+  }, []);
+
+  const touchDragEnd = useCallback((e) => {
+    const td = touchDragRef.current;
+    touchDragRef.current = null;
+    if (!td?.dragging) return;
+    if (td.ghost) { td.ghost.remove(); td.ghost = null; }
+    setDragCardName(null);
+    setDragOverZone(null);
+    const t = e.changedTouches[0];
+    const el = document.elementFromPoint(t.clientX, t.clientY);
+    const zoneEl = el?.closest('[data-pz-zone]');
+    const handEl = el?.closest('[data-pz-hand]');
+    if (zoneEl) {
+      const [si, zt, hi, slot] = zoneEl.dataset.pzZone.split('-');
+      const siN = parseInt(si), hiN = parseInt(hi), slotN = parseInt(slot);
+      if (canDrop(td.cardName, zt, siN, hiN, slotN)) {
+        // Remove from source
+        if (td.handIdx != null) { if (td.handSource === 'oppHand') removeFromOppHand(td.handIdx); else removeFromHand(td.handIdx); }
+        if (td.sourceZone) clearZone(td.sourceZone.zt, td.sourceZone.si, td.sourceZone.hi, td.sourceZone.slot);
+        // Place
+        if (zt === 'hero') placeHero(td.cardName, siN, hiN);
+        else if (zt === 'ability') placeAbility(td.cardName, siN, hiN, slotN);
+        else if (zt === 'support') placeSupport(td.cardName, siN, hiN, slotN);
+        else if (zt === 'surprise') placeSurprise(td.cardName, siN, hiN);
+        else if (zt === 'area') placeArea(td.cardName, siN);
+        else if (zt === 'permanent') placePermanent(td.cardName, siN);
+      }
+    } else if (handEl) {
+      const handType = handEl.dataset.pzHand;
+      // Dropping back on the same hand it came from → do nothing
+      if (td.handSource === handType && td.handIdx != null) return;
+      // Remove from source hand or zone
+      if (td.handIdx != null) { if (td.handSource === 'oppHand') removeFromOppHand(td.handIdx); else removeFromHand(td.handIdx); }
+      if (td.sourceZone) clearZone(td.sourceZone.zt, td.sourceZone.si, td.sourceZone.hi, td.sourceZone.slot);
+      // Add to target hand
+      if (handType === 'hand') addToHand({ name: td.cardName });
+      else if (handType === 'oppHand') addToOppHand({ name: td.cardName });
+    }
+  }, [canDrop, clearZone, removeFromHand, removeFromOppHand, placeHero, placeAbility, placeSupport, placeSurprise, placeArea, placePermanent, addToHand, addToOppHand]);
+
   // ── Puzzle Battle State ──
   const [puzzleGameState, setPuzzleGameState] = useState(null);
   const puzzleRoomRef = useRef(null); // stores roomId during puzzle battle
@@ -111,7 +215,9 @@ function PuzzleCreator() {
   }, [notify]);
 
   // ── Tooltip (shared hook — wires BoardCard hover automatically) ──
-  const { tooltipCard, tooltipSide, showTooltip, hideTooltip } = useCardTooltip({ defaultSide: 'left' });
+  const { tooltipCard, tooltipSide, showTooltip: _showTooltip, hideTooltip } = useCardTooltip({ defaultSide: 'left' });
+  // On touch devices, suppress hover tooltips (they never dismiss since there's no mouseLeave)
+  const showTooltip = isTouchDevice ? () => {} : _showTooltip;
 
   const cardDB = window.CARDS_BY_NAME || {};
   const getCard = useCallback((name) => cardDB[name] || null, [cardDB]);
@@ -619,7 +725,8 @@ function PuzzleCreator() {
       zt === 'area' ? areaZones[si][0] : null
     ) : null;
     return {
-      draggable: !!hasCard,
+      'data-pz-zone': `${si}-${zt}-${hi}-${slot}`,
+      draggable: !!hasCard && !isTouchDevice,
       onDragStart: (e) => {
         if (hasCard && zoneCardName) {
           // Capture entity metadata for board-to-board moves
@@ -645,12 +752,45 @@ function PuzzleCreator() {
         if (hasCard) { e.preventDefault(); removeCard(si, zt, hi, slot); }
       },
       onClick: () => {
-        if (zt === 'hero' && p.heroes[hi]) openStatEditor(si, zt, hi, 0);
-        else if (zt === 'support' && (p.supportZones[hi]?.[slot]||[]).length) openStatEditor(si, zt, hi, slot);
+        // Mobile tap-to-place: if a card is selected, try placing it here
+        if (mobileSelected && canDrop(mobileSelected.cardName, zt, si, hi, slot)) {
+          const sel = mobileSelected;
+          // Remove from source hand
+          if (sel.handIdx != null) { if (sel.handSource === 'oppHand') removeFromOppHand(sel.handIdx); else removeFromHand(sel.handIdx); }
+          // Place in target
+          if (zt === 'hero') placeHero(sel.cardName, si, hi);
+          else if (zt === 'ability') placeAbility(sel.cardName, si, hi, slot);
+          else if (zt === 'support') placeSupport(sel.cardName, si, hi, slot);
+          else if (zt === 'surprise') placeSurprise(sel.cardName, si, hi);
+          else if (zt === 'area') placeArea(sel.cardName, si);
+          else if (zt === 'permanent') placePermanent(sel.cardName, si);
+          setMobileSelected(null);
+          return;
+        }
+        if (!isTouchDevice) {
+          if (zt === 'hero' && p.heroes[hi]) openStatEditor(si, zt, hi, 0);
+          else if (zt === 'support' && (p.supportZones[hi]?.[slot]||[]).length) openStatEditor(si, zt, hi, slot);
+        }
       },
+      // Touch drag for board cards (mobile)
+      onTouchStart: hasCard && zoneCardName ? (e) => touchDragStart(zoneCardName, null, null, { zt, si, hi, slot }, e) : undefined,
+      onTouchMove: hasCard ? touchDragMove : undefined,
+      onTouchEnd: hasCard && zoneCardName ? (e) => {
+        const wasDragging = touchDragRef.current?.dragging;
+        touchDragEnd(e);
+        if (!wasDragging) {
+          e.preventDefault();
+          if (zt === 'hero' && p.heroes[hi]) openStatEditor(si, zt, hi, 0);
+          else if (zt === 'support' && (p.supportZones[hi]?.[slot]||[]).length) openStatEditor(si, zt, hi, slot);
+        }
+      } : undefined,
     };
   };
-  const hl = (zt, si, hi, slot) => dragOverZone === `${si}-${zt}-${hi}-${slot}` && dragCardName && canDrop(dragCardName, zt, si, hi, slot) ? { boxShadow: '0 0 14px rgba(0,240,255,.5)', zIndex: 5 } : undefined;
+  const hl = (zt, si, hi, slot) => {
+    if (dragOverZone === `${si}-${zt}-${hi}-${slot}` && dragCardName && canDrop(dragCardName, zt, si, hi, slot)) return { boxShadow: '0 0 14px rgba(0,240,255,.5)', zIndex: 5 };
+    if (mobileSelected && canDrop(mobileSelected.cardName, zt, si, hi, slot)) return { boxShadow: '0 0 10px rgba(0,240,255,.3)', borderColor: 'var(--accent)' };
+    return undefined;
+  };
 
   // ── Render one player side ──
   const renderSide = (si, isOpp) => {
@@ -904,8 +1044,12 @@ function PuzzleCreator() {
             {searchResults.map((c, i) => {
               const img = cardImageUrl(c.name);
               return (
-                <div key={c.name + i} className="pz-search-card" onClick={() => addToHand(c)}
-                  draggable onDragStart={(e) => onDragStart(e, c.name, null, null)} onDragEnd={onDragEnd}
+                <div key={c.name + i} className="pz-search-card"
+                  onClick={!isTouchDevice ? () => { addToHand(c); setMobileSelected(null); } : undefined}
+                  onTouchStart={(e) => touchDragStart(c.name, null, null, null, e)}
+                  onTouchMove={touchDragMove}
+                  onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); addToHand(c); setMobileSelected(null); } }}
+                  draggable={!isTouchDevice} onDragStart={(e) => onDragStart(e, c.name, null, null)} onDragEnd={onDragEnd}
                   onMouseEnter={() => showTooltip(c, 'right')} onMouseLeave={hideTooltip}
                   title={c.name + ' (' + c.cardType + (c.subtype ? ' / ' + c.subtype : '') + ')'}>
                   {img ? <img src={img} className="pz-search-card-img" draggable={false} /> : (
@@ -931,12 +1075,20 @@ function PuzzleCreator() {
             onDragLeave={() => setDragOverZone(null)}
             onDrop={handleOppHandDrop}>
             <span className="pz-hand-label orbit-font">OPP HAND ({oppHand.length})</span>
-            <div className="pz-hand-cards" style={dragOverZone === 'oppHand' ? { boxShadow: '0 0 14px rgba(0,240,255,.4) inset' } : undefined}>
+            <div className="pz-hand-cards" data-pz-hand="oppHand" style={dragOverZone === 'oppHand' || dragOverZone === 'hand:oppHand' ? { boxShadow: '0 0 14px rgba(0,240,255,.4) inset' } : undefined}>
               {oppHand.map((cardName, i) => {
                 const img = cardImageUrl(cardName);
                 return (
-                  <div key={i} className="pz-hand-card" draggable
+                  <div key={i} className={'pz-hand-card' + (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i ? ' pz-hand-card-selected' : '')}
+                    draggable={!isTouchDevice}
                     onDragStart={(e) => onDragStart(e, cardName, i, null, 'oppHand')} onDragEnd={onDragEnd}
+                    onClick={!isTouchDevice ? () => {
+                      if (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i) setMobileSelected(null);
+                      else setMobileSelected({ cardName, handIdx: i, handSource: 'oppHand' });
+                    } : undefined}
+                    onTouchStart={(e) => touchDragStart(cardName, i, 'oppHand', null, e)}
+                    onTouchMove={touchDragMove}
+                    onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); if (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'oppHand' }); } }}
                     onContextMenu={(e) => { e.preventDefault(); removeFromOppHand(i); }}
                     onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                     onMouseLeave={hideTooltip}
@@ -984,12 +1136,20 @@ function PuzzleCreator() {
         onDragLeave={() => setDragOverZone(null)}
         onDrop={handleHandDrop}>
         <span className="pz-hand-label orbit-font">HAND ({hand.length})</span>
-        <div className="pz-hand-cards" style={dragOverZone === 'hand' ? { boxShadow: '0 0 14px rgba(0,240,255,.4) inset' } : undefined}>
+        <div className="pz-hand-cards" data-pz-hand="hand" style={dragOverZone === 'hand' || dragOverZone === 'hand:hand' ? { boxShadow: '0 0 14px rgba(0,240,255,.4) inset' } : undefined}>
           {hand.map((cardName, i) => {
             const img = cardImageUrl(cardName);
             return (
-              <div key={i} className="pz-hand-card" draggable
+              <div key={i} className={'pz-hand-card' + (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i ? ' pz-hand-card-selected' : '')}
+                draggable={!isTouchDevice}
                 onDragStart={(e) => onDragStart(e, cardName, i, null, 'hand')} onDragEnd={onDragEnd}
+                onClick={!isTouchDevice ? () => {
+                  if (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i) setMobileSelected(null);
+                  else setMobileSelected({ cardName, handIdx: i, handSource: 'hand' });
+                } : undefined}
+                onTouchStart={(e) => touchDragStart(cardName, i, 'hand', null, e)}
+                onTouchMove={touchDragMove}
+                onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); if (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'hand' }); } }}
                 onContextMenu={(e) => { e.preventDefault(); removeFromHand(i); }}
                 onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                 onMouseLeave={hideTooltip}
@@ -1000,7 +1160,7 @@ function PuzzleCreator() {
               </div>
             );
           })}
-          {hand.length === 0 && <span style={{ color: 'var(--text2)', fontSize: 11 }}>Search → click to add or drag directly onto the board. Right-click to remove.</span>}
+          {hand.length === 0 && <span style={{ color: 'var(--text2)', fontSize: 11 }}>{isTouchDevice ? 'Search → tap to add. Tap card, then tap zone to place.' : 'Search → click to add or drag directly onto the board. Right-click to remove.'}</span>}
         </div>
         <div className="pz-gold-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginLeft: 8, flexShrink: 0, alignSelf: 'stretch', padding: '4px 10px', borderLeft: '1px solid rgba(255,215,0,.2)', background: 'rgba(255,215,0,.04)' }}>
           <span style={{ fontSize: 18, color: '#ffd700' }}>💰</span>

@@ -7518,6 +7518,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // ── Collapse state for log/chat ──
   const [logCollapsed, setLogCollapsed] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth <= 900);
   const toggleLogCollapse = () => { setLogCollapsed(v => !v); if (chatCollapsed) setChatCollapsed(false); };
   const toggleChatCollapse = () => { setChatCollapsed(v => !v); if (logCollapsed) setLogCollapsed(false); };
 
@@ -8625,9 +8626,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             )}
           </div>
 
-          <div className="chat-log-column">
-            {renderActionLog()}
-            {renderChatPanel()}
+          <div className={'chat-log-column' + (sidebarCollapsed ? ' chat-log-collapsed' : '')}>
+            {sidebarCollapsed ? (
+              <button className="sidebar-toggle-btn" onClick={() => setSidebarCollapsed(false)} title="Show Log & Chat">
+                <span style={{ writingMode: 'vertical-rl', fontSize: 9, letterSpacing: 2 }}>LOG ● CHAT</span>
+                <span style={{ fontSize: 12 }}>◂</span>
+              </button>
+            ) : (
+              <>
+                <button className="sidebar-toggle-btn sidebar-toggle-close" onClick={() => setSidebarCollapsed(true)} title="Hide Log & Chat">▸</button>
+                {renderActionLog()}
+                {renderChatPanel()}
+              </>
+            )}
           </div>
 
           <div className="board-util board-util-right">
