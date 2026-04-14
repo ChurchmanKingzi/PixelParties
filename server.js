@@ -1327,6 +1327,7 @@ function sendGameState(room, playerIdx, extra) {
     areaZones: gs.areaZones, turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
     isPuzzle: gs.isPuzzle || false,
+    isTutorial: gs.isTutorial || false,
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     customPlacementCards: (() => {
@@ -1588,6 +1589,7 @@ function sendSpectatorGameState(room) {
     areaZones: gs.areaZones, turn: gs.turn, activePlayer: gs.activePlayer, currentPhase: gs.currentPhase || 0,
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
     isPuzzle: gs.isPuzzle || false,
+    isTutorial: gs.isTutorial || false,
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     customPlacementCards: [],
@@ -1845,6 +1847,7 @@ function puzzleEndGame(room, winnerIdx, reason) {
     eloChanges: null,
     setScore: [0, 0], setOver: true, format: 1,
     isPuzzle: true,
+    isTutorial: gs.isTutorial || false,
     puzzleResult: puzzleSuccess ? 'success' : 'fail',
     puzzleAttemptId: gs._puzzleAttemptId || null,
     puzzleDifficulty: gs._puzzleDifficulty || null,
@@ -1886,6 +1889,31 @@ function puzzleEndGame(room, winnerIdx, reason) {
         }
         // Re-sync with updated scAwarded
         for (let i = 0; i < 2; i++) sendGameState(room, i);
+      })();
+    }
+  }
+
+  // Track tutorial completion (no SC reward)
+  if (puzzleSuccess && gs.isTutorial && gs._puzzleAttemptId) {
+    const userId = winner?.userId;
+    const puzzleId = gs._puzzleAttemptId;
+    if (userId) {
+      (async () => {
+        try {
+          const existing = await db.get(
+            'SELECT puzzle_id FROM puzzle_completions WHERE user_id = ? AND puzzle_id = ?',
+            [userId, puzzleId]
+          );
+          if (!existing) {
+            await db.run(
+              'INSERT INTO puzzle_completions (user_id, puzzle_id) VALUES (?, ?)',
+              [userId, puzzleId]
+            );
+            console.log(`[Tutorial] ${winner.username} cleared ${puzzleId}`);
+          }
+        } catch (err) {
+          console.error('[Tutorial] completion tracking error:', err.message);
+        }
       })();
     }
   }
@@ -4699,6 +4727,7 @@ io.on('connection', (socket) => {
       result: null, rematchRequests: [],
       awaitingFirstChoice: false,
       isPuzzle: true,
+      isTutorial: opts.isTutorial || false,
       _puzzleAttemptId: opts.puzzleAttemptId || null,
       _puzzleDifficulty: opts.puzzleDifficulty || null,
       _gameStartTime: Date.now(),
@@ -4880,6 +4909,65 @@ io.on('connection', (socket) => {
       } catch (err) {
         console.error('[Puzzle] start_puzzle_attempt error:', err.message, err.stack);
         socket.emit('puzzle_error', 'Failed to load puzzle: ' + err.message);
+      }
+    })();
+  });
+
+  // ── Tutorial system ──
+  socket.on('get_tutorials', async () => {
+    if (!currentUser) return;
+    try {
+      const tutDir = path.join(__dirname, 'data', 'puzzles', 'tutorial');
+      if (!fs.existsSync(tutDir)) { socket.emit('tutorial_list', []); return; }
+      const files = fs.readdirSync(tutDir).filter(f => f.endsWith('.json')).sort();
+      const tutorials = [];
+      for (const file of files) {
+        const base = file.replace(/\.json$/, '');
+        const match = base.match(/^tutorial(\d+)\s+(.+)$/i);
+        if (!match) continue;
+        const num = parseInt(match[1], 10);
+        const name = match[2];
+        const tutorialId = 'tutorial/' + base;
+        tutorials.push({ num, name, tutorialId, fileName: base });
+      }
+      tutorials.sort((a, b) => a.num - b.num);
+
+      const completions = await db.all(
+        'SELECT puzzle_id FROM puzzle_completions WHERE user_id = ?',
+        [currentUser.userId]
+      );
+      const completedSet = new Set(completions.map(r => r.puzzle_id));
+
+      socket.emit('tutorial_list', tutorials.map(t => ({
+        num: t.num, name: t.name, tutorialId: t.tutorialId,
+        completed: completedSet.has(t.tutorialId),
+      })));
+    } catch (err) {
+      console.error('[Tutorial] get_tutorials error:', err.message);
+      socket.emit('tutorial_list', []);
+    }
+  });
+
+  socket.on('start_tutorial_attempt', ({ tutorialId }) => {
+    if (!currentUser) return;
+    if (activeGames.has(currentUser.userId)) { socket.emit('puzzle_error', 'Already in a game'); return; }
+
+    (async () => {
+      try {
+        const fileName = tutorialId.replace('tutorial/', '');
+        const filePath = path.join(__dirname, 'data', 'puzzles', 'tutorial', fileName + '.json');
+        if (!fs.existsSync(filePath)) { socket.emit('puzzle_error', 'Tutorial not found'); return; }
+
+        const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        const puzzleData = decryptPuzzle(raw.data);
+
+        await createPuzzleGame(puzzleData, {
+          puzzleAttemptId: tutorialId,
+          isTutorial: true,
+        });
+      } catch (err) {
+        console.error('[Tutorial] start_tutorial_attempt error:', err.message, err.stack);
+        socket.emit('puzzle_error', 'Failed to load tutorial: ' + err.message);
       }
     })();
   });

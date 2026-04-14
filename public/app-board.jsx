@@ -3233,6 +3233,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const meDisconnected = me.disconnected || false;
   const myRematchSent = !isSpectator && (gameState.rematchRequests || []).includes(user.id);
 
+  // ── Tutorial outro: show textbox before victory screen ──
+  const [tutorialOutroPending, setTutorialOutroPending] = useState(false);
+  const tutorialOutroFiredRef = useRef(null);
+  useEffect(() => {
+    if (!result || !result.isTutorial || result.puzzleResult !== 'success') return;
+    const num = window._currentTutorialNum;
+    if (!num || tutorialOutroFiredRef.current === num) return;
+    const script = (window.TUTORIAL_SCRIPTS || {})[num];
+    if (script?.outro) {
+      tutorialOutroFiredRef.current = num;
+      setTutorialOutroPending(true);
+      setTimeout(() => {
+        const outroPages = Array.isArray(script.outro) ? script.outro : undefined;
+        const outroText = typeof script.outro === 'string' ? script.outro : undefined;
+        showTextBox({
+          speaker: '/MoniaBot.png',
+          speakerName: 'Monia Bot',
+          ...(outroPages ? { pages: outroPages } : { text: outroText }),
+          onDismiss: () => setTutorialOutroPending(false),
+        });
+      }, 300);
+    }
+  }, [result]);
+
   // ── Shared board tooltip (single instance, driven by BoardCard/CardRevealEntry) ──
   const { tooltipCard, setTooltipCard } = useCardTooltip({
     hoverSelectors: '.board-card:hover, .card-reveal-entry:hover, .card-mini:hover, .card-name-picker-row:hover, .revealed-hand-card:hover',
@@ -8162,7 +8186,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 return (
                   <div key={z}
                     className={'board-zone board-zone-ability' + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget ? ' board-zone-play-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '')}
-                    data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel}
+                    data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel} data-card-name={cards[0] || ''}
                     onClick={onAbilityClick}
                     onMouseEnter={() => {
                       // Track hovered Luck's declared target for tooltip
@@ -8308,7 +8332,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const chainPickCreatureStep = chainPickSelected.findIndex(t => t.id === creatureChainId);
               return (
                 <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '')}
-                  data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'}
+                  data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   onClick={isChainPickCreatureValid ? () => {
                     const tgt = (chainPickData?.targets || []).find(t => t.id === creatureChainId);
                     if (tgt) setChainPickSelected(prev => [...prev, tgt]);
@@ -8515,11 +8539,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
 
           {/* Phase tracker — positioned absolutely, left edge */}
+          {/* Tutorial phase lock: block advancement until conditions met */}
+          {(() => {
+            let tutorialPhaseLocked = false;
+            if (gameState.isTutorial && window._currentTutorialNum === 1) {
+              // Lock until Ida has Destruction Magic at level 3
+              const idaIdx = me.heroes.findIndex(h => h?.name && h.name.startsWith('Ida'));
+              if (idaIdx >= 0) {
+                const abSlots = me.abilityZones[idaIdx] || [];
+                const dmCount = abSlots.flat().filter(n => n === 'Destruction Magic').length;
+                if (dmCount < 3) tutorialPhaseLocked = true;
+              } else { tutorialPhaseLocked = true; }
+            }
+            return (
           <div className="phase-column">
             <div className="board-phase-tracker">
               {['Start Phase', 'Resource Phase', 'Main Phase 1', 'Action Phase', 'Main Phase 2', 'End Phase'].map((phase, i) => {
                 const isActive = currentPhase === i;
-                const canClick = isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && (
+                const canClick = !tutorialPhaseLocked && isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && (
                   (currentPhase === 2 && (i === 3 || i === 5)) ||
                   (currentPhase === 3 && (i === 4 || i === 5)) ||
                   (currentPhase === 4 && i === 5)
@@ -8527,6 +8564,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 return (
                   <div key={i}
                     className={'board-phase-item' + (isActive ? ' active' : '') + (canClick ? ' clickable' : '')}
+                    data-phase-name={phase}
                     style={isActive ? { borderColor: phaseColor, boxShadow: `0 0 10px ${phaseColor}44` } : undefined}
                     onClick={() => { if (canClick) tryAdvancePhase(i); }}>
                     {phase}
@@ -8535,7 +8573,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               })}
             </div>
             {!isSpectator && (() => {
-              const canAdvance = isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && currentPhase >= 2 && currentPhase <= 4;
+              const canAdvance = !tutorialPhaseLocked && isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && currentPhase >= 2 && currentPhase <= 4;
               const nextMap = { 2: 3, 3: 4, 4: 5 };
               return (
                 <div className="phase-buttons-row">
@@ -8558,6 +8596,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               );
             })()}
           </div>
+            );
+          })()}
 
           <div className="board-center-spacer" />
           <div className="board-center" ref={boardCenterRef} style={{ position: 'relative' }}>
@@ -8719,7 +8759,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isStealHighlighted = stealHighlightMe.has(item.origIdx);
                 const isStealHidden = stealHiddenMe.has(item.origIdx) && hand.length === stealExpectedMeCountRef.current;
                 return (
-                  <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-touch-drag="1"
+                  <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-touch-drag="1"
                     className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed) ? ' hand-card-dimmed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '')}
                     style={(isDrawAnim || isPendingPlay || isStealHidden) ? { visibility: 'hidden' } : undefined}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
@@ -10034,23 +10074,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </div>
       )}
 
-      {/* ── Puzzle Result Overlay ── */}
-      {result && result.isPuzzle && (
+      {/* ── Puzzle / Tutorial Result Overlay ── */}
+      {result && result.isPuzzle && !tutorialOutroPending && (
         <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.8)' }}>
           <div className="animate-in" style={{ textAlign: 'center' }}>
             {result.puzzleResult === 'success' ? (
               <>
                 <div className="pixel-font" style={{ fontSize: 42, marginBottom: 12, color: '#ffd700', textShadow: '0 0 40px rgba(255,215,0,.6)' }}>
-                  🧩 PUZZLE CLEARED! 🧩
+                  {result.isTutorial ? '📖 STAGE CLEARED! 📖' : '🧩 PUZZLE CLEARED! 🧩'}
                 </div>
                 <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 24 }}>
-                  All enemy heroes defeated in one turn!
+                  {result.isTutorial ? 'Great job!' : 'All enemy heroes defeated in one turn!'}
                 </div>
               </>
             ) : (
               <>
                 <div className="pixel-font" style={{ fontSize: 36, marginBottom: 12, color: 'var(--danger)', textShadow: '0 0 30px rgba(255,51,102,.5)' }}>
-                  PUZZLE FAILED
+                  {result.isTutorial ? 'STAGE FAILED' : 'PUZZLE FAILED'}
                 </div>
                 <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 24 }}>
                   {result.reason === 'puzzle_failed' ? 'Your turn ended without defeating all enemy heroes.' :
@@ -10064,7 +10104,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               borderColor: result.puzzleResult === 'success' ? '#ffd700' : 'var(--accent)',
               color: result.puzzleResult === 'success' ? '#ffd700' : 'var(--accent)',
             }} onClick={handleLeave}>
-              ← RETURN TO PUZZLE
+              {result.isTutorial ? '← RETURN TO TUTORIAL' : '← RETURN TO PUZZLE'}
             </button>
           </div>
         </div>

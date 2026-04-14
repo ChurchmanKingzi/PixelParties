@@ -577,8 +577,13 @@ function PuzzleCreator() {
             p.heroes[hi].hp = entityData.data.hp;
             p.heroes[hi].maxHp = entityData.data.maxHp;
             p.heroes[hi].atk = entityData.data.atk;
-            p.heroes[hi].statuses = entityData.data.statuses || {};
-            if (entityData.data.buffs) p.heroes[hi].buffs = entityData.data.buffs;
+            if (entityData.data.hp <= 0) {
+              p.heroes[hi].statuses = {};
+              p.heroes[hi].buffs = undefined;
+            } else {
+              p.heroes[hi].statuses = entityData.data.statuses || {};
+              if (entityData.data.buffs) p.heroes[hi].buffs = entityData.data.buffs;
+            }
           }
           return p;
         });
@@ -679,8 +684,13 @@ function PuzzleCreator() {
         p.heroes[hi].hp = parseInt(editHp) || 0;
         p.heroes[hi].maxHp = parseInt(editMaxHp) || 0;
         p.heroes[hi].atk = parseInt(editAtk) || 0;
-        p.heroes[hi].statuses = { ...editStatuses };
-        p.heroes[hi].buffs = Object.keys(editBuffs).length > 0 ? { ...editBuffs } : undefined;
+        if (p.heroes[hi].hp <= 0) {
+          p.heroes[hi].statuses = {};
+          p.heroes[hi].buffs = undefined;
+        } else {
+          p.heroes[hi].statuses = { ...editStatuses };
+          p.heroes[hi].buffs = Object.keys(editBuffs).length > 0 ? { ...editBuffs } : undefined;
+        }
       }
       return p;
     });
@@ -704,9 +714,11 @@ function PuzzleCreator() {
     const h = players[si].heroes[hi];
     if (!h) return;
     if (h.hp > 0) {
-      // Kill: set HP to 0
+      // Kill: set HP to 0, clear all statuses and buffs
       setEditHp('0');
-      updatePlayer(si, (p) => { if (p.heroes[hi]) p.heroes[hi].hp = 0; return p; });
+      setEditStatuses({});
+      setEditBuffs({});
+      updatePlayer(si, (p) => { if (p.heroes[hi]) { p.heroes[hi].hp = 0; p.heroes[hi].statuses = {}; p.heroes[hi].buffs = undefined; } return p; });
     } else {
       // Revive: set HP to maxHp
       const full = String(h.maxHp || 0);
@@ -734,9 +746,9 @@ function PuzzleCreator() {
 
   const handleExport = useCallback(() => {
     if (!validated) return;
-    const data = { players, areaZones, oppHand, version: 1 };
+    const data = { players, areaZones, hand, oppHand, version: 1 };
     socket.emit('export_puzzle', data);
-  }, [validated, players, areaZones, oppHand]);
+  }, [validated, players, areaZones, hand, oppHand]);
 
   // Listen for encrypted puzzle from server
   useEffect(() => {

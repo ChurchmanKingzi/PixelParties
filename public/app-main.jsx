@@ -560,6 +560,22 @@ function App() {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [screen, user]);
 
+  // Show welcome text box for brand-new accounts only
+  const welcomeShownRef = useRef(false);
+  useEffect(() => {
+    if (user && !welcomeShownRef.current && window._isNewAccount) {
+      welcomeShownRef.current = true;
+      window._isNewAccount = false;
+      setTimeout(() => {
+        showTextBox({
+          speaker: '/MoniaBot.png',
+          speakerName: 'Monia Bot',
+          text: 'Heya! Welcome to Pixel Parties, beep-boop!\nI am your friendly neighborhood Monia Bot, the coolest bot there is, here to guide you through the game.\nIf you want my help to learn the ropes - follow me into the Tutorial!\nIf not, you can disable the Tutorial in your Profile, beep-boop!',
+        });
+      }, 400);
+    }
+  }, [user]);
+
   if (loading) {
     return (
       <div className="screen-center">
@@ -579,6 +595,7 @@ function App() {
         <div className="rotate-sub">Pixel Parties requires landscape orientation for the best experience</div>
       </div>
       <MusicManager inBattle={inBattle} />
+      <TextBox />
       {notif && <Notification key={notif.id} message={notif.message} type={notif.type} onClose={() => setNotif(null)} />}
       {!user ? <AuthScreen /> :
         screen === 'menu' ? <MainMenu /> :

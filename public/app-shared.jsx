@@ -881,6 +881,304 @@ function useCardTooltip(opts) {
   return { tooltipCard, tooltipSide, setTooltipSide, showTooltip, hideTooltip, setTooltipCard };
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  TEXTBOX — Generic dialogue box with typewriter effect
+//  Supports **bold** and *italic* markdown in text.
+//  Usage: showTextBox({ speaker: '/MoniaBot.png', speakerName: 'Monia Bot', text: 'Hello!', onDismiss: () => {} })
+//         showTextBox(null)  to hide
+// ═══════════════════════════════════════════════════════════════
+
+// Parse inline **bold**, *italic*, and {color:text} into segments
+function parseInlineMarkdown(raw) {
+  const segments = [];
+  let i = 0;
+  let bold = false, italic = false, color = null;
+  let buf = '';
+  const flush = () => { if (buf) { segments.push({ text: buf, bold, italic, color }); buf = ''; } };
+  while (i < raw.length) {
+    if (raw[i] === '{' && !color) {
+      const close = raw.indexOf(':', i + 1);
+      if (close > i + 1) {
+        flush();
+        color = raw.slice(i + 1, close);
+        i = close + 1;
+        continue;
+      }
+    }
+    if (raw[i] === '}' && color) {
+      flush(); color = null; i++; continue;
+    }
+    if (raw[i] === '*' && raw[i + 1] === '*') {
+      flush(); bold = !bold; i += 2;
+    } else if (raw[i] === '*') {
+      flush(); italic = !italic; i += 1;
+    } else {
+      buf += raw[i]; i++;
+    }
+  }
+  flush();
+  const plainText = segments.map(s => s.text).join('');
+  return { segments, plainText };
+}
+
+// Render segments up to charCount visible characters
+function renderMarkdownSlice(segments, charCount) {
+  const els = [];
+  let remaining = charCount;
+  for (let i = 0; i < segments.length && remaining > 0; i++) {
+    const seg = segments[i];
+    const slice = seg.text.slice(0, remaining);
+    remaining -= slice.length;
+    const style = seg.color ? { color: seg.color } : undefined;
+    let el;
+    if (seg.bold && seg.italic) el = <strong key={i} style={style}><em>{slice}</em></strong>;
+    else if (seg.bold) el = <strong key={i} style={style}>{slice}</strong>;
+    else if (seg.italic) el = <em key={i} style={style}>{slice}</em>;
+    else if (style) el = <span key={i} style={style}>{slice}</span>;
+    else el = <span key={i}>{slice}</span>;
+    els.push(el);
+  }
+  return els;
+}
+
+let _textBoxSetter = null;
+
+function showTextBox(opts) {
+  if (_textBoxSetter) _textBoxSetter(opts || null);
+}
+
+function TextBox() {
+  const [opts, setOpts] = useState(null);
+  const [pages, setPages] = useState([]);     // array of { text, highlights? }
+  const [pageIdx, setPageIdx] = useState(0);
+  const [charCount, setCharCount] = useState(0);
+  const [done, setDone] = useState(false);
+  const [highlightRects, setHighlightRects] = useState([]); // [{rect, pulse}]
+  const timerRef = useRef(null);
+  const parsedRef = useRef({ segments: [], plainText: '' });
+  const bodyRef = useRef(null);
+
+  useEffect(() => { _textBoxSetter = setOpts; return () => { _textBoxSetter = null; }; }, []);
+
+  // Split a paragraph into sentences (keep punctuation attached)
+  const splitSentences = useCallback((text) => {
+    const parts = [];
+    const re = /[^.!?]*[.!?]+[\s]?|[^.!?]+$/g;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      if (m[0].trim()) parts.push(m[0]);
+    }
+    return parts.length ? parts : [text];
+  }, []);
+
+  // Compute pages after opts change
+  useLayoutEffect(() => {
+    if (!opts) { setPages([]); setPageIdx(0); setCharCount(0); setDone(false); setHighlightRects([]); return; }
+
+    // Explicit pages mode: each page is { text, highlights? }
+    if (opts.pages && Array.isArray(opts.pages)) {
+      setPages(opts.pages);
+      setPageIdx(0);
+      return;
+    }
+
+    // Auto-pagination from opts.text
+    const text = (opts.text || '').trim();
+    if (!text) { setPages([]); return; }
+
+    const body = bodyRef.current;
+    if (!body) { setPages([{ text }]); return; }
+
+    const measure = document.createElement('span');
+    measure.className = 'textbox-text';
+    measure.style.cssText = 'visibility:hidden;pointer-events:none;';
+    body.appendChild(measure);
+
+    const maxH = body.clientHeight;
+    const paragraphs = text.split('\n').map(p => p.trim()).filter(Boolean);
+    const result = [];
+
+    for (const para of paragraphs) {
+      const sentences = splitSentences(para);
+      let current = '';
+      for (let i = 0; i < sentences.length; i++) {
+        const candidate = current ? current + sentences[i] : sentences[i];
+        measure.textContent = candidate.replace(/\*+/g, '').replace(/\{[^:}]+:/g, '').replace(/\}/g, '');
+        if (measure.scrollHeight > maxH && current) {
+          result.push({ text: current.trim() });
+          current = sentences[i];
+        } else {
+          current = candidate;
+        }
+      }
+      if (current.trim()) result.push({ text: current.trim() });
+    }
+
+    body.removeChild(measure);
+    setPages(result.length ? result : [{ text }]);
+    setPageIdx(0);
+  }, [opts, splitSentences]);
+
+  // Start typewriter when page changes
+  useEffect(() => {
+    clearInterval(timerRef.current);
+    if (!pages.length) { setCharCount(0); setDone(false); return; }
+    const page = pages[pageIdx];
+    const raw = (typeof page === 'string' ? page : page?.text) || '';
+    const parsed = parseInlineMarkdown(raw);
+    parsedRef.current = parsed;
+    setCharCount(0);
+    setDone(false);
+    let i = 0;
+    const len = parsed.plainText.length;
+    const speed = (opts && opts.speed) || 25;
+    timerRef.current = setInterval(() => {
+      i++;
+      if (i >= len) { setCharCount(len); setDone(true); clearInterval(timerRef.current); }
+      else setCharCount(i);
+    }, speed);
+    return () => clearInterval(timerRef.current);
+  }, [pages, pageIdx]);
+
+  // Update highlights when page changes — clone elements into overlay
+  useEffect(() => {
+    if (!pages.length) { setHighlightRects([]); return; }
+    const page = pages[pageIdx];
+    const hl = page?.highlights;
+    if (!hl || !hl.length) { setHighlightRects([]); return; }
+    const rects = [];
+    for (const h of hl) {
+      const sel = typeof h === 'string' ? h : h.selector;
+      const pulse = typeof h === 'object' && h.pulse;
+      if (!sel) continue;
+      document.querySelectorAll(sel).forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) {
+          rects.push({ rect: r, pulse, html: el.outerHTML });
+        }
+      });
+    }
+    setHighlightRects(rects);
+  }, [pages, pageIdx]);
+
+  const handleAdvance = useCallback(() => {
+    if (!opts) return;
+    if (!done) {
+      clearInterval(timerRef.current);
+      setCharCount(parsedRef.current.plainText.length);
+      setDone(true);
+    } else if (pageIdx < pages.length - 1) {
+      setPageIdx(pageIdx + 1);
+    } else {
+      const cb = opts.onDismiss;
+      setOpts(null);
+      if (cb) cb();
+    }
+  }, [opts, done, pageIdx, pages]);
+
+  const handleBack = useCallback((e) => {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    if (pageIdx > 0) {
+      clearInterval(timerRef.current);
+      setPageIdx(pageIdx - 1);
+    }
+  }, [pageIdx]);
+
+  // Keyboard: space/enter = advance, left/backspace = back
+  useEffect(() => {
+    if (!opts) return;
+    const onKey = (e) => {
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); handleAdvance(); }
+      else if ((e.key === 'ArrowLeft' || e.key === 'Backspace') && pageIdx > 0) { e.preventDefault(); handleBack(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [opts, handleAdvance, handleBack, pageIdx]);
+
+  if (!opts) return null;
+
+  const isLastPage = pageIdx >= pages.length - 1;
+
+  return (
+    <div className="textbox-overlay" onClick={handleAdvance}>
+      {/* Highlight clones — bright copies of elements rendered above the overlay */}
+      {highlightRects.map((h, i) => (
+        <div key={i} className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '')} style={{
+          position: 'fixed',
+          left: h.rect.left, top: h.rect.top,
+          width: h.rect.width, height: h.rect.height,
+          pointerEvents: 'none',
+        }}>
+          <div className="textbox-highlight-clone" dangerouslySetInnerHTML={{ __html: h.html }} />
+        </div>
+      ))}
+      <div className="textbox">
+        {opts.speaker && (
+          <div className="textbox-portrait">
+            <div className="textbox-portrait-frame">
+              <img src={opts.speaker} alt={opts.speakerName || ''} draggable={false} />
+              {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.35) + 's', top: [10,60,5,50,30,65,15,45][i] + '%', left: [5,70,55,10,80,35,90,60][i] + '%' }} />)}
+            </div>
+            {opts.speakerName && <span className="textbox-speaker-name">{opts.speakerName}</span>}
+          </div>
+        )}
+        <div className="textbox-body" ref={bodyRef}>
+          <span className="textbox-text">{renderMarkdownSlice(parsedRef.current.segments, charCount)}</span>
+          {done && <span className="textbox-advance">{isLastPage ? '▼' : '▶'}</span>}
+          {pages.length > 1 && (
+            <div className="textbox-footer">
+              {pageIdx > 0 && <span className="textbox-back" onClick={handleBack}>◀</span>}
+              <span className="textbox-page-indicator">{pageIdx + 1}/{pages.length}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TUTORIAL SCRIPTS — Intro/outro dialogue for each tutorial stage
+//  Keyed by tutorial number (1, 2, 3...)
+// ═══════════════════════════════════════════════════════════════
+const TUTORIAL_SCRIPTS = {
+  1: {
+    intro: [
+      { text: 'Heya!' },
+      { text: "To win a game of Pixel Parties, you must defeat all your opponent's Heroes by dropping their HP to 0!",
+        highlights: ['[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]'] },
+      { text: 'To do that, you can use {red:**Attacks**} or {red:**Spells**} to deal direct damage with your own Heroes, or summon {red:**Creatures**} to do the job for you.',
+        highlights: ['.game-hand-me [data-card-name="Magic Hammer"]'] },
+      { text: "Let's try hitting the opponent's {purple:*Beato*} with your big, strong {red:*Magic Hammer*} Spell!",
+        highlights: [
+          { selector: '[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]', pulse: true },
+          { selector: '.game-hand-me [data-card-name="Magic Hammer"]', pulse: true },
+        ] },
+      { text: "But ... your {red:*Ida*} currently can't use that Spell.",
+        highlights: ['[data-hero-owner="me"][data-hero-name="Ida, the Adept of Destruction"]'] },
+      { text: "Its level is too high for her!" },
+      { text: 'To use an Attack or Spell or summon a Creature with a Hero, it needs the correct {#88ccee:**Ability**} at an appropriate level first.' },
+      { text: 'For Magic Hammer, that Ability is {#88ccee:**Destruction Magic**}, which Ida currently has 2 copies of attached to her.',
+        highlights: [
+          '.game-hand-me [data-card-name="Destruction Magic"]',
+          '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
+        ] },
+      { text: "So her Destruction Magic is at {red:**level 2**}. But Magic Hammer is a {red:**level 3**} Spell! Ida needs one more Destruction Magic!" },
+      { text: 'Attach it to her from your hand, then go into the Action Phase to actually cast your Spell with her and defeat the Beato!',
+        highlights: [
+          '[data-hero-owner="me"][data-hero-name="Ida, the Adept of Destruction"]',
+          '.game-hand-me .hand-slot',
+          '[data-phase-name="Action Phase"]',
+        ] },
+    ],
+    outro: [
+      { text: 'Excellent job, beep-boop!' },
+      { text: 'To use Attacks or Spells or Summon Creatures, you need to spend {red:**Actions**}.' },
+      { text: 'That is done during the {red:**Action Phase**} - but you only get one Action per Action Phase, so use it wisely!' },
+    ],
+  },
+};
+
 window.canCardTypeEnterSection = canCardTypeEnterSection;
 window.typeColor = typeColor;
 window.typeClass = typeClass;
@@ -899,3 +1197,6 @@ window.hideGameTooltip = hideGameTooltip;
 window.GameTooltip = GameTooltip;
 window.StatusBadges = StatusBadges;
 window.BuffColumn = BuffColumn;
+window.TextBox = TextBox;
+window.showTextBox = showTextBox;
+window.TUTORIAL_SCRIPTS = TUTORIAL_SCRIPTS;

@@ -25,6 +25,7 @@ function AuthScreen() {
       });
       window.AUTH_TOKEN = data.token;
       socket.emit('auth', data.token);
+      if (mode === 'signup') window._isNewAccount = true;
       setUser(data.user);
     } catch (e) { setError(e.message); }
     setLoading(false);
@@ -68,6 +69,13 @@ function MainMenu() {
   const [puzzleList, setPuzzleList] = useState(null); // null = not loaded, [] = empty
   const [puzzleAttemptState, setPuzzleAttemptState] = useState(null);
   const puzzleAttemptRoom = useRef(null);
+  const [scFloat, setScFloat] = useState(null); // { amount, id }
+
+  // Tutorial state
+  const [tutorialBrowserOpen, setTutorialBrowserOpen] = useState(false);
+  const [tutorialList, setTutorialList] = useState(null);
+  const [tutorialAttemptState, setTutorialAttemptState] = useState(null);
+  const tutorialAttemptRoom = useRef(null);
 
   const logout = async () => {
     try { await api('/auth/logout', { method: 'POST' }); } catch {}
@@ -88,7 +96,7 @@ function MainMenu() {
   useEffect(() => {
     if (!puzzleBrowserOpen) return;
     const onGameState = (state) => {
-      if (state.isPuzzle) {
+      if (state.isPuzzle && !state.isTutorial) {
         puzzleAttemptRoom.current = state.roomId;
         setPuzzleAttemptState(state);
       }
@@ -129,6 +137,7 @@ function MainMenu() {
     if (result) {
       const success = result.isPuzzle && result.puzzleResult === 'success';
       if (success && result.scAwarded > 0) {
+        setScFloat({ amount: result.scAwarded, id: Date.now() });
         notify(`🧩 Puzzle cleared! +${result.scAwarded} SC`, 'success');
       } else if (success) {
         notify('🧩 Puzzle cleared!', 'success');
@@ -137,6 +146,104 @@ function MainMenu() {
       }
     }
   }, [puzzleAttemptState, notify]);
+
+  // ── Tutorial system ──
+  useEffect(() => {
+    if (!tutorialBrowserOpen) return;
+    socket.emit('get_tutorials');
+    const onList = (list) => setTutorialList(list);
+    socket.on('tutorial_list', onList);
+    return () => socket.off('tutorial_list', onList);
+  }, [tutorialBrowserOpen]);
+
+  useEffect(() => {
+    if (!tutorialBrowserOpen) return;
+    const onGameState = (state) => {
+      if (state.isPuzzle && state.isTutorial) {
+        tutorialAttemptRoom.current = state.roomId;
+        setTutorialAttemptState(state);
+      }
+    };
+    const onError = (msg) => notify('Tutorial error: ' + msg, 'error');
+    socket.on('game_state', onGameState);
+    socket.on('puzzle_error', onError);
+    return () => { socket.off('game_state', onGameState); socket.off('puzzle_error', onError); };
+  }, [tutorialBrowserOpen, notify]);
+
+  useEffect(() => {
+    if (!tutorialBrowserOpen) return;
+    const h = (e) => {
+      if (e.key === 'Escape') {
+        if (tutorialAttemptState) return;
+        setTutorialBrowserOpen(false);
+        e.stopImmediatePropagation();
+      }
+    };
+    window.addEventListener('keydown', h, true);
+    return () => window.removeEventListener('keydown', h, true);
+  }, [tutorialBrowserOpen, tutorialAttemptState]);
+
+  // Show tutorial intro textbox when game first loads
+  const tutorialIntroShownRef = useRef(null);
+  useEffect(() => {
+    if (!tutorialAttemptState || tutorialAttemptState.result) return;
+    const num = window._currentTutorialNum;
+    if (!num || tutorialIntroShownRef.current === num) return;
+    const script = (window.TUTORIAL_SCRIPTS || {})[num];
+    if (script?.intro) {
+      tutorialIntroShownRef.current = num;
+      setTimeout(() => {
+        const introPages = Array.isArray(script.intro) ? script.intro : undefined;
+        const introText = typeof script.intro === 'string' ? script.intro : undefined;
+        showTextBox({
+          speaker: '/MoniaBot.png',
+          speakerName: 'Monia Bot',
+          ...(introPages ? { pages: introPages } : { text: introText }),
+        });
+      }, 600);
+    }
+  }, [tutorialAttemptState]);
+
+  const startTutorialAttempt = (tutorial) => {
+    window._currentTutorialNum = tutorial.num;
+    socket.emit('start_tutorial_attempt', { tutorialId: tutorial.tutorialId });
+  };
+
+  const onTutorialAttemptLeave = useCallback(() => {
+    const gs = tutorialAttemptState;
+    const roomId = tutorialAttemptRoom.current;
+    const result = gs?.result;
+    if (roomId) socket.emit('leave_game', { roomId });
+    setTutorialAttemptState(null);
+    tutorialAttemptRoom.current = null;
+    tutorialIntroShownRef.current = null;
+    window._currentTutorialNum = null;
+    socket.emit('get_tutorials');
+    if (result) {
+      const success = result.isPuzzle && result.puzzleResult === 'success';
+      if (success) {
+        notify('📖 Stage cleared!', 'success');
+      } else {
+        notify('Stage not cleared — try again!', 'info');
+      }
+    }
+  }, [tutorialAttemptState, notify]);
+
+  // Render GameBoard during tutorial attempt
+  if (tutorialAttemptState) {
+    const GameBoard = window.GameBoard;
+    return (
+      <GameBoard
+        gameState={tutorialAttemptState}
+        lobby={{ id: tutorialAttemptState.roomId }}
+        onLeave={onTutorialAttemptLeave}
+        decks={[]}
+        sampleDecks={[]}
+        selectedDeck={null}
+        setSelectedDeck={() => {}}
+      />
+    );
+  }
 
   // Render GameBoard during puzzle attempt
   if (puzzleAttemptState) {
@@ -164,7 +271,7 @@ function MainMenu() {
       <div className="menu-body">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 280 }} className="animate-in menu-buttons">
           {!user.hide_tutorial && (
-            <button className="btn btn-big" onClick={() => notify('Tutorial coming soon!', 'info')} style={{ fontSize: 16, borderColor: '#ff44cc', color: '#ff44cc', background: 'rgba(255,68,204,.08)' }}>📖 TUTORIAL</button>
+            <button className="btn btn-big" onClick={() => setTutorialBrowserOpen(true)} style={{ fontSize: 16, borderColor: '#ff44cc', color: '#ff44cc', background: 'rgba(255,68,204,.08)' }}>📖 TUTORIAL</button>
           )}
           <button className="btn btn-big" onClick={() => setScreen('play')} style={{ fontSize: 16 }}>⚔ PLAY</button>
           <button className="btn btn-big btn-accent2" onClick={() => setScreen('deckbuilder')} style={{ fontSize: 16 }}>✦ EDIT DECK</button>
@@ -194,11 +301,17 @@ function MainMenu() {
       {puzzleBrowserOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={(e) => { if (e.target === e.currentTarget) setPuzzleBrowserOpen(false); }}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid #ff8800', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,136,0,.2)' }}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid #ff8800', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,136,0,.2)', position: 'relative' }}>
             <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h3 className="orbit-font" style={{ fontSize: 16, color: '#ff8800', margin: 0 }}>🧩 PUZZLE LIBRARY</h3>
               <button className="btn" onClick={() => setPuzzleBrowserOpen(false)} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
             </div>
+            {scFloat && (
+              <div key={scFloat.id} className="sc-float-reward" onAnimationEnd={() => setScFloat(null)}>
+                <span>+{scFloat.amount}</span>
+                <img src="/sc.png" alt="SC" style={{ width: 22, height: 22 }} draggable={false} />
+              </div>
+            )}
             <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px 20px' }}>
               {puzzleList === null ? (
                 <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>Loading puzzles...</div>
@@ -227,6 +340,36 @@ function MainMenu() {
                     </div>
                   );
                 })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tutorial Browser Modal ── */}
+      {tutorialBrowserOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setTutorialBrowserOpen(false); }}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid #ff44cc', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,68,204,.2)' }}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 className="orbit-font" style={{ fontSize: 16, color: '#ff44cc', margin: 0 }}>📖 TUTORIAL</h3>
+              <button className="btn" onClick={() => setTutorialBrowserOpen(false)} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px 20px' }}>
+              {tutorialList === null ? (
+                <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>Loading tutorials...</div>
+              ) : tutorialList.length === 0 ? (
+                <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>No tutorials available yet.</div>
+              ) : (
+                tutorialList.map((t, i) => (
+                  <button key={t.tutorialId} className="btn" onClick={() => startTutorialAttempt(t)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: 'rgba(255,68,204,.25)', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start' }}>
+                    <span style={{ color: t.completed ? '#33ff88' : 'var(--bg4)', fontSize: 16, width: 20, textAlign: 'center' }}>{t.completed ? '✓' : '○'}</span>
+                    <span style={{ color: '#ff44cc', fontSize: 11, width: 24, flexShrink: 0 }}>{t.num}.</span>
+                    <span style={{ flex: 1 }}>{t.name}</span>
+                    {t.completed && <span style={{ fontSize: 9, color: 'var(--text2)' }}>CLEARED</span>}
+                  </button>
+                ))
               )}
             </div>
           </div>
