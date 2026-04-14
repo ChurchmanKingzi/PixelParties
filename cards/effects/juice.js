@@ -3,7 +3,8 @@
 //  Reaction Artifact — Choose any 1 target on
 //  the board with negative statuses. Heal it
 //  from any number of them. Orange bubbles.
-//  Can be activated in response to ANY event.
+//  Triggers only during opponent's phase changes.
+//  Can also be activated proactively on own turn.
 // ═══════════════════════════════════════════
 
 const { STATUS_EFFECTS, getNegativeStatuses } = require('./_hooks');
@@ -52,7 +53,10 @@ module.exports = {
   isTargetingArtifact: true,
   proactivePlay: true,
 
-  reactionCondition: (gs, pi, engine) => {
+  reactionCondition: (gs, pi, engine, chainCtx) => {
+    // Only trigger as a reaction during the opponent's phase transitions
+    if (gs.activePlayer === pi) return false;
+    if (chainCtx?.eventDesc !== 'The phase has ended') return false;
     return getValidTargets(gs, engine).length > 0;
   },
 

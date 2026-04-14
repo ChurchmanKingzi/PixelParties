@@ -12085,7 +12085,7 @@
     "hp": null,
     "atk": null,
     "cost": 0,
-    "effect": "Choose any target on the board and heal it from any number of negative status effects.",
+    "effect": "You may play this card between phases of your opponent's turn. Choose any target on the board and heal it from any number of negative status effects.",
     "archetype": "",
     "setID": "PP WAW",
     "banned": "",

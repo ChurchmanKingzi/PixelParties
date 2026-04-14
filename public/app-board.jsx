@@ -3961,21 +3961,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (canSetSurprise || canSetBakhm) return false; // Un-gray: can be set face-down
         // Surprise can also be played normally if it has additional action coverage — fall through
       }
-      // Main Phase 1 or 2: gray out action types UNLESS they have Additional Action coverage
+      // Main Phase: gray out action types that can't be played on any hero
+      // (server-side heroPlayableCards handles inherent/additional action economy)
       if (isActionType) {
-        // Check if this is an inherent action (playable without additional action provider)
-        const isInherent = (gameState.inherentActionCards || []).includes(cardName);
-        // Check if any Additional Action covers this card
-        const additionalActions = gameState.additionalActions || [];
-        const hasAdditional = additionalActions.some(aa => aa.eligibleHandCards.includes(cardName));
-        if (!hasAdditional && !isInherent) return true;
-        // Has additional action — check summonLocked for creatures
         if (card.cardType === 'Creature' && me.summonLocked) return true;
-        // Check if the card can actually be played on any hero
         if (!canActionCardBePlayed(card)) return true;
-        // Check blockedSpells even for inherent/additional action cards
         if ((gameState.blockedSpells || []).includes(cardName)) return true;
-        return false; // Un-gray: playable via Additional Action
+        return false; // Un-gray: playable
       }
       // Gray out Abilities that can't be played on any hero
       if (card.cardType === 'Ability') {
@@ -4154,59 +4146,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return abZones.some(slot => (slot || []).length === 0);
   };
 
-  // Check if a hero can play a card (server-driven constraint check + client-side phase checks)
+  // Check if a hero can play a card (fully server-driven via heroPlayableCards).
+  // All action economy logic (bonus actions, additional actions, inherent actions,
+  // phase restrictions) is computed server-side in getHeroPlayableCards().
   const canHeroPlayCard = (playerData, heroIdx, card) => {
-    // ── Server-driven hero constraint check ──
-    // heroPlayableCards covers: alive, frozen/stunned, combo lock, action limit,
-    // level/school (with all overrides), hero script restrictions (Ghuanjun, etc.),
-    // equip restrictions, and creature support zone availability.
     const isOwn = playerData === me;
     const playableMap = isOwn
       ? (gameState.heroPlayableCards?.own || {})
       : (gameState.heroPlayableCards?.charmed || {});
     const playableList = playableMap[heroIdx] || [];
-    if (!playableList.includes(card.name)) return false;
-
-    // ── Phase-related checks (client-side, driven by other server-computed fields) ──
-
-    // Action Phase: after normal action used, all plays need an additional action provider
-    if (currentPhase === 3 && isOwn && (playerData.heroesActedThisTurn?.length > 0)) {
-      const isActionType = ACTION_TYPES.includes(card.cardType);
-      if (isActionType) {
-        const categoryMap = { Creature: 'creature', Spell: 'spell', Attack: 'attack' };
-        const cardCategory = categoryMap[card.cardType];
-        const additionalForCard = (gameState.additionalActions || []).filter(aa =>
-          aa.eligibleHandCards.includes(card.name) ||
-          (aa.allowedCategories?.includes(cardCategory))
-        );
-        if (additionalForCard.length === 0) return false;
-        if (additionalForCard.every(aa => aa.heroRestricted)) {
-          const heroHasProvider = additionalForCard.some(aa => aa.providers.some(p => p.heroIdx === heroIdx));
-          if (!heroHasProvider) return false;
-        }
-      }
-    }
-
-    // Main Phase: per-hero inherent action restrictions (Muscle Training, etc.)
-    if ((currentPhase === 2 || currentPhase === 4) && isOwn) {
-      const inherentHeroes = gameState.inherentActionHeroes?.[card.name];
-      if (inherentHeroes !== undefined) {
-        const hasAdditional = (gameState.additionalActions || []).some(aa => {
-          if (!aa.eligibleHandCards.includes(card.name)) return false;
-          if (aa.heroRestricted) return aa.providers.some(p => p.heroIdx === heroIdx);
-          return true;
-        });
-        if (!hasAdditional && !inherentHeroes.includes(heroIdx)) return false;
-      }
-    }
-
-    // Bonus actions: only allowed card types during active bonus
-    if (isOwn && playerData.bonusActions?.heroIdx === heroIdx && playerData.bonusActions.remaining > 0) {
-      const allowed = playerData.bonusActions.allowedTypes || [];
-      if (allowed.length > 0 && !allowed.includes(card.cardType)) return false;
-    }
-
-    return true;
+    return playableList.includes(card.name);
   };
 
   // Find free support zone slot for a hero
@@ -4349,7 +4298,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const isHeroAction = !dimmed && heroActionPrompt && (heroActionPrompt.eligibleCards || []).includes(cardName);
     const isPlayable = !dimmed && (isHeroAction || (isMyTurn && card && ACTION_TYPES.includes(card.cardType)
       && !(card.cardType === 'Creature' && (gameState.summonBlocked || []).includes(cardName))
-      && (currentPhase === 3 || ((currentPhase === 2 || currentPhase === 4) && ((gameState.additionalActions || []).some(aa => aa.eligibleHandCards.includes(cardName)) || (gameState.inherentActionCards || []).includes(cardName))))));
+      && (currentPhase === 2 || currentPhase === 3 || currentPhase === 4)));
     const isAbilityPlayable = isAbilityAttachEligible || (!dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Ability');
     const isEquipPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Artifact'
       && (card.subtype || '').toLowerCase() === 'equipment' && (me.gold || 0) >= (card.cost || 0);
@@ -7966,7 +7915,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // During heroAction, dim all heroes except the Coffee hero
           const heroActionDimmed = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx && gameState.effectPrompt?.heroIdx !== undefined && gameState.effectPrompt?.heroIdx !== i;
           // Dim heroes that can't use hero-restricted additional actions (e.g. Reiza's extra action)
-          const additionalActionDimmed = !isOpp && !isDead && isMyTurn && currentPhase === 3 && (me.heroesActedThisTurn?.length > 0) && (() => {
+          const additionalActionDimmed = !isOpp && !isDead && isMyTurn && currentPhase === 3 && (me.heroesActedThisTurn?.length > 0)
+            && !(me.bonusActions?.remaining > 0) && (() => {
             const aas = gameState.additionalActions || [];
             if (aas.length === 0) return false;
             // If all additional actions are hero-restricted, dim heroes without providers

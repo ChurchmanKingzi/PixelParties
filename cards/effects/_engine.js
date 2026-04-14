@@ -3400,10 +3400,11 @@ class GameEngine {
    * Returns a map of hero indices → card names that the hero can play,
    * considering ALL hero-specific constraints: level/school, frozen/stunned,
    * combo lock, per-hero action limit, hero script restrictions (Ghuanjun, etc.),
-   * equip restrictions, and creature support zone availability.
+   * equip restrictions, creature support zone availability,
+   * AND phase-aware action economy (bonus actions, additional actions, inherent actions).
    *
-   * This is sent in the game state so the client never needs to duplicate
-   * level/school/constraint logic — it just does a lookup.
+   * This is the single source of truth for card playability — the client
+   * never duplicates action economy logic, it just does a lookup.
    *
    * @param {number} playerIdx
    * @returns {{ own: Object<number, string[]>, charmed: Object<number, string[]> }}
@@ -3415,6 +3416,11 @@ class GameEngine {
 
     const cardDB = this._getCardDB();
     const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
+
+    // Phase context for action economy checks
+    const isActionPhase = gs.currentPhase === 3;
+    const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
+    const heroActed = (ps.heroesActedThisTurn?.length || 0) > 0;
 
     // Collect unique action cards from hand
     const handCards = [];
@@ -3450,6 +3456,9 @@ class GameEngine {
         if (eScript?.canPlayCard) equipScripts.push(eScript);
       }
 
+      // Bonus action state for this hero
+      const hasBonusAction = isActionPhase && ps.bonusActions?.heroIdx === hi && ps.bonusActions.remaining > 0;
+
       for (const cd of handCards) {
         // Reaction subtype: not proactively playable unless script opts in
         if ((cd.subtype || '').toLowerCase() === 'reaction') {
@@ -3479,6 +3488,29 @@ class GameEngine {
           for (let z = 0; z < 3; z++) { if ((supZones[z] || []).length === 0) { hasFree = true; break; } }
           if (!hasFree) continue;
         }
+
+        // ── Phase-aware action economy (single source of truth) ──
+
+        // Action Phase: after a hero has already acted, cards need bonus action or additional action coverage
+        if (isActionPhase && heroActed) {
+          if (hasBonusAction) {
+            // Bonus actions (Ghuanjun combo, etc.): only the allowed card types
+            const allowed = ps.bonusActions.allowedTypes || [];
+            if (allowed.length > 0 && !allowed.includes(cd.cardType)) continue;
+          } else {
+            // Normal: must have an additional action provider for this card + hero
+            if (!this.findAdditionalActionForCard(playerIdx, cd.name, hi)) continue;
+          }
+        }
+
+        // Main Phase: action cards need inherent action or additional action coverage
+        if (isMainPhase) {
+          const cardScript = loadCardEffect(cd.name);
+          const isInherent = cardScript?.inherentAction === true
+            || (typeof cardScript?.inherentAction === 'function' && cardScript.inherentAction(gs, playerIdx, hi, this));
+          if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi)) continue;
+        }
+
         playable.push(cd.name);
       }
       own[hi] = playable;
@@ -4351,8 +4383,10 @@ class GameEngine {
       if (script?.canActivate && (script.isTargetingArtifact || script.isPotion || script.resolve)) {
         if (!script.canActivate(this.gs, playerIdx, this)) blocked.push(cardName);
       }
-      // Reaction cards: check reactionCondition
-      if (script?.isReaction && script.reactionCondition) {
+      // Reaction cards: check reactionCondition for dimming.
+      // Cards with proactivePlay use canActivate for proactive availability instead,
+      // so reactionCondition only gates the reaction trigger window, not the hand dimming.
+      if (script?.isReaction && script.reactionCondition && !script.proactivePlay) {
         if (!script.reactionCondition(this.gs, playerIdx, this)) blocked.push(cardName);
       }
     }

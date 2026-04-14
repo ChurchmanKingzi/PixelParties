@@ -3198,10 +3198,11 @@ io.on('connection', (socket) => {
     if (creatureHero?.statuses?.charmed) return;
 
     // Additional action handling — creatures in Main Phase or Action Phase after normal action MUST use one
-    // UNLESS the creature itself is an inherent additional action
+    // UNLESS the creature itself is an inherent additional action or bonus actions are active for this hero
     const additionalTypeId = !isInherentAction ? room.engine.findAdditionalActionForCard(pi, cardName, heroIdx) : null;
     const usingAdditional = !!additionalTypeId;
-    const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0);
+    const hasBonusAction = isActionPhase && ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0;
+    const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
     if ((isMainPhase || actionAlreadyUsed) && !usingAdditional && !isInherentAction) return;
 
     // Validate support zone slot is free
@@ -3319,7 +3320,9 @@ io.on('connection', (socket) => {
     const wisdomDiscardCost = room.engine.getWisdomDiscardCost(heroOwner, heroIdx, cardData);
 
     // Check if this needs an additional action (Main Phase play, or Action Phase after normal action used)
-    const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0);
+    // Bonus actions (Ghuanjun combo, etc.) are handled separately — they don't consume additional action tokens
+    const hasBonusAction = isActionPhase && ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0;
+    const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
     const needsAdditional = (isMainPhase && !isInherentAction) || actionAlreadyUsed;
     let additionalConsumed = false;
     let consumedInst = null;

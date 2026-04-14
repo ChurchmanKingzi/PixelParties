@@ -44,6 +44,7 @@ function PuzzleCreator() {
   const [dragOverZone, setDragOverZone] = useState(null);
   const [viewPile, setViewPile] = useState(null);
   const boardWrapRef = useRef(null);
+  const dragEntityData = useRef(null); // carries hero/creature metadata during board-to-board drags
 
   // ── Auto-save state to localStorage on every change ──
   useEffect(() => {
@@ -184,7 +185,13 @@ function PuzzleCreator() {
             p.supportZones[hi].splice(p.supportZones[hi].length - islandCount, islandCount);
             p.islandZoneCount[hi] = 0;
           }
+          // Clear old creature metadata
+          if (p._customSupportHp?.[hi]) p._customSupportHp[hi][slot] = null;
+          if (p._creatureStatuses) delete p._creatureStatuses[hi + '-' + slot];
           p.supportZones[hi][slot] = [cardName];
+          // Set default HP from card data
+          const nc = getCard(cardName);
+          if (nc?.hp) { if (!p._customSupportHp) p._customSupportHp = [[null,null,null],[null,null,null],[null,null,null]]; p._customSupportHp[hi][slot] = nc.hp; }
           // If new card is also a Flying Island, re-add islands
           if (cardName === 'Flying Island in the Sky') {
             if (!p.islandZoneCount) p.islandZoneCount = [0, 0, 0];
@@ -199,7 +206,13 @@ function PuzzleCreator() {
       setHand(prev => [...prev, ...zone]);
     }
     updatePlayer(si, (p) => {
+      // Clear old creature metadata when replacing
+      if (p._customSupportHp?.[hi]) p._customSupportHp[hi][slot] = null;
+      if (p._creatureStatuses) delete p._creatureStatuses[hi + '-' + slot];
       p.supportZones[hi][slot] = [cardName];
+      // Set default HP from card data
+      const nc = getCard(cardName);
+      if (nc?.hp) { if (!p._customSupportHp) p._customSupportHp = [[null,null,null],[null,null,null],[null,null,null]]; p._customSupportHp[hi][slot] = nc.hp; }
       // Flying Island adds 2 island zones
       if (cardName === 'Flying Island in the Sky') {
         if (!p.islandZoneCount) p.islandZoneCount = [0, 0, 0];
@@ -208,7 +221,7 @@ function PuzzleCreator() {
       }
       return p;
     });
-  }, [players, updatePlayer, notify]);
+  }, [players, updatePlayer, getCard]);
 
   const placeSurprise = useCallback((cardName, si, hi) => {
     if (!players[si].heroes[hi]) { notify('Place a Hero first!', 'error'); return; }
@@ -231,6 +244,9 @@ function PuzzleCreator() {
     else if (zt === 'support') updatePlayer(si, (p) => {
       const removedCard = p.supportZones[hi][slot][0];
       p.supportZones[hi][slot] = [];
+      // Clear creature metadata
+      if (p._customSupportHp?.[hi]) p._customSupportHp[hi][slot] = null;
+      if (p._creatureStatuses) delete p._creatureStatuses[hi + '-' + slot];
       // If removing Flying Island, also remove island zones
       if (removedCard === 'Flying Island in the Sky') {
         const islandCount = (p.islandZoneCount || [0,0,0])[hi] || 0;
@@ -271,7 +287,7 @@ function PuzzleCreator() {
     hideTooltip(); // dismiss tooltip during drag
     e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', '');
   }, []);
-  const onDragEnd = useCallback(() => { setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragOverZone(null); }, []);
+  const onDragEnd = useCallback(() => { setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragOverZone(null); dragEntityData.current = null; }, []);
   // Silently clear a zone (no return to hand — used when moving between zones)
   const clearZone = useCallback((zt, si, hi, slot) => {
     if (zt === 'hero') updatePlayer(si, (p) => { p.heroes[hi] = null; p.abilityZones[hi] = [[], [], []]; p.supportZones[hi] = [[], [], []]; p.surpriseZones[hi] = []; if (p.islandZoneCount) p.islandZoneCount[hi] = 0; return p; });
@@ -279,6 +295,9 @@ function PuzzleCreator() {
     else if (zt === 'support') updatePlayer(si, (p) => {
       const removedCard = p.supportZones[hi][slot]?.[0];
       p.supportZones[hi][slot] = [];
+      // Clear creature metadata for this slot
+      if (p._customSupportHp?.[hi]) p._customSupportHp[hi][slot] = null;
+      if (p._creatureStatuses) delete p._creatureStatuses[hi + '-' + slot];
       if (removedCard === 'Flying Island in the Sky') {
         const ic = (p.islandZoneCount || [0,0,0])[hi] || 0;
         if (ic > 0) { p.supportZones[hi].splice(p.supportZones[hi].length - ic, ic); p.islandZoneCount[hi] = 0; }
@@ -293,6 +312,7 @@ function PuzzleCreator() {
   const handleDrop = useCallback((zt, si, hi, slot) => {
     if (dragCardName == null) return;
     if (!canDrop(dragCardName, zt, si, hi, slot)) return;
+    const entityData = dragEntityData.current;
     // Remove from source first (board zone or hand)
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
     if (dragHandIdx != null) removeFromHand(dragHandIdx);
@@ -303,8 +323,35 @@ function PuzzleCreator() {
     else if (zt === 'surprise') placeSurprise(dragCardName, si, hi);
     else if (zt === 'area') placeArea(dragCardName, si);
     else if (zt === 'permanent') placePermanent(dragCardName, si);
-    setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragOverZone(null);
-  }, [dragCardName, dragHandIdx, dragSource, canDrop, clearZone, placeHero, placeAbility, placeSupport, placeSurprise, placeArea, placePermanent, removeFromHand]);
+    // Restore entity metadata from drag source
+    if (entityData) {
+      if (zt === 'hero' && entityData.type === 'hero') {
+        updatePlayer(si, (p) => {
+          if (p.heroes[hi]) {
+            p.heroes[hi].hp = entityData.data.hp;
+            p.heroes[hi].maxHp = entityData.data.maxHp;
+            p.heroes[hi].atk = entityData.data.atk;
+            p.heroes[hi].statuses = entityData.data.statuses || {};
+            if (entityData.data.buffs) p.heroes[hi].buffs = entityData.data.buffs;
+          }
+          return p;
+        });
+      } else if (zt === 'support' && entityData.type === 'support') {
+        updatePlayer(si, (p) => {
+          if (entityData.data.customHp != null) {
+            if (!p._customSupportHp) p._customSupportHp = [[null,null,null],[null,null,null],[null,null,null]];
+            p._customSupportHp[hi][slot] = entityData.data.customHp;
+          }
+          if (entityData.data.statuses) {
+            if (!p._creatureStatuses) p._creatureStatuses = {};
+            p._creatureStatuses[hi + '-' + slot] = entityData.data.statuses;
+          }
+          return p;
+        });
+      }
+    }
+    setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragOverZone(null); dragEntityData.current = null;
+  }, [dragCardName, dragHandIdx, dragSource, canDrop, clearZone, placeHero, placeAbility, placeSupport, placeSurprise, placeArea, placePermanent, removeFromHand, updatePlayer]);
 
   // Drop onto hand zone
   const handleHandDrop = useCallback((e) => {
@@ -312,7 +359,7 @@ function PuzzleCreator() {
     if (dragCardName == null) return;
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
     if (dragHandIdx == null) setHand(prev => [...prev, dragCardName]); // from board or gallery → add to hand
-    setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragOverZone(null);
+    setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragOverZone(null); dragEntityData.current = null;
   }, [dragCardName, dragHandIdx, dragSource, clearZone]);
 
   // ── Pile zone helpers ──
@@ -322,7 +369,7 @@ function PuzzleCreator() {
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
     if (dragHandIdx != null) removeFromHand(dragHandIdx);
     updatePlayer(si, pp => { pp[key].push(dragCardName); return pp; });
-    setDragCardName(null); setDragHandIdx(null); setDragSource(null);
+    setDragCardName(null); setDragHandIdx(null); setDragSource(null); dragEntityData.current = null;
   }, [dragCardName, dragHandIdx, dragSource, clearZone, removeFromHand, updatePlayer]);
 
   const removePileCard = useCallback((si, key, idx) => {
@@ -453,18 +500,12 @@ function PuzzleCreator() {
     { key: 'immune', label: '✨ Immune', color: '#ffdd88' },
     { key: 'healReversed', label: '💔 Heal Reversed', color: '#ff4488' },
     { key: 'untargetable', label: '👻 Untargetable', color: '#aaaacc' },
-    { key: 'charmed', label: '💘 Charmed', color: '#ff69b4' },
   ];
   const BUFF_LIST = [
     { key: 'cloudy', label: '☁️ Cloudy', color: '#88bbdd' },
     { key: 'freeze_immune', label: '🔥 Freeze Immune', color: '#ff8844' },
-    { key: 'immortal', label: '✨ Immortal', color: '#ffdd44' },
-    { key: 'combo_locked', label: '🔒 Combo Locked', color: '#aaa' },
-    { key: 'submerged', label: '🌊 Submerged', color: '#4488ff' },
+    { key: 'submerged', label: '🌊 Submerged', color: '#4488ff', scope: 'oppHero' },
     { key: 'negative_status_immune', label: '😎 Status Immune', color: '#44ff88' },
-    { key: 'dark_gear_negated', label: '⚙️ Dark Gear Neg.', color: '#888' },
-    { key: 'diplomacy_negated', label: '🕊️ Diplomacy Neg.', color: '#888' },
-    { key: 'necromancy_negated', label: '💀 Necromancy Neg.', color: '#888' },
   ];
 
   // ── Column layout for island zone alignment across all rows (matching existing board) ──
@@ -493,7 +534,23 @@ function PuzzleCreator() {
     ) : null;
     return {
       draggable: !!hasCard,
-      onDragStart: (e) => { if (hasCard && zoneCardName) onDragStart(e, zoneCardName, null, { zt, si, hi, slot }); else e.preventDefault(); },
+      onDragStart: (e) => {
+        if (hasCard && zoneCardName) {
+          // Capture entity metadata for board-to-board moves
+          if (zt === 'hero' && p.heroes[hi]) {
+            dragEntityData.current = { type: 'hero', data: JSON.parse(JSON.stringify(p.heroes[hi])) };
+          } else if (zt === 'support') {
+            const key = hi + '-' + slot;
+            dragEntityData.current = { type: 'support', data: {
+              customHp: p._customSupportHp?.[hi]?.[slot] ?? null,
+              statuses: p._creatureStatuses?.[key] ? JSON.parse(JSON.stringify(p._creatureStatuses[key])) : null,
+            }};
+          } else {
+            dragEntityData.current = null;
+          }
+          onDragStart(e, zoneCardName, null, { zt, si, hi, slot });
+        } else e.preventDefault();
+      },
       onDragEnd,
       onDragOver: (e) => { e.preventDefault(); if (dragCardName && canDrop(dragCardName, zt, si, hi, slot)) { e.dataTransfer.dropEffect = 'move'; setDragOverZone(`${si}-${zt}-${hi}-${slot}`); } },
       onDragLeave: () => setDragOverZone(null),
@@ -568,7 +625,7 @@ function PuzzleCreator() {
                   <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderStyle: 'dashed', borderColor: 'rgba(255,215,0,.3)' }}
                     onDragOver={(e) => { e.preventDefault(); if (dragCardName) setDragOverZone('perm-' + si); }}
                     onDragLeave={() => setDragOverZone(null)}
-                    onDrop={(e) => { e.preventDefault(); setDragOverZone(null); if (dragCardName != null) { if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot); placePermanent(dragCardName, si); if (dragHandIdx != null) removeFromHand(dragHandIdx); setDragCardName(null); setDragHandIdx(null); setDragSource(null); } }}>
+                    onDrop={(e) => { e.preventDefault(); setDragOverZone(null); if (dragCardName != null) { if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot); placePermanent(dragCardName, si); if (dragHandIdx != null) removeFromHand(dragHandIdx); setDragCardName(null); setDragHandIdx(null); setDragSource(null); dragEntityData.current = null; } }}>
                     <div className="board-zone-empty" style={{ fontSize: 'calc(8px * var(--board-scale))' }}>Perm</div>
                   </div>
                 </div>
@@ -832,7 +889,7 @@ function PuzzleCreator() {
         const sideLabel = viewPile.si === 0 ? 'You' : 'Opponent';
         if (pile.length === 0) { setViewPile(null); return null; }
         return (
-          <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setViewPile(null); }}>
+          <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setViewPile(null); }}>
             <div className="modal" style={{ maxWidth: 600, padding: 20, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <h3 className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>{sideLabel} — {labels[viewPile.key] || viewPile.key} ({pile.length})</h3>
@@ -872,7 +929,7 @@ function PuzzleCreator() {
 
       {/* ── Stat Editor Modal ── */}
       {editTarget && (
-        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setEditTarget(null); }}>
+        <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setEditTarget(null); }}>
           <div className="modal" style={{ maxWidth: 400, padding: 20, maxHeight: '80vh', overflowY: 'auto' }}>
             <h3 className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 14 }}>
               EDIT {editTarget.zt === 'hero' ? 'HERO' : 'CREATURE'} STATS
@@ -889,13 +946,11 @@ function PuzzleCreator() {
               );
             })()}
             <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-              {editHp !== '' && (
-                <label style={{ flex: 1 }}>
-                  <span style={{ fontSize: 10, color: '#ff4466', fontWeight: 700 }}>HP</span>
-                  <input className="input" type="number" value={editHp} onChange={(e) => setEditHp(e.target.value)}
-                    style={{ width: '100%', marginTop: 4 }} onKeyDown={(e) => e.key === 'Enter' && saveStats()} autoFocus />
-                </label>
-              )}
+              <label style={{ flex: 1 }}>
+                <span style={{ fontSize: 10, color: '#ff4466', fontWeight: 700 }}>HP</span>
+                <input className="input" type="number" value={editHp} onChange={(e) => setEditHp(e.target.value)}
+                  style={{ width: '100%', marginTop: 4 }} onKeyDown={(e) => e.key === 'Enter' && saveStats()} autoFocus />
+              </label>
               {editTarget.zt === 'hero' && (
                 <label style={{ flex: 1 }}>
                   <span style={{ fontSize: 10, color: '#ff8844', fontWeight: 700 }}>MAX HP</span>
@@ -948,7 +1003,11 @@ function PuzzleCreator() {
             <div style={{ marginBottom: 14 }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>Buffs</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                {BUFF_LIST.map(bf => {
+                {BUFF_LIST.filter(bf => {
+                  if (!bf.scope) return true;
+                  if (bf.scope === 'oppHero') return editTarget.zt === 'hero' && editTarget.si === 1;
+                  return true;
+                }).map(bf => {
                   const active = !!editBuffs[bf.key];
                   return (
                     <button key={bf.key} className="btn" style={{
