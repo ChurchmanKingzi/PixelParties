@@ -95,10 +95,7 @@ module.exports = {
     ps.mainDeck.splice(deckIdx, 1);
 
     // Shuffle deck
-    for (let i = ps.mainDeck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [ps.mainDeck[i], ps.mainDeck[j]] = [ps.mainDeck[j], ps.mainDeck[i]];
-    }
+    engine.shuffleDeck(activator);
 
     // Reveal the chosen card to opponent (opponent confirms)
     const oppIdx = activator === 0 ? 1 : 0;

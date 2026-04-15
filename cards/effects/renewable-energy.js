@@ -75,12 +75,8 @@ module.exports = {
       await engine._delay(250);
     }
 
-    // Shuffle the deck (Fisher-Yates)
-    const deck = ps.mainDeck;
-    for (let i = deck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
+    // Shuffle the deck
+    engine.shuffleDeck(pi);
 
     engine.log('renewable_energy', {
       player: ps.username,

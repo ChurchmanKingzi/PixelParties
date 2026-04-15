@@ -600,6 +600,10 @@ class GameEngine {
       shuffleBackToDeck(playerIdx, cardNames, source) {
         return engine.actionShuffleBackToDeck(playerIdx, cardNames, source || cardInstance.name);
       },
+      /** Shuffle a player's deck. No-op in puzzle mode. */
+      shuffleDeck(playerIdx, deckType) {
+        return engine.shuffleDeck(playerIdx, deckType);
+      },
       /**
        * Safely place a card into a support zone with zone-occupied fallback.
        * If occupied, auto-relocates to another free base zone on the same hero.
@@ -2392,13 +2396,27 @@ class GameEngine {
         ps.mainDeck.push(cn);
       }
     }
-    // Shuffle the deck
-    for (let i = ps.mainDeck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [ps.mainDeck[i], ps.mainDeck[j]] = [ps.mainDeck[j], ps.mainDeck[i]];
-    }
+    this.shuffleDeck(playerIdx);
     this.log('shuffle_back', { player: ps.username, count: cardNames.length, source: source || null });
     this.sync();
+  }
+
+  /**
+   * Shuffle a player's main deck (Fisher-Yates).
+   * In puzzle mode, deck order is intentional — shuffle is skipped.
+   * @param {number} playerIdx
+   * @param {'main'|'potion'} [deckType='main']
+   */
+  shuffleDeck(playerIdx, deckType = 'main') {
+    if (this.isPuzzle) return;
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return;
+    const deck = deckType === 'potion' ? ps.potionDeck : ps.mainDeck;
+    if (!deck || deck.length <= 1) return;
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
   }
 
   async actionDestroyCard(source, targetCard, opts = {}) {
@@ -2915,16 +2933,10 @@ class GameEngine {
     delete gs.handReturnToOppCards;
 
     // Shuffle all players' decks (returned cards may have gone to opponent's deck)
-    for (const ps of gs.players) {
-      if (!ps) continue;
-      const shuffle = (arr) => {
-        for (let i = arr.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-      };
-      shuffle(ps.mainDeck);
-      if (ps.potionDeck) shuffle(ps.potionDeck);
+    for (let pi = 0; pi < gs.players.length; pi++) {
+      if (!gs.players[pi]) continue;
+      this.shuffleDeck(pi, 'main');
+      this.shuffleDeck(pi, 'potion');
     }
 
     return { potionCount };

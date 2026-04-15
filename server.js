@@ -4730,6 +4730,7 @@ io.on('connection', (socket) => {
       isTutorial: opts.isTutorial || false,
       _puzzleAttemptId: opts.puzzleAttemptId || null,
       _puzzleDifficulty: opts.puzzleDifficulty || null,
+      _puzzleRawData: JSON.parse(JSON.stringify(puzzleData)),
       _gameStartTime: Date.now(),
       _playerIPs: [getSocketIP(socket), 'cpu'],
     };
@@ -4970,6 +4971,107 @@ io.on('connection', (socket) => {
         socket.emit('puzzle_error', 'Failed to load tutorial: ' + err.message);
       }
     })();
+  });
+
+  // ── Retry puzzle/tutorial: clean up current game and immediately restart ──
+  socket.on('retry_puzzle', () => {
+    if (!currentUser) return;
+    const activeRoomId = activeGames.get(currentUser.userId);
+    if (!activeRoomId) return;
+    const room = rooms.get(activeRoomId);
+    if (!room?.gameState || room.type !== 'puzzle') return;
+
+    const gs = room.gameState;
+    const puzzleData = gs._puzzleRawData;
+    const attemptId = gs._puzzleAttemptId;
+    const difficulty = gs._puzzleDifficulty;
+    const isTutorial = gs.isTutorial || false;
+
+    if (!puzzleData) { socket.emit('puzzle_error', 'No puzzle data available for retry'); return; }
+
+    // Clean up old room
+    socket.leave('room:' + activeRoomId);
+    activeGames.delete(currentUser.userId);
+    rooms.delete(activeRoomId);
+
+    // Restart with stored data (deep clone so original stays clean for future retries)
+    const freshData = JSON.parse(JSON.stringify(puzzleData));
+    createPuzzleGame(freshData, {
+      puzzleAttemptId: attemptId,
+      puzzleDifficulty: isTutorial ? null : difficulty,
+      isTutorial,
+    }).catch(err => {
+      console.error('[Puzzle] retry error:', err.message, err.stack);
+      socket.emit('puzzle_error', 'Failed to retry: ' + err.message);
+    });
+  });
+
+  // ── Tutorial mid-game state modifications ──
+  socket.on('tutorial_modify', ({ type }) => {
+    if (!currentUser) return;
+    const activeRoomId = activeGames.get(currentUser.userId);
+    if (!activeRoomId) return;
+    const room = rooms.get(activeRoomId);
+    if (!room?.gameState || !room.gameState.isPuzzle) return;
+
+    const gs = room.gameState;
+    const engine = room.engine;
+    const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+
+    if (type === 'tutorial3_boost') {
+      const ps = gs.players[pi];
+      // Find Willy and Reiza by name prefix
+      const willyIdx = ps.heroes.findIndex(h => h?.name && h.name.startsWith('Willy'));
+      const reizaIdx = ps.heroes.findIndex(h => h?.name && h.name.startsWith('Reiza'));
+      console.log(`[Tutorial] tutorial3_boost: Willy=${willyIdx}, Reiza=${reizaIdx}, heroes=${ps.heroes.map(h => h?.name).join(', ')}`);
+
+      // Phase 1: ATK changes + remove Reiza's Fighting + clear Willy's old abilities
+      if (willyIdx >= 0) {
+        ps.heroes[willyIdx].atk = 9999;
+        ps.heroes[willyIdx].baseAtk = 9999;
+        // Clear old ability card instances for Willy
+        if (engine) {
+          engine.cardInstances = engine.cardInstances.filter(c =>
+            !(c.owner === pi && c.zone === 'ability' && c.heroIdx === willyIdx)
+          );
+        }
+        ps.abilityZones[willyIdx] = [[], [], []];
+      }
+
+      if (reizaIdx >= 0) {
+        ps.heroes[reizaIdx].atk = 0;
+        ps.heroes[reizaIdx].baseAtk = 0;
+        // Remove Reiza's Fighting abilities
+        if (engine) {
+          engine.cardInstances = engine.cardInstances.filter(c =>
+            !(c.owner === pi && c.zone === 'ability' && c.heroIdx === reizaIdx && c.name === 'Fighting')
+          );
+        }
+        for (let z = 0; z < (ps.abilityZones[reizaIdx] || []).length; z++) {
+          ps.abilityZones[reizaIdx][z] = (ps.abilityZones[reizaIdx][z] || []).filter(n => n !== 'Fighting');
+        }
+      }
+
+      // Sync phase 1
+      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      sendSpectatorGameState(room);
+
+      // Phase 2: Attach Fighting to Willy after a short delay
+      if (willyIdx >= 0) {
+        setTimeout(() => {
+          if (!room.gameState || room.gameState.result) return;
+          ps.abilityZones[willyIdx] = [[], ['Fighting', 'Fighting', 'Fighting'], []];
+          if (engine) {
+            for (let copy = 0; copy < 3; copy++) {
+              engine._trackCard('Fighting', pi, 'ability', willyIdx, 1);
+            }
+          }
+          for (let i = 0; i < 2; i++) sendGameState(room, i);
+          sendSpectatorGameState(room);
+        }, 600);
+      }
+    }
   });
 
   socket.on('leave_room', ({ roomId }) => handleLeaveRoom(socket, roomId, currentUser));
