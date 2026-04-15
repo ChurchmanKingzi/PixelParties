@@ -371,6 +371,12 @@ function PuzzleCreator() {
   }, [search]);
 
   const invalidate = useCallback(() => setValidated(false), []);
+  // Invalidate whenever hands change (covers add, remove, reorder, drag-drop)
+  const handMountedRef = useRef(false);
+  useEffect(() => {
+    if (!handMountedRef.current) { handMountedRef.current = true; return; }
+    invalidate();
+  }, [hand, oppHand]);
   const updatePlayer = useCallback((idx, fn) => {
     setPlayers(prev => { const next = [...prev]; next[idx] = fn(JSON.parse(JSON.stringify(prev[idx]))); return next; });
     invalidate();
@@ -380,10 +386,10 @@ function PuzzleCreator() {
     invalidate();
   }, [invalidate]);
 
-  const addToHand = useCallback((card) => setHand(prev => [...prev, card.name]), []);
-  const removeFromHand = useCallback((idx) => setHand(prev => prev.filter((_, i) => i !== idx)), []);
-  const addToOppHand = useCallback((card) => setOppHand(prev => [...prev, card.name]), []);
-  const removeFromOppHand = useCallback((idx) => setOppHand(prev => prev.filter((_, i) => i !== idx)), []);
+  const addToHand = useCallback((card) => { setHand(prev => [...prev, card.name]); invalidate(); }, [invalidate]);
+  const removeFromHand = useCallback((idx) => { setHand(prev => prev.filter((_, i) => i !== idx)); invalidate(); }, [invalidate]);
+  const addToOppHand = useCallback((card) => { setOppHand(prev => [...prev, card.name]); invalidate(); }, [invalidate]);
+  const removeFromOppHand = useCallback((idx) => { setOppHand(prev => prev.filter((_, i) => i !== idx)); invalidate(); }, [invalidate]);
 
   // ── Placement ──
   const placeHero = useCallback((cardName, si, hi) => {

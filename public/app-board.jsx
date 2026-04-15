@@ -3236,11 +3236,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // ── Tutorial outro: show textbox before victory screen ──
   const [tutorialOutroPending, setTutorialOutroPending] = useState(false);
   const [resultFading, setResultFading] = useState(false);
-  const handleResultLeave = useCallback(() => {
-    if (resultFading) return;
-    setResultFading(true);
-    setTimeout(() => { setResultFading(false); handleLeave(); }, 800);
-  }, [resultFading, handleLeave]);
   const tutorialOutroFiredRef = useRef(null);
   useEffect(() => {
     if (!result || !result.isTutorial || result.puzzleResult !== 'success') return;
@@ -6856,6 +6851,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const handleRematch = () => {
     socket.emit('request_rematch', { roomId: gameState.roomId });
   };
+  const handleResultLeave = useCallback(() => {
+    if (resultFading) return;
+    setResultFading(true);
+    setTimeout(() => { setResultFading(false); handleLeave(); }, 800);
+  }, [resultFading, handleLeave]);
 
   // Keyboard shortcuts on game-over screen: Escape=Leave, Enter/Space=Rematch
   const showGameOver = result && (result.setOver || !result.format || result.format === 1 || (result.format > 1 && result.setOver));
