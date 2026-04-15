@@ -5072,6 +5072,22 @@ io.on('connection', (socket) => {
         }, 600);
       }
     }
+
+    if (type === 'tutorial4_suppress_reiza') {
+      // Strip Reiza's onActionUsed hook (additional action) while keeping her afterSpellResolved (Stun+Poison)
+      if (engine) {
+        for (const inst of engine.cardInstances) {
+          if (inst.owner === pi && inst.zone === 'hero' && inst.name && inst.name.startsWith('Reiza')) {
+            const originalScript = inst.loadScript();
+            if (originalScript?.hooks?.onActionUsed) {
+              inst.script = { ...originalScript, hooks: { ...originalScript.hooks } };
+              delete inst.script.hooks.onActionUsed;
+              console.log(`[Tutorial] Stripped Reiza onActionUsed hook for player ${pi}`);
+            }
+          }
+        }
+      }
+    }
   });
 
   socket.on('leave_room', ({ roomId }) => handleLeaveRoom(socket, roomId, currentUser));
@@ -5136,14 +5152,16 @@ function handleLeaveRoom(socket, roomId, user) {
 }
 
 function getRoomList() {
-  return Array.from(rooms.values()).map(r => ({
-    id: r.id, host: r.host, type: r.type, format: r.format || 1,
-    hasPlayerPw: !!r.playerPw, hasSpecPw: !!r.specPw,
-    playerCount: r.players.length,
-    spectatorCount: r.spectators.length,
-    status: r.status, created: r.created,
-    players: r.players.map(p => p.username),
-  }));
+  return Array.from(rooms.values())
+    .filter(r => r.type !== 'puzzle')
+    .map(r => ({
+      id: r.id, host: r.host, type: r.type, format: r.format || 1,
+      hasPlayerPw: !!r.playerPw, hasSpecPw: !!r.specPw,
+      playerCount: r.players.length,
+      spectatorCount: r.spectators.length,
+      status: r.status, created: r.created,
+      players: r.players.map(p => p.username),
+    }));
 }
 
 function sanitizeRoom(room, forUser) {

@@ -3339,10 +3339,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [drawAnimCards, setDrawAnimCards] = useState([]); // [{id, cardName, origIdx}]
   const prevHandLenRef = useRef((me.hand || []).length);
   const prevRoomIdRef = useRef(gameState.roomId);
+  const prevDeckCountRef = useRef(me.deckCount || 0);
+  const prevPotionDeckCountRef = useRef(me.potionDeckCount || 0);
+  const roomJustChanged = gameState.roomId !== prevRoomIdRef.current;
   // On retry/new game (roomId changes), reset hand length tracking to suppress draw animations
-  if (gameState.roomId !== prevRoomIdRef.current) {
+  if (roomJustChanged) {
     prevRoomIdRef.current = gameState.roomId;
     prevHandLenRef.current = (me.hand || []).length;
+    prevDeckCountRef.current = me.deckCount || 0;
+    prevPotionDeckCountRef.current = me.potionDeckCount || 0;
   }
   // Spectator: track bottom player hand count for draw animations (like opponent draw)
   const [specMeDrawAnims, setSpecMeDrawAnims] = useState([]);
@@ -3405,7 +3410,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Clear stale steal-hidden indices when hand state changes (sync arrived)
       if (stealHiddenMe.size > 0) setStealHiddenMe(new Set());
       // Detect newly drawn cards (added at end of hand)
-      if (newHand.length > prevLen && !stealInProgressRef.current) {
+      const newDeckCount = me.deckCount || 0;
+      const newPotionCount = me.potionDeckCount || 0;
+      const deckDecreased = newDeckCount < prevDeckCountRef.current || newPotionCount < prevPotionDeckCountRef.current;
+      prevDeckCountRef.current = newDeckCount;
+      prevPotionDeckCountRef.current = newPotionCount;
+      if (newHand.length > prevLen && !stealInProgressRef.current && deckDecreased) {
         // If cards arrived via steal, skip draw animation for them
         const skipCount = stealSkipDrawRef.current;
         if (skipCount > 0) {
@@ -3434,6 +3444,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }, 500);
         }
         }
+      } else if (newHand.length > prevLen && !stealInProgressRef.current && !deckDecreased) {
+        // Cards arrived without deck decreasing — likely stolen from opponent's hand
+        // Animate from opponent's hand area
+        const oppHandEl = document.querySelector('.game-hand-opp .game-hand-cards');
+        const oppRect = oppHandEl?.getBoundingClientRect();
+        if (oppRect) {
+          const newAnims = [];
+          for (let i = prevLen; i < newHand.length; i++) {
+            newAnims.push({
+              id: Date.now() + Math.random() + i,
+              cardName: newHand[i],
+              origIdx: i,
+              startX: oppRect.left + oppRect.width / 2 - 32,
+              startY: oppRect.top + oppRect.height / 2 - 45,
+            });
+          }
+          setDrawAnimCards(prev => [...prev, ...newAnims]);
+          setTimeout(() => {
+            setDrawAnimCards(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
+          }, 500);
+        }
       }
       prevHandLenRef.current = newHand.length;
     }
@@ -3443,6 +3474,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [oppDrawAnims, setOppDrawAnims] = useState([]);
   const [oppDrawHidden, setOppDrawHidden] = useState(new Set()); // indices to hide during anim
   const prevOppHandCountRef = useRef(opp.handCount || 0);
+  if (roomJustChanged) prevOppHandCountRef.current = opp.handCount || 0;
   useEffect(() => {
     const newCount = opp.handCount || 0;
     const prevCount = prevOppHandCountRef.current;

@@ -1201,7 +1201,7 @@ function TextBox() {
 const TUTORIAL_SCRIPTS = {
   1: {
     intro: [
-      { text: 'Heya! Welcome on the battlefield!' },
+      { text: 'Heya! Welcome to the battlefield!' },
       { text: "To win a game of Pixel Parties, you must defeat all your opponent's Heroes by dropping their HP to 0!",
         highlights: ['[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]'] },
       { text: 'To do that, you can use {red:**Attacks**} or {red:**Spells**} to deal direct damage with your own Heroes, or summon {red:**Creatures**} to do the job for you.',
@@ -1229,7 +1229,7 @@ const TUTORIAL_SCRIPTS = {
     ],
     outro: [
       { text: 'Excellent job, beep-boop!' },
-      { text: 'To use Attacks or Spells or Summon Creatures, you need to spend {red:**Actions**}.' },
+      { text: 'To use Attacks or Spells or summon Creatures, you need to spend {red:**Actions**}.' },
       { text: 'That is done during the {red:**Action Phase**} - but you only get one Action per Action Phase, so use it wisely!' },
     ],
   },
@@ -1254,7 +1254,7 @@ const TUTORIAL_SCRIPTS = {
       { text: "The big upside of Creatures is that they can use their active effects every single turn." },
       { text: "So if you didn't win already - next turn, there'd be even more pain and lasers in your opponent's future!" },
       { text: "But the big downside is that Creatures cannot use their active effects the turn that they are summoned." },
-      { text: "These Cosmic Skeletons all already survived from a previous turn - you'll have to think about a way to keep them alive if you want to actually use them!" },
+      { text: "These Cosmic Skeletons already survived from a previous turn - you'll have to find ways to keep yours alive!" },
     ],
   },
   3: {
@@ -1300,6 +1300,49 @@ const TUTORIAL_SCRIPTS = {
       { text: "... this wasn't even...!", speakerName: 'Monia Bot', nameColor: 'silver' },
       { text: '...', speakerName: 'Monia Bot', nameColor: 'silver' },
       { text: 'Okay. Attacks. Big strong. See you next lesson.', speakerName: 'Monia Bot', nameColor: 'silver' },
+    ],
+  },
+  4: {
+    intro: [
+      { text: '...' },
+      { text: '... is ... that raccoon gone?' },
+      { text: '...' },
+      { text: 'Good.' },
+      { text: '...', speed: 80 },
+      { text: 'Heya! Welcome back!' },
+      { text: "What I was **trying** to say last time was that thing's interference wasn't even necessary.",
+        onShow: () => { socket.emit('tutorial_modify', { type: 'tutorial4_suppress_reiza' }); } },
+      { text: "There are a few status effects in this game that can help you win." },
+      { text: "{#88ddff:**Freeze**} and {yellow:**Stun**} are the most common to stop your opponent." },
+      { text: "But if one wears off naturally, its target becomes {silver:**immune**} to those effects for a turn!" },
+      { text: "And {purple:**Poison**} and {orange:**Burn**} are used to weaken targets - or even finish them off!" },
+      { text: "{orange:**Burn**} is {orange:**60**} damage a turn, {purple:**Poison**} {purple:**30**} ... but it {purple:**stacks**}!" },
+      { text: "Your Hero {purple:**Medea**} even **doubles** any Poison damage dealt to your opponent!",
+        highlights: [
+          { selector: '[data-hero-owner="me"][data-hero-name*="Medea"]', pulse: true },
+        ] },
+      { text: "So! See your Hero {purple:**Reiza**}?",
+        highlights: [
+          { selector: '[data-hero-owner="me"][data-hero-name*="Reiza"]', pulse: true },
+        ] },
+      { text: "She Stuns AND Poisons anything she hits with an Attack!",
+        highlights: [
+          { selector: '[data-hero-owner="me"][data-hero-name*="Reiza"]', pulse: true },
+        ] },
+      { text: "And the cards in your hand? More than enough status damage to defeat all enemy Heroes!",
+        highlights: [
+          '.game-hand-me .hand-slot',
+          '[data-hero-owner="opp"]',
+        ] },
+      { text: "And see that {silver:**Quick Attack**}? That thing can be used as an {red:**additional Action**}!",
+        highlights: [
+          { selector: '.game-hand-me [data-card-name="Quick Attack"]', pulse: true },
+        ] },
+      { text: "So you can use it even outside your {red:**Action Phase**}! You can use it and **not** use up your one main Action per turn!" },
+      { text: 'Go ahead - apply as much status as you can and make the enemy Heroes succumb to it, beep-boop!' },
+    ],
+    outro: [
+      { text: "Perfect! You can use {yellow:**Stun**}, {#88ddff:**Freeze**} and other inhibiting effects to slow your opponent down while {purple:**Poison**} and {orange:**Burn**} whittle them down!" },
     ],
   },
 };

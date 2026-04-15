@@ -459,6 +459,9 @@ class GameEngine {
         console.error(`[Engine] Hook "${hookName}" on card "${card.name}" (${card.id}) failed:`, err.message);
       }
 
+      // Propagate cancellation back to shared hookCtx
+      if (ctx.cancelled) hookCtx.cancelled = true;
+
       // If this hook created pending triggers, collect them
       if (ctx._triggers?.length) {
         this.pendingTriggers.push(...ctx._triggers);
