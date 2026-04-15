@@ -941,6 +941,26 @@ function renderMarkdownSlice(segments, charCount) {
   return els;
 }
 
+// Wrap each character in a shake span for erratic text animation
+function applyShake(node, counterRef) {
+  if (!counterRef) counterRef = { i: 0 };
+  if (typeof node === 'string') {
+    return [...node].map((ch) => {
+      const ci = counterRef.i++;
+      if (ch === '\n') return React.createElement('br', { key: ci });
+      return React.createElement('span', { key: ci, className: 'textbox-shake-char', style: { animationDelay: (ci * 0.073 % 0.4) + 's' } }, ch);
+    });
+  }
+  if (Array.isArray(node)) {
+    return node.map((child) => applyShake(child, counterRef));
+  }
+  if (React.isValidElement(node)) {
+    const newChildren = applyShake(node.props.children, counterRef);
+    return React.cloneElement(node, { key: node.key }, newChildren);
+  }
+  return node;
+}
+
 let _textBoxSetter = null;
 
 function showTextBox(opts) {
@@ -949,18 +969,21 @@ function showTextBox(opts) {
 
 function TextBox() {
   const [opts, setOpts] = useState(null);
-  const [pages, setPages] = useState([]);     // array of { text, highlights? }
+  const [pages, setPages] = useState([]);
   const [pageIdx, setPageIdx] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [done, setDone] = useState(false);
-  const [highlightRects, setHighlightRects] = useState([]); // [{rect, pulse}]
+  const [highlightRects, setHighlightRects] = useState([]);
+  const [rightVisible, setRightVisible] = useState(false);
+  const [rightExiting, setRightExiting] = useState(false);
+  const [fading, setFading] = useState(false);
   const timerRef = useRef(null);
   const parsedRef = useRef({ segments: [], plainText: '' });
   const bodyRef = useRef(null);
+  const onShowFiredRef = useRef(new Set());
 
   useEffect(() => { _textBoxSetter = setOpts; return () => { _textBoxSetter = null; }; }, []);
 
-  // Split a paragraph into sentences (keep punctuation attached)
   const splitSentences = useCallback((text) => {
     const parts = [];
     const re = /[^.!?]*[.!?]+[\s]?|[^.!?]+$/g;
@@ -971,33 +994,27 @@ function TextBox() {
     return parts.length ? parts : [text];
   }, []);
 
-  // Compute pages after opts change
   useLayoutEffect(() => {
-    if (!opts) { setPages([]); setPageIdx(0); setCharCount(0); setDone(false); setHighlightRects([]); return; }
+    if (!opts) { setPages([]); setPageIdx(0); setCharCount(0); setDone(false); setHighlightRects([]); setRightVisible(false); setRightExiting(false); setFading(false); onShowFiredRef.current = new Set(); return; }
 
-    // Explicit pages mode: each page is { text, highlights? }
     if (opts.pages && Array.isArray(opts.pages)) {
       setPages(opts.pages);
       setPageIdx(0);
+      onShowFiredRef.current = new Set();
       return;
     }
 
-    // Auto-pagination from opts.text
     const text = (opts.text || '').trim();
     if (!text) { setPages([]); return; }
-
     const body = bodyRef.current;
     if (!body) { setPages([{ text }]); return; }
-
     const measure = document.createElement('span');
     measure.className = 'textbox-text';
     measure.style.cssText = 'visibility:hidden;pointer-events:none;';
     body.appendChild(measure);
-
     const maxH = body.clientHeight;
     const paragraphs = text.split('\n').map(p => p.trim()).filter(Boolean);
     const result = [];
-
     for (const para of paragraphs) {
       const sentences = splitSentences(para);
       let current = '';
@@ -1013,13 +1030,13 @@ function TextBox() {
       }
       if (current.trim()) result.push({ text: current.trim() });
     }
-
     body.removeChild(measure);
     setPages(result.length ? result : [{ text }]);
     setPageIdx(0);
+    onShowFiredRef.current = new Set();
   }, [opts, splitSentences]);
 
-  // Start typewriter when page changes
+  // Start typewriter + handle per-page events
   useEffect(() => {
     clearInterval(timerRef.current);
     if (!pages.length) { setCharCount(0); setDone(false); return; }
@@ -1029,6 +1046,14 @@ function TextBox() {
     parsedRef.current = parsed;
     setCharCount(0);
     setDone(false);
+
+    // Per-page events
+    if (page?.enterRight) setRightVisible(true);
+    if (page?.onShow && !onShowFiredRef.current.has(pageIdx)) {
+      onShowFiredRef.current.add(pageIdx);
+      page.onShow();
+    }
+
     let i = 0;
     const len = parsed.plainText.length;
     const speed = (opts && opts.speed) || 25;
@@ -1040,7 +1065,7 @@ function TextBox() {
     return () => clearInterval(timerRef.current);
   }, [pages, pageIdx]);
 
-  // Update highlights when page changes — clone elements into overlay
+  // Highlights
   useEffect(() => {
     if (!pages.length) { setHighlightRects([]); return; }
     const page = pages[pageIdx];
@@ -1053,28 +1078,35 @@ function TextBox() {
       if (!sel) continue;
       document.querySelectorAll(sel).forEach(el => {
         const r = el.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0) {
-          rects.push({ rect: r, pulse, html: el.outerHTML });
-        }
+        if (r.width > 0 && r.height > 0) rects.push({ rect: r, pulse, html: el.outerHTML });
       });
     }
     setHighlightRects(rects);
   }, [pages, pageIdx]);
 
   const handleAdvance = useCallback(() => {
-    if (!opts) return;
+    if (!opts || fading) return;
     if (!done) {
       clearInterval(timerRef.current);
       setCharCount(parsedRef.current.plainText.length);
       setDone(true);
     } else if (pageIdx < pages.length - 1) {
+      const currentPage = pages[pageIdx];
+      if (currentPage?.exitRight) { setRightExiting(true); setTimeout(() => { setRightVisible(false); setRightExiting(false); }, 600); }
       setPageIdx(pageIdx + 1);
     } else {
+      const currentPage = pages[pageIdx];
+      if (currentPage?.exitRight) { setRightExiting(true); setTimeout(() => { setRightVisible(false); setRightExiting(false); }, 600); }
+      // Fade out then dismiss
+      setFading(true);
       const cb = opts.onDismiss;
-      setOpts(null);
-      if (cb) cb();
+      setTimeout(() => {
+        setOpts(null);
+        setFading(false);
+        if (cb) cb();
+      }, 1200);
     }
-  }, [opts, done, pageIdx, pages]);
+  }, [opts, done, pageIdx, pages, fading]);
 
   const handleBack = useCallback((e) => {
     if (e) { e.stopPropagation(); e.preventDefault(); }
@@ -1084,24 +1116,40 @@ function TextBox() {
     }
   }, [pageIdx]);
 
-  // Keyboard: space/enter = advance, left/backspace = back
   useEffect(() => {
     if (!opts) return;
     const onKey = (e) => {
-      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); handleAdvance(); }
-      else if ((e.key === 'ArrowLeft' || e.key === 'Backspace') && pageIdx > 0) { e.preventDefault(); handleBack(); }
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); handleAdvance(); }
+      else if ((e.key === 'ArrowLeft' || e.key === 'Backspace') && pageIdx > 0) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); handleBack(); }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [opts, handleAdvance, handleBack, pageIdx]);
+
+  useEffect(() => {
+    if (!opts) return;
+    const onClick = (e) => {
+      if (e.target.closest('.textbox-back')) return;
+      handleAdvance();
+    };
+    window.addEventListener('mousedown', onClick);
+    window.addEventListener('touchstart', onClick, { passive: true });
+    return () => { window.removeEventListener('mousedown', onClick); window.removeEventListener('touchstart', onClick); };
+  }, [opts, handleAdvance]);
 
   if (!opts) return null;
 
   const isLastPage = pageIdx >= pages.length - 1;
+  const page = pages[pageIdx];
+  const activeSide = page?.side || 'left';
+  const leftName = (activeSide === 'left' && page?.speakerName) ? page.speakerName : opts.speakerName;
+  const leftNameColor = activeSide === 'left' && page?.nameColor ? page.nameColor : undefined;
+  const rightName = (activeSide === 'right' && page?.speakerName) ? page.speakerName : opts.rightSpeakerName;
+  const rightNameColor = activeSide === 'right' && page?.nameColor ? page.nameColor : undefined;
+  const hasRight = opts.rightSpeaker && rightVisible;
 
   return (
-    <div className="textbox-overlay" onClick={handleAdvance}>
-      {/* Highlight clones — bright copies of elements rendered above the overlay */}
+    <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '')}>
       {highlightRects.map((h, i) => (
         <div key={i} className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '')} style={{
           position: 'fixed',
@@ -1114,16 +1162,16 @@ function TextBox() {
       ))}
       <div className="textbox">
         {opts.speaker && (
-          <div className="textbox-portrait">
+          <div className={'textbox-portrait' + (hasRight && activeSide !== 'left' ? ' textbox-portrait-inactive' : '')}>
             <div className="textbox-portrait-frame">
               <img src={opts.speaker} alt={opts.speakerName || ''} draggable={false} />
               {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.35) + 's', top: [10,60,5,50,30,65,15,45][i] + '%', left: [5,70,55,10,80,35,90,60][i] + '%' }} />)}
             </div>
-            {opts.speakerName && <span className="textbox-speaker-name">{opts.speakerName}</span>}
+            {leftName && <span className="textbox-speaker-name" style={leftNameColor ? { color: leftNameColor } : undefined}>{leftName}</span>}
           </div>
         )}
         <div className="textbox-body" ref={bodyRef}>
-          <span className="textbox-text">{renderMarkdownSlice(parsedRef.current.segments, charCount)}</span>
+          <span className="textbox-text">{(() => { const els = renderMarkdownSlice(parsedRef.current.segments, charCount); return page?.shakeText ? applyShake(els) : els; })()}</span>
           {done && <span className="textbox-advance">{isLastPage ? '▼' : '▶'}</span>}
           {pages.length > 1 && (
             <div className="textbox-footer">
@@ -1132,6 +1180,15 @@ function TextBox() {
             </div>
           )}
         </div>
+        {opts.rightSpeaker && rightVisible && (
+          <div className={'textbox-portrait textbox-portrait-right' + (activeSide !== 'right' ? ' textbox-portrait-inactive' : '') + (rightExiting ? ' textbox-portrait-exit' : '')}>
+            <div className="textbox-portrait-frame">
+              <img src={opts.rightSpeaker} alt={opts.rightSpeakerName || ''} draggable={false} />
+              {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.25 + 0.1) + 's', top: [15,55,8,48,35,62,20,42][i] + '%', left: [8,65,50,15,75,30,85,55][i] + '%' }} />)}
+            </div>
+            {rightName && <span className="textbox-speaker-name" style={rightNameColor ? { color: rightNameColor } : undefined}>{rightName}</span>}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1144,7 +1201,7 @@ function TextBox() {
 const TUTORIAL_SCRIPTS = {
   1: {
     intro: [
-      { text: 'Heya!' },
+      { text: 'Heya! Welcome on the battlefield!' },
       { text: "To win a game of Pixel Parties, you must defeat all your opponent's Heroes by dropping their HP to 0!",
         highlights: ['[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]'] },
       { text: 'To do that, you can use {red:**Attacks**} or {red:**Spells**} to deal direct damage with your own Heroes, or summon {red:**Creatures**} to do the job for you.',
@@ -1160,11 +1217,10 @@ const TUTORIAL_SCRIPTS = {
       { text: 'To use an Attack or Spell or summon a Creature with a Hero, it needs the correct {#88ccee:**Ability**} at an appropriate level first.' },
       { text: 'For Magic Hammer, that Ability is {#88ccee:**Destruction Magic**}, which Ida currently has 2 copies of attached to her.',
         highlights: [
-          '.game-hand-me [data-card-name="Destruction Magic"]',
           '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
         ] },
       { text: "So her Destruction Magic is at {red:**level 2**}. But Magic Hammer is a {red:**level 3**} Spell! Ida needs one more Destruction Magic!" },
-      { text: 'Attach it to her from your hand, then go into the Action Phase to actually cast your Spell with her and defeat the Beato!',
+      { text: 'Attach it to her from your hand, then go into the Action Phase to actually cast your Spell with her and defeat Beato!',
         highlights: [
           '[data-hero-owner="me"][data-hero-name="Ida, the Adept of Destruction"]',
           '.game-hand-me .hand-slot',
@@ -1175,6 +1231,75 @@ const TUTORIAL_SCRIPTS = {
       { text: 'Excellent job, beep-boop!' },
       { text: 'To use Attacks or Spells or Summon Creatures, you need to spend {red:**Actions**}.' },
       { text: 'That is done during the {red:**Action Phase**} - but you only get one Action per Action Phase, so use it wisely!' },
+    ],
+  },
+  2: {
+    intro: [
+      { text: 'Heya!' },
+      { text: "In a real game, just defeating one Hero won't be enough - there's three of them for you to get rid of!" },
+      { text: "Doing so with a single Spell will be very difficult, but {green:**Creatures**} can be used to deal lots of damage to multiple targets!" },
+      { text: "Here, the {green:**Cosmic Skeletons**} can each deal 150 damage to a target.",
+        highlights: [
+          { selector: '[data-support-owner="me"][data-card-name="Cosmic Skeleton"]', pulse: true },
+        ] },
+      { text: "Let's go send them onto the enemy Heroes and turn them into burnt spots on the ground, beep-boop!" },
+      { text: 'To activate a Creature\'s active effect, just click on it during either {red:**Main Phase**}!',
+        highlights: [
+          '[data-phase-name="Main Phase 1"]',
+          '[data-phase-name="Main Phase 2"]',
+        ] },
+    ],
+    outro: [
+      { text: "Cool!" },
+      { text: "The big upside of Creatures is that they can use their active effects every single turn." },
+      { text: "So if you didn't win already - next turn, there'd be even more pain and lasers in your opponent's future!" },
+      { text: "But the big downside is that Creatures cannot use their active effects the turn that they are summoned." },
+      { text: "These Cosmic Skeletons all already survived from a previous turn - you'll have to think about a way to keep them alive if you want to actually use them!" },
+    ],
+  },
+  3: {
+    opts: { rightSpeaker: '/Antonia.png', rightSpeakerName: 'Antonia' },
+    intro: [
+      { text: 'Heya, welcome back to the battlefield!' },
+      { text: "{green:**Creatures**} are great for spreading damage, but there's more efficient ways to deal with a single strong target!",
+        highlights: [
+          { selector: '[data-hero-owner="opp"][data-hero-name*="Fiona"]', pulse: true },
+        ] },
+      { text: 'Just look at -', enterRight: true },
+      { text: 'Khekhekhe! You want da damage?', side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
+      { text: 'I got da damages for ya!', side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
+      { text: "Listen, kiddo! Da real **big** damages aren't done with Blah-Blah-Spells or Who-Cares-Creatures!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
+      { text: "{red:**Attacks!**}\nDat's what it's all about, ya get me?!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
+      { text: "Can't go wrong with da BONK for **big** damages, right?", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
+      { text: "Dere - I've done ya a little somethin' of a favor, ya see?", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true,
+        onShow: () => {
+          socket.emit('tutorial_modify', { type: 'tutorial3_boost' });
+          const el = document.querySelector('[data-hero-owner="me"][data-hero-name*="Willy"]');
+          if (el) { el.classList.add('tutorial-boost-anim'); setTimeout(() => el.classList.remove('tutorial-boost-anim'), 2500); }
+        },
+        highlights: [
+          { selector: '[data-hero-owner="me"][data-hero-name*="Willy"]', pulse: true },
+        ] },
+      { text: "Attacks do harder BONKs when your Heroes got higher BONK stats, so dis lil' boost'll help you hit real hard!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true,
+        highlights: [
+          { selector: '[data-hero-owner="me"][data-hero-name*="Willy"]', pulse: true },
+          { selector: '[data-ability-owner="me"][data-card-name="Fighting"]', pulse: true },
+        ] },
+      { text: "Now use dat {red:**Attack**} in your hand to break some bones or somethin'!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true,
+        highlights: [
+          '.game-hand-me .hand-slot',
+        ] },
+      { text: '...' },
+      { text: "But that's not even...!" },
+    ],
+    outro: [
+      { text: "Not bad, eh? Dat poor princess'll feel dat one for a while, khekhe...!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', enterRight: true, shakeText: true },
+      { text: "Or ... not feel it at all anymore, being *dead* an' all.", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
+      { text: "Khekhekhekhe, you're fun to bozz around, Imma be back for ya later!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', exitRight: true, shakeText: true },
+      { text: '... you could have...', speakerName: 'Monia Bot', nameColor: 'silver' },
+      { text: "... this wasn't even...!", speakerName: 'Monia Bot', nameColor: 'silver' },
+      { text: '...', speakerName: 'Monia Bot', nameColor: 'silver' },
+      { text: 'Okay. Attacks. Big strong. See you next lesson.', speakerName: 'Monia Bot', nameColor: 'silver' },
     ],
   },
 };

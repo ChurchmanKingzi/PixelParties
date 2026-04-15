@@ -122,6 +122,7 @@ function MainMenu() {
   }, [puzzleBrowserOpen, puzzleAttemptState]);
 
   const startPuzzleAttempt = (puzzle) => {
+    window._currentPuzzleAttempt = { puzzleId: puzzle.puzzleId, difficulty: puzzle.difficulty };
     socket.emit('start_puzzle_attempt', { puzzleId: puzzle.puzzleId, difficulty: puzzle.difficulty });
   };
 
@@ -156,10 +157,11 @@ function MainMenu() {
     return () => socket.off('tutorial_list', onList);
   }, [tutorialBrowserOpen]);
 
+
   useEffect(() => {
     if (!tutorialBrowserOpen) return;
     const onGameState = (state) => {
-      if (state.isPuzzle && state.isTutorial) {
+      if (state.isPuzzle && state.isTutorial && !window._tutorialGaveUp) {
         tutorialAttemptRoom.current = state.roomId;
         setTutorialAttemptState(state);
       }
@@ -183,10 +185,16 @@ function MainMenu() {
     return () => window.removeEventListener('keydown', h, true);
   }, [tutorialBrowserOpen, tutorialAttemptState]);
 
-  // Show tutorial intro textbox when game first loads
+  // Show tutorial intro textbox when game first loads (or on retry with new roomId)
   const tutorialIntroShownRef = useRef(null);
+  const tutorialRoomIdRef = useRef(null);
   useEffect(() => {
     if (!tutorialAttemptState || tutorialAttemptState.result) return;
+    // Reset intro tracking when room changes (retry)
+    if (tutorialAttemptState.roomId !== tutorialRoomIdRef.current) {
+      tutorialRoomIdRef.current = tutorialAttemptState.roomId;
+      tutorialIntroShownRef.current = null;
+    }
     const num = window._currentTutorialNum;
     if (!num || tutorialIntroShownRef.current === num) return;
     const script = (window.TUTORIAL_SCRIPTS || {})[num];
@@ -199,6 +207,7 @@ function MainMenu() {
           speaker: '/MoniaBot.png',
           speakerName: 'Monia Bot',
           ...(introPages ? { pages: introPages } : { text: introText }),
+          ...(script.opts || {}),
         });
       }, 600);
     }
@@ -206,6 +215,8 @@ function MainMenu() {
 
   const startTutorialAttempt = (tutorial) => {
     window._currentTutorialNum = tutorial.num;
+    window._currentTutorialRetryId = tutorial.tutorialId;
+    window._tutorialGaveUp = false;
     socket.emit('start_tutorial_attempt', { tutorialId: tutorial.tutorialId });
   };
 

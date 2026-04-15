@@ -474,6 +474,15 @@ body {
   justify-content: center;
   z-index: 1000;
 }
+.result-overlay-fade {
+  animation: result-fade-in .6s ease-out;
+}
+.result-overlay-fading {
+  animation: result-fade-out .7s ease-in forwards;
+  pointer-events: none;
+}
+@keyframes result-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes result-fade-out { from { opacity: 1; } to { opacity: 0; } }
 .modal {
   background: var(--bg2);
   border: 2px solid var(--accent);
@@ -3586,6 +3595,15 @@ body {
   text-shadow: 0 0 4px #000, 0 0 2px #000;
   font-family: 'Orbitron', sans-serif;
 }
+.deck-empty-label {
+  position: absolute;
+  bottom: 2px; right: 3px;
+  font-size: calc(10px * var(--board-scale)); font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 4px #000, 0 0 2px #000;
+  font-family: 'Orbitron', sans-serif;
+  opacity: 0.5;
+}
 .board-card.flipped .board-card-label {
   transform: rotate(180deg);
   top: 2px; bottom: auto; left: 3px; right: auto;
@@ -5855,10 +5873,21 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   justify-content: center;
   padding-top: 18px;
   background: rgba(0,0,0,.45);
-  cursor: pointer;
+  pointer-events: none;
   animation: textbox-fade-in .25s ease-out;
 }
 @keyframes textbox-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.textbox-fading {
+  animation: textbox-fade-out 1s ease-in forwards;
+  pointer-events: none !important;
+}
+@keyframes textbox-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+/* Boost tooltip above textbox overlay when active */
+body:has(.textbox-overlay) .board-tooltip,
+body:has(.textbox-overlay) .tooltip {
+  z-index: 90003 !important;
+}
 
 .textbox {
   display: flex;
@@ -5871,6 +5900,8 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   box-shadow: 0 0 24px rgba(0,240,255,.15), 0 8px 32px rgba(0,0,0,.6);
   overflow: hidden;
   animation: textbox-slide-in .3s ease-out;
+  pointer-events: auto;
+  cursor: pointer;
 }
 @keyframes textbox-slide-in {
   from { opacity: 0; transform: translateY(-20px); }
@@ -5888,6 +5919,27 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   border-right: 1px solid var(--bg4);
   padding: 10px 8px 6px;
   gap: 4px;
+  transition: opacity .3s, filter .3s;
+}
+.textbox-portrait-right {
+  border-right: none;
+  border-left: 1px solid var(--bg4);
+  animation: textbox-portrait-enter .5s ease-out;
+}
+.textbox-portrait-inactive {
+  opacity: 0.4;
+  filter: brightness(0.6) saturate(0.5);
+}
+.textbox-portrait-exit {
+  animation: textbox-portrait-leave .5s ease-in forwards;
+}
+@keyframes textbox-portrait-enter {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes textbox-portrait-leave {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(100%); opacity: 0; }
 }
 .textbox-portrait-frame {
   position: relative;
@@ -5937,8 +5989,8 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   flex: 1;
   display: flex;
   align-items: flex-start;
-  padding: 16px 20px;
-  height: 90px;
+  padding: 14px 20px 8px;
+  height: 110px;
   position: relative;
   overflow: hidden;
 }
@@ -5958,6 +6010,27 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
 .textbox-text em {
   color: #ffcc66;
   font-style: italic;
+}
+/* Shake text — each character bobs independently */
+.textbox-shake-char {
+  position: relative;
+  animation: textbox-char-shake 0.5s ease-in-out infinite alternate;
+}
+@keyframes textbox-char-shake {
+  0%   { top: -1.5px; }
+  100% { top: 1.5px; }
+}
+/* Tutorial boost — card grows dramatically */
+.tutorial-boost-anim {
+  animation: tutorial-card-grow 2s ease-out !important;
+  z-index: 100 !important;
+  position: relative !important;
+}
+@keyframes tutorial-card-grow {
+  0%   { transform: scale(1); filter: brightness(1); }
+  10%  { transform: scale(1.5); filter: brightness(1.8) saturate(1.5); box-shadow: 0 0 40px rgba(255,200,0,.9), 0 0 80px rgba(255,100,0,.5); }
+  30%  { transform: scale(1.35); filter: brightness(1.4); box-shadow: 0 0 30px rgba(255,200,0,.6); }
+  100% { transform: scale(1); filter: brightness(1); box-shadow: none; }
 }
 .textbox-advance {
   position: absolute;
@@ -6037,7 +6110,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   .textbox-portrait img { width: 48px; height: 48px; }
   .textbox-sparkle { width: 4px; height: 4px; }
   .textbox-speaker-name { font-size: 7px; }
-  .textbox-body { padding: 10px 14px; height: 70px; }
+  .textbox-body { padding: 10px 14px 6px; height: 80px; }
   .textbox-text { font-size: 14px; }
 }
 

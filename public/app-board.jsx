@@ -3235,6 +3235,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // ── Tutorial outro: show textbox before victory screen ──
   const [tutorialOutroPending, setTutorialOutroPending] = useState(false);
+  const [resultFading, setResultFading] = useState(false);
+  const handleResultLeave = useCallback(() => {
+    if (resultFading) return;
+    setResultFading(true);
+    setTimeout(() => { setResultFading(false); handleLeave(); }, 800);
+  }, [resultFading, handleLeave]);
   const tutorialOutroFiredRef = useRef(null);
   useEffect(() => {
     if (!result || !result.isTutorial || result.puzzleResult !== 'success') return;
@@ -3251,6 +3257,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           speaker: '/MoniaBot.png',
           speakerName: 'Monia Bot',
           ...(outroPages ? { pages: outroPages } : { text: outroText }),
+          ...(script.opts || {}),
           onDismiss: () => setTutorialOutroPending(false),
         });
       }, 300);
@@ -3336,6 +3343,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const handKeyRef = useRef(JSON.stringify(me.hand || []));
   const [drawAnimCards, setDrawAnimCards] = useState([]); // [{id, cardName, origIdx}]
   const prevHandLenRef = useRef((me.hand || []).length);
+  const prevRoomIdRef = useRef(gameState.roomId);
+  // On retry/new game (roomId changes), reset hand length tracking to suppress draw animations
+  if (gameState.roomId !== prevRoomIdRef.current) {
+    prevRoomIdRef.current = gameState.roomId;
+    prevHandLenRef.current = (me.hand || []).length;
+  }
   // Spectator: track bottom player hand count for draw animations (like opponent draw)
   const [specMeDrawAnims, setSpecMeDrawAnims] = useState([]);
   const [specMeDrawHidden, setSpecMeDrawHidden] = useState(new Set());
@@ -6826,6 +6839,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   }, []);
 
   const handleLeave = () => {
+    showTextBox(null);
     if (isSpectator) {
       socket.emit('leave_room', { roomId: gameState.roomId });
     } else {
@@ -6834,6 +6848,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     onLeave();
   };
   const handleSurrender = () => {
+    showTextBox(null);
     setShowSurrender(false);
     socket.emit('leave_game', { roomId: gameState.roomId });
     // Don't call onLeave — server will send updated game state with result
@@ -6847,7 +6862,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   useEffect(() => {
     if (!showGameOver) return;
     const handleKey = (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); handleLeave(); }
+      if (e.key === 'Escape') { e.preventDefault(); result?.isPuzzle ? handleResultLeave() : handleLeave(); }
       if ((e.key === 'Enter' || e.key === ' ') && !isSpectator && !oppLeft && !oppDisconnected && !myRematchSent && !result?.isPuzzle) {
         e.preventDefault(); handleRematch();
       }
@@ -6881,7 +6896,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       else if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx) return; // Non-cancellable prompt active — ignore Escape
       else if (!gameState.result && !isSpectator) { setShowSurrender(true); surrenderOpenedAt.current = Date.now(); }
-      else if (gameState.result) handleLeave();
+      else if (gameState.result) { gameState.result.isPuzzle ? handleResultLeave() : handleLeave(); }
     };
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
@@ -8438,7 +8453,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </button>
         ) : (
           <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => result ? handleLeave() : setShowSurrender(true)}>
-            {result ? '✕ LEAVE' : '⚑ SURRENDER'}
+            {result ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
           </button>
         )}
         <h2 className="orbit-font" style={{ fontSize: 14, color: isSpectator ? 'var(--text2)' : 'var(--accent)', position: 'absolute', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
@@ -8684,10 +8699,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div className="board-util board-util-right">
             <div className="board-util-side">
               <BoardZone type="deck" label="Deck" faceDown style={oppBoardZone('deck')}>
-                <div className="board-card face-down" data-opp-deck="1"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.deckCount}</div></div>
+                {opp.deckCount > 0 ? <div className="board-card face-down" data-opp-deck="1"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.deckCount}</div></div>
+                : <div className="board-card" data-opp-deck="1"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
               <BoardZone type="potion" label="Potions" faceDown style={oppBoardZone('potion')}>
-                {opp.potionDeckCount > 0 && <div className="board-card face-down"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>}
+                {opp.potionDeckCount > 0 ? <div className="board-card face-down"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>
+                : <div className="board-card"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
               <div className="board-util-spacer" />
             </div>
@@ -8696,12 +8713,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <div className="board-util-spacer" />
               <div onClick={() => !isSpectator && me.potionDeckCount > 0 && setDeckViewer('potion')} style={{ cursor: !isSpectator && me.potionDeckCount > 0 ? 'pointer' : 'default' }} data-my-potion-deck="1">
               <BoardZone type="potion" label="Potions" faceDown style={myBoardZone('potion')}>
-                {me.potionDeckCount > 0 && <div className="board-card face-down"><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.potionDeckCount}</div></div>}
+                {me.potionDeckCount > 0 ? <div className="board-card face-down"><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.potionDeckCount}</div></div>
+                : <div className="board-card"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
               </div>
               <div onClick={() => !isSpectator && me.deckCount > 0 && setDeckViewer('deck')} style={{ cursor: !isSpectator && me.deckCount > 0 ? 'pointer' : 'default' }} data-my-deck="1">
               <BoardZone type="deck" label="Deck" faceDown style={myBoardZone('deck')}>
-                <div className="board-card face-down"><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.deckCount}</div></div>
+                {me.deckCount > 0 ? <div className="board-card face-down"><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.deckCount}</div></div>
+                : <div className="board-card"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
               </div>
             </div>
@@ -9321,15 +9340,38 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Surrender confirmation */}
       {showSurrender && (() => {
         const isBestOf = (gameState.format || 1) > 1;
+        const isPuzzleMode = gameState.isPuzzle;
+        const handleRetry = () => {
+          showTextBox(null);
+          setShowSurrender(false);
+          socket.emit('retry_puzzle', { roomId: gameState.roomId });
+        };
         return (
         <div className="modal-overlay" onClick={() => setShowSurrender(false)}>
           <div className="modal animate-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 380, textAlign: 'center' }}>
-            <div className="pixel-font" style={{ fontSize: 14, color: 'var(--danger)', marginBottom: 16 }}>SURRENDER?</div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
-              {isBestOf ? `Best of ${gameState.format} — Score: ${(gameState.setScore||[0,0]).join(' – ')}` : 'Do you really want to give up?'}
+            <div className="pixel-font" style={{ fontSize: 14, color: isPuzzleMode ? '#ff8800' : 'var(--danger)', marginBottom: 16 }}>
+              {isPuzzleMode ? (gameState.isTutorial ? 'TUTORIAL' : 'PUZZLE') : 'SURRENDER?'}
             </div>
-            <div style={{ display: 'flex', flexDirection: isBestOf ? 'column' : 'row', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
-              {isBestOf ? (<>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
+              {isPuzzleMode ? 'What would you like to do?'
+              : isBestOf ? `Best of ${gameState.format} — Score: ${(gameState.setScore||[0,0]).join(' – ')}` : 'Do you really want to give up?'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: isPuzzleMode || isBestOf ? 'column' : 'row', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
+              {isPuzzleMode ? (<>
+                <button className="btn" style={{ padding: '10px 28px', fontSize: 13, width: 220, borderColor: 'var(--accent)', color: 'var(--accent)' }} onClick={handleRetry}>🔄 Retry</button>
+                <button className="btn btn-danger" style={{ padding: '10px 28px', fontSize: 13, width: 220 }} onClick={() => {
+                  showTextBox(null);
+                  setShowSurrender(false);
+                  if (gameState.isTutorial) {
+                    window._tutorialGaveUp = true;
+                    socket.emit('leave_game', { roomId: gameState.roomId });
+                    onLeave();
+                  } else {
+                    handleSurrender();
+                  }
+                }}>✕ Give Up</button>
+                <button className="btn" style={{ padding: '10px 28px', fontSize: 13, width: 220 }} onClick={() => setShowSurrender(false)}>Cancel</button>
+              </>) : isBestOf ? (<>
                 <button className="btn btn-danger" style={{ padding: '10px 28px', fontSize: 13, width: 220 }} onClick={() => {
                   setShowSurrender(false);
                   socket.emit('surrender_game', { roomId: gameState.roomId });
@@ -10076,7 +10118,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Puzzle / Tutorial Result Overlay ── */}
       {result && result.isPuzzle && !tutorialOutroPending && (
-        <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.8)' }}>
+        <div className={'modal-overlay result-overlay-fade' + (resultFading ? ' result-overlay-fading' : '')} style={{ background: 'rgba(0,0,0,.8)' }}>
           <div className="animate-in" style={{ textAlign: 'center' }}>
             {result.puzzleResult === 'success' ? (
               <>
@@ -10103,7 +10145,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               padding: '12px 32px', fontSize: 14,
               borderColor: result.puzzleResult === 'success' ? '#ffd700' : 'var(--accent)',
               color: result.puzzleResult === 'success' ? '#ffd700' : 'var(--accent)',
-            }} onClick={handleLeave}>
+            }} onClick={handleResultLeave}>
               {result.isTutorial ? '← RETURN TO TUTORIAL' : '← RETURN TO PUZZLE'}
             </button>
           </div>
