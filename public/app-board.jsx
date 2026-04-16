@@ -968,6 +968,332 @@ const ANIM_REGISTRY = {
   flame_strike: FlameStrikeEffect,
   venom_fog: VenomFogEffect,
   poisoned_well: PoisonedWellEffect,
+  // ── Steam Dwarfs archetype ───────────────────────────────────────
+  // A puff of white/grey steam clouds rising upward. Used as a
+  // generic "steam engine fired" feedback — +HP on discard, brewing,
+  // engineer activation, miner end-of-turn draw, etc.
+  steam_puff: (() => {
+    return function SteamPuffEffect({ x, y }) {
+      const puffs = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+        startX: -25 + Math.random() * 50,
+        startY: 15 + Math.random() * 15,
+        dx: -10 + Math.random() * 20,
+        dy: -(30 + Math.random() * 40),
+        size: 18 + Math.random() * 22,
+        delay: i * 45 + Math.random() * 100,
+        dur: 700 + Math.random() * 400,
+        opacity: 0.55 + Math.random() * 0.35,
+        shade: Math.random() < 0.5 ? '#e8e8ec' : '#c8c8d0',
+      })), []);
+      const sparks = useMemo(() => Array.from({ length: 5 }, () => ({
+        dx: -15 + Math.random() * 30,
+        dy: -(5 + Math.random() * 20),
+        size: 2 + Math.random() * 3,
+        delay: Math.random() * 150,
+        dur: 400 + Math.random() * 200,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {puffs.map((p, i) => (
+            <div key={'sp' + i} style={{
+              position: 'absolute',
+              left: p.startX + 'px', top: p.startY + 'px',
+              width: p.size + 'px', height: p.size + 'px',
+              borderRadius: '50%',
+              background: `radial-gradient(circle, ${p.shade} 0%, ${p.shade}99 45%, transparent 75%)`,
+              opacity: 0,
+              animation: `steam-puff-rise ${p.dur}ms ease-out ${p.delay}ms forwards`,
+              '--stpdx': p.dx + 'px', '--stpdy': p.dy + 'px', '--stpop': p.opacity,
+            }} />
+          ))}
+          {sparks.map((s, i) => (
+            <div key={'ss' + i} style={{
+              position: 'absolute', left: 0, top: 20,
+              width: s.size + 'px', height: s.size + 'px',
+              borderRadius: '50%',
+              background: '#ffcc44', boxShadow: '0 0 6px #ffaa22',
+              opacity: 0,
+              animation: `steam-spark-pop ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              '--ssdx': s.dx + 'px', '--ssdy': s.dy + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes steam-puff-rise {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              25%  { opacity: var(--stpop, 0.8); }
+              100% { opacity: 0; transform: translate(var(--stpdx), var(--stpdy)) scale(1.8); }
+            }
+            @keyframes steam-spark-pop {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              30%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--ssdx), var(--ssdy)) scale(0.6); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Steam Dwarf Exterminator ─────────────────────────────────────
+  // Wide cone of flamethrower fire sweeping from one side across the
+  // target, followed by a lingering burst of lingering orange flames.
+  // Designed to FEEL different from flame_strike (which is a radial
+  // burst) — this one is directional, like a jet of flame.
+  flamethrower_douse: (() => {
+    return function FlamethrowerDouseEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      // Jet particles — fast-moving, stretched, coming in from the left
+      const jet = useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+        endX: -cw * 0.2 + Math.random() * cw * 1.4,
+        endY: -ch * 0.15 + Math.random() * ch * 0.3,
+        size: 14 + Math.random() * 16,
+        delay: (i * 18) + Math.random() * 40,
+        dur: 280 + Math.random() * 160,
+        char: ['🔥', '🔥', '🔥', '💥', '✦'][Math.floor(Math.random() * 5)],
+        tilt: -15 + Math.random() * 30,
+      })), [cw, ch]);
+      // Lingering flames that stick around on the target after the jet hits
+      const lingering = useMemo(() => Array.from({ length: 16 }, () => ({
+        x: -cw * 0.35 + Math.random() * cw * 0.7,
+        y: -ch * 0.35 + Math.random() * ch * 0.7,
+        size: 10 + Math.random() * 14,
+        delay: 300 + Math.random() * 300,
+        dur: 400 + Math.random() * 300,
+      })), [cw, ch]);
+      // Embers drifting off after the strike
+      const embers = useMemo(() => Array.from({ length: 14 }, () => {
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.2;
+        const speed = 30 + Math.random() * 50;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed,
+          size: 3 + Math.random() * 4,
+          color: ['#ff3300', '#ff8800', '#ffaa00', '#ffcc33'][Math.floor(Math.random() * 4)],
+          delay: 350 + Math.random() * 250,
+          dur: 500 + Math.random() * 400,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Bright initial flash on contact */}
+          <div style={{
+            position: 'absolute',
+            left: -cw * 0.45 + 'px', top: -ch * 0.45 + 'px',
+            width: cw * 0.9 + 'px', height: ch * 0.9 + 'px',
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse, #fff8dd 0%, #ffaa22 30%, #ff4400aa 60%, transparent 85%)',
+            opacity: 0,
+            animation: 'flame-douse-flash 360ms ease-out forwards',
+          }} />
+          {/* Jet streaks — the flamethrower cone */}
+          {jet.map((p, i) => (
+            <div key={'jt' + i} style={{
+              position: 'absolute',
+              left: (-cw * 0.7) + 'px',
+              top: p.endY + 'px',
+              fontSize: p.size + 'px',
+              filter: `drop-shadow(0 0 4px #ff6600)`,
+              opacity: 0,
+              animation: `flame-jet-streak ${p.dur}ms cubic-bezier(0.2, 0.7, 0.4, 1) ${p.delay}ms forwards`,
+              '--jtdx': (p.endX + cw * 0.7) + 'px',
+              '--jttilt': p.tilt + 'deg',
+            }}>{p.char}</div>
+          ))}
+          {/* Lingering flames on the target zone */}
+          {lingering.map((f, i) => (
+            <div key={'lf' + i} style={{
+              position: 'absolute',
+              left: f.x + 'px', top: f.y + 'px',
+              fontSize: f.size + 'px',
+              filter: 'drop-shadow(0 0 3px #ff4400)',
+              opacity: 0,
+              animation: `flame-linger ${f.dur}ms ease-out ${f.delay}ms forwards`,
+            }}>🔥</div>
+          ))}
+          {/* Drifting embers */}
+          {embers.map((e, i) => (
+            <div key={'em' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: e.size + 'px', height: e.size + 'px',
+              borderRadius: '50%',
+              background: e.color,
+              boxShadow: `0 0 6px ${e.color}`,
+              opacity: 0,
+              animation: `flame-ember ${e.dur}ms ease-out ${e.delay}ms forwards`,
+              '--emdx': e.dx + 'px', '--emdy': e.dy + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes flame-douse-flash {
+              0%   { opacity: 0;   transform: scale(0.3); }
+              30%  { opacity: 0.95; transform: scale(1.1); }
+              100% { opacity: 0;   transform: scale(1.4); }
+            }
+            @keyframes flame-jet-streak {
+              0%   { opacity: 0;   transform: translate(0, 0) rotate(0deg) scaleX(0.6); }
+              20%  { opacity: 1; }
+              100% { opacity: 0;   transform: translate(var(--jtdx), 0) rotate(var(--jttilt)) scaleX(1.4); }
+            }
+            @keyframes flame-linger {
+              0%   { opacity: 0;   transform: scale(0.5) translateY(0); }
+              30%  { opacity: 1;   transform: scale(1) translateY(-2px); }
+              100% { opacity: 0;   transform: scale(0.7) translateY(-10px); }
+            }
+            @keyframes flame-ember {
+              0%   { opacity: 0;   transform: translate(0, 0) scale(1); }
+              20%  { opacity: 1; }
+              100% { opacity: 0;   transform: translate(var(--emdx), var(--emdy)) scale(0.3); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Steam Dwarf Dragon Pilot ─────────────────────────────────────
+  // A huge incoming fireball that impacts the target with a radial
+  // blast wave and a cloud of smoke. Distinct from flame_strike in
+  // that it has a clear "incoming projectile → impact → aftermath"
+  // arc, not just a burst.
+  fireball: (() => {
+    return function FireballEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      // Shockwave rings expanding outward from impact
+      const rings = useMemo(() => [0, 1, 2].map(i => ({
+        delay: 280 + i * 90,
+        dur: 500 + i * 50,
+        maxSize: 140 + i * 40,
+      })), []);
+      // Radial fire shards blasting out from the impact
+      const shards = useMemo(() => Array.from({ length: 22 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 40 + Math.random() * 60;
+        return {
+          dx: Math.cos(angle) * dist,
+          dy: Math.sin(angle) * dist,
+          size: 14 + Math.random() * 14,
+          delay: 280 + Math.random() * 120,
+          dur: 450 + Math.random() * 250,
+          char: ['🔥', '🔥', '💥', '✦'][Math.floor(Math.random() * 4)],
+        };
+      }), []);
+      // Smoke clouds rising from the impact site
+      const smoke = useMemo(() => Array.from({ length: 10 }, (_, i) => ({
+        dx: -25 + Math.random() * 50,
+        dy: -(20 + Math.random() * 35),
+        size: 20 + Math.random() * 20,
+        delay: 500 + i * 60 + Math.random() * 80,
+        dur: 800 + Math.random() * 400,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Incoming fireball streak — comes in from top-left */}
+          <div style={{
+            position: 'absolute',
+            left: '-80px', top: '-80px',
+            fontSize: '56px',
+            filter: 'drop-shadow(0 0 12px #ff6600) drop-shadow(0 0 24px #ff3300)',
+            opacity: 0,
+            animation: 'fireball-incoming 280ms ease-in forwards',
+          }}>🔥</div>
+          {/* Streak trail behind the fireball */}
+          <div style={{
+            position: 'absolute',
+            left: '-60px', top: '-60px',
+            width: '120px', height: '10px',
+            background: 'linear-gradient(90deg, transparent 0%, #ff440088 40%, #ffaa22 100%)',
+            borderRadius: '5px',
+            transformOrigin: '100% 50%',
+            transform: 'rotate(45deg)',
+            opacity: 0,
+            animation: 'fireball-trail 280ms ease-in forwards',
+          }} />
+          {/* Impact flash — massive bright pulse */}
+          <div style={{
+            position: 'absolute',
+            left: (-cw * 0.6) + 'px', top: (-ch * 0.6) + 'px',
+            width: cw * 1.2 + 'px', height: ch * 1.2 + 'px',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, #ffffee 0%, #ffcc22 20%, #ff4400cc 50%, #ff220055 75%, transparent 90%)',
+            opacity: 0,
+            animation: 'fireball-flash 600ms ease-out 280ms forwards',
+          }} />
+          {/* Shockwave rings */}
+          {rings.map((r, i) => (
+            <div key={'rg' + i} style={{
+              position: 'absolute',
+              left: '0px', top: '0px',
+              width: '8px', height: '8px',
+              marginLeft: '-4px', marginTop: '-4px',
+              borderRadius: '50%',
+              border: '3px solid #ff6600',
+              boxShadow: '0 0 12px #ff4400',
+              opacity: 0,
+              animation: `fireball-ring ${r.dur}ms ease-out ${r.delay}ms forwards`,
+              '--ringSize': r.maxSize + 'px',
+            }} />
+          ))}
+          {/* Radial fire shards */}
+          {shards.map((s, i) => (
+            <div key={'fs' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: s.size + 'px',
+              filter: 'drop-shadow(0 0 4px #ff4400)',
+              opacity: 0,
+              animation: `fireball-shard ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              '--fsdx': s.dx + 'px', '--fsdy': s.dy + 'px',
+            }}>{s.char}</div>
+          ))}
+          {/* Rising smoke */}
+          {smoke.map((sm, i) => (
+            <div key={'sm' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: sm.size + 'px', height: sm.size + 'px',
+              marginLeft: -sm.size / 2 + 'px', marginTop: -sm.size / 2 + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, #55555599 0%, #33333366 50%, transparent 80%)',
+              opacity: 0,
+              animation: `fireball-smoke ${sm.dur}ms ease-out ${sm.delay}ms forwards`,
+              '--smdx': sm.dx + 'px', '--smdy': sm.dy + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes fireball-incoming {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              30%  { opacity: 1; }
+              100% { opacity: 1; transform: translate(80px, 80px) scale(1.6); }
+            }
+            @keyframes fireball-trail {
+              0%   { opacity: 0; transform: rotate(45deg) scaleX(0.3); }
+              50%  { opacity: 0.9; transform: rotate(45deg) scaleX(1); }
+              100% { opacity: 0; transform: rotate(45deg) scaleX(0.6); }
+            }
+            @keyframes fireball-flash {
+              0%   { opacity: 0; transform: scale(0.2); }
+              20%  { opacity: 1; transform: scale(1); }
+              60%  { opacity: 0.7; transform: scale(1.15); }
+              100% { opacity: 0; transform: scale(1.3); }
+            }
+            @keyframes fireball-ring {
+              0%   { opacity: 0; transform: scale(0.2); }
+              30%  { opacity: 0.8; }
+              100% { opacity: 0; width: var(--ringSize); height: var(--ringSize); margin-left: calc(var(--ringSize) / -2); margin-top: calc(var(--ringSize) / -2); }
+            }
+            @keyframes fireball-shard {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              25%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--fsdx), var(--fsdy)) scale(0.7); }
+            }
+            @keyframes fireball-smoke {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.5); }
+              30%  { opacity: 0.7; }
+              100% { opacity: 0; transform: translate(var(--smdx), var(--smdy)) scale(1.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   plague_smoke: (() => {
     return function PlagueSmokeEffect({ x, y }) {
       const clouds = useMemo(() => Array.from({ length: 18 }, (_, i) => ({

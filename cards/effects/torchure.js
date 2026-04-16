@@ -60,8 +60,11 @@ module.exports = {
         hero: ps.heroes[target.heroIdx]?.name,
       });
 
-      // Grant 1 bonus main Action for this turn's Action Phase
-      ps._bonusMainActions = (ps._bonusMainActions || 0) + 1;
+      // Grant the second-action grace slot. Does NOT stack with itself —
+      // casting Torchure multiple times still only grants ONE bonus action
+      // (the second slot of Action Phase). Consumption and slot-position
+      // checks are handled by the server's action handlers + engine.
+      ps._bonusMainActions = 1;
     },
   },
 };

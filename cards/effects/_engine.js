@@ -3884,8 +3884,19 @@ class GameEngine {
         if (eScript?.canPlayCard) equipScripts.push(eScript);
       }
 
-      // Bonus action state for this hero
+      // Bonus action state for this hero:
+      // - `bonusActions` is hero-specific with optional type restrictions (Ghuanjun combo).
+      // - `_bonusMainActions` is the Torchure-style "second-action grace slot." It's a
+      //   one-shot flag (not a stacking counter) granting access to exactly ONE specific
+      //   Action Phase slot: the player's second action this phase. The flag is consumed
+      //   (or lost) as soon as a second action is played, whether that action was
+      //   regular, additional, or inherent. We track action count with
+      //   `_actionsPlayedThisPhase` (incremented by each play handler) to identify which
+      //   slot we're in. The grace slot is available iff we've already played exactly
+      //   one action (slot #2) and the flag is set.
       const hasBonusAction = isActionPhase && ps.bonusActions?.heroIdx === hi && ps.bonusActions.remaining > 0;
+      const actionsPlayed = ps._actionsPlayedThisPhase || 0;
+      const hasBonusMainAction = isActionPhase && (ps._bonusMainActions || 0) > 0 && actionsPlayed === 1;
 
       for (const cd of handCards) {
         // Reaction subtype: not proactively playable unless script opts in
@@ -3921,8 +3932,12 @@ class GameEngine {
 
         // Action Phase: after a hero has already acted, cards need bonus action or additional action coverage
         if (isActionPhase && heroActed) {
-          if (hasBonusAction) {
-            // Bonus actions (Ghuanjun combo, etc.): only the allowed card types
+          if (hasBonusMainAction) {
+            // Generic bonus main action (Torchure, Dragon Pilot Lv1 sacrifice, etc.):
+            // no hero restriction, no type restriction — any action card is playable.
+            // Consumption happens in advanceToPhase, not here.
+          } else if (hasBonusAction) {
+            // Hero-specific bonus actions (Ghuanjun combo, etc.): only the allowed card types
             const allowed = ps.bonusActions.allowedTypes || [];
             if (allowed.length > 0 && !allowed.includes(cd.cardType)) continue;
           } else {
@@ -4479,6 +4494,7 @@ class GameEngine {
         if (ps._discardToDeleteActive) this.disableDiscardToDelete(this.gs.players.indexOf(ps));
         ps.bonusActions = null;
         ps._bonusMainActions = 0;
+        ps._actionsPlayedThisPhase = 0;
         // Reset per-hero action counters (Sol Rym, etc.)
         for (const hero of (ps.heroes || [])) {
           if (hero?._actionsThisTurn) hero._actionsThisTurn = 0;
@@ -4560,6 +4576,11 @@ class GameEngine {
         break;
 
       case PHASES.ACTION:
+        // Reset per-phase action count (tracks total actions played for
+        // Torchure-style second-action-slot semantics)
+        for (const ps of this.gs.players) {
+          if (ps) ps._actionsPlayedThisPhase = 0;
+        }
         // Compute which creatures have custom summon conditions that block them
         this.gs.summonBlocked = this.getSummonBlocked(this.gs.activePlayer);
         // Player-controlled — wait for card play or manual skip
@@ -4671,22 +4692,33 @@ class GameEngine {
     const allowed = legalTransitions[current];
     if (!allowed || !allowed.includes(targetPhase)) return false;
 
-    // Generic bonus action system: if a card granted extra main actions,
-    // skip one Action → Main2 advance per bonus action remaining.
+    // Generic bonus action system: if a card granted a second-action grace slot
+    // (Torchure), keep the player in Action Phase when they try to advance after
+    // their first action. The flag is consumed (or lost) in the play handlers the
+    // moment a second action begins — we never decrement it here, because the skip
+    // must fire once per second-action-slot attempt, and the slot is defined by
+    // _actionsPlayedThisPhase === 1.
     if (current === PHASES.ACTION && targetPhase === PHASES.MAIN2) {
       const ps = this.gs.players[playerIdx];
-      if (ps?._bonusMainActions > 0) {
-        ps._bonusMainActions--;
+      const actionsPlayed = ps?._actionsPlayedThisPhase || 0;
+      if (ps?._bonusMainActions > 0 && actionsPlayed === 1) {
         this.sync();
-        return true; // Stay in Action Phase — bonus action available
+        return true; // Stay in Action Phase — player has a pending 2nd-action grace slot
       }
     }
 
-    // Clear bonus actions when leaving Action Phase
+    // Clear bonus action state when actually leaving Action Phase
     if (current === PHASES.ACTION) {
       const ps = this.gs.players[playerIdx];
       if (ps?.bonusActions) {
         ps.bonusActions = null;
+      }
+      // Clear any residual main-action bonus + phase action count at phase exit
+      if (ps && (ps._bonusMainActions || 0) > 0) {
+        ps._bonusMainActions = 0;
+      }
+      if (ps) {
+        ps._actionsPlayedThisPhase = 0;
       }
     }
 

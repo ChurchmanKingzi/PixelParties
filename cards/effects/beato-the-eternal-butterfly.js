@@ -14,6 +14,16 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // Passive setup in onGameStart must fire even if this hero starts
+  // frozen / stunned / negated (e.g. a puzzle where she begins
+  // Ascended AND incapacitated). Without this, her bypassLevelReq
+  // field would never get set and would remain missing even after
+  // the status is cleansed — because nothing else re-asserts it.
+  // bypassLevelReq is a plain field on the hero object, so once set
+  // it persists through subsequent freeze/thaw cycles without
+  // further intervention.
+  bypassStatusFilter: true,
+
   /**
    * Called by performAscension after the hero identity is swapped.
    * Sets up the new hero's passive effects on the hero object.

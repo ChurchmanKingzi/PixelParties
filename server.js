@@ -2682,6 +2682,18 @@ io.on('connection', (socket) => {
     if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[hoptKey] = gs.turn;
 
+    // Action-count tracking for Torchure-style second-action slot: increment
+    // on every Action Phase play (regular/inherent/additional all count). If
+    // this is the second action slot, clear the Torchure bonus — whether we
+    // USED it or LOST it, the bonus is spent either way.
+    if (isActionPhase) {
+      const actingPs = gs.players[pi];
+      actingPs._actionsPlayedThisPhase = (actingPs._actionsPlayedThisPhase || 0) + 1;
+      if (actingPs._actionsPlayedThisPhase === 2 && (actingPs._bonusMainActions || 0) > 0) {
+        actingPs._bonusMainActions = 0;
+      }
+    }
+
     room.engine._setPendingPlayLog('ability_activated', { player: gs.players[pi].username, card: abilityName, hero: hero.name, level });
 
     (async () => {
@@ -2911,6 +2923,12 @@ io.on('connection', (socket) => {
 
           // If activated during Action Phase, consume the action
           if (isActionPhase) {
+            // Action-count tracking for Torchure-style second-action slot
+            const actingPs = gs.players[pi];
+            actingPs._actionsPlayedThisPhase = (actingPs._actionsPlayedThisPhase || 0) + 1;
+            if (actingPs._actionsPlayedThisPhase === 2 && (actingPs._bonusMainActions || 0) > 0) {
+              actingPs._bonusMainActions = 0;
+            }
             await room.engine.advanceToPhase(pi, 4);
           }
         } else {
@@ -3347,7 +3365,15 @@ io.on('connection', (socket) => {
     // UNLESS the creature itself is an inherent additional action or bonus actions are active for this hero
     const additionalTypeId = !isInherentAction ? room.engine.findAdditionalActionForCard(pi, cardName, heroIdx) : null;
     const usingAdditional = !!additionalTypeId;
-    const hasBonusAction = isActionPhase && ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0;
+    // Bonus-action gating:
+    // - `bonusActions` = Ghuanjun-style hero+type restricted.
+    // - `_bonusMainActions` = Torchure-style "second-action grace slot." Only valid as
+    //   the player's SECOND action of Action Phase (actionsPlayed === 1 at this point).
+    const actionsPlayedThisPhase = ps._actionsPlayedThisPhase || 0;
+    const hasBonusAction = isActionPhase && (
+      (ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0)
+      || ((ps._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
+    );
     const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
     if ((isMainPhase || actionAlreadyUsed) && !usingAdditional && !isInherentAction) return;
 
@@ -3366,6 +3392,18 @@ io.on('connection', (socket) => {
     // Execute: remove from hand
     ps.hand.splice(handIndex, 1);
     if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+
+    // Action-count tracking for Torchure-style second-action slot: increment
+    // on every Action Phase play (regular/inherent/additional all count). If
+    // this is the second action slot, clear the Torchure bonus — whether we
+    // USED it (regular play gated through) or LOST it (inherent/additional
+    // claimed the slot), the bonus is spent either way.
+    if (isActionPhase) {
+      ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
+      if (ps._actionsPlayedThisPhase === 2 && (ps._bonusMainActions || 0) > 0) {
+        ps._bonusMainActions = 0;
+      }
+    }
 
     room.engine._trackTerrorResolvedEffect(pi, cardName);
 
@@ -3466,8 +3504,15 @@ io.on('connection', (socket) => {
     const wisdomDiscardCost = room.engine.getWisdomDiscardCost(heroOwner, heroIdx, cardData);
 
     // Check if this needs an additional action (Main Phase play, or Action Phase after normal action used)
-    // Bonus actions (Ghuanjun combo, etc.) are handled separately — they don't consume additional action tokens
-    const hasBonusAction = isActionPhase && ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0;
+    // Bonus-action gating:
+    // - `bonusActions` = Ghuanjun-style hero+type restricted.
+    // - `_bonusMainActions` = Torchure-style "second-action grace slot." Only valid as
+    //   the player's SECOND action of Action Phase (actionsPlayed === 1 at this point).
+    const actionsPlayedThisPhase = ps._actionsPlayedThisPhase || 0;
+    const hasBonusAction = isActionPhase && (
+      (ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0)
+      || ((ps._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
+    );
     const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
     const needsAdditional = (isMainPhase && !isInherentAction) || actionAlreadyUsed;
     let additionalConsumed = false;
@@ -3477,6 +3522,18 @@ io.on('connection', (socket) => {
       if (!typeId) return; // No additional action available
       consumedInst = room.engine.consumeAdditionalAction(pi, typeId);
       additionalConsumed = true;
+    }
+
+    // Action-count tracking for Torchure-style second-action slot: increment
+    // on every Action Phase play (regular/inherent/additional all count). If
+    // this is the second action slot, clear the Torchure bonus — whether we
+    // USED it (regular play gated through) or LOST it (inherent/additional
+    // claimed the slot), the bonus is spent either way.
+    if (isActionPhase) {
+      ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
+      if (ps._actionsPlayedThisPhase === 2 && (ps._bonusMainActions || 0) > 0) {
+        ps._bonusMainActions = 0;
+      }
     }
 
     // Mark card as resolving (stays in hand visually, prevents re-play)
@@ -4692,12 +4749,44 @@ io.on('connection', (socket) => {
     const usr = await db.get('SELECT color, avatar, cardback, board FROM users WHERE id = ?', [currentUser.userId]);
 
     const buildPlayerState = (pz, userId, username, socketId, hand) => {
+      // Normalize statuses loaded from the puzzle editor so they behave like
+      // statuses applied during normal play. The editor stores statuses as
+      // either `true` (non-stacking: frozen, stunned, burned, negated, ...)
+      // or `{ stacks: N }` (poisoned). Neither shape carries the `appliedTurn`
+      // field that cards like Coffee use to tell "inflicted this turn" apart
+      // from "inflicted previously". Since puzzle statuses represent the
+      // pre-existing board state before the player's turn begins, they MUST
+      // count as "not inflicted this turn" — i.e. have an appliedTurn that
+      // is strictly less than the puzzle's starting turn (which is 1).
+      //
+      // We normalize to appliedTurn: 0 for anything missing one. Any future
+      // editor format that writes appliedTurn explicitly is preserved.
+      const normalizePuzzleStatuses = (raw) => {
+        if (!raw || typeof raw !== 'object') return {};
+        const out = {};
+        for (const key of Object.keys(raw)) {
+          const v = raw[key];
+          if (v == null || v === false) continue;
+          if (v === true) {
+            out[key] = { appliedTurn: 0 };
+          } else if (typeof v === 'object') {
+            out[key] = { appliedTurn: 0, ...v };
+            // If editor explicitly set appliedTurn, the spread above already
+            // overrode the default (object props win in right-side spread).
+          } else {
+            // Unknown shape — coerce to a minimal object form
+            out[key] = { appliedTurn: 0, value: v };
+          }
+        }
+        return out;
+      };
+
       const heroes = (pz.heroes || []).map(h => {
         if (!h || !h.name) return { name: null, hp: 0, maxHp: 0, atk: 0, baseAtk: 0, statuses: {} };
         return {
           name: h.name, hp: h.hp ?? 0, maxHp: h.maxHp ?? h.hp ?? 0,
           atk: h.atk ?? 0, baseAtk: h.baseAtk ?? h.atk ?? 0,
-          statuses: h.statuses ? JSON.parse(JSON.stringify(h.statuses)) : {},
+          statuses: normalizePuzzleStatuses(h.statuses),
           buffs: h.buffs ? JSON.parse(JSON.stringify(h.buffs)) : undefined,
         };
       });
@@ -4828,6 +4917,7 @@ io.on('connection', (socket) => {
           ps.potionsUsedThisTurn = 0; ps.attacksPlayedThisTurn = 0;
           ps.comboLockHeroIdx = null; ps.heroesActedThisTurn = []; ps.heroesAttackedThisTurn = [];
           ps._creaturesSummonedThisTurn = 0; ps.bonusActions = null; ps._bonusMainActions = 0;
+          ps._actionsPlayedThisPhase = 0;
           ps.abilityGivenThisTurn = [false, false, false];
           for (const hero of (ps.heroes || [])) { if (hero?._actionsThisTurn) hero._actionsThisTurn = 0; }
         }

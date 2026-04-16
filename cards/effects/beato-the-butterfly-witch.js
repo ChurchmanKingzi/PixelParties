@@ -50,6 +50,13 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // Passive setup in onGameStart must fire even if this hero starts
+  // frozen / stunned / negated (e.g. a puzzle where she begins
+  // incapacitated). Without this, her bypassLevelReq field and orb
+  // tracking would never get set and would remain missing even after
+  // the status is cleansed.
+  bypassStatusFilter: true,
+
   /** Beato cannot be cheat-ascended — must earn all 5 orbs. */
   cheatAscensionBlocked: true,
 
@@ -80,6 +87,9 @@ module.exports = {
      * Only counts if:
      *  - Beato herself cast it (casterIdx + heroIdx match)
      *  - The spell was NOT negated by a surprise/reaction
+     *  - Beato is not currently incapacitated (since bypassStatusFilter
+     *    was enabled to let onGameStart fire while frozen, we must
+     *    manually re-apply the filter to orb-tracking hooks)
      */
     afterSpellResolved: (ctx) => {
       // Match caster to this Beato instance
@@ -89,6 +99,8 @@ module.exports = {
       if (ctx._engine.gs._spellNegatedByEffect) return;
       const hero = ctx.attachedHero;
       if (!hero?.ascensionOrbs || hero.ascensionReady) return;
+      // Guard against incapacitation (undoes the module-wide bypassStatusFilter)
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
       // Get spell school from the resolved spell/attack
       const cd = ctx.spellCardData;
       if (!cd) return;
@@ -113,6 +125,8 @@ module.exports = {
       if (entering.owner !== ctx.cardOriginalOwner) return;
       const hero = ctx.attachedHero;
       if (!hero?.ascensionOrbs || hero.ascensionReady) return;
+      // Guard against incapacitation (undoes the module-wide bypassStatusFilter)
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
       // Look up creature's spell school
       const cardDB = ctx._engine._getCardDB();
       const cd = cardDB[entering.name];
