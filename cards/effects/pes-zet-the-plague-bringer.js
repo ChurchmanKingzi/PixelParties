@@ -97,26 +97,10 @@ module.exports = {
         });
       } else if (picked.type === 'equip' && picked.cardInstance) {
         const inst = picked.cardInstance;
-        if (engine.canApplyCreatureStatus(inst, 'poisoned')) {
-          // Monia-style creature protection check
-          const hookCtx = { creature: inst, effectType: 'status', source: { name: hero.name, owner: pi, heroIdx }, cancelled: false, _skipReactionCheck: true };
-          await engine.runHooks('beforeCreatureAffected', hookCtx);
-          if (hookCtx.cancelled) {
-            engine.log('poison_blocked', { card: inst.name, reason: 'creature protection' });
-          } else {
-            if (inst.counters.poisoned) {
-              inst.counters.poisonStacks = (inst.counters.poisonStacks || 1) + 1;
-            } else {
-              inst.counters.poisoned = 1;
-              inst.counters.poisonStacks = 1;
-            }
-            inst.counters.poisonAppliedBy = pi;
-            engine.log('poison_applied', {
-              target: inst.name, stacks: inst.counters.poisonStacks,
-              by: hero.name,
-            });
-          }
-        }
+        await engine.actionApplyCreaturePoison(
+          { name: hero.name, owner: pi, heroIdx },
+          inst,
+        );
       }
 
       engine.log('peszet_plague', {

@@ -1789,7 +1789,7 @@
     "hp": null,
     "atk": null,
     "cost": 5,
-    "effect": "Equip this card to a Hero you control. The equipped Hero's Attack stat is increased by 10. \nAdditionally, any target hit by an Attack of the equipped Hero is Poisoned for the rest of the game. \nIf the target is already Poisoned, increase the Poison's damage by 30 instead.",
+    "effect": "Equip this card to a Hero you control. The equipped Hero's Attack stat is increased by 10. Additionally, apply 1 Stack of Poison to any target hit by the equipped Hero's Attacks.",
     "archetype": "",
     "setID": "COH073",
     "banned": "",
@@ -12039,7 +12039,7 @@
     "startingAbility2": "Pillage",
     "spellSchool1": "",
     "spellSchool2": "",
-    "foil": null
+    "foil": "rare"
   },
   {
     "name": "Jenny, the Class Fairy",
@@ -12741,7 +12741,7 @@
     "startingAbility2": "Toughness",
     "spellSchool1": "",
     "spellSchool2": "",
-    "foil": null
+    "foil": "rare"
   },
   {
     "name": "Layn, Master of Deri's Relic",
@@ -15469,7 +15469,7 @@
     "hp": 400,
     "atk": 40,
     "cost": null,
-    "effect": "Whenever this Hero hits exactly 1 target with a Spell, you may choose one of that target's Abilities and place it on top of any of your Heroes' Abilities as an additional attachment, leveling it up. Abilities attached this way cannot be removed from the board in any way and are returned to your opponent's Heroes at the end of the turn.",
+    "effect": "You may once per turn place a copy of any Creature into one of this Hero's free Support Zones, but its effects are negated until the start of your next turn and its current and max HP become 1.",
     "archetype": "",
     "setID": "PP SET01",
     "banned": "",
@@ -17162,7 +17162,7 @@
     "hp": 50,
     "atk": null,
     "cost": null,
-    "effect": "If this is the first Creature you summon during your turn, summoning it counts as an additional Action. When you summon this Creature, you may search your deck for a Decay Magic Ability, reveal it and add it to your hand. You may once per turn discard a Decay Magic Ability from your hand to choose a target and Poison it for the rest of the game. If the target is already Poisoned, the damage its Poison deals is increased by 30 instead.",
+    "effect": "If this is the first Creature you summon during your turn, summoning it counts as an additional Action. When you summon this Creature, you may search your deck for a Decay Magic Ability, reveal it and add it to your hand. You may once per turn discard a Decay Magic Ability from your hand to apply 1 Stack of Poison to any target on the board.",
     "archetype": "Harpyformers",
     "setID": "PP MBS1",
     "banned": "",
@@ -17828,7 +17828,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Choose a target and deal 150 damage to it. This damage cannot be reduced or negated.",
+    "effect": "Choose a target and deal 200 damage to it. This damage cannot be reduced or negated.",
     "archetype": "",
     "setID": "PP SET01",
     "banned": "",

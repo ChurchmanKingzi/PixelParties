@@ -1607,6 +1607,32 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  heart_burst: (() => {
+    const HEARTS = ['❤️','💖','💗','💕','💘','💝','💓','🩷'];
+    return function HeartBurstEffect({ x, y }) {
+      const particles = useMemo(() => Array.from({ length: 18 }, () => ({
+        char:  HEARTS[Math.floor(Math.random() * HEARTS.length)],
+        xOff:  -50 + Math.random() * 100,
+        delay: Math.random() * 300,
+        dur:   500 + Math.random() * 500,
+        size:  12 + Math.random() * 16,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(255,120,160,.6) 0%, rgba(255,80,120,.25) 45%, transparent 70%)' }} />
+          {particles.map((p, i) => (
+            <div key={'hb'+i} style={{
+              position: 'absolute', left: p.xOff, top: 10,
+              fontSize: p.size,
+              filter: 'drop-shadow(0 0 4px rgba(255,80,120,0.7))',
+              animation: `holySparkleRise ${p.dur}ms ease-out ${p.delay}ms forwards`,
+              opacity: 0,
+            }}>{p.char}</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
   golden_ankh_revival: (() => {
     return function GoldenAnkhRevivalEffect({ x, y }) {
       const ankhs = useMemo(() => Array.from({ length: 12 }, () => ({
@@ -4007,6 +4033,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Hand-lock: dim non-Ability cards that are blocked by handLock
     if (me.handLocked && card.cardType !== 'Ability' && (me.handLockBlockedCards || []).includes(cardName)) return true;
 
+    // Never-playable cards (e.g. Glass of Marbles, Mystery Box) — always dimmed
+    if ((me.neverPlayableCards || []).includes(cardName)) return true;
+
     // Divine Gift of Creation lock: dim cards with locked names
     if ((me.creationLockedNames || []).includes(cardName)) return true;
 
@@ -5587,6 +5616,228 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => flash.remove(), 550);
     };
     socket.on('qinglong_lightning', onQinglongLightning);
+    const onRedLightningRain = ({ owner, heroIdx, zoneSlot }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const sel = zoneSlot >= 0
+        ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
+        : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
+      const tgtEl = document.querySelector(sel);
+      if (!tgtEl) return;
+      const tr = tgtEl.getBoundingClientRect();
+      const cx = tr.left + tr.width / 2;
+      const cy = tr.top + tr.height / 2;
+
+      // Inject keyframes once
+      if (!document.getElementById('red-lightning-rain-kf')) {
+        const style = document.createElement('style');
+        style.id = 'red-lightning-rain-kf';
+        style.textContent = `
+          @keyframes redBoltFall {
+            0%   { transform: scaleY(0); opacity: 0; }
+            15%  { transform: scaleY(1); opacity: 1; }
+            60%  { opacity: 1; }
+            100% { opacity: 0; }
+          }
+          @keyframes redImpact {
+            0%   { transform: scale(0); opacity: 1; }
+            50%  { transform: scale(1.4); opacity: 0.8; }
+            100% { transform: scale(2); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      // Spawn 6 red bolts raining down with staggered timing
+      for (let i = 0; i < 6; i++) {
+        const xOff  = (Math.random() - 0.5) * tr.width * 1.2;
+        const boltH = 60 + Math.random() * 80;
+        const boltW = 3 + Math.random() * 4;
+        const delay = i * 60 + Math.random() * 40;
+        const bolt  = document.createElement('div');
+        bolt.style.cssText = [
+          `position:fixed`,
+          `left:${cx + xOff - boltW / 2}px`,
+          `top:${cy - boltH}px`,
+          `width:${boltW}px`,
+          `height:${boltH}px`,
+          `background:linear-gradient(180deg,transparent 0%,#ff3333 30%,#ff8888 60%,#ffffff 80%,transparent 100%)`,
+          `border-radius:${boltW}px`,
+          `transform-origin:50% 0%`,
+          `box-shadow:0 0 10px #ff2222,0 0 25px #cc0000,0 0 50px rgba(200,0,0,.4)`,
+          `pointer-events:none`,
+          `z-index:10000`,
+          `animation:redBoltFall .5s ${delay}ms ease-out forwards`,
+        ].join(';');
+        document.body.appendChild(bolt);
+        setTimeout(() => bolt.remove(), 650 + delay);
+
+        // Impact flash at strike point
+        const flash = document.createElement('div');
+        flash.style.cssText = [
+          `position:fixed`,
+          `left:${cx + xOff - 14}px`,
+          `top:${cy - 14}px`,
+          `width:28px`,
+          `height:28px`,
+          `border-radius:50%`,
+          `background:radial-gradient(circle,rgba(255,180,180,.9),rgba(200,0,0,.5),transparent)`,
+          `pointer-events:none`,
+          `z-index:10001`,
+          `animation:redImpact .4s ${delay + 150}ms ease-out forwards`,
+        ].join(';');
+        document.body.appendChild(flash);
+        setTimeout(() => flash.remove(), 650 + delay);
+      }
+    };
+    socket.on('red_lightning_rain', onRedLightningRain);
+    const onBoulderFall = ({ owner, heroIdx, zoneSlot }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const sel = zoneSlot >= 0
+        ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
+        : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
+      const tgtEl = document.querySelector(sel);
+      if (!tgtEl) return;
+      const tr = tgtEl.getBoundingClientRect();
+      const cx = tr.left + tr.width / 2;
+      const cy = tr.top + tr.height / 2;
+
+      if (!document.getElementById('boulder-fall-kf')) {
+        const style = document.createElement('style');
+        style.id = 'boulder-fall-kf';
+        style.textContent = `
+          @keyframes boulderDrop {
+            0%   { transform: translateY(-220px) rotate(-15deg) scale(0.6); opacity: 0; }
+            20%  { opacity: 1; }
+            80%  { transform: translateY(0px) rotate(10deg) scale(1.1); opacity: 1; }
+            90%  { transform: translateY(8px) rotate(12deg) scale(1.15); }
+            100% { transform: translateY(0px) rotate(8deg) scale(0); opacity: 0; }
+          }
+          @keyframes boulderCrash {
+            0%   { transform: scale(0); opacity: 0.9; }
+            40%  { transform: scale(2.2); opacity: 0.7; }
+            100% { transform: scale(3.5); opacity: 0; }
+          }
+          @keyframes boulderDebris {
+            0%   { transform: translate(0,0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      // Giant boulder emoji
+      const boulder = document.createElement('div');
+      boulder.textContent = '🪨';
+      boulder.style.cssText = [
+        'position:fixed',
+        `left:${cx - 30}px`,
+        `top:${cy - 30}px`,
+        'width:60px', 'height:60px',
+        'font-size:56px', 'line-height:60px', 'text-align:center',
+        'pointer-events:none', 'z-index:10002',
+        'filter:drop-shadow(0 8px 16px rgba(80,40,0,0.8))',
+        'animation:boulderDrop 0.55s ease-in forwards',
+      ].join(';');
+      document.body.appendChild(boulder);
+
+      // Crash shockwave ring
+      setTimeout(() => {
+        const ring = document.createElement('div');
+        ring.style.cssText = [
+          'position:fixed',
+          `left:${cx - 20}px`, `top:${cy - 20}px`,
+          'width:40px', 'height:40px', 'border-radius:50%',
+          'background:radial-gradient(circle,rgba(160,100,40,.9),rgba(100,60,20,.5),transparent)',
+          'pointer-events:none', 'z-index:10001',
+          'animation:boulderCrash 0.5s ease-out forwards',
+        ].join(';');
+        document.body.appendChild(ring);
+        setTimeout(() => ring.remove(), 550);
+
+        // Debris chunks flying outward
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * 360;
+          const dist  = 30 + Math.random() * 40;
+          const dx = Math.cos(angle * Math.PI / 180) * dist;
+          const dy = Math.sin(angle * Math.PI / 180) * dist;
+          const chunk = document.createElement('div');
+          chunk.textContent = '🪨';
+          chunk.style.cssText = [
+            'position:fixed',
+            `left:${cx - 8}px`, `top:${cy - 8}px`,
+            'font-size:14px',
+            'pointer-events:none', 'z-index:10001',
+            `--dx:${dx}px`, `--dy:${dy}px`,
+            `animation:boulderDebris ${0.4 + Math.random() * 0.2}s ease-out forwards`,
+          ].join(';');
+          document.body.appendChild(chunk);
+          setTimeout(() => chunk.remove(), 700);
+        }
+      }, 450);
+
+      setTimeout(() => boulder.remove(), 700);
+    };
+    socket.on('boulder_fall', onBoulderFall);
+    const onSlowDarkMagic = ({ ownerIdx }) => {
+      // Animate on the hand of the player who is discarding
+      const ownerLabel = ownerIdx === myIdx ? 'me' : 'opp';
+      const handEl = document.querySelector(`.game-hand-${ownerLabel}`);
+      if (!handEl) return;
+      const r = handEl.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+
+      if (!document.getElementById('slow-dark-magic-kf')) {
+        const style = document.createElement('style');
+        style.id = 'slow-dark-magic-kf';
+        style.textContent = `
+          @keyframes slowMagicRise {
+            0%   { transform: translate(0, 0) scale(0.4); opacity: 0; }
+            25%  { opacity: 1; }
+            100% { transform: translate(var(--smx), var(--smy)) scale(0); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      const symbols = ['✦','✧','⬟','◆','✵','❋','⁕'];
+      for (let i = 0; i < 14; i++) {
+        const p = document.createElement('div');
+        const angle = (i / 14) * 360 + Math.random() * 20;
+        const dist  = 20 + Math.random() * 55;
+        const dx    = Math.cos(angle * Math.PI / 180) * dist;
+        const dy    = Math.sin(angle * Math.PI / 180) * dist;
+        const size  = 10 + Math.random() * 14;
+        const delay = Math.random() * 200;
+        const dur   = 500 + Math.random() * 400;
+        const col   = Math.random() > 0.5 ? '#cc44ff' : '#8822dd';
+        p.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+        p.style.cssText = [
+          'position:fixed',
+          `left:${cx + (Math.random() - 0.5) * r.width * 0.7}px`,
+          `top:${cy + (Math.random() - 0.5) * r.height * 0.7}px`,
+          `font-size:${size}px`, `color:${col}`,
+          `filter:drop-shadow(0 0 5px ${col})`,
+          'pointer-events:none', 'z-index:10100',
+          `--smx:${dx}px`, `--smy:${dy}px`,
+          `animation:slowMagicRise ${dur}ms ease-out ${delay}ms forwards`,
+          'opacity:0',
+        ].join(';');
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), dur + delay + 50);
+      }
+    };
+    socket.on('slow_dark_magic', onSlowDarkMagic);
+    const onCardEffectFlash = ({ owner, heroIdx, zoneSlot }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const sel = (zoneSlot != null && zoneSlot >= 0)
+        ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
+        : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
+      setTimeout(() => playAnimation('gold_sparkle', sel, { duration: 1400 }), 50);
+      setTimeout(() => playAnimation('gold_sparkle', sel, { duration: 1200 }), 250);
+      setTimeout(() => playAnimation('gold_sparkle', sel, { duration: 1000 }), 450);
+    };
+    socket.on('card_effect_flash', onCardEffectFlash);
     const onJumpscareBox = ({ owner, heroIdx }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
@@ -5734,10 +5985,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (el) playAnimation(type || 'holy_revival', el, { duration: 1200 });
     };
     socket.on('play_permanent_animation', onPermanentAnim);
-    const onRamAnimation = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, targetPermId, cardName, duration, trailType }) => {
+    const onRamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, targetPermId, cardName, duration, trailType }) => {
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
-      const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
+      // If sourceZoneSlot is provided, originate from that support zone; otherwise from the hero zone.
+      const srcEl = (sourceZoneSlot != null && sourceZoneSlot >= 0)
+        ? document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`)
+        : document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
       let tgtEl;
       if (targetZoneType === 'ability' && targetHeroIdx >= 0 && targetZoneSlot >= 0) {
         tgtEl = document.querySelector(`[data-ability-zone][data-ability-owner="${tgtLabel}"][data-ability-hero="${targetHeroIdx}"][data-ability-slot="${targetZoneSlot}"]`);
@@ -5795,10 +6049,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('play_card_transfer', onCardTransfer);
-    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, emoji, duration, trailClass, emojiStyle, projectileClass }) => {
+    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, emoji, duration, trailClass, emojiStyle, projectileClass }) => {
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
-      const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
+      const srcEl = (sourceZoneSlot != null && sourceZoneSlot >= 0)
+        ? document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`)
+        : document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
       let tgtEl;
       if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
         tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
@@ -6272,6 +6528,153 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('discard_to_deck_animation', onDiscardToDeck);
+    const onDeckToDiscard = ({ owner, cardNames, deleteMode, holdDuration }) => {
+      const isMe    = owner === myIdx;
+      const deckSel     = isMe ? '[data-my-deck]'    : '[data-opp-deck]';
+      const discardSel  = isMe
+        ? (deleteMode ? '[data-my-deleted]'  : '[data-my-discard]')
+        : (deleteMode ? '[data-opp-deleted]' : '[data-opp-discard]');
+      const srcEl = document.querySelector(deckSel);
+      const tgtEl = document.querySelector(discardSel);
+      if (!srcEl || !tgtEl || !cardNames || cardNames.length === 0) return;
+
+      const sr  = srcEl.getBoundingClientRect();
+      const tr  = tgtEl.getBoundingClientRect();
+      const srcX = sr.left + sr.width  / 2;
+      const srcY = sr.top  + sr.height / 2;
+      const dx  = (tr.left + tr.width  / 2) - srcX;
+      const dy  = (tr.top  + tr.height / 2) - srcY;
+
+      if (!document.getElementById('deck-to-discard-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'deck-to-discard-keyframes';
+        style.textContent = `
+          @keyframes deckToDiscard {
+            0%   { transform: translate(0,0) scale(1); opacity: 1; }
+            20%  { transform: translate(0,-18px) scale(1.08); opacity: 1; }
+            80%  { transform: translate(var(--dtdsDx), calc(var(--dtdsDy) - 10px)) scale(0.92); opacity: 1; }
+            100% { transform: translate(var(--dtdsDx), var(--dtdsDy)) scale(0.72); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      for (let i = 0; i < cardNames.length; i++) {
+        const card    = document.createElement('div');
+        const imgUrl  = window.cardImageUrl ? window.cardImageUrl(cardNames[i]) : null;
+        const delay   = i * 200;
+        const holdMs  = holdDuration || 0;
+        const travelMs = 700;
+        const totalMs  = travelMs + holdMs + (holdMs > 0 ? 300 : 0); // travel + hold + fade-out
+
+        // For cards with a hold phase, generate a unique keyframe
+        let animName = 'deckToDiscard';
+        if (holdMs > 0) {
+          const kfId   = `dtd-hold-${travelMs}-${holdMs}`;
+          animName     = kfId;
+          if (!document.getElementById(kfId)) {
+            const tPct  = Math.round((travelMs / totalMs) * 100);
+            const hPct  = Math.round(((travelMs + holdMs) / totalMs) * 100);
+            const style = document.createElement('style');
+            style.id    = kfId;
+            style.textContent = `
+              @keyframes ${kfId} {
+                0%     { transform: translate(0,0) scale(1); opacity: 1; }
+                ${Math.round(tPct * 0.25)}% { transform: translate(0,-18px) scale(1.08); opacity: 1; }
+                ${Math.round(tPct * 0.85)}% { transform: translate(var(--dtdsDx), calc(var(--dtdsDy) - 10px)) scale(0.92); opacity: 1; }
+                ${tPct}%  { transform: translate(var(--dtdsDx), var(--dtdsDy)) scale(0.88); opacity: 1; }
+                ${hPct}%  { transform: translate(var(--dtdsDx), var(--dtdsDy)) scale(0.88); opacity: 1; }
+                100%   { transform: translate(var(--dtdsDx), var(--dtdsDy)) scale(0.72); opacity: 0; }
+              }
+            `;
+            document.head.appendChild(style);
+          }
+        }
+
+        card.style.cssText = [
+          'position:fixed',
+          `left:${srcX - 32}px`, `top:${srcY - 44}px`,
+          'width:64px', 'height:88px', 'z-index:10200', 'pointer-events:none',
+          'border-radius:4px', 'overflow:hidden',
+          'box-shadow:0 0 12px rgba(180,80,255,0.7),0 0 4px rgba(120,40,200,0.5)',
+          `--dtdsDx:${dx}px`, `--dtdsDy:${dy}px`,
+          `animation:${animName} ${totalMs}ms ease-in-out ${delay}ms forwards`,
+          'opacity:0',
+        ].join(';');
+        if (imgUrl) {
+          const img = document.createElement('img');
+          img.src        = imgUrl;
+          img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+          img.draggable  = false;
+          card.appendChild(img);
+          card.style.opacity = '1';
+        } else {
+          card.style.background = 'linear-gradient(135deg,#2a1a4a,#1a0a3a)';
+          card.style.opacity    = '1';
+          card.innerHTML = `<div style="color:#c8a;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardNames[i]}</div>`;
+        }
+        document.body.appendChild(card);
+        setTimeout(() => card.remove(), delay + totalMs + 100);
+      }
+    };
+    socket.on('deck_to_discard_animation', onDeckToDiscard);
+    const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const deckSel = ownerLabel === 'me' ? '[data-my-deck]' : '[data-opp-deck]';
+      const abSel   = `[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`;
+      const srcEl   = document.querySelector(deckSel);
+      const tgtEl   = document.querySelector(abSel);
+      if (!srcEl || !tgtEl || !count) return;
+
+      const sr  = srcEl.getBoundingClientRect();
+      const tr  = tgtEl.getBoundingClientRect();
+      const srcX = sr.left + sr.width  / 2;
+      const srcY = sr.top  + sr.height / 2;
+      const dx  = (tr.left + tr.width  / 2) - srcX;
+      const dy  = (tr.top  + tr.height / 2) - srcY;
+
+      if (!document.getElementById('deck-to-ability-kf')) {
+        const style = document.createElement('style');
+        style.id = 'deck-to-ability-kf';
+        style.textContent = `
+          @keyframes deckToAbility {
+            0%   { transform: translate(0,0) scale(1); opacity: 1; }
+            20%  { transform: translate(0,-18px) scale(1.08); opacity: 1; }
+            80%  { transform: translate(var(--dtaDx), calc(var(--dtaDy) - 10px)) scale(0.85); opacity: 1; }
+            100% { transform: translate(var(--dtaDx), var(--dtaDy)) scale(0.7); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      for (let i = 0; i < count; i++) {
+        const card   = document.createElement('div');
+        const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
+        const delay  = i * 300;
+        card.style.cssText = [
+          'position:fixed',
+          `left:${srcX - 32}px`, `top:${srcY - 44}px`,
+          'width:64px', 'height:88px', 'z-index:10200', 'pointer-events:none',
+          'border-radius:4px', 'overflow:hidden',
+          'box-shadow:0 0 12px rgba(255,200,50,0.8),0 0 4px rgba(200,150,0,0.6)',
+          `--dtaDx:${dx}px`, `--dtaDy:${dy}px`,
+          `animation:deckToAbility 600ms ease-in-out ${delay}ms forwards`,
+          'opacity:0',
+        ].join(';');
+        if (imgUrl) {
+          const img = document.createElement('img');
+          img.src = imgUrl; img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+          img.draggable = false; card.appendChild(img); card.style.opacity = '1';
+        } else {
+          card.style.background = 'linear-gradient(135deg,#3a2a0a,#2a1a00)';
+          card.style.opacity = '1';
+          card.innerHTML = `<div style="color:#ffa;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardName}</div>`;
+        }
+        document.body.appendChild(card);
+        setTimeout(() => card.remove(), delay + 700);
+      }
+    };
+    socket.on('deck_to_ability_animation', onDeckToAbility);
     const onPunchBox = ({ targetOwner, targetHeroIdx, targetZoneSlot }) => {
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
       let tgtEl;
@@ -6684,6 +7087,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('baihu_petrify', onBaihuPetrify);
       socket.off('cardinal_beast_win', onCardinalBeastWin);
       socket.off('qinglong_lightning', onQinglongLightning);
+      socket.off('red_lightning_rain', onRedLightningRain);
+      socket.off('boulder_fall', onBoulderFall);
+      socket.off('slow_dark_magic', onSlowDarkMagic);
+      socket.off('card_effect_flash', onCardEffectFlash);
       socket.off('jumpscare_box', onJumpscareBox);
       socket.off('anti_magic_bubble', onAntiMagicBubble);
       socket.off('fireshield_corona', onFireshieldCorona);
@@ -6698,6 +7105,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('divine_rain_start', onDivineRainStart);
       socket.off('moe_bomb_animation', onMoeBomb);
       socket.off('discard_to_deck_animation', onDiscardToDeck);
+      socket.off('deck_to_discard_animation', onDeckToDiscard);
+      socket.off('deck_to_ability_animation', onDeckToAbility);
       socket.off('punch_box_animation', onPunchBox);
       socket.off('tears_of_creation_animation', onTearsOfCreation);
       socket.off('play_hand_steal', onHandSteal);
@@ -8428,7 +8837,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         return <BoardCard cardName={cards[0]} style={{ opacity: 0.6 }} />;
                       }
                     }
-                    const isCreature = (cc?._cardDataOverride?.cardType || CARDS_BY_NAME[cards[cards.length-1]]?.cardType || '').split('/').some(t => t.trim() === 'Creature'); const creatureStyle = cc?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' } : cc?._xuanwuRevived ? { filter: 'sepia(0.2) hue-rotate(180deg) brightness(1.1)', opacity: 0.75 } : undefined; return !isCreature ? (
+                    const isCreature = (cc?._cardDataOverride?.cardType || CARDS_BY_NAME[cards[cards.length-1]]?.cardType || '').split('/').some(t => t.trim() === 'Creature'); const creatureStyle = cc?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' } : (cc?._xuanwuRevived || cc?._illusionSummon) ? { filter: 'sepia(0.2) hue-rotate(180deg) brightness(1.1)', opacity: 0.75 } : undefined; return !isCreature ? (
                       <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} />
                     ) : (
                     <>
@@ -8550,6 +8959,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#cc8800' });
             if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#ff4444' });
             if (opp.damageLocked) debuffs.push({ key: 'damage-opp', icon: '🛡️', text: `${opp.username} cannot deal any more damage to your targets this turn!`, color: '#ff8844' });
+            if (me.oppHandLocked) debuffs.push({ key: 'opphand-me', icon: '🫲', text: 'You cannot interact with your opponent\'s hand for the rest of this turn!', color: '#aa44ff' });
+            if (opp.oppHandLocked) debuffs.push({ key: 'opphand-opp', icon: '🫲', text: `${opp.username} cannot interact with your hand for the rest of this turn!`, color: '#8833cc' });
             if (me.potionLocked) debuffs.push({ key: 'potion-me', icon: '🧪', text: 'You cannot play any more Potions this turn!', color: '#aa44ff' });
             if (opp.potionLocked) debuffs.push({ key: 'potion-opp', icon: '🧪', text: `${opp.username} cannot play any more Potions this turn!`, color: '#8844cc' });
             if (me.supportSpellLocked) debuffs.push({ key: 'support-me', icon: '💚', text: 'You cannot use another Support Spell this turn.', color: '#ff4444' });
@@ -9394,13 +9805,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <button className="btn btn-danger" style={{ padding: '10px 28px', fontSize: 13, width: 220 }} onClick={() => {
                   showTextBox(null);
                   setShowSurrender(false);
-                  if (gameState.isTutorial) {
-                    window._tutorialGaveUp = true;
-                    socket.emit('leave_game', { roomId: gameState.roomId });
-                    onLeave();
-                  } else {
-                    handleSurrender();
-                  }
+                  if (gameState.isTutorial) window._tutorialGaveUp = true;
+                  onLeave();
                 }}>✕ Give Up</button>
                 <button className="btn" style={{ padding: '10px 28px', fontSize: 13, width: 220 }} onClick={() => setShowSurrender(false)}>Cancel</button>
               </>) : isBestOf ? (<>
@@ -10173,13 +10579,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 </div>
               </>
             )}
-            <button className="btn" style={{
-              padding: '12px 32px', fontSize: 14,
-              borderColor: result.puzzleResult === 'success' ? '#ffd700' : 'var(--accent)',
-              color: result.puzzleResult === 'success' ? '#ffd700' : 'var(--accent)',
-            }} onClick={handleResultLeave}>
-              {result.isTutorial ? '← RETURN TO TUTORIAL' : '← RETURN TO PUZZLE'}
-            </button>
+            {result.puzzleResult === 'success' ? (
+              <button className="btn" style={{ padding: '12px 32px', fontSize: 14, borderColor: '#ffd700', color: '#ffd700' }} onClick={handleResultLeave}>
+                {result.isTutorial ? '← RETURN TO TUTORIAL' : '← RETURN TO PUZZLE'}
+              </button>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+                <button className="btn" style={{ padding: '10px 28px', fontSize: 13, width: 220, borderColor: 'var(--accent)', color: 'var(--accent)' }}
+                  onClick={() => { socket.emit('retry_puzzle', { roomId: gameState.roomId }); }}>
+                  🔄 Retry
+                </button>
+                <button className="btn btn-danger" style={{ padding: '10px 28px', fontSize: 13, width: 220 }}
+                  onClick={() => { if (result?.isTutorial) window._tutorialGaveUp = true; onLeave(); }}>
+                  ✕ Give Up
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

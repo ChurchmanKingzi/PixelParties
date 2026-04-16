@@ -1295,6 +1295,7 @@ function sendGameState(room, playerIdx, extra) {
       abilityGivenThisTurn: ps.abilityGivenThisTurn || [false,false,false],
       summonLocked: ps.summonLocked || false,
       damageLocked: ps.damageLocked || false,
+      oppHandLocked: ps.oppHandLocked || false,
       itemLocked: ps.itemLocked || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
@@ -1315,6 +1316,7 @@ function sendGameState(room, playerIdx, extra) {
         }
         return [...blocked];
       })() : [],
+      neverPlayableCards: pi === playerIdx ? ps.hand.filter(cn => loadCardEffect(cn)?.neverPlayable) : [],
       supportSpellLocked: ps.supportSpellLocked || false,
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       heroesActedThisTurn: ps.heroesActedThisTurn || [],
@@ -1562,6 +1564,7 @@ function sendSpectatorGameState(room) {
       abilityGivenThisTurn: ps.abilityGivenThisTurn || [false, false, false],
       summonLocked: ps.summonLocked || false,
       damageLocked: ps.damageLocked || false,
+      oppHandLocked: ps.oppHandLocked || false,
       itemLocked: ps.itemLocked || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
@@ -1583,6 +1586,7 @@ function sendSpectatorGameState(room) {
       revealedHandCards: [],
       creationLockedNames: [],
       handLockBlockedCards: [],
+      neverPlayableCards: [],
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       heroesActedThisTurn: ps.heroesActedThisTurn || [],
     })),
@@ -2282,7 +2286,12 @@ io.on('connection', (socket) => {
       const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
       if (pi >= 0) {
         const winnerIdx = pi === 0 ? 1 : 0;
-        if (room.type === 'puzzle') puzzleEndGame(room, winnerIdx, 'surrender');
+        if (room.type === 'puzzle') {
+          puzzleEndGame(room, winnerIdx, 'surrender');
+          // Puzzle surrender: clean up immediately so the player can start a new puzzle
+          socket.leave('room:' + roomId);
+          activeGames.delete(currentUser.userId);
+        }
         else await endGame(room, winnerIdx, 'surrender');
       }
       // Don't mark as left — both players should see Rematch/Leave
@@ -3099,6 +3108,10 @@ io.on('connection', (socket) => {
 
           if (!gs.hoptUsed) gs.hoptUsed = {};
           gs.hoptUsed[chosen.hoptKey] = gs.turn;
+          // _preventPhaseAdvance set by afterSpellResolved hooks (e.g. Legendary Sword)
+          // keeps the phase open for additional actions; clean it up here since the
+          // hero-effect path doesn't run the normal spell phase-advance logic.
+          delete gs._preventPhaseAdvance;
         } else {
           // Cancelled — clean up pending reveal + log
           delete gs._pendingCardReveal;
@@ -4810,6 +4823,7 @@ io.on('connection', (socket) => {
           if (!ps) continue;
           ps.summonLocked = false; ps.handLocked = false; ps.damageLocked = false;
           ps.dealtDamageToOpponent = false; ps.potionLocked = false;
+          ps.oppHandLocked = false;
           ps.supportSpellLocked = false; ps.supportSpellUsedThisTurn = false;
           ps.potionsUsedThisTurn = 0; ps.attacksPlayedThisTurn = 0;
           ps.comboLockHeroIdx = null; ps.heroesActedThisTurn = []; ps.heroesAttackedThisTurn = [];
@@ -4819,6 +4833,10 @@ io.on('connection', (socket) => {
         }
         room.engine._resetTerrorTracking();
         await room.engine.runHooks('onGameStart', { _skipReactionCheck: true });
+        // Puzzles skip the normal Resource/Action phases and jump straight to Main Phase 1.
+        // Fire onTurnStart so cards that rely on it for per-turn setup (Slime Rancher,
+        // additional actions, etc.) are correctly initialised before the player acts.
+        await room.engine.runHooks('onTurnStart', { playerIdx: 0, _skipReactionCheck: true });
         gs.currentPhase = 2; // PHASES.MAIN1
         gs.unactivatableArtifacts = room.engine.getUnactivatableArtifacts(0);
         room.engine.log('phase_start', { phase: 'Main Phase 1' });

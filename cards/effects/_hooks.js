@@ -29,6 +29,7 @@ const HOOKS = {
   BEFORE_PLAY:      'beforePlay',
   ON_PLAY:          'onPlay',
   ON_DISCARD:       'onDiscard',
+  ON_MILL:          'onMill',       // Fires when cards are milled from deck to discard (NOT onDiscard)
   ON_DELETE:        'onDelete',
   ON_CARD_ENTER_ZONE: 'onCardEnterZone',
   ON_CARD_LEAVE_ZONE: 'onCardLeaveZone',
@@ -52,6 +53,7 @@ const HOOKS = {
   // ── Status ──
   ON_STATUS_APPLIED:  'onStatusApplied',
   ON_STATUS_REMOVED:  'onStatusRemoved',
+  BEFORE_HERO_EFFECT: 'beforeHeroEffect',  // buff add/remove, heal — cancellable
 
   // ── Chain-specific ──
   ON_CHAIN_START:    'onChainStart',

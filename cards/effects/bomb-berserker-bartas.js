@@ -55,20 +55,8 @@ module.exports = {
 
       // Check spell level < Bartas's Destruction Magic level
       const spellLevel = spellData.level || 0;
-      const abZones = ps.abilityZones[heroIdx] || [];
-      let dmLevel = 0;
-      for (const slot of abZones) {
-        if (!slot || slot.length === 0) continue;
-        const base = slot[0];
-        for (const ab of slot) {
-          if (ab === 'Destruction Magic') dmLevel++;
-          else if (ab === 'Performance' && base === 'Destruction Magic') dmLevel++;
-        }
-      }
+      const dmLevel = engine.countAbilitiesForSchool('Destruction Magic', ps.abilityZones[heroIdx] || []);
       if (spellLevel >= dmLevel) return;
-
-      // Check Bartas still has the required Destruction Magic level to cast
-      if (dmLevel < spellLevel) return;
 
       // Check there's at least 1 OTHER valid target on the opponent's side
       const oppIdx = pi === 0 ? 1 : 0;

@@ -591,13 +591,12 @@ class GameEngine {
       async discardCards(playerIdx, count) {
         return engine.actionDiscardCards(playerIdx, count);
       },
+      async millCards(playerIdx, count, opts) {
+        return engine.actionMillCards(playerIdx, count, opts);
+      },
       /** Add a specific card to a player's hand with logging. */
       addCardToHand(playerIdx, cardName, source) {
         return engine.actionAddCardToHand(playerIdx, cardName, source || cardInstance.name);
-      },
-      /** Mill cards from deck to discard/delete pile. */
-      millCards(playerIdx, count, destination, source) {
-        return engine.actionMillCards(playerIdx, count, destination, source || cardInstance.name);
       },
       /** Shuffle cards from hand back into deck. */
       shuffleBackToDeck(playerIdx, cardNames, source) {
@@ -1383,7 +1382,15 @@ class GameEngine {
 
         if (targets.length === 0) return [];
 
-        const max = Math.min(config.max || targets.length, targets.length);
+        // Single-target attack restriction (e.g. Toras, Master of all Weapons).
+        // When the caster's heroFlag singleTargetAttack is set, cap selection to 1.
+        const casterPi      = cardInstance.controller ?? cardInstance.owner ?? -1;
+        const casterHeroIdx = cardInstance.heroIdx ?? -1;
+        const casterHeroFlag = (casterPi >= 0 && casterHeroIdx >= 0)
+          ? gs.heroFlags?.[`${casterPi}-${casterHeroIdx}`]
+          : null;
+        const maxCap = casterHeroFlag?.singleTargetAttack ? 1 : (config.max || targets.length);
+        const max = Math.min(maxCap, targets.length);
         const min = config.min || 1;
 
         const selectedIds = await engine.promptEffectTarget(pi, targets, {
@@ -1996,6 +2003,10 @@ class GameEngine {
       if (this.gs.heroFlags?.[flagKey]?.overhealPassive && target.hp <= maxHp) allowOverheal = true;
     }
     const hpBefore = target.hp;
+    // Allow Resistance to cancel healing
+    const healCtx = { playerIdx: targetPi, heroIdx: targetHi, hero: target, effectType: 'heal', amount, cancelled: false, _skipReactionCheck: true };
+    await this.runHooks(HOOKS.BEFORE_HERO_EFFECT, healCtx);
+    if (healCtx.cancelled) return;
     if (allowOverheal) {
       target.hp += amount;
       this.log('heal', { source: source?.name, target: this._heroLabel(target), amount, overheal: target.hp > maxHp });
@@ -2112,9 +2123,27 @@ class GameEngine {
    * @param {object} opts - { alsoHealCurrent: true (default) }
    * @returns {number} The actual amount max HP was increased by (may be 0 if capped)
    */
-  increaseMaxHp(hero, amount, opts = {}) {
-    if (!hero || hero.hp === undefined) return 0;
-    const alsoHeal = opts.alsoHealCurrent !== false; // default true
+  increaseMaxHp(target, amount, opts = {}) {
+    if (!target || amount <= 0) return 0;
+
+    // ── Creature path ──────────────────────────────────────────────────────
+    // Detected by the presence of a counters object (CardInstance).
+    // Both currentHp and maxHp are always increased by the full amount —
+    // this correctly handles Nao-style overheal (currentHp can exceed maxHp).
+    if (target.counters !== undefined) {
+      const cd        = this._getCardDB()[target.name];
+      const baseHp    = target.counters.maxHp    ?? cd?.hp ?? 0;
+      const currentHp = target.counters.currentHp ?? baseHp;
+      target.counters.maxHp     = baseHp    + amount;
+      target.counters.currentHp = currentHp + amount;
+      this.log('max_hp_increase', { target: target.name, amount, newMax: target.counters.maxHp });
+      return amount;
+    }
+
+    // ── Hero path (original logic) ─────────────────────────────────────────
+    const hero = target;
+    if (hero.hp === undefined) return 0;
+    const alsoHeal   = opts.alsoHealCurrent !== false; // default true
     const currentMax = hero.maxHp || hero.hp;
 
     let effective = amount;
@@ -2212,6 +2241,70 @@ class GameEngine {
         cancellable: false,
       });
     }
+  }
+
+  /**
+   * Search a player's main deck for a card with an exact name, add one copy
+   * to their hand, reveal it to the opponent, and shuffle the deck.
+   *
+   * @param {number}  playerIdx  - The searching player's index.
+   * @param {string}  cardName   - Exact card name to search for.
+   * @param {string}  title      - Effect title shown in the reveal prompt.
+   * @param {object}  [opts]
+   * @param {boolean} [opts.shuffle=true]  - Whether to shuffle after (default true).
+   * @returns {string|null} The card name if found and added, otherwise null.
+   */
+  async searchDeckForNamedCard(playerIdx, cardName, title, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return null;
+
+    const idx = (ps.mainDeck || []).indexOf(cardName);
+    if (idx < 0) return null;
+
+    ps.mainDeck.splice(idx, 1);
+    ps.hand.push(cardName);
+
+    await this.revealSearchedCards(playerIdx, [cardName], title);
+
+    if (opts.shuffle !== false) this.shuffleDeck(playerIdx);
+
+    this.sync();
+    return cardName;
+  }
+
+  /**
+   * Apply (or add a stack to) Poison on a creature instance.
+   * Centralised handler used by all Poison effects that target creatures.
+   * Handles: immunity check, beforeCreatureAffected hook, stack increment
+   * vs fresh application, counter bookkeeping, and logging.
+   *
+   * @param {object}       source - { name, owner, heroIdx } of the effect source
+   * @param {CardInstance} inst   - Target creature instance
+   */
+  async actionApplyCreaturePoison(source, inst) {
+    if (!inst || inst.zone !== 'support') return;
+    if (!this.canApplyCreatureStatus(inst, 'poisoned')) return;
+
+    const hookCtx = {
+      creature: inst,
+      effectType: 'status',
+      source,
+      cancelled: false,
+      _skipReactionCheck: true,
+    };
+    await this.runHooks('beforeCreatureAffected', hookCtx);
+    if (hookCtx.cancelled) return;
+
+    if (inst.counters.poisoned) {
+      inst.counters.poisonStacks = (inst.counters.poisonStacks || 1) + 1;
+    } else {
+      inst.counters.poisoned = 1;
+      inst.counters.poisonStacks = 1;
+    }
+    inst.counters.poisonAppliedBy = source.owner ?? -1;
+    this.log('poison_applied', {
+      target: inst.name, stacks: inst.counters.poisonStacks, by: source.name,
+    });
   }
 
   async actionDrawCards(playerIdx, count, opts = {}) {
@@ -2484,7 +2577,21 @@ class GameEngine {
       }
     }
 
-    await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, { card: cardInstance, fromZone, fromHeroIdx });
+    await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, {
+      card: cardInstance, fromZone, fromHeroIdx,
+      fromZoneSlot: cardInstance.zoneSlot ?? -1,
+      fromOwner: cardInstance.owner,
+      toZone,
+    });
+
+    // Cards can set _returnToHand = true in onCardLeaveZone to redirect
+    // a discard/delete into a return-to-hand (e.g. The White Eye).
+    if (cardInstance._returnToHand && toZone === ZONES.DISCARD) {
+      delete cardInstance._returnToHand;
+      toZone    = ZONES.HAND;
+      toHeroIdx = -1;
+      toSlot    = -1;
+    }
 
     // Remove from old zone in game state
     this._removeCardFromState(cardInstance);
@@ -2519,12 +2626,115 @@ class GameEngine {
       if (inst) {
         inst.zone = ZONES.DISCARD;
         this.log('discard', { player: ps.username, card: cardName });
-        await this.runHooks(HOOKS.ON_DISCARD, { playerIdx, card: inst, cardName });
+        await this.runHooks(HOOKS.ON_DISCARD, { playerIdx, card: inst, cardName, discardedCardName: cardName, _fromHand: true });
       }
     }
   }
 
   // ─── SAFE SUPPORT ZONE PLACEMENT ─────────
+
+  /**
+   * Mill `count` cards from the top of a player's main deck to their discard pile.
+   * This is NOT discarding — milled cards do NOT fire ON_DISCARD.
+   * Fires ON_MILL after the animation delay. Stops early if the deck runs out.
+   *
+   * @param {number}  playerIdx      - Player whose deck is milled.
+   * @param {number}  count          - Max number of cards to mill.
+   * @param {object}  [opts]
+   * @param {string}  [opts.source]  - Name of the effect causing the mill (for logging).
+   * @param {boolean} [opts.deleteMode] - If true, send to deletedPile instead of discardPile.
+   * @returns {string[]} The names of cards that were milled.
+   */
+  async actionMillCards(playerIdx, count, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !ps.mainDeck || ps.mainDeck.length === 0) return [];
+
+    // First-turn protection: cannot be milled by opponent effects on turn 1
+    if (!opts.selfInflicted && this.gs.firstTurnProtectedPlayer === playerIdx) {
+      this.log('mill_blocked', { player: ps.username, reason: 'shielded' });
+      return [];
+    }
+
+    const toMill     = Math.min(count, ps.mainDeck.length);
+    const milledCards = [];
+    const pileKey    = opts.deleteMode ? 'deletedPile' : 'discardPile';
+
+    if (opts.targetCardName) {
+      // Targeted mill: remove a specific named card from anywhere in the deck
+      const idx = ps.mainDeck.indexOf(opts.targetCardName);
+      if (idx >= 0) {
+        ps.mainDeck.splice(idx, 1);
+        ps[pileKey].push(opts.targetCardName);
+        milledCards.push(opts.targetCardName);
+      }
+    } else {
+      // Normal mill: take from the top of the deck
+      for (let i = 0; i < toMill; i++) {
+        const cardName = ps.mainDeck.shift();
+        if (!cardName) break;
+        ps[pileKey].push(cardName);
+        milledCards.push(cardName);
+      }
+    }
+
+    if (milledCards.length === 0) return [];
+
+    // For any milled card whose script has an onMill hook, create a tracked
+    // instance in the discard/deleted zone so it can fire as a listener.
+    // (Cards in the deck normally have no tracked instances.)
+    const { loadCardEffect } = require('./_loader');
+    const destZoneMill = opts.deleteMode ? ZONES.DELETED : ZONES.DISCARD;
+    for (const cardName of milledCards) {
+      const existing = this.cardInstances.find(
+        c => c.owner === playerIdx && c.name === cardName && c.zone === destZoneMill,
+      );
+      if (!existing) {
+        const script = loadCardEffect(cardName);
+        if (script?.hooks?.onMill) {
+          this._trackCard(cardName, playerIdx, destZoneMill);
+        }
+      }
+    }
+
+    // Log and fire onMill BEFORE the animation — the game state change is already
+    // complete, so hooks (Mystery Box draw, Jean bonus mill, etc.) fire immediately.
+    this.log('mill', {
+      player:      ps.username,
+      count:       milledCards.length,
+      cards:       milledCards,
+      destination: opts.deleteMode ? 'delete' : 'discard',
+      source:      opts.source || null,
+    });
+
+    await this.runHooks(HOOKS.ON_MILL, {
+      playerIdx,
+      milledCards,
+      count:          milledCards.length,
+      source:         opts.source || null,
+      deleteMode:     !!opts.deleteMode,
+      _jeanTriggered: !!opts._jeanTriggered,
+      _skipReactionCheck: true,
+    });
+
+    // Broadcast face-up flying-card animation: deck → discard (purely visual)
+    this._broadcastEvent('deck_to_discard_animation', {
+      owner:        playerIdx,
+      cardNames:    milledCards,
+      deleteMode:   !!opts.deleteMode,
+      holdDuration: opts.holdDuration || 0,
+    });
+
+    // Wait for animation only if there's a hold (Magenta's 2s reveal); otherwise skip
+    if (opts.holdDuration) {
+      const travelMs = 700;
+      const holdMs   = opts.holdDuration;
+      const fadeMs   = 300;
+      await this._delay((milledCards.length - 1) * 200 + travelMs + holdMs + fadeMs + 100);
+    }
+
+    this.sync();
+    return milledCards;
+  }
 
   /**
    * Safely place a card into a support zone with zone-occupied fallback.
@@ -3004,7 +3214,7 @@ class GameEngine {
       const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: result?.cardName })[0];
       if (inst) {
         inst.zone = destZone;
-        await this.runHooks(hookName, { playerIdx, card: inst, cardName: result.cardName, _skipReactionCheck: true });
+        await this.runHooks(hookName, { playerIdx, card: inst, cardName: result.cardName, discardedCardName: result.cardName, _fromHand: true, _skipReactionCheck: true });
       }
       this.sync();
     }
@@ -3070,7 +3280,7 @@ class GameEngine {
         const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0];
         if (inst) inst.zone = destZone;
         this.log('hand_limit_' + pile, { player: ps.username, card: cardName });
-        await this.runHooks(hookName, { playerIdx, cardName, _skipReactionCheck: true });
+        await this.runHooks(hookName, { playerIdx, cardName, discardedCardName: cardName, _fromHand: true, _skipReactionCheck: true });
         this.sync();
         continue;
       }
@@ -3090,7 +3300,7 @@ class GameEngine {
       if (inst) inst.zone = destZone;
 
       this.log('hand_limit_' + pile, { player: ps.username, card: result.cardName });
-      await this.runHooks(hookName, { playerIdx, cardName: result.cardName, _skipReactionCheck: true });
+      await this.runHooks(hookName, { playerIdx, cardName: result.cardName, discardedCardName: result.cardName, _fromHand: true, _skipReactionCheck: true });
       this.sync();
     }
   }
@@ -3299,6 +3509,10 @@ class GameEngine {
   async actionAddBuff(hero, playerIdx, heroIdx, buffName, opts = {}) {
     if (!hero?.name || hero.hp <= 0) return false;
     if (!hero.buffs) hero.buffs = {};
+    // Allow Resistance (and similar) to cancel the buff
+    const buffCtx = { playerIdx, heroIdx, hero, effectType: 'buff_add', buffName, cancelled: false, _skipReactionCheck: true };
+    await this.runHooks(HOOKS.BEFORE_HERO_EFFECT, buffCtx);
+    if (buffCtx.cancelled) return false;
     const buffDef = BUFF_EFFECTS[buffName] || {};
     hero.buffs[buffName] = {
       ...opts,
@@ -3342,6 +3556,10 @@ class GameEngine {
    */
   async actionRemoveBuff(hero, playerIdx, heroIdx, buffName, opts = {}) {
     if (!hero?.buffs?.[buffName]) return;
+    // Allow Resistance to cancel debuff removal too (e.g. an enemy stripping a hero's buff)
+    const buffCtx = { playerIdx, heroIdx, hero, effectType: 'buff_remove', buffName, cancelled: false, _skipReactionCheck: true };
+    await this.runHooks(HOOKS.BEFORE_HERO_EFFECT, buffCtx);
+    if (buffCtx.cancelled) return;
     const buffData = hero.buffs[buffName];
     delete hero.buffs[buffName];
     this.log('buff_remove', { hero: hero.name, buff: buffName });
@@ -4247,6 +4465,7 @@ class GameEngine {
         ps.dealtDamageToOpponent = false;
         ps.potionLocked = false;
         ps.supportSpellLocked = false;
+        ps.oppHandLocked = false; // Slow — cannot interact with opponent's hand this turn
         ps.supportSpellUsedThisTurn = false;
         ps.potionsUsedThisTurn = 0;
         ps.attacksPlayedThisTurn = 0;
@@ -4268,6 +4487,8 @@ class GameEngine {
     }
     // Reset Nomu bonus draw counter each turn
     this.gs._nomuDrawCount = {};
+    // Reset Resistance block counters each turn
+    this.gs._resistanceBlocks = {};
     this.log('turn_start', { turn: this.gs.turn, activePlayer: this.gs.activePlayer, username: activePs?.username });
 
     // Process status effects FIRST — before any card hooks fire

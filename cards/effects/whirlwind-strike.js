@@ -36,6 +36,12 @@ module.exports = {
 
       if (selectedHeroes.length === 0) return;
 
+      // Toras (and any hero with singleTargetAttack) restricts Attacks to 1 target total.
+      // The engine already capped hero selection to 1, but Whirlwind's secondary creature
+      // hits count as additional targets — skip them when the restriction is active.
+      const heroFlag = gs.heroFlags?.[`${pi}-${heroIdx}`];
+      const singleTargetOnly = !!heroFlag?.singleTargetAttack;
+
       // ── ANIMATION: spin up on attacker ──
       engine._broadcastEvent('play_zone_animation', {
         type: 'whirlwind_spin', owner: pi, heroIdx, zoneSlot: -1,
@@ -56,19 +62,22 @@ module.exports = {
         }
 
         // Find Creatures in this hero's support zone via cardInstances
-        for (const inst of engine.cardInstances) {
-          if (inst.owner !== tgt.owner) continue;
-          if (inst.zone !== 'support') continue;
-          if (inst.heroIdx !== tgt.heroIdx) continue;
-          // Check cardType from DB
-          const cd = cardDB[inst.name];
-          if (!cd || !hasCardType(cd, 'Creature')) continue;
-          allCreatureEntries.push({
-            inst, amount: atkDamage, type: 'attack',
-            source: attackSource, sourceOwner: pi,
-            canBeNegated: true,
-            tgtHeroIdx: tgt.heroIdx,
-          });
+        // Skipped when singleTargetAttack is active — only the hero itself is hit.
+        if (!singleTargetOnly) {
+          for (const inst of engine.cardInstances) {
+            if (inst.owner !== tgt.owner) continue;
+            if (inst.zone !== 'support') continue;
+            if (inst.heroIdx !== tgt.heroIdx) continue;
+            // Check cardType from DB
+            const cd = cardDB[inst.name];
+            if (!cd || !hasCardType(cd, 'Creature')) continue;
+            allCreatureEntries.push({
+              inst, amount: atkDamage, type: 'attack',
+              source: attackSource, sourceOwner: pi,
+              canBeNegated: true,
+              tgtHeroIdx: tgt.heroIdx,
+            });
+          }
         }
       }
 

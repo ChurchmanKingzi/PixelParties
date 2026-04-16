@@ -37,6 +37,7 @@ module.exports = {
      */
     onCardLeaveZone: async (ctx) => {
       if (ctx.fromZone !== 'support') return;
+      if (ctx.fromOwner !== ctx.cardOwner || ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
       ctx.revokeAtk();
     },
 

@@ -253,14 +253,15 @@ function PuzzleCreator() {
     try { localStorage.setItem('pz-creator-state', JSON.stringify({ players, areaZones, hand, oppHand, puzzleName })); } catch (_) {}
   }, [players, areaZones, hand, oppHand, puzzleName]);
 
+  const puzzleIgnoreRef = useRef(false); // true after leaving — blocks inflight game_state updates
+
   // ── Puzzle Battle: socket listeners ──
   useEffect(() => {
     const onGameState = (state) => {
-      if (state.isPuzzle) {
-        puzzleRoomRef.current = state.roomId;
-        setPuzzleGameState(state);
-        setInBattle(true);
-      }
+      if (!state.isPuzzle || puzzleIgnoreRef.current) return;
+      puzzleRoomRef.current = state.roomId;
+      setPuzzleGameState(state);
+      setInBattle(true);
     };
     const onPuzzleError = (msg) => {
       notify('Puzzle error: ' + msg, 'error');
@@ -277,6 +278,8 @@ function PuzzleCreator() {
   const onPuzzleLeave = useCallback(() => {
     const gs = puzzleGameState;
     const roomId = puzzleRoomRef.current;
+    puzzleIgnoreRef.current = true;  // Block any inflight game_state updates
+    puzzleRoomRef.current = null;
     // Read result before clearing
     const result = gs?.result;
     const success = result?.isPuzzle && result?.puzzleResult === 'success';
@@ -305,9 +308,18 @@ function PuzzleCreator() {
   }, [notify]);
 
   // ── Tooltip (shared hook — wires BoardCard hover automatically) ──
-  const { tooltipCard, tooltipSide, showTooltip: _showTooltip, hideTooltip } = useCardTooltip({ defaultSide: 'left' });
+  const { tooltipCard, tooltipSide, showTooltip: _showTooltip, hideTooltip, setTooltipCard } = useCardTooltip({ defaultSide: 'left' });
   // On touch devices, suppress hover tooltips (they never dismiss since there's no mouseLeave)
   const showTooltip = isTouchDevice ? () => {} : _showTooltip;
+
+  // Re-register the board tooltip setter after returning from a validation battle.
+  // GameBoard's unmount cleanup nullifies window._boardTooltipSetter — restore it here
+  // whenever puzzleGameState transitions back to null.
+  useEffect(() => {
+    if (puzzleGameState) return; // GameBoard is mounted and owns the setter
+    window._boardTooltipSetter = (card) => setTooltipCard(card || null);
+    return () => { window._boardTooltipSetter = null; };
+  }, [puzzleGameState, setTooltipCard]);
 
   const cardDB = window.CARDS_BY_NAME || {};
   const getCard = useCallback((name) => cardDB[name] || null, [cardDB]);
@@ -747,6 +759,7 @@ function PuzzleCreator() {
       if (oppHand.length > maxHand1) { notify('Opponent hand has too many cards! (max ' + maxHand1 + ' with ' + pollutionCount1 + ' Pollution Token' + (pollutionCount1 !== 1 ? 's' : '') + ')', 'error'); return; }
     }
     // Send puzzle to server — starts a real battle against a CPU opponent
+    puzzleIgnoreRef.current = false;
     socket.emit('start_puzzle', { players, areaZones, hand, oppHand });
   }, [players, areaZones, hand, oppHand, notify]);
 
