@@ -71,7 +71,7 @@ module.exports = {
       confirmClass: 'btn-danger',
       cancellable: true,
       exclusiveTypes: true,
-      maxPerType: { hero: 1, equip: 1, ability: 1, perm: 1, surprise: 1 },
+      maxPerType: { hero: 1, equip: 1, ability: 1, perm: 1, area: 1, surprise: 1 },
     });
 
     if (!cardPick || cardPick.length === 0) {
@@ -108,6 +108,11 @@ module.exports = {
     } else if (tgtZoneType === 'permanent') {
       ramEvent.targetZoneType = 'permanent';
       ramEvent.targetPermId = targetInst.counters?.permId || targetInst.id;
+    } else if (tgtZoneType === 'area') {
+      // Area zones are owner-scoped only (no heroIdx / zoneSlot), so the
+      // frontend selector keys on `[data-area-zone][data-area-owner]` —
+      // see play_ram_animation handler.
+      ramEvent.targetZoneType = 'area';
     } else if (tgtZoneSlot >= 0) {
       ramEvent.targetZoneSlot = tgtZoneSlot;
     }
@@ -125,6 +130,10 @@ module.exports = {
       explEvent.zoneSlot = -1;
       explEvent.zoneType = 'permanent';
       explEvent.permId = targetInst.counters?.permId || targetInst.id;
+    } else if (tgtZoneType === 'area') {
+      explEvent.heroIdx = -1;
+      explEvent.zoneSlot = -1;
+      explEvent.zoneType = 'area';
     } else if (tgtHeroIdx >= 0) {
       explEvent.heroIdx = tgtHeroIdx;
       explEvent.zoneSlot = tgtZoneSlot >= 0 ? tgtZoneSlot : -1;
@@ -207,6 +216,18 @@ function _collectBoardTargets(gs, engine) {
       targets.push({
         id: `perm-${inst.owner}-${inst.counters?.permId || inst.id}`,
         type: 'perm', owner: inst.owner, heroIdx: -1,
+        cardName: inst.name, _cardInstance: inst,
+      });
+    } else if (inst.zone === 'area') {
+      // Area zones count as non-Hero board cards — anything that can
+      // target a Permanent should also be able to target an Area. The
+      // BoardZone displays the top entry of areaZones[owner], so
+      // filter to just that entry.
+      const areaArr = gs.areaZones?.[inst.owner] || [];
+      if (areaArr.length > 0 && areaArr[areaArr.length - 1] !== inst.name) continue;
+      targets.push({
+        id: `area-${inst.owner}`,
+        type: 'area', owner: inst.owner, heroIdx: -1,
         cardName: inst.name, _cardInstance: inst,
       });
     } else if (inst.zone === 'surprise') {

@@ -45,7 +45,7 @@ async function fireSteamEngine(ctx) {
 
   if (!inst || inst.zone !== 'support') return;
   if (ctx.playerIdx !== ctx.cardOwner) return;        // only my discards
-  if (inst.counters?.negated) return;                 // respect negation
+  if (inst.counters?.negated || inst.counters?.nulled) return; // respect negation/nulled
   const hero = ctx.attachedHero;
   if (!hero?.name || hero.hp <= 0) return;            // dead hero column → skip
 

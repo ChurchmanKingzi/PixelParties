@@ -1,0 +1,37 @@
+=== PIXEL PARTIES DECK ===
+Name: Sample Deck: Spell Industrialization
+
+== HEROES ==
+Cooldin, King of Coolness
+Victorica, the Eternal Empress
+Ingo, Investor of Evil
+
+== MAIN DECK ==
+6x Alchemy
+2x Dark Gear
+1x Divine Gift of Fire
+2x Eraser Beam
+4x Golden Ankh
+2x Golden Wings
+1x Goldify
+6x Leadership
+2x Magic Mirror
+2x Magnetic Glove
+6x Mana Mining
+4x Pollution Piranha
+4x Pollution Spewer
+4x Pyroblast
+2x Rain of Arrows
+1x Rain of Death
+1x Reincarnation
+2x Shard of Chaos
+2x Tea
+2x The Great Clock Tower "Big Gwen"
+4x Wheels
+
+== POTION DECK ==
+2x Elixir of Quickness
+2x Magnetic Potion
+1x Resuscitation Potion
+
+== SIDE DECK ==

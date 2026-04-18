@@ -1,28 +1,44 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Wisdom"
-//  Ability — passive level-boosting effect.
+//  Ability — level-manipulation (paid coverage).
 //
-//  This Hero can use Spells [Wisdom level]
-//  higher than it normally could. If a Spell
-//  is played that wouldn't be usable without
-//  Wisdom, the player must discard cards equal
-//  to the level gap (enforced in play_spell).
+//  This Hero can use Spells [Wisdom level] higher
+//  than it normally could. For every level of
+//  school gap Wisdom covers, the player must
+//  discard that many cards from their hand. The
+//  discard cost is always paid — even if the
+//  Spell is negated, interrupted, or fizzles.
 //
-//  The discard cost is always paid — even if
-//  the Spell is negated, interrupted, or fails.
+//  Wisdom plugs into the engine's generic
+//  level-manipulation mechanism via `coverLevelGap`.
+//  The engine walks abilities and finds a coverage
+//  handler without knowing about Wisdom by name —
+//  any future paid-gap ability follows the same API.
 //
-//  Implementation:
-//  - heroMeetsLevelReq checks for Wisdom
-//    ability in the hero's zones and allows
-//    Spells up to [Wisdom level] above normal.
-//  - getWisdomDiscardCost computes the gap.
-//  - getHeroPlayableCards enforces hand-size
-//    eligibility (must have enough cards to
-//    pay the discard cost).
-//  - server.js play_spell enforces the actual
-//    discard after resolution (or negation).
+//  Discard enforcement (the actual hand-splice) lives
+//  in server.js play_spell; Wisdom only declares
+//  coverability + cost here.
 // ═══════════════════════════════════════════
 
 module.exports = {
   activeIn: ['ability'],
+
+  /**
+   * Generic level-gap coverage. Called by the engine when a Spell's
+   * effective level exceeds the hero's school count by `gap`.
+   * Wisdom covers up to `abilityLevel` levels of gap at a cost of
+   * one discarded card per covered level.
+   *
+   * @param {object} cardData - The Spell being played
+   * @param {number} abilityLevel - Wisdom's slot size on this hero (1-3)
+   * @param {object} engine - Engine reference (unused but passed for consistency)
+   * @param {number} gap - Remaining level gap after silent reductions
+   * @returns {{ coverable: boolean, discardCost: number }}
+   */
+  coverLevelGap(cardData, abilityLevel, engine, gap) {
+    if (cardData?.cardType !== 'Spell') return { coverable: false, discardCost: 0 };
+    if (gap <= 0) return { coverable: true, discardCost: 0 };
+    if (abilityLevel >= gap) return { coverable: true, discardCost: gap };
+    return { coverable: false, discardCost: 0 };
+  },
 };

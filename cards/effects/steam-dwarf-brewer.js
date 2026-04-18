@@ -62,7 +62,7 @@ module.exports = attachSteamEngine({
     const engine = ctx._engine;
     const inst = ctx.card;
     if (!inst || inst.zone !== 'support') return false;
-    if (inst.counters?.negated) return false;
+    if (inst.counters?.negated || inst.counters?.nulled) return false;
     return getBrewTargets(engine, ctx.cardOwner, inst.id).length > 0;
   },
 

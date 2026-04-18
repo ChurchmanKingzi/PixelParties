@@ -9,8 +9,6 @@
 //  Animation: red acid splash on target.
 // ═══════════════════════════════════════════
 
-const { HOOKS, hasCardType } = require('./_hooks');
-
 module.exports = {
   isPotion: true,
 
@@ -96,62 +94,34 @@ module.exports = {
     if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[`acid-vial:${pi}`] = gs.turn;
 
+    const source = { name: 'Acid Vial', owner: pi, heroIdx: -1 };
+
     if (target.type === 'hero') {
       const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (!hero || hero.hp <= 0) return;
 
-      // Turn-1 protection is the ONLY thing that blocks this
-      if (gs.firstTurnProtectedPlayer === target.owner) {
-        engine.log('damage_blocked', { target: hero.name, reason: 'shielded' });
-        return;
-      }
-
-      // Apply damage directly — bypasses charmed, submerged, immortal, shielded, damage reduction
-      const hpBefore = hero.hp;
-      hero.hp = Math.max(0, hero.hp - DAMAGE);
-      const dealt = hpBefore - hero.hp;
-
-      engine.log('damage', { source: 'Acid Vial', target: engine._heroLabel(hero), amount: dealt, damageType: 'other' });
-
-      // Fire afterDamage hooks (Shield of Life/Death may trigger)
-      await engine.runHooks(HOOKS.AFTER_DAMAGE, {
-        source: { name: 'Acid Vial', owner: pi, heroIdx: -1 },
-        target: hero, amount: dealt, type: 'other', sourceHeroIdx: -1,
+      const { dealt } = await engine.actionDealTrueDamage(source, hero, DAMAGE, {
+        type: 'other',
         _skipReactionCheck: true,
       });
 
-      // SC tracking
+      // SC tracking — specific to Acid Vial's context, not part of the
+      // generic true-damage helper.
       if (dealt > 0 && gs._scTracking && pi >= 0 && pi < 2) {
         const t = gs._scTracking[pi];
         if (dealt > t.maxDamageInstance) t.maxDamageInstance = dealt;
       }
 
-      // Check for hero KO
-      if (hero.hp <= 0) {
-        hero.diedOnTurn = gs.turn;
-        await engine.runHooks(HOOKS.ON_HERO_KO, { hero, source: { name: 'Acid Vial' }, _bypassDeadHeroFilter: true });
-        if (hero.hp <= 0 && !hero._koProcessed) {
-          hero._koProcessed = true;
-          await engine.handleHeroDeathCleanup(hero);
-          await engine.checkAllHeroesDead();
-        }
-      }
-
     } else if (target.type === 'equip') {
-      // Creature damage — route through batch system so Monia can react (but can't negate)
+      // Creature damage — dealTrueDamage wraps the batch internally, so
+      // Monia can still react and the _damagedOnTurn tracker is set.
       const inst = engine.cardInstances.find(c =>
         c.owner === target.owner && c.zone === 'support' &&
         c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
       );
       if (!inst) return;
 
-      await engine.processCreatureDamageBatch([{
-        inst,
-        amount: DAMAGE,
-        type: 'other',
-        source: { name: 'Acid Vial', owner: pi, heroIdx: -1 },
-        canBeNegated: false,
-      }]);
+      await engine.actionDealTrueDamage(source, inst, DAMAGE, { type: 'other' });
     }
 
     engine.sync();

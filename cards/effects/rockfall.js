@@ -5,13 +5,12 @@
 //  Choose a target and deal 200 damage to it.
 //  This damage cannot be reduced or negated.
 //
-//  True-damage implementation mirrors Ida:
-//  • Heroes:   beforeDamage hook sets
-//              ctx.cannotBeNegated = true
-//              (bypasses Cloudy, Shielded, etc.)
-//  • Creatures: canBeNegated: false in the
-//               damage batch entry
-//              (pierces Gate Shield, Guardian)
+//  True-damage routed through the generic
+//  engine.actionDealTrueDamage helper (also used
+//  by Acid Vial) — bypasses Cloudy, Shielded,
+//  Gate Shield, Guardian, buff multipliers, etc.
+//  while still setting the `_damagedOnTurn`
+//  tracking flag that Medusa's Curse reads.
 //
 //  Animation: giant boulder falls from above
 //  and crashes on the target (boulder_fall).
@@ -57,36 +56,14 @@ module.exports = {
       if (target.type === 'hero') {
         const tgtHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
         if (tgtHero && tgtHero.hp > 0) {
-          // ctx.dealDamage triggers beforeDamage hooks; Rockfall's own hook
-          // (below) intercepts by matching source ID and sets cannotBeNegated.
-          await ctx.dealDamage(tgtHero, DAMAGE, 'destruction_spell');
+          await ctx.dealTrueDamage(tgtHero, DAMAGE, 'destruction_spell');
         }
       } else if (target.cardInstance) {
-        await engine.actionDealCreatureDamage(
-          { name: CARD_NAME, owner: pi, heroIdx },
-          target.cardInstance, DAMAGE, 'destruction_spell',
-          { sourceOwner: pi, canBeNegated: false }, // True damage: pierces all shields
-        );
+        await ctx.dealTrueDamage(target.cardInstance, DAMAGE, 'destruction_spell');
       }
 
       engine.log('rockfall', { player: ps.username, target: target.cardName, damage: DAMAGE });
       engine.sync();
-    },
-
-    /**
-     * Mark Rockfall's own hero damage as un-reducible / un-negatable.
-     * Fires for every beforeDamage event; guards ensure only Rockfall's
-     * own damage (matched by card instance ID and hero slot) is affected.
-     */
-    beforeDamage: (ctx) => {
-      if (ctx.type !== 'destruction_spell') return;
-
-      // Source must be this specific Rockfall instance
-      if (ctx.source?.id !== ctx.card.id) return;
-      if ((ctx.source?.heroIdx ?? -1) !== ctx.cardHeroIdx) return;
-      if ((ctx.source?.owner ?? ctx.source?.controller ?? -1) !== ctx.cardOwner) return;
-
-      ctx.cannotBeNegated = true; // Bypasses Cloudy half-damage, Shielded, etc.
     },
   },
 };

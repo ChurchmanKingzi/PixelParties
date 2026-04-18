@@ -31,7 +31,7 @@ module.exports = {
             return hero && !hero.statuses?.immune && !hero.statuses?.negated;
           }
           if (t.type === 'equip' && t.cardInstance) {
-            return !t.cardInstance.counters?.negated;
+            return !(t.cardInstance.counters?.negated || t.cardInstance.counters?.nulled);
           }
           return true;
         },

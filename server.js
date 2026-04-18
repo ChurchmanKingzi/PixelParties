@@ -2219,6 +2219,14 @@ io.on('connection', (socket) => {
       if (gs.mulliganDecisions[0] !== null && gs.mulliganDecisions[1] !== null) {
         gs.mulliganPending = false;
         delete gs.mulliganDecisions;
+        // [TEST] Inject the current batch of cards under test into both
+        // players' starting hands. Added AFTER mulligan so the injection
+        // survives a shuffle-back-and-redraw. Remove when done.
+        for (let pi2 = 0; pi2 < 2; pi2++) {
+          gs.players[pi2].hand.push('The Great Clock Tower "Big Gwen"');
+          // Magic Arts so a hero can cast Big Gwen (Lv1 Magic Arts).
+          gs.players[pi2].hand.push('Magic Arts');
+        }
         for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
         room.engine.startGame().catch(err => console.error('[Engine] startGame error:', err.message));
       }
@@ -3434,6 +3442,19 @@ io.on('connection', (socket) => {
           return;
         }
 
+        // Pre-placement beforeSummon hook (sacrifice costs, tribute costs).
+        // Runs BEFORE the creature touches the board so a failed/cancelled
+        // cost never leaves a transient ghost Creature momentarily visible.
+        // Returning false aborts the whole summon — put the card back in
+        // hand (it wasn't actually spent) and bail.
+        const beforeSummonOk = await room.engine._runBeforeSummon(cardName, pi, heroIdx);
+        if (!beforeSummonOk) {
+          ps.hand.push(cardName);
+          room.engine.log('creature_fizzle', { card: cardName, reason: 'beforeSummon_failed' });
+          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+          return;
+        }
+
         // Not negated — place creature in support zone via centralized summon
         const placeResult = room.engine.summonCreature(cardName, pi, heroIdx, zoneSlot);
         if (!placeResult) {
@@ -3551,6 +3572,21 @@ io.on('connection', (socket) => {
 
         room.engine._setPendingPlayLog('spell_played', { card: cardName, player: ps.username, hero: hero.name, cardType: cardData.cardType });
 
+        // ── Activation cost (runs BEFORE the reaction window) ──
+        // Some Pollution cards (Cold Coffin, etc.) specify their Pollution
+        // token placement as a COST, not a resolution effect — it must be
+        // paid at activation time and is not refunded by negation. Runs
+        // before executeCardWithChain so that Anti Magic Shield, The Master's
+        // Plan, and any future counter-spell all still see the cost paid.
+        if (script?.payActivationCost) {
+          try {
+            const costCtx = room.engine._createContext(inst, {});
+            await script.payActivationCost(costCtx);
+          } catch (err) {
+            console.error(`[Engine] payActivationCost for ${cardName} failed:`, err.message);
+          }
+        }
+
         // ── Reaction chain window — opponents can chain before spell resolves ──
         const chainResult = await room.engine.executeCardWithChain({
           cardName, owner: pi, cardType: cardData.cardType, goldCost: 0, heroIdx,
@@ -3607,8 +3643,15 @@ io.on('connection', (socket) => {
         delete gs._attachmentZoneSlot;
         await room.engine._flushSurpriseDrawChecks();
 
-        // If spell was cancelled (player backed out of target selection), unmark and keep in hand
-        if (gs._spellCancelled) {
+        // If spell was cancelled (player backed out of target selection), unmark and keep in hand.
+        //
+        // Exception: if the spell was ALSO negated by a post-target reaction
+        // (Anti Magic Shield, Invisibility Cloak, etc.), the spell is consumed
+        // even though prompt-returns-null paths fire `_spellCancelled = true`
+        // in most targeting cards. The card has no way to distinguish "user
+        // cancelled" from "effect negated" at that call site, so we let the
+        // negation flag win here — card goes to discard normally.
+        if (gs._spellCancelled && !gs._spellNegatedByEffect) {
           delete gs._pendingCardReveal;
           delete gs._pendingPlayLog;
           ps._resolvingCard = null;
@@ -3671,6 +3714,8 @@ io.on('connection', (socket) => {
         delete gs._spellNegatedByEffect;
         delete gs._surpriseCheckedHeroes;
         delete gs._deferredRecoil;
+        delete gs._ameShieldedHeroes;
+        delete gs._ameDeclinedHeroes;
 
         // Move to discard (unless the spell placed itself on the board as an attachment)
         const resolveHi = getResolvingHandIndex(ps);
@@ -3786,11 +3831,23 @@ io.on('connection', (socket) => {
     if ((ps.gold || 0) < cost) return;
 
     const hero = ps.heroes[heroIdx];
-    if (!hero || !hero.name || hero.hp <= 0) return;
-    if (hero.statuses?.frozen) return; // Can't equip to frozen heroes
-    // Charmed heroes' support zones are locked
-    if (hero.statuses?.charmed) return;
-    const isEquip = (cardData.subtype || '').toLowerCase() === 'equipment';
+    if (!hero || !hero.name) return;
+    const subLower = (cardData.subtype || '').toLowerCase();
+    const isEquip = subLower === 'equipment';
+    // Artifact-Creature hybrid (Pollution Spewer): cardType 'Artifact' with
+    // a 'Creature' subtype. Plays through this handler like an equip, but
+    // bypasses equipment-specific hero restrictions — the card text on
+    // these hybrids explicitly allows placement on ANY hero, including
+    // dead / frozen / charmed ones, since they function as Creatures once
+    // on the board rather than equipping to the hero.
+    const isArtifactCreature = subLower.split('/').some(t => t.trim() === 'creature');
+    // Normal equipment still respects the hero-alive / not-frozen /
+    // not-charmed gates; Artifact-Creatures skip them.
+    if (isEquip) {
+      if (hero.hp <= 0) return;
+      if (hero.statuses?.frozen) return;
+      if (hero.statuses?.charmed) return;
+    }
     if (isEquip) {
       // Per-card equip restrictions (e.g. Lifeforce Howitzer 1-per-hero)
       const equipScript = loadCardEffect(cardName);
@@ -3878,6 +3935,78 @@ io.on('connection', (socket) => {
           }
         } catch (err) {
           console.error('[Engine] play_artifact hooks error:', err.message);
+        }
+        for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      })();
+    } else if (isArtifactCreature) {
+      // ── Artifact-Creature (Pollution Spewer, any future hybrid) ──
+      // Plays into a Support Zone of the chosen hero. Costs gold like any
+      // Artifact; no action cost; lives on the board as a Creature for
+      // targeting / damage / death purposes. Zone-state rules apply
+      // (must have a free slot on that hero) but hero-state does not —
+      // the card can arrive on a dead / frozen / charmed hero too.
+      if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
+      let finalSlot = zoneSlot;
+      if (finalSlot < 0) {
+        for (let z = 0; z < 3; z++) {
+          if ((ps.supportZones[heroIdx][z] || []).length === 0) { finalSlot = z; break; }
+        }
+        if (finalSlot < 0) return;
+      }
+      if (finalSlot < 0 || finalSlot >= 3) return;
+      if ((ps.supportZones[heroIdx][finalSlot] || []).length > 0) return;
+
+      ps.hand.splice(handIndex, 1);
+      if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+      room.engine.log('artifact_creature_placed', { player: ps.username, card: cardName, hero: hero.name, cost });
+      room.engine._trackTerrorResolvedEffect(pi, cardName);
+
+      (async () => {
+        try {
+          // Reveal before chain window (Tool Freezer etc. can react).
+          const oi = pi === 0 ? 1 : 0;
+          const oppSid = gs.players[oi]?.socketId;
+          if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
+          sendToSpectators(room, 'card_reveal', { cardName });
+          await new Promise(r => setTimeout(r, 100));
+
+          // Item lock cost applies to ALL Artifact plays.
+          if (ps.itemLocked && (ps.hand || []).length > 0) {
+            await room.engine.actionPromptForceDiscard(pi, 1, {
+              title: 'Item Lock Cost',
+              description: 'You must delete 1 card from your hand to use an Artifact.',
+              source: 'Item Lock', deleteMode: true, selfInflicted: true,
+            });
+          }
+
+          const chainResult = await room.engine.executeCardWithChain({
+            cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
+            resolve: async () => {
+              // Deduct gold on resolve (not negated).
+              if (cost > 0) ps.gold -= cost;
+              // Place as a tracked Creature. summonCreatureWithHooks runs
+              // beforeSummon (sacrifice costs etc.) if the card defines one
+              // and fires onPlay + onCardEnterZone after placement — same
+              // lifecycle as a played-from-hand Creature, minus the action-
+              // accounting the normal Creature-play path would add.
+              const placed = await room.engine.summonCreatureWithHooks(
+                cardName, pi, heroIdx, finalSlot,
+                { source: 'Artifact-Creature play' },
+              );
+              if (!placed) {
+                ps.discardPile.push(cardName);
+                room.engine.log('artifact_creature_fizzle', { card: cardName, reason: 'no_free_zone_or_canceled' });
+                return true;
+              }
+              return true;
+            },
+          });
+
+          if (chainResult.negated) {
+            ps.discardPile.push(cardName);
+          }
+        } catch (err) {
+          console.error('[Engine] play_artifact (creature) error:', err.message);
         }
         for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       })();
@@ -4820,7 +4949,15 @@ io.on('connection', (socket) => {
 
     const p0 = buildPlayerState(puzzleData.players[0], currentUser.userId, currentUser.username, socket.id, puzzleData.hand || []);
     const p1 = buildPlayerState(puzzleData.players[1], 'cpu-puzzle', 'CPU', null, puzzleData.oppHand || []);
-    if (usr) { p0.color = usr.color || '#00f0ff'; p0.avatar = usr.avatar; p0.cardback = usr.cardback; p0.board = usr.board; }
+    if (usr) {
+      p0.color = usr.color || '#00f0ff'; p0.avatar = usr.avatar;
+      p0.cardback = usr.cardback; p0.board = usr.board;
+      // Apply the player's chosen board skin to the CPU side too so the
+      // whole puzzle playfield — including the opponent's Area Zone —
+      // uses the same skin as a normal game instead of the default.
+      p1.board = usr.board;
+      p1.cardback = usr.cardback;
+    }
 
     const gs = {
       players: [p0, p1],
@@ -4890,6 +5027,35 @@ io.on('connection', (socket) => {
             if (cs.negated) inst.counters.negated = 1;
             if (cs.poisoned) { inst.counters.poisoned = 1; inst.counters.poisonStacks = cs.poisoned.stacks || 1; }
             if (cs.buffs) { if (!inst.counters.buffs) inst.counters.buffs = {}; Object.assign(inst.counters.buffs, cs.buffs); }
+            // Anti Magic Enchantment buff on an Equip needs its functional
+            // counter too — the `antiMagicEnchanted` counter is what the
+            // engine reads to offer spell-negation, the buff is just the
+            // visible icon. Set both so puzzle-authored equips protect heroes.
+            if (cs.buffs?.anti_magic_enchanted) {
+              inst.counters.antiMagicEnchanted = { ownerPi: pi, charges: 1 };
+            }
+            // Biomancy Token: a Potion placed in a Support Zone in the
+            // puzzle builder represents a Biomancy Token. Apply the same
+            // override counters the runtime Biomancy ability sets up so
+            // the in-game behavior (Creature/Token with HP, once-per-turn
+            // damage effect) is identical whether the token was created
+            // during play or authored into a puzzle.
+            if (cs.biomancyLevel) {
+              const level = Math.max(1, Math.min(3, cs.biomancyLevel));
+              const stats = { 1: 40, 2: 60, 3: 80 }[level];
+              const potionData = cardsByName[inst.name];
+              inst.counters._cardDataOverride = {
+                ...(potionData || {}),
+                cardType: 'Creature/Token',
+                hp: stats,
+                effect: `Once per turn: Deal ${stats} damage to any target on the board.`,
+              };
+              inst.counters._effectOverride = 'Biomancy Token';
+              inst.counters.currentHp = stats;
+              inst.counters.maxHp = stats;
+              inst.counters.biomancyDamage = stats;
+              inst.counters.biomancyLevel = level;
+            }
           }
         }
       }

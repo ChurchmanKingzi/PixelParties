@@ -18,10 +18,22 @@ module.exports = {
     },
 
     onCardLeaveZone: async (ctx) => {
-      // When this card leaves its support zone, remove island zones
-      // (creatures inside are defeated)
+      // Only react to Flying Island's own departure from a Support Zone.
+      // Fire-site shapes vary (some pass fromOwner/fromZoneSlot, some
+      // don't) — only REJECT when a field is explicitly present and
+      // mismatches. Engine fire sites that set `_onlyCard` have already
+      // filtered this down to the actual leaving instance, so in that
+      // case all of these checks pass trivially.
+      if (ctx.fromZone !== 'support') return;
+      if (ctx.fromOwner !== undefined && ctx.fromOwner !== ctx.cardOwner) return;
+      if (ctx.fromHeroIdx !== undefined && ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
+      if (ctx.fromZoneSlot !== undefined && ctx.card?.zoneSlot !== undefined
+          && ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
+      // Remove ONLY the 2 islands this specific card added. Passing the
+      // explicit count keeps stacked Flying Islands from wiping each other
+      // out when just one is destroyed.
       const engine = ctx._engine;
-      await engine.removeIslandZones(ctx.cardOwner, ctx.cardHeroIdx);
+      await engine.removeIslandZones(ctx.cardOwner, ctx.cardHeroIdx, 2);
     },
   },
 };

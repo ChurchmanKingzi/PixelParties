@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"require\\('./cards/effects/_hooks.js'\\); require\\('./cards/effects/null-zone.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/_engine.js'\\); require\\('./cards/effects/sparky-slime.js'\\); require\\('./cards/effects/_steam-dwarf-shared.js'\\); require\\('./cards/effects/steam-dwarf-brewer.js'\\); require\\('./cards/effects/steam-dwarf-engineer.js'\\); require\\('./cards/effects/steam-dwarf-dragon-pilot.js'\\); require\\('./cards/effects/steam-dwarf-miner.js'\\); require\\('./cards/effects/steam-dwarf-exterminator.js'\\); require\\('./cards/effects/steam-dwarf-diver.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/_engine.js'\\); require\\('./cards/effects/null-zone.js'\\); console.log\\('engine + null-zone OK'\\);\")",
+      "Bash(node --check public/app-board.jsx)",
+      "Bash(node -e \"const n = require\\('./cards/effects/null-zone.js'\\); console.log\\('inherentAction:', n.inherentAction, ' placesPollution:', n.placesPollutionTokens\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/_engine.js'\\); require\\('./cards/effects/_hooks.js'\\); require\\('./cards/effects/anti-magic-enchantment.js'\\); require\\('./cards/effects/magic-mirror.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/_engine.js'\\); require\\('./cards/effects/_hooks.js'\\); require\\('./cards/effects/anti-magic-enchantment.js'\\); require\\('./cards/effects/magic-mirror.js'\\); require\\('./server.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/anti-magic-enchantment.js'\\); require\\('./cards/effects/_engine.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/_engine.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./server.js'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/_engine.js'\\); console.log\\('engine OK'\\);\")",
+      "Bash(node -e \"console.log\\('sanity'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/coffee.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/_engine.js'\\); require\\('./cards/effects/_area-shared.js'\\); require\\('./cards/effects/acid-rain.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/_engine.js'\\); require\\('./cards/effects/acid-rain.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/_engine.js'\\); require\\('./cards/effects/acid-rain.js'\\); require\\('./cards/effects/_area-shared.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/_engine.js'\\); require\\('./cards/effects/acid-rain.js'\\); require\\('./cards/effects/flying-island-in-the-sky.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/flying-island-in-the-sky.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/fire-bomb.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/the-great-clock-tower-big-gwen.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/_engine.js'\\); require\\('./cards/effects/the-yeeting.js'\\); console.log\\('OK'\\);\")",
+      "Bash(node -e \"require\\('./cards/effects/the-yeeting.js'\\); require\\('./cards/effects/the-great-clock-tower-big-gwen.js'\\); console.log\\('OK'\\);\")",
+      "Bash(grep -n \"^};$\" \"C:/Pixel Parties WEB/PixelPartiesWeb/public/app-board.jsx\")",
+      "Bash(node -c \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/_engine.js\")",
+      "Bash(node -c \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/victorica-the-eternal-empress.js\")",
+      "Bash(node -c \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/mana-mining.js\")",
+      "Bash(node -c \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/wisdom.js\")",
+      "Bash(node -c \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/eraser-beam.js\")",
+      "Bash(node -c \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/pollution-piranha.js\")"
+    ]
+  }
+}

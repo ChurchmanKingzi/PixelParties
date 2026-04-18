@@ -19,6 +19,8 @@
 //  Animation: gear spin CW → card flies across → gear spin CCW
 // ═══════════════════════════════════════════
 
+const { hasNumericCreatureLevel } = require('./_hooks');
+
 const BASE_COST = 5;
 
 /**
@@ -66,7 +68,12 @@ function getStealableCreatures(engine, playerIdx) {
     if (inst && engine.isCreatureImmune(inst, 'targeting_immune')) return false;
     if (inst && engine.isCreatureImmune(inst, 'control_immune')) return false;
     const cd = cardDB[t.cardName];
-    const level = cd?.level || 1;
+    // Dark Gear's cost scales with the target's level, so level-less
+    // Creatures (Artifact-Creatures like Pollution Spewer) are NOT valid
+    // targets — `hasNumericCreatureLevel` returns false for `level: null`,
+    // filtering them out here and anywhere else that needs a numeric level.
+    if (!hasNumericCreatureLevel(cd)) return false;
+    const level = cd.level;
     const cost = level * BASE_COST;
     if (gold < cost) return false;
     t.level = level;

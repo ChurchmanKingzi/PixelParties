@@ -27,7 +27,7 @@ module.exports = attachSteamEngine({
   canActivateCreatureEffect(ctx) {
     const inst = ctx.card;
     if (!inst || inst.zone !== 'support') return false;
-    if (inst.counters?.negated) return false;
+    if (inst.counters?.negated || inst.counters?.nulled) return false;
     const cd = ctx._engine._getCardDB()[inst.name];
     const curHp = inst.counters?.currentHp ?? cd?.hp ?? 0;
     return curHp > 0;

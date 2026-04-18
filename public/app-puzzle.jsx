@@ -308,18 +308,26 @@ function PuzzleCreator() {
   }, [notify]);
 
   // ── Tooltip (shared hook — wires BoardCard hover automatically) ──
-  const { tooltipCard, tooltipSide, showTooltip: _showTooltip, hideTooltip, setTooltipCard } = useCardTooltip({ defaultSide: 'left' });
+  const { tooltipCard, tooltipSide, showTooltip: _showTooltip, hideTooltip, setTooltipCard, setTooltipSide } = useCardTooltip({ defaultSide: 'left' });
   // On touch devices, suppress hover tooltips (they never dismiss since there's no mouseLeave)
   const showTooltip = isTouchDevice ? () => {} : _showTooltip;
 
   // Re-register the board tooltip setter after returning from a validation battle.
   // GameBoard's unmount cleanup nullifies window._boardTooltipSetter — restore it here
   // whenever puzzleGameState transitions back to null.
+  //
+  // CRITICAL: must mirror useCardTooltip's own setter by resetting `tooltipSide`
+  // to the default ('left') whenever a card is shown via BoardCard hover. If we
+  // only set the card, a prior gallery hover ('right' side) leaks through — the
+  // tooltip renders over the board, obscuring the card being hovered.
   useEffect(() => {
     if (puzzleGameState) return; // GameBoard is mounted and owns the setter
-    window._boardTooltipSetter = (card) => setTooltipCard(card || null);
+    window._boardTooltipSetter = (card) => {
+      setTooltipCard(card || null);
+      if (card) setTooltipSide('left');
+    };
     return () => { window._boardTooltipSetter = null; };
-  }, [puzzleGameState, setTooltipCard]);
+  }, [puzzleGameState, setTooltipCard, setTooltipSide]);
 
   const cardDB = window.CARDS_BY_NAME || {};
   const getCard = useCallback((name) => cardDB[name] || null, [cardDB]);
@@ -434,20 +442,55 @@ function PuzzleCreator() {
     updatePlayer(si, (p) => {
       if (p.abilityZones[hi][slot].length > 0 && p.abilityZones[hi][slot][0] === cardName) p.abilityZones[hi][slot].push(cardName);
       else p.abilityZones[hi][slot] = [cardName];
+      // Biomancy sync: when Biomancy is placed/stacked on a hero, every
+      // Biomancy Token already sitting on that hero snaps to the new level.
+      if (cardName === 'Biomancy') {
+        let n = 0;
+        for (const s of (p.abilityZones[hi] || [])) for (const cc of (s || [])) if (cc === 'Biomancy') n++;
+        const level = Math.max(1, Math.min(3, n || 1));
+        const stats = { 1: 40, 2: 60, 3: 80 }[level];
+        for (let z = 0; z < (p.supportZones[hi] || []).length; z++) {
+          const cards = p.supportZones[hi][z] || [];
+          if (!cards.length) continue;
+          const sc = getCard(cards[0]);
+          if (sc?.cardType !== 'Potion') continue;
+          if (!p._customSupportHp) p._customSupportHp = [[null,null,null],[null,null,null],[null,null,null]];
+          p._customSupportHp[hi][z] = stats;
+          if (!p._creatureStatuses) p._creatureStatuses = {};
+          const cs = { ...(p._creatureStatuses[hi + '-' + z] || {}), biomancyLevel: level };
+          p._creatureStatuses[hi + '-' + z] = cs;
+        }
+      }
       return p;
     });
   }, [getCard, players, updatePlayer, notify]);
 
+  // Biomancy Token stats by level. Matches engine's biomancy.js LEVEL_STATS.
+  const BIOMANCY_STATS = { 1: 40, 2: 60, 3: 80 };
+  // Count a hero's Biomancy ability level = number of "Biomancy" cards
+  // across its three ability slots, clamped to 1..3 (a Biomancy Token is
+  // at least level 1 even on a hero with no Biomancy ability, per user
+  // intent that tokens always have a sensible default).
+  const getHeroBiomancyLevel = useCallback((p, hi) => {
+    const ab = (p.abilityZones?.[hi] || []);
+    let n = 0;
+    for (const slot of ab) for (const c of (slot || [])) if (c === 'Biomancy') n++;
+    return Math.max(1, Math.min(3, n || 1));
+  }, []);
+
   const placeSupport = useCallback((cardName, si, hi, slot) => {
     const zone = players[si].supportZones[hi][slot];
     if (zone.length > 0) {
-      // If removing a Flying Island, also remove island zones
+      // Replacing a Flying Island — drop exactly 2 island zones (the
+      // rightmost pair). Multiple stacked Flying Islands each keep their
+      // own 2 zones; only the replaced card's pair goes.
       if (zone[0] === 'Flying Island in the Sky') {
         updatePlayer(si, (p) => {
           const islandCount = (p.islandZoneCount || [0,0,0])[hi] || 0;
-          if (islandCount > 0) {
-            p.supportZones[hi].splice(p.supportZones[hi].length - islandCount, islandCount);
-            p.islandZoneCount[hi] = 0;
+          const removeCount = Math.min(2, islandCount);
+          if (removeCount > 0) {
+            p.supportZones[hi].splice(p.supportZones[hi].length - removeCount, removeCount);
+            p.islandZoneCount[hi] = islandCount - removeCount;
           }
           // Clear old creature metadata
           if (p._customSupportHp?.[hi]) p._customSupportHp[hi][slot] = null;
@@ -474,9 +517,22 @@ function PuzzleCreator() {
       if (p._customSupportHp?.[hi]) p._customSupportHp[hi][slot] = null;
       if (p._creatureStatuses) delete p._creatureStatuses[hi + '-' + slot];
       p.supportZones[hi][slot] = [cardName];
-      // Set default HP from card data
       const nc = getCard(cardName);
-      if (nc?.hp) { if (!p._customSupportHp) p._customSupportHp = [[null,null,null],[null,null,null],[null,null,null]]; p._customSupportHp[hi][slot] = nc.hp; }
+      // Potions placed into a Support Zone become Biomancy Tokens. Stamp
+      // their initial level from the hero's Biomancy ability count so
+      // puzzle authors get the "matches ability" default for free; the
+      // user can override via the stat editor.
+      if (nc?.cardType === 'Potion') {
+        const level = getHeroBiomancyLevel(p, hi);
+        const stats = BIOMANCY_STATS[level];
+        if (!p._customSupportHp) p._customSupportHp = [[null,null,null],[null,null,null],[null,null,null]];
+        p._customSupportHp[hi][slot] = stats;
+        if (!p._creatureStatuses) p._creatureStatuses = {};
+        p._creatureStatuses[hi + '-' + slot] = { biomancyLevel: level };
+      } else if (nc?.hp) {
+        if (!p._customSupportHp) p._customSupportHp = [[null,null,null],[null,null,null],[null,null,null]];
+        p._customSupportHp[hi][slot] = nc.hp;
+      }
       // Flying Island adds 2 island zones
       if (cardName === 'Flying Island in the Sky') {
         if (!p.islandZoneCount) p.islandZoneCount = [0, 0, 0];
@@ -485,7 +541,7 @@ function PuzzleCreator() {
       }
       return p;
     });
-  }, [players, updatePlayer, getCard]);
+  }, [players, updatePlayer, getCard, getHeroBiomancyLevel]);
 
   const placeSurprise = useCallback((cardName, si, hi) => {
     if (!players[si].heroes[hi]) { notify('Place a Hero first!', 'error'); return; }
@@ -511,13 +567,17 @@ function PuzzleCreator() {
       // Clear creature metadata
       if (p._customSupportHp?.[hi]) p._customSupportHp[hi][slot] = null;
       if (p._creatureStatuses) delete p._creatureStatuses[hi + '-' + slot];
-      // If removing Flying Island, also remove island zones
+      // If removing ONE Flying Island, remove exactly 2 island zones
+      // (the rightmost pair). Multiple stacked Flying Islands on the same
+      // hero each contribute their own 2 zones, so destroying one copy
+      // must not wipe out the other copies' zones.
       if (removedCard === 'Flying Island in the Sky') {
         const islandCount = (p.islandZoneCount || [0,0,0])[hi] || 0;
-        if (islandCount > 0) {
-          p.supportZones[hi].splice(p.supportZones[hi].length - islandCount, islandCount);
+        const removeCount = Math.min(2, islandCount);
+        if (removeCount > 0) {
+          p.supportZones[hi].splice(p.supportZones[hi].length - removeCount, removeCount);
           if (!p.islandZoneCount) p.islandZoneCount = [0,0,0];
-          p.islandZoneCount[hi] = 0;
+          p.islandZoneCount[hi] = islandCount - removeCount;
         }
       }
       return p;
@@ -530,14 +590,27 @@ function PuzzleCreator() {
   const canDrop = useCallback((cardName, zt, si, hi, slot) => {
     const c = getCard(cardName); if (!c) return false;
     const p = players[si];
+    // Creature-like: cardType OR subtype contains "Creature". This catches
+    // standard Creatures, Creature/Token hybrids, and Artifact-Creature
+    // hybrids (Pollution Spewer and any future card with cardType: 'Artifact'
+    // + subtype: 'Creature') — they all occupy a Support Zone as a Creature.
+    const isCreatureLike = c.cardType === 'Creature'
+      || c.cardType === 'Token'
+      || c.cardType === 'Creature/Token'
+      || (c.subtype || '').split('/').some(t => t.trim() === 'Creature');
     if (zt === 'hero') return c.cardType === 'Hero' || c.cardType === 'Ascended Hero';
     if (zt === 'ability') return c.cardType === 'Ability' && !!p.heroes[hi];
     if (zt === 'support') {
       const islandCount = (p.islandZoneCount || [0,0,0])[hi] || 0;
       const baseCount = (p.supportZones[hi] || []).length - islandCount;
       const isIsland = slot != null && slot >= baseCount;
-      if (isIsland) return c.cardType === 'Creature' || c.cardType === 'Token' || c.cardType === 'Creature/Token';
-      return c.cardType === 'Creature' || c.cardType === 'Token' || c.cardType === 'Creature/Token' || c.subtype === 'Equipment' || c.subtype === 'Attachment';
+      // Potions dropped into a Support Zone become Biomancy Tokens — a
+      // Creature/Token with 40/60/80 HP and a "once per turn: deal 40/60/80
+      // damage" effect, scaling with the Hero's Biomancy Ability level.
+      // Allow them on both base and Island zones (they're Creature-like).
+      if (c.cardType === 'Potion') return true;
+      if (isIsland) return isCreatureLike;
+      return isCreatureLike || c.subtype === 'Equipment' || c.subtype === 'Attachment';
     }
     if (zt === 'surprise') return !!p.heroes[hi] && c.subtype === 'Surprise';
     if (zt === 'area') return c.subtype === 'Area';
@@ -564,7 +637,8 @@ function PuzzleCreator() {
       if (p._creatureStatuses) delete p._creatureStatuses[hi + '-' + slot];
       if (removedCard === 'Flying Island in the Sky') {
         const ic = (p.islandZoneCount || [0,0,0])[hi] || 0;
-        if (ic > 0) { p.supportZones[hi].splice(p.supportZones[hi].length - ic, ic); p.islandZoneCount[hi] = 0; }
+        const rm = Math.min(2, ic);
+        if (rm > 0) { p.supportZones[hi].splice(p.supportZones[hi].length - rm, rm); p.islandZoneCount[hi] = ic - rm; }
       }
       return p;
     });
@@ -675,6 +749,7 @@ function PuzzleCreator() {
   // ── Stat editor ──
   const [editStatuses, setEditStatuses] = useState({});
   const [editBuffs, setEditBuffs] = useState({});
+  const [editBiomancyLevel, setEditBiomancyLevel] = useState(null);
   const openStatEditor = useCallback((si, zt, hi, slot) => {
     const p = players[si];
     if (zt === 'hero') {
@@ -691,6 +766,10 @@ function PuzzleCreator() {
       const cs = p._creatureStatuses?.[hi + '-' + slot] || {};
       setEditStatuses({ ...cs }); delete editStatuses.buffs;
       setEditBuffs({ ...(cs.buffs || {}) });
+      // Biomancy Token: Potion in a support zone — carries a `biomancyLevel`
+      // in creatureStatuses. Hydrate the level picker so the dedicated
+      // editor branch shows and the generic stat/status inputs are hidden.
+      setEditBiomancyLevel(c?.cardType === 'Potion' ? (cs.biomancyLevel || 1) : null);
     }
   }, [players, getCard]);
 
@@ -713,18 +792,41 @@ function PuzzleCreator() {
       return p;
     });
     else if (zt === 'support') updatePlayer(si, (p) => {
+      const cards = p.supportZones[hi]?.[slot] || [];
+      const c = cards.length ? getCard(cards[0]) : null;
+      const isEquip = c && c.cardType === 'Artifact' && (c.subtype || '').toLowerCase() === 'equipment';
+      const isBiomancyToken = c?.cardType === 'Potion' && editBiomancyLevel != null;
+      // Biomancy Token: the saved state is ONLY biomancyLevel + the HP
+      // derived from the level. Everything else is stripped.
+      if (isBiomancyToken) {
+        const lv = Math.max(1, Math.min(3, editBiomancyLevel || 1));
+        const stats = { 1: 40, 2: 60, 3: 80 }[lv];
+        if (!p._customSupportHp) p._customSupportHp = [[null,null,null],[null,null,null],[null,null,null]];
+        p._customSupportHp[hi][slot] = stats;
+        if (!p._creatureStatuses) p._creatureStatuses = {};
+        p._creatureStatuses[hi + '-' + slot] = { biomancyLevel: lv };
+        return p;
+      }
       if (editHp !== '') {
         if (!p._customSupportHp) p._customSupportHp = [[null,null,null],[null,null,null],[null,null,null]];
         p._customSupportHp[hi][slot] = parseInt(editHp) || 0;
       }
       if (!p._creatureStatuses) p._creatureStatuses = {};
-      const merged = { ...editStatuses };
-      if (Object.keys(editBuffs).length > 0) merged.buffs = { ...editBuffs };
+      // Equip Artifacts: strip out every status/buff that isn't AME so
+      // stale creature-data doesn't persist across a Creature → Equip swap.
+      let merged;
+      if (isEquip) {
+        merged = {};
+        if (editBuffs.anti_magic_enchanted) merged.buffs = { anti_magic_enchanted: true };
+      } else {
+        merged = { ...editStatuses };
+        if (Object.keys(editBuffs).length > 0) merged.buffs = { ...editBuffs };
+      }
       p._creatureStatuses[hi + '-' + slot] = merged;
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, updatePlayer]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, updatePlayer, getCard]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -747,16 +849,19 @@ function PuzzleCreator() {
 
   const handleVerify = useCallback(() => {
     if (!players[0].heroes.some(Boolean) || !players[1].heroes.some(Boolean)) { notify('Both sides need at least one Hero!', 'error'); return; }
-    // Hand size pre-check: max = max(1, 7 - Pollution Tokens in Support Zones). Skipped if 0 Pollution.
-    const pollutionCount0 = players[0].supportZones.flat().filter(zone => zone.includes('Pollution Token')).length;
-    if (pollutionCount0 > 0) {
-      const maxHand0 = Math.max(1, 7 - pollutionCount0);
-      if (hand.length > maxHand0) { notify('Your hand has too many cards! (max ' + maxHand0 + ' with ' + pollutionCount0 + ' Pollution Token' + (pollutionCount0 !== 1 ? 's' : '') + ')', 'error'); return; }
+    // Hand size pre-check — uses the shared hand-limit registry so Pollution
+    // Tokens, Royal Corgi, Big Gwen, and any future cap-modifying card are
+    // accounted for automatically. The registry lives in app-shared.jsx
+    // and must stay in sync with the engine's counter semantics.
+    const maxHand0 = window.computeSupportHandLimit(players[0], areaZones?.[0] || []);
+    if (hand.length > maxHand0) {
+      notify('Your hand has too many cards! (max ' + (maxHand0 === Infinity ? '∞' : maxHand0) + ' given the current board)', 'error');
+      return;
     }
-    const pollutionCount1 = players[1].supportZones.flat().filter(zone => zone.includes('Pollution Token')).length;
-    if (pollutionCount1 > 0) {
-      const maxHand1 = Math.max(1, 7 - pollutionCount1);
-      if (oppHand.length > maxHand1) { notify('Opponent hand has too many cards! (max ' + maxHand1 + ' with ' + pollutionCount1 + ' Pollution Token' + (pollutionCount1 !== 1 ? 's' : '') + ')', 'error'); return; }
+    const maxHand1 = window.computeSupportHandLimit(players[1], areaZones?.[1] || []);
+    if (oppHand.length > maxHand1) {
+      notify('Opponent hand has too many cards! (max ' + (maxHand1 === Infinity ? '∞' : maxHand1) + ' given the current board)', 'error');
+      return;
     }
     // Send puzzle to server — starts a real battle against a CPU opponent
     puzzleIgnoreRef.current = false;
@@ -819,6 +924,11 @@ function PuzzleCreator() {
     { key: 'freeze_immune', label: '🔥 Freeze Immune', color: '#ff8844' },
     { key: 'submerged', label: '🌊 Submerged', color: '#4488ff', scope: 'oppHero' },
     { key: 'negative_status_immune', label: '😎 Status Immune', color: '#44ff88' },
+    // Equip-Artifact-only buff: Anti Magic Enchantment. The scope tag below
+    // flips rendering so this buff ONLY shows up when editing an Equipment
+    // Artifact, and for that zone type ONLY this buff is offered (all
+    // creature/hero statuses + buffs are hidden).
+    { key: 'anti_magic_enchanted', label: '🛡️ Anti Magic Enchantment', color: '#ffaa33', scope: 'equip' },
   ];
 
   // ── Column layout for island zone alignment across all rows (matching existing board) ──
@@ -942,7 +1052,7 @@ function PuzzleCreator() {
                   {hero.statuses?.healReversed && <HealReversedOverlay />}
                   {hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                   {hero.statuses?.immune && !hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
-                  {(hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.burned || hero.statuses?.poisoned || hero.statuses?.negated || hero.statuses?.healReversed || hero.statuses?.untargetable || hero.statuses?.charmed) &&
+                  {(hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.burned || hero.statuses?.poisoned || hero.statuses?.negated || hero.statuses?.nulled || hero.statuses?.healReversed || hero.statuses?.untargetable || hero.statuses?.charmed) &&
                     <StatusBadges statuses={hero.statuses} isHero={true} />}
                   {hero.buffs && <BuffColumn buffs={hero.buffs} />}
                 </> : <div className="board-zone-empty">Hero</div>}
@@ -1004,7 +1114,7 @@ function PuzzleCreator() {
               {maxRight > 0 && Array.from({ length: maxRight }).map((_, s) => <div key={'rp'+s} className="board-zone-spacer" />)}
               {/* Deleted pile — inside first group, positioned to its left */}
               {hi === 0 && (
-                <div className="board-zone" style={{ position: 'absolute', right: '100%', top: 0, marginRight: 'calc(8px * var(--board-scale))', ...zs('deleted'), cursor: p.deletedPile.length ? 'pointer' : undefined, ...(dragOverZone === 'deleted-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
+                <div className="board-zone board-zone-deleted" style={{ position: 'absolute', right: '100%', top: 0, marginRight: 'calc(8px * var(--board-scale))', ...zs('delete'), cursor: p.deletedPile.length ? 'pointer' : undefined, ...(dragOverZone === 'deleted-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
                   onClick={() => p.deletedPile.length > 0 && setViewPile({ si, key: 'deletedPile' })}
                   onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('deleted-' + si); }}
                   onDragLeave={() => setDragOverZone(null)}
@@ -1068,8 +1178,31 @@ function PuzzleCreator() {
                     {...zh('support', si, hi, slot)}>
                     {cards.length > 0 ? (() => {
                       const cs = p._creatureStatuses?.[hi + '-' + slot] || {};
+                      // Biomancy Tokens render their HP bar from the stored
+                      // level (40/60/80) even though the underlying Potion
+                      // has no HP in its card data.
+                      const isBiomancyToken = c?.cardType === 'Potion' && cs.biomancyLevel;
+                      const bioStats = isBiomancyToken ? { 1: 40, 2: 60, 3: 80 }[cs.biomancyLevel] : null;
+                      const showHp = !!(c?.hp || isBiomancyToken);
+                      const hpVal = isBiomancyToken
+                        ? (p._customSupportHp?.[hi]?.[slot] ?? bioStats)
+                        : (c?.hp ? (p._customSupportHp?.[hi]?.[slot] ?? c.hp) : undefined);
+                      const maxHpVal = isBiomancyToken ? bioStats : c?.hp;
+                      // Override the hover tooltip for Biomancy Tokens so
+                      // it shows the level-scaled effect text instead of
+                      // the source Potion's original text.
+                      const tooltipOverride = isBiomancyToken ? {
+                        ...(c || {}),
+                        name: 'Biomancy Token',
+                        cardType: 'Creature/Token',
+                        hp: bioStats,
+                        effect: `You may once per turn deal ${bioStats} damage to any target on the board.`,
+                      } : undefined;
                       return <>
-                        <BoardCard cardName={cards[0]} hp={c?.hp ? (p._customSupportHp?.[hi]?.[slot] ?? c.hp) : undefined} maxHp={c?.hp} hpPosition={c?.hp ? 'bottom' : undefined} />
+                        <BoardCard cardName={cards[0]} hp={showHp ? hpVal : undefined} maxHp={maxHpVal} hpPosition={showHp ? 'bottom' : undefined} tooltipCardOverride={tooltipOverride} />
+                        {isBiomancyToken && (
+                          <div style={{ position: 'absolute', top: 2, left: 2, background: 'rgba(20,80,30,.9)', color: '#8fe8a0', fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 3, border: '1px solid rgba(80,200,120,.6)', pointerEvents: 'none' }}>Lv{cs.biomancyLevel}</div>
+                        )}
                         {cs.frozen && <FrozenOverlay />}
                         {cs.burned && <BurnedOverlay />}
                         {cs.negated && <NegatedOverlay />}
@@ -1252,11 +1385,11 @@ function PuzzleCreator() {
             {/* Mid-row: 2 area zones positioned to match spacer positions between hero groups */}
             <div className="board-row" style={{ padding: 'calc(12px * var(--board-scale)) 0' }}>
               <div className="board-hero-group"><div className="board-zone-spacer" /><div className="board-zone-spacer" /><div className="board-zone-spacer" /></div>
-              <div className="board-zone" style={{ ...(zs('area') || {}), borderColor: 'rgba(255,51,102,.5)', background: zs('area') ? undefined : 'rgba(255,51,102,.08)', ...hl('area', 0, 0, 0) }} {...zh('area', 0, 0, 0)}>
+              <div className="board-zone" style={{ ...(zs('area') || {}), borderColor: 'rgba(255,51,102,.5)', backgroundColor: zs('area') ? undefined : 'rgba(255,51,102,.08)', ...hl('area', 0, 0, 0) }} {...zh('area', 0, 0, 0)}>
                 {areaZones[0].length > 0 ? <BoardCard cardName={areaZones[0][0]} /> : <div className="board-zone-empty">Your Area</div>}
               </div>
               <div className="board-hero-group"><div className="board-zone-spacer" /><div className="board-zone-spacer" /><div className="board-zone-spacer" /></div>
-              <div className="board-zone" style={{ ...(zs('area') || {}), borderColor: 'rgba(255,51,102,.5)', background: zs('area') ? undefined : 'rgba(255,51,102,.08)', ...hl('area', 1, 0, 0) }} {...zh('area', 1, 0, 0)}>
+              <div className="board-zone" style={{ ...(zs('area') || {}), borderColor: 'rgba(255,51,102,.5)', backgroundColor: zs('area') ? undefined : 'rgba(255,51,102,.08)', ...hl('area', 1, 0, 0) }} {...zh('area', 1, 0, 0)}>
                 {areaZones[1].length > 0 ? <BoardCard cardName={areaZones[1][0]} /> : <div className="board-zone-empty">Opp Area</div>}
               </div>
               <div className="board-hero-group"><div className="board-zone-spacer" /><div className="board-zone-spacer" /><div className="board-zone-spacer" /></div>
@@ -1367,13 +1500,41 @@ function PuzzleCreator() {
       })()}
 
       {/* ── Stat Editor Modal ── */}
-      {editTarget && (
+      {editTarget && (() => {
+        // Biomancy Token edit branch — Potion-in-support tokens replace
+        // the full stat editor with a minimal level picker. Everything
+        // else (HP input, status/buff lists) is suppressed: the level
+        // fully determines HP + damage.
+        const _editP = players[editTarget.si];
+        const _editCards = editTarget.zt === 'support' ? (_editP.supportZones[editTarget.hi]?.[editTarget.slot] || []) : [];
+        const _editCard = _editCards.length ? getCard(_editCards[0]) : null;
+        const isBiomancyTokenEdit = editTarget.zt === 'support' && _editCard?.cardType === 'Potion';
+        return (
         <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setEditTarget(null); }}>
           <div className="modal" style={{ maxWidth: 400, padding: 20, maxHeight: '80vh', overflowY: 'auto' }}>
             <h3 className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 14 }}>
-              EDIT {editTarget.zt === 'hero' ? 'HERO' : 'CREATURE'} STATS
+              {isBiomancyTokenEdit ? 'EDIT BIOMANCY TOKEN' : ('EDIT ' + (editTarget.zt === 'hero' ? 'HERO' : 'CREATURE') + ' STATS')}
             </h3>
-            {editTarget.zt === 'hero' && (() => {
+            {isBiomancyTokenEdit && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>Biomancy Level</span>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  {[1, 2, 3].map(lv => {
+                    const stats = { 1: 40, 2: 60, 3: 80 }[lv];
+                    const active = (editBiomancyLevel || 1) === lv;
+                    return (
+                      <button key={lv} className={'btn ' + (active ? 'btn-success' : '')}
+                        style={{ flex: 1, padding: '10px 0', fontSize: 12, borderColor: active ? '#44dd66' : 'var(--bg4)' }}
+                        onClick={() => setEditBiomancyLevel(lv)}>
+                        Biomancy Level {lv}
+                        <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>{stats} HP / {stats} dmg</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {!isBiomancyTokenEdit && editTarget.zt === 'hero' && (() => {
               const h = players[editTarget.si].heroes[editTarget.hi];
               const isDead = h && h.hp <= 0;
               return (
@@ -1384,6 +1545,7 @@ function PuzzleCreator() {
                 </button>
               );
             })()}
+            {!isBiomancyTokenEdit && (
             <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
               <label style={{ flex: 1 }}>
                 <span style={{ fontSize: 10, color: '#ff4466', fontWeight: 700 }}>HP</span>
@@ -1405,7 +1567,17 @@ function PuzzleCreator() {
                 </label>
               )}
             </div>
-            {/* ── Status Effects ── */}
+            )}
+            {/* Equip-Artifact edit targets restrict the buff picker to
+                the Anti-Magic-Enchantment buff and hide all Status Effects.
+                Biomancy Token edit targets hide both sections entirely. */}
+            {/* ── Status Effects ── (hidden for Equip Artifacts & Biomancy Tokens) */}
+            {!isBiomancyTokenEdit && !(editTarget.zt === 'support' && (() => {
+              const p = players[editTarget.si];
+              const cards = p.supportZones[editTarget.hi]?.[editTarget.slot] || [];
+              const c = cards.length ? getCard(cards[0]) : null;
+              return c && c.cardType === 'Artifact' && (c.subtype || '').toLowerCase() === 'equipment';
+            })()) && (
             <div style={{ marginBottom: 14 }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>Status Effects</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
@@ -1438,11 +1610,24 @@ function PuzzleCreator() {
                 })}
               </div>
             </div>
-            {/* ── Buffs ── */}
+            )}
+            {/* ── Buffs ── (hidden for Biomancy Tokens) */}
+            {!isBiomancyTokenEdit && (
             <div style={{ marginBottom: 14 }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>Buffs</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                 {BUFF_LIST.filter(bf => {
+                  // Determine zone type for scope filtering.
+                  const isEquipEdit = editTarget.zt === 'support' && (() => {
+                    const p = players[editTarget.si];
+                    const cards = p.supportZones[editTarget.hi]?.[editTarget.slot] || [];
+                    const c = cards.length ? getCard(cards[0]) : null;
+                    return c && c.cardType === 'Artifact' && (c.subtype || '').toLowerCase() === 'equipment';
+                  })();
+                  // Equip Artifacts: ONLY the equip-scoped buff (AME) is offered.
+                  if (isEquipEdit) return bf.scope === 'equip';
+                  // Everything else: hide equip-scoped buffs and apply normal scoping.
+                  if (bf.scope === 'equip') return false;
                   if (!bf.scope) return true;
                   if (bf.scope === 'oppHero') return editTarget.zt === 'hero' && editTarget.si === 1;
                   return true;
@@ -1465,13 +1650,15 @@ function PuzzleCreator() {
                 })}
               </div>
             </div>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-success" style={{ flex: 1, padding: '8px 0' }} onClick={saveStats}>SAVE</button>
               <button className="btn" style={{ flex: 1, padding: '8px 0' }} onClick={() => setEditTarget(null)}>CANCEL</button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
       <GameTooltip />
 
       {/* ── Remove card popup (fixed, above everything) ── */}

@@ -42,8 +42,12 @@ function loadCardEffect(cardName) {
     if (fs.existsSync(filePath)) {
       mod = require(filePath);
 
-      // Validate minimum structure
-      if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
+      // Validate minimum structure. Level-manipulation utility abilities
+      // (Wisdom, Mana Mining, future ones) carry no hooks or type flags —
+      // they plug into the engine's generic level-manipulation mechanism
+      // via `reduceSpellLevel` / `coverLevelGap`, so those count as valid
+      // exports too.
+      if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !mod.reduceSpellLevel && !mod.coverLevelGap && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
         console.warn(`[Loader] Card "${cardName}" (${normalized}.js) has no hooks, effects, or card type flags — ignored.`);
         mod = null;
       }

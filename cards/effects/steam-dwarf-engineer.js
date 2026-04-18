@@ -36,7 +36,7 @@ module.exports = attachSteamEngine({
     const gs = engine.gs;
     const inst = ctx.card;
     if (!inst || inst.zone !== 'support') return false;
-    if (inst.counters?.negated) return false;
+    if (inst.counters?.negated || inst.counters?.nulled) return false;
     if (inst.turnPlayed === (gs.turn || 0)) return false;
 
     const cd = engine._getCardDB()[inst.name];
@@ -119,14 +119,18 @@ module.exports = attachSteamEngine({
     await engine.actionDestroyCard({ name: CARD_NAME, owner: pi, heroIdx }, inst);
     await engine._delay(200);
 
-    // Summon the chosen Creature into the freed slot. hookExtras
-    // carries the _steamEngineerSummon flag which Dragon Pilot (and
-    // any future sacrifice-requiring Creature) checks in its onPlay
-    // to skip the sacrifice prompt.
+    // Summon the chosen Creature into the freed slot. `skipBeforeSummon`
+    // bypasses any sacrifice cost the Creature would normally require —
+    // Engineer's own life IS the cost, so Dragon Pilot (and any future
+    // sacrifice-requiring Creature) shouldn't also demand its own tribute
+    // when arriving via this path. The `_steamEngineerSummon` hookExtra
+    // is kept as an ambient flag for any card script that wants to
+    // inspect "was I summoned by Engineer?" during onPlay.
     const placeResult = await engine.summonCreatureWithHooks(
       summonedName, pi, heroIdx, zoneSlot,
       {
         source: CARD_NAME,
+        skipBeforeSummon: true,
         hookExtras: { _steamEngineerSummon: true },
       },
     );

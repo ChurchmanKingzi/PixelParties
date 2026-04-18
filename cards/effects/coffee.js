@@ -105,7 +105,7 @@ module.exports = {
     if (removedStatuses.length === 0) return; // Nothing selected — fizzle
 
     // Step 2: Remove selected statuses
-    engine.cleanseHeroStatuses(hero, pi, heroIdx, removedStatuses, 'Coffee');
+    engine.cleanseHeroStatuses(hero, pi, target.heroIdx, removedStatuses, 'Coffee');
 
     // Play coffee animation on hero
     engine._broadcastEvent('play_zone_animation', { type: 'coffee_steam', owner: pi, heroIdx: target.heroIdx, zoneSlot: -1 });

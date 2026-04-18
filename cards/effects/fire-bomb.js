@@ -6,7 +6,7 @@
 //  Destroyed cards go to discard pile.
 // ═══════════════════════════════════════════
 const { loadCardEffect } = require('./_loader');
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isArtifactCreature } = require('./_hooks');
 
 let _cardDBCache = null;
 function _getCardDB() {
@@ -59,7 +59,11 @@ module.exports = {
           }
         }
       }
-      // Equip artifacts in support zones
+      // Artifact-style support-zone targets. Includes standard equipment,
+      // support-zone Heroes (Initiation Ritual), and the Artifact-Creature
+      // hybrid (Pollution Spewer & future equivalents — they ARE Artifacts
+      // by cardType, so Fire Bomb / any other Artifact-destroying effect
+      // hits them just like an equip).
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         if (!ps.heroes[hi]?.name || ps.heroes[hi]?.hp <= 0) continue;
         for (let zi = 0; zi < (ps.supportZones[hi] || []).length; zi++) {
@@ -67,10 +71,10 @@ module.exports = {
           for (const cardName of cards) {
             const script = loadCardEffect(cardName);
             const cd = cardDB[cardName];
-            // isEquip script flag, OR a Hero/Ascended Hero in support zone (Initiation Ritual)
             const isEquip = script?.isEquip
               || (cd && (cd.subtype || '').toLowerCase() === 'equipment')
-              || (cd && (cd.cardType === 'Hero' || cd.cardType === 'Ascended Hero'));
+              || (cd && (cd.cardType === 'Hero' || cd.cardType === 'Ascended Hero'))
+              || isArtifactCreature(cd);
             if (isEquip) {
               targets.push({
                 id: `equip-${pi}-${hi}-${zi}-${cardName}`,
@@ -130,7 +134,7 @@ module.exports = {
           if (inst) {
             await engine.runHooks('onCardLeaveZone', { _onlyCard: inst, card: inst, fromZone: 'ability', fromHeroIdx: t.heroIdx });
             engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
-            const fbDiscardPs = gs.players[inst.originalOwner];
+            const fbDiscardPs = engine.gs.players[inst.originalOwner];
             if (fbDiscardPs) fbDiscardPs.discardPile.push(removed);
           } else {
             ps.discardPile.push(removed);
@@ -148,7 +152,7 @@ module.exports = {
           const zone = (ps.supportZones[t.heroIdx] || [])[t.slotIdx] || [];
           const idx = zone.indexOf(t.cardName);
           if (idx >= 0) zone.splice(idx, 1);
-          const fbSupDiscardPs = gs.players[inst.originalOwner];
+          const fbSupDiscardPs = engine.gs.players[inst.originalOwner];
           if (fbSupDiscardPs) fbSupDiscardPs.discardPile.push(t.cardName);
           engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
           engine.log('destroy', { card: t.cardName, by: 'Fire Bomb' });

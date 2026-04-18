@@ -94,6 +94,7 @@ At least one of these must be present, or the loader will ignore the file.
 |--------|-----------|-------------|
 | `spellPlayCondition` | `(gs, playerIdx) → bool` | Extra condition beyond spell school/level. Return `false` to block play. |
 | `canPlayCard` | `(gs, pi, heroIdx, cardData, engine) → bool` | Hero-level play restriction (e.g. duplicate attack bans). Exported by hero scripts. |
+| `payActivationCost` | `async (ctx) → void` | **Runs BEFORE the reaction chain window.** Use for costs that must be paid at activation and are NOT refunded by negation (e.g. Cold Coffin's Pollution placement). `ctx` is a standard card ctx built from the hand-zone instance — includes `promptZonePick`, `promptGeneric`, etc. If the spell is later negated by Anti Magic Shield / The Master's Plan / any counter-spell, the cost stays paid. Make `onPlay`'s target prompt `cancellable: false` since the cost is committed. |
 
 ### Heroes
 
@@ -307,6 +308,7 @@ card scripts have to the game engine.
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `ctx.dealDamage(target, amount, type)` | `Promise` | Deal damage to a hero. `type`: `'destruction_spell'`, `'attack'`, `'creature'`, `'status'`, `'artifact'`, `'other'` |
+| `ctx.dealTrueDamage(target, amount, type, opts)` | `Promise<{dealt}>` | **"Cannot be reduced or negated"** damage. Works on both heroes and creatures. Bypasses buff multipliers (Cloudy, medusa_petrified), Charmed/Submerged immunity, Immortal/HP-1 caps, Smug Coin, Gate Shield, Guardian. Still respects first-turn protection and absolute creature immunities (Cardinal Beast, Baihu Petrify). Sets the `_damagedOnTurn` tracker so "took damage this turn" effects (Medusa's Curse) see it. Use this for Acid Vial / Rockfall / future true-damage cards. |
 | `ctx.healHero(target, amount)` | `Promise` | Heal a hero |
 | `ctx.reviveHero(playerIdx, heroIdx, hp, opts)` | `Promise` | Revive a KO'd hero |
 | `ctx.increaseMaxHp(target, amount, opts)` | — | Increase a hero's max HP. `opts.cap` to set upper limit. |
@@ -423,7 +425,7 @@ back to the server's play handler:
 
 | Flag | Set by | Effect |
 |------|--------|--------|
-| `gs._spellCancelled = true` | Spell/Attack `onPlay` | Spell returns to hand (player cancelled target selection) |
+| `gs._spellCancelled = true` | Spell/Attack `onPlay` | Spell returns to hand (player cancelled target selection). Overridden by `_spellNegatedByEffect` — negated spells always go to discard. |
 | `gs._spellFreeAction = true` | Spell/Attack `onPlay` | This spell didn't consume the action — grant another |
 | `gs._spellPlacedOnBoard = true` | Spell/Attack `onPlay` | Don't send to discard after resolution (card placed itself) |
 | `gs._preventPhaseAdvance = true` | Any hook | Keep the current phase open (e.g. bonus actions) |

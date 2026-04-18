@@ -26,7 +26,7 @@ module.exports = attachSteamEngine({
     const engine = ctx._engine;
     const inst = ctx.card;
     if (!inst || inst.zone !== 'support') return false;
-    if (inst.counters?.negated) return false;
+    if (inst.counters?.negated || inst.counters?.nulled) return false;
 
     // Must be able to pay the HP cost without dying (max must stay
     // above 0 after paying; we also want some current HP buffer).

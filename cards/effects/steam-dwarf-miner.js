@@ -36,8 +36,8 @@ module.exports = attachSteamEngine({
       const hero = ctx.attachedHero;
       if (!hero?.name || hero.hp <= 0) return;
 
-      // Negated creatures do nothing
-      if (inst.counters?.negated) return;
+      // Negated or Nulled creatures do nothing
+      if (inst.counters?.negated || inst.counters?.nulled) return;
 
       const cd = engine._getCardDB()[inst.name];
       const maxHp = inst.counters?.maxHp ?? cd?.hp ?? 0;

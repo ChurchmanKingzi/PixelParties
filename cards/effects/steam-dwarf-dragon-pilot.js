@@ -15,162 +15,69 @@
 //    1+ cards, choose a target and deal 100
 //    damage to it with a massive fireball.
 //
-//  Note on ordering: the normal play_creature
-//  server flow places the Creature BEFORE firing
-//  onPlay, so by the time the sacrifice prompt
-//  runs the Dragon Pilot is already on the field.
-//  Sacrifices are picked immediately, and if the
-//  player cannot satisfy the requirement (which
-//  canSummon already gates) we self-destroy as
-//  a fail-safe.
+//  The sacrifice cost is defined via the shared
+//  `_sacrifice-shared` module and resolved BEFORE
+//  placement through the engine's beforeSummon
+//  hook — any valid summon path (hand play,
+//  Living Illusion, Reincarnation, future summon
+//  effects) pays the cost the same way, and
+//  failed cost payment aborts the summon cleanly
+//  without a transient ghost creature.
 //
-//  When summoned via Steam Dwarf Engineer, the
-//  ctx carries _steamEngineerSummon which
-//  bypasses both the sacrifice prompt and the
-//  bonus-action calculation.
+//  Steam Engineer bypasses the cost by passing
+//  `skipBeforeSummon: true` when it calls
+//  summonCreatureWithHooks (see engineer file).
 // ═══════════════════════════════════════════
 
-const { attachSteamEngine, getSacrificableCreatures } = require('./_steam-dwarf-shared');
+const { attachSteamEngine } = require('./_steam-dwarf-shared');
+const { canSatisfySacrifice, resolveSacrificeCost } = require('./_sacrifice-shared');
 
 const CARD_NAME = 'Steam Dwarf Dragon Pilot';
-const MIN_SAC_COUNT = 2;
-const MIN_SAC_MAXHP = 300;
 const DISCHARGE_DAMAGE = 100;
 const DISCHARGES_PER_TURN = 3;
 
-/**
- * Check if a set of candidate sacrifices contains at least one
- * combination of 2+ creatures whose combined maxHp is ≥ 300.
- * Greedy check: sort by maxHp desc, take the top 2 — if their sum
- * meets the requirement, any requirement including them does. We
- * also need ≥2 entries total. No deep combinatorial check needed:
- * if the two fattest don't make it, no 2-combo does.
- */
-function hasValidSacrificeSet(candidates) {
-  if (!candidates || candidates.length < MIN_SAC_COUNT) return false;
-  const sorted = [...candidates].sort((a, b) => b.maxHp - a.maxHp);
-  const top2 = sorted[0].maxHp + sorted[1].maxHp;
-  return top2 >= MIN_SAC_MAXHP;
-}
+// Shared spec used by BOTH canSummon (pure gate) and beforeSummon
+// (interactive cost resolution). The onResolved rider is where
+// Dragon Pilot's "all Lv1 → bonus Main Phase action" effect lives.
+const SACRIFICE_SPEC = {
+  minCount: 2,
+  minMaxHp: 300,
+  title: CARD_NAME,
+  description: 'Sacrifice 2 or more of your Creatures (not summoned this turn) with combined max HP ≥ 300.',
+  confirmLabel: '🐉 Sacrifice!',
+  confirmClass: 'btn-danger',
+  onResolved: async (ctx, picked) => {
+    // If every sacrificed Creature was Lv1 or lower, Dragon Pilot's
+    // summon was BONUS — grant an additional Main Phase action
+    // (same mechanism Torchure uses).
+    const allLowLevel = picked.every(t => (t._meta.level || 0) <= 1);
+    if (!allLowLevel) return;
+    const engine = ctx._engine;
+    const ps = engine.gs.players[ctx.cardOwner];
+    if (!ps) return;
+    ps._bonusMainActions = (ps._bonusMainActions || 0) + 1;
+    engine.log('dragon_pilot_bonus_action', {
+      player: ps.username, note: 'all sacrifices were Lv1 or lower',
+    });
+  },
+};
 
 module.exports = attachSteamEngine({
-  // Sacrifice requirement check — gates playability from hand.
-  // Does NOT run when Engineer summons us (Engineer bypasses the
-  // normal play flow entirely via summonCreatureWithHooks).
+  // Cheap gate — true whenever a valid sacrifice subset exists right now.
+  // Used by the engine for hand-play gating (`getSummonBlocked`) AND by
+  // summon effects (Living Illusion etc.) via `engine.isCreatureSummonable`.
   canSummon(ctx) {
-    const engine = ctx._engine;
-    const candidates = getSacrificableCreatures(engine, ctx.cardOwner);
-    return hasValidSacrificeSet(candidates);
+    return canSatisfySacrifice(ctx._engine, ctx.cardOwner, SACRIFICE_SPEC);
+  },
+
+  // Pre-placement resolution: prompt for sacrifices, destroy them, apply
+  // the onResolved rider. Returning false aborts the summon (the engine's
+  // summonCreatureWithHooks / server's play_creature respects this).
+  async beforeSummon(ctx) {
+    return await resolveSacrificeCost(ctx, SACRIFICE_SPEC);
   },
 
   hooks: {
-    /**
-     * Fire on play. Three branches:
-     *   - Engineer-summoned (ctx._steamEngineerSummon): skip entirely.
-     *   - Normal summon: prompt sacrifices, destroy them, check Lv1
-     *     rule for bonus-action grant.
-     *   - Sacrifice set not available somehow (shouldn't happen due
-     *     to canSummon gate but defensive): self-destroy.
-     */
-    onPlay: async (ctx) => {
-      // Bypass: Engineer summoned us → no sacrifice cost, no bonus
-      if (ctx._steamEngineerSummon) return;
-
-      const engine = ctx._engine;
-      const gs = engine.gs;
-      const inst = ctx.card;
-      const pi = ctx.cardOwner;
-      const ps = gs.players[pi];
-      if (!ps) return;
-
-      // Build sacrifice candidates (exclude self — self is fresh this turn)
-      const candidates = getSacrificableCreatures(engine, pi)
-        .filter(c => c.inst.id !== inst.id);
-
-      if (!hasValidSacrificeSet(candidates)) {
-        // Shouldn't happen: canSummon was true at play-time but state
-        // changed before we got here (e.g. a reaction destroyed our
-        // sacrifices). Clean up by self-destroying.
-        engine.log('dragon_pilot_fizzle', {
-          player: ps.username, reason: 'no_valid_sacrifices',
-        });
-        await engine.actionDestroyCard({ name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx }, inst);
-        return;
-      }
-
-      // Build targeting list for the sacrifice prompt
-      const targets = candidates.map(c => ({
-        id: `equip-${c.inst.owner}-${c.inst.heroIdx}-${c.inst.zoneSlot}`,
-        type: 'equip',
-        owner: c.inst.owner,
-        heroIdx: c.inst.heroIdx,
-        slotIdx: c.inst.zoneSlot,
-        cardName: c.cardName,
-        cardInstance: c.inst,
-        _meta: { maxHp: c.maxHp, level: c.level },
-      }));
-
-      // Prompt loop: the player must select a valid combination.
-      // We validate minCount/minMaxHp after selection via re-prompt
-      // on invalid pick (cancellable: false — this cost MUST be paid).
-      let picked = null;
-      while (true) {
-        const ids = await engine.promptEffectTarget(pi, targets, {
-          title: CARD_NAME,
-          description: `Sacrifice 2 or more of your Creatures (not summoned this turn) with combined max HP ≥ ${MIN_SAC_MAXHP}.`,
-          confirmLabel: '🐉 Sacrifice!',
-          confirmClass: 'btn-danger',
-          cancellable: false,
-          allowNonCreatureEquips: false,
-          maxTotal: candidates.length,
-          minRequired: MIN_SAC_COUNT,
-        });
-        if (!ids || ids.length < MIN_SAC_COUNT) continue;
-
-        const chosen = ids.map(id => targets.find(t => t.id === id)).filter(Boolean);
-        if (chosen.length < MIN_SAC_COUNT) continue;
-
-        const sumMax = chosen.reduce((s, t) => s + (t._meta.maxHp || 0), 0);
-        if (sumMax < MIN_SAC_MAXHP) continue;   // re-prompt
-
-        picked = chosen;
-        break;
-      }
-
-      // Check the "all Lv1 or lower" rule BEFORE destroying (so we
-      // still have access to the level metadata on the picked set).
-      const allLowLevel = picked.every(t => (t._meta.level || 0) <= 1);
-
-      // Sacrifice: destroy each picked creature in order.
-      // actionDestroyCard fires onCreatureDeath hooks for each.
-      for (const t of picked) {
-        try {
-          await engine.actionDestroyCard({ name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx }, t.cardInstance);
-        } catch (err) {
-          console.error('[Dragon Pilot] sacrifice failed:', err.message);
-        }
-      }
-
-      engine.log('dragon_pilot_sacrificed', {
-        player: ps.username,
-        victims: picked.map(t => t.cardName),
-        count: picked.length,
-      });
-
-      // If all sacrifices were Lv1 or lower, the summon was an
-      // ADDITIONAL action rather than costing an action. Grant one
-      // bonus Main Phase action — same mechanism as Torchure.
-      if (allLowLevel) {
-        ps._bonusMainActions = (ps._bonusMainActions || 0) + 1;
-        engine.log('dragon_pilot_bonus_action', {
-          player: ps.username,
-          note: 'all sacrifices were Lv1 or lower',
-        });
-      }
-
-      engine.sync();
-    },
-
     /**
      * On discard of 1+ cards from hand, deal 100 damage to any target.
      * Up to 3 uses per turn per instance (tracked on inst.counters).
@@ -189,7 +96,7 @@ module.exports = attachSteamEngine({
 
       // Only when this Creature is actively on the field
       if (!inst || inst.zone !== 'support') return;
-      if (inst.counters?.negated) return;
+      if (inst.counters?.negated || inst.counters?.nulled) return;
       const hero = ctx.attachedHero;
       if (!hero?.name || hero.hp <= 0) return;
 

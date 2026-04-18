@@ -10,46 +10,17 @@
 //
 //  The player picks zones one-by-one for each
 //  Pollution Token placement.
+//
+//  Refactored to use _pollution-shared.js for
+//  zone counting and token placement — no
+//  card-specific Pollution logic remains here.
 // ═══════════════════════════════════════════
 
-/**
- * Count free support zones for a player.
- * A zone is free if the sub-array is empty.
- */
-function countFreeZones(gs, playerIdx) {
-  const ps = gs.players[playerIdx];
-  let count = 0;
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
-    for (let si = 0; si < 3; si++) {
-      const slot = (ps.supportZones[hi] || [])[si] || [];
-      if (slot.length === 0) count++;
-    }
-  }
-  return count;
-}
-
-/**
- * Get list of free support zone descriptors for zone picking.
- */
-function getFreeZones(gs, playerIdx) {
-  const ps = gs.players[playerIdx];
-  const zones = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
-    for (let si = 0; si < 3; si++) {
-      const slot = (ps.supportZones[hi] || [])[si] || [];
-      if (slot.length === 0) {
-        zones.push({ heroIdx: hi, slotIdx: si, label: `${hero.name} — Slot ${si + 1}` });
-      }
-    }
-  }
-  return zones;
-}
+const { countFreeZones, placePollutionTokens } = require('./_pollution-shared');
 
 module.exports = {
+  placesPollutionTokens: true,
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -126,55 +97,16 @@ module.exports = {
       engine.sync();
       await engine._delay(400);
 
-      // ── Place Pollution Tokens ──
-      const tokensToPlace = hitTargets.length;
-      const ps = gs.players[pi];
-
-      for (let t = 0; t < tokensToPlace; t++) {
-        const freeZones = getFreeZones(gs, pi);
-        if (freeZones.length === 0) break;
-
-        let chosenZone;
-        if (freeZones.length === 1) {
-          chosenZone = freeZones[0];
-        } else {
-          const picked = await ctx.promptZonePick(freeZones, {
-            title: 'Pyroblast — Pollution',
-            description: `Place Pollution Token ${t + 1}/${tokensToPlace} into a free Support Zone.`,
-            cancellable: false,
-          });
-          chosenZone = (picked && freeZones.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx)) || freeZones[0];
-        }
-
-        const hi = chosenZone.heroIdx;
-        const si = chosenZone.slotIdx;
-        if (!ps.supportZones[hi]) ps.supportZones[hi] = [[], [], []];
-        if (!ps.supportZones[hi][si]) ps.supportZones[hi][si] = [];
-        ps.supportZones[hi][si].push('Pollution Token');
-
-        const inst = engine._trackCard('Pollution Token', pi, 'support', hi, si);
-
-        await engine.runHooks('onPlay', {
-          _onlyCard: inst, playedCard: inst,
-          cardName: 'Pollution Token', zone: 'support', heroIdx: hi, zoneSlot: si,
-          _skipReactionCheck: true,
-        });
-        await engine.runHooks('onCardEnterZone', {
-          enteringCard: inst, toZone: 'support', toHeroIdx: hi,
-          _skipReactionCheck: true,
-        });
-
-        engine.log('pollution_placed', { player: ps.username, heroIdx: hi, zoneSlot: si, by: 'Pyroblast' });
-        engine.sync();
-        await engine._delay(300);
-      }
-
-      await engine._checkReactiveHandLimits(pi);
+      // ── Place Pollution Tokens (shared helper handles zone-pick loop,
+      //    hook firing, logging, and _checkReactiveHandLimits) ──
+      const { placed } = await placePollutionTokens(engine, pi, hitTargets.length, 'Pyroblast', {
+        promptCtx: ctx,
+      });
 
       engine.log('pyroblast', {
         player: gs.players[pi].username,
         targets: hitTargets.map(t => t.cardName),
-        tokensPlaced: tokensToPlace,
+        tokensPlaced: placed,
       });
 
       engine.sync();

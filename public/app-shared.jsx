@@ -141,6 +141,103 @@ window.STARTING_ABILITIES = [];
 window.ARCHETYPES = [];
 window.SKINS_DB = {}; // cardName → [skinName, ...]
 
+// ═══════════════════════════════════════════
+//  HAND-LIMIT MODIFIER REGISTRY
+//  Source of truth for any frontend code that needs to compute "how
+//  many cards can this player have in hand given their current board".
+//  The battle engine derives this from CardInstance counters directly
+//  (cards/effects/_engine.js — handLimitReduction on support cards,
+//  _shouldBypassHandLimit for bypasses). In the puzzle builder and
+//  any other pre-battle UI, we don't have instances yet — just card
+//  names on zones — so we mirror the engine's rules here.
+//
+//  Entry shape: { zone, delta, bypass? }
+//    zone:   'support' | 'area'  — where the card lives
+//    delta:  number that SHRINKS the hand cap per copy (positive = smaller
+//            hand; negative = larger hand). Mirrors the engine's
+//            handLimitReduction counter semantics exactly.
+//    bypass: optional (state, side) → bool. If any entry on this player's
+//            side returns true, the cap is lifted entirely. Used by Big
+//            Gwen which requires at least one Pollution Token to activate.
+//
+//  When adding a future card that modifies the hand cap, add its entry
+//  here and its effect module — keep them in sync.
+// ═══════════════════════════════════════════
+window.CARD_HAND_LIMIT_MODIFIERS = {
+  'Pollution Token': { zone: 'support', delta: 1 },
+  'Royal Corgi':     { zone: 'support', delta: -3 },
+  'The Great Clock Tower "Big Gwen"': {
+    zone: 'area',
+    delta: 0,
+    // Big Gwen lifts the cap only while the owner controls at least one
+    // Pollution Token on their support zones.
+    bypass: (sideState) => {
+      const zones = sideState?.supportZones || [];
+      for (const heroSlot of zones) {
+        for (const zone of (heroSlot || [])) {
+          if ((zone || []).includes('Pollution Token')) return true;
+        }
+      }
+      return false;
+    },
+  },
+};
+
+/**
+ * Compute a player's effective max hand size from their board state.
+ * Pre-battle equivalent of _engine.js enforceHandLimit — no instance
+ * state (no statuses), so every card contributes its delta unconditionally
+ * IF its attached hero slot is filled.
+ *
+ * @param {object} sideState - { heroes, supportZones }
+ * @param {string[]} areaZone - array of Area card names on this side
+ * @returns {number} effective max hand size (≥ 1)
+ */
+window.computeSupportHandLimit = function (sideState, areaZone) {
+  const supportZones = sideState?.supportZones || [];
+  const heroes = sideState?.heroes || [];
+
+  // Bypass check (Big Gwen, future cards). Any `true` wins.
+  for (const cardName of (areaZone || [])) {
+    const entry = window.CARD_HAND_LIMIT_MODIFIERS[cardName];
+    if (!entry || entry.zone !== 'area') continue;
+    if (typeof entry.bypass === 'function' && entry.bypass(sideState)) {
+      return Infinity; // No cap while bypass is active
+    }
+  }
+
+  // Puzzle-builder convenience: while the side has ZERO Pollution Tokens on
+  // its board, hand size is uncapped. The cap only matters as a constraint
+  // the builder has to work around once Pollution starts accumulating, so
+  // leaving it at 7 while there's no pollution in play is just noise.
+  let pollutionCount = 0;
+  for (let hi = 0; hi < supportZones.length; hi++) {
+    if (!heroes[hi]) continue;
+    const heroZones = supportZones[hi] || [];
+    for (const zone of heroZones) {
+      for (const cardName of (zone || [])) {
+        if (cardName === 'Pollution Token') pollutionCount++;
+      }
+    }
+  }
+  if (pollutionCount === 0) return Infinity;
+
+  let cap = 7;
+  for (let hi = 0; hi < supportZones.length; hi++) {
+    // Skip zones attached to an empty hero slot — those cards wouldn't
+    // fire hooks (engine's isCardEffectActive returns false).
+    if (!heroes[hi]) continue;
+    const heroZones = supportZones[hi] || [];
+    for (const zone of heroZones) {
+      for (const cardName of (zone || [])) {
+        const entry = window.CARD_HAND_LIMIT_MODIFIERS[cardName];
+        if (entry && entry.zone === 'support') cap -= entry.delta;
+      }
+    }
+  }
+  return Math.max(1, cap);
+};
+
 async function loadCardDB() {
   // Load full card database (needed for rule lookups on existing decks)
   const res = await fetch('/data/cards.json');
@@ -713,18 +810,42 @@ function GameTooltip() {
   );
 }
 
-function StatusBadges({ statuses, counters, isHero, player }) {
+function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
   const badges = [];
   const s = statuses || {};
   const c = counters || {};
+  // Buffs live on the hero/creature separately from statuses/counters. For
+  // creatures they're also nested under counters.buffs, so fall back there.
+  const b = buffs || c.buffs || {};
   const dur = (statusData) => {
     if (!statusData || typeof statusData !== 'object') return ' Wears off at the end of its owner\'s turn.';
     if (statusData.duration != null && statusData.duration > 1) return ` Lasts for ${statusData.duration} of its owner's turns.`;
     return ' Wears off at the end of its owner\'s turn.';
   };
   const durStart = (statusData) => ' Wears off at the start of its owner\'s turn.';
-  if (s.frozen || c.frozen) badges.push({ key: 'frozen', icon: '❄️', tooltip: 'Frozen: Cannot act and has its effects and Abilities negated.' + (isHero ? ' Cannot be equipped with Artifacts.' : '') + dur(s.frozen || c.frozen) });
-  if (s.stunned || c.stunned) badges.push({ key: 'stunned', icon: '⚡', tooltip: 'Stunned: Cannot act and has its effects and Abilities negated.' + dur(s.stunned || c.stunned) });
+  if (s.frozen || c.frozen) {
+    const fr = s.frozen || c.frozen;
+    const remaining = (fr && typeof fr === 'object' && fr.duration != null) ? fr.duration : null;
+    badges.push({
+      key: 'frozen', icon: '❄️',
+      tooltip: 'Frozen: Cannot act and has its effects and Abilities negated.' + (isHero ? ' Cannot be equipped with Artifacts.' : '') + dur(fr),
+      duration: remaining,
+    });
+  }
+  if (s.stunned || c.stunned) {
+    // Medusa's Curse stuns are paired with the medusa_petrified buff, which
+    // drops all incoming damage to 0 — surface that directly on the stun
+    // badge so the player can see "this stun is the damage-immune variant"
+    // without having to read the buff column.
+    if (b.medusa_petrified) {
+      badges.push({
+        key: 'stunned', icon: '🗿',
+        tooltip: "Stunned (Petrified): Cannot act and has its effects and Abilities negated. Takes 0 damage from all sources. (Medusa's Curse)",
+      });
+    } else {
+      badges.push({ key: 'stunned', icon: '⚡', tooltip: 'Stunned: Cannot act and has its effects and Abilities negated.' + dur(s.stunned || c.stunned) });
+    }
+  }
   if (c._baihuStunned) badges.push({ key: 'petrified', icon: '🪨', tooltip: `Petrified: Stunned and immune to all damage. Lasts for ${c._baihuStunned.duration || 1} of its owner's turns.` });
   if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
   if (s.poisoned || c.poisoned) {
@@ -734,36 +855,60 @@ function StatusBadges({ statuses, counters, isHero, player }) {
     badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: `${isUnhealable ? 'Unhealable ' : ''}Poisoned: Takes ${perStack * stacks} damage at the start of each of its owner's turns.${isUnhealable ? ' Cannot be removed.' : ''}`, className: isUnhealable ? 'status-unhealable' : '' });
   }
   if (s.negated || c.negated) badges.push({ key: 'negated', icon: '🚫', tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.') + dur(s.negated || c.negated) });
+  if (s.nulled || c.nulled) badges.push({ key: 'nulled', icon: '🔇', tooltip: (isHero ? 'Nulled: Cannot cast Spells.' : 'Nulled: Has its effects negated.') + dur(s.nulled || c.nulled) });
   if (s.immune) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
   if (s.shielded) badges.push({ key: 'shielded', icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + durStart(s.shielded) });
   if (s.untargetable) badges.push({ key: 'untargetable', icon: '🦋', tooltip: 'Untargetable: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen.' });
   if (s.healReversed) badges.push({ key: 'healReversed', icon: '💀', tooltip: 'Overheal Shock: Takes any healing as damage.' });
   if (s.charmed) badges.push({ key: 'charmed', icon: '💘', tooltip: 'Charmed: Under opponent control and immune to all effects.' });
   if (badges.length === 0) return null;
+  // Keep the big board-card tooltip up while hovering a status badge. Badges
+  // are positioned just outside the card's bounds (left: -2px), so moving
+  // onto one normally fires the card's mouseLeave and hides the preview.
+  // Re-asserting the tooltip here, plus clearing it on badge leave, keeps
+  // the two tooltips (status-description and card-preview) in sync.
+  const tooltipCard = cardName && window.CARDS_BY_NAME ? window.CARDS_BY_NAME[cardName] : null;
+  const showBoardTip = () => { if (tooltipCard) window._boardTooltipSetter?.(tooltipCard); };
+  const hideBoardTip = () => { if (tooltipCard) window._boardTooltipSetter?.(null); };
   return (
     <div className="status-badges-row">
       {badges.map(b => (
-        <div key={b.key} className="status-badge"
-          onMouseEnter={e => showGameTooltip(e, b.tooltip)}
-          onMouseLeave={hideGameTooltip}>
+        <div key={b.key} className={'status-badge' + (b.className ? ' ' + b.className : '')}
+          onMouseEnter={e => { showGameTooltip(e, b.tooltip); showBoardTip(); }}
+          onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
           {b.icon}
+          {b.duration != null && <span className="status-badge-duration">{b.duration}</span>}
         </div>
       ))}
     </div>
   );
 }
 
-function BuffColumn({ buffs }) {
+function BuffColumn({ buffs, cardName }) {
   if (!buffs || Object.keys(buffs).length === 0) return null;
-  const BUFF_ICONS = { cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' } };
+  const BUFF_ICONS = { cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' } };
+  // medusa_petrified is surfaced through the Stunned status badge (as the
+  // "Petrified" variant), so don't also render it as a separate buff icon —
+  // that would double-represent the same effect. null_zone_negated is the
+  // expiry-timer buff paired with the 'nulled' status badge (same reason).
+  const BUFF_HIDDEN = new Set(['medusa_petrified', 'null_zone_negated']);
+  // Same tooltip-bridge pattern as StatusBadges: buff icons are absolute-
+  // positioned relative to the card and the cursor moving onto one fires
+  // the card's mouseLeave, hiding the big preview. Re-assert the preview
+  // on buff-icon hover so both tooltips (buff description + card preview)
+  // stay in sync. The `.buff-icon:hover` entry in useCardTooltip's
+  // hoverSelectors keeps the 300ms safety-sweep from wiping it back out.
+  const tooltipCard = cardName && window.CARDS_BY_NAME ? window.CARDS_BY_NAME[cardName] : null;
+  const showBoardTip = () => { if (tooltipCard) window._boardTooltipSetter?.(tooltipCard); };
+  const hideBoardTip = () => { if (tooltipCard) window._boardTooltipSetter?.(null); };
   return (
     <div className="buff-column">
-      {Object.entries(buffs).map(([key]) => {
+      {Object.entries(buffs).filter(([key]) => !BUFF_HIDDEN.has(key)).map(([key]) => {
         const def = BUFF_ICONS[key] || { icon: '✦', tooltip: key };
         return (
           <div key={key} className="buff-icon"
-            onMouseEnter={e => showGameTooltip(e, def.tooltip)}
-            onMouseLeave={hideGameTooltip}>
+            onMouseEnter={e => { showGameTooltip(e, def.tooltip); showBoardTip(); }}
+            onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
             {def.icon}
           </div>
         );
@@ -841,7 +986,11 @@ function CardTooltipContent({ card, children }) {
  */
 function useCardTooltip(opts) {
   const defaultSide = (opts && opts.defaultSide) || 'right';
-  const hoverSelectors = (opts && opts.hoverSelectors) || '.board-card:hover, .card-mini:hover, .pz-search-card:hover, .pz-hand-card:hover';
+  // Include .status-badge:hover and .buff-icon:hover so the 300ms safety-
+  // clear below doesn't wipe the card preview while the cursor is over a
+  // status badge or buff icon (both hang off the card's bounds and aren't
+  // .board-card elements themselves).
+  const hoverSelectors = (opts && opts.hoverSelectors) || '.board-card:hover, .card-mini:hover, .pz-search-card:hover, .pz-hand-card:hover, .status-badge:hover, .buff-icon:hover';
   const [tooltipCard, setTooltipCard] = useState(null);
   const [tooltipSide, setTooltipSide] = useState(defaultSide);
 

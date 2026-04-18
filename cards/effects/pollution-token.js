@@ -24,5 +24,13 @@ module.exports = {
     onPlay: async (ctx) => {
       ctx.card.counters.handLimitReduction = 1;
     },
+
+    // Puzzle mode pre-places support-zone cards directly without firing
+    // onPlay, so the counter wouldn't otherwise be set. Mirrors Royal
+    // Corgi's idempotent onGameStart restore pattern.
+    onGameStart: async (ctx) => {
+      if (ctx.card.counters.handLimitReduction === 1) return;
+      ctx.card.counters.handLimitReduction = 1;
+    },
   },
 };

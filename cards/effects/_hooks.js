@@ -26,6 +26,7 @@ const HOOKS = {
   // ── Card movement ──
   BEFORE_DRAW:      'beforeDraw',
   ON_DRAW:          'onDraw',
+  ON_CARD_ADDED_TO_HAND: 'onCardAddedToHand', // Fires when a card is added to a hand from the deck (tutor effects — Mass Multiplication, etc.). Complements ON_DRAW, which only fires for top-of-deck draws.
   BEFORE_PLAY:      'beforePlay',
   ON_PLAY:          'onPlay',
   ON_DISCARD:       'onDiscard',
@@ -88,6 +89,9 @@ const HOOKS = {
 
   // ── Ascension ──
   ON_ASCENSION: 'onAscension',  // Fires when a Hero ascends into an Ascended Hero (reaction window)
+
+  // ── Archetype-specific (fired from cards/effects/_*-shared.js modules) ──
+  ON_POLLUTION_TOKEN_REMOVED: 'onPollutionTokenRemoved',  // Fired by _pollution-shared when a Pollution Token leaves the board (Pollution Spewer, etc.)
 };
 
 // ── Status damage base values ──
@@ -132,6 +136,7 @@ const STATUS_EFFECTS = {
   negated: { negative: true, label: 'Negated', icon: '⚡', immuneKey: 'negate_immune' },
   burned:  { negative: true, label: 'Burned',  icon: '🔥', immuneKey: 'burn_immune' },
   poisoned:{ negative: true, label: 'Poisoned', icon: '☠️', immuneKey: 'poison_immune' },
+  nulled:  { negative: true, label: 'Nulled',  icon: '🔇', immuneKey: 'null_immune' },
   immune:  { negative: false, label: 'Immune',  icon: '🛡️' },
   shielded:{ negative: false, label: 'Shielded', icon: '✨' },
 };
@@ -150,6 +155,9 @@ const BUFF_EFFECTS = {
   cloudy: { label: 'Cloudy', icon: '☁️', tooltip: 'Takes half damage from all sources!', damageMultiplier: 0.5 },
   submerged: { label: 'Submerged', icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' },
   negative_status_immune: { label: 'Cool', icon: '😎', tooltip: 'Immune to all negative status effects!' },
+  medusa_petrified: { label: 'Petrified', icon: '🗿', tooltip: 'Takes 0 damage from all sources! (Medusa\'s Curse)', damageMultiplier: 0 },
+  golden_wings: { label: 'Golden Wings', icon: '🪽', tooltip: 'Golden Wings: Fully immune to all opponent effects for the rest of this turn.' },
+  anti_magic_enchanted: { label: 'Anti Magic Enchantment', icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate the effects of a Spell that hits this Artifact\'s equipped Hero.' },
 };
 
 // ═══════════════════════════════════════════
@@ -175,4 +183,51 @@ function hasCardType(cd, type) {
   return false;
 }
 
-module.exports = { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE };
+/**
+ * "Artifact-Creature" hybrid: a card whose cardType is `Artifact` AND whose
+ * subtype contains `Creature` (Pollution Spewer is the reference implementation).
+ * Plays like an Artifact — pays gold, goes to a Support Zone during Main
+ * Phase, no Action cost, no spell school / level / hero-state requirements.
+ * Once on the board it functions as a Creature — has HP, takes creature
+ * damage, dies when HP hits 0, targetable by effects that hit Creatures.
+ *
+ * Its level is intentionally `null`. Effects that scale off a Creature's
+ * level (Dark Gear, etc.) should treat Artifact-Creatures as "level-less"
+ * and exclude them from their target pool — use `hasNumericCreatureLevel`
+ * below.
+ */
+function isArtifactCreature(cd) {
+  if (!cd) return false;
+  return cd.cardType === 'Artifact' && hasCardType(cd, 'Creature');
+}
+
+/**
+ * A Creature has a "numeric level" when its `level` field is a finite,
+ * positive number. Regular Creatures have levels 1..5; Artifact-Creatures
+ * (Pollution Spewer) have `null`. Effects that need to scale / gate by
+ * level use this to exclude level-less targets.
+ */
+function hasNumericCreatureLevel(cd) {
+  if (!cd) return false;
+  return typeof cd.level === 'number' && cd.level > 0;
+}
+
+/**
+ * Whether a creature's effects are currently negated.
+ * "Negated" (Dark Gear / Necromancy / Diplomacy) and "Nulled" (Null Zone)
+ * are distinct status keys but both gate a creature's effects identically —
+ * any code checking "can this creature's effects fire?" must treat them the
+ * same. Centralize the OR here so new negation-like statuses can be added
+ * in one place.
+ */
+function isCreatureNegated(inst) {
+  const c = inst?.counters;
+  return !!(c?.negated || c?.nulled);
+}
+
+module.exports = {
+  SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES,
+  STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS,
+  hasCardType, isArtifactCreature, hasNumericCreatureLevel, isCreatureNegated,
+  POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,
+};
