@@ -18,6 +18,13 @@ module.exports = {
     const gs      = engine.gs;
     const pi      = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
+    // Physical render side — where the creature actually sits on the
+    // board. For a stolen / charmed-hero creature, ctx.cardOwner is the
+    // activator (for damage credit) but the instance is still on its
+    // original owner's side, so animations must use cardHeroOwner to
+    // find the right support slot. For a non-stolen creature this
+    // equals cardOwner, so the branch is invisible in the common case.
+    const sourceOwner = ctx.cardHeroOwner;
 
     const target = await ctx.promptDamageTarget({
       side: 'any',
@@ -38,7 +45,7 @@ module.exports = {
 
     // Haressassin dashes to the target …
     engine._broadcastEvent('play_ram_animation', {
-      sourceOwner: pi, sourceHeroIdx: heroIdx,
+      sourceOwner, sourceHeroIdx: heroIdx,
       sourceZoneSlot: ctx.card.zoneSlot,          // originate from this creature's support slot
       targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
       targetZoneSlot: tgtZoneSlot,

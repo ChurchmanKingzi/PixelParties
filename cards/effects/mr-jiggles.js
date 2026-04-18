@@ -19,6 +19,11 @@ module.exports = {
     const gs      = engine.gs;
     const pi      = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
+    // Physical render side — source-side animations must originate from
+    // where the creature actually sits (cardHeroOwner), not from the
+    // activator (cardOwner). For a temporarily stolen creature those
+    // differ; for any normal creature they're equal.
+    const sourceOwner = ctx.cardHeroOwner;
 
     const targets = await ctx.promptMultiTarget({
       types: ['hero', 'creature'],
@@ -36,7 +41,7 @@ module.exports = {
     // Fire all laser beams simultaneously (no await between broadcasts)
     for (const target of targets) {
       engine._broadcastEvent('play_beam_animation', {
-        sourceOwner: pi, sourceHeroIdx: heroIdx, sourceZoneSlot: ctx.card.zoneSlot,
+        sourceOwner, sourceHeroIdx: heroIdx, sourceZoneSlot: ctx.card.zoneSlot,
         targetOwner: target.owner, targetHeroIdx: target.heroIdx,
         targetZoneSlot: target.type === 'equip' ? target.slotIdx : -1,
         color: '#ff2222',

@@ -13,6 +13,122 @@ const CHAIN_TIMEOUT_MS = 30000; // 30s to respond to chain prompt
 const EFFECT_TIMEOUT_MS = 5000; // 5s max for a single effect to execute
 
 // ═══════════════════════════════════════════
+//  GENERIC TARGETING FILTER:
+//  Forced-target ("taunt") mechanic.
+//
+//  A Creature can mark itself as the sole eligible target of its
+//  side for a specific caster via:
+//    inst.counters.forcesTargeting = true
+//    inst.counters.forcesTargeting_pi = casterIdx   // who is forced
+//    inst.counters.forcesTargeting_untilTurn = N    // expires when gs.turn > N
+//
+//  Matching `type` is derived from the forcing creature's own type: a
+//  Creature taunter filters out other Creatures on its side; Heroes on
+//  the same side are untouched (because the taunter is a Creature, not
+//  a Hero). This honors the "if possible" clause — if the source can't
+//  target creatures at all, no filtering occurs.
+//
+//  Used by Deepsea Horror Clown; usable by any future taunt-style card.
+// ═══════════════════════════════════════════
+function _applyForcesTargetingFilter(engine, targets, casterPi) {
+  if (!targets || targets.length === 0) return;
+  const gs = engine.gs;
+  const turn = gs.turn || 0;
+
+  // A taunt is active against THIS caster when:
+  //   • forcesTargeting_pi is either this caster or null/undef (puzzle-
+  //     authored taunt with no specific target → applies to any opposing
+  //     caster).
+  //   • forcesTargeting_untilTurn is null/undef (permanent) or still in
+  //     the future.
+  const tauntDirectedAtCaster = (pi, until) => {
+    if (pi != null && pi !== casterPi) return false;
+    if (until != null && turn > until) return false;
+    return true;
+  };
+
+  // Creature taunters on the side OPPOSITE the caster. Flag is read from
+  // either counters.forcesTargeting (runtime setters like Horror Clown)
+  // or counters.buffs.forcesTargeting (puzzle editor / any buff-system
+  // usage). The buff-mirror makes BuffColumn render the 🎯 icon
+  // consistently.
+  const creatureForcers = engine.cardInstances.filter(inst => {
+    if (inst.zone !== 'support') return false;
+    const c = inst.counters;
+    if (!c || !(c.forcesTargeting || c.buffs?.forcesTargeting)) return false;
+    const side = inst.controller ?? inst.owner;
+    if (side === casterPi) return false;
+    return tauntDirectedAtCaster(c.forcesTargeting_pi, c.forcesTargeting_untilTurn);
+  });
+
+  // Hero taunters (buffs.forcesTargeting on the hero object) — used by
+  // the puzzle editor to author a taunting Hero.
+  const heroForcers = [];
+  for (let pi = 0; pi < 2; pi++) {
+    if (pi === casterPi) continue;
+    const ps = gs.players[pi];
+    if (!ps) continue;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (!hero.buffs?.forcesTargeting) continue;
+      if (!tauntDirectedAtCaster(hero.forcesTargeting_pi, hero.forcesTargeting_untilTurn)) continue;
+      heroForcers.push({ pi, hi });
+    }
+  }
+
+  if (creatureForcers.length === 0 && heroForcers.length === 0) return;
+
+  // Pre-compute every forcer's target id so multiple taunters all stay
+  // valid (the opponent picks any). Without this set, the first forcer
+  // would splice the second out and break "multiple taunters, pick any".
+  const forcerIds = new Set();
+  for (const f of creatureForcers) {
+    const side = f.controller ?? f.owner;
+    forcerIds.add(`equip-${side}-${f.heroIdx}-${f.zoneSlot}`);
+  }
+  for (const hf of heroForcers) {
+    forcerIds.add(`hero-${hf.pi}-${hf.hi}`);
+  }
+
+  // Each creature forcer removes every other (non-forcer) target on its
+  // side — BOTH creatures and heroes. The card text "with all Attacks
+  // and Spells they play" doesn't restrict to same-type targets; only
+  // the "if possible" clause matters. "If possible" is already handled
+  // by the `if (!targets.find(... forcerTargetId))` skip: when the
+  // caster's effect can't target the forcer at all (e.g. hero-only
+  // source targeting a creature forcer), we don't filter — heroes stay
+  // targetable and the effect goes through normally.
+  for (const forcer of creatureForcers) {
+    const forcerSide = forcer.controller ?? forcer.owner;
+    const forcerTargetId = `equip-${forcerSide}-${forcer.heroIdx}-${forcer.zoneSlot}`;
+    if (!targets.find(t => t.id === forcerTargetId)) continue;
+    for (let i = targets.length - 1; i >= 0; i--) {
+      const t = targets[i];
+      if (forcerIds.has(t.id)) continue;
+      if (t.owner !== forcerSide) continue;
+      // Remove creatures AND heroes on the forcer's side.
+      if (t.type !== 'equip' && t.type !== 'hero') continue;
+      targets.splice(i, 1);
+    }
+  }
+
+  // Hero forcers mirror the same rule — filter every non-forcer target
+  // on their side.
+  for (const hf of heroForcers) {
+    const forcerTargetId = `hero-${hf.pi}-${hf.hi}`;
+    if (!targets.find(t => t.id === forcerTargetId)) continue;
+    for (let i = targets.length - 1; i >= 0; i--) {
+      const t = targets[i];
+      if (forcerIds.has(t.id)) continue;
+      if (t.owner !== hf.pi) continue;
+      if (t.type !== 'equip' && t.type !== 'hero') continue;
+      targets.splice(i, 1);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
 //  CARD INSTANCE
 //  Wraps a card name with tracking metadata.
 // ═══════════════════════════════════════════
@@ -182,6 +298,16 @@ class GameEngine {
       const eligible = promptData.eligibleIndices || [];
       if (eligible.length === 0) return null;
       return { selectedIndex: eligible[0] };
+    }
+
+    if (type === 'pickHandCard') {
+      // Single-pick from hand, restricted to eligibleIndices. CPU
+      // just picks the first eligible card.
+      const ps = this.gs.players[this._cpuPlayerIdx];
+      if (!ps || !ps.hand || ps.hand.length === 0) return null;
+      const eligible = promptData.eligibleIndices;
+      const idx = eligible ? eligible[0] : 0;
+      return { cardName: ps.hand[idx], handIndex: idx };
     }
 
     if (type === 'heroAction') {
@@ -526,6 +652,18 @@ class GameEngine {
         effectiveController = heroObj.charmedBy;
         effectiveOwner = heroObj.charmedBy;
         effectiveHeroOwner = cardInstance.owner; // hero is still physically on original owner's side
+      } else if (cardInstance.zone === 'support' && cardInstance.stolenBy != null) {
+        // Temporarily stolen creature (Deepsea Succubus). The creature's
+        // host hero is NOT charmed, so it physically stays on its owner's
+        // side — the zone renders under inst.owner. We flip effectiveOwner
+        // / effectiveController to the stealer so cardOwner-driven logic
+        // (damage source, prompts, HOPT keys) routes to them, but leave
+        // effectiveHeroOwner anchored to the render side so scripts that
+        // use cardHeroOwner for source-zone animations paint on the
+        // correct board.
+        effectiveController = cardInstance.stolenBy;
+        effectiveOwner = cardInstance.stolenBy;
+        effectiveHeroOwner = cardInstance.owner;
       }
     }
 
@@ -1242,6 +1380,21 @@ class GameEngine {
           if (targets.length === 0) return null;
         }
 
+        // ── Forced-target filter (Deepsea Horror Clown, taunt mechanic) ──
+        // Generic: if any creature currently on the board has counters.
+        // forcesTargeting === true, forcesTargeting_pi === caster, and
+        // forcesTargeting_untilTurn >= current turn, and it's a legal
+        // target (same side as caster's opponents and matches the type
+        // filter), then all OTHER targets on that creature's side whose
+        // type matches the forcer's type get filtered out. Example:
+        // Horror Clown (Creature) forces creature-type targeting on its
+        // side → other creatures on its side become untargetable, but
+        // heroes on its side remain untargetable iff Clown is only a
+        // creature-type match. "If possible" => if Clown's not a legal
+        // target type (e.g. source targets heroes only), no filtering.
+        _applyForcesTargetingFilter(engine, targets, pi);
+        if (targets.length === 0) return null;
+
         // Filter out excluded targets (Bartas second-cast, etc.)
         const excludeIds = gs._spellExcludeTargets || [];
         const filteredTargets = excludeIds.length > 0 ? targets.filter(t => !excludeIds.includes(t.id)) : targets;
@@ -1327,6 +1480,20 @@ class GameEngine {
               if (negIdx >= 0) gs._spellDamageLog.splice(negIdx, 1);
             }
             return null;
+          }
+
+          // Target-redirect reaction (Deepsea Encounter): the reaction
+          // returned a replacement target. Swap `selected` + the damage
+          // log entry so the caller's damage / buff / debuff lands on
+          // the newly-placed creature instead of the bounced one.
+          if (ptResult?.newTargets && ptResult.newTargets.length > 0) {
+            const newSel = ptResult.newTargets[0];
+            if (gs._spellDamageLog) {
+              const oldIdx = gs._spellDamageLog.findIndex(t => t.id === selected.id);
+              if (oldIdx >= 0) gs._spellDamageLog.splice(oldIdx, 1, { ...newSel });
+              else gs._spellDamageLog.push({ ...newSel });
+            }
+            selected = newSel;
           }
 
           // If the selected target died during the reaction, force retarget
@@ -1442,6 +1609,12 @@ class GameEngine {
           if (targets.length === 0) return [];
         }
 
+        // ── Forced-target filter (Deepsea Horror Clown) ──
+        // Mirror of the filter in promptDamageTarget. See that site for
+        // full documentation.
+        _applyForcesTargetingFilter(engine, targets, pi);
+        if (targets.length === 0) return [];
+
         // Single-target attack restriction (e.g. Toras, Master of all Weapons).
         // When the caster's heroFlag singleTargetAttack is set, cap selection to 1.
         const casterPi      = cardInstance.controller ?? cardInstance.owner ?? -1;
@@ -1506,6 +1679,23 @@ class GameEngine {
               }
             }
             return [];
+          }
+
+          // Target-redirect reaction (Deepsea Encounter): for each new
+          // target returned, replace the matching entry in `result` (by
+          // id — support-slot coordinates stay the same post-swap) and
+          // mirror the swap in the spell damage log.
+          if (ptResult?.newTargets && ptResult.newTargets.length > 0) {
+            for (const nt of ptResult.newTargets) {
+              const i = result.findIndex(t => t.id === nt.id);
+              if (i >= 0) result[i] = nt;
+              else result.push(nt);
+              if (gs._spellDamageLog) {
+                const di = gs._spellDamageLog.findIndex(t => t.id === nt.id);
+                if (di >= 0) gs._spellDamageLog.splice(di, 1, { ...nt });
+                else gs._spellDamageLog.push({ ...nt });
+              }
+            }
           }
         }
 
@@ -2470,6 +2660,11 @@ class GameEngine {
   async searchDeckForNamedCard(playerIdx, cardName, title, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return null;
+    // Hand-lock gate — shared with every other draw/search/tutor path.
+    // Fizzle silently so effects that call into this helper without
+    // their own early-return don't leak a half-executed search (card
+    // ripped from deck but never reaching hand).
+    if (ps.handLocked) return null;
 
     const idx = (ps.mainDeck || []).indexOf(cardName);
     if (idx < 0) return null;
@@ -2622,6 +2817,9 @@ class GameEngine {
   async actionDrawFromPotionDeck(playerIdx, count) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
+    // Hand-lock gate — same rule as the main-deck draw path. A locked
+    // hand can't receive cards from any source for the rest of the turn.
+    if (ps.handLocked) return [];
 
     // Fire batch-level draw hook (Intrude, etc.)
     if (this.gs.currentPhase !== PHASES.RESOURCE) {
@@ -2656,6 +2854,11 @@ class GameEngine {
   actionAddCardToHand(playerIdx, cardName, source) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
+    // Hand-lock gate. This is the generic "add one card to a player's
+    // hand" helper, used by `ctx.addCardToHand` and by any future
+    // search/tutor effect that routes through here. Fizzles silently
+    // when the hand is locked — matches the draw/tutor policy.
+    if (ps.handLocked) return;
     ps.hand.push(cardName);
     this.log('card_added_to_hand', { player: ps.username, card: cardName, by: source || null });
     this.sync();
@@ -2732,6 +2935,12 @@ class GameEngine {
     if (!targetCard) return;
     if (targetCard.counters?.immovable) return; // Cannot be destroyed or removed
     if (targetCard.counters?._cardinalImmune) return; // Cardinal Beast immunity
+    // Temporarily stolen creatures with damage-immune flag (Deepsea Succubus)
+    // cannot be destroyed while controlled by the thief.
+    if (targetCard.counters?._stealImmortal) {
+      this.log('destroy_blocked', { card: targetCard.name, reason: 'steal-immortal' });
+      return;
+    }
     // First-turn protection: cards belonging to the protected player cannot be destroyed
     if (this.gs.firstTurnProtectedPlayer != null && targetCard.owner === this.gs.firstTurnProtectedPlayer) {
       this.log('destroy_blocked', { card: targetCard.name, reason: 'first-turn protection' });
@@ -2804,6 +3013,23 @@ class GameEngine {
       toZone    = ZONES.HAND;
       toHeroIdx = -1;
       toSlot    = -1;
+    }
+
+    // Generic support→hand transfer animation. Fires BEFORE state
+    // mutations so DOM coords still reflect the source slot. Covers
+    // The White Eye, Shu'Chaku's artifact bounce, and any future card
+    // that ends up routing a Support card back to the owner's hand
+    // via actionMoveCard. (The Deepsea bounce path in _deepsea-shared
+    // doesn't funnel through here — it fires its own pile-transfer
+    // broadcast with the same schema.)
+    if (fromZone === ZONES.SUPPORT && toZone === ZONES.HAND) {
+      const owner = cardInstance.owner;
+      const handForOwner = this.gs.players[owner]?.hand || [];
+      this._broadcastEvent('play_pile_transfer', {
+        owner, cardName: cardInstance.name, from: 'support', to: 'hand',
+        fromHeroIdx: cardInstance.heroIdx, fromSlotIdx: cardInstance.zoneSlot,
+        toHandIdx: handForOwner.length,
+      });
     }
 
     // Remove from old zone in game state
@@ -2889,6 +3115,18 @@ class GameEngine {
         ps.mainDeck.splice(idx, 1);
         ps[pileKey].push(opts.targetCardName);
         milledCards.push(opts.targetCardName);
+      }
+    } else if (Array.isArray(opts.targetCardNames) && opts.targetCardNames.length > 0) {
+      // Batch targeted mill: remove each named card from the deck in order
+      // and fire a single deck→discard animation event with all of them, so
+      // multi-card targeted mills (Deepsea Skeleton) animate in one staggered
+      // burst instead of waiting holdDuration+fade between cards.
+      for (const targetName of opts.targetCardNames) {
+        const idx = ps.mainDeck.indexOf(targetName);
+        if (idx < 0) continue;
+        ps.mainDeck.splice(idx, 1);
+        ps[pileKey].push(targetName);
+        milledCards.push(targetName);
       }
     } else {
       // Normal mill: take from the top of the deck
@@ -3231,8 +3469,16 @@ class GameEngine {
     if (!toPs.supportZones[destHeroIdx][destSlotIdx]) toPs.supportZones[destHeroIdx][destSlotIdx] = [];
     toPs.supportZones[destHeroIdx][destSlotIdx].push(cardName);
 
-    // Update card instance — controller changes, owner stays (tracks original ownership)
+    // Permanent steal — the creature physically relocates to the new
+    // owner's board, so `inst.owner` follows the move. `originalOwner`
+    // stays frozen to the creator (death routes discard back to them);
+    // `controller` tracks the current legal controller. Keeping
+    // `inst.owner` in sync with the render side means that source-side
+    // animations (cardHeroOwner), the creatureCounters server key, and
+    // any other inst.owner-gated logic all agree on "which side of the
+    // board is this creature currently physically on".
     inst.controller = toPlayerIdx;
+    inst.owner = toPlayerIdx;
     inst.zone = ZONES.SUPPORT;
     inst.heroIdx = destHeroIdx;
     inst.zoneSlot = destSlotIdx;
@@ -4201,6 +4447,43 @@ class GameEngine {
    * @param {number} playerIdx
    * @returns {{ own: Object<number, string[]>, charmed: Object<number, string[]> }}
    */
+  /**
+   * Per-hand-card list of occupied Support-Zone slots that accept a direct
+   * drop as an alternative placement (e.g. Deepsea bounce-place swap).
+   *
+   * Returns `{ [cardName]: [{ heroIdx, slotIdx }, ...] }`. Empty entries
+   * are omitted so the serialized payload stays small.
+   *
+   * Each card script opts in by exporting
+   *   getBouncePlacementTargets(gs, pi, engine) → Array<{heroIdx,slotIdx}>
+   *
+   * The client uses this to light up occupied slots as valid drop targets
+   * while the player is dragging the card. The server uses the same map
+   * to validate drops server-side.
+   */
+  getBouncePlacementTargets(playerIdx) {
+    const gs = this.gs;
+    const ps = gs.players[playerIdx];
+    if (!ps) return {};
+    const out = {};
+    const seen = new Set();
+    for (const cardName of (ps.hand || [])) {
+      if (seen.has(cardName)) continue;
+      seen.add(cardName);
+      const script = loadCardEffect(cardName);
+      if (typeof script?.getBouncePlacementTargets !== 'function') continue;
+      try {
+        const targets = script.getBouncePlacementTargets(gs, playerIdx, this);
+        if (Array.isArray(targets) && targets.length > 0) {
+          out[cardName] = targets.map(t => ({ heroIdx: t.heroIdx, slotIdx: t.slotIdx }));
+        }
+      } catch (err) {
+        console.error('[getBouncePlacementTargets]', cardName, err.message);
+      }
+    }
+    return out;
+  }
+
   getHeroPlayableCards(playerIdx) {
     const gs = this.gs;
     const ps = gs.players[playerIdx];
@@ -4232,9 +4515,13 @@ class GameEngine {
       const hero = ps.heroes[hi];
       const playable = [];
 
-      // Hero-wide blocks: dead, frozen, stunned, combo-locked out, action limit
-      if (!hero?.name || hero.hp <= 0) { own[hi] = playable; continue; }
-      if (hero.statuses?.frozen || hero.statuses?.stunned) { own[hi] = playable; continue; }
+      // Hero-wide blocks: empty slot, combo-locked out, action limit.
+      // NOTE: dead is NOT an automatic block any more — placement-style
+      // cards (canBypassFreeZoneRequirement === true) may still install
+      // into a dead / frozen / stunned Hero's Support Zones. Filtered
+      // per-card inside the handCards loop below.
+      if (!hero?.name) { own[hi] = playable; continue; }
+      const heroParalyzed = !!(hero.hp <= 0 || hero.statuses?.frozen || hero.statuses?.stunned);
       if (ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== hi) { own[hi] = playable; continue; }
       if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) { own[hi] = playable; continue; }
 
@@ -4263,6 +4550,18 @@ class GameEngine {
       const hasBonusMainAction = isActionPhase && (ps._bonusMainActions || 0) > 0 && actionsPlayed === 1;
 
       for (const cd of handCards) {
+        // Frozen / Stunned heroes only host PLACEMENTS. A card opts
+        // into this path by exporting canBypassFreeZoneRequirement
+        // and returning true right now (Deepsea when a bounceable
+        // exists, DDG when a valid tribute exists). Vanilla Creatures
+        // have no such hook and are filtered out here.
+        if (heroParalyzed) {
+          const s = loadCardEffect(cd.name);
+          if (typeof s?.canBypassFreeZoneRequirement !== 'function') continue;
+          let ok = false;
+          try { ok = !!s.canBypassFreeZoneRequirement(gs, playerIdx, hi, cd, this); } catch {}
+          if (!ok) continue;
+        }
         // Reaction subtype: not proactively playable unless script opts in
         if ((cd.subtype || '').toLowerCase() === 'reaction') {
           const s = loadCardEffect(cd.name);
@@ -4305,7 +4604,23 @@ class GameEngine {
           const supZones = ps.supportZones[hi] || [];
           let hasFree = false;
           for (let z = 0; z < 3; z++) { if ((supZones[z] || []).length === 0) { hasFree = true; break; } }
-          if (!hasFree) continue;
+          // Free-zone bypass — the card can opt out of the "Hero must
+          // have a free slot" requirement by exporting canBypassFree
+          // ZoneRequirement(gs, pi, heroIdx, cd, engine). Used by the
+          // Deepsea bounce-place path (destination slot comes from the
+          // bounced Creature, not from this Hero's free zones).
+          if (!hasFree) {
+            const cbfScript = loadCardEffect(cd.name);
+            let bypassed = false;
+            if (typeof cbfScript?.canBypassFreeZoneRequirement === 'function') {
+              try {
+                bypassed = !!cbfScript.canBypassFreeZoneRequirement(gs, playerIdx, hi, cd, this);
+              } catch (err) {
+                console.error('[canBypassFreeZoneRequirement]', cd.name, err.message);
+              }
+            }
+            if (!bypassed) continue;
+          }
         }
         // Card-level per-hero gate. Opposite side of `canPlayCard` (which is
         // a HERO script asking "can this card be played here?"): this is the
@@ -4449,8 +4764,30 @@ class GameEngine {
     const heroOwner = opts.charmedOwner != null ? opts.charmedOwner : pi;
     const heroPs = gs.players[heroOwner];
     const hero = heroPs?.heroes?.[heroIdx];
-    if (!hero?.name || hero.hp <= 0) return null;
-    if (hero.statuses?.frozen || hero.statuses?.stunned) return null;
+    if (!hero?.name) return null;
+    // Incapacitated heroes (dead / frozen / stunned) can't ACT. The Hero
+    // CAN still host a Placement (bounce-place, tribute, any mechanic
+    // that uses the Hero only as a Support-Zone address — cards whose
+    // cards.json effect text says "place" the Creature). We detect that
+    // via the generic `canBypassFreeZoneRequirement` hook, which every
+    // placement-style card exports — a `true` return means "this play
+    // doesn't need the Hero to act; it will install into a slot
+    // determined by the card's own mechanic". Normal summons (Aggressive
+    // Town Guard, any vanilla Creature), Spells, Attacks, and ability
+    // activations continue to require a capable Hero.
+    const heroIncapacitated = hero.hp <= 0 || hero.statuses?.frozen || hero.statuses?.stunned;
+    if (heroIncapacitated) {
+      const cardScript = loadCardEffect(cardData.name);
+      let bypass = false;
+      if (typeof cardScript?.canBypassFreeZoneRequirement === 'function') {
+        try {
+          bypass = !!cardScript.canBypassFreeZoneRequirement(gs, pi, heroIdx, cardData, this);
+        } catch (err) {
+          console.error('[canBypassFreeZoneRequirement]', cardData.name, err.message);
+        }
+      }
+      if (!bypass) return null;
+    }
 
     // Nulled heroes (Null Zone) can play Attacks and Creatures but not
     // Spells. This is a generic gate — any future card applying the
@@ -4918,6 +5255,56 @@ class GameEngine {
     }
     delete this.gs._charmedSupportLocked;
 
+    // ── Revert temporarily-stolen creatures (Deepsea Succubus, generic) ──
+    // Mirrors the Charme Lv3 revert: creatures whose controller was flipped
+    // get their original controller restored.
+    try { this._revertStolenCreatures(); }
+    catch (err) { console.error('[stolenCreatureRevert]', err.message); }
+
+    // ── Clear per-turn archetype override (Deepsea Spores) ──
+    // Spores flags ONLY the turn it was cast; the predicate in
+    // _deepsea-shared already checks equality with gs.turn, so nothing
+    // needs explicit deletion — but we clear it for cleanliness so
+    // stale turn numbers never accumulate.
+    if (this.gs._deepseaSporesActiveTurn != null &&
+        this.gs._deepseaSporesActiveTurn < this.gs.turn) {
+      delete this.gs._deepseaSporesActiveTurn;
+    }
+
+    // ── Clear per-turn next-artifact cost reduction (Shu'Chaku) ──
+    // Stored on the player, cleared if leftover from a past turn.
+    for (const ps of this.gs.players) {
+      if (!ps) continue;
+      if (ps._nextArtifactCostReduction && ps._nextArtifactCostReductionTurn !== this.gs.turn) {
+        delete ps._nextArtifactCostReduction;
+        delete ps._nextArtifactCostReductionTurn;
+      }
+    }
+
+    // ── Reset per-turn Deepsea summon limit sets ──
+    // "You can only summon 1 X per turn" is enforced via a per-player Set
+    // of summoned card names. Managed by _deepsea-shared.
+    try {
+      const { resetPerTurnSummons } = require('./_deepsea-shared');
+      for (const ps of this.gs.players) if (ps) resetPerTurnSummons(ps);
+    } catch (err) {
+      console.error('[deepseaPerTurnReset]', err.message);
+    }
+
+    // ── Reset Teppes's per-turn return-draw counter ──
+    // Teppes draws up to 5× per turn when cards return to hand; the
+    // counter lives on hero. We reset it at turn start (for both
+    // players' heroes, so either side's Teppes resets).
+    for (const ps of this.gs.players) {
+      if (!ps) continue;
+      for (const hero of (ps.heroes || [])) {
+        if (!hero) continue;
+        if (hero._teppesReturnDrawsThisTurn != null) {
+          hero._teppesReturnDrawsThisTurn = 0;
+        }
+      }
+    }
+
     // Reset per-turn flags
     const activePs = this.gs.players[this.gs.activePlayer];
     if (activePs) activePs.abilityGivenThisTurn = [false, false, false];
@@ -5378,6 +5765,819 @@ class GameEngine {
     return true;
   }
 
+  // ─── GENERIC EFFECT PRIMITIVES ──────────────
+  //
+  // The methods below were previously scattered across archetype-
+  // agnostic `_*-shared.js` files (hand steal, gold steal, deck search,
+  // recycle, temporary control, creature placement, sacrifice, Area
+  // zones, Ascension bonus). All of them are generic — any card can
+  // call in — so they live here on the engine alongside actionMillCards
+  // / actionDrawCards / actionDealDamage. Archetype-specific helpers
+  // (Deepsea bounce-place, Pollution Tokens, Harpyformer transforms,
+  // etc.) remain in their respective shared modules.
+
+  /**
+   * Steal up to `requested` Gold from the activator's opponent.
+   * Fizzles on Turn-1 protection or when the opponent is at 0 Gold.
+   * Broadcasts the coin-burst animation on both gold counters.
+   */
+  async actionStealGold(pi, requested, opts = {}) {
+    const gs = this.gs;
+    const ps = gs.players[pi];
+    const oi = pi === 0 ? 1 : 0;
+    const ops = gs.players[oi];
+    const source = opts.sourceName || 'Gold Steal';
+    if (!ps || !ops) return { stolen: 0, fizzled: true };
+
+    if (gs.firstTurnProtectedPlayer === oi) {
+      this.log('gold_steal_fizzle', { by: source, reason: 'first-turn protection' });
+      return { stolen: 0, fizzled: true };
+    }
+
+    const clamped = Math.min(Math.max(0, requested | 0), ops.gold || 0);
+    if (clamped <= 0) {
+      this.log('gold_steal_fizzle', { by: source, reason: 'opponent at 0 Gold' });
+      return { stolen: 0, fizzled: true };
+    }
+
+    this._broadcastEvent('gold_steal_burst', { fromPlayer: oi, toPlayer: pi, amount: clamped });
+
+    ops.gold = Math.max(0, (ops.gold || 0) - clamped);
+    await this.actionGainGold(pi, clamped);
+
+    this.log('gold_steal', {
+      by: source, player: ps.username, from: ops.username,
+      amount: clamped, fromRemaining: ops.gold, toTotal: ps.gold,
+    });
+    this.sync();
+    return { stolen: clamped, fizzled: false };
+  }
+
+  /**
+   * Prompt the activator to pick N cards from the opponent's hand
+   * (blind face-down), then steal them. Fizzles on Turn-1 protection
+   * or empty opp hand.
+   */
+  async actionStealFromHand(pi, opts = {}) {
+    const gs = this.gs;
+    const ps = gs.players[pi];
+    const oppIdx = pi === 0 ? 1 : 0;
+    const oppPs = gs.players[oppIdx];
+    if (!ps || !oppPs) return { stolen: [], cancelled: false, fizzled: true };
+
+    if (gs.firstTurnProtectedPlayer === oppIdx) {
+      this.log('hand_steal_blocked', {
+        by: opts.sourceName || 'Hand Steal',
+        reason: 'first-turn protection',
+      });
+      return { stolen: [], cancelled: false, fizzled: true };
+    }
+
+    const oppHandLen = (oppPs.hand || []).length;
+    if (oppHandLen === 0) return { stolen: [], cancelled: false, fizzled: true };
+
+    const requested = Math.max(1, opts.count || 1);
+    const effectiveCount = Math.min(requested, oppHandLen);
+    const cancellable = !!opts.cancellable;
+    const defaultDesc = `Pick ${effectiveCount} card${effectiveCount > 1 ? 's' : ''} from ${oppPs.username}'s hand to steal.`;
+
+    const prompt = await this.promptGeneric(pi, {
+      type: 'blindHandPick',
+      title: opts.title || 'Steal Cards',
+      description: opts.description || defaultDesc,
+      maxSelect: effectiveCount,
+      confirmLabel: opts.confirmLabel || '🫳 Steal!',
+      oppHandCount: oppHandLen,
+      cancellable,
+      autoConfirm: effectiveCount === 1,
+    });
+
+    if (!prompt || prompt.cancelled) {
+      return { stolen: [], cancelled: true, fizzled: false };
+    }
+
+    const raw = Array.isArray(prompt.selectedIndices) ? prompt.selectedIndices : [];
+    const validated = raw
+      .filter(i => Number.isInteger(i) && i >= 0 && i < oppPs.hand.length)
+      .slice(0, effectiveCount)
+      .sort((a, b) => a - b);
+    if (validated.length === 0) return { stolen: [], cancelled: true, fizzled: false };
+
+    const cardNames = validated.map(idx => oppPs.hand[idx]).filter(Boolean);
+
+    const flightMs = 800;
+    const highlightMs = validated.length > 1 ? 700 : 250;
+    this._broadcastEvent('play_hand_steal', {
+      fromPlayer: oppIdx, toPlayer: pi,
+      indices: validated, cardNames, count: validated.length,
+      duration: flightMs, highlightMs,
+    });
+    const perCardStagger = Math.max(0, (validated.length - 1) * 100);
+    await this._delay(highlightMs + flightMs + perCardStagger + 120);
+
+    const stolen = [];
+    for (const idx of [...validated].sort((a, b) => b - a)) {
+      const cardName = oppPs.hand[idx];
+      if (!cardName) continue;
+      oppPs.hand.splice(idx, 1);
+      ps.hand.push(cardName);
+      stolen.push(cardName);
+      const inst = this.cardInstances.find(c =>
+        c.owner === oppIdx && c.zone === 'hand' && c.name === cardName
+      );
+      if (inst) { inst.owner = pi; inst.controller = pi; }
+    }
+
+    if (stolen.length > 0) {
+      this.log('hand_steal', {
+        player: ps.username, from: oppPs.username,
+        by: opts.sourceName || 'Hand Steal',
+        stolen,
+      });
+    }
+    this.sync();
+    return { stolen, cancelled: false, fizzled: false };
+  }
+
+  /**
+   * Pull a specific named card from a player's main deck to their hand.
+   * Broadcasts the face-up deck→hand flight animation, optionally
+   * shuffles the deck, and optionally shows a reveal prompt to the
+   * opponent before returning.
+   */
+  async actionAddCardFromDeckToHand(pi, cardName, opts = {}) {
+    const ps = this.gs.players[pi];
+    if (!ps) return false;
+    // Hand lock gates every mechanism that adds cards to the caster's
+    // hand — draws (actionDrawCards), tutors (this function), and any
+    // future hand-augmenting action. Fizzles silently here so card
+    // scripts that forget to guard don't leak broken state (card
+    // removed from deck but never reaches hand).
+    if (ps.handLocked) return false;
+    const idx = (ps.mainDeck || []).indexOf(cardName);
+    if (idx < 0) return false;
+
+    ps.mainDeck.splice(idx, 1);
+    if (!ps.hand) ps.hand = [];
+    ps.hand.push(cardName);
+
+    this._broadcastEvent('deck_search_add', { cardName, playerIdx: pi });
+    this.log('deck_search', {
+      player: ps.username, card: cardName, by: opts.source || null,
+    });
+
+    if (opts.shuffle) this.shuffleDeck(pi, 'main');
+    this.sync();
+
+    if (opts.reveal !== false) {
+      const delay = opts.revealDelayMs != null ? opts.revealDelayMs : 500;
+      if (delay > 0) await this._delay(delay);
+      const oi = pi === 0 ? 1 : 0;
+      await this.promptGeneric(oi, {
+        type: 'deckSearchReveal',
+        cardName, searcherName: ps.username,
+        title: opts.source || 'Deck Search',
+        cancellable: false,
+      });
+    }
+    return true;
+  }
+
+  /**
+   * Recycle one copy of each named card from discard pile back to main
+   * deck. Staggered flight animation, optional shuffle.
+   */
+  async actionRecycleCards(pi, cardNames, opts = {}) {
+    const ps = this.gs.players[pi];
+    if (!ps || !Array.isArray(cardNames) || cardNames.length === 0) return [];
+
+    const available = [...(ps.discardPile || [])];
+    const toRecycle = [];
+    for (const name of cardNames) {
+      const idx = available.indexOf(name);
+      if (idx < 0) continue;
+      available.splice(idx, 1);
+      toRecycle.push(name);
+    }
+    if (toRecycle.length === 0) return [];
+
+    this._broadcastEvent('discard_to_deck_animation', {
+      owner: pi, cardNames: toRecycle,
+    });
+    await this._delay(200);
+
+    const stepDelay = opts.stepDelayMs != null ? opts.stepDelayMs : 250;
+    const source = opts.source || 'Recycle';
+    for (const name of toRecycle) {
+      const idx = ps.discardPile.indexOf(name);
+      if (idx < 0) continue;
+      ps.discardPile.splice(idx, 1);
+      ps.mainDeck.push(name);
+      this.log('card_recycled', {
+        player: ps.username, card: name, by: source,
+        from: 'discard', to: 'deck',
+      });
+      this.sync();
+      if (stepDelay > 0) await this._delay(stepDelay);
+    }
+
+    if (opts.shuffle !== false) this.shuffleDeck(pi, 'main');
+    this.sync();
+    return toRecycle;
+  }
+
+  /**
+   * Temporarily steal an opponent's Hero. Sets `charmedBy` /
+   * `charmedFromOwner` / `charmedHeroIdx`, applies `charmed` status,
+   * locks support zones on the original owner. Reverts at turn start.
+   */
+  actionStealHero(stealerPi, heroOwnerPi, heroIdx, opts = {}) {
+    const gs = this.gs;
+    const ops = gs.players[heroOwnerPi];
+    const hero = ops?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    if (hero.charmedBy != null) return false;
+
+    if (!opts.bypassFirstTurnProtection && gs.firstTurnProtectedPlayer === heroOwnerPi) {
+      this.log('hero_steal_fizzle', {
+        by: opts.sourceName || 'Steal', target: hero.name,
+        reason: 'turn-1 protection',
+      });
+      return false;
+    }
+
+    hero.charmedBy = stealerPi;
+    hero.charmedFromOwner = heroOwnerPi;
+    hero.charmedHeroIdx = heroIdx;
+    if (!hero.statuses) hero.statuses = {};
+    hero.statuses.charmed = { controller: stealerPi, appliedTurn: gs.turn };
+    if (!gs._charmedSupportLocked) gs._charmedSupportLocked = [];
+    gs._charmedSupportLocked.push({ owner: heroOwnerPi, heroIdx });
+
+    this.log('hero_stolen', {
+      by: opts.sourceName || 'Steal', target: hero.name,
+      stealer: gs.players[stealerPi]?.username,
+      original: gs.players[heroOwnerPi]?.username,
+    });
+    return true;
+  }
+
+  /**
+   * Temporarily steal an opponent's Creature. Flips `inst.controller`,
+   * leaves `inst.owner` on the original owner's side, optionally flags
+   * `_stealImmortal`. Reverts at turn start.
+   */
+  actionStealCreature(stealerPi, inst, opts = {}) {
+    if (!inst || inst.zone !== 'support') return false;
+    const originalOwner = inst.owner;
+    if (originalOwner === stealerPi) return false;
+    if (inst.stolenBy != null) return false;
+
+    inst.stolenBy = stealerPi;
+    inst.stolenFromOwner = originalOwner;
+    inst.controller = stealerPi;
+    if (opts.damageImmune) {
+      inst.counters = inst.counters || {};
+      inst.counters._stealImmortal = 1;
+    }
+
+    this.log('creature_stolen', {
+      by: opts.sourceName || 'Steal', target: inst.name,
+      stealer: this.gs.players[stealerPi]?.username,
+      original: this.gs.players[originalOwner]?.username,
+    });
+    return true;
+  }
+
+  /**
+   * Revert all temporarily-stolen creatures at turn start. Called from
+   * the engine's `startTurn` cleanup block alongside charmed-hero revert.
+   */
+  _revertStolenCreatures() {
+    for (const inst of this.cardInstances) {
+      if (inst.stolenBy == null) continue;
+      inst.controller = inst.stolenFromOwner ?? inst.owner;
+      delete inst.stolenBy;
+      delete inst.stolenFromOwner;
+      if (inst.counters) delete inst.counters._stealImmortal;
+      this.log('creature_steal_revert', { card: inst.name });
+    }
+  }
+
+  /**
+   * Generic creature placement primitive. Used by Monster in a Bottle,
+   * Barker, Alice, Elixir of Immortality, every Deepsea bounce-place,
+   * Dark Deepsea God, etc. Blocks on `ps.summonLocked`. Tracks a fresh
+   * instance, flags `isPlacement`, optionally negates effects, fires
+   * the full on-summon hook chain unless suppressed.
+   */
+  async actionPlaceCreature(cardName, playerIdx, heroIdx, slotIdx, opts = {}) {
+    const gs = this.gs;
+    const ps = gs.players[playerIdx];
+    if (!ps) return null;
+
+    if (ps.summonLocked) {
+      this.log('placement_blocked', {
+        card: cardName, by: opts.sourceName || 'Placement', reason: 'summonLocked',
+      });
+      return null;
+    }
+
+    const source = opts.source || 'hand';
+    const sourceName = opts.sourceName || 'Placement';
+
+    if (source === 'hand') {
+      const idx = opts.sourceIdx != null ? opts.sourceIdx : (ps.hand || []).indexOf(cardName);
+      if (idx < 0) return null;
+      ps.hand.splice(idx, 1);
+    } else if (source === 'discard') {
+      const idx = opts.sourceIdx != null ? opts.sourceIdx : (ps.discardPile || []).indexOf(cardName);
+      if (idx < 0) return null;
+      ps.discardPile.splice(idx, 1);
+    }
+
+    if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
+    ps.supportZones[heroIdx][slotIdx] = [cardName];
+
+    const inst = this._trackCard(cardName, playerIdx, ZONES.SUPPORT, heroIdx, slotIdx);
+    inst.counters = inst.counters || {};
+    inst.counters.isPlacement = 1;
+    inst.turnPlayed = gs.turn || 0;
+
+    if (opts.negateEffects) {
+      inst.counters.negated = 1;
+      inst.counters.negated_placement = 1;
+    }
+    if (opts.countAsSummon) {
+      ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
+    }
+
+    const animType = opts.animationType || 'summon';
+    if (animType === 'summon') {
+      this._broadcastEvent('summon_effect', {
+        owner: playerIdx, heroIdx, zoneSlot: slotIdx, cardName,
+      });
+    } else if (animType !== 'none') {
+      this._broadcastEvent('play_zone_animation', {
+        type: animType, owner: playerIdx, heroIdx, zoneSlot: slotIdx,
+      });
+    }
+
+    this.log('placement', {
+      card: cardName, by: sourceName, from: source,
+      heroIdx, zoneSlot: slotIdx, negated: !!opts.negateEffects,
+    });
+
+    if (opts.fireHooks !== false && !opts.negateEffects) {
+      await this.runHooks('onPlay', {
+        _onlyCard: inst, playedCard: inst, cardName,
+        zone: ZONES.SUPPORT, heroIdx, zoneSlot: slotIdx,
+        _skipReactionCheck: true,
+      });
+      await this.runHooks('onCardEnterZone', {
+        enteringCard: inst, toZone: ZONES.SUPPORT, toHeroIdx: heroIdx,
+        _skipReactionCheck: true,
+      });
+    } else if (opts.fireHooks !== false && opts.negateEffects) {
+      await this.runHooks('onCardEnterZone', {
+        enteringCard: inst, toZone: ZONES.SUPPORT, toHeroIdx: heroIdx,
+        _skipReactionCheck: true,
+      });
+    }
+
+    this.sync();
+    return { inst };
+  }
+
+  /** Enumerate free Support Zone descriptors for a player. */
+  getFreeSupportZones(playerIdx, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+    const livingOnly = !!opts.livingHeroesOnly;
+    const zones = [];
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name) continue;
+      if (livingOnly && hero.hp <= 0) continue;
+      for (let si = 0; si < 3; si++) {
+        const slot = (ps.supportZones[hi] || [])[si] || [];
+        if (slot.length === 0) {
+          const label = hero.hp <= 0
+            ? `${hero.name} (KO) — Slot ${si + 1}`
+            : `${hero.name} — Slot ${si + 1}`;
+          zones.push({ heroIdx: hi, slotIdx: si, label });
+        }
+      }
+    }
+    return zones;
+  }
+
+  /** All own non-face-down creatures eligible as tributes right now. */
+  getSacrificableCreatures(playerIdx) {
+    const gs = this.gs;
+    const turn = gs.turn || 0;
+    const cardDB = this._getCardDB();
+    const results = [];
+    for (const inst of this.cardInstances) {
+      if (inst.owner !== playerIdx) continue;
+      if (inst.zone !== 'support') continue;
+      if (inst.faceDown) continue;
+      if (inst.turnPlayed === turn) continue;
+      const cd = cardDB[inst.name];
+      if (!cd) continue;
+      const isCreature = cd.cardType === 'Creature'
+        || (cd.cardType || '').split('/').includes('Creature')
+        || (cd.subtype || '').split('/').includes('Creature');
+      if (!isCreature) continue;
+      const maxHp = inst.counters?.maxHp ?? cd.hp ?? 0;
+      const level = cd.level || 0;
+      results.push({ inst, maxHp, level, cardName: inst.name });
+    }
+    return results;
+  }
+
+  /**
+   * Does any valid sacrifice subset exist?
+   *
+   * Must satisfy: subset size ≥ minCount, combined maxHp ≥ minMaxHp,
+   * combined levels ≥ minSumLevel. Since the player may sacrifice MORE
+   * than minCount, the gate's upper bound on each sum is the total
+   * across ALL candidates — if that total doesn't clear the threshold,
+   * no subset of any size can.
+   */
+  hasValidSacrificeSet(candidates, minCount, minMaxHp = 0, minSumLevel = 0) {
+    if (!candidates || candidates.length < minCount) return false;
+    if (minMaxHp > 0) {
+      const totalHp = candidates.reduce((s, c) => s + (c.maxHp || 0), 0);
+      if (totalHp < minMaxHp) return false;
+    }
+    if (minSumLevel > 0) {
+      const totalLvl = candidates.reduce((s, c) => s + (c.level || 0), 0);
+      if (totalLvl < minSumLevel) return false;
+    }
+    return true;
+  }
+
+  _collectSacrificeCandidates(playerIdx, spec, selfId) {
+    let cs = this.getSacrificableCreatures(playerIdx);
+    if (selfId != null) cs = cs.filter(c => c.inst.id !== selfId);
+    if (spec?.filter) cs = cs.filter(c => spec.filter(c));
+    return cs;
+  }
+
+  /** Pure gate: could we satisfy this sacrifice spec right now? */
+  canSatisfySacrifice(playerIdx, spec, selfId) {
+    const candidates = this._collectSacrificeCandidates(playerIdx, spec, selfId);
+    // Required tributes must be present among the candidates, otherwise
+    // no valid subset can satisfy the spec.
+    if (spec.requiredInstIds && spec.requiredInstIds.length > 0) {
+      for (const id of spec.requiredInstIds) {
+        if (!candidates.some(c => c.inst.id === id)) return false;
+      }
+    }
+    // "Must include ≥1 tribute from this specific Hero's Support Zones"
+    // — e.g. Dragon Pilot on the all-full-slots path, where one of the
+    // summoning Hero's own Creatures has to be sacrificed to free the
+    // slot the new Creature lands in.
+    if (spec.mustIncludeFromHeroIdx != null) {
+      if (!candidates.some(c => c.inst.heroIdx === spec.mustIncludeFromHeroIdx)) return false;
+    }
+    return this.hasValidSacrificeSet(candidates, spec.minCount, spec.minMaxHp || 0, spec.minSumLevel || 0);
+  }
+
+  /**
+   * Interactive sacrifice resolution — prompts the caster to pick a
+   * valid subset, destroys them, invokes `spec.onResolved(ctx, sacs)`.
+   * Returns true on success; caller aborts the summon on false.
+   */
+  async resolveSacrificeCost(ctx, spec) {
+    const pi = ctx.cardOwner;
+    const selfId = ctx.card?.id;
+    const candidates = this._collectSacrificeCandidates(pi, spec, selfId);
+    if (!this.hasValidSacrificeSet(candidates, spec.minCount, spec.minMaxHp || 0, spec.minSumLevel || 0)) {
+      this.log('sacrifice_fizzle', {
+        card: ctx.cardName, player: this.gs.players[pi]?.username,
+        reason: 'no_valid_set',
+      });
+      return false;
+    }
+    // Required tributes must be in the candidate pool after any filter
+    // is applied. If one was filtered out, fizzle cleanly rather than
+    // spinning the re-prompt loop forever.
+    if (spec.requiredInstIds && spec.requiredInstIds.length > 0) {
+      const candidateIds = new Set(candidates.map(c => c.inst.id));
+      if (!spec.requiredInstIds.every(id => candidateIds.has(id))) {
+        this.log('sacrifice_fizzle', {
+          card: ctx.cardName, player: this.gs.players[pi]?.username,
+          reason: 'required_filtered_out',
+        });
+        return false;
+      }
+    }
+    // Must-include-from-hero: same reasoning — if the filter removed
+    // every Creature on that Hero, the constraint can't be met.
+    if (spec.mustIncludeFromHeroIdx != null) {
+      if (!candidates.some(c => c.inst.heroIdx === spec.mustIncludeFromHeroIdx)) {
+        this.log('sacrifice_fizzle', {
+          card: ctx.cardName, player: this.gs.players[pi]?.username,
+          reason: 'must_include_from_hero_filtered_out',
+        });
+        return false;
+      }
+    }
+
+    const targets = candidates.map(c => ({
+      id: `equip-${c.inst.owner}-${c.inst.heroIdx}-${c.inst.zoneSlot}`,
+      type: 'equip',
+      owner: c.inst.owner, heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot,
+      cardName: c.cardName, cardInstance: c.inst,
+      _meta: { maxHp: c.maxHp, level: c.level },
+    }));
+
+    // Optional: also include the filtered-out sacrificable Creatures as
+    // visually dimmed ineligible targets, so the player can see at a
+    // glance which of their board Creatures would qualify and which
+    // don't. Used by Dragon Pilot on the inherent path (≤Lv1 only).
+    if (spec.showFilteredAsIneligible && spec.filter) {
+      const shownIds = new Set(targets.map(t => t.id));
+      let allSac = this.getSacrificableCreatures(pi);
+      if (selfId != null) allSac = allSac.filter(c => c.inst.id !== selfId);
+      for (const c of allSac) {
+        const id = `equip-${c.inst.owner}-${c.inst.heroIdx}-${c.inst.zoneSlot}`;
+        if (shownIds.has(id)) continue;
+        targets.push({
+          id, type: 'equip',
+          owner: c.inst.owner, heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot,
+          cardName: c.cardName, cardInstance: c.inst,
+          ineligible: true,
+          _meta: { maxHp: c.maxHp, level: c.level, ineligible: true },
+        });
+      }
+    }
+
+    const defaultDescParts = [];
+    if (spec.minMaxHp) defaultDescParts.push(`combined max HP ≥ ${spec.minMaxHp}`);
+    if (spec.minSumLevel) defaultDescParts.push(`combined levels ≥ ${spec.minSumLevel}`);
+    const defaultDesc = `Sacrifice ${spec.minCount}+ of your Creatures (not summoned this turn)` +
+      (defaultDescParts.length ? ' with ' + defaultDescParts.join(' and ') : '') + '.';
+
+    const cancellable = spec.cancellable !== false;
+    let picked = null;
+    while (true) {
+      const ids = await this.promptEffectTarget(pi, targets, {
+        title: spec.title || `${ctx.cardName} — Sacrifice`,
+        description: spec.description || defaultDesc,
+        confirmLabel: spec.confirmLabel || '🗡️ Sacrifice!',
+        confirmClass: spec.confirmClass || 'btn-danger',
+        cancellable,
+        maxTotal: targets.length,
+        minRequired: spec.minCount,
+        minSumMaxHp: spec.minMaxHp || undefined,
+        minSumLevel: spec.minSumLevel || undefined,
+      });
+      // Explicit cancel → resolveEffectPrompt returns null. Abort the
+      // summon cleanly so the caller can refund the action / return the
+      // card to hand.
+      if (ids === null && cancellable) {
+        this.log('sacrifice_cancelled', {
+          card: ctx.cardName, player: this.gs.players[pi]?.username,
+        });
+        return false;
+      }
+      if (!ids || ids.length < spec.minCount) continue;
+      const chosen = ids.map(id => targets.find(t => t.id === id)).filter(Boolean);
+      if (chosen.length < spec.minCount) continue;
+      if (spec.minMaxHp) {
+        const sumMax = chosen.reduce((s, t) => s + (t._meta.maxHp || 0), 0);
+        if (sumMax < spec.minMaxHp) continue;
+      }
+      if (spec.minSumLevel) {
+        const sumLvl = chosen.reduce((s, t) => s + (t._meta.level || 0), 0);
+        if (sumLvl < spec.minSumLevel) continue;
+      }
+      // Required tributes must all be part of the chosen subset.
+      if (spec.requiredInstIds && spec.requiredInstIds.length > 0) {
+        const chosenIds = new Set(chosen.map(t => t.cardInstance?.id));
+        if (!spec.requiredInstIds.every(id => chosenIds.has(id))) continue;
+      }
+      // "Must include ≥1 from Hero" constraint.
+      if (spec.mustIncludeFromHeroIdx != null) {
+        if (!chosen.some(t => t.cardInstance?.heroIdx === spec.mustIncludeFromHeroIdx)) continue;
+      }
+      picked = chosen;
+      break;
+    }
+
+    for (const t of picked) {
+      try {
+        await this.actionDestroyCard(
+          { name: ctx.cardName, owner: pi, heroIdx: ctx.cardHeroIdx },
+          t.cardInstance,
+        );
+      } catch (err) {
+        console.error(`[${ctx.cardName}] sacrifice destroy failed:`, err.message);
+      }
+    }
+
+    this.log('sacrifice_paid', {
+      card: ctx.cardName, player: this.gs.players[pi]?.username,
+      victims: picked.map(t => t.cardName), count: picked.length,
+    });
+
+    if (spec.onResolved) {
+      try { await spec.onResolved(ctx, picked); }
+      catch (err) { console.error(`[${ctx.cardName}] sacrifice onResolved rider failed:`, err.message); }
+    }
+    return true;
+  }
+
+  /** Place an Area card from a casting spell onto its owner's area zone. */
+  async placeArea(playerIdx, cardInstance, opts = {}) {
+    const gs = this.gs;
+    const ps = gs.players[playerIdx];
+    if (!ps) return;
+
+    if (!gs.areaZones) gs.areaZones = [[], []];
+    if (!gs.areaZones[playerIdx]) gs.areaZones[playerIdx] = [];
+
+    if (opts.replaceExisting) {
+      await this.removeAllAreas(playerIdx, opts.replacedBy || cardInstance.name);
+    }
+
+    const cardName = cardInstance.name;
+    gs.areaZones[playerIdx].push(cardName);
+    cardInstance.zone = 'area';
+    cardInstance.heroIdx = -1;
+    cardInstance.zoneSlot = -1;
+
+    const resolvingName = ps._resolvingCard?.name;
+    if (resolvingName && resolvingName !== cardName) {
+      cardInstance.counters._skipAfterResolveName = resolvingName;
+    }
+    if (!resolvingName || resolvingName === cardName) {
+      gs._spellPlacedOnBoard = true;
+    }
+
+    this.log('area_placed', { player: ps.username, area: cardName });
+    this._broadcastEvent('area_descend', { owner: playerIdx, cardName });
+
+    await this.runHooks('onCardEnterZone', {
+      enteringCard: cardInstance, toZone: 'area', toHeroIdx: -1,
+      _skipReactionCheck: true,
+    });
+    this.sync();
+    await this._delay(1300);
+  }
+
+  /** Remove a specific Area card from the board to its owner's discard. */
+  async removeArea(cardInstance, sourceName = 'unknown') {
+    const gs = this.gs;
+    const ownerIdx = cardInstance.owner;
+    const ps = gs.players[ownerIdx];
+    if (!ps) return;
+    const cardName = cardInstance.name;
+
+    this._broadcastEvent('play_pile_transfer', {
+      owner: ownerIdx, cardName, from: 'area', to: 'discard',
+    });
+
+    if (gs.areaZones?.[ownerIdx]) {
+      const idx = gs.areaZones[ownerIdx].indexOf(cardName);
+      if (idx >= 0) gs.areaZones[ownerIdx].splice(idx, 1);
+    }
+    if (!ps.discardPile) ps.discardPile = [];
+    ps.discardPile.push(cardName);
+    cardInstance.zone = 'discard';
+
+    this.log('area_removed', { player: ps.username, area: cardName, by: sourceName });
+    await this.runHooks('onCardLeaveZone', {
+      card: cardInstance, fromZone: 'area',
+      fromOwner: ownerIdx, fromHeroIdx: -1, fromZoneSlot: -1,
+      _skipReactionCheck: true,
+    });
+    this.sync();
+    await this._delay(750);
+  }
+
+  /** Remove every Area except those owned by `excludePlayerIdx`. */
+  async removeAllAreas(excludePlayerIdx = -2, sourceName = 'unknown') {
+    const areaInsts = this.cardInstances.filter(c => c.zone === 'area');
+    let removed = 0;
+    for (const inst of areaInsts) {
+      if (inst.owner === excludePlayerIdx) continue;
+      await this.removeArea(inst, sourceName);
+      removed++;
+    }
+    return removed;
+  }
+
+  /** Return active Area CardInstances for a player (or both if null). */
+  getAreas(playerIdx) {
+    return this.cardInstances.filter(inst =>
+      inst.zone === 'area' && (playerIdx == null || inst.owner === playerIdx)
+    );
+  }
+
+  /**
+   * Ascension bonus: lets a freshly-Ascended Hero take up to 3 copies
+   * of one ability from the caster's deck directly into its Ability
+   * Zone. Prompts the player between options if more than one is
+   * offered; fizzles silently if none are available.
+   */
+  async performAscensionBonus(pi, heroIdx, abilityChoices) {
+    const gs = this.gs;
+    const ps = gs.players[pi];
+    if (!ps) return;
+
+    const abZones = ps.abilityZones?.[heroIdx] || [[], [], []];
+
+    const calcPlacement = (name) => {
+      const deckCount = ps.mainDeck.filter(cn => cn === name).length;
+      if (deckCount === 0) return null;
+      const existingIdx = abZones.findIndex(slot => slot.length > 0 && slot[0] === name);
+      if (existingIdx >= 0) {
+        const room = 3 - abZones[existingIdx].length;
+        if (room <= 0) return null;
+        return { slotIdx: existingIdx, canAdd: Math.min(deckCount, room) };
+      }
+      const freeIdx = abZones.findIndex(slot => slot.length === 0);
+      if (freeIdx < 0) return null;
+      return { slotIdx: freeIdx, canAdd: Math.min(deckCount, 3) };
+    };
+
+    const available = abilityChoices
+      .map(name => ({ name, ...calcPlacement(name) }))
+      .filter(entry => entry.slotIdx !== undefined);
+    if (available.length === 0) return;
+
+    let chosen;
+    if (available.length === 1) {
+      const entry = available[0];
+      const result = await this.promptGeneric(pi, {
+        type: 'optionPicker',
+        title: 'Ascension Bonus',
+        description: `Add up to ${entry.canAdd} ${entry.name} from your deck?`,
+        options: [
+          { id: 'yes',  label: `✅ Add ${entry.name}`, color: '#44bb44' },
+          { id: 'skip', label: '✗ Skip',               color: '#888' },
+        ],
+        cancellable: false,
+      });
+      if (!result || result.optionId !== 'yes') return;
+      chosen = entry;
+    } else {
+      const options = available.map(e => ({
+        id: e.name, label: e.name,
+        description: `Up to ${e.canAdd} cop${e.canAdd > 1 ? 'ies' : 'y'}`,
+        color: '#44aaff',
+      }));
+      options.push({ id: 'skip', label: '✗ Skip', color: '#888' });
+      const result = await this.promptGeneric(pi, {
+        type: 'optionPicker',
+        title: 'Ascension Bonus',
+        description: 'Choose your activation bonus!',
+        options, cancellable: false,
+      });
+      if (!result || result.optionId === 'skip') return;
+      chosen = available.find(e => e.name === result.optionId);
+      if (!chosen) return;
+    }
+
+    const { name: abilityName, slotIdx, canAdd } = chosen;
+
+    const placedInsts = [];
+    for (let i = 0; i < canAdd; i++) {
+      const deckIdx = ps.mainDeck.indexOf(abilityName);
+      if (deckIdx < 0) break;
+      ps.mainDeck.splice(deckIdx, 1);
+      abZones[slotIdx].push(abilityName);
+      const inst = this._trackCard(abilityName, pi, 'ability', heroIdx, slotIdx);
+      placedInsts.push(inst);
+    }
+
+    ps.abilityZones[heroIdx] = abZones;
+    this.shuffleDeck(pi);
+
+    for (const inst of placedInsts) {
+      await this.runHooks('onPlay', {
+        _onlyCard: inst, playedCard: inst,
+        cardName: abilityName, zone: 'ability',
+        heroIdx, zoneSlot: slotIdx,
+        _skipReactionCheck: true,
+      });
+    }
+
+    this._broadcastEvent('deck_to_ability_animation', {
+      owner: pi, heroIdx, slotIdx, cardName: abilityName, count: canAdd,
+    });
+
+    await this._delay(canAdd * 300 + 400);
+    this.log('ascension_bonus', {
+      player: ps.username, ability: abilityName, count: canAdd,
+    });
+    this.sync();
+  }
+
   // ─── HERO STATUS EFFECTS ────────────────────
 
   /**
@@ -5415,6 +6615,9 @@ class GameEngine {
           // the selected targets' `_meta.maxHp` values meets this floor
           // (Dragon Pilot etc.). Complements minRequired / maxTotal.
           minSumMaxHp: config.minSumMaxHp,
+          // Parallel rule for combined-level thresholds (Dark Deepsea
+          // God's tribute: 2+ creatures with combined levels ≥ 4).
+          minSumLevel: config.minSumLevel,
         },
       };
       this.sync();
@@ -5591,11 +6794,18 @@ class GameEngine {
   /**
    * Resolve a pending effect prompt (called by server socket handler).
    */
-  resolveEffectPrompt(selectedIds) {
+  resolveEffectPrompt(selectedIds, options = {}) {
     if (!this._pendingPrompt) return false;
     const { resolve } = this._pendingPrompt;
     this._pendingPrompt = null;
     this.gs.potionTargeting = null;
+    // Explicit cancel (options.cancelled === true) resolves to null so
+    // callers like resolveSacrificeCost can break out of a retry loop.
+    // All other paths resolve with the selection array (possibly empty).
+    if (options.cancelled) {
+      resolve(null);
+      return true;
+    }
     if (selectedIds && selectedIds.length > 0) this._firePendingCardReveal();
     resolve(selectedIds || []);
     return true;
@@ -7739,7 +8949,157 @@ class GameEngine {
     const oi = playerIdx === 0 ? 1 : 0;
     scanPlayer(oi, oi);
 
+    // Creatures we've temporarily stolen (Deepsea Succubus) — they stay
+    // on the opponent's board but `inst.controller` is flipped to us.
+    // Walk the opponent's support zones and pick up any instance whose
+    // stolenBy matches us. Mirrors the scanner loop's gating so only
+    // creatures with a creatureEffect appear, respects HOPT / summoning
+    // sickness, and carries the same result shape as the other passes.
+    const oppPs = this.gs.players[oi];
+    if (oppPs) {
+      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
+        const hero = oppPs.heroes[hi];
+        if (!hero?.name) continue;
+        // Don't double-count — charmed heroes' creatures already handled above.
+        if (hero.charmedBy === playerIdx) continue;
+        for (let zi = 0; zi < (oppPs.supportZones[hi] || []).length; zi++) {
+          const slot = (oppPs.supportZones[hi] || [])[zi] || [];
+          if (slot.length === 0) continue;
+          const inst = this.cardInstances.find(c =>
+            c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi && c.owner === oi
+          );
+          if (!inst) continue;
+          if (inst.stolenBy !== playerIdx) continue;
+          if (inst.faceDown) continue;
+
+          const cd = this.getEffectiveCardData(inst) || cardDB[inst.name];
+          if (!cd || !hasCardType(cd, 'Creature')) continue;
+
+          const effectName = inst.counters?._effectOverride || inst.name;
+          const script = loadCardEffect(effectName);
+          if (!script?.creatureEffect) continue;
+
+          const hasSummoningSickness = inst.turnPlayed === (this.gs.turn || 0);
+          const hoptKey = `creature-effect:${inst.id}`;
+          const exhausted = this.gs.hoptUsed?.[hoptKey] === this.gs.turn;
+          let canActivate = !exhausted && !hasSummoningSickness;
+          if (canActivate && script.canActivateCreatureEffect) {
+            try {
+              const ctx = this._createContext(inst, { event: 'canCreatureEffectCheck' });
+              canActivate = !!script.canActivateCreatureEffect(ctx);
+            } catch { canActivate = false; }
+          }
+
+          result.push({
+            owner: oi, heroIdx: hi, zoneSlot: zi,
+            cardName: inst.name, canActivate, exhausted,
+            instId: inst.id,
+            // `charmedOwner` is how the client's render loop distinguishes
+            // "this activation lives on the opponent's side but belongs
+            // to me" — same field the charmed-hero scan uses, so the
+            // existing click handler and charmedOwner plumbing on the
+            // socket path (activate_creature_effect) apply unchanged.
+            charmedOwner: oi,
+          });
+        }
+      }
+    }
+
     return result;
+  }
+
+  // ─── ACTIVATABLE AREA EFFECTS ─────────
+  /**
+   * Walk both players' area zones and return the Areas whose
+   * `areaEffect` is currently activatable BY THIS PLAYER (Main Phase,
+   * HOPT not consumed, the card's `canActivateAreaEffect(ctx)` passes).
+   *
+   * Each entry carries the area's owner (`areaOwner` — distinct from
+   * the activating player; Deepsea Castle reads on both sides) and a
+   * `canActivate` boolean so the client can render all areas but
+   * grey out the ones that aren't currently usable.
+   *
+   * @returns {Array<{areaOwner, areaName, instId, canActivate, exhausted}>}
+   */
+  getActivatableAreas(playerIdx) {
+    const gs = this.gs;
+    const ps = gs.players[playerIdx];
+    if (!ps) return [];
+    if (gs.activePlayer !== playerIdx) return [];
+    const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
+    if (!isMainPhase) return [];
+    const result = [];
+    for (let ownerPi = 0; ownerPi < 2; ownerPi++) {
+      const areaNames = gs.areaZones?.[ownerPi] || [];
+      for (const areaName of areaNames) {
+        const script = loadCardEffect(areaName);
+        if (!script?.areaEffect) continue;
+        const inst = this.cardInstances.find(c =>
+          c.name === areaName && c.zone === 'area' && c.owner === ownerPi
+        );
+        if (!inst) continue;
+        const hoptKey = `area-effect:${areaName}:${playerIdx}`;
+        const exhausted = this.gs.hoptUsed?.[hoptKey] === this.gs.turn;
+        let canActivate = !exhausted;
+        if (canActivate && typeof script.canActivateAreaEffect === 'function') {
+          try {
+            const ctx = this._createContext(inst, { _activator: playerIdx });
+            canActivate = script.canActivateAreaEffect(ctx) !== false;
+          } catch (err) {
+            console.error(`[canActivateAreaEffect] ${areaName}:`, err.message);
+            canActivate = false;
+          }
+        }
+        result.push({ areaOwner: ownerPi, areaName, instId: inst.id, canActivate, exhausted });
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Invoke a specific area's `onAreaEffect(ctx)` as `activatorPi`. On
+   * success, claims the area's once-per-turn HOPT for that player so
+   * repeated clicks in the same turn are silently ignored. Returns
+   * true when the effect actually fired.
+   */
+  async activateAreaEffect(activatorPi, areaOwnerPi, areaName) {
+    const gs = this.gs;
+    if (gs.activePlayer !== activatorPi) return false;
+    const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
+    if (!isMainPhase) return false;
+    const hoptKey = `area-effect:${areaName}:${activatorPi}`;
+    if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) return false;
+
+    const script = loadCardEffect(areaName);
+    if (!script?.areaEffect || typeof script.onAreaEffect !== 'function') return false;
+    const inst = this.cardInstances.find(c =>
+      c.name === areaName && c.zone === 'area' && c.owner === areaOwnerPi
+    );
+    if (!inst) return false;
+
+    // Re-verify the per-card gate — state may have shifted since the
+    // client computed activatableAreas.
+    if (typeof script.canActivateAreaEffect === 'function') {
+      const ctx = this._createContext(inst, { _activator: activatorPi });
+      if (script.canActivateAreaEffect(ctx) === false) return false;
+    }
+
+    // Claim HOPT BEFORE running the effect so a long-running prompt
+    // can't be fired twice by a rapid double-click.
+    if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
+    this.gs.hoptUsed[hoptKey] = this.gs.turn;
+
+    const ctx = this._createContext(inst, { _activator: activatorPi });
+    try {
+      await script.onAreaEffect(ctx);
+      this.log('area_effect_activated', {
+        area: areaName, activator: gs.players[activatorPi]?.username,
+      });
+    } catch (err) {
+      console.error(`[onAreaEffect] ${areaName}:`, err.message);
+    }
+    this.sync();
+    return true;
   }
 
   // ─── ACTIVE EQUIP EFFECTS ─────────────
@@ -8129,6 +9489,21 @@ class GameEngine {
         if (gap > 0) {
           const cov = this._findLevelGapCoverage(cardData, gap, abZones);
           if (cov?.coverable) return true;
+        }
+      }
+
+      // Per-card level-req bypass — the card script opts in by exporting
+      // `canBypassLevelReq(gs, playerIdx, heroIdx, cardData, engine) → bool`.
+      // Lets an alternate play path (e.g. Deepsea bounce-place) let the
+      // card through without spell-school requirements. Any future card
+      // with a similar "play via alternate cost" mechanic uses the same
+      // hook — no engine edit per card.
+      const cardScript = loadCardEffect(cardData.name);
+      if (typeof cardScript?.canBypassLevelReq === 'function') {
+        try {
+          if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this)) return true;
+        } catch (err) {
+          console.error(`[canBypassLevelReq] ${cardData.name} threw:`, err.message);
         }
       }
 
@@ -8762,6 +10137,9 @@ class GameEngine {
       if (e.inst?.counters?._cardinalImmune || e.inst?.counters?._baihuPetrify) {
         e._immuneCreature = true;
       } else if (e.inst?.counters?._guardianImmune && e.canBeNegated !== false) {
+        e._immuneCreature = true;
+      } else if (e.inst?.counters?._stealImmortal) {
+        // Temporarily stolen (Deepsea Succubus): cannot take damage while stolen.
         e._immuneCreature = true;
       }
     }

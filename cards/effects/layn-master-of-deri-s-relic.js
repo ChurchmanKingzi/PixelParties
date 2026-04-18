@@ -17,7 +17,6 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
-const { performAscensionBonus } = require('./_ascension-bonus');
 
 const CARD_NAME  = 'Layn, Master of Deri\'s Relic';
 const MAX_LEVEL  = 3;
@@ -47,7 +46,7 @@ module.exports = {
   heroEffect: true,
 
   async onAscensionBonus(engine, pi, heroIdx) {
-    await performAscensionBonus(engine, pi, heroIdx, ['Fighting']);
+    await engine.performAscensionBonus(pi, heroIdx, ['Fighting']);
   },
 
   canActivateHeroEffect(ctx) {

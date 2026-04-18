@@ -15,9 +15,15 @@ const { api, emitSocket, socket, AppContext, CardMini, FoilOverlay, useFoilBands
 // ═══════════════════════════════════════════
 let _activeLuckTooltipTarget = null;
 let _boardTooltipLocked = false;
+// While a card is being dragged, suppress all card-hover tooltips — the
+// preview gets in the way of seeing the drop target. Flipped from the
+// drag-state effect below and consulted on every setBoardTooltip(...)
+// call, so any hover that tries to open a preview mid-drag is ignored.
+let _isDraggingCard = false;
 function setBoardTooltip(card) {
   // When locked (prompt card hovered), ignore external clears
   if (!card && _boardTooltipLocked) return;
+  if (card && _isDraggingCard) return;
   window._boardTooltipSetter?.(card);
 }
 
@@ -86,7 +92,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
 }
 
 function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style, className, dataAttrs }) {
-  const cls = 'board-zone board-zone-' + type + (className ? ' ' + className : '');
+  const cls = 'board-zone board-zone-' + type + (className ? ' ' + className : '') + ((cards?.length > 0) ? ' zone-has-card' : '');
   const topCardName = cards && cards.length > 0 && !faceDown ? cards[cards.length - 1] : null;
   const suppressChildTooltip = !!onClick && !!onHoverCard;
   return (
@@ -655,6 +661,88 @@ function FlameStrikeEffect({ x, y }) {
 // while an Acid Rain Area card is active in either area zone. Sized via
 // position:absolute inset:0 so it fills the .board-center container
 // without leaking onto the hand / side panels.
+// Deepsea Castle area overlay — split into two layers:
+//   • DARKNESS: radial gradient at z-index auto, rendered first inside
+//     .board-center so it paints before ALL zones/cards (siblings and
+//     their descendants later in DOM stack on top). Empty zones have
+//     a semi-transparent bg so the darkness shows through; filled
+//     zones with opaque card images naturally cover it.
+//   • GODRAYS + motes: z-index 1000, rendered as a sibling above every
+//     card and zone. Paints red beams on top of the entire battlefield.
+//
+// Both layers are pointer-events: none so they never steal clicks.
+function DeepseaCastleOverlay() {
+  const beams = useMemo(() => Array.from({ length: 9 }, () => ({
+    left: Math.random() * 100,
+    width: 10 + Math.random() * 26,
+    skew: -8 + Math.random() * 16,
+    delay: -Math.random() * 4,
+    dur: 6 + Math.random() * 4,
+    opacityPeak: 0.22 + Math.random() * 0.22,
+  })), []);
+  const motes = useMemo(() => Array.from({ length: 20 }, () => ({
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    size: 2 + Math.random() * 2.5,
+    delay: -Math.random() * 6,
+    dur: 4 + Math.random() * 5,
+  })), []);
+  return (
+    <>
+      {/* LAYER 1 — DARKNESS (beneath all cards + zones). */}
+      <div className="deepsea-castle-darkness" style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        overflow: 'hidden',
+        background: 'radial-gradient(ellipse at center top, rgba(20,0,5,0.35) 0%, rgba(5,0,2,0.55) 70%, rgba(0,0,0,0.6) 100%)',
+      }} />
+      {/* LAYER 2 — GODRAYS + motes (above all cards + zones). z-index
+          1000 wins over zone-has-card (z 10) and any standard board-
+          layer stacking, while staying BELOW hand (z 10000) and
+          modal/popup overlays (z 90000+) so UI stays usable. */}
+      <div className="deepsea-castle-rays" style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1000,
+        overflow: 'hidden',
+      }}>
+        {beams.map((b, i) => (
+          <span key={'b' + i} style={{
+            position: 'absolute',
+            left: b.left + '%', top: '-10%',
+            width: b.width + 'px', height: '130%',
+            transform: 'skewX(' + b.skew + 'deg)',
+            transformOrigin: 'top center',
+            background: 'linear-gradient(180deg, rgba(255,40,60,' + b.opacityPeak + ') 0%, rgba(180,10,25,' + (b.opacityPeak * 0.7) + ') 40%, rgba(80,0,10,0) 100%)',
+            filter: 'blur(6px)',
+            mixBlendMode: 'screen',
+            animation: 'deepseaCastleBeam ' + b.dur + 's ease-in-out ' + b.delay + 's infinite',
+          }} />
+        ))}
+        {motes.map((m, i) => (
+          <span key={'m' + i} style={{
+            position: 'absolute',
+            left: m.x + '%', top: m.y + '%',
+            width: m.size + 'px', height: m.size + 'px',
+            borderRadius: '50%',
+            background: 'rgba(255,80,100,0.85)',
+            boxShadow: '0 0 6px rgba(255,40,60,0.9)',
+            animation: 'deepseaCastleMote ' + m.dur + 's ease-in-out ' + m.delay + 's infinite',
+          }} />
+        ))}
+        <style>{`
+          @keyframes deepseaCastleBeam {
+            0%, 100% { opacity: 0.35; transform: translateX(0) skewX(var(--skew, 0deg)); }
+            50%      { opacity: 1;    transform: translateX(6px) skewX(var(--skew, 0deg)); }
+          }
+          @keyframes deepseaCastleMote {
+            0%   { opacity: 0; transform: translateY(0) scale(0.6); }
+            25%  { opacity: 0.85; }
+            100% { opacity: 0; transform: translateY(-40px) scale(1); }
+          }
+        `}</style>
+      </div>
+    </>
+  );
+}
+
 function AcidRainOverlay() {
   // Spawn a large pool of drops with staggered delays / durations so the
   // rain reads as "continuous" without any visible reset point.
@@ -1510,6 +1598,351 @@ const ANIM_REGISTRY = {
       return null;
     };
   })(),
+  // Critical Slash — Critical Strike's signature. Two huge diagonal
+  // slashes (NE↘SW and NW↘SE) cross-cut the target in quick succession
+  // with a bright white glint at the intersection, a gold-red
+  // "CRITICAL!" text pulse, shockwave ring, and scattering sparks.
+  // Everything front-loads so the hit feels instantaneous and heavy.
+  critical_slash: (() => {
+    return function CriticalSlashEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 80, 80);
+      const hh = Math.max(h || 110, 110);
+      const len = Math.hypot(ww, hh) * 2.1;
+      const sparks = useMemo(() => Array.from({ length: 24 }, () => ({
+        angle: Math.random() * 360,
+        dist: 50 + Math.random() * 120,
+        delay: 120 + Math.random() * 180,
+        dur: 400 + Math.random() * 260,
+        size: 3 + Math.random() * 6,
+        gold: Math.random() < 0.55,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10120 }}>
+          {/* Bright radial shockwave pulse behind the cuts */}
+          <div style={{
+            position: 'absolute', left: -80, top: -80, width: 160, height: 160,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,240,.9) 0%, rgba(255,200,60,.55) 35%, rgba(220,40,40,.35) 65%, transparent 85%)',
+            boxShadow: '0 0 45px rgba(255,220,100,.9), 0 0 90px rgba(255,80,40,.55)',
+            animation: 'criticalShockwave 480ms ease-out forwards',
+            opacity: 0,
+          }} />
+          {/* First slash — NE → SW, rotated -35deg */}
+          <div style={{
+            position: 'absolute', left: -len / 2, top: -4,
+            width: len, height: 8,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,240,.15) 10%, rgba(255,230,110,.95) 44%, rgba(255,255,255,1) 50%, rgba(255,200,60,.95) 56%, rgba(255,120,60,.5) 85%, transparent 100%)',
+            boxShadow: '0 0 18px rgba(255,230,120,.95), 0 0 34px rgba(255,80,40,.75)',
+            transform: 'rotate(-35deg) translateX(-130%)',
+            transformOrigin: 'center center',
+            animation: 'criticalSlashA 220ms cubic-bezier(0.15, 0.95, 0.25, 1) forwards',
+            opacity: 0,
+          }} />
+          {/* Second slash — NW → SE, rotated +35deg, staggered */}
+          <div style={{
+            position: 'absolute', left: -len / 2, top: -4,
+            width: len, height: 8,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,240,.15) 10%, rgba(255,230,110,.95) 44%, rgba(255,255,255,1) 50%, rgba(255,200,60,.95) 56%, rgba(255,120,60,.5) 85%, transparent 100%)',
+            boxShadow: '0 0 18px rgba(255,230,120,.95), 0 0 34px rgba(255,80,40,.75)',
+            transform: 'rotate(35deg) translateX(-130%)',
+            transformOrigin: 'center center',
+            animation: 'criticalSlashB 220ms cubic-bezier(0.15, 0.95, 0.25, 1) 110ms forwards',
+            opacity: 0,
+          }} />
+          {/* Intersection glint — giant white burst at the crossing */}
+          <div style={{
+            position: 'absolute', left: -30, top: -30, width: 60, height: 60,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,240,180,.85) 45%, transparent 80%)',
+            boxShadow: '0 0 50px rgba(255,255,220,1), 0 0 90px rgba(255,190,80,.7)',
+            animation: 'criticalGlint 360ms ease-out 180ms forwards',
+            opacity: 0,
+          }} />
+          {/* "CRITICAL!" text pulse — punchy gold-red */}
+          <div style={{
+            position: 'absolute', left: -90, top: -56, width: 180,
+            textAlign: 'center',
+            fontFamily: '"Orbitron", "Rajdhani", sans-serif',
+            fontSize: 28, fontWeight: 900, letterSpacing: '2px',
+            color: '#fff7c0',
+            textShadow: '0 0 8px rgba(255,60,20,.95), 0 0 18px rgba(255,120,40,.85), 2px 2px 0 #6b0010, -2px 2px 0 #6b0010, 2px -2px 0 #6b0010, -2px -2px 0 #6b0010',
+            animation: 'criticalText 620ms cubic-bezier(0.2, 1.4, 0.4, 1) 180ms forwards',
+            opacity: 0,
+            transform: 'scale(0.3)',
+            pointerEvents: 'none',
+          }}>CRITICAL!</div>
+          {/* Spark fan radiating out of the impact */}
+          {sparks.map((s, i) => (
+            <div key={'cs'+i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: s.size, height: s.size, borderRadius: '50%',
+              background: s.gold ? '#ffe066' : '#ff4830',
+              boxShadow: `0 0 ${s.size * 2}px ${s.gold ? 'rgba(255,220,100,.9)' : 'rgba(255,80,40,.9)'}`,
+              animation: `criticalSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              opacity: 0,
+              '--csAngle': s.angle + 'deg',
+              '--csDist': s.dist + 'px',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+
+  // Siphem orbital laser — a tall red beam lances down from the top
+  // of the viewport onto the target slot. Charge-up dot appears above,
+  // the beam drops through with an explosion at the impact point, and
+  // a crimson impact shockwave flashes out. Paired with Siphem's
+  // Deepsea-Counter damage so the kill feels orbital-strike serious.
+  orbital_laser_red: (() => {
+    return function OrbitalLaserRedEffect({ x, y }) {
+      // Beam travels from the viewport's top edge down to the target.
+      const beamHeight = Math.max(y + 40, 180);
+      const sparks = useMemo(() => Array.from({ length: 14 }, () => ({
+        angle: Math.random() * 360,
+        dist: 40 + Math.random() * 80,
+        delay: 260 + Math.random() * 140,
+        dur: 420 + Math.random() * 240,
+        size: 3 + Math.random() * 5,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Charge-up pulse dot at the top of the screen, above the target */}
+          <div style={{
+            position: 'fixed', left: x - 18, top: 6, width: 36, height: 36,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle at 40% 40%, #ffd0d0 0%, #ff2a3e 50%, #6e0008 100%)',
+            boxShadow: '0 0 24px rgba(255,50,70,.95), 0 0 44px rgba(200,0,30,.7)',
+            animation: 'orbitalLaserCharge 260ms ease-out forwards',
+            opacity: 0,
+          }} />
+          {/* Main beam — narrow bright core + wider red halo. Anchored
+              at the viewport top (fixed positioning ignores local y). */}
+          <div style={{
+            position: 'fixed', left: x - 5, top: 20,
+            width: 10, height: beamHeight - 20,
+            background: 'linear-gradient(to bottom, rgba(255,180,190,.9), rgba(220,30,50,.95) 35%, rgba(140,0,20,.8))',
+            boxShadow: '0 0 12px rgba(255,60,80,.85), 0 0 28px rgba(200,0,30,.7)',
+            transformOrigin: 'center top',
+            animation: 'orbitalLaserBeam 520ms cubic-bezier(0.4, 0, 0.2, 1) 260ms forwards',
+            opacity: 0,
+          }} />
+          <div style={{
+            position: 'fixed', left: x - 22, top: 20,
+            width: 44, height: beamHeight - 20,
+            background: 'linear-gradient(to bottom, rgba(255,80,100,.5), rgba(180,0,20,.55) 40%, rgba(100,0,10,.35))',
+            filter: 'blur(2px)',
+            transformOrigin: 'center top',
+            animation: 'orbitalLaserBeam 520ms cubic-bezier(0.4, 0, 0.2, 1) 260ms forwards',
+            opacity: 0,
+          }} />
+          {/* Impact flash at the target — bright white-red burst */}
+          <div style={{
+            position: 'absolute', left: -55, top: -55, width: 110, height: 110,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,80,100,.85) 30%, rgba(180,0,20,.5) 60%, transparent 85%)',
+            boxShadow: '0 0 40px rgba(255,60,80,.9), 0 0 80px rgba(200,0,30,.7)',
+            animation: 'orbitalLaserImpact 580ms ease-out 540ms forwards',
+            opacity: 0,
+          }} />
+          {/* Ember sparks radiating from impact */}
+          {sparks.map((s, i) => (
+            <div key={'ol'+i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: s.size, height: s.size, borderRadius: '50%',
+              background: i % 3 === 0 ? '#ffdfe4' : '#ff2a3e',
+              boxShadow: `0 0 ${s.size * 2}px rgba(255,60,80,.85)`,
+              animation: `orbitalLaserSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              opacity: 0,
+              '--olAngle': s.angle + 'deg',
+              '--olDist': s.dist + 'px',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+
+  // Blood Moon pulse — Blood Moon under the Sea re-trigger signature.
+  // Crimson moonlight bathes the slot: a large blood-red moon appears
+  // above the card with dark halo rings, beams of red light lance
+  // downward, and a sheet of red droplets drips past the card. Fires on
+  // BOTH the Blood Moon's slot and the creature whose on-summon is
+  // being re-triggered so the link between them reads instantly.
+  blood_moon_pulse: (() => {
+    return function BloodMoonPulseEffect({ x, y, w, h }) {
+      const drops = useMemo(() => Array.from({ length: 14 }, () => ({
+        xOff: -30 + Math.random() * 60,
+        startY: -30 + Math.random() * 10,
+        endY: 70 + Math.random() * 30,
+        delay: 120 + Math.random() * 320,
+        dur: 650 + Math.random() * 300,
+        size: 3 + Math.random() * 4,
+      })), []);
+      const rays = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+        angle: -45 + i * 15 + (Math.random() * 6 - 3),
+        len: 70 + Math.random() * 30,
+        delay: Math.random() * 150,
+        dur: 700 + Math.random() * 250,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Dark red halo behind the card */}
+          <div style={{
+            position: 'absolute', left: -55, top: -55, width: 110, height: 110,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(160,10,20,.55) 0%, rgba(80,0,10,.35) 40%, transparent 80%)',
+            boxShadow: '0 0 22px rgba(200,20,40,.75), inset 0 0 14px rgba(120,0,20,.55)',
+            animation: 'bloodMoonHalo 1100ms ease-out forwards',
+            opacity: 0,
+          }} />
+          {/* Blood moon orb drifting in above */}
+          <div style={{
+            position: 'absolute', left: -18, top: -74, width: 36, height: 36,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle at 35% 30%, #c42a3a, #7a0010 55%, #3a0008 100%)',
+            boxShadow: '0 0 22px rgba(220,30,50,.85), 0 0 36px rgba(140,0,20,.6)',
+            animation: 'bloodMoonOrb 1000ms ease-out forwards',
+            opacity: 0,
+          }} />
+          {/* Moonlight rays lancing downward */}
+          {rays.map((r, i) => (
+            <div key={'bmr'+i} style={{
+              position: 'absolute', left: 0, top: -58,
+              width: 3, height: r.len,
+              background: 'linear-gradient(to bottom, rgba(220,40,60,.9), rgba(140,0,20,.5) 60%, transparent)',
+              borderRadius: 3,
+              transform: `rotate(${r.angle}deg) scaleY(0)`,
+              transformOrigin: 'center top',
+              animation: `bloodMoonRay ${r.dur}ms ease-out ${r.delay}ms forwards`,
+              boxShadow: '0 0 6px rgba(220,40,60,.75)',
+            }} />
+          ))}
+          {/* Red droplets trickling down past the card */}
+          {drops.map((d, i) => (
+            <div key={'bmd'+i} style={{
+              position: 'absolute', left: d.xOff, top: d.startY,
+              width: d.size, height: d.size * 1.4, borderRadius: '50% 50% 50% 50% / 40% 40% 60% 60%',
+              background: 'radial-gradient(circle at 40% 30%, #ff3048, #8a0010)',
+              boxShadow: '0 0 5px rgba(200,20,40,.8)',
+              animation: `bloodMoonDrop ${d.dur}ms ease-in ${d.delay}ms forwards`,
+              opacity: 0,
+              '--bmEndY': d.endY + 'px',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // Deepsea Spores rain — full-board particle shower in the archetype
+  // palette (teal, blue, dark-blue, red, dark-red). Spores drift in
+  // serpentine paths from the top of the viewport down through the
+  // entire play area. Paired with `deepsea_spores_growth` per creature.
+  deepsea_spores_rain: (() => {
+    return function DeepseaSporesRainEffect({ x, y, w, h }) {
+      const W = Math.max(w || window.innerWidth, 480);
+      const H = Math.max(h || window.innerHeight, 320);
+      const palette = ['#6adbc4', '#3a86d9', '#1a3ea8', '#c42842', '#6a0e1c'];
+      const spores = useMemo(() => Array.from({ length: 180 }, () => ({
+        xStart: Math.random() * W - W / 2,
+        yStart: -H / 2 - 40,
+        xEnd:   (-60 + Math.random() * 120),
+        yEnd:   H / 2 + 40,
+        wobble: (-30 + Math.random() * 60),
+        delay:  Math.random() * 1400,
+        dur:    1300 + Math.random() * 700,
+        size:   3 + Math.random() * 7,
+        color:  palette[Math.floor(Math.random() * palette.length)],
+        opacity: 0.55 + Math.random() * 0.4,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10090 }}>
+          {/* Ambient ominous red wash over the whole play area */}
+          <div style={{
+            position: 'absolute', left: -W / 2, top: -H / 2, width: W, height: H,
+            background: 'radial-gradient(ellipse at center, rgba(140,0,10,.12) 0%, rgba(30,10,50,.05) 55%, transparent 85%)',
+            animation: 'deepseaSporesWash 2400ms ease-in-out forwards',
+            opacity: 0,
+          }} />
+          {spores.map((s, i) => (
+            <div key={'ds'+i} style={{
+              position: 'absolute', left: s.xStart, top: s.yStart,
+              width: s.size, height: s.size, borderRadius: '50%',
+              background: `radial-gradient(circle at 35% 35%, ${s.color}, ${s.color}80 55%, transparent 80%)`,
+              boxShadow: `0 0 ${s.size * 1.5}px ${s.color}`,
+              animation: `deepseaSporeFall ${s.dur}ms linear ${s.delay}ms forwards`,
+              opacity: 0,
+              '--dsEndX': s.xEnd + 'px',
+              '--dsEndY': s.yEnd + 'px',
+              '--dsWobble': s.wobble + 'px',
+              '--dsOpacity': s.opacity,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+
+  // Per-creature algae / anemone growth on Spores activation. Tendrils
+  // sprout from the creature's slot, along with an ominous red pulse
+  // and a few drifting spores that hang in place. Meant to be fired
+  // via `playAnimation('deepsea_spores_growth', supportSlotSelector)`.
+  deepsea_spores_growth: (() => {
+    return function DeepseaSporesGrowthEffect({ x, y }) {
+      const tendrils = useMemo(() => Array.from({ length: 8 }, (_, i) => ({
+        angle: -70 + (i * 20) + (Math.random() * 10 - 5),
+        len:   28 + Math.random() * 18,
+        delay: Math.random() * 200,
+        dur:   800 + Math.random() * 300,
+        width: 2.5 + Math.random() * 2,
+        shade: (i % 3 === 0) ? '#8b1025' : (i % 3 === 1 ? '#5a9a7a' : '#1e4a8a'),
+      })), []);
+      const fronds = useMemo(() => Array.from({ length: 5 }, () => ({
+        xOff: -18 + Math.random() * 36,
+        delay: 150 + Math.random() * 250,
+        dur: 700 + Math.random() * 200,
+        size: 10 + Math.random() * 8,
+        emoji: Math.random() < 0.5 ? '🌿' : '🪸',
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10110 }}>
+          {/* Ominous red pulse covering the creature card */}
+          <div style={{
+            position: 'absolute', left: -35, top: -48, width: 70, height: 96,
+            background: 'radial-gradient(ellipse at center, rgba(200,20,40,.55) 0%, rgba(120,0,20,.3) 55%, transparent 85%)',
+            boxShadow: '0 0 18px rgba(180,20,40,.7), inset 0 0 12px rgba(100,0,20,.5)',
+            borderRadius: 6,
+            animation: 'deepseaSporeRedPulse 1600ms ease-out forwards',
+            opacity: 0,
+          }} />
+          {/* Tendril bases — thin curved lines growing outward */}
+          {tendrils.map((t, i) => (
+            <div key={'dt'+i} style={{
+              position: 'absolute', left: 0, top: 20,
+              width: t.width, height: t.len,
+              background: `linear-gradient(to top, ${t.shade}, ${t.shade}aa 60%, ${t.shade}44 100%)`,
+              borderRadius: t.width,
+              boxShadow: `0 0 6px ${t.shade}aa`,
+              transform: `rotate(${t.angle}deg) scaleY(0)`,
+              transformOrigin: 'center bottom',
+              animation: `deepseaTendrilGrow ${t.dur}ms cubic-bezier(0.3, 1.4, 0.5, 1) ${t.delay}ms forwards`,
+            }} />
+          ))}
+          {/* Fronds (algae / coral emoji) popping out at the tendril tips */}
+          {fronds.map((f, i) => (
+            <div key={'df'+i} style={{
+              position: 'absolute', left: f.xOff, top: -8,
+              fontSize: f.size,
+              filter: 'drop-shadow(0 0 4px rgba(140,0,30,.8))',
+              animation: `deepseaFrondPop ${f.dur}ms ease-out ${f.delay}ms forwards`,
+              opacity: 0,
+            }}>{f.emoji}</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+
   deep_sea_bubbles: (() => {
     return function DeepSeaBubblesEffect({ x, y }) {
       const bubbles = useMemo(() => Array.from({ length: 20 }, () => ({
@@ -1536,6 +1969,198 @@ const ANIM_REGISTRY = {
               '--endY': b.endY + 'px',
               '--wobble': b.wobble + 'px',
               '--bubbleOpacity': b.opacity,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // Claw maul — Deepsea Werewolf's damage signature. Four diagonal
+  // gashes rake across the target in a tight cluster, each with its
+  // own crimson wound trailing behind; a burst of red-black gore
+  // splatter drops beneath the cuts.
+  claw_maul: (() => {
+    return function ClawMaulEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 80, 80);
+      const hh = Math.max(h || 110, 110);
+      const len = Math.hypot(ww, hh) * 1.55;
+      // Four claw lines — three main gashes + one accent, each offset
+      // so they form a rake pattern rather than stacking on top.
+      const gashes = useMemo(() => [
+        { offY: -18, delay:   0, scale: 1.0, thick: 3.5 },
+        { offY:  -6, delay:  60, scale: 1.0, thick: 3.0 },
+        { offY:   6, delay:  30, scale: 1.05, thick: 3.5 },
+        { offY:  18, delay:  90, scale: 0.95, thick: 2.5 },
+      ], []);
+      const gore = useMemo(() => Array.from({ length: 16 }, () => ({
+        dx: -30 + Math.random() * 60,
+        dy: 8 + Math.random() * 55,
+        delay: 180 + Math.random() * 220,
+        dur: 420 + Math.random() * 220,
+        size: 3 + Math.random() * 5,
+        shade: Math.random() < 0.7 ? '#a00010' : '#550008',
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Background rage haze */}
+          <div className="anim-flame-flash" style={{
+            width: 110, height: 110, marginLeft: -55, marginTop: -55,
+            background: 'radial-gradient(circle, rgba(180,0,0,.45) 0%, rgba(100,0,0,.2) 40%, transparent 75%)',
+            animationDuration: '500ms',
+          }} />
+          {gashes.map((g, i) => (
+            <React.Fragment key={'cm'+i}>
+              {/* Steel-white claw streak */}
+              <div style={{
+                position: 'absolute', left: -len / 2, top: g.offY - 2,
+                width: len, height: g.thick,
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,240,230,.1) 20%, rgba(255,245,240,.95) 48%, rgba(255,255,255,1) 52%, rgba(255,220,210,.7) 70%, transparent 100%)',
+                boxShadow: '0 0 8px rgba(255,220,210,.85), 0 0 14px rgba(200,60,60,.55)',
+                transform: `rotate(-32deg) scale(${g.scale}) translateX(-120%)`,
+                transformOrigin: 'center center',
+                animation: `clawSlash 380ms cubic-bezier(0.2, 0.9, 0.3, 1) ${g.delay}ms forwards`,
+                opacity: 0,
+              }} />
+              {/* Crimson wound lingering along the cut path */}
+              <div style={{
+                position: 'absolute', left: -ww * 0.55, top: g.offY - 1.5,
+                width: ww * 1.1, height: g.thick + 1,
+                background: 'linear-gradient(90deg, transparent 0%, rgba(140,0,8,.7) 18%, rgba(200,25,30,.95) 50%, rgba(140,0,8,.7) 82%, transparent 100%)',
+                boxShadow: '0 0 9px rgba(170,15,20,.85)',
+                transform: `rotate(-32deg) scale(${g.scale})`,
+                transformOrigin: 'center center',
+                animation: `clawWound 580ms ease-out ${g.delay + 160}ms forwards`,
+                opacity: 0,
+              }} />
+            </React.Fragment>
+          ))}
+          {/* Gore splatter beneath the gashes */}
+          {gore.map((d, i) => (
+            <div key={'cd'+i} style={{
+              position: 'absolute', left: d.dx, top: -4,
+              width: d.size, height: d.size, borderRadius: '50%',
+              background: d.shade,
+              boxShadow: `0 0 4px rgba(120,0,10,.8)`,
+              animation: `clawGore ${d.dur}ms ease-in ${d.delay}ms forwards`,
+              opacity: 0,
+              '--cmGy': d.dy + 'px',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // Scythe cut — Deepsea Reaper's creature-defeat signature. A dark
+  // steel blade streaks diagonally across the Creature slot, a bright
+  // white glint flashes on impact, and a crimson slash wound lingers
+  // briefly in the cut's wake. Tuned to ~700ms so the cut resolves
+  // before destruction fires.
+  scythe_cut: (() => {
+    return function ScytheCutEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 80, 80);
+      const hh = Math.max(h || 110, 110);
+      // Diagonal cut: upper-right to lower-left.
+      const len = Math.hypot(ww, hh) * 1.6;
+      const drops = useMemo(() => Array.from({ length: 10 }, () => ({
+        dx: -18 + Math.random() * 36,
+        dy: 10 + Math.random() * 40,
+        delay: 220 + Math.random() * 150,
+        dur: 400 + Math.random() * 200,
+        size: 3 + Math.random() * 4,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Steel blade streak */}
+          <div style={{
+            position: 'absolute', left: -len / 2, top: -2,
+            width: len, height: 4,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(220,230,255,.1) 20%, rgba(240,250,255,.95) 48%, rgba(255,255,255,1) 52%, rgba(200,220,255,.7) 70%, transparent 100%)',
+            boxShadow: '0 0 12px rgba(200,220,255,.9), 0 0 24px rgba(150,190,230,.6)',
+            transform: 'rotate(-42deg) translateX(-120%)',
+            transformOrigin: 'center center',
+            animation: 'scytheSlash 420ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards',
+            opacity: 0,
+          }} />
+          {/* Impact glint at the midpoint */}
+          <div style={{
+            position: 'absolute', left: -14, top: -14, width: 28, height: 28,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(220,230,255,.7) 30%, transparent 70%)',
+            animation: 'scytheGlint 360ms ease-out 180ms forwards',
+            opacity: 0,
+          }} />
+          {/* Crimson slash wound lingering along the cut path */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.6, top: -3,
+            width: ww * 1.2, height: 6,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(160,0,10,.7) 20%, rgba(220,30,40,.95) 50%, rgba(160,0,10,.7) 80%, transparent 100%)',
+            boxShadow: '0 0 10px rgba(180,20,30,.85)',
+            transform: 'rotate(-42deg)',
+            transformOrigin: 'center center',
+            animation: 'scytheWound 620ms ease-out 220ms forwards',
+            opacity: 0,
+          }} />
+          {/* Blood droplets falling off the wound */}
+          {drops.map((d, i) => (
+            <div key={'sd'+i} style={{
+              position: 'absolute', left: d.dx, top: -2,
+              width: d.size, height: d.size, borderRadius: '50%',
+              background: '#b00010',
+              boxShadow: '0 0 4px rgba(120,0,10,.8)',
+              animation: `scytheDrop ${d.dur}ms ease-in ${d.delay}ms forwards`,
+              opacity: 0,
+              '--scDropY': d.dy + 'px',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // Spooky ghost — Deepsea Poltergeister's artifact-destroy signature.
+  // A wobbling 👻 floats up through the Artifact slot with a violet haze
+  // and a handful of wisps spiraling out. Tuned to ~1200ms so the ghost
+  // has time to "haunt" the artifact before destruction fires.
+  spooky_ghost: (() => {
+    return function SpookyGhostEffect({ x, y }) {
+      const wisps = useMemo(() => Array.from({ length: 10 }, () => ({
+        xOff: -35 + Math.random() * 70,
+        startY: 20 + Math.random() * 20,
+        endY: -70 - Math.random() * 50,
+        delay: Math.random() * 500,
+        dur: 700 + Math.random() * 500,
+        size: 4 + Math.random() * 8,
+        wobble: -12 + Math.random() * 24,
+        shade: Math.random() < 0.5 ? 'rgba(200,180,255,.55)' : 'rgba(160,220,200,.45)',
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Violet haze flash */}
+          <div className="anim-flame-flash" style={{
+            width: 140, height: 140, marginLeft: -70, marginTop: -70,
+            background: 'radial-gradient(circle, rgba(180,140,255,.55) 0%, rgba(90,60,160,.3) 45%, transparent 75%)',
+            animationDuration: '900ms',
+          }} />
+          {/* Main ghost */}
+          <div style={{
+            position: 'absolute', left: -22, top: -4,
+            fontSize: 44,
+            filter: 'drop-shadow(0 0 10px rgba(190,150,255,.8)) drop-shadow(0 0 18px rgba(120,80,200,.6))',
+            animation: 'spookyGhostFloat 1200ms ease-in-out forwards',
+            opacity: 0,
+          }}>
+            👻
+          </div>
+          {/* Ectoplasm wisps */}
+          {wisps.map((w, i) => (
+            <div key={'sg'+i} style={{
+              position: 'absolute', left: w.xOff, top: w.startY,
+              width: w.size, height: w.size, borderRadius: '50%',
+              background: `radial-gradient(circle at 40% 40%, ${w.shade}, transparent 70%)`,
+              boxShadow: `0 0 ${w.size}px ${w.shade}`,
+              animation: `spookyWispRise ${w.dur}ms ease-out ${w.delay}ms forwards`,
+              opacity: 0,
+              '--sgEndY': w.endY + 'px',
+              '--sgWobble': w.wobble + 'px',
             }} />
           ))}
         </div>
@@ -5069,6 +5694,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       prevDeckCountRef.current = newDeckCount;
       prevPotionDeckCountRef.current = newPotionCount;
       prevHandDiscardLenRef.current = newDiscardLenForHand;
+      // Pile-transfer handshake: every card arriving via a server-driven
+      // `play_pile_transfer` (Deepsea bounce, Castle swap, Monstrosity
+      // second-bounce, Shu'Chaku artifact return, etc.) already has its
+      // own flying-card animation. Consume one slot of the pending
+      // counter per new hand card and skip the auto branches below.
+      const delta = newHand.length - prevLen;
+      if (delta > 0 && pileTransferToHandPendingMeRef.current > 0) {
+        pileTransferToHandPendingMeRef.current = Math.max(0, pileTransferToHandPendingMeRef.current - delta);
+        prevHandLenRef.current = newHand.length;
+        return;
+      }
       if (newHand.length > prevLen && !stealInProgressRef.current && deckDecreased) {
         // If cards arrived via steal, skip draw animation for them
         const skipCount = stealSkipDrawRef.current;
@@ -5150,11 +5786,32 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Opponent draw animation tracking
   const [oppDrawAnims, setOppDrawAnims] = useState([]);
   const [oppDrawHidden, setOppDrawHidden] = useState(new Set()); // indices to hide during anim
+  // Bounce-return animation tracking — keys are `${owner}-${handIdx}`.
+  // Hand slot matching this key stays invisible while the flying card is
+  // still in flight (support→hand pile-transfer animation). Cleared
+  // slightly AFTER the 700ms keyframe so the reveal aligns with the
+  // landing moment.
+  const [bounceReturnHidden, setBounceReturnHidden] = useState(new Set());
+  // Bounce-outgoing animation tracking — keys are `${owner}-${heroIdx}-${slotIdx}`.
+  // Support-slot card matching this key stays invisible while the flying
+  // card is inbound from hand (hand→support pile-transfer). Paired with
+  // bounceReturnHidden to achieve the visual crossing of Deepsea/Castle
+  // swaps — old creature flies out while new creature flies in.
+  const [bounceOutgoingHidden, setBounceOutgoingHidden] = useState(new Set());
   const prevOppHandCountRef = useRef(opp.handCount || 0);
   if (roomJustChanged) prevOppHandCountRef.current = opp.handCount || 0;
   useEffect(() => {
     const newCount = opp.handCount || 0;
     const prevCount = prevOppHandCountRef.current;
+    // Pile-transfer handshake (opponent view): cards arriving via a
+    // server-driven `play_pile_transfer` already animate; consume one
+    // suppression slot per new hand card and skip the deck auto-anim.
+    const oppDelta = newCount - prevCount;
+    if (oppDelta > 0 && pileTransferToHandPendingOppRef.current > 0) {
+      pileTransferToHandPendingOppRef.current = Math.max(0, pileTransferToHandPendingOppRef.current - oppDelta);
+      prevOppHandCountRef.current = newCount;
+      return;
+    }
     if (newCount > prevCount && !stealInProgressRef.current) {
       const hiddenIdxs = new Set();
       for (let i = prevCount; i < newCount; i++) hiddenIdxs.add(i);
@@ -5359,7 +6016,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
 
-        // 2. Remaining entries from board
+        // 2. Deck→pile handshake: drop names already animated by the
+        //    server's deck_to_discard broadcast so they don't get a
+        //    duplicate phantom flight from a matching board card.
+        const pendingMe = deckToDiscardPendingMeRef.current;
+        for (let i = newDiscardEntries.length - 1; i >= 0; i--) {
+          const pIdx = pendingMe.discard.indexOf(newDiscardEntries[i]);
+          if (pIdx >= 0) { pendingMe.discard.splice(pIdx, 1); newDiscardEntries.splice(i, 1); }
+        }
+        for (let i = newDeletedEntries.length - 1; i >= 0; i--) {
+          const pIdx = pendingMe.deleted.indexOf(newDeletedEntries[i]);
+          if (pIdx >= 0) { pendingMe.deleted.splice(pIdx, 1); newDeletedEntries.splice(i, 1); }
+        }
+
+        // 3. Remaining entries from board
         const br = boardCardRectsRef.current.me || {};
         const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-my-discard]'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-my-deleted]')];
         newAnims.push(...boardAnims);
@@ -5454,6 +6124,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (t) newAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'deleted' });
           }
         }
+      }
+
+      // Deck→pile handshake: drop names already animated by the server's
+      // deck_to_discard broadcast (mill) so they don't get a duplicate
+      // phantom flight from a matching board card.
+      const pendingMe = deckToDiscardPendingMeRef.current;
+      for (let i = newDiscardEntries.length - 1; i >= 0; i--) {
+        const pIdx = pendingMe.discard.indexOf(newDiscardEntries[i]);
+        if (pIdx >= 0) { pendingMe.discard.splice(pIdx, 1); newDiscardEntries.splice(i, 1); }
+      }
+      for (let i = newDeletedEntries.length - 1; i >= 0; i--) {
+        const pIdx = pendingMe.deleted.indexOf(newDeletedEntries[i]);
+        if (pIdx >= 0) { pendingMe.deleted.splice(pIdx, 1); newDeletedEntries.splice(i, 1); }
       }
 
       // 2. Remaining entries came from the board — use stored board positions
@@ -5561,6 +6244,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
 
+      // Deck→pile handshake: drop names already animated by the server's
+      // deck_to_discard broadcast (mill) so they don't get a duplicate
+      // phantom flight from a matching opp-board card.
+      const pendingOpp = deckToDiscardPendingOppRef.current;
+      for (let i = newDiscardEntries.length - 1; i >= 0; i--) {
+        const pIdx = pendingOpp.discard.indexOf(newDiscardEntries[i]);
+        if (pIdx >= 0) { pendingOpp.discard.splice(pIdx, 1); newDiscardEntries.splice(i, 1); }
+      }
+      for (let i = newDeletedEntries.length - 1; i >= 0; i--) {
+        const pIdx = pendingOpp.deleted.indexOf(newDeletedEntries[i]);
+        if (pIdx >= 0) { pendingOpp.deleted.splice(pIdx, 1); newDeletedEntries.splice(i, 1); }
+      }
+
       // 2. Remaining entries came from the opponent's board
       const br = boardCardRectsRef.current.opp || {};
       const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-opp-discard]'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-opp-deleted]')];
@@ -5664,6 +6360,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const forceDiscardCancellable = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt.ownerIdx === myIdx;
     if (forceDiscardCancellable) return false;
 
+    // Pick Hand Card mode — only eligible indices are clickable; dim
+    // the rest so the player's eye lands on the legal picks.
+    const pickHandCard = gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt.ownerIdx === myIdx;
+    if (pickHandCard) {
+      const eligible = gameState.effectPrompt.eligibleIndices;
+      return !(!eligible || eligible.includes(handIdx));
+    }
+
     // Hand Pick mode (Shard of Chaos) — dim ineligible cards
     const handPickActive = gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx;
     if (handPickActive) {
@@ -5709,6 +6413,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // (server-side heroPlayableCards handles inherent/additional action economy)
       if (isActionType) {
         if (card.cardType === 'Creature' && me.summonLocked) return true;
+        // Per-turn summon gate (Deepsea: "only 1 X per turn"). Applies
+        // in Main Phase too because Deepsea Creatures can cheat
+        // themselves out mid-Main via their own bounce-place effect,
+        // so once the first copy has been summoned the second copy
+        // must grey out even before the Action Phase.
+        if (card.cardType === 'Creature' && (gameState.summonBlocked || []).includes(cardName)) return true;
         if (!canActionCardBePlayed(card)) return true;
         if ((gameState.blockedSpells || []).includes(cardName)) return true;
         return false; // Un-gray: playable
@@ -5853,12 +6563,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Surprise drag state (Main Phases — dragging Surprise card to hero's surprise zone)
   // surpriseDrag merged into playDrag (with isSurprise: true flag)
 
+  // Sync the module-level `_isDraggingCard` flag with the active drag
+  // state so every setBoardTooltip(...) call suppresses mid-drag card
+  // previews. Any tooltip already open when the drag starts is
+  // dismissed immediately so the player sees the drop target clearly.
+  useEffect(() => {
+    const dragging = !!(playDrag || abilityDrag);
+    _isDraggingCard = dragging;
+    if (dragging) window._boardTooltipSetter?.(null);
+  }, [playDrag, abilityDrag]);
+
   // Additional Action provider selection state
   const [pendingAdditionalPlay, setPendingAdditionalPlay] = useState(null); // { cardName, handIndex, heroIdx, zoneSlot, providers: [{cardId, cardName, heroIdx, zoneSlot}] }
   const [pendingAbilityActivation, setPendingAbilityActivation] = useState(null); // { heroIdx, zoneIdx, abilityName, level }
   const [spellHeroPick, setSpellHeroPick] = useState(null); // { cardName, handIndex, card, eligible, isHeroAction }
+  // Click-to-swap state for Deepsea-style bounce-place cards. When set,
+  // the board shows highlights on every legal drop target (bounce
+  // candidates + free Support Zones) and the user clicks one to
+  // dispatch play_creature — identical to having drag-dropped the
+  // card there. Cleared on turn change, phase change, or Esc/cancel.
+  const [pendingBouncePick, setPendingBouncePick] = useState(null); // { cardName, handIndex, card, bounceTargets, freeSlotTargets }
   // Clear spell hero pick when game state changes
-  useEffect(() => { setSpellHeroPick(null); }, [gameState.activePlayer, gameState.currentPhase, gameState.effectPrompt, gameState.turn]);
+  useEffect(() => { setSpellHeroPick(null); setPendingBouncePick(null); }, [gameState.activePlayer, gameState.currentPhase, gameState.effectPrompt, gameState.turn]);
 
   // Check if a hero can receive a specific ability
   const canHeroReceiveAbility = (playerData, heroIdx, abilityName, opts = {}) => {
@@ -5990,6 +6716,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       return;
     }
 
+    // Pick Hand Card mode (Deepsea Castle second pick, etc.) — click
+    // a highlighted hand card to submit { cardName, handIndex }. Unlike
+    // forceDiscard, the clicked card isn't implicitly discarded — the
+    // caller decides what to do with the selection.
+    const pickHandCardActive = gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt.ownerIdx === myIdx;
+    if (pickHandCardActive) {
+      const eligible = gameState.effectPrompt.eligibleIndices;
+      if (eligible && !eligible.includes(idx)) return;
+      if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return;
+      if (e.cancelable) e.preventDefault();
+      socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
+      return;
+    }
+
     // Hand Pick mode (Shard of Chaos) — toggle card selection
     const handPickPrompt = gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx;
     if (handPickPrompt) {
@@ -6026,7 +6766,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (gameState.surprisePending) return; // Lock hand during surprise prompts for both players
     const activePrompt = gameState.effectPrompt;
     if (activePrompt && activePrompt.ownerIdx === myIdx
-        && !['forceDiscard','forceDiscardCancellable','handPick','abilityAttach','heroAction'].includes(activePrompt.type)) return;
+        && !['forceDiscard','forceDiscardCancellable','pickHandCard','handPick','abilityAttach','heroAction'].includes(activePrompt.type)) return;
 
     // Block activation of the specific resolving card (spam-click prevention) — but NOT force-discard (handled above)
     if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return;
@@ -6199,6 +6939,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
 
         if (!surpriseTarget) {
+          // Two distinct drop modes:
+          //  • Bounce mode (the card publishes bouncePlacementTargets): the
+          //    destination slot is the one the bounced creature already
+          //    occupies. ONLY those specific occupied slots are valid drops.
+          //    Empty slots must NOT be highlighted — dropping there would
+          //    land the card somewhere else entirely (the server's
+          //    beforeSummon would pick a bounce target itself), which
+          //    violates "don't highlight what isn't the destination".
+          //  • Normal mode (no bounce targets): highlight empty slots on
+          //    heroes that can actually summon this card (canHeroPlayCard
+          //    is the engine's source of truth — it already honors
+          //    canBypassLevelReq and inherentAction for the hero-specific
+          //    case). Occupied slots stay un-highlighted.
+          const bpTargets = (gameState.bouncePlacementTargets || {})[cardName] || [];
+          const bpSet = new Set(bpTargets.map(t => t.heroIdx + ':' + t.slotIdx));
+          const hasBounceTargets = bpTargets.length > 0;
+
           const els = document.querySelectorAll('[data-support-zone]');
           for (const el of els) {
             const r = el.getBoundingClientRect();
@@ -6206,17 +6963,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const hi = parseInt(el.dataset.supportHero);
               const si = parseInt(el.dataset.supportSlot);
               const isOwn = el.dataset.supportOwner === 'me';
-              // During heroAction, only the Coffee hero's zones are valid
+              if (!isOwn) continue;
+              // During heroAction, only the Coffee hero's zones are valid.
               if (heroActionHeroIdx !== undefined && hi !== heroActionHeroIdx) continue;
-              // isHeroAction bypasses the normal action-economy gate
-              // (`canHeroPlayCard`) because the prompt's eligibleCards list
-              // is the single source of truth for what the Coffee'd hero can
-              // play as their immediate additional Action.
-              const canPlayHere = isHeroAction || canHeroPlayCard(me, hi, card);
-              if (isOwn && canPlayHere && findFreeSupportSlot(me, hi) >= 0) {
-                // Check this specific slot is free (base or island zones OK for creatures)
-                const slotCards = (me.supportZones[hi] || [])[si] || [];
-                if (slotCards.length === 0 && si < ((me.supportZones[hi] || []).length || 3)) { targetHero = hi; targetSlot = si; }
+              const slotCards = (me.supportZones[hi] || [])[si] || [];
+              const isOccupied = slotCards.length > 0;
+              const isBounceSlot = bpSet.has(hi + ':' + si);
+              if (hasBounceTargets) {
+                // Bounce mode — only the specific bounce-target slots
+                // are legal drops.
+                if (isOccupied && isBounceSlot) { targetHero = hi; targetSlot = si; }
+              } else {
+                // Normal mode — require a hero that can cast this card
+                // AND an empty slot.
+                const canPlayHere = isHeroAction || canHeroPlayCard(me, hi, card);
+                if (!canPlayHere) continue;
+                if (isOccupied) continue;
+                if (si >= ((me.supportZones[hi] || []).length || 3)) continue;
+                targetHero = hi; targetSlot = si;
               }
             }
           }
@@ -6484,6 +7248,57 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             } else if (eligible.length > 1) {
               // Multiple eligible — show hero selection popup
               setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isHeroAction });
+            }
+          } else if (card.cardType === 'Creature' && isPlayable) {
+            // Click-to-summon. Two routing paths:
+            //
+            // (A) Bounce-place is available (Deepsea archetype / any
+            //     future card publishing bouncePlacementTargets). The
+            //     hero choice is irrelevant — only WHICH Creature gets
+            //     bounced matters, so we skip the hero picker entirely
+            //     and dispatch play_creature directly. The server's
+            //     beforeSummon hook runs tryBouncePlace which prompts
+            //     for the bounce selection.
+            //     To keep the server's zone validation happy, we first
+            //     try to pass a free slot (letting the prompt appear);
+            //     if no free slot anywhere, we fall back to the first
+            //     bounce-target slot (the server sets
+            //     _requestedBouncePlaceSlot and the swap happens
+            //     immediately on that target).
+            //
+            // (B) No bounce targets — fall through to the standard
+            //     hero picker: eligible heroes must meet canHeroPlay
+            //     Card AND have a free Support Zone (base OR Flying
+            //     Island extension).
+            const bpTargets = (gameState.bouncePlacementTargets || {})[cardName] || [];
+            if (bpTargets.length > 0) {
+              // Enter "pick a swap target" mode — highlight ONLY the
+              // valid swap targets (occupied slots containing eligible
+              // creatures). No free-Support-Zone highlights: click-to-
+              // swap is strictly a swap-in gesture. If the player
+              // wants to normal-summon onto an empty slot instead,
+              // they drag to it.
+              setPendingBouncePick({
+                cardName, handIndex: idx, card,
+                bounceTargets: bpTargets,
+              });
+            } else {
+              const eligible = [];
+              for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+                if (!canHeroPlayCard(me, hi, card)) continue;
+                const slot = findFreeSupportSlot(me, hi);
+                if (slot < 0) continue;
+                eligible.push({ idx: hi, name: me.heroes[hi].name, zoneSlot: slot });
+              }
+              if (eligible.length === 1) {
+                socket.emit('play_creature', {
+                  roomId: gameState.roomId, cardName,
+                  handIndex: idx, heroIdx: eligible[0].idx,
+                  zoneSlot: eligible[0].zoneSlot,
+                });
+              } else if (eligible.length > 1) {
+                setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isCreature: true });
+              }
             }
           } else if (isAscensionPlayable) {
             // Click on Ascended Hero — find eligible base heroes
@@ -6773,6 +7588,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [stealAnims, setStealAnims] = useState([]); // flying card elements [{id, cardName, startX, startY, endX, endY}]
   const stealInProgressRef = useRef(false); // suppress draw animations during steals
   const stealSkipDrawRef = useRef(0); // number of new hand cards to skip draw-anim for after steal
+  // Number of upcoming hand additions to suppress auto-animations for —
+  // incremented by each incoming `play_pile_transfer` whose destination is
+  // `hand`. The server-driven pile-transfer is the authoritative flying-
+  // card animation for those arrivals; without these counters the
+  // client's hand-count auto-detection would overlay a second (incorrect)
+  // draw-from-opp-hand animation. Counters are per-side because both
+  // players' views react to the same event: the card's owner suppresses
+  // their own me.hand auto-anim; the spectator / opponent suppresses
+  // their opp.handCount auto-anim. Decremented in the hand-animation
+  // branches that early-return when > 0.
+  const pileTransferToHandPendingMeRef  = useRef(0);
+  const pileTransferToHandPendingOppRef = useRef(0);
+  // Deck→discard handshake: tracks card names that the server has
+  // already animated from the deck to the discard / deleted pile via
+  // `deck_to_discard_animation`. The pile-growth auto-detector would
+  // otherwise match those names against same-named cards on the board
+  // and spawn a phantom board→pile flight. When the detector sees a
+  // pile grow, it consults these lists and removes matching names
+  // BEFORE falling through to the board-match path.
+  const deckToDiscardPendingMeRef  = useRef({ discard: [], deleted: [] });
+  const deckToDiscardPendingOppRef = useRef({ discard: [], deleted: [] });
   const stealExpectedOppCountRef = useRef(-1); // opp hand count when stealHiddenOpp was set
   const stealExpectedMeCountRef = useRef(-1); // my hand count when stealHiddenMe was set
   const [stealHighlightMe, setStealHighlightMe] = useState(new Set()); // hand indices highlighted by opponent's blind pick selection
@@ -6997,6 +7833,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('summon_effect', onSummon);
     socket.on('burn_tick', onBurnTick);
     socket.on('play_zone_animation', onZoneAnim);
+
+    // Deepsea Spores activation — spawn a full-board particle rain
+    // overlay AND fire a per-creature algae/anemone-growth + red glow
+    // on every existing creature. The server supplies the list of
+    // affected creature coordinates so the client doesn't have to
+    // re-derive them from state.
+    const onDeepseaSporesActivated = ({ creatures }) => {
+      // Board-wide particle overlay: play on the full-screen container
+      // (coords are the viewport center, so the animation component
+      // paints across the whole play area).
+      const vx = window.innerWidth / 2;
+      const vy = window.innerHeight / 2;
+      const id = Date.now() + Math.random();
+      setGameAnims(prev => [...prev, {
+        id, type: 'deepsea_spores_rain', x: vx, y: vy,
+        w: window.innerWidth, h: window.innerHeight,
+      }]);
+      setTimeout(() => setGameAnims(prev => prev.filter(a => a.id !== id)), 2400);
+
+      // Per-creature anemone growth + red glow. Staggered so the
+      // screen doesn't flash 6 creatures simultaneously.
+      for (let i = 0; i < (creatures || []).length; i++) {
+        const c = creatures[i];
+        const ownerLabel = c.owner === myIdx ? 'me' : 'opp';
+        const sel = `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${c.heroIdx}"][data-support-slot="${c.zoneSlot}"]`;
+        setTimeout(() => playAnimation('deepsea_spores_growth', sel, { duration: 1800 }), 200 + i * 120);
+      }
+    };
+    socket.on('deepsea_spores_activated', onDeepseaSporesActivated);
     const onNomuDraw = ({ playerIdx: drawPlayer }) => {
       const ownerLabel = drawPlayer === myIdx ? 'me' : 'opp';
       const handEl = ownerLabel === 'me' ? document.querySelector('.hand-container')
@@ -8176,6 +9041,51 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => playAnimation('gold_sparkle', sel, { duration: 1000 }), 450);
     };
     socket.on('card_effect_flash', onCardEffectFlash);
+
+    // Gold steal — paint a coin-particle burst on the victim's and the
+    // thief's gold counters. The +/− numeric overlays are already
+    // handled automatically by the gold-change watcher.
+    const onGoldStealBurst = ({ fromPlayer, toPlayer, amount }) => {
+      const fromSel = `[data-gold-player="${fromPlayer}"]`;
+      const toSel = `[data-gold-player="${toPlayer}"]`;
+      const fromEl = document.querySelector(fromSel);
+      const toEl = document.querySelector(toSel);
+      if (!fromEl || !toEl) return;
+      const fromRect = fromEl.getBoundingClientRect();
+      const toRect = toEl.getBoundingClientRect();
+      // Flash both counters with gold_sparkle for a quick pop.
+      setTimeout(() => playAnimation('gold_sparkle', fromSel, { duration: 900 }), 50);
+      setTimeout(() => playAnimation('gold_sparkle', toSel,   { duration: 900 }), 180);
+      // Spawn `amount` coin particles (capped at 12 for visual density)
+      // that arc from the victim's counter to the thief's counter.
+      const count = Math.min(12, Math.max(4, amount));
+      const startX = fromRect.left + fromRect.width / 2;
+      const startY = fromRect.top + fromRect.height / 2;
+      const endX = toRect.left + toRect.width / 2;
+      const endY = toRect.top + toRect.height / 2;
+      for (let i = 0; i < count; i++) {
+        const coin = document.createElement('div');
+        const delay = i * 55;
+        const jitterX = (Math.random() - 0.5) * 44;
+        const jitterY = -30 - Math.random() * 35;
+        const dur = 700 + Math.random() * 200;
+        coin.textContent = '🪙';
+        coin.style.cssText = [
+          'position:fixed',
+          `left:${startX - 10}px`, `top:${startY - 10}px`,
+          'font-size:20px', 'line-height:1', 'pointer-events:none',
+          'z-index:10250',
+          'filter:drop-shadow(0 0 6px rgba(255,220,100,.85)) drop-shadow(0 0 10px rgba(255,160,40,.6))',
+          `--gsDx:${endX - startX}px`, `--gsDy:${endY - startY}px`,
+          `--gsMx:${jitterX}px`, `--gsMy:${jitterY}px`,
+          `animation:goldStealCoin ${dur}ms cubic-bezier(0.4, 0.1, 0.2, 1) ${delay}ms forwards`,
+          'opacity:0',
+        ].join(';');
+        document.body.appendChild(coin);
+        setTimeout(() => coin.remove(), delay + dur + 100);
+      }
+    };
+    socket.on('gold_steal_burst', onGoldStealBurst);
     const onJumpscareBox = ({ owner, heroIdx }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
@@ -8355,7 +9265,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         id, cardName,
         srcX: sr.left + sr.width / 2, srcY: sr.top + sr.height / 2,
         tgtX: tr.left + tr.width / 2, tgtY: tr.top + tr.height / 2,
-        srcOwner: sourceOwner, srcHeroIdx: sourceHeroIdx, dur, angle, trailType,
+        srcOwner: sourceOwner, srcHeroIdx: sourceHeroIdx,
+        // Preserve the source zone slot so the hero-hide check
+        // (isRamming) can distinguish a hero-originated ram (slot < 0)
+        // from a creature-originated ram (slot >= 0). Creature rams
+        // must NOT hide the hero in the same column.
+        srcZoneSlot: (sourceZoneSlot != null && sourceZoneSlot >= 0) ? sourceZoneSlot : -1,
+        dur, angle, trailType,
       }]);
       setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)), dur);
     };
@@ -8871,20 +9787,88 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Generic pile-to-pile flying card animation. Used for moves the
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
-    const onPileTransfer = ({ owner, cardName, from, to }) => {
+    const onPileTransfer = ({ owner, cardName, from, to, fromHeroIdx, fromSlotIdx, fromHandIdx, toHandIdx, toHeroIdx, toSlotIdx }) => {
       const isMe = owner === myIdx;
-      const selFor = (pile) => {
-        if (pile === 'discard') return isMe ? '[data-my-discard]' : '[data-opp-discard]';
-        if (pile === 'deleted') return isMe ? '[data-my-deleted]' : '[data-opp-deleted]';
-        if (pile === 'area') return `[data-area-zone][data-area-owner="${isMe ? 'me' : 'opp'}"]`;
+      const ownerLabel = isMe ? 'me' : 'opp';
+      // Pre-register the upcoming hand arrival so the hand-count auto-
+      // animation effect(s) suppress their own draw anim. Without this,
+      // the client would overlay a spurious "flew from deck / opp hand"
+      // animation on top of the authoritative pile-transfer flight.
+      if (to === 'hand') {
+        if (isMe) pileTransferToHandPendingMeRef.current  += 1;
+        else      pileTransferToHandPendingOppRef.current += 1;
+      }
+      // Resolve `pile` + locator extras to a DOM element. Tries the most
+      // specific selector first and falls back on a generic container
+      // when the specific target may not exist yet (e.g. a hand slot
+      // that's about to be added on the next React render).
+      const elementFor = (pile, extras = {}) => {
+        if (pile === 'discard') return document.querySelector(isMe ? '[data-my-discard]' : '[data-opp-discard]');
+        if (pile === 'deleted') return document.querySelector(isMe ? '[data-my-deleted]' : '[data-opp-deleted]');
+        if (pile === 'area')    return document.querySelector(`[data-area-zone][data-area-owner="${ownerLabel}"]`);
+        if (pile === 'support' && extras.heroIdx != null && extras.slotIdx != null) {
+          return document.querySelector(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${extras.heroIdx}"][data-support-slot="${extras.slotIdx}"]`);
+        }
+        if (pile === 'hand') {
+          const base = isMe ? '.game-hand-me' : '.game-hand-opp';
+          if (extras.handIdx != null) {
+            const specific =
+              document.querySelector(`${base} .hand-slot[data-hand-idx="${extras.handIdx}"]`) ||
+              document.querySelector(`${base} [data-hand-idx="${extras.handIdx}"]`);
+            if (specific) return specific;
+            // Slot might not exist yet — fall back to the last existing slot
+            // (end of hand where new cards land) or the container.
+            const slots = document.querySelectorAll(`${base} .hand-slot, ${base} [data-hand-idx]`);
+            if (slots.length > 0) return slots[slots.length - 1];
+          }
+          return document.querySelector(base);
+        }
         return null;
       };
-      const fromSel = selFor(from);
-      const toSel   = selFor(to);
-      if (!fromSel || !toSel) return;
-      const srcEl = document.querySelector(fromSel);
-      const tgtEl = document.querySelector(toSel);
+      const srcEl = elementFor(from, { heroIdx: fromHeroIdx, slotIdx: fromSlotIdx, handIdx: fromHandIdx });
+      const tgtEl = elementFor(to,   { handIdx: toHandIdx, heroIdx: toHeroIdx, slotIdx: toSlotIdx });
       if (!srcEl || !tgtEl) return;
+
+      // Hide the landing hand slot until the flying card arrives so both
+      // copies aren't simultaneously visible. Keyed by `${owner}-${idx}`.
+      if (to === 'hand' && toHandIdx != null) {
+        const hideKey = `${owner}-${toHandIdx}`;
+        setBounceReturnHidden(prev => {
+          const next = new Set(prev);
+          next.add(hideKey);
+          return next;
+        });
+        setTimeout(() => {
+          setBounceReturnHidden(prev => {
+            if (!prev.has(hideKey)) return prev;
+            const next = new Set(prev);
+            next.delete(hideKey);
+            return next;
+          });
+        }, 720); // Animation is 700ms; +20ms to avoid a visible flicker.
+      }
+
+      // Mirror for hand → support: hide the destination support-slot's
+      // rendered card until the flying card lands, so the newly-placed
+      // creature "appears" only when the inbound animation arrives. This
+      // is what makes the Deepsea swap visually CROSS — old flies to
+      // hand while new flies to support at the same time.
+      if (to === 'support' && toHeroIdx != null && toSlotIdx != null) {
+        const hideKey = `${owner}-${toHeroIdx}-${toSlotIdx}`;
+        setBounceOutgoingHidden(prev => {
+          const next = new Set(prev);
+          next.add(hideKey);
+          return next;
+        });
+        setTimeout(() => {
+          setBounceOutgoingHidden(prev => {
+            if (!prev.has(hideKey)) return prev;
+            const next = new Set(prev);
+            next.delete(hideKey);
+            return next;
+          });
+        }, 720);
+      }
 
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
@@ -8903,21 +9887,38 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             80%  { transform: translate(var(--ptDx), calc(var(--ptDy) - 10px)) scale(0.92); opacity: 1; }
             100% { transform: translate(var(--ptDx), var(--ptDy)) scale(0.7); opacity: 0; }
           }
+          /* Hand-landing variant: no fade/shrink at the end. The card
+             arrives solidly so the reveal of the hidden hand slot
+             (unhid at t=720ms) is visually continuous. */
+          @keyframes pileTransferToHand {
+            0%   { transform: translate(0,0) scale(1); opacity: 1; }
+            20%  { transform: translate(0, -16px) scale(1.08); opacity: 1; }
+            80%  { transform: translate(var(--ptDx), calc(var(--ptDy) - 10px)) scale(0.98); opacity: 1; }
+            100% { transform: translate(var(--ptDx), var(--ptDy)) scale(1); opacity: 1; }
+          }
         `;
         document.head.appendChild(style);
       }
 
       const card = document.createElement('div');
       const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
-      // Violet glow matches the color of the discard-animation family.
+      const isToHand = (to === 'hand');
+      const isToSupport = (to === 'support');
+      // Hand-landing and support-landing use a teal glow (matches
+      // Deepsea's aesthetic) and the solid-landing variant; discard/
+      // deleted/area destinations keep the classic violet fade-out.
+      const glow = (isToHand || isToSupport)
+        ? 'box-shadow:0 0 14px rgba(100,220,255,0.85),0 0 4px rgba(60,170,230,0.55)'
+        : 'box-shadow:0 0 12px rgba(180,80,255,0.7),0 0 4px rgba(120,40,200,0.5)';
+      const anim = (isToHand || isToSupport) ? 'pileTransferToHand' : 'pileTransfer';
       card.style.cssText = [
         'position:fixed',
         `left:${srcX - 32}px`, `top:${srcY - 44}px`,
         'width:64px', 'height:88px', 'z-index:10200', 'pointer-events:none',
         'border-radius:4px', 'overflow:hidden',
-        'box-shadow:0 0 12px rgba(180,80,255,0.7),0 0 4px rgba(120,40,200,0.5)',
+        glow,
         `--ptDx:${dx}px`, `--ptDy:${dy}px`,
-        'animation:pileTransfer 700ms ease-in-out forwards',
+        `animation:${anim} 700ms ease-in-out forwards`,
         'opacity:0',
       ].join(';');
       if (imgUrl) {
@@ -8938,6 +9939,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('play_pile_transfer', onPileTransfer);
     const onDeckToDiscard = ({ owner, cardNames, deleteMode, holdDuration }) => {
       const isMe    = owner === myIdx;
+      // Pre-register the milled names so the pile-growth auto-detector
+      // doesn't spawn a phantom board→pile flight when one of these
+      // names happens to also exist on the board (common case:
+      // Abilities being milled while a same-named Ability is equipped).
+      if (Array.isArray(cardNames) && cardNames.length > 0) {
+        const pending = isMe ? deckToDiscardPendingMeRef.current : deckToDiscardPendingOppRef.current;
+        const bucket = deleteMode ? 'deleted' : 'discard';
+        pending[bucket].push(...cardNames);
+      }
       const deckSel     = isMe ? '[data-my-deck]'    : '[data-opp-deck]';
       const discardSel  = isMe
         ? (deleteMode ? '[data-my-deleted]'  : '[data-my-discard]')
@@ -9253,16 +10263,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('tears_of_creation_animation', onTearsOfCreation);
-    const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration }) => {
+    const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration, highlightMs: hlMs }) => {
       stealInProgressRef.current = true;
       const iAmVictim = fromPlayer === myIdx;
       const fromLabel = fromPlayer === myIdx ? 'me' : 'opp';
       const toLabel = fromPlayer === myIdx ? 'opp' : 'me';
       const dur = duration || 800;
+      // Highlight phase duration — short by default so the flight
+      // starts almost immediately after the pick. Callers can pass a
+      // longer `highlightMs` for multi-card steals where the player
+      // confirmed a batch and needs a beat to register the selection.
+      const highlightMs = (typeof hlMs === 'number' && hlMs >= 0) ? hlMs : 300;
       const stealIndices = indices || [];
       const names = cardNames || [];
 
-      // Phase 1: Highlight the stolen cards (800ms)
+      // Phase 1: Highlight the stolen cards
       if (iAmVictim) {
         setStealMarkedMe(new Set(stealIndices));
       } else {
@@ -9274,6 +10289,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         });
       }
+
+      // Total batch end — when the LAST clone lands. All clones are
+      // removed together at this point, timed to coincide with the
+      // server's state sync so the real card appears exactly when the
+      // clone disappears (no stale ghost hanging around past the
+      // landing).
+      const batchEndMs = dur + Math.max(0, (stealIndices.length - 1) * 100) + 100;
 
       // Phase 2: After highlight, hide source cards and fly face-up clones
       setTimeout(() => {
@@ -9336,18 +10358,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             flyEl.textContent = name;
           }
           document.body.appendChild(flyEl);
-          setTimeout(() => flyEl.remove(), dur + i * 100 + 2200);
+          // All clones share the SAME removal time (`batchEndMs`) so
+          // the batch disappears in lockstep with the server's state
+          // sync. The previous per-clone 2200ms padding kept clones
+          // alive long after the real cards landed, so when the
+          // triggering card (Thieving Strike etc.) was discarded and
+          // the real cards slid left, the stale clones lingered at
+          // the old "end of hand" rects — a visible ghost duplicate.
+          setTimeout(() => flyEl.remove(), batchEndMs);
         });
 
-        // Phase 3: Clear hidden states AFTER server sync arrives (~2000ms + latency)
+        // Phase 3: Clear hidden states right as the clones dissolve.
         setTimeout(() => {
           setStealHiddenMe(new Set());
           setStealHiddenOpp(new Set());
           // If I'm the stealer (toPlayer === myIdx), skip draw anims for incoming cards
           if (!iAmVictim) stealSkipDrawRef.current = stealIndices.length;
           stealInProgressRef.current = false;
-        }, 2500);
-      }, 800);
+        }, batchEndMs + 100);
+      }, highlightMs);
     };
     socket.on('play_hand_steal', onHandSteal);
     const onBlindPickHighlight = ({ indices }) => {
@@ -9437,6 +10466,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setAnnouncement({ text, color: 'var(--success)', short: true });
     };
     socket.on('hero_announcement', onHeroAnnouncement);
+    // Dark Deepsea God manifest — huge DDG.png fades in, grows, and
+    // fades out over ~2500ms above the battlefield (above the Castle
+    // mood lighting, below hand / modals). Sized to the board container
+    // so both players see the same framing regardless of viewport.
+    const onDDGManifest = () => {
+      const container = document.querySelector('.board-center') || document.querySelector('.game-board') || document.body;
+      const rect = container.getBoundingClientRect();
+      const img = document.createElement('img');
+      img.src = '/DDG.png';
+      img.className = 'ddg-manifest';
+      img.draggable = false;
+      img.style.cssText = [
+        'position:fixed',
+        `left:${rect.left}px`,
+        `top:${rect.top}px`,
+        `width:${rect.width}px`,
+        `height:${rect.height}px`,
+        'pointer-events:none',
+        'z-index:9500',
+        'object-fit:contain',
+        'transform-origin:center center',
+        'opacity:0',
+        'animation:ddgManifest 2500ms ease-in-out forwards',
+        'filter:drop-shadow(0 0 40px rgba(255,40,60,0.85))',
+      ].join(';');
+      document.body.appendChild(img);
+      setTimeout(() => img.remove(), 2700);
+    };
+    socket.on('dark_deepsea_god_manifest', onDDGManifest);
     const onChaosScreen = () => {
       const overlay = document.createElement('div');
       overlay.className = 'chaos-screen-overlay';
@@ -9484,6 +10542,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('creature_zone_move', onCreatureZoneMove); socket.off('fighting_atk_change', onFightingAtk);
       socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick);
       socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange);
+      socket.off('deepsea_spores_activated', onDeepseaSporesActivated);
       socket.off('nomu_draw', onNomuDraw);
       socket.off('ability_activated', onAbilityActivated); socket.off('play_beam_animation', onBeamAnimation);
       socket.off('hero_ascension', onHeroAscension);
@@ -9503,6 +10562,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('boulder_fall', onBoulderFall);
       socket.off('slow_dark_magic', onSlowDarkMagic);
       socket.off('card_effect_flash', onCardEffectFlash);
+      socket.off('gold_steal_burst', onGoldStealBurst);
       socket.off('jumpscare_box', onJumpscareBox);
       socket.off('anti_magic_bubble', onAntiMagicBubble);
       socket.off('fireshield_corona', onFireshieldCorona);
@@ -9529,6 +10589,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_heal_beam', onHealBeam);
       socket.off('play_guardian_angel', onGuardianAngel);
       socket.off('hero_announcement', onHeroAnnouncement);
+      socket.off('dark_deepsea_god_manifest', onDDGManifest);
       socket.off('play_chaos_screen', onChaosScreen);
       socket.off('play_gold_coins', onGoldCoins);
       socket.off('deck_to_deleted', onDeckToDeleted);
@@ -9733,6 +10794,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       e.stopImmediatePropagation();
       if (showEndTurnConfirm) { cancelEndTurn(); return; }
       if (spellHeroPick) { setSpellHeroPick(null); return; }
+      if (pendingBouncePick) { setPendingBouncePick(null); return; }
       if (mulliganActive) { setMulliganDecided(true); socket.emit('mulligan_decision', { roomId: gameState.roomId, accept: false }); return; }
       if (pendingAbilityActivation) { setPendingAbilityActivation(null); return; }
       if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx && gameState.effectPrompt.cancellable !== false) {
@@ -9754,7 +10816,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
-  }, [showSurrender, showEndTurnConfirm, cancelEndTurn, spellHeroPick, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation, gameState.mulliganPending, mulliganDecided, gameState.result, isSpectator]);
+  }, [showSurrender, showEndTurnConfirm, cancelEndTurn, spellHeroPick, pendingBouncePick, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation, gameState.mulliganPending, mulliganDecided, gameState.result, isSpectator]);
 
   // Enter/Space confirms active confirmation dialogs and prompts
   useEffect(() => {
@@ -10171,13 +11233,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Generic lock: blocks ALL effect activations (hero effects, abilities, creature effects)
   // whenever ANY targeting/prompt overlay is active
   const isEffectLocked = !!(isTargeting || gameState.effectPrompt || gameState.surprisePending || gameState.mulliganPending || gameState.heroEffectPending || spellHeroPick || pendingAdditionalPlay || pendingAbilityActivation || showSurrender || showEndTurnConfirm);
-  const validTargetIds = isTargeting ? new Set((pt.validTargets || []).map(t => t.id)) : new Set();
+  // Valid targets can be clicked/selected; ineligible targets are only
+  // shown visually (dimmed) so the player can see which board Creatures
+  // WOULD qualify for the effect but don't meet its filter (e.g. Dragon
+  // Pilot's ≤Lv1 requirement on the inherent path).
+  const validTargetIds = isTargeting ? new Set((pt.validTargets || []).filter(t => !t.ineligible).map(t => t.id)) : new Set();
+  const ineligibleTargetIds = isTargeting ? new Set((pt.validTargets || []).filter(t => t.ineligible).map(t => t.id)) : new Set();
   const selectedSet = new Set(potionSelection);
 
   const togglePotionTarget = (targetId) => {
     if (!isTargeting || !validTargetIds.has(targetId)) return;
     const target = pt.validTargets.find(t => t.id === targetId);
-    if (!target) return;
+    if (!target || target.ineligible) return;
     setPotionSelection(prev => {
       if (prev.includes(targetId)) {
         // Deselect
@@ -10237,6 +11304,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const minReq    = pt?.config?.minRequired || 0;
     const maxTotal  = pt?.config?.maxTotal;
     const minSumHp  = pt?.config?.minSumMaxHp;
+    const minSumLvl = pt?.config?.minSumLevel;
     if (potionSelection.length < minReq) return false;
     if (maxTotal != null && potionSelection.length > maxTotal) return false;
     // Sacrifice-summon rule: sum of selected targets' _meta.maxHp must
@@ -10248,6 +11316,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const selectedTargets = (pt?.validTargets || []).filter(t => potionSelection.includes(t.id));
       const total = selectedTargets.reduce((sum, t) => sum + (t?._meta?.maxHp || 0), 0);
       if (total < minSumHp) return false;
+    }
+    // Parallel rule for combined original-level thresholds (Dark Deepsea
+    // God's tribute: 2+ creatures with combined levels ≥ 4).
+    if (minSumLvl != null && minSumLvl > 0) {
+      const selectedTargets = (pt?.validTargets || []).filter(t => potionSelection.includes(t.id));
+      const total = selectedTargets.reduce((sum, t) => sum + (t?._meta?.level || 0), 0);
+      if (total < minSumLvl) return false;
     }
     return true;
   })();
@@ -10883,6 +11958,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const isShielded = hero?.statuses?.shielded;
           const isHealReversed = hero?.statuses?.healReversed;
           const isUntargetable = hero?.statuses?.untargetable;
+          const isSirenLinked = !!hero?.statuses?.sirenLinked;
           // Check if this hero has an active hero effect
           const heroEffectEntry = (gameState.activeHeroEffects || []).find(e => e.heroIdx === i && ((!isOpp && !e.charmedOwner) || (isOpp && e.charmedOwner === pi)));
           const isHeroEffectActive = !!heroEffectEntry;
@@ -10891,7 +11967,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const charmedByColor = isCharmed ? (hero.charmedBy === myIdx ? me.color : opp.color)
             : isControlled ? (hero.controlledBy === myIdx ? me.color : opp.color)
             : null;
-          const isRamming = ramAnims.some(r => r.srcOwner === pi && r.srcHeroIdx === i);
+          // Only hero-originated rams hide the hero tile during flight —
+          // creature-originated rams (Haressassin etc., `srcZoneSlot >= 0`)
+          // animate their own support slot and must leave the hero visible.
+          const isRamming = ramAnims.some(r => r.srcOwner === pi && r.srcHeroIdx === i && (r.srcZoneSlot == null || r.srcZoneSlot < 0));
           // Chain target pick
           const isChainPickValid = chainPickValidIds.has(heroTargetId);
           const isChainPickSelected = chainPickSelectedIds.has(heroTargetId);
@@ -10910,7 +11989,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
                 style={zsMerge('hero', { ...((isHeroEffectActive || isValidHeroTarget || isChainPickValid) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
@@ -10931,7 +12010,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
                 {hero?.name && isHealReversed && <HealReversedOverlay />}
-                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable) && <StatusBadges statuses={hero.statuses} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
+                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isSirenLinked) && <StatusBadges statuses={hero.statuses} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
                 {hero?.name && (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Mummy Token')) && (
@@ -10941,6 +12020,33 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   >🧟</div>
                 )}
                 {hero?.name && hero.buffs && <BuffColumn buffs={hero.buffs} cardName={hero.name} />}
+                {/* ── Deepsea Counter badge (Siphem) ── */}
+                {hero?.name && (hero.deepseaCounters || 0) > 0 && (
+                  <div
+                    className="deepsea-counter-badge"
+                    style={{
+                      position: 'absolute', top: '6%', right: '6%',
+                      minWidth: 'calc(18px * var(--board-scale))',
+                      height: 'calc(18px * var(--board-scale))',
+                      padding: '0 calc(3px * var(--board-scale))',
+                      borderRadius: 'calc(9px * var(--board-scale))',
+                      background: 'radial-gradient(circle at 30% 30%, #7cd8ff, #0b4a8a)',
+                      color: '#e8faff',
+                      fontFamily: 'Pixel Intv, monospace',
+                      fontSize: 'calc(9px * var(--board-scale))',
+                      fontWeight: 'bold', lineHeight: 1,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      gap: 'calc(1px * var(--board-scale))',
+                      boxShadow: '0 0 calc(5px * var(--board-scale)) #38c0ff, inset 0 0 calc(2px * var(--board-scale)) #b8ecff',
+                      border: 'calc(1.5px * var(--board-scale)) solid #061528',
+                      zIndex: 6, pointerEvents: 'auto', cursor: 'help',
+                    }}
+                    onMouseEnter={e => showGameTooltip(e, `Deepsea Counters: ${hero.deepseaCounters}`)}
+                    onMouseLeave={hideGameTooltip}
+                  >
+                    🌊{hero.deepseaCounters}
+                  </div>
+                )}
                 {/* ── Ascension Orbs ── */}
                 {hero?.name && hero.ascensionOrbs && (
                   <div className="ascension-orbs-container"
@@ -11105,7 +12211,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 } : (isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined);
                 return (
                   <div key={z}
-                    className={'board-zone board-zone-ability' + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget ? ' board-zone-play-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '')}
+                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget ? ' board-zone-play-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '')}
                     data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel} data-card-name={cards[0] || ''}
                     onClick={onAbilityClick}
                     onMouseEnter={() => {
@@ -11212,6 +12318,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Check all possible equip target IDs for this zone
               const equipTargetIds = (pt?.validTargets || []).filter(t => t.type === 'equip' && t.owner === pi && t.heroIdx === i && t.slotIdx === z).map(t => t.id);
               const isValidEquipTarget = isTargeting && equipTargetIds.some(id => validTargetIds.has(id));
+              const isIneligibleEquipTarget = isTargeting && !isValidEquipTarget && equipTargetIds.some(id => ineligibleTargetIds.has(id));
               const isSelectedEquipTarget = equipTargetIds.some(id => selectedSet.has(id));
               const isEquipExploding = equipTargetIds.some(id => explosions.includes(id));
               const isSummonGlow = summonGlow && summonGlow.owner === pi && summonGlow.heroIdx === i && summonGlow.zoneSlot === z;
@@ -11235,8 +12342,38 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const heroActionCoversCard = !!(heroActionActive && heroActionHeroIdx === i && playDrag?.card
                 && (gameState.effectPrompt.eligibleCards || []).includes(playDrag.card.name));
               const canPlayHere = heroActionCoversCard || (!!playDrag?.card && canHeroPlayCard(me, i, playDrag.card));
-              const isDragValidZone = (isDraggingCreature || isDraggingAttachment) && cards.length === 0 && canPlayHere && z < ((me.supportZones[i] || []).length || 3) && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
-              const isDragInvalidZone = (isDraggingCreature || isDraggingAttachment) && !isDragValidZone;
+              // Bounce-place target: OCCUPIED slot listed server-side as
+              // a valid swap destination for the card being dragged. Used
+              // by the Deepsea archetype (drop on an existing bounceable
+              // Creature to swap it back to hand and place the new one in
+              // its slot). Computed once per zone per frame.
+              const _bpTargetsForDrag = (!isOpp && playDrag?.card?.cardType === 'Creature')
+                ? ((gameState.bouncePlacementTargets || {})[playDrag.card.name] || [])
+                : [];
+              const isBouncePlaceTarget = _bpTargetsForDrag.some(t => t.heroIdx === i && t.slotIdx === z);
+              // Click-to-swap highlight: same visual as drag-bounce-place
+              // but triggered by pendingBouncePick (clicking a Deepsea
+              // card in hand). Covers BOTH bounce-candidate slots
+              // (occupied) and free-slot targets.
+              const _bpPickOwn = !isOpp && pendingBouncePick;
+              const isPendingBounceTarget = _bpPickOwn && (pendingBouncePick.bounceTargets || []).some(t => t.heroIdx === i && t.slotIdx === z);
+              // Valid drop zones come in two flavors, mirroring the
+              // drag-target resolution above:
+              //  • Bounce mode — a dragged Creature with bouncePlacement
+              //    Targets lights up ONLY those specific occupied slots.
+              //    Empty slots must stay un-highlighted even on heroes
+              //    who could otherwise cast the card, because the server
+              //    wouldn't actually land the card there.
+              //  • Normal mode — empty slots on heroes that can cast
+              //    the card.
+              const _bpTargetsForThisDrag = _bpTargetsForDrag; // alias for readability
+              const _bpDragActive = _bpTargetsForThisDrag.length > 0;
+              const isDragValidZone = (isDraggingCreature || isDraggingAttachment)
+                && !_bpDragActive
+                && cards.length === 0 && canPlayHere
+                && z < ((me.supportZones[i] || []).length || 3)
+                && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
+              const isDragInvalidZone = (isDraggingCreature || isDraggingAttachment) && !isDragValidZone && !isBouncePlaceTarget;
               // heroAction: dim zones for non-Coffee heroes
               const isHeroActionZoneDimmed = heroActionActive && !isDraggingCreature && !isDraggingAttachment && i !== heroActionHeroIdx;
               // Additional Action provider selection highlight
@@ -11269,10 +12406,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const isChainPickCreatureValid = chainPickValidIds.has(creatureChainId);
               const isChainPickCreatureSelected = chainPickSelectedIds.has(creatureChainId);
               const chainPickCreatureStep = chainPickSelected.findIndex(t => t.id === creatureChainId);
+              // Stolen creature highlight (Deepsea Succubus) — paints the
+              // controller's player color around the slot, mirroring the
+              // charmed-hero treatment so cross-side control is visually
+              // distinct.
+              const stolenBy = (gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._stolenBy;
+              const isStolen = stolenBy != null;
+              const stolenColor = isStolen ? (stolenBy === myIdx ? me.color : opp.color) : null;
               return (
-                <div key={z} className={'board-zone board-zone-support' + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
-                  onClick={isChainPickCreatureValid ? () => {
+                  onClick={isPendingBounceTarget ? () => {
+                    // Click-to-swap: dispatches play_creature as if the
+                    // card had been dragged here. Server treats the
+                    // rest identically — occupied slot routes through
+                    // canPlaceOnOccupiedSlot, free slot through normal
+                    // placement. Clear the pick state so the highlights
+                    // disappear. handIndex is stale after hand shifts
+                    // (draws / returns) — resolve by name so the right
+                    // copy plays.
+                    const ps = pendingBouncePick;
+                    setPendingBouncePick(null);
+                    const currentIdx = hand.findIndex(c => c === ps.cardName);
+                    if (currentIdx < 0) return;
+                    socket.emit('play_creature', {
+                      roomId: gameState.roomId, cardName: ps.cardName,
+                      handIndex: currentIdx, heroIdx: i, zoneSlot: z,
+                    });
+                  } : isChainPickCreatureValid ? () => {
                     const tgt = (chainPickData?.targets || []).find(t => t.id === creatureChainId);
                     if (tgt) setChainPickSelected(prev => [...prev, tgt]);
                   } : isSkatesCreature ? () => {
@@ -11296,7 +12457,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       socket.emit('pending_placement_clear', { roomId: gameState.roomId });
                     }
                   } : isZonePickTarget ? () => respondToPrompt({ heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
-                  style={zsMerge('support', (isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined)}>
+                  style={zsMerge('support', {
+                    ...((isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined),
+                    ...(isStolen && stolenColor ? { '--charmed-color': stolenColor } : undefined),
+                  })}
+                  data-bounce-hiding={bounceOutgoingHidden.has(`${pi}-${i}-${z}`) ? 'true' : undefined}>
                   {isChainPickCreatureSelected && <div className="chain-pick-number">{chainPickCreatureStep + 1}</div>}
                   {(isPlayTarget || isAutoTarget) && playDrag.card ? (
                     <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
@@ -11328,7 +12493,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // Creature HP bar / damage display.
                     const isCreature = _ccType.split('/').some(t => t.trim() === 'Creature')
                       || _ccSubtype.split('/').some(t => t.trim() === 'Creature');
-                    const creatureStyle = cc?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' } : (cc?._xuanwuRevived || cc?._illusionSummon) ? { filter: 'sepia(0.2) hue-rotate(180deg) brightness(1.1)', opacity: 0.75 } : undefined; return !isCreature ? (
+                    // Deepsea Spores tint: when the per-turn override is
+                    // active, every board Creature that is NOT already a
+                    // Deepsea archetype card is rendered dark-red and its
+                    // tooltip is prefixed with "Deepsea " to surface the
+                    // archetype shift. Already-Deepsea cards stay as-is.
+                    const _ccCardDataForSpores = CARDS_BY_NAME[cards[cards.length-1]];
+                    const _ccIsAlreadyDeepsea = (_ccCardDataForSpores?.archetype === 'Deepsea')
+                      || cards[cards.length-1] === 'Infected Squirrel';
+                    const _ccSporified = isCreature && gameState.deepseaSporesActive && !_ccIsAlreadyDeepsea;
+                    const creatureStyle = cc?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' }
+                      : (cc?._xuanwuRevived || cc?._illusionSummon) ? { filter: 'sepia(0.2) hue-rotate(180deg) brightness(1.1)', opacity: 0.75 }
+                      : _ccSporified ? { filter: 'brightness(0.78) sepia(0.6) hue-rotate(-50deg) saturate(1.7) contrast(1.05)', transition: 'filter 0.5s' }
+                      : undefined; return !isCreature ? (
                       <>
                         <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} />
                         {cc?.buffs ? <BuffColumn buffs={cc.buffs} cardName={cards[cards.length-1]} /> : null}
@@ -11359,6 +12536,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         } else if (over) {
                           tooltipOverride = { ...(baseCard || {}), ...over };
                         }
+                        // Deepsea Spores tooltip prefix — "Haressassin"
+                        // reads as "Deepsea Haressassin" while the
+                        // override is active. Already-Deepsea creatures
+                        // skip this so they don't become e.g. "Deepsea
+                        // Deepsea Reaper". We set `displayName` (not
+                        // `name`) so the image lookup still uses the
+                        // canonical `Haressassin.png` — otherwise the
+                        // tooltip tries `Deepsea Haressassin.png`,
+                        // which doesn't exist.
+                        if (_ccSporified) {
+                          const src = tooltipOverride || baseCard || {};
+                          const existingDisplay = src.displayName || src.name || cards[0];
+                          if (!/^Deepsea\s/i.test(existingDisplay)) {
+                            tooltipOverride = {
+                              ...src,
+                              displayName: `Deepsea ${existingDisplay}`,
+                              archetype: 'Deepsea',
+                            };
+                          }
+                        }
                         return <BoardCard cardName={cards[0]} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={creatureStyle} tooltipCardOverride={tooltipOverride} />;
                       })()
                     ) : (
@@ -11379,7 +12576,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     {cc?.frozen ? <FrozenOverlay /> : null}
                     {(cc?.negated || cc?.nulled) ? <NegatedOverlay /> : null}
                     {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
-                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated || cc?.nulled || cc?._baihuStunned) ? <StatusBadges counters={cc} isHero={false} player={p} cardName={cards[cards.length-1]} /> : null}
+                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated || cc?.nulled || cc?._baihuStunned || cc?.sirenLinked) ? <StatusBadges counters={cc} isHero={false} player={p} cardName={cards[cards.length-1]} /> : null}
                     {cc?.buffs ? <BuffColumn buffs={cc.buffs} cardName={cards[cards.length-1]} /> : null}
                     {cc?._guardianImmune ? <div className="board-card-guardian-shield" /> : null}
                     </>
@@ -11444,13 +12641,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               return (
                 <div key={i}
                   className={'board-card hand-card' + (revealEntry ? ' revealed-hand-card' : ' face-down') + (isSelected ? ' blind-pick-selected' : '') + (isBlindPick && !isSelected && !isFull ? ' blind-pick-eligible' : '') + (isFull ? ' hand-card-dimmed' : '')}
-                  data-hand-idx={i} style={(oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current)) ? { visibility: 'hidden' } : (isBlindPick ? { cursor: 'pointer' } : undefined)}
+                  data-hand-idx={i} style={(oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current) || bounceReturnHidden.has(`${oppIdx}-${i}`)) ? { visibility: 'hidden' } : (isBlindPick ? { cursor: 'pointer' } : undefined)}
                   onClick={isBlindPick ? () => {
-                    setBlindPickSelected(prev => {
-                      const next = new Set(prev);
-                      if (next.has(i)) { next.delete(i); } else if (next.size < maxSelect) { next.add(i); }
-                      return next;
-                    });
+                    // Compute the NEXT selection set outside the
+                    // setState updater. React may double-invoke state
+                    // updaters (StrictMode dev, batching), so the
+                    // auto-confirm respondToPrompt MUST live outside
+                    // the updater — otherwise it fires twice and the
+                    // server processes the steal twice (victim loses
+                    // one card, thief gains two copies).
+                    const prev = blindPickSelected;
+                    const next = new Set(prev);
+                    if (next.has(i)) next.delete(i);
+                    else if (next.size < maxSelect) next.add(i);
+                    setBlindPickSelected(next);
+                    if (gameState.effectPrompt?.autoConfirm && next.size === maxSelect) {
+                      respondToPrompt({ selectedIndices: [...next] });
+                    }
                   } : undefined}>
                   {revealEntry ? (
                     <img src={cardImageUrl(revealEntry.name)} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} draggable={false}
@@ -11578,6 +12785,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div className="board-center-spacer" />
           <div className="board-center" ref={boardCenterRef} style={{ position: 'relative' }}>
             {(((gameState.areaZones?.[0] || []).includes('Acid Rain')) || ((gameState.areaZones?.[1] || []).includes('Acid Rain'))) && <AcidRainOverlay />}
+            {(((gameState.areaZones?.[0] || []).includes('Deepsea Castle')) || ((gameState.areaZones?.[1] || []).includes('Deepsea Castle'))) && <DeepseaCastleOverlay />}
             {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
             <div className="board-area-zones-center">
@@ -11593,19 +12801,39 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const anyCasterForArea = draggingArea && (me.heroes || []).some((h, hi) => canHeroPlayCard(me, hi, playDrag.card));
                 const myAreaEmpty = (gameState.areaZones?.[myIdx] || []).length === 0;
                 const myAreaDropEligible = draggingArea && anyCasterForArea && myAreaEmpty;
-                const myAreaCls = (isMyAreaValid ? 'potion-target-valid' : '') + (selectedSet.has(myAreaId) ? ' potion-target-selected' : '') + (myAreaDropEligible ? ' area-drop-eligible' : '');
-                const oppAreaCls = (isOppAreaValid ? 'potion-target-valid' : '') + (selectedSet.has(oppAreaId) ? ' potion-target-selected' : '');
+                // Area-effect activation — card exports `areaEffect: true`
+                // + `onAreaEffect(ctx)`. The engine publishes an entry per
+                // activatable area per player; we look up each side and
+                // mark the zone clickable when the player can fire the
+                // effect (Main Phase, HOPT fresh, per-card gate passes).
+                const activatableAreas = gameState.activatableAreas || [];
+                const myAreaEntry = activatableAreas.find(a => a.areaOwner === myIdx);
+                const oppAreaEntry = activatableAreas.find(a => a.areaOwner === oppIdx);
+                const myAreaActivatable = !isEffectLocked && !!myAreaEntry?.canActivate;
+                const oppAreaActivatable = !isEffectLocked && !!oppAreaEntry?.canActivate;
+                const myAreaCls = (isMyAreaValid ? 'potion-target-valid' : '') + (selectedSet.has(myAreaId) ? ' potion-target-selected' : '') + (myAreaDropEligible ? ' area-drop-eligible' : '') + (myAreaActivatable ? ' zone-ability-activatable' : '');
+                const oppAreaCls = (isOppAreaValid ? 'potion-target-valid' : '') + (selectedSet.has(oppAreaId) ? ' potion-target-selected' : '') + (oppAreaActivatable ? ' zone-ability-activatable' : '');
+                const onMyAreaClick = isMyAreaValid
+                  ? () => togglePotionTarget(myAreaId)
+                  : (myAreaActivatable ? () => socket.emit('activate_area_effect', {
+                      roomId: gameState.roomId, areaOwner: myIdx, areaName: myAreaEntry.areaName,
+                    }) : undefined);
+                const onOppAreaClick = isOppAreaValid
+                  ? () => togglePotionTarget(oppAreaId)
+                  : (oppAreaActivatable ? () => socket.emit('activate_area_effect', {
+                      roomId: gameState.roomId, areaOwner: oppIdx, areaName: oppAreaEntry.areaName,
+                    }) : undefined);
                 return (<>
                   <BoardZone type="area" cards={gameState.areaZones?.[myIdx] || []} label="Area"
-                    style={{...myBoardZone('area'), left: areaPositions[0], cursor: isMyAreaValid ? 'pointer' : undefined}}
+                    style={{...myBoardZone('area'), left: areaPositions[0], cursor: (isMyAreaValid || myAreaActivatable) ? 'pointer' : undefined}}
                     className={(myAreaCls + ' area-zone-me').trim()}
                     dataAttrs={{ 'data-area-zone': '1', 'data-area-owner': 'me' }}
-                    onClick={isMyAreaValid ? () => togglePotionTarget(myAreaId) : undefined} />
+                    onClick={onMyAreaClick} />
                   <BoardZone type="area" cards={gameState.areaZones?.[oppIdx] || []} label="Area"
-                    style={{...oppBoardZone('area'), left: areaPositions[1], cursor: isOppAreaValid ? 'pointer' : undefined}}
+                    style={{...oppBoardZone('area'), left: areaPositions[1], cursor: (isOppAreaValid || oppAreaActivatable) ? 'pointer' : undefined}}
                     className={(oppAreaCls + ' area-zone-opp').trim()}
                     dataAttrs={{ 'data-area-zone': '1', 'data-area-owner': 'opp' }}
-                    onClick={isOppAreaValid ? () => togglePotionTarget(oppAreaId) : undefined} />
+                    onClick={onOppAreaClick} />
                 </>);
               })()}
             </div>
@@ -11745,6 +12973,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isAnyDiscard = isForceDiscard || isForceDiscardCancellable;
                 const forceDiscardEligible = isForceDiscard && gameState.effectPrompt.eligibleIndices;
                 const isForceDiscardEligible = !forceDiscardEligible || gameState.effectPrompt.eligibleIndices.includes(item.origIdx);
+                // Pick-a-Hand-Card prompt (Deepsea Castle swap-in, any
+                // future single-pick-from-hand effect): eligible cards
+                // use the purple "pick" highlight; ineligible ones dim.
+                const isPickHandCard = gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt?.ownerIdx === myIdx;
+                const pickEligibleList = isPickHandCard ? gameState.effectPrompt.eligibleIndices : null;
+                const isPickHandCardEligible = isPickHandCard && (!pickEligibleList || pickEligibleList.includes(item.origIdx));
+                const isPickHandCardDimmed = isPickHandCard && !isPickHandCardEligible;
                 const isHandPick = gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt?.ownerIdx === myIdx;
                 const isHandPickSelected = isHandPick && handPickSelected.has(item.origIdx);
                 const isHandPickEligible = isHandPick && (gameState.effectPrompt.eligibleIndices || []).includes(item.origIdx);
@@ -11766,8 +13001,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isStealHidden = stealHiddenMe.has(item.origIdx) && hand.length === stealExpectedMeCountRef.current;
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed) ? ' hand-card-dimmed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '')}
-                    style={(isDrawAnim || isPendingPlay || isStealHidden) ? { visibility: 'hidden' } : undefined}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '')}
+                    style={(isDrawAnim || isPendingPlay || isStealHidden || bounceReturnHidden.has(`${myIdx}-${item.origIdx}`)) ? { visibility: 'hidden' } : undefined}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
@@ -12697,6 +13932,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </DraggablePanel>
       )}
 
+      {/* ── Effect Prompt: Pick a Hand Card (Deepsea Castle, etc.) ── */}
+      {isMyEffectPrompt && ep.type === 'pickHandCard' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(200,100,255,.6)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#c864ff', marginBottom: 4 }}>{ep.title || 'Pick a Card'}</div>
+          {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
+          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>{ep.instruction || 'Click a highlighted card in your hand.'}</div>
+          {ep.cancellable !== false && <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>}
+        </DraggablePanel>
+      )}
+
       {/* ── Waiting for opponent (when they have an active effect prompt) ── */}
       {(isOppEffectPrompt || isActivePlayerPromptForOpp) && !gameState.potionTargeting && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 260 }}>
@@ -12705,6 +13951,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'deckSearchReveal' ? '🔍 Opponent is viewing...' :
              ep.type === 'optionPicker' ? '🤔 Opponent is deciding...' :
              ep.type === 'forceDiscard' || ep.type === 'forceDiscardCancellable' ? (ep.opponentTitle || '🗑 Opponent is discarding...') :
+             ep.type === 'pickHandCard' ? (ep.opponentTitle || '🎴 Opponent is choosing a card...') :
              ep.type === 'abilityAttach' ? '⚡ Opponent is equipping...' :
              ep.type === 'blindHandPick' ? '🫳 Opponent is stealing...' :
              ep.type === 'cardNamePicker' ? '🍀 Opponent is declaring...' :
@@ -12720,6 +13967,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'heroAction' ? 'Waiting for opponent to play a card...' :
              ep.type === 'forceDiscard' ? (ep.opponentSubtitle || 'Waiting for opponent to discard a card...') :
              ep.type === 'forceDiscardCancellable' ? 'Waiting for opponent to discard or pass...' :
+             ep.type === 'pickHandCard' ? (ep.opponentSubtitle || 'Waiting for opponent to pick a card from their hand...') :
              ep.type === 'handPick' ? 'Waiting for opponent to select cards...' :
              ep.type === 'optionPicker' ? 'Waiting for opponent to choose an option...' :
              ep.type === 'playerPicker' ? 'Waiting for opponent to pick a player...' :
@@ -12771,9 +14019,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {spellHeroPick && !result && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>
-            {spellHeroPick.isSurprise ? '🎭' : spellHeroPick.isAscension ? '🦋' : spellHeroPick.card?.cardType === 'Attack' ? '⚔️' : '✦'} {spellHeroPick.isSurprise ? 'Set' : spellHeroPick.isAscension ? 'Ascend' : 'Play'} {spellHeroPick.cardName}
+            {spellHeroPick.isSurprise ? '🎭' : spellHeroPick.isAscension ? '🦋' : spellHeroPick.isCreature ? '🐾' : spellHeroPick.card?.cardType === 'Attack' ? '⚔️' : '✦'} {spellHeroPick.isSurprise ? 'Set' : spellHeroPick.isAscension ? 'Ascend' : spellHeroPick.isCreature ? 'Summon' : 'Play'} {spellHeroPick.cardName}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>{spellHeroPick.isSurprise ? 'Choose a Hero to set this Surprise face-down:' : spellHeroPick.isAscension ? 'Choose a Hero to Ascend:' : 'Choose a Hero to play this card:'}</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>{spellHeroPick.isSurprise ? 'Choose a Hero to set this Surprise face-down:' : spellHeroPick.isAscension ? 'Choose a Hero to Ascend:' : spellHeroPick.isCreature ? 'Choose a Hero to summon this Creature:' : 'Choose a Hero to play this card:'}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {spellHeroPick.eligible.map(h => (
               <button key={(h.charmedOwner != null ? 'c' : '') + h.idx} className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: h.charmedOwner != null ? '#ff69b4' : 'var(--accent)', color: h.charmedOwner != null ? '#ff69b4' : 'var(--accent)', textAlign: 'left' }}
@@ -12795,6 +14043,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     socket.emit('effect_prompt_response', {
                       roomId: gameState.roomId,
                       response: { cardName: pick.cardName, handIndex: pick.handIndex, heroIdx: h.idx },
+                    });
+                  } else if (pick.isCreature) {
+                    socket.emit('play_creature', {
+                      roomId: gameState.roomId, cardName: pick.cardName,
+                      handIndex: pick.handIndex, heroIdx: h.idx,
+                      zoneSlot: h.zoneSlot,
                     });
                   } else {
                     socket.emit('play_spell', {
@@ -12862,6 +14116,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {isMyEffectPrompt && ep.type === 'blindHandPick' && (() => {
         const maxSel = ep.maxSelect || 2;
         const canConfirm = blindPickSelected.size >= maxSel;
+        // Cancellable picks get a Cancel button (Escape is wired up by
+        // the existing `cancellable !== false` effectPrompt handler).
+        const cancellable = ep.cancellable === true;
         return (
           <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(255,150,50,.85)' }}>
             <div className="orbit-font" style={{ fontSize: 13, color: '#ff9933', marginBottom: 4 }}>{ep.title || 'Steal Cards'}</div>
@@ -12869,11 +14126,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div style={{ fontSize: 11, color: '#ff9933', opacity: .8, marginBottom: 8 }}>
               Selected: {blindPickSelected.size}/{maxSel}
             </div>
-            <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: canConfirm ? '#ff9933' : '#555', color: canConfirm ? '#ff9933' : '#555' }}
-              disabled={!canConfirm}
-              onClick={() => {
-                respondToPrompt({ selectedIndices: [...blindPickSelected] });
-              }}>{ep.confirmLabel || '🫳 Steal!'}</button>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: canConfirm ? '#ff9933' : '#555', color: canConfirm ? '#ff9933' : '#555' }}
+                disabled={!canConfirm}
+                onClick={() => {
+                  respondToPrompt({ selectedIndices: [...blindPickSelected] });
+                }}>{ep.confirmLabel || '🫳 Steal!'}</button>
+              {cancellable && (
+                <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                  onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+              )}
+            </div>
           </DraggablePanel>
         );
       })()}
@@ -12987,6 +14250,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 </div>
               );
             }
+            // Parallel combined-level readout (Dark Deepsea God tribute).
+            let levelLine = null;
+            const minSumLvl = pt.config.minSumLevel;
+            if (minSumLvl != null && minSumLvl > 0) {
+              const selectedTargets = (pt.validTargets || []).filter(t => potionSelection.includes(t.id));
+              const sumLvl = selectedTargets.reduce((s, t) => s + (t?._meta?.level || 0), 0);
+              const met = sumLvl >= minSumLvl;
+              levelLine = (
+                <div style={{ fontSize: 11, color: met ? 'var(--success)' : 'var(--danger)', marginBottom: 10, fontWeight: 600 }}>
+                  Combined Levels {sumLvl} / {minSumLvl}{met ? ' ✓' : ''}
+                </div>
+              );
+            }
             return (
               <>
                 <div style={{ fontSize: 11, color: 'var(--accent)', marginBottom: 10, fontWeight: 600 }}>
@@ -12996,6 +14272,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     : ''}
                 </div>
                 {hpLine}
+                {levelLine}
               </>
             );
           })()}

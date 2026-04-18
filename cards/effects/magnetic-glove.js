@@ -3,7 +3,9 @@
 //  Artifact (Normal) — Search your deck for
 //  any card, reveal it and add it to hand.
 //  Hard once per turn.
-//  Introduces the standard deck-search pattern.
+//  Uses the shared deck-search helper so the
+//  full add-to-hand + flight + reveal flow
+//  stays in sync with every other search card.
 // ═══════════════════════════════════════════
 
 module.exports = {
@@ -63,28 +65,9 @@ module.exports = {
 
     if (!result || !result.cardName) return;
 
-    // Verify the card is actually in the deck
-    const deckIdx = ps.mainDeck.indexOf(result.cardName);
-    if (deckIdx < 0) return;
-
-    // Remove from deck, add to hand
-    ps.mainDeck.splice(deckIdx, 1);
-    ps.hand.push(result.cardName);
-
-    // Broadcast deck search event (face-up draw animation for opponent)
-    engine._broadcastEvent('deck_search_add', { cardName: result.cardName, playerIdx: pi });
-    engine.log('deck_search', { player: ps.username, card: result.cardName, by: 'Magnetic Glove' });
-    engine.sync();
-
-    // Show reveal prompt to opponent — halts game until they click OK
-    await engine._delay(500);
-    const oi = pi === 0 ? 1 : 0;
-    await engine.promptGeneric(oi, {
-      type: 'deckSearchReveal',
-      cardName: result.cardName,
-      searcherName: ps.username,
-      title: 'Magnetic Glove',
-      cancellable: false,
+    await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
+      source: 'Magnetic Glove',
+      reveal: true,
     });
   },
 };

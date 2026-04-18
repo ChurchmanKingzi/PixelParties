@@ -25,7 +25,6 @@
 //    • onCardLeaveZone → reactive hand-limit recheck.
 // ═══════════════════════════════════════════
 
-const { placeArea } = require('./_area-shared');
 const { countPollutionTokens } = require('./_pollution-shared');
 
 module.exports = {
@@ -40,7 +39,7 @@ module.exports = {
       if (ctx.cardZone !== 'hand') return;
       if (ctx.playedCard?.id !== ctx.card.id) return;
       const engine = ctx._engine;
-      await placeArea(engine, ctx.cardOwner, ctx.card);
+      await engine.placeArea(ctx.cardOwner, ctx.card);
       // Big Gwen's signature: a giant clock face materializes over the
       // board, hands ticking from 11:55 to 12:00 sharp. Fires AFTER
       // placeArea so the card is already sitting in its zone when the

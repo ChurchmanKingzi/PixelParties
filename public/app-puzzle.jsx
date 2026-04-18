@@ -764,7 +764,13 @@ function PuzzleCreator() {
       setEditTarget({ si, zt, hi, slot });
       setEditHp(String(c?.hp ? (p._customSupportHp?.[hi]?.[slot] ?? c.hp) : '')); setEditMaxHp(''); setEditAtk('');
       const cs = p._creatureStatuses?.[hi + '-' + slot] || {};
-      setEditStatuses({ ...cs }); delete editStatuses.buffs;
+      // Strip `buffs` out of editStatuses cleanly — they're tracked in
+      // editBuffs. Spreading `cs` directly (as before) carried the buffs
+      // key through, which then survived the save path because saveStats
+      // did `merged = { ...editStatuses }` without clearing the legacy
+      // key, so unchecking every buff couldn't actually remove them.
+      const { buffs: _csBuffs, ...csWithoutBuffs } = cs;
+      setEditStatuses(csWithoutBuffs);
       setEditBuffs({ ...(cs.buffs || {}) });
       // Biomancy Token: Potion in a support zone — carries a `biomancyLevel`
       // in creatureStatuses. Hydrate the level picker so the dedicated
@@ -820,6 +826,11 @@ function PuzzleCreator() {
         if (editBuffs.anti_magic_enchanted) merged.buffs = { anti_magic_enchanted: true };
       } else {
         merged = { ...editStatuses };
+        // Defensive: always drop any legacy `buffs` field that might have
+        // leaked in from the editStatuses spread. editBuffs is the sole
+        // source of truth for buffs, so an empty editBuffs means the
+        // saved state must not have any `buffs` key.
+        delete merged.buffs;
         if (Object.keys(editBuffs).length > 0) merged.buffs = { ...editBuffs };
       }
       p._creatureStatuses[hi + '-' + slot] = merged;
@@ -924,6 +935,10 @@ function PuzzleCreator() {
     { key: 'freeze_immune', label: '🔥 Freeze Immune', color: '#ff8844' },
     { key: 'submerged', label: '🌊 Submerged', color: '#4488ff', scope: 'oppHero' },
     { key: 'negative_status_immune', label: '😎 Status Immune', color: '#44ff88' },
+    // Taunt: the opponent must target this Hero/Creature with Attacks,
+    // Spells, and Creature effects if possible. Multiple Taunters on a
+    // side = opponent picks any. Applies to Heroes AND Creatures.
+    { key: 'forcesTargeting', label: '🎯 Taunt', color: '#ff5060' },
     // Equip-Artifact-only buff: Anti Magic Enchantment. The scope tag below
     // flips rendering so this buff ONLY shows up when editing an Equipment
     // Artifact, and for that zone type ONLY this buff is offered (all

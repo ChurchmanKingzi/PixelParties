@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════
 const { useState, useEffect, useRef, useCallback, useMemo, useContext, useLayoutEffect } = React;
 const { api, socket, AppContext, CardMini, FoilOverlay, useFoilBands, cardImageUrl, skinImageUrl,
-        isDeckLegal, countInDeck, hasNicolasHero, canAddCard, typeColor, typeClass,
+        isDeckLegal, countInDeck, hasNicolasHero, canAddCard, trimOverLimitCopies, typeColor, typeClass,
         sortDeckCards, shuffleArray } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, CARD_TYPES, SUBTYPES,
         SPELL_SCHOOLS, STARTING_ABILITIES, ARCHETYPES, SKINS_DB } = window;
@@ -434,10 +434,25 @@ function DeckBuilder() {
   const removeFrom = useCallback((cardName, section, index) => {
     if (!currentDeck) return;
     const removeOne = (arr, idx) => { const n = [...arr]; if (idx != null) n.splice(idx, 1); else { const i = n.indexOf(cardName); if (i >= 0) n.splice(i, 1); } return n; };
-    if (section === 'main') updateSections({ main: removeOne(currentDeck.mainDeck || [], index) });
-    else if (section === 'potion') updateSections({ potion: removeOne(currentDeck.potionDeck || [], index) });
-    else if (section === 'side') updateSections({ side: removeOne(currentDeck.sideDeck || [], index) });
-    else if (section === 'hero') {
+    // "The Sacred Jewel" clause: removing this card may drop the deck's
+    // Sacred Jewel count below the 4-copy threshold that grants every
+    // Artifact a 5-copy allowance. When that happens, any Artifact
+    // currently at 5 copies must be auto-trimmed back to 4. We assemble
+    // the prospective post-remove deck, then run trimOverLimitCopies.
+    const maybeAutoTrim = (draftDeck) => {
+      if (cardName !== 'The Sacred Jewel') return draftDeck;
+      return trimOverLimitCopies(draftDeck);
+    };
+    if (section === 'main') {
+      const next = maybeAutoTrim({ ...currentDeck, mainDeck: removeOne(currentDeck.mainDeck || [], index) });
+      updateSections({ main: next.mainDeck, potion: next.potionDeck, side: next.sideDeck });
+    } else if (section === 'potion') {
+      const next = maybeAutoTrim({ ...currentDeck, potionDeck: removeOne(currentDeck.potionDeck || [], index) });
+      updateSections({ main: next.mainDeck, potion: next.potionDeck, side: next.sideDeck });
+    } else if (section === 'side') {
+      const next = maybeAutoTrim({ ...currentDeck, sideDeck: removeOne(currentDeck.sideDeck || [], index) });
+      updateSections({ main: next.mainDeck, potion: next.potionDeck, side: next.sideDeck });
+    } else if (section === 'hero') {
       const heroes = [...(currentDeck.heroes || [])];
       const slot = heroes.findIndex(h => h && h.hero === cardName);
       if (slot >= 0) heroes[slot] = { hero: null, ability1: null, ability2: null };

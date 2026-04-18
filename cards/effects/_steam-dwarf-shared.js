@@ -174,35 +174,6 @@ function isSteamDwarf(cardName, engine) {
   return cd?.archetype === ARCHETYPE;
 }
 
-/**
- * Find all alive, non-negated creatures on `playerIdx`'s side that are
- * eligible as sacrifices right now: in a support zone, not summoned
- * this turn. Used by Dragon Pilot.
- */
-function getSacrificableCreatures(engine, playerIdx) {
-  const gs = engine.gs;
-  const turn = gs.turn || 0;
-  const cardDB = engine._getCardDB();
-  const results = [];
-  for (const inst of engine.cardInstances) {
-    if (inst.owner !== playerIdx) continue;
-    if (inst.zone !== 'support') continue;
-    if (inst.faceDown) continue;
-    if (inst.turnPlayed === turn) continue;
-    const cd = cardDB[inst.name];
-    if (!cd) continue;
-    // Accept Creatures and Tokens with Creature subtype
-    const isCreature = cd.cardType === 'Creature'
-      || (cd.cardType || '').split('/').includes('Creature')
-      || (cd.subtype || '').split('/').includes('Creature');
-    if (!isCreature) continue;
-    const maxHp = inst.counters?.maxHp ?? cd.hp ?? 0;
-    const level = cd.level || 0;
-    results.push({ inst, maxHp, level, cardName: inst.name });
-  }
-  return results;
-}
-
 module.exports = {
   STEAM_ENGINE_GAIN,
   ARCHETYPE,
@@ -211,5 +182,4 @@ module.exports = {
   decreaseCreatureMaxHp,
   setCreatureHp,
   isSteamDwarf,
-  getSacrificableCreatures,
 };

@@ -30,7 +30,28 @@
       "Bash(node -c \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/mana-mining.js\")",
       "Bash(node -c \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/wisdom.js\")",
       "Bash(node -c \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/eraser-beam.js\")",
-      "Bash(node -c \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/pollution-piranha.js\")"
+      "Bash(node -c \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/pollution-piranha.js\")",
+      "Bash(node -c cards/effects/_engine.js)",
+      "Bash(node -c server.js)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"require\\('./cards/effects/_engine.js'\\); console.log\\('engine requires cleanly'\\);\")",
+      "Bash(node -c cards/effects/deepsea-spores.js)",
+      "Bash(node -e \"const m = require\\('./cards/effects/deepsea-spores.js'\\); console.log\\(Object.keys\\(m\\)\\);\")",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('data/cards.json','utf8'\\)\\); console.log\\('cards.json OK'\\);\")",
+      "Bash(node -c cards/effects/_deepsea-shared.js)",
+      "Bash(node -c cards/effects/deepsea-castle.js)",
+      "Bash(node -c cards/effects/dark-deepsea-god.js)",
+      "Bash(node -c cards/effects/teppes-the-deepsea-vampire.js)",
+      "Bash(node -e \"const fs=require\\('fs'\\);JSON.parse\\(fs.readFileSync\\('data/cards.json','utf8'\\)\\);console.log\\('OK-json'\\)\")",
+      "Bash(node -c cards/effects/deepsea-horror-clown.js)",
+      "Bash(awk 'NR>=6300 && /^@media/ {print NR\": \"$0}' \"C:/Pixel Parties WEB/PixelPartiesWeb/public/style.css\")",
+      "Bash(node -c cards/effects/_sacrifice-shared.js)",
+      "Bash(node -e \"require\\('./cards/effects/dark-deepsea-god.js'\\)\")",
+      "Bash(node -e \"const m = require\\('./cards/effects/dark-deepsea-god.js'\\); console.log\\(Object.keys\\(m\\)\\);\")",
+      "Bash(node -c cards/effects/_placement-shared.js)",
+      "Bash(node -e \"require\\('./cards/effects/deepsea-castle.js'\\)\")",
+      "Bash(node -e \"const m = require\\('./cards/effects/deepsea-castle.js'\\); console.log\\(Object.keys\\(m\\)\\);\")",
+      "Bash(node *)"
     ]
   }
 }

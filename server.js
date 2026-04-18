@@ -1331,7 +1331,11 @@ function sendGameState(room, playerIdx, extra) {
     isPuzzle: gs.isPuzzle || false,
     isTutorial: gs.isTutorial || false,
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
-    summonBlocked: gs.summonBlocked || [],
+    // Compute fresh per-sync so per-turn gates (Deepsea `canSummon`,
+    // etc.) flip to "blocked" the moment the first copy is summoned.
+    // The phase-start cache alone would miss mid-turn updates and let
+    // a second copy slip through.
+    summonBlocked: room.engine ? room.engine.getSummonBlocked(playerIdx) : (gs.summonBlocked || []),
     customPlacementCards: (() => {
       const ps2 = gs.players[playerIdx];
       const names = new Set();
@@ -1380,17 +1384,23 @@ function sendGameState(room, playerIdx, extra) {
       const currentTurn = gs.turn || 0;
       for (const inst of room.engine.cardInstances) {
         if (inst.zone !== 'support') continue;
-        const key = `${inst.controller}-${inst.heroIdx}-${inst.zoneSlot}`;
+        // Key by OWNER — the creature renders on its owner's board even
+        // when its `controller` has been flipped by a steal. The client
+        // reads `creatureCounters[${ownerPi}-${hi}-${zi}]`. `_stolenBy`
+        // surfaces the stealer so the client can paint their color.
+        const key = `${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
         const hasCounters = Object.keys(inst.counters).length > 0;
         const hasSummoningSickness = inst.turnPlayed === currentTurn && (() => {
           const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
           return !!(script?.creatureEffect);
         })();
         const isFaceDown = !!inst.faceDown;
-        if (hasCounters || hasSummoningSickness || isFaceDown) {
+        const isStolen = inst.stolenBy != null && inst.controller !== inst.owner;
+        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen) {
           cc[key] = { ...inst.counters };
           if (hasSummoningSickness) cc[key].summoningSickness = true;
           if (isFaceDown) cc[key].faceDown = true;
+          if (isStolen) cc[key]._stolenBy = inst.stolenBy;
         }
       }
       return cc;
@@ -1444,9 +1454,16 @@ function sendGameState(room, playerIdx, extra) {
     freeActivatableAbilities: room.engine ? room.engine.getFreeActivatableAbilities(playerIdx) : [],
     activeHeroEffects: room.engine ? room.engine.getActiveHeroEffects(playerIdx) : [],
     activatableCreatures: room.engine ? room.engine.getActivatableCreatures(playerIdx) : [],
+    // True only while Deepsea Spores' per-turn override is live — the
+    // client tints every board Creature dark-red and prefixes "Deepsea"
+    // onto the tooltip name. Cleared automatically on the next turn
+    // because the engine compares the stored turn against `gs.turn`.
+    deepseaSporesActive: !!(gs._deepseaSporesActiveTurn != null && gs._deepseaSporesActiveTurn === gs.turn),
     activatableEquips: room.engine ? room.engine.getActivatableEquips(playerIdx) : [],
     activatablePermanents: room.engine ? room.engine.getActivatablePermanents(playerIdx) : [],
+    activatableAreas: room.engine ? room.engine.getActivatableAreas(playerIdx) : [],
     heroPlayableCards: room.engine ? room.engine.getHeroPlayableCards(playerIdx) : { own: {}, charmed: {} },
+    bouncePlacementTargets: room.engine ? room.engine.getBouncePlacementTargets(playerIdx) : {},
     bakhmSurpriseSlots: room.engine ? (() => {
       const result = [];
       const ps2 = gs.players[playerIdx];
@@ -1622,17 +1639,23 @@ function sendSpectatorGameState(room) {
       const currentTurn = gs.turn || 0;
       for (const inst of room.engine.cardInstances) {
         if (inst.zone !== 'support') continue;
-        const key = `${inst.controller}-${inst.heroIdx}-${inst.zoneSlot}`;
+        // Key by OWNER — the creature renders on its owner's board even
+        // when its `controller` has been flipped by a steal. The client
+        // reads `creatureCounters[${ownerPi}-${hi}-${zi}]`. `_stolenBy`
+        // surfaces the stealer so the client can paint their color.
+        const key = `${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
         const hasCounters = Object.keys(inst.counters).length > 0;
         const hasSummoningSickness = inst.turnPlayed === currentTurn && (() => {
           const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
           return !!(script?.creatureEffect);
         })();
         const isFaceDown = !!inst.faceDown;
-        if (hasCounters || hasSummoningSickness || isFaceDown) {
+        const isStolen = inst.stolenBy != null && inst.controller !== inst.owner;
+        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen) {
           cc[key] = { ...inst.counters };
           if (hasSummoningSickness) cc[key].summoningSickness = true;
           if (isFaceDown) cc[key].faceDown = true;
+          if (isStolen) cc[key]._stolenBy = inst.stolenBy;
         }
       }
       return cc;
@@ -1648,7 +1671,9 @@ function sendSpectatorGameState(room) {
     activatableCreatures: [],
     activatableEquips: [],
     activatablePermanents: [],
+    activatableAreas: [],
     heroPlayableCards: { own: {}, charmed: {} },
+    bouncePlacementTargets: {},
     bakhmSurpriseSlots: [],
     ushabtiSummonable: [],
     roomParticipants: {
@@ -2219,14 +2244,6 @@ io.on('connection', (socket) => {
       if (gs.mulliganDecisions[0] !== null && gs.mulliganDecisions[1] !== null) {
         gs.mulliganPending = false;
         delete gs.mulliganDecisions;
-        // [TEST] Inject the current batch of cards under test into both
-        // players' starting hands. Added AFTER mulligan so the injection
-        // survives a shuffle-back-and-redraw. Remove when done.
-        for (let pi2 = 0; pi2 < 2; pi2++) {
-          gs.players[pi2].hand.push('The Great Clock Tower "Big Gwen"');
-          // Magic Arts so a hero can cast Big Gwen (Lv1 Magic Arts).
-          gs.players[pi2].hand.push('Magic Arts');
-        }
         for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
         room.engine.startGame().catch(err => console.error('[Engine] startGame error:', err.message));
       }
@@ -3151,6 +3168,25 @@ io.on('connection', (socket) => {
   });
 
   // ── ACTIVE CREATURE EFFECTS ──
+  // Generic Area-effect activation — Deepsea Castle etc. The engine's
+  // activateAreaEffect validates turn/phase/HOPT, re-runs the card's
+  // canActivateAreaEffect gate, and invokes onAreaEffect(ctx).
+  socket.on('activate_area_effect', async ({ roomId, areaOwner, areaName }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room?.engine || !room.gameState) return;
+    const gs = room.gameState;
+    const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0 || pi !== gs.activePlayer) return;
+    if (gs.potionTargeting) return;
+    try {
+      await room.engine.activateAreaEffect(pi, areaOwner, areaName);
+    } catch (err) {
+      console.error('[activate_area_effect]', err.message);
+    }
+    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  });
+
   socket.on('activate_creature_effect', ({ roomId, heroIdx, zoneSlot, charmedOwner }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
@@ -3165,7 +3201,6 @@ io.on('connection', (socket) => {
     const ps = gs.players[heroOwner];
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name) return;
-    if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return;
 
     const slot = (ps.supportZones[heroIdx] || [])[zoneSlot] || [];
     if (slot.length === 0) return;
@@ -3175,6 +3210,15 @@ io.on('connection', (socket) => {
       (c.owner === heroOwner || c.controller === heroOwner) && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
     );
     if (!inst) return;
+
+    // Cross-side activation gate: when `charmedOwner` is supplied, the
+    // creature lives on the opponent's board. The activator qualifies
+    // if EITHER the host hero is charmed / controlled by them OR the
+    // creature itself was stolen by them (Deepsea Succubus). Otherwise
+    // reject — no cross-side activation without explicit control.
+    if (charmedOwner != null
+        && hero.charmedBy !== pi && hero.controlledBy !== pi
+        && inst.stolenBy !== pi) return;
 
     const { loadCardEffect } = require('./cards/effects/_loader');
     const effectName = inst.counters?._effectOverride || creatureName;
@@ -3198,13 +3242,36 @@ io.on('connection', (socket) => {
 
     (async () => {
       try {
-        // Temporarily override controller for charmed heroes
+        // Cross-side activation owner handling.
+        //
+        //   • Charmed-hero creature (hero.charmedBy === pi): legacy path.
+        //     Flip inst.owner + inst.controller to the activator for the
+        //     duration of the effect so scripts that read
+        //     cardOriginalOwner treat the stealer as the source. Legacy
+        //     behavior — left unchanged to avoid regressions.
+        //
+        //   • Succubus-stolen creature (inst.stolenBy === pi): do NOT
+        //     flip inst.owner. The creature physically sits on the
+        //     original owner's side; flipping inst.owner would reroute
+        //     every `owner: ...` animation broadcast to the stealer's
+        //     empty support slot. _createContext already returns
+        //     cardOwner = stealer (via the stolenBy branch added to it),
+        //     so the activator still drives prompts / damage credit
+        //     without the instance mutation.
+        const isStolenByPi = inst.stolenBy === pi && inst.controller === pi;
+        const charmedHeroCreature = charmedOwner != null && !isStolenByPi;
+
         const origController = inst.controller;
         const origOwner = inst.owner;
-        if (charmedOwner != null) {
+        if (charmedHeroCreature) {
           inst.controller = pi;
           inst.owner = pi;
           inst.heroOwner = charmedOwner;
+        } else if (isStolenByPi) {
+          // Surface heroOwner so cardHeroOwner in the ctx resolves to
+          // the physical side (where the creature sits), matching the
+          // charmed-hero-creature contract.
+          inst.heroOwner = inst.owner;
         }
 
         // Queue card reveal — fires on the script's first confirmed prompt
@@ -3214,9 +3281,11 @@ io.on('connection', (socket) => {
         const resolved = await script.onCreatureEffect(ctx);
 
         // Restore controller
-        if (charmedOwner != null) {
+        if (charmedHeroCreature) {
           inst.controller = origController;
           inst.owner = origOwner;
+          delete inst.heroOwner;
+        } else if (isStolenByPi) {
           delete inst.heroOwner;
         }
 
@@ -3364,7 +3433,13 @@ io.on('connection', (socket) => {
 
     // Creature-specific checks
     if (ps.summonLocked) return;
-    if ((gs.summonBlocked || []).includes(cardName)) return;
+    // Fresh canSummon check — the cached `gs.summonBlocked` is only
+    // rebuilt at Action Phase start, so within-turn reflections (e.g. a
+    // Deepsea Creature just consumed its one-per-turn slot via bounce-
+    // place) wouldn't show up yet. Re-run the engine check so the
+    // second copy of a Deepsea Creature can't slip through.
+    const freshBlocked = room.engine.getSummonBlocked(pi);
+    if (freshBlocked.includes(cardName)) return;
     // Charmed heroes' support zones are locked
     const creatureHero = ps.heroes?.[heroIdx];
     if (creatureHero?.statuses?.charmed) return;
@@ -3385,21 +3460,44 @@ io.on('connection', (socket) => {
     const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
     if ((isMainPhase || actionAlreadyUsed) && !usingAdditional && !isInherentAction) return;
 
-    // Validate support zone slot is free
+    // Validate support zone slot is free. An occupied slot is tolerated
+    // when the card script opts into "direct drop on occupied slot"
+    // (Deepsea bounce-place swap). In that case we stash the target on
+    // the player state so beforeSummon can pick it up and execute the
+    // alternative placement without a redundant zone-pick prompt.
     if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
     const totalZones = ps.supportZones[heroIdx].length;
     if (zoneSlot < 0 || zoneSlot >= totalZones) return;
-    if ((ps.supportZones[heroIdx][zoneSlot] || []).length > 0) return;
-
-    // Consume additional action if applicable
-    if (usingAdditional) {
-      const consumed = room.engine.consumeAdditionalAction(pi, additionalTypeId, additionalActionProvider || null);
-      if (!consumed) return; // Failed to consume — shouldn't happen
+    if ((ps.supportZones[heroIdx][zoneSlot] || []).length > 0) {
+      const occCardScript = loadCardEffect(cardName);
+      let allowOccupied = false;
+      if (typeof occCardScript?.canPlaceOnOccupiedSlot === 'function') {
+        try {
+          allowOccupied = !!occCardScript.canPlaceOnOccupiedSlot(gs, pi, heroIdx, zoneSlot, room.engine);
+        } catch (err) {
+          console.error('[canPlaceOnOccupiedSlot]', cardName, err.message);
+        }
+      }
+      if (!allowOccupied) return;
+      ps._requestedBouncePlaceSlot = { heroIdx, slotIdx: zoneSlot };
     }
 
-    // Execute: remove from hand
-    ps.hand.splice(handIndex, 1);
-    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+    // Consume additional action if applicable
+    let additionalConsumed = false;
+    let consumedInst = null;
+    if (usingAdditional) {
+      consumedInst = room.engine.consumeAdditionalAction(pi, additionalTypeId, additionalActionProvider || null);
+      if (!consumedInst) return; // Failed to consume — shouldn't happen
+      additionalConsumed = true;
+    }
+
+    // Mark as resolving — card STAYS IN HAND until beforeSummon commits
+    // (normal summon) or the alternative-placement path consumes it. This
+    // matches the Spell flow so Deepsea bounce-place prompts (and any
+    // future beforeSummon prompt) don't pull the card out from under the
+    // player while they're still deciding.
+    const nthCreature = ps.hand.slice(0, handIndex + 1).filter(c => c === cardName).length;
+    ps._resolvingCard = { name: cardName, nth: nthCreature };
 
     // Action-count tracking for Torchure-style second-action slot: increment
     // on every Action Phase play (regular/inherent/additional all count). If
@@ -3415,6 +3513,19 @@ io.on('connection', (socket) => {
 
     room.engine._trackTerrorResolvedEffect(pi, cardName);
 
+    // Helper: commit the play by removing the resolving card from hand.
+    // Uses getResolvingHandIndex to find the card in case the hand has
+    // shifted during an async prompt. Safe to call once per play.
+    const commitHandRemoval = () => {
+      const idx = getResolvingHandIndex(ps);
+      ps._resolvingCard = null;
+      if (idx >= 0) {
+        ps.hand.splice(idx, 1);
+        if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+      }
+      return idx;
+    };
+
     // Fire hooks, wait for resolution, then advance phase (only if NOT using additional action)
     (async () => {
       try {
@@ -3426,7 +3537,8 @@ io.on('connection', (socket) => {
         });
 
         if (chainResult.negated) {
-          // Creature was negated — goes to discard, action still consumed
+          // Creature was negated — commit the hand removal, then discard.
+          commitHandRemoval();
           ps.discardPile.push(cardName);
           room.engine.log('creature_negated', { card: cardName, player: ps.username });
           if (isActionPhase && !usingAdditional) {
@@ -3442,41 +3554,66 @@ io.on('connection', (socket) => {
           return;
         }
 
-        // Pre-placement beforeSummon hook (sacrifice costs, tribute costs).
-        // Runs BEFORE the creature touches the board so a failed/cancelled
-        // cost never leaves a transient ghost Creature momentarily visible.
-        // Returning false aborts the whole summon — put the card back in
-        // hand (it wasn't actually spent) and bail.
-        const beforeSummonOk = await room.engine._runBeforeSummon(cardName, pi, heroIdx);
-        if (!beforeSummonOk) {
-          ps.hand.push(cardName);
-          room.engine.log('creature_fizzle', { card: cardName, reason: 'beforeSummon_failed' });
+        // Pre-placement beforeSummon hook (sacrifice costs, tribute costs,
+        // Deepsea bounce-place). Runs while the card is STILL IN HAND —
+        // tryBouncePlace can prompt the player to pick which Creature to
+        // bounce without the hand card briefly disappearing.
+        //
+        // Outcomes:
+        //   • returns true → normal summon proceeds below.
+        //   • returns false + ps._placementConsumedByCard === cardName →
+        //     the alternative path already placed the card into a Support
+        //     Zone; we just commit the hand removal and skip summonCreature.
+        //   • returns false + flag NOT set → player cancelled (e.g. closed
+        //     the bounce-prompt). Clear _resolvingCard so the card goes
+        //     back to being plainly in hand, refund additional action, bail.
+        const beforeSummonOk = await room.engine._runBeforeSummon(cardName, pi, heroIdx, { isInherentAction });
+        const placementConsumed = ps._placementConsumedByCard === cardName;
+        if (placementConsumed) delete ps._placementConsumedByCard;
+        if (!beforeSummonOk && !placementConsumed) {
+          ps._resolvingCard = null;
+          if (additionalConsumed && consumedInst) {
+            consumedInst.counters.additionalActionAvail = 1;
+          }
+          room.engine.log('creature_fizzle', { card: cardName, reason: 'beforeSummon_cancelled' });
           for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
           return;
         }
 
-        // Not negated — place creature in support zone via centralized summon
-        const placeResult = room.engine.summonCreature(cardName, pi, heroIdx, zoneSlot);
-        if (!placeResult) {
-          ps.discardPile.push(cardName);
-          room.engine.log('creature_fizzle', { card: cardName, reason: 'zone_occupied' });
-          for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
-          return;
-        }
-        const actualZoneSlot = placeResult.actualSlot;
-        const inst = placeResult.inst;
+        let actualZoneSlot = zoneSlot;
+        let inst = null;
+        if (placementConsumed) {
+          // Alternative-placement path already ran. The card is physically
+          // in a Support Zone as a new instance; the hand still holds the
+          // name (we were resolving). Commit the removal now.
+          commitHandRemoval();
+        } else {
+          // Normal path: commit removal, then call summonCreature.
+          commitHandRemoval();
+          const placeResult = room.engine.summonCreature(cardName, pi, heroIdx, zoneSlot);
+          if (!placeResult) {
+            ps.discardPile.push(cardName);
+            room.engine.log('creature_fizzle', { card: cardName, reason: 'zone_occupied' });
+            for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+            return;
+          }
+          actualZoneSlot = placeResult.actualSlot;
+          inst = placeResult.inst;
 
-        // Emit summon effect highlight to both players
-        for (let i = 0; i < 2; i++) {
-          const sid = gs.players[i]?.socketId;
-          if (sid) io.to(sid).emit('summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
+          // Emit summon effect highlight to both players
+          for (let i = 0; i < 2; i++) {
+            const sid = gs.players[i]?.socketId;
+            if (sid) io.to(sid).emit('summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
+          }
+          sendToSpectators(room, 'summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
         }
-        sendToSpectators(room, 'summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
 
         if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
 
-        await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualZoneSlot });
-        await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
+        if (!placementConsumed) {
+          await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualZoneSlot });
+          await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
+        }
         // Fire action hooks
         await room.engine.runHooks('onActionUsed', {
           actionType: 'creature', playerIdx: pi, cardName, heroIdx,
@@ -3826,8 +3963,15 @@ io.on('connection', (socket) => {
     const cardData = getCardDB()[cardName];
     if (!cardData || cardData.cardType !== 'Artifact') return;
 
-    // Check gold
-    const cost = cardData.cost || 0;
+    // Check gold — with optional per-turn reduction (Shu'Chaku, generic).
+    // A card effect sets ps._nextArtifactCostReduction to discount the very
+    // next Artifact play this turn. The reduction clamps at 0 (never
+    // refunds). Consumed (cleared) when the artifact actually resolves —
+    // that way a cancelled / negated / insufficient-gold play keeps the
+    // discount available for a later attempt.
+    const rawCost = cardData.cost || 0;
+    const costReduction = ps._nextArtifactCostReduction || 0;
+    const cost = Math.max(0, rawCost - costReduction);
     if ((ps.gold || 0) < cost) return;
 
     const hero = ps.heroes[heroIdx];
@@ -3903,8 +4047,13 @@ io.on('connection', (socket) => {
           const chainResult = await room.engine.executeCardWithChain({
             cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
             resolve: async () => {
-              // Deduct gold on resolve (not negated)
+              // Deduct gold on resolve (not negated). Consume any
+              // per-play cost reduction so it doesn't apply twice.
               if (cost > 0) ps.gold -= cost;
+              if (costReduction > 0) {
+                delete ps._nextArtifactCostReduction;
+                delete ps._nextArtifactCostReductionTurn;
+              }
 
               // Safe placement — handles zone-occupied fallback (Slippery Fridge, etc.)
               const result = room.engine.safePlaceInSupport(cardName, pi, heroIdx, finalSlot);
@@ -3982,8 +4131,13 @@ io.on('connection', (socket) => {
           const chainResult = await room.engine.executeCardWithChain({
             cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
             resolve: async () => {
-              // Deduct gold on resolve (not negated).
+              // Deduct gold on resolve (not negated). Consume any
+              // per-play cost reduction so it doesn't apply twice.
               if (cost > 0) ps.gold -= cost;
+              if (costReduction > 0) {
+                delete ps._nextArtifactCostReduction;
+                delete ps._nextArtifactCostReductionTurn;
+              }
               // Place as a tracked Creature. summonCreatureWithHooks runs
               // beforeSummon (sacrifice costs etc.) if the card defines one
               // and fires onPlay + onCardEnterZone after placement — same
@@ -4144,7 +4298,13 @@ io.on('connection', (socket) => {
     if (!cardData || cardData.cardType !== 'Artifact') return;
     if ((cardData.subtype || '').toLowerCase() === 'equipment') return; // Equips use play_artifact
 
-    const cost = cardData.cost || 0;
+    // Apply any one-shot artifact cost reduction the player has queued up
+    // (mirrors the logic in play_artifact). The no-targeting branch below
+    // references `costReduction` when clearing the flag post-resolve, so
+    // it must be declared here in the handler's scope.
+    const rawCost = cardData.cost || 0;
+    const costReduction = ps._nextArtifactCostReduction || 0;
+    const cost = Math.max(0, rawCost - costReduction);
     if ((ps.gold || 0) < cost) return;
 
     const script = loadCardEffect(cardName);
@@ -4229,6 +4389,10 @@ io.on('connection', (socket) => {
 
         if (cost > 0 && !script.manualGoldCost && !chainResult.negated) {
           ps.gold -= cost;
+        }
+        if (!chainResult.negated && costReduction > 0) {
+          delete ps._nextArtifactCostReduction;
+          delete ps._nextArtifactCostReductionTurn;
         }
 
         const currentIdx = getResolvingHandIndex(ps);
@@ -4563,7 +4727,7 @@ io.on('connection', (socket) => {
     if (pi !== room.gameState.potionTargeting.ownerIdx) return;
     room.gameState.potionTargeting = null;
     // Resolve the engine's pending prompt so the play_spell handler can reach its cancel path
-    if (room.engine) room.engine.resolveEffectPrompt([]);
+    if (room.engine) room.engine.resolveEffectPrompt(null, { cancelled: true });
     for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   });
 
@@ -5013,11 +5177,18 @@ io.on('connection', (socket) => {
             c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === slot
           );
           if (!inst) continue;
+          // Explicitly stamp max HP from cards.json on every preset
+          // creature so downstream readers (sacrifice thresholds, Alice's
+          // damage, UI displays) see a populated value instead of
+          // undefined. Max HP ALWAYS tracks cards.json in puzzle mode —
+          // customHp below only affects CURRENT HP.
+          const cd = cardsByName[inst.name];
+          if (cd?.hp) inst.counters.maxHp = cd.hp;
           const customHp = pz._customSupportHp?.[hi]?.[slot];
           if (customHp != null) {
+            // customHp is CURRENT HP only — may be above or below the
+            // card's max. Effects that check max HP still see cards.json.
             inst.counters.currentHp = customHp;
-            const cd = cardsByName[inst.name];
-            if (cd?.hp && customHp !== cd.hp) inst.counters.maxHp = cd.hp;
           }
           const cs = pz._creatureStatuses?.[hi + '-' + slot];
           if (cs) {
@@ -5027,6 +5198,13 @@ io.on('connection', (socket) => {
             if (cs.negated) inst.counters.negated = 1;
             if (cs.poisoned) { inst.counters.poisoned = 1; inst.counters.poisonStacks = cs.poisoned.stacks || 1; }
             if (cs.buffs) { if (!inst.counters.buffs) inst.counters.buffs = {}; Object.assign(inst.counters.buffs, cs.buffs); }
+            // Taunt mirror: when a puzzle creature carries the
+            // forcesTargeting buff, set the functional counter the engine
+            // filter actually reads. No pi restriction (= any opposing
+            // caster) and no untilTurn (= permanent).
+            if (cs.buffs?.forcesTargeting) {
+              inst.counters.forcesTargeting = true;
+            }
             // Anti Magic Enchantment buff on an Equip needs its functional
             // counter too — the `antiMagicEnchanted` counter is what the
             // engine reads to offer spell-negation, the buff is just the

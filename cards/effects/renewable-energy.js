@@ -5,10 +5,10 @@
 //  pile and shuffle them back into your deck.
 //  Delete this card.
 //
-//  Uses cardGalleryMulti prompt showing all
-//  discard pile cards (including duplicates).
-//  Selection is by name, so duplicates highlight
-//  together but only 1 copy per name is returned.
+//  Uses the shared recycleCardsFromDiscard
+//  helper so the discard→deck flight, pile
+//  mutation, shuffle, and log all match the
+//  other recycler cards (Deepsea Stein, etc.).
 //
 //  deleteOnUse: the artifact play flow sends
 //  this card to deletedPile instead of discardPile.
@@ -56,32 +56,15 @@ module.exports = {
 
     const selectedNames = result.selectedCards;
 
-    // Broadcast discard-to-deck animation
-    engine._broadcastEvent('discard_to_deck_animation', {
-      owner: pi,
-      cardNames: selectedNames,
+    const recycled = await engine.actionRecycleCards(pi, selectedNames, {
+      source: 'Renewable Energy',
+      shuffle: true,
     });
-    await engine._delay(200);
-
-    // Move one copy of each selected name from discard pile to main deck
-    for (const name of selectedNames) {
-      const idx = ps.discardPile.indexOf(name);
-      if (idx >= 0) {
-        ps.discardPile.splice(idx, 1);
-        ps.mainDeck.push(name);
-        engine.log('card_recycled', { player: ps.username, card: name, from: 'discard', to: 'deck' });
-      }
-      engine.sync();
-      await engine._delay(250);
-    }
-
-    // Shuffle the deck
-    engine.shuffleDeck(pi);
 
     engine.log('renewable_energy', {
       player: ps.username,
-      recycled: selectedNames,
-      count: selectedNames.length,
+      recycled,
+      count: recycled.length,
     });
 
     engine.sync();

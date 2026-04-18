@@ -15,7 +15,6 @@
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens, countFreeZones } = require('./_pollution-shared');
-const { removeArea } = require('./_area-shared');
 
 const POLLUTION_TOKEN = 'Pollution Token';
 const SUN_BEAM_MAX = 3;
@@ -160,7 +159,7 @@ module.exports = {
         const inst = t._cardInstance;
         if (!inst) continue;
         if (inst.zone === 'area') {
-          await removeArea(engine, inst, 'Sun Beam');
+          await engine.removeArea(inst, 'Sun Beam');
           destroyed++;
         } else {
           await engine.actionDestroyCard(ctx.card, inst);

@@ -16,8 +16,6 @@
 //  heals, and other Attack-reactive effects work.
 // ═══════════════════════════════════════════
 
-const { performAscensionBonus } = require('./_ascension-bonus');
-
 const CARD_NAME = 'Arthor, Inheritor of the Barbarian Sword';
 const DAMAGE    = 400;
 
@@ -34,7 +32,7 @@ module.exports = {
   heroEffect: true,
 
   async onAscensionBonus(engine, pi, heroIdx) {
-    await performAscensionBonus(engine, pi, heroIdx, ['Fighting', 'Summoning Magic']);
+    await engine.performAscensionBonus(pi, heroIdx, ['Fighting', 'Summoning Magic']);
   },
 
   canActivateHeroEffect(ctx) {

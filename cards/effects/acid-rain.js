@@ -22,7 +22,6 @@
 //      the turn number of the last firing.
 // ═══════════════════════════════════════════
 
-const { placeArea } = require('./_area-shared');
 const { placePollutionTokens, countFreeZones } = require('./_pollution-shared');
 const { hasCardType } = require('./_hooks');
 
@@ -41,7 +40,7 @@ module.exports = {
     onPlay: async (ctx) => {
       if (ctx.cardZone !== 'hand') return;
       if (ctx.playedCard?.id !== ctx.card.id) return;
-      await placeArea(ctx._engine, ctx.cardOwner, ctx.card);
+      await ctx._engine.placeArea(ctx.cardOwner, ctx.card);
     },
 
     /**

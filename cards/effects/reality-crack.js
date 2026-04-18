@@ -13,7 +13,6 @@
 //  play another Area for the rest of this turn.
 // ═══════════════════════════════════════════
 
-const { placeArea, removeAllAreas } = require('./_area-shared');
 const { placePollutionTokens } = require('./_pollution-shared');
 const { hasCardType } = require('./_hooks');
 
@@ -50,7 +49,7 @@ module.exports = {
       const cardDB = engine._getCardDB();
 
       // ── Step 1: wipe all Areas currently on the board ──
-      const wipedCount = await removeAllAreas(engine, -2, 'Reality Crack');
+      const wipedCount = await engine.removeAllAreas(-2, 'Reality Crack');
       engine.log('reality_crack_wipe', {
         player: ps.username, wiped: wipedCount,
       });
@@ -154,7 +153,7 @@ module.exports = {
       // If the Area's own onPlay didn't place itself (shouldn't happen for
       // a properly-written Area card), fall back to placing directly.
       if (newInst.zone !== 'area') {
-        await placeArea(engine, pi, newInst);
+        await engine.placeArea(pi, newInst);
       }
 
       // ── Step 6: calculate excess level and place Pollution Tokens ──

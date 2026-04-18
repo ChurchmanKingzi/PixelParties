@@ -18,6 +18,10 @@ module.exports = {
     const gs      = engine.gs;
     const pi      = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
+    // Physical render side — source-side animations must start from the
+    // creature's actual support slot (cardHeroOwner), not the activator
+    // (cardOwner). Those diverge for a temporarily stolen creature.
+    const sourceOwner = ctx.cardHeroOwner;
 
     const target = await ctx.promptDamageTarget({
       side: 'any',
@@ -38,7 +42,7 @@ module.exports = {
 
     // Cannonball projectile
     engine._broadcastEvent('play_projectile_animation', {
-      sourceOwner: pi, sourceHeroIdx: heroIdx, sourceZoneSlot: ctx.card.zoneSlot,
+      sourceOwner, sourceHeroIdx: heroIdx, sourceZoneSlot: ctx.card.zoneSlot,
       targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
       targetZoneSlot: tgtZoneSlot,
       emoji: '💣',

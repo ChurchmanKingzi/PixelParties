@@ -1777,6 +1777,142 @@ body {
   100% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0; }
 }
 
+/* Gold-steal coin — flies from victim's gold counter to thief's, arcing
+   upward via a midpoint jitter so the stream reads as a shower of
+   coins rather than a straight line. */
+@keyframes goldStealCoin {
+  0%   { opacity: 0; transform: translate(0, 0) scale(0.6) rotate(0deg); }
+  20%  { opacity: 1; transform: translate(var(--gsMx), var(--gsMy)) scale(1.1) rotate(140deg); }
+  70%  { opacity: 1; transform:
+    translate(calc(var(--gsDx) * 0.75 + var(--gsMx) * 0.25),
+              calc(var(--gsDy) * 0.75 + var(--gsMy) * 0.25))
+    scale(1) rotate(320deg); }
+  100% { opacity: 0; transform: translate(var(--gsDx), var(--gsDy)) scale(0.7) rotate(520deg); }
+}
+
+/* Critical Strike — huge cross-cut slash with shockwave, glint, text,
+   and a fan of sparks. Front-loaded so the hit lands heavy and fast. */
+@keyframes criticalSlashA {
+  0%   { opacity: 0; transform: rotate(-35deg) translateX(-130%); }
+  30%  { opacity: 1; }
+  100% { opacity: 0; transform: rotate(-35deg) translateX(130%); }
+}
+@keyframes criticalSlashB {
+  0%   { opacity: 0; transform: rotate(35deg) translateX(-130%); }
+  30%  { opacity: 1; }
+  100% { opacity: 0; transform: rotate(35deg) translateX(130%); }
+}
+@keyframes criticalGlint {
+  0%   { opacity: 0; transform: scale(0.2); }
+  40%  { opacity: 1; transform: scale(1.4); }
+  100% { opacity: 0; transform: scale(2.4); }
+}
+@keyframes criticalShockwave {
+  0%   { opacity: 0; transform: scale(0.25); }
+  25%  { opacity: 1; transform: scale(1.05); }
+  65%  { opacity: 0.7; transform: scale(1.35); }
+  100% { opacity: 0; transform: scale(1.7); }
+}
+@keyframes criticalText {
+  0%   { opacity: 0; transform: scale(0.3) translateY(8px); }
+  35%  { opacity: 1; transform: scale(1.15) translateY(0); }
+  75%  { opacity: 1; transform: scale(1) translateY(-2px); }
+  100% { opacity: 0; transform: scale(0.95) translateY(-14px); }
+}
+@keyframes criticalSpark {
+  0%   { opacity: 0; transform: translate(0, 0) scale(1); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform:
+    translate(calc(cos(var(--csAngle)) * var(--csDist)), calc(sin(var(--csAngle)) * var(--csDist)))
+    scale(0.15); }
+}
+
+/* Siphem orbital laser — charge-up, falling beam, impact flash, sparks. */
+@keyframes orbitalLaserCharge {
+  0%   { opacity: 0; transform: scale(0.3); }
+  60%  { opacity: 1; transform: scale(1.25); }
+  100% { opacity: 0.95; transform: scale(1); }
+}
+@keyframes orbitalLaserBeam {
+  0%   { opacity: 0; transform: scaleY(0); }
+  25%  { opacity: 1; transform: scaleY(1); }
+  75%  { opacity: 0.95; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(1); }
+}
+@keyframes orbitalLaserImpact {
+  0%   { opacity: 0; transform: scale(0.35); }
+  25%  { opacity: 1; transform: scale(1.2); }
+  60%  { opacity: 0.75; transform: scale(1.55); }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+@keyframes orbitalLaserSpark {
+  0%   { opacity: 0; transform: translate(0, 0) scale(1); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform:
+    translate(calc(cos(var(--olAngle)) * var(--olDist)), calc(sin(var(--olAngle)) * var(--olDist)))
+    scale(0.2); }
+}
+
+/* Blood Moon under the Sea re-trigger — red moon, beams, dripping blood. */
+@keyframes bloodMoonOrb {
+  0%   { opacity: 0; transform: translateY(14px) scale(0.4); }
+  35%  { opacity: 1; transform: translateY(0) scale(1.15); }
+  100% { opacity: 0.85; transform: translateY(-6px) scale(1); }
+}
+@keyframes bloodMoonHalo {
+  0%   { opacity: 0; transform: scale(0.55); }
+  40%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 0; transform: scale(1.25); }
+}
+@keyframes bloodMoonRay {
+  0%   { opacity: 0; transform: rotate(var(--bmrAngle, 0deg)) scaleY(0); }
+  35%  { opacity: 1; transform: rotate(var(--bmrAngle, 0deg)) scaleY(1); }
+  80%  { opacity: 0.85; }
+  100% { opacity: 0; transform: rotate(var(--bmrAngle, 0deg)) scaleY(1); }
+}
+@keyframes bloodMoonDrop {
+  0%   { opacity: 0; transform: translateY(0) scaleY(1); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(var(--bmEndY, 80px)) scaleY(1.2); }
+}
+
+/* Deepsea Spores — board-wide rain + per-creature anemone growth. */
+@keyframes deepseaSporeFall {
+  0%   { opacity: 0; transform: translate(0, 0); }
+  10%  { opacity: var(--dsOpacity, .8); }
+  50%  { transform: translate(calc(var(--dsEndX) * 0.5 + var(--dsWobble)), calc(var(--dsEndY) * 0.5)); }
+  90%  { opacity: var(--dsOpacity, .6); }
+  100% { opacity: 0; transform: translate(var(--dsEndX), var(--dsEndY)); }
+}
+@keyframes deepseaSporesWash {
+  0%   { opacity: 0; }
+  30%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes deepseaSporeRedPulse {
+  0%   { opacity: 0; transform: scale(0.6); }
+  30%  { opacity: 1; transform: scale(1.05); }
+  70%  { opacity: 0.8; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.08); }
+}
+@keyframes deepseaTendrilGrow {
+  0%   { transform: rotate(var(--dtAngle, 0deg)) scaleY(0); }
+  60%  { transform: rotate(var(--dtAngle, 0deg)) scaleY(1.08); }
+  100% { transform: rotate(var(--dtAngle, 0deg)) scaleY(1); }
+}
+@keyframes deepseaFrondPop {
+  0%   { opacity: 0; transform: translate(0, 0) scale(0.2) rotate(-12deg); }
+  30%  { opacity: 1; transform: translate(0, -6px) scale(1.1) rotate(6deg); }
+  100% { opacity: 0.9; transform: translate(0, -18px) scale(1) rotate(-4deg); }
+}
+
+/* Sporified creature — dark-red tint while Deepsea Spores is active. */
+.creature-sporified {
+  filter: brightness(0.78) sepia(0.6) hue-rotate(-50deg) saturate(1.7) contrast(1.05);
+  transition: filter 300ms ease-in-out;
+}
+
 /* Deep sea bubble rise animation for Monster in a Bottle */
 @keyframes bubbleRise {
   0% { opacity: 0; transform: translateY(0) translateX(0); }
@@ -1784,6 +1920,68 @@ body {
   50% { transform: translateY(calc(var(--endY) * 0.5)) translateX(var(--wobble)); }
   85% { opacity: var(--bubbleOpacity, 0.4); }
   100% { opacity: 0; transform: translateY(var(--endY)) translateX(0); }
+}
+
+/* Claw maul — Deepsea Werewolf's damage signature. Four parallel
+   claw streaks rake across the target, each leaving a crimson wound;
+   gore drops splatter beneath the cut cluster. */
+@keyframes clawSlash {
+  0%   { transform: rotate(-32deg) scale(var(--cmScale, 1)) translateX(-120%); opacity: 0; }
+  25%  { opacity: 1; }
+  100% { transform: rotate(-32deg) scale(var(--cmScale, 1)) translateX(120%); opacity: 0; }
+}
+@keyframes clawWound {
+  0%   { opacity: 0; transform: rotate(-32deg) scaleX(0); }
+  22%  { opacity: 1; transform: rotate(-32deg) scaleX(1); }
+  75%  { opacity: 0.75; }
+  100% { opacity: 0; transform: rotate(-32deg) scaleX(1); }
+}
+@keyframes clawGore {
+  0%   { opacity: 0; transform: translate(0, 0); }
+  18%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-4px, var(--cmGy)); }
+}
+
+/* Scythe cut — Deepsea Reaper's creature-defeat signature. The blade
+   streaks across the slot, a white glint pops at the impact point, a
+   crimson wound lingers along the cut path, and droplets fall away. */
+@keyframes scytheSlash {
+  0%   { transform: rotate(-42deg) translateX(-120%); opacity: 0; }
+  25%  { opacity: 1; }
+  100% { transform: rotate(-42deg) translateX(120%); opacity: 0; }
+}
+@keyframes scytheGlint {
+  0%   { opacity: 0; transform: scale(0.2); }
+  30%  { opacity: 1; transform: scale(1.4); }
+  100% { opacity: 0; transform: scale(2.2); }
+}
+@keyframes scytheWound {
+  0%   { opacity: 0; transform: rotate(-42deg) scaleX(0); }
+  20%  { opacity: 1; transform: rotate(-42deg) scaleX(1); }
+  75%  { opacity: 0.85; }
+  100% { opacity: 0; transform: rotate(-42deg) scaleX(1); }
+}
+@keyframes scytheDrop {
+  0%   { opacity: 0; transform: translate(0, 0); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-6px, var(--scDropY)); }
+}
+
+/* Spooky ghost float — Deepsea Poltergeister artifact-destroy signature.
+   Ghost fades in, wobbles side-to-side while rising, fades out. */
+@keyframes spookyGhostFloat {
+  0%   { opacity: 0; transform: translate(0, 10px) scale(0.6); }
+  15%  { opacity: 1; transform: translate(-6px, 2px) scale(1.05); }
+  35%  { opacity: 1; transform: translate(8px, -18px) scale(1); }
+  55%  { opacity: 0.95; transform: translate(-6px, -36px) scale(1.02); }
+  75%  { opacity: 0.8; transform: translate(6px, -54px) scale(1); }
+  100% { opacity: 0; transform: translate(0, -78px) scale(0.75); }
+}
+@keyframes spookyWispRise {
+  0%   { opacity: 0; transform: translate(0, 0); }
+  20%  { opacity: 0.9; }
+  60%  { transform: translate(var(--sgWobble), calc(var(--sgEndY) * 0.55)); opacity: 0.6; }
+  100% { opacity: 0; transform: translate(0, var(--sgEndY)); }
 }
 
 /* Holy revival animation for Resuscitation Potion */
@@ -2138,6 +2336,13 @@ body {
   width: 100%;
   height: 0;
   pointer-events: none;
+  /* z-index: 10 lifts the area zones above sibling board rows (static
+     flex children of .board-center that otherwise paint over the area
+     zones' lower half, eating hover events on the bottom of the card).
+     The Deepsea Castle mood-lighting split now lives at z-index auto
+     (darkness) + z-index 1000 (rays), so area zones at 10 correctly
+     sit BETWEEN the darkness and the rays and are no longer trapped
+     above the Castle effect. */
   z-index: 10;
 }
 .board-area-zones-center .board-zone {
@@ -3207,6 +3412,15 @@ body {
   border-color: #ff3333 !important;
   animation: potionPulse .8s ease-in-out infinite;
 }
+/* Ineligible targets: visually present but grayed out so the player
+   sees at a glance which of their own board Creatures fail the current
+   effect's filter (e.g. Dragon Pilot's ≤Lv1 inherent-path requirement).
+   Pointer-events off so clicks fall through to anything below. */
+.potion-target-ineligible {
+  filter: grayscale(0.9) brightness(0.55);
+  opacity: 0.65;
+  pointer-events: none;
+}
 @keyframes potionPulse {
   0%, 100% { box-shadow: 0 0 20px rgba(255,50,50,.9), 0 0 40px rgba(255,30,30,.5), inset 0 0 12px rgba(255,50,50,.4); }
   50% { box-shadow: 0 0 30px rgba(255,50,50,1), 0 0 55px rgba(255,30,30,.7), inset 0 0 18px rgba(255,50,50,.6); }
@@ -3257,6 +3471,30 @@ body {
 .zone-drag-invalid {
   opacity: 0.35;
   filter: saturate(0.3);
+}
+/* Bounce-place target (Deepsea swap gesture) — cyan/teal pulse on
+   occupied slots where the dragged Creature can swap with the
+   occupant. Overrides the invalid-zone dimming. */
+.zone-bounce-place-target {
+  box-shadow: 0 0 14px rgba(80,210,255,.85), 0 0 28px rgba(40,170,230,.55), inset 0 0 10px rgba(120,230,255,.45) !important;
+  border-color: rgba(140,230,255,.9) !important;
+  animation: bouncePlacePulse 1.1s ease-in-out infinite !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+@keyframes bouncePlacePulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(80,210,255,.85), 0 0 28px rgba(40,170,230,.55), inset 0 0 10px rgba(120,230,255,.45); }
+  50%      { box-shadow: 0 0 22px rgba(150,240,255,1),  0 0 42px rgba(70,200,255,.75), inset 0 0 16px rgba(180,240,255,.6); }
+}
+
+/* Bounce-outgoing hide — the destination Support Zone during a Deepsea
+   swap. Keeps the zone's background/border visible (so the zone itself
+   doesn't look like it moved) while hiding just the card contents, so
+   the inbound flying card can visually "arrive" into an empty-looking
+   slot. */
+[data-bounce-hiding="true"] > * {
+  visibility: hidden !important;
 }
 
 /* Additional Action provider selection */
@@ -3340,6 +3578,18 @@ body {
   flex-shrink: 0;
 }
 .board-card.flipped { transform: rotate(180deg); }
+
+/* Dark Deepsea God manifest — huge /DDG.png above the battlefield:
+   starts small + transparent, swells to full size + full opacity,
+   then fades out while continuing to grow past the original bounds.
+   Total duration 2500ms; JS cleans the node up at 2700ms. */
+@keyframes ddgManifest {
+  0%   { opacity: 0;    transform: scale(0.35); filter: drop-shadow(0 0 40px rgba(255,40,60,0.85)); }
+  20%  { opacity: 0.45; transform: scale(0.65); }
+  50%  { opacity: 1;    transform: scale(1.00); }
+  72%  { opacity: 1;    transform: scale(1.10); filter: drop-shadow(0 0 55px rgba(255,60,80,1)); }
+  100% { opacity: 0;    transform: scale(1.45); filter: drop-shadow(0 0 70px rgba(255,80,100,0.5)); }
+}
 
 /* HP display on board cards */
 .board-card-hp {

@@ -333,14 +333,39 @@ function hasNicolasHero(deck) {
   return (deck.heroes || []).some(h => h?.hero === 'Nicolas, the Hidden Alchemist');
 }
 
+// "The Sacred Jewel" deck-building clause: "If you have 4 copies of this
+// card in your deck, your deck may contain 5 copies of every Artifact."
+// Returns true when the deck currently has ≥ 4 copies of The Sacred Jewel
+// anywhere (main + potion + side + heroes — though it'll only be in main
+// or side in practice). When active, every Artifact's per-card cap is
+// raised by one (4 → 5), including The Sacred Jewel itself.
+const SACRED_JEWEL = 'The Sacred Jewel';
+function hasSacredJewelArtifactBonus(deck) {
+  return countInDeck(deck, SACRED_JEWEL) >= 4;
+}
+
+// Effective per-card max across sections. Centralizes the default-4
+// logic and the Sacred Jewel exception so callers (canAddCard, auto-trim
+// on Sacred Jewel removal, etc.) all agree.
+function getCardMax(deck, cardName) {
+  const card = window.CARDS_BY_NAME[cardName];
+  if (!card) return 0;
+  if (card.maxCopies != null) return card.maxCopies;
+  const ct = card.cardType;
+  if (ct === 'Hero') return 1;
+  if (ct === 'Potion') return 2;
+  if (ct === 'Ability') return Infinity;
+  if (ct === 'Artifact' && hasSacredJewelArtifactBonus(deck)) return 5;
+  return 4;
+}
+
 function canAddCard(deck, cardName, section) {
   const card = window.CARDS_BY_NAME[cardName];
   if (!card) return false;
   const ct = card.cardType;
   // Token cards cannot be added to any deck
   if (ct === 'Token') return false;
-  // Per-card copy limit (e.g. Performance has maxCopies: 4 despite being an Ability)
-  const cardMax = card.maxCopies;
+  const effMax = getCardMax(deck, cardName);
   if (section === 'main') {
     if (ct === 'Hero') return false;
     // Potions allowed in main deck ONLY if Nicolas is a hero
@@ -351,34 +376,74 @@ function canAddCard(deck, cardName, section) {
       const totalPotions = (deck.mainDeck || []).filter(n => window.CARDS_BY_NAME[n]?.cardType === 'Potion').length
         + (deck.potionDeck || []).length;
       if (totalPotions >= 15) return false;
-      if (countInDeck(deck, cardName) >= (cardMax || 2)) return false;
+      if (countInDeck(deck, cardName) >= effMax) return false;
       return true;
     }
     if ((deck.mainDeck || []).length >= 60) return false;
-    if (ct === 'Ability' && !cardMax) return true; // Unlimited unless maxCopies set
-    if (countInDeck(deck, cardName) >= (cardMax || 4)) return false;
+    if (ct === 'Ability' && effMax === Infinity) return true;
+    if (countInDeck(deck, cardName) >= effMax) return false;
     return true;
   }
   if (section === 'potion') {
     if (ct !== 'Potion') return false;
     if ((deck.potionDeck || []).length >= 15) return false;
-    if (countInDeck(deck, cardName) >= (cardMax || 2)) return false;
+    if (countInDeck(deck, cardName) >= effMax) return false;
     return true;
   }
   if (section === 'hero') {
     if (ct !== 'Hero') return false;
     if (!(deck.heroes || []).some(h => !h || !h.hero)) return false;
-    if (countInDeck(deck, cardName) >= (cardMax || 1)) return false;
+    if (countInDeck(deck, cardName) >= effMax) return false;
     return true;
   }
   if (section === 'side') {
     if ((deck.sideDeck || []).length >= 15) return false;
-    if (ct === 'Ability' && !cardMax) return true; // Unlimited unless maxCopies set
-    const maxC = cardMax || (ct === 'Hero' ? 1 : ct === 'Potion' ? 2 : 4);
-    if (countInDeck(deck, cardName) >= maxC) return false;
+    if (ct === 'Ability' && effMax === Infinity) return true;
+    if (countInDeck(deck, cardName) >= effMax) return false;
     return true;
   }
   return false;
+}
+
+// Trim any card in the deck whose count exceeds its effective max.
+// Used after removing a Sacred Jewel copy that drops the count below 4
+// (revoking the 5-copy-Artifact bonus) — any Artifact currently at 5
+// copies has its extras removed. Returns a new deck object; mutates no
+// inputs. Trim order: side deck first (least impactful), then potion
+// deck, then main deck (so the player's core strategy is preserved as
+// much as possible).
+function trimOverLimitCopies(deck) {
+  const out = {
+    ...deck,
+    mainDeck: [...(deck.mainDeck || [])],
+    potionDeck: [...(deck.potionDeck || [])],
+    sideDeck: [...(deck.sideDeck || [])],
+    heroes: [...(deck.heroes || [])],
+  };
+  // Walk every distinct card name in the deck.
+  const distinct = new Set([
+    ...out.mainDeck, ...out.potionDeck, ...out.sideDeck,
+    ...out.heroes.map(h => h?.hero).filter(Boolean),
+  ]);
+  for (const cardName of distinct) {
+    const max = getCardMax(out, cardName);
+    if (!Number.isFinite(max)) continue;
+    let count = countInDeck(out, cardName);
+    if (count <= max) continue;
+    // Remove excess from side → potion → main (heroes stay put; hero
+    // max is 1 so excess here shouldn't occur in practice).
+    const sections = ['sideDeck', 'potionDeck', 'mainDeck'];
+    for (const sk of sections) {
+      for (let i = out[sk].length - 1; i >= 0 && count > max; i--) {
+        if (out[sk][i] === cardName) {
+          out[sk].splice(i, 1);
+          count--;
+        }
+      }
+      if (count <= max) break;
+    }
+  }
+  return out;
 }
 
 function typeColor(ct) {
@@ -696,19 +761,35 @@ function VolumeControl() {
     return saved != null ? parseFloat(saved) : 0.4;
   });
   const [muted, setMuted] = useState(() => localStorage.getItem('pp_muted') === '1');
+  const [tabHidden, setTabHidden] = useState(() => typeof document !== 'undefined' && document.hidden);
   const ref = useRef(null);
+
+  // Effective volume: 0 while the tab is hidden OR the user has muted,
+  // otherwise the user's chosen slider value. Re-applied whenever any
+  // of those inputs changes so the bgm fades in/out automatically.
+  const effectiveVol = (muted || tabHidden) ? 0 : volume;
 
   // Apply volume changes to music
   useEffect(() => {
     localStorage.setItem('pp_volume', volume);
     localStorage.setItem('pp_muted', muted ? '1' : '0');
-    if (window._ppSetMusicVolume) window._ppSetMusicVolume(muted ? 0 : volume);
-  }, [volume, muted]);
+    if (window._ppSetMusicVolume) window._ppSetMusicVolume(effectiveVol);
+  }, [volume, muted, effectiveVol]);
 
   // Expose initial state on mount for MusicManager
   useEffect(() => {
-    window._ppGetVolume = () => muted ? 0 : volume;
-  }, [volume, muted]);
+    window._ppGetVolume = () => effectiveVol;
+  }, [effectiveVol]);
+
+  // Auto-mute while the tab is in the background — when the user
+  // switches to another tab in the same browser, document.hidden
+  // flips to true and we pull the music down to 0 without touching
+  // their saved volume. Restored on return.
+  useEffect(() => {
+    const sync = () => setTabHidden(document.hidden);
+    document.addEventListener('visibilitychange', sync);
+    return () => document.removeEventListener('visibilitychange', sync);
+  }, []);
 
   // Close slider when clicking outside
   useEffect(() => {
@@ -749,6 +830,9 @@ window.isDeckLegal = isDeckLegal;
 window.countInDeck = countInDeck;
 window.hasNicolasHero = hasNicolasHero;
 window.canAddCard = canAddCard;
+window.getCardMax = getCardMax;
+window.trimOverLimitCopies = trimOverLimitCopies;
+window.hasSacredJewelArtifactBonus = hasSacredJewelArtifactBonus;
 
 /**
  * Check if a card's TYPE is compatible with a deck section.
@@ -861,6 +945,16 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
   if (s.untargetable) badges.push({ key: 'untargetable', icon: '🦋', tooltip: 'Untargetable: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen.' });
   if (s.healReversed) badges.push({ key: 'healReversed', icon: '💀', tooltip: 'Overheal Shock: Takes any healing as damage.' });
   if (s.charmed) badges.push({ key: 'charmed', icon: '💘', tooltip: 'Charmed: Under opponent control and immune to all effects.' });
+  if (s.sirenLinked || c.sirenLinked) {
+    const linkData = s.sirenLinked || c.sirenLinked;
+    const partner = (typeof linkData === 'object' && linkData.partnerName)
+      || c._sirenLinkedToName
+      || 'its Deepsea Siren';
+    badges.push({
+      key: 'sirenLinked', icon: '🎵',
+      tooltip: `Linked: This target is bound to ${partner}. Damage the Siren takes is mirrored here; if an opponent defeats the Siren, this target is defeated alongside it.`,
+    });
+  }
   if (badges.length === 0) return null;
   // Keep the big board-card tooltip up while hovering a status badge. Badges
   // are positioned just outside the card's bounds (left: -2px), so moving
@@ -886,7 +980,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
 
 function BuffColumn({ buffs, cardName }) {
   if (!buffs || Object.keys(buffs).length === 0) return null;
-  const BUFF_ICONS = { cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' } };
+  const BUFF_ICONS = { cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' } };
   // medusa_petrified is surfaced through the Stunned status badge (as the
   // "Petrified" variant), so don't also render it as a separate buff icon —
   // that would double-represent the same effect. null_zone_negated is the
@@ -936,9 +1030,15 @@ function BuffColumn({ buffs, cardName }) {
  */
 function CardTooltipContent({ card, children }) {
   if (!card) return null;
+  // Image always keys on the canonical card name (matches the asset
+  // filename). Tooltip titles can be overridden via `displayName` for
+  // cards that show a transformed label without a matching asset —
+  // e.g. Deepsea Spores prefixing "Deepsea " onto each creature's name
+  // while the underlying card image (Haressassin.png) stays the same.
   const imgUrl = cardImageUrl(card.name);
   const foilType = card.foil || null;
   const isFoil = foilType === 'secret_rare' || foilType === 'diamond_rare';
+  const displayName = card.displayName || card.name;
   return (
     <>
       {imgUrl && (
@@ -952,7 +1052,7 @@ function CardTooltipContent({ card, children }) {
         </div>
       )}
       <div style={{ padding: '10px 12px' }}>
-        <div style={{ fontWeight: 700, fontSize: 18, color: typeColor(card.cardType), marginBottom: 5 }}>{card.name}</div>
+        <div style={{ fontWeight: 700, fontSize: 18, color: typeColor(card.cardType), marginBottom: 5 }}>{displayName}</div>
         <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>
           {card.cardType}{card.subtype ? ' · ' + card.subtype : ''}{card.archetype ? ' · ' + card.archetype : ''}
         </div>
