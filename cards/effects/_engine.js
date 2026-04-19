@@ -10286,15 +10286,20 @@ class GameEngine {
             creatureDiscardPs.discardPile.push(e.inst.name);
           }
         }
-        this._untrackCard(e.inst.id);
         // `_onlyCard: e.inst` — onCardLeaveZone fires ONLY the leaving
         // card's own cleanup hook, not every tracked card's. Without this
         // filter, every creature death made cards like Flying Island
         // (whose onCardLeaveZone removes its island zones) mistakenly
         // think THEY left. Other cards that want to react to creature
         // deaths should hook onCreatureDeath instead.
+        //
+        // Order matters: runHooks filters listeners from cardInstances,
+        // so the dying card must still be tracked when the hook fires —
+        // otherwise its own leave hook never runs (Pollution Piranha's
+        // delete-a-card-on-leave, etc.). Untracking happens after.
         await this.runHooks('onCardLeaveZone', { _onlyCard: e.inst, leavingCard: e.inst, fromZone: 'support', fromOwner: e.inst.owner, fromHeroIdx: e.inst.heroIdx, fromZoneSlot: e.inst.zoneSlot, _skipReactionCheck: true });
         await this.runHooks(HOOKS.ON_CREATURE_DEATH, { creature: deathInfo, source: e.source, _skipReactionCheck: true });
+        this._untrackCard(e.inst.id);
       }
       this.sync();
       await this._delay(200);

@@ -11,7 +11,7 @@ const { GameBoard } = window;
 let _pendingGameState = null;
 
 function PlayScreen() {
-  const { user, setScreen, notify, setInBattle } = useContext(AppContext);
+  const { user, setScreen, notify, setBgmMode } = useContext(AppContext);
   const [decks, setDecks] = useState([]);
   const [sampleDecks, setSampleDecks] = useState([]);
   const [selectedDeck, setSelectedDeck] = useState('');
@@ -32,11 +32,13 @@ function PlayScreen() {
     return pending;
   });
 
-  // Sync battle music state
+  // Sync battle music state. Puzzle / tutorial games use bgm_puzzle.
   useEffect(() => {
-    setInBattle(!!gameState);
-    return () => setInBattle(false);
-  }, [gameState, setInBattle]);
+    if (!gameState) setBgmMode('menu');
+    else if (gameState.isPuzzle || gameState.isTutorial) setBgmMode('puzzle');
+    else setBgmMode('battle');
+    return () => setBgmMode('menu');
+  }, [gameState, setBgmMode]);
 
   // Load decks + sample decks
   useEffect(() => {
@@ -67,7 +69,7 @@ function PlayScreen() {
     const onRoomClosed = () => { setLobby(null); setGameState(null); notify('Room was closed by host', 'error'); };
     const onJoinError = (msg) => notify(msg, 'error');
     const onPlayerJoined = (data) => setPlayerJoined(data.username);
-    const onGameStarted = (r) => { setLobby(r); };
+    const onGameStarted = (r) => { setLobby(r); if (window.playSFX) window.playSFX('match_found'); };
     const onGameState = (state) => { setGameState(state); };
 
     socket.on('rooms', onRooms);
@@ -389,20 +391,57 @@ function PlayScreen() {
 
 const _bgmMenu = typeof Audio !== 'undefined' ? new Audio('/music/bgm_menu.mp3') : null;
 const _bgmBattle = typeof Audio !== 'undefined' ? new Audio('/music/bgm_battle.mp3') : null;
-if (_bgmMenu) { _bgmMenu.loop = true; _bgmMenu.volume = 0.4; _bgmMenu.preload = 'auto'; }
-if (_bgmBattle) { _bgmBattle.loop = true; _bgmBattle.volume = 0.4; _bgmBattle.preload = 'auto'; }
+const _bgmPuzzle = typeof Audio !== 'undefined' ? new Audio('/music/bgm_puzzle.mp3') : null;
+const _bgmTracks = { menu: _bgmMenu, battle: _bgmBattle, puzzle: _bgmPuzzle };
+for (const t of [_bgmMenu, _bgmBattle, _bgmPuzzle]) {
+  if (t) { t.loop = true; t.volume = 0.4; t.preload = 'auto'; }
+}
 
 // Volume control bridge — VolumeControl sets this
 window._ppSetMusicVolume = (vol) => {
-  const cur = _bgmMenu?.paused === false ? _bgmMenu : _bgmBattle?.paused === false ? _bgmBattle : null;
-  if (_bgmMenu) _bgmMenu._targetVol = vol;
-  if (_bgmBattle) _bgmBattle._targetVol = vol;
+  let cur = null;
+  for (const t of Object.values(_bgmTracks)) {
+    if (!t) continue;
+    t._targetVol = vol;
+    if (t.paused === false) cur = t;
+  }
   if (cur) cur.volume = vol;
 };
 
-function MusicManager({ inBattle }) {
+// Temporary ducking for big one-shots (victory / defeat fanfares). Called
+// from the sound manager. phase === 'start' fades the current BGM down to 0
+// over ~400ms; phase === 'end' ramps it back to the slider's target over
+// ~640ms. Multiple start/end pairs cancel each other cleanly.
+let _bgmDuckIntv = null;
+window._ppDuckBgm = (phase) => {
+  if (_bgmDuckIntv) { clearInterval(_bgmDuckIntv); _bgmDuckIntv = null; }
+  const cur = Object.values(_bgmTracks).find(t => t && !t.paused) || null;
+  if (!cur) return;
+  const targetVol = window._ppGetVolume ? window._ppGetVolume() : 0.4;
+  if (phase === 'start') {
+    const origVol = cur.volume;
+    let step = 0;
+    const total = 10; // 10 × 40ms = 400ms fade-out
+    _bgmDuckIntv = setInterval(() => {
+      step++;
+      cur.volume = Math.max(0, origVol * (1 - step / total));
+      if (step >= total) { clearInterval(_bgmDuckIntv); _bgmDuckIntv = null; }
+    }, 40);
+  } else {
+    const startVol = cur.volume;
+    let step = 0;
+    const total = 16; // 16 × 40ms = 640ms fade-in
+    _bgmDuckIntv = setInterval(() => {
+      step++;
+      cur.volume = Math.min(targetVol, startVol + (targetVol - startVol) * (step / total));
+      if (step >= total) { clearInterval(_bgmDuckIntv); _bgmDuckIntv = null; }
+    }, 40);
+  }
+};
+
+function MusicManager({ bgmMode }) {
   const unlocked = useRef(false);
-  const currentTrack = useRef(null); // 'menu' | 'battle'
+  const currentTrack = useRef(null); // 'menu' | 'battle' | 'puzzle'
 
   const getTargetVol = useCallback(() => {
     return window._ppGetVolume ? window._ppGetVolume() : 0.4;
@@ -410,9 +449,10 @@ function MusicManager({ inBattle }) {
 
   const switchTrack = useCallback((target) => {
     if (currentTrack.current === target) return;
-    const fadeOut = target === 'battle' ? _bgmMenu : _bgmBattle;
-    const fadeIn = target === 'battle' ? _bgmBattle : _bgmMenu;
+    const fadeIn = _bgmTracks[target];
     if (!fadeIn) return;
+    // Fade out whichever track is currently playing.
+    const fadeOut = Object.entries(_bgmTracks).find(([k, t]) => k !== target && t && !t.paused)?.[1] || null;
 
     const targetVol = getTargetVol();
 
@@ -458,15 +498,14 @@ function MusicManager({ inBattle }) {
 
   // Unlock audio on first user interaction
   // Chromium/Opera require a direct user gesture to unlock each Audio element.
-  // We "touch" both tracks (play → immediate pause) to unlock them, then start the real track.
+  // We "touch" every track (play → immediate pause) to unlock them, then start the real track.
   useEffect(() => {
     if (unlocked.current) return;
     const unlock = () => {
       if (unlocked.current) return;
       unlocked.current = true;
-      // Touch both audio elements to unlock them in Chromium/Opera
       const touchAndUnlock = async () => {
-        for (const audio of [_bgmMenu, _bgmBattle]) {
+        for (const audio of Object.values(_bgmTracks)) {
           if (!audio) continue;
           try {
             audio.volume = 0;
@@ -475,8 +514,7 @@ function MusicManager({ inBattle }) {
             audio.currentTime = 0;
           } catch {}
         }
-        // Now start the real track
-        switchTrack(inBattle ? 'battle' : 'menu');
+        switchTrack(bgmMode || 'menu');
       };
       touchAndUnlock();
       window.removeEventListener('click', unlock);
@@ -491,13 +529,13 @@ function MusicManager({ inBattle }) {
       window.removeEventListener('keydown', unlock);
       window.removeEventListener('touchstart', unlock);
     };
-  }, [inBattle]);
+  }, [bgmMode]);
 
-  // Switch tracks when inBattle changes
+  // Switch tracks when bgmMode changes
   useEffect(() => {
     if (!unlocked.current) return;
-    switchTrack(inBattle ? 'battle' : 'menu');
-  }, [inBattle, switchTrack]);
+    switchTrack(bgmMode || 'menu');
+  }, [bgmMode, switchTrack]);
 
   return null; // No visual output
 }
@@ -507,10 +545,18 @@ function App() {
   const [screen, setScreen] = useState('menu');
   const [loading, setLoading] = useState(true);
   const [notif, setNotif] = useState(null);
-  const [inBattle, setInBattle] = useState(false);
+  // bgmMode: 'menu' | 'battle' | 'puzzle'. setInBattle is kept as a
+  // compatibility wrapper so existing callers continue to work.
+  const [bgmMode, setBgmMode] = useState('menu');
+  const inBattle = bgmMode !== 'menu';
+  const setInBattle = useCallback((v) => setBgmMode(v ? 'battle' : 'menu'), []);
 
   const notify = useCallback((message, type) => {
     setNotif({ message, type, id: Date.now() });
+    // Only play a sound for errors — success/info notifications usually
+    // follow a user click that already fired ui_click via the delegated
+    // listener, so playing it again here is a superfluous double-tap.
+    if (type === 'error' && window.playSFX) window.playSFX('ui_error');
   }, []);
 
   // Auto-login + load card DB
@@ -584,7 +630,7 @@ function App() {
     );
   }
 
-  const ctx = { user, setUser, screen, setScreen, notify, inBattle, setInBattle };
+  const ctx = { user, setUser, screen, setScreen, notify, inBattle, setInBattle, bgmMode, setBgmMode };
 
   return (
     <AppContext.Provider value={ctx}>
@@ -594,7 +640,7 @@ function App() {
         <div className="rotate-text">Please rotate your device</div>
         <div className="rotate-sub">Pixel Parties requires landscape orientation for the best experience</div>
       </div>
-      <MusicManager inBattle={inBattle} />
+      <MusicManager bgmMode={bgmMode} />
       <TextBox />
       {notif && <Notification key={notif.id} message={notif.message} type={notif.type} onClose={() => setNotif(null)} />}
       {!user ? <AuthScreen /> :

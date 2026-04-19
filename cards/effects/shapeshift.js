@@ -170,7 +170,12 @@ module.exports = {
       }
 
       // ── Step 3: atomic swap ───────────────────────────────────────
-      await atomicSwap(engine, pi, chosenInst, newName, CARD_NAME);
+      // atomicSwap calls the replacement Creature's beforeSummon hook.
+      // On abort (tribute/sacrifice prompt cancelled, or the card placed
+      // itself via its own hook — e.g. Dark Deepsea God) it returns null
+      // and we bail out of Shapeshift without logging a swap.
+      const swap = await atomicSwap(engine, pi, chosenInst, newName, CARD_NAME);
+      if (!swap) { gs._spellCancelled = true; return; }
       engine.log('shapeshift_swap', {
         player: ps.username, bounced: chosenName, placed: newName,
         bouncedLevel: chosenLevel, placedLevel: newLevel,

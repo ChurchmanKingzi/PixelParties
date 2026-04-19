@@ -62,6 +62,616 @@ function getPointerXY(e) {
 }
 window.getPointerXY = getPointerXY;
 
+// ═══════════════════════════════════════════
+//  SOUND EFFECT MANAGER
+//  Preloads all /sounds/*.wav once via Web Audio API, then plays overlapping
+//  copies on demand. Volume is read from window._ppGetVolume at play time so
+//  the slider takes effect immediately. MIDI files (victory/defeat) fall back
+//  to HTMLAudioElement — browsers don't natively decode MIDI, so those will
+//  only play if the browser/OS has MIDI support. Convert to .ogg/.wav for
+//  reliable playback across all browsers.
+// ═══════════════════════════════════════════
+
+const SFX_NAMES = [
+  'ability_activate', 'ascension', 'attack_ram', 'buff', 'burn',
+  'chain_add', 'creature_destroyed', 'critical_strike', 'damage',
+  'ddg_manifest', 'debuff', 'defeat', 'discard', 'draw',
+  'elem_acid', 'elem_biomancy', 'elem_dark', 'elem_fire', 'elem_holy',
+  'elem_ice', 'elem_lightning', 'elem_water', 'elem_wind',
+  'gold_gain', 'heal', 'heavy_impact', 'hero_death', 'jumpscare',
+  'laser',
+  'match_found', 'match_start', 'negate', 'orbital_laser', 'ping',
+  'placement', 'poison', 'projectile', 'reveal', 'revive',
+  'shop_purchase', 'shuffle', 'slash', 'spell_cast', 'status_remove',
+  'summon', 'sunglasses_drop', 'turn_start', 'ui_cancel', 'ui_click',
+  'ui_error', 'ui_prompt_open', 'victory',
+];
+
+let _sfxCtx = null;
+const _sfxBytes = {};       // name → ArrayBuffer (fetched up-front, no ctx needed)
+const _sfxBuffers = {};     // name → AudioBuffer (decoded once ctx exists)
+const _sfxMissing = {};     // name → true if 404 (skip silently)
+const _sfxRecentPlays = {}; // name → timestamp (dedupe rapid duplicates)
+const _sfxCategoryPlays = {}; // category → timestamp (cross-sound dedupe, e.g. 'effect' collapses spell_cast + zone-anim + status-apply into one play)
+const _activeOneShots = {};   // name → { src, gain } for sounds we may need to stop mid-play (victory / defeat fanfares)
+
+function _getSfxCtx() {
+  if (_sfxCtx) return _sfxCtx;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  try { _sfxCtx = new AC(); } catch { return null; }
+  return _sfxCtx;
+}
+
+// Fetch the bytes now; decoding is deferred until the AudioContext exists
+// (first user gesture), so no browsers emit the "AudioContext was not
+// allowed to start" warning on page load.
+function _fetchSfxBytes(name) {
+  if (_sfxBytes[name] || _sfxMissing[name]) return;
+  fetch(`/sounds/${name}.wav`)
+    .then(r => { if (!r.ok) throw new Error('404'); return r.arrayBuffer(); })
+    .then(buf => {
+      _sfxBytes[name] = buf;
+      if (_sfxCtx) _decodeSfxBytes(name); // decode immediately if ctx exists
+    })
+    .catch(() => { _sfxMissing[name] = true; });
+}
+
+function _decodeSfxBytes(name) {
+  const ctx = _sfxCtx;
+  if (!ctx || !_sfxBytes[name] || _sfxBuffers[name]) return;
+  // decodeAudioData transfers the buffer on success; keep a copy to allow
+  // retry if decoding fails on the first attempt.
+  const copy = _sfxBytes[name].slice(0);
+  ctx.decodeAudioData(copy, (buf) => { _sfxBuffers[name] = buf; }, () => { _sfxMissing[name] = true; });
+}
+
+function _initSoundManager() {
+  if (typeof window === 'undefined') return;
+  // Fetch raw bytes for every SFX up-front. No AudioContext needed.
+  for (const name of SFX_NAMES) _fetchSfxBytes(name);
+}
+
+function _sfxVolume() {
+  const v = window._ppGetVolume ? window._ppGetVolume() : 0.4;
+  return Math.max(0, Math.min(1, typeof v === 'number' ? v : 0.4));
+}
+
+// Per-sound intrinsic volume. Applied on top of master + per-call volume.
+// Tune here when a specific sample is mastered louder/quieter than the rest.
+const SFX_VOLUME_OVERRIDES = {
+  ui_click: 0.5,
+};
+
+/**
+ * Play a sound effect.
+ *   name        — filename without extension, e.g. 'draw', 'damage', 'victory'
+ *   opts.volume — multiplier applied to master volume (default 1.0)
+ *   opts.rate     — playback rate, e.g. 0.6 to pitch down (default 1.0)
+ *   opts.dedupe   — if >0, suppress repeated plays of the same name within N ms
+ *   opts.delay    — ms to wait before playing (used to sync with animations)
+ *   opts.category — cross-name dedupe bucket, e.g. 'effect' collapses all
+ *                   spell_cast / zone-animation / status-apply sounds into the
+ *                   first one that fires within opts.categoryDedupe ms
+ *   opts.categoryDedupe — window for opts.category (default 400ms)
+ */
+function playSFX(name, opts = {}) {
+  if (!name) return;
+  const now = performance.now();
+  // Same-name dedupe (batch draws, burn ticks, etc.).
+  if (opts.dedupe) {
+    const last = _sfxRecentPlays[name] || 0;
+    if (now - last < opts.dedupe) return;
+  }
+  // Cross-name category dedupe. One attack = one "effect" sound: whichever
+  // effect-class sound fires first (spell_cast, slash, elem_*, etc.) wins
+  // and suppresses the rest for the dedupe window.
+  if (opts.category) {
+    const last = _sfxCategoryPlays[opts.category] || 0;
+    if (now - last < (opts.categoryDedupe || 400)) return;
+    _sfxCategoryPlays[opts.category] = now;
+  }
+  if (opts.dedupe) _sfxRecentPlays[name] = now;
+  const intrinsic = SFX_VOLUME_OVERRIDES[name] != null ? SFX_VOLUME_OVERRIDES[name] : 1;
+  const delaySec = opts.delay && opts.delay > 0 ? opts.delay / 1000 : 0;
+  // MIDI branch (victory / defeat). Prefer a decoded .wav buffer if one
+  // exists in /sounds/ — browsers won't decode MIDI natively, so the Audio
+  // element fallback usually fails silently.
+  if (name === 'victory' || name === 'defeat') {
+    const ctx = _getSfxCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') { try { ctx.resume(); } catch {} }
+    let buf = _sfxBuffers[name];
+    if (!buf) {
+      if (_sfxBytes[name]) { _decodeSfxBytes(name); buf = _sfxBuffers[name]; }
+      if (!buf) {
+        if (!_sfxMissing[name]) _fetchSfxBytes(name);
+        return;
+      }
+    }
+    // Duck the BGM while the fanfare plays; ramp it back in once playback
+    // ends. The source is tracked in _activeOneShots so callers can stop
+    // it mid-play via window.stopSFX (e.g. leaving the result overlay
+    // while the fanfare is still running).
+    const gainMul = _sfxVolume() * intrinsic * (opts.volume != null ? opts.volume : 1);
+    // If a previous fanfare is still playing, cut it off first.
+    if (_activeOneShots[name]) {
+      try { _activeOneShots[name].src.stop(); } catch {}
+    }
+    if (window._ppDuckBgm) window._ppDuckBgm('start');
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = opts.rate != null ? opts.rate : 1;
+    const gain = ctx.createGain();
+    gain.gain.value = gainMul;
+    src.connect(gain).connect(ctx.destination);
+    const clear = () => {
+      if (_activeOneShots[name] && _activeOneShots[name].src === src) {
+        delete _activeOneShots[name];
+      }
+      if (window._ppDuckBgm) window._ppDuckBgm('end');
+    };
+    src.onended = clear;
+    _activeOneShots[name] = { src, gain };
+    try { src.start(delaySec > 0 ? ctx.currentTime + delaySec : 0); }
+    catch { clear(); }
+    return;
+  }
+  // WAV branch — scheduled via AudioContext.currentTime so the delay is
+  // sample-accurate and doesn't depend on setTimeout firing.
+  const ctx = _getSfxCtx();
+  if (!ctx) return;
+  if (ctx.state === 'suspended') { try { ctx.resume(); } catch {} }
+  let buf = _sfxBuffers[name];
+  if (!buf) {
+    if (_sfxBytes[name]) { _decodeSfxBytes(name); buf = _sfxBuffers[name]; }
+    if (!buf) {
+      if (!_sfxMissing[name]) _fetchSfxBytes(name);
+      return;
+    }
+  }
+  _playBuffer(ctx, buf, opts, intrinsic, delaySec);
+}
+
+function _playBuffer(ctx, buf, opts, intrinsic, delaySec) {
+  if (ctx.state === 'suspended') { try { ctx.resume(); } catch {} }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.playbackRate.value = opts.rate != null ? opts.rate : 1;
+  const gain = ctx.createGain();
+  gain.gain.value = _sfxVolume() * intrinsic * (opts.volume != null ? opts.volume : 1);
+  src.connect(gain).connect(ctx.destination);
+  try { src.start(delaySec > 0 ? ctx.currentTime + delaySec : 0); } catch {}
+}
+
+// Resume AudioContext on first user gesture (Chrome/Safari autoplay policy).
+// Also kick off decoding of any SFX bytes fetched before the context existed.
+if (typeof window !== 'undefined') {
+  const _unlockSfx = () => {
+    const ctx = _getSfxCtx();
+    if (ctx && ctx.state === 'suspended') { try { ctx.resume(); } catch {} }
+    for (const name of SFX_NAMES) {
+      if (_sfxBytes[name] && !_sfxBuffers[name]) _decodeSfxBytes(name);
+    }
+    window.removeEventListener('click', _unlockSfx);
+    window.removeEventListener('keydown', _unlockSfx);
+    window.removeEventListener('touchstart', _unlockSfx);
+  };
+  window.addEventListener('click', _unlockSfx);
+  window.addEventListener('keydown', _unlockSfx);
+  window.addEventListener('touchstart', _unlockSfx);
+  _initSoundManager();
+}
+
+window.playSFX = playSFX;
+
+/**
+ * Stop an in-progress one-shot sound mid-play. Currently used for the
+ * victory / defeat fanfares so they cut off when the player leaves the
+ * result overlay. If `name` is omitted, every tracked one-shot is stopped.
+ * Also fades the BGM back in via the standard un-duck hook.
+ */
+function stopSFX(name) {
+  const keys = name ? [name] : Object.keys(_activeOneShots);
+  for (const key of keys) {
+    const entry = _activeOneShots[key];
+    if (!entry) continue;
+    try { entry.src.stop(); } catch {}
+    try { entry.src.disconnect(); } catch {}
+    try { entry.gain.disconnect(); } catch {}
+    delete _activeOneShots[key];
+  }
+  // src.onended handles un-ducking when it fires normally; calling stop()
+  // also triggers onended, so the duck-end ramp kicks in there.
+}
+window.stopSFX = stopSFX;
+
+// ═══════════════════════════════════════════
+//  SFX DISPATCHER — map action log entries / status names to sound files
+// ═══════════════════════════════════════════
+
+// Status → SFX. Positive/negative are handled as fallbacks by playSFXForStatus.
+const STATUS_SFX = {
+  frozen: 'elem_ice',
+  burned: 'burn',
+  poisoned: 'poison',
+  stunned: 'elem_lightning',
+  negated: 'elem_dark',
+  shielded: 'elem_holy',
+  immune: 'elem_holy',
+  petrified: 'elem_dark',
+  mummified: 'elem_dark',
+  charmed: 'elem_dark',
+  submerged: 'elem_water',
+  terror: 'elem_dark',
+};
+
+// Statuses that represent something unambiguously negative; used when we
+// need to infer buff vs debuff for generic "status added" cases.
+const NEGATIVE_STATUSES = new Set([
+  'frozen', 'burned', 'poisoned', 'stunned', 'negated', 'petrified',
+  'mummified', 'charmed', 'submerged', 'terror',
+]);
+
+function playSFXForStatus(statusName) {
+  if (!statusName) return;
+  const key = String(statusName).toLowerCase();
+  const mapped = STATUS_SFX[key];
+  // Status applications fired alongside an attack (Blow of the Venom Snake
+  // applying poison, etc.) collapse into the same 'effect' bucket as the
+  // spell_cast / zone-anim sound, so one attack = one effect sound.
+  if (mapped) { playSFX(mapped, { category: 'effect' }); return; }
+  playSFX(NEGATIVE_STATUSES.has(key) ? 'debuff' : 'buff');
+}
+
+/**
+ * Convert an action_log entry into a sound effect. Called from the log
+ * handler in app-board.jsx. Returns quickly for types with no SFX.
+ */
+function playSFXForLog(entry) {
+  if (!entry || !entry.type) return;
+  const t = entry.type;
+  switch (t) {
+    // ── Card flow ─────────────────────────────
+    case 'draw':
+    case 'potion_draw':
+    case 'nomu_draw':
+      playSFX('draw', { dedupe: 40 });
+      return;
+    case 'discard':
+    case 'forced_discard':
+    case 'mill':
+    case 'card_recycled':
+      // card_recycled fires once per card returned to the deck (Deepsea
+      // Stein, Spontaneous Reappearance, etc.). Treated as a discard-style
+      // cue so the player hears each card go.
+      playSFX('discard', { dedupe: 40 });
+      return;
+    // Card-specific discard logs that push straight to discardPile without
+    // going through engine.discardFromHand(). The discardPile-grew watcher
+    // catches most of these, but mapping them here guarantees the cue
+    // regardless of sync ordering or batching.
+    case 'magenta_discard':
+    case 'arthor_discard':
+    case 'ballad_discard':
+    case 'country_discard':
+    case 'grunge_discard':
+    case 'choir_discard':
+    case 'mana_beacon_discard':
+    case 'inventing_discard_draw':
+      playSFX('discard', { dedupe: 40 });
+      return;
+    case 'shuffle_back':
+      playSFX('shuffle');
+      return;
+    case 'deck_search':
+    case 'card_added_to_hand':
+    case 'surprise_activated':
+      playSFX('reveal');
+      return;
+
+    // ── Play / summon / placement ─────────────
+    case 'creature_summoned':
+    case 'token_placed':
+      playSFX('summon', { category: 'effect' });
+      return;
+    case 'placement':
+    case 'area_placed':
+    case 'move':
+    case 'support_zone_relocated':
+    case 'hero_stolen':
+    case 'creature_stolen':
+    case 'ability_attached':
+    case 'surprise_set':
+      playSFX('placement');
+      return;
+
+    // ── Turn / match flow ─────────────────────
+    case 'turn_start':
+      playSFX('turn_start');
+      return;
+    case 'phase_start':
+      // Phase transitions. Dedupe 500ms covers the case where the player
+      // clicked the Advance Phase button (which already plays ui_click via
+      // the delegated listener) — that sound wins; this is the fallback for
+      // auto phase changes.
+      playSFX('ui_click', { dedupe: 500 });
+      return;
+    // 'all_heroes_dead' intentionally not mapped — victory/defeat fires from
+    // the board's result useEffect, which also covers surrender and other
+    // paths that set gameState.result without going through the engine log.
+
+    // ── Damage / heal / death ─────────────────
+    case 'damage':
+    case 'creature_damage':
+    case 'recoil':
+    case 'heal_reversed':
+      // Status ticks (burn/poison) already fire a dedicated cue via
+      // burn_damage / poison_damage; the engine also emits this generic
+      // damage log alongside them, so suppress it for status sources.
+      if (entry.source === 'Burn' || entry.source === 'Poison') return;
+      playSFX('damage', { dedupe: 30 });
+      return;
+    case 'heal':
+    case 'heal_creature':
+      playSFX('heal', { dedupe: 30 });
+      return;
+    case 'hero_ko':
+    case 'force_kill':
+      playSFX('hero_death');
+      return;
+    case 'destroy':
+    case 'creature_destroyed':
+    case 'island_zone_defeat':
+      playSFX('creature_destroyed', { dedupe: 30 });
+      return;
+    case 'hero_revived':
+      playSFX('revive');
+      return;
+    case 'burn_damage':
+      playSFX('burn', { dedupe: 50 });
+      return;
+    case 'poison_damage':
+      playSFX('poison', { dedupe: 50 });
+      return;
+
+    // ── Resources ─────────────────────────────
+    case 'gold_gain':
+    case 'gold_steal':
+      playSFX('gold_gain', { dedupe: 30 });
+      return;
+
+    // ── Stats / buffs / debuffs ───────────────
+    // Dedupe ~150ms collapses the burst of buff_add / atk_grant /
+    // max_hp_increase that fires at puzzle start (or any mass-stat update)
+    // into a single cue, without suppressing back-to-back buffs across turns.
+    case 'level_change':
+      playSFX((entry.delta || 0) >= 0 ? 'buff' : 'debuff', { dedupe: 150 });
+      return;
+    case 'max_hp_increase':
+    case 'buff_add':
+    case 'atk_grant':
+      playSFX('buff', { dedupe: 150 });
+      return;
+    case 'max_hp_decrease':
+    case 'buff_remove':
+    case 'atk_revoke':
+      playSFX('debuff', { dedupe: 150 });
+      return;
+
+    // ── Statuses ──────────────────────────────
+    case 'status_add':
+      playSFXForStatus(entry.status);
+      return;
+    case 'status_remove':
+    case 'status_removed':
+      playSFX('status_remove');
+      return;
+
+    // ── Negation ──────────────────────────────
+    case 'card_negated':
+    case 'effect_negated':
+    case 'creature_negated':
+    case 'anti_magic_enchantment_negate':
+      playSFX('negate');
+      return;
+
+    // ── Ascension / special ───────────────────
+    case 'hero_ascension':
+      playSFX('ascension');
+      return;
+    case 'reaction_activated':
+      playSFX('chain_add');
+      return;
+
+    // ── Card played ──
+    // spell_played fires for Spells/Attacks, card_played for Potions/Artifacts,
+    // immediate_action for cards auto-played by another card's effect. All
+    // go into the 'effect' category so exactly one "cast-class" sound fires
+    // per attack/spell/creature (the first one to arrive wins — subsequent
+    // zone-animation sounds and status-apply cues within the dedupe window
+    // are suppressed).
+    case 'spell_played':
+      playSFX('spell_cast', { category: 'effect' });
+      return;
+    case 'card_played': {
+      const ct = entry.cardType;
+      // Potions: rely on the potion's own animationType for the effect
+      // sound (Poison Vial → poison, Acid Vial → elem_acid, etc.). The
+      // generic spell_cast would otherwise win the 'effect' dedupe slot
+      // and suppress the specific potion cue.
+      if (ct === 'Artifact') { playSFX('placement'); return; }
+      return;
+    }
+    case 'immediate_action': {
+      const ct = entry.cardType;
+      if (ct === 'Spell') { playSFX('spell_cast', { category: 'effect' }); return; }
+      if (ct === 'Artifact') { playSFX('placement'); return; }
+      return; // Creature handled by 'creature_summoned'; Potions rely on zone-anim sound
+    }
+
+    // Silent: phase_start, ame_*, damage_blocked, damage_capped,
+    // status_blocked, gold_spend, destroy_blocked, *_fizzle, etc.
+    default:
+      return;
+  }
+}
+
+window.playSFXForLog = playSFXForLog;
+window.playSFXForStatus = playSFXForStatus;
+
+// play_zone_animation events carry a `type` field naming the animation.
+// Most animations have a corresponding action_log entry that already plays
+// the right sound, so we only map the ones that are animation-only or need
+// a distinctive layer (e.g. orbital laser pitched down).
+const ZONE_ANIM_SFX = {
+  // Signature
+  orbital_laser_red:       { name: 'orbital_laser', opts: { rate: 0.6 } },
+  blood_moon_pulse:        { name: 'elem_dark' },
+  sunglasses_drop:         { name: 'sunglasses_drop' },
+  critical_slash:          { name: 'critical_strike' },
+  // Fire
+  fireball:                { name: 'elem_fire' },
+  flame_avalanche:         { name: 'elem_fire' },
+  flamethrower_douse:      { name: 'elem_fire' },
+  // Lightning — covered by dedicated qinglong/red_lightning_rain socket events
+  // Ice
+  cold_coffin_encase:      { name: 'elem_ice' },
+  // Acid / poison (poison has its own sound per user)
+  acid_splash:             { name: 'elem_acid' },
+  plague_smoke:            { name: 'poison' },
+  poison_vial:             { name: 'poison' },
+  poison_tick:             { name: 'poison' },
+  poison_ooze:             { name: 'poison' },
+  poison_pollen_rain:      { name: 'poison' },
+  mushroom_spore:          { name: 'poison' },
+  // Biomancy
+  biomancy_bloom:          { name: 'elem_biomancy' },
+  biomancy_vines:          { name: 'elem_biomancy' },
+  // Water / deepsea
+  deepsea_spores_rain:     { name: 'elem_water' },
+  deepsea_spores_growth:   { name: 'elem_water' },
+  deep_sea_bubbles:        { name: 'elem_water' },
+  water_splash:            { name: 'elem_water' },
+  whirlpool:               { name: 'elem_water' },
+  // Wind
+  whirlwind_spin:          { name: 'elem_wind' },
+  sand_twister:            { name: 'elem_wind' },
+  fan_blow:                { name: 'elem_wind' },
+  // Holy
+  sun_beam:                { name: 'elem_holy' },
+  guardian_shield:         { name: 'elem_holy' },
+  gate_shield:             { name: 'elem_holy' },
+  golden_wings:            { name: 'elem_holy' },
+  victorica_holy_cleanse:  { name: 'elem_holy' },
+  holy_revival:            { name: 'revive' },
+  angel_revival:           { name: 'revive' },
+  golden_ankh_revival:     { name: 'revive' },
+  // Dark
+  petrify:                 { name: 'elem_dark' },
+  spooky_ghost:            { name: 'elem_dark' },
+  death_skulls:            { name: 'elem_dark' },
+  dark_swarm:              { name: 'elem_dark' },
+  null_zone_spiral:        { name: 'elem_dark' },
+  rain_of_death:           { name: 'elem_dark' },
+  mummy_wrap:              { name: 'elem_dark' },
+  necromancy_summon:       { name: 'elem_dark' },
+  // Slash / bite
+  claw_maul:               { name: 'slash' },
+  scythe_cut:              { name: 'slash' },
+  quick_slash:             { name: 'slash' },
+  piranha_bite:            { name: 'slash' },
+  warlord_bite:            { name: 'slash' },
+  snake_devour:            { name: 'slash' },
+  cactus_burst:            { name: 'slash' },
+  stranglehold_squeeze:    { name: 'slash' },
+  // Heavy impact
+  magic_hammer:            { name: 'heavy_impact', opts: { delay: 400 } },
+  tiger_impact:            { name: 'heavy_impact' },
+  ox_impact:               { name: 'heavy_impact' },
+  snake_impact:            { name: 'heavy_impact' },
+  dumbbell_pump:           { name: 'heavy_impact' },
+  // Projectile
+  arrow_rain:              { name: 'projectile' },
+  // Utility / misc
+  music_notes:             { name: 'spell_cast' },
+  overheal_shock_equip:    { name: 'damage' },
+  pollution_place:         { name: 'placement' },
+  goldify_transmute:       { name: 'buff' },
+  // Silent — redundant with a log or purely decorative
+  gold_sparkle:            null,
+  heal_sparkle:            null,
+  healing_hearts:          null,
+  heart_burst:             null,
+  steam_puff:              null,
+  dark_gear_spin_cw:       null,
+  dark_gear_spin_ccw:      null,
+  cloud_gather:            null,
+  cloud_disperse:          null,
+  sand_reset:              null,
+  anger_mark:              null,
+  thought_bubbles:         null,
+  juice_bubbles:           null,
+  tea_steam:               null,
+  coffee_steam:            null,
+  pollution_evaporate:     null,
+  laser_burst:             { name: 'laser' },
+};
+
+// Zone-animation sounds represent "the signature of the spell/attack/
+// creature effect" and therefore belong in the 'effect' category — one
+// attack = one effect sound. Individual entries can override the category
+// (set to null) if their animation is a purely decorative overlay that
+// should layer with another cue.
+const ZONE_ANIM_NONEFFECT = new Set([
+  // Self-contained non-attack visuals that can layer with another cue.
+]);
+
+function playSFXForZoneAnim(type) {
+  if (!type) return;
+  if (!(type in ZONE_ANIM_SFX)) return;
+  const entry = ZONE_ANIM_SFX[type];
+  if (!entry) return;
+  const opts = { ...(entry.opts || {}) };
+  if (opts.category === undefined && !ZONE_ANIM_NONEFFECT.has(type)) {
+    opts.category = 'effect';
+  }
+  playSFX(entry.name, opts);
+}
+
+window.playSFXForZoneAnim = playSFXForZoneAnim;
+
+// ═══════════════════════════════════════════
+//  GLOBAL UI SFX LISTENERS
+//  Delegated listeners save us wiring hundreds of onClick handlers.
+// ═══════════════════════════════════════════
+if (typeof document !== 'undefined') {
+  // Any button / [role=button] click → ui_click.
+  // Suppress inside the volume control so adjusting volume stays silent.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button, [role="button"]');
+    if (!btn) return;
+    if (btn.closest('.volume-control, .volume-slider-popup')) return;
+    // Don't double-fire on buttons that have data-sfx="none".
+    if (btn.dataset && btn.dataset.sfx === 'none') return;
+    // Cancel-style buttons get ui_cancel instead of ui_click.
+    const label = (btn.textContent || '').trim().toLowerCase();
+    const isCancel = btn.dataset?.sfx === 'cancel'
+      || btn.classList.contains('btn-cancel')
+      || btn.classList.contains('cancel-btn')
+      || ['cancel', 'close', 'back', '×', '✕', 'x'].includes(label);
+    // ui_click uses its intrinsic (SFX_VOLUME_OVERRIDES) for a uniform level.
+    // ui_cancel keeps its explicit attenuation.
+    if (isCancel) playSFX('ui_cancel', { dedupe: 40, volume: 0.4 });
+    else playSFX('ui_click', { dedupe: 40 });
+  }, { capture: false });
+
+  // Escape key → ui_cancel.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') playSFX('ui_cancel', { dedupe: 40 });
+  });
+}
+
 // ── CAPTURE-PHASE TOUCH PREVENTION ──
 // This listener fires BEFORE React's event delegation and before the browser's
 // compositor decides to scroll. Without this, React's delegated onTouchStart
@@ -269,8 +879,13 @@ async function loadCardDB() {
     if (c.subtype) subSet.add(c.subtype);
     if (c.spellSchool1) ssSet.add(c.spellSchool1);
     if (c.spellSchool2) ssSet.add(c.spellSchool2);
-    if (c.startingAbility1) saSet.add(c.startingAbility1);
-    if (c.startingAbility2) saSet.add(c.startingAbility2);
+    // Ascended Heroes reuse the startingAbility fields to describe their
+    // ascension bonus ("Any 2 Spells from your deck", "Fighting 3", etc.),
+    // which aren't real starting abilities — exclude them from the filter.
+    if (c.cardType !== 'Ascended Hero') {
+      if (c.startingAbility1) saSet.add(c.startingAbility1);
+      if (c.startingAbility2) saSet.add(c.startingAbility2);
+    }
     if (c.archetype) arSet.add(c.archetype);
   });
   window.CARD_TYPES.length = 0; window.CARD_TYPES.push(...[...typesSet].sort());
@@ -1335,6 +1950,7 @@ function TextBox() {
 
   const handleAdvance = useCallback(() => {
     if (!opts || fading) return;
+    if (window.playSFX) window.playSFX('ui_click', { dedupe: 80, volume: 0.5 });
     if (!done) {
       clearInterval(timerRef.current);
       setCharCount(parsedRef.current.plainText.length);

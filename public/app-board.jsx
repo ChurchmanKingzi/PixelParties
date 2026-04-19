@@ -5345,7 +5345,10 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
 
   const toggleCard = (idx) => {
     setSelected(prev => {
-      if (prev.includes(idx)) return prev.filter(i => i !== idx);
+      if (prev.includes(idx)) {
+        if (window.playSFX) window.playSFX('ui_click');
+        return prev.filter(i => i !== idx);
+      }
       if (prev.length >= maxSelect) return prev;
       // Budget check
       if (maxBudget != null) {
@@ -5353,6 +5356,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
         const currentTotal = prev.reduce((sum, i) => sum + (cards[i]?.[costKey] || 0), 0);
         if (currentTotal + entryCost > maxBudget) return prev;
       }
+      if (window.playSFX) window.playSFX('ui_click');
       return [...prev, idx];
     });
   };
@@ -5497,6 +5501,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const gameSkins = useMemo(() => ({ ...(me.deckSkins || {}), ...(opp.deckSkins || {}) }), [me.deckSkins, opp.deckSkins]);
   const result = gameState.result;
   const iWon = result && result.winnerIdx === myIdx;
+  const resultSfxPlayedRef = useRef(false);
   const oppLeft = opp.left || false;
   const oppDisconnected = opp.disconnected || false;
   const meDisconnected = me.disconnected || false;
@@ -5506,6 +5511,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [tutorialOutroPending, setTutorialOutroPending] = useState(false);
   const [resultFading, setResultFading] = useState(false);
   const tutorialOutroFiredRef = useRef(null);
+  // Synchronous mirror of tutorialOutroPending — written alongside the
+  // setState call so other effects running in the same commit can see the
+  // gate without waiting for the next render (React batches setState, but
+  // refs update immediately). The fanfare SFX effect consults this.
+  const outroPendingRef = useRef(false);
   useEffect(() => {
     if (!result || !result.isTutorial || result.puzzleResult !== 'success') return;
     const num = window._currentTutorialNum;
@@ -5513,6 +5523,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const script = (window.TUTORIAL_SCRIPTS || {})[num];
     if (script?.outro) {
       tutorialOutroFiredRef.current = num;
+      outroPendingRef.current = true;
       setTutorialOutroPending(true);
       setTimeout(() => {
         const outroPages = Array.isArray(script.outro) ? script.outro : undefined;
@@ -5522,11 +5533,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           speakerName: 'Monia Bot',
           ...(outroPages ? { pages: outroPages } : { text: outroText }),
           ...(script.opts || {}),
-          onDismiss: () => setTutorialOutroPending(false),
+          onDismiss: () => { outroPendingRef.current = false; setTutorialOutroPending(false); },
         });
       }, 300);
     }
   }, [result]);
+
+  // Victory / defeat fanfare — fires exactly once when result first appears.
+  // Spectators get the victory cue (neutral-positive) regardless of winner.
+  // For tutorials with an outro textbox, delay the fanfare until that
+  // textbox closes so it doesn't overlap the Monia Bot dialogue.
+  //
+  // We check outroPendingRef (synchronous) rather than the state flag,
+  // because on the initial `result` commit both the outro effect and this
+  // one run back-to-back: the outro effect queues setState(true) but the
+  // state hasn't applied yet by the time this effect reads it. The ref
+  // has already been set inside the outro effect, so it's the reliable
+  // gate for this same-commit timing.
+  useEffect(() => {
+    if (!result || resultSfxPlayedRef.current) return;
+    if (outroPendingRef.current) return;
+    resultSfxPlayedRef.current = true;
+    const sfx = isSpectator ? 'victory' : (iWon ? 'victory' : 'defeat');
+    if (window.playSFX) window.playSFX(sfx);
+  }, [result, iWon, isSpectator, tutorialOutroPending]);
 
   // ── Shared board tooltip (single instance, driven by BoardCard/CardRevealEntry) ──
   const { tooltipCard, setTooltipCard } = useCardTooltip({
@@ -5550,9 +5580,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [areaPositions, setAreaPositions] = useState([undefined, undefined]);
 
   useEffect(() => {
+    const container = boardCenterRef.current;
+    if (!container) return;
     const measure = () => {
-      const container = boardCenterRef.current;
-      if (!container) return;
       // Find all hero zones from the "me" side (bottom) for stable measurement
       const myHeroes = container.querySelectorAll('[data-hero-owner="me"][data-hero-zone]');
       if (myHeroes.length < 3) return;
@@ -5566,10 +5596,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const mid12 = ((rects[1].left + rects[1].right) / 2 + (rects[2].left + rects[2].right) / 2) / 2 - containerRect.left - halfZone;
       setAreaPositions([mid01, mid12]);
     };
-    measure();
+    // Defer the initial measure one frame so the board auto-scaling
+    // ResizeObserver (defined in the effect below) has a chance to apply
+    // its scale before we compute area-zone positions. Without this, the
+    // first measure runs at scale=1 and the zones visibly "snap" to the
+    // real scaled position once setTimeout(200) fires.
+    const raf1 = requestAnimationFrame(() => {
+      measure();
+      // Second rAF catches any trailing layout from the scale ResizeObserver.
+      requestAnimationFrame(measure);
+    });
+    // ResizeObserver on the board container AND the first hero zone so
+    // any later scale change (window resize, device orientation) triggers
+    // an immediate remeasure rather than waiting for the setTimeout tail.
+    const ro = new ResizeObserver(measure);
+    ro.observe(container);
+    const firstHero = container.querySelector('[data-hero-owner="me"][data-hero-zone]');
+    if (firstHero) ro.observe(firstHero);
     window.addEventListener('resize', measure);
     const timer = setTimeout(measure, 200);
-    return () => { window.removeEventListener('resize', measure); clearTimeout(timer); };
+    return () => {
+      cancelAnimationFrame(raf1);
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+      clearTimeout(timer);
+    };
   }, [gameState.turn, gameState.players[0]?.islandZoneCount, gameState.players[1]?.islandZoneCount]);
 
   // ── Board auto-scaling: fit board to available width ──
@@ -5711,6 +5762,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (skipCount > 0) {
           stealSkipDrawRef.current = 0;
         } else {
+        // Play the draw cue per card. This catches server-side paths that
+        // bypass engine.log('draw') — namely the initial-mulligan redraw
+        // (server.js shifts cards directly from mainDeck/potionDeck). For
+        // normal engine-driven draws, the `draw` log already fires its
+        // SFX; the 80ms dedupe suppresses the duplicate here.
+        if (window.playSFX) {
+          for (let i = prevLen; i < newHand.length; i++) {
+            setTimeout(() => window.playSFX('draw', { dedupe: 80 }), (i - prevLen) * 80);
+          }
+        }
         const deckEl = document.querySelector('[data-my-deck]');
         const deckRect = deckEl?.getBoundingClientRect();
         const potionDeckEl = document.querySelector('[data-my-potion-deck]');
@@ -5813,6 +5874,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       return;
     }
     if (newCount > prevCount && !stealInProgressRef.current) {
+      // Draw cue per new opp card. For engine-driven draws the `draw`
+      // action log already fired this sound via the dispatcher — the
+      // 80ms dedupe collapses the duplicate. The initial-mulligan redraw
+      // (server.js shifts cards directly without logging) relies on this
+      // block to make the sound audible at all.
+      if (window.playSFX) {
+        for (let i = 0; i < newCount - prevCount; i++) {
+          setTimeout(() => window.playSFX('draw', { dedupe: 80 }), i * 80);
+        }
+      }
       const hiddenIdxs = new Set();
       for (let i = prevCount; i < newCount; i++) hiddenIdxs.add(i);
       setOppDrawHidden(prev => new Set([...prev, ...hiddenIdxs]));
@@ -6087,6 +6158,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const discardGrew = newDiscardLen > prevDiscardLen;
     const deletedGrew = newDeletedLen > prevDeletedLen;
 
+    // Discard cue for any card hitting the discard pile. Engine-logged
+    // discards already fire this sound via the dispatcher; 80ms dedupe
+    // suppresses the duplicate. This catches cards pushed to discard
+    // without a log — Artifacts that resolve and drop (Cute Cheese, etc.).
+    if (discardGrew && window.playSFX) {
+      const addedCount = newDiscardLen - prevDiscardLen;
+      for (let k = 0; k < addedCount; k++) {
+        setTimeout(() => window.playSFX('discard', { dedupe: 80 }), k * 80);
+      }
+    }
+
     if (discardGrew || deletedGrew) {
       const newDiscardEntries = discardGrew ? [...me.discardPile.slice(prevDiscardLen)] : [];
       const newDeletedEntries = deletedGrew ? [...me.deletedPile.slice(prevDeletedLen)] : [];
@@ -6165,6 +6247,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (ni < newHand.length && prevHand[i] === newHand[ni]) { ni++; }
         else { removed.push({ cardName: prevHand[i], handIdx: i }); }
       }
+      // Discard cue per returned card (dedupe so a big mulligan collapses).
+      if (removed.length > 0 && window.playSFX) {
+        for (let k = 0; k < removed.length; k++) {
+          setTimeout(() => window.playSFX('discard', { dedupe: 60 }), k * 80);
+        }
+      }
       const storedRects = myHandRectsRef.current;
       const deckEl = document.querySelector('[data-my-deck]');
       const deckR = deckEl?.getBoundingClientRect();
@@ -6216,6 +6304,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const prevDeletedLen = prevOppDeletedLenRef.current;
     const discardGrew = newDiscardLen > prevDiscardLen;
     const deletedGrew = newDeletedLen > prevDeletedLen;
+
+    // Discard cue for opponent-side discard pile growth (mirrors own-side).
+    if (discardGrew && window.playSFX) {
+      const addedCount = newDiscardLen - prevDiscardLen;
+      for (let k = 0; k < addedCount; k++) {
+        setTimeout(() => window.playSFX('discard', { dedupe: 80 }), k * 80);
+      }
+    }
 
     if (discardGrew || deletedGrew) {
       const newDiscardEntries = discardGrew ? [...opp.discardPile.slice(prevDiscardLen)] : [];
@@ -6277,13 +6373,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
     // Opponent mulligan / hand-return-to-deck: cards returning to deck (hand count shrinks but no pile grows)
     if (!discardGrew && !deletedGrew && newCount < prevCount && (gameState.mulliganPending || gameState.handReturnToDeck)) {
+      const returnedCount = prevCount - newCount;
+      // Discard cue per card, staggered so a batch sounds like a shuffle.
+      if (returnedCount > 0 && window.playSFX) {
+        for (let k = 0; k < returnedCount; k++) {
+          setTimeout(() => window.playSFX('discard', { dedupe: 60 }), k * 80);
+        }
+      }
       const storedRects = oppHandRectsRef.current;
       const deckEl = document.querySelector('[data-opp-deck]');
       const deckR = deckEl?.getBoundingClientRect();
       const deckTarget = deckR ? { x: deckR.left + deckR.width / 2 - 32, y: deckR.top + deckR.height / 2 - 45 } : null;
       if (deckTarget) {
         const returnAnims = [];
-        for (let i = 0; i < prevCount - newCount; i++) {
+        for (let i = 0; i < returnedCount; i++) {
           const sr = storedRects[Math.max(0, prevCount - 1 - i)];
           if (!sr) continue;
           returnAnims.push({ id: Date.now() + Math.random() + i, cardName: '', startX: sr.left, startY: sr.top, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
@@ -6583,8 +6686,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // dispatch play_creature — identical to having drag-dropped the
   // card there. Cleared on turn change, phase change, or Esc/cancel.
   const [pendingBouncePick, setPendingBouncePick] = useState(null); // { cardName, handIndex, card, bounceTargets, freeSlotTargets }
+  // Click-to-attach an Ability. When set, eligible hero zones + their valid
+  // ability slots (or existing stacks of the same ability) light up; clicking
+  // one dispatches play_ability. Cleared on cancel / turn change / etc.
+  const [abilityAttachPick, setAbilityAttachPick] = useState(null); // { cardName, handIndex, card }
   // Clear spell hero pick when game state changes
-  useEffect(() => { setSpellHeroPick(null); setPendingBouncePick(null); }, [gameState.activePlayer, gameState.currentPhase, gameState.effectPrompt, gameState.turn]);
+  useEffect(() => { setSpellHeroPick(null); setPendingBouncePick(null); setAbilityAttachPick(null); }, [gameState.activePlayer, gameState.currentPhase, gameState.effectPrompt, gameState.turn]);
+
+  // Play a single open cue whenever any hand-card target picker appears.
+  useEffect(() => { if (spellHeroPick && window.playSFX) window.playSFX('ui_prompt_open'); }, [spellHeroPick]);
+  useEffect(() => { if (abilityAttachPick && window.playSFX) window.playSFX('ui_prompt_open'); }, [abilityAttachPick]);
+  useEffect(() => { if (pendingBouncePick && window.playSFX) window.playSFX('ui_prompt_open'); }, [pendingBouncePick]);
+  useEffect(() => { if (pendingAdditionalPlay && window.playSFX) window.playSFX('ui_prompt_open'); }, [pendingAdditionalPlay]);
+  useEffect(() => { if (pendingAbilityActivation && window.playSFX) window.playSFX('ui_prompt_open'); }, [pendingAbilityActivation]);
+  // Server-driven targeting / effect prompts — e.g. clicking Magic Hammer
+  // skips the hero picker (only one caster possible) and lands directly in
+  // target selection. Play the open cue once when that state appears for me.
+  const targetingActive = !!(gameState.potionTargeting && gameState.potionTargeting.ownerIdx === myIdx);
+  const effectPromptActive = !!(gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx);
+  useEffect(() => { if (targetingActive && window.playSFX) window.playSFX('ui_prompt_open'); }, [targetingActive]);
+  useEffect(() => { if (effectPromptActive && window.playSFX) window.playSFX('ui_prompt_open'); }, [effectPromptActive]);
 
   // Check if a hero can receive a specific ability
   const canHeroReceiveAbility = (playerData, heroIdx, abilityName, opts = {}) => {
@@ -6730,39 +6851,55 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       return;
     }
 
-    // Hand Pick mode (Shard of Chaos) — toggle card selection
+    // Hand Pick mode (Shard of Chaos, Leadership) — toggle card selection
     const handPickPrompt = gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx;
     if (handPickPrompt) {
       const eligible = gameState.effectPrompt.eligibleIndices || [];
       if (!eligible.includes(idx)) return;
       if (e.cancelable) e.preventDefault();
+      // Decide up front (synchronously) whether this click will actually
+      // toggle the selection. React 18's automatic batching can defer the
+      // setHandPickSelected updater past the end of this handler, so any
+      // side-effect flag set inside it is unreliable for "did a change
+      // happen" checks. Reading state from closure avoids that race.
+      const maxSelect = gameState.effectPrompt.maxSelect || 3;
+      const cardTypes = gameState.effectPrompt.cardTypes || {};
+      const typeLimits = gameState.effectPrompt.typeLimits || {};
+      const thisType = cardTypes[idx];
+      let willChange;
+      if (handPickSelected.has(idx)) {
+        willChange = true; // Deselection always succeeds.
+      } else if (handPickSelected.size >= maxSelect) {
+        willChange = false;
+      } else if (thisType && typeLimits[thisType] !== undefined) {
+        let selectedOfType = 0;
+        for (const si of handPickSelected) {
+          if (cardTypes[si] === thisType) selectedOfType++;
+        }
+        willChange = selectedOfType < typeLimits[thisType];
+      } else {
+        willChange = true;
+      }
+      if (willChange && window.playSFX) window.playSFX('ui_click');
       setHandPickSelected(prev => {
         const next = new Set(prev);
-        if (next.has(idx)) {
-          next.delete(idx);
-        } else {
-          const maxSelect = gameState.effectPrompt.maxSelect || 3;
-          if (next.size >= maxSelect) return prev;
-          // Check per-type limit
-          const cardTypes = gameState.effectPrompt.cardTypes || {};
-          const typeLimits = gameState.effectPrompt.typeLimits || {};
-          const thisType = cardTypes[idx];
-          if (thisType && typeLimits[thisType] !== undefined) {
-            let selectedOfType = 0;
-            for (const si of next) {
-              if (cardTypes[si] === thisType) selectedOfType++;
-            }
-            if (selectedOfType >= typeLimits[thisType]) return prev; // Type quota full
+        if (next.has(idx)) { next.delete(idx); return next; }
+        if (next.size >= maxSelect) return prev;
+        if (thisType && typeLimits[thisType] !== undefined) {
+          let selectedOfType = 0;
+          for (const si of next) {
+            if (cardTypes[si] === thisType) selectedOfType++;
           }
-          next.add(idx);
+          if (selectedOfType >= typeLimits[thisType]) return prev;
         }
+        next.add(idx);
         return next;
       });
       return;
     }
 
     // Block hand play while any dialog/submenu is open
-    if (showSurrender || showEndTurnConfirm || spellHeroPick) return;
+    if (showSurrender || showEndTurnConfirm || spellHeroPick || abilityAttachPick) return;
     if (gameState.surprisePending) return; // Lock hand during surprise prompts for both players
     const activePrompt = gameState.effectPrompt;
     if (activePrompt && activePrompt.ownerIdx === myIdx
@@ -7249,6 +7386,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Multiple eligible — show hero selection popup
               setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isHeroAction });
             }
+          } else if (card.cardType === 'Ability' && isAbilityPlayable && !isAbilityAttachEligible) {
+            // Click-to-attach. Instead of a popup, enter "pick-a-zone" mode:
+            // eligible hero zones light up, existing stacks of the same
+            // ability or empty ability slots become clickable.
+            const anyEligible = (me.heroes || []).some((_, hi) => canHeroReceiveAbility(me, hi, cardName));
+            if (anyEligible) {
+              setAbilityAttachPick({ cardName, handIndex: idx, card });
+            }
           } else if (card.cardType === 'Creature' && isPlayable) {
             // Click-to-summon. Two routing paths:
             //
@@ -7696,7 +7841,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // Listen for opponent card reveal
   useEffect(() => {
-    const onReveal = ({ cardName }) => setCardReveals(prev => [...prev, { id: Date.now() + Math.random(), cardName }]);
+    const onReveal = ({ cardName }) => { if (window.playSFX) window.playSFX('reveal'); setCardReveals(prev => [...prev, { id: Date.now() + Math.random(), cardName }]); };
     const onDeckSearchAdd = ({ cardName, playerIdx }) => {
       // If the OPPONENT searched, prepare face-up draw animation
       if (playerIdx !== myIdx) {
@@ -7709,6 +7854,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     const onChainResolvingStart = () => {}; // Chain is about to resolve
     const onChainLinkResolving = ({ linkIndex }) => {
+      if (window.playSFX) window.playSFX('spell_cast', { category: 'effect' });
       setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'resolving' } : l));
     };
     const onChainLinkResolved = ({ linkIndex }) => {
@@ -7751,6 +7897,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => setBurnTickingHeroes([]), 1500);
     };
     const onZoneAnim = ({ type, owner, heroIdx, zoneSlot, zoneType, permId }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(type);
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       let sel;
       if (zoneType === 'ability' && heroIdx >= 0 && zoneSlot >= 0) {
@@ -7774,6 +7921,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => setLevelChanges(prev => prev.filter(e => e.id !== entry.id)), 1600);
     };
     const onAbilityActivated = ({ owner, heroIdx, zoneIdx, abilityName }) => {
+      // Training (and similar effects) re-broadcasts ability_activated as
+      // a visual flash for the secondary zone it affects. Dedupe 800ms
+      // collapses those extra flashes into the single "ability triggered"
+      // cue the player cares about, while still letting genuinely separate
+      // ability activations play their own sound.
+      if (window.playSFX) window.playSFX('ability_activate', { dedupe: 800 });
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const abSel = `[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${zoneIdx}"]`;
       // Set flash overlay on the ability zone (visible to both players)
@@ -7793,6 +7946,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }, 400);
     };
     const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, color, duration }) => {
+      if (window.playSFX) window.playSFX('laser', { dedupe: 60, category: 'effect' });
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
       const srcEl = sourceZoneSlot != null && sourceZoneSlot >= 0
@@ -7840,6 +7994,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // affected creature coordinates so the client doesn't have to
     // re-derive them from state.
     const onDeepseaSporesActivated = ({ creatures }) => {
+      if (window.playSFX) window.playSFX('elem_water', { category: 'effect' });
       // Board-wide particle overlay: play on the full-screen container
       // (coords are the viewport center, so the animation component
       // paints across the whole play area).
@@ -8054,6 +8209,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('alleria_spider_redirect', onAlleriaSpiderRedirect);
     const onDarkControl = ({ owner, heroIdx }) => {
+      if (window.playSFX) window.playSFX('elem_dark', { category: 'effect' });
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
@@ -8101,6 +8257,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('dark_control', onDarkControl);
     const onBurningFingerSlash = ({ owner, heroIdx, zoneSlot }) => {
+      if (window.playSFX) window.playSFX('slash', { category: 'effect' });
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const sel = zoneSlot >= 0
         ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
@@ -8141,6 +8298,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('burning_finger_slash', onBurningFingerSlash);
     const onPunchImpact = ({ owner, heroIdx, zoneSlot }) => {
+      // punchStrike keyframes put the fist AT the target at 30% of 350ms
+      // (~105ms in). Delay the hit so the sound lands on the impact frame
+      // instead of during the wind-up.
+      if (window.playSFX) window.playSFX('heavy_impact', { delay: 110, category: 'effect' });
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const sel = zoneSlot >= 0
         ? `[data-equip-zone][data-equip-owner="${ownerLabel}"][data-equip-hero="${heroIdx}"][data-equip-slot="${zoneSlot}"]`
@@ -8233,6 +8394,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('cardinal_beast_win', onCardinalBeastWin);
     const onQinglongLightning = ({ srcOwner, srcHeroIdx, srcZoneSlot, tgtOwner, tgtHeroIdx, tgtZoneSlot, step }) => {
+      if (window.playSFX) window.playSFX('elem_lightning', { dedupe: 80, category: 'effect' });
       const sLabel = srcOwner === myIdx ? 'me' : 'opp';
       const tLabel = tgtOwner === myIdx ? 'me' : 'opp';
       const srcSel = srcZoneSlot >= 0
@@ -8276,6 +8438,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('qinglong_lightning', onQinglongLightning);
     const onRedLightningRain = ({ owner, heroIdx, zoneSlot }) => {
+      if (window.playSFX) window.playSFX('elem_lightning', { dedupe: 80, category: 'effect' });
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const sel = zoneSlot >= 0
         ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
@@ -8894,6 +9057,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('big_gwen_clock_activation', onBigGwenClockActivation);
     const onBoulderFall = ({ owner, heroIdx, zoneSlot }) => {
+      if (window.playSFX) window.playSFX('heavy_impact', { category: 'effect' });
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const sel = zoneSlot >= 0
         ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
@@ -8982,6 +9146,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('boulder_fall', onBoulderFall);
     const onSlowDarkMagic = ({ ownerIdx }) => {
+      if (window.playSFX) window.playSFX('elem_dark', { category: 'effect' });
       // Animate on the hand of the player who is discarding
       const ownerLabel = ownerIdx === myIdx ? 'me' : 'opp';
       const handEl = document.querySelector(`.game-hand-${ownerLabel}`);
@@ -9087,6 +9252,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('gold_steal_burst', onGoldStealBurst);
     const onJumpscareBox = ({ owner, heroIdx }) => {
+      if (window.playSFX) window.playSFX('jumpscare', { category: 'effect' });
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
@@ -9132,6 +9298,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('jumpscare_box', onJumpscareBox);
     const onAntiMagicBubble = ({ owner, heroIdx }) => {
+      if (window.playSFX) window.playSFX('negate');
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
@@ -9161,6 +9328,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('anti_magic_bubble', onAntiMagicBubble);
     const onFireshieldCorona = ({ owner, heroIdx }) => {
+      if (window.playSFX) window.playSFX('elem_fire', { category: 'effect' });
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
@@ -9228,12 +9396,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('surprise_reset', onSurpriseReset);
     const onPermanentAnim = ({ owner, permId, type }) => {
+      if (window.playSFX) window.playSFX('ability_activate');
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-perm-id="${permId}"][data-perm-owner="${ownerLabel}"]`);
       if (el) playAnimation(type || 'holy_revival', el, { duration: 1200 });
     };
     socket.on('play_permanent_animation', onPermanentAnim);
     const onRamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, targetPermId, cardName, duration, trailType }) => {
+      if (window.playSFX) window.playSFX('attack_ram', { category: 'effect' });
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
       // If sourceZoneSlot is provided, originate from that support zone; otherwise from the hero zone.
@@ -9277,6 +9447,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('play_ram_animation', onRamAnimation);
     const onCardTransfer = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, cardName, duration, particles }) => {
+      if (window.playSFX) window.playSFX('placement');
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
       // Support hero zones (zoneSlot === -1) as source or target
@@ -9306,6 +9477,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('play_card_transfer', onCardTransfer);
     const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, emoji, duration, trailClass, emojiStyle, projectileClass }) => {
+      if (window.playSFX) window.playSFX('projectile', { category: 'effect' });
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
       const srcEl = (sourceZoneSlot != null && sourceZoneSlot >= 0)
@@ -9572,6 +9744,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('divine_rain_start', onDivineRainStart);
     const onMoeBomb = () => {
+      if (window.playSFX) window.playSFX('heavy_impact', { category: 'effect' });
       // Inject keyframes once
       if (!document.getElementById('moe-bomb-keyframes')) {
         const style = document.createElement('style');
@@ -10094,6 +10267,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('deck_to_ability_animation', onDeckToAbility);
     const onPunchBox = ({ targetOwner, targetHeroIdx, targetZoneSlot }) => {
+      if (window.playSFX) window.playSFX('heavy_impact', { category: 'effect' });
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
       let tgtEl;
       if (targetZoneSlot >= 0) {
@@ -10463,6 +10637,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('play_guardian_angel', onGuardianAngel);
     const onHeroAnnouncement = ({ text }) => {
+      if (window.playSFX) window.playSFX('match_start');
       setAnnouncement({ text, color: 'var(--success)', short: true });
     };
     socket.on('hero_announcement', onHeroAnnouncement);
@@ -10471,6 +10646,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // mood lighting, below hand / modals). Sized to the board container
     // so both players see the same framing regardless of viewport.
     const onDDGManifest = () => {
+      if (window.playSFX) window.playSFX('ddg_manifest', { category: 'effect' });
       const container = document.querySelector('.board-center') || document.querySelector('.game-board') || document.body;
       const rect = container.getBoundingClientRect();
       const img = document.createElement('img');
@@ -10607,12 +10783,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setPrivateChats(prev => ({ ...prev, [pairKey]: [...(prev[pairKey] || []), entry] }));
     };
     const onChatPing = ({ from, color }) => {
+      if (window.playSFX) window.playSFX('ping');
       setPingFlash({ color });
       setTimeout(() => setPingFlash(null), 900);
     };
     const onActionLog = (entry) => {
       setActionLog(prev => [...prev, entry]);
       setTimeout(() => actionLogRef.current?.scrollTo({ top: actionLogRef.current.scrollHeight, behavior: 'smooth' }), 50);
+      if (window.playSFXForLog) window.playSFXForLog(entry);
     };
     const onChatHistory = ({ main, private: priv }) => {
       if (main) setChatMessages(main);
@@ -10680,6 +10858,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   useEffect(() => {
     const onResolved = ({ destroyedIds, animationType }) => {
       if (!destroyedIds || destroyedIds.length === 0) return;
+      // Potion animations are dispatched directly via playAnimation (below)
+      // rather than play_zone_animation, so route the SFX through the zone-
+      // animation dispatcher here so `acid_splash → elem_acid` etc. fires.
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(animationType);
       setExplosions(destroyedIds);
       setTimeout(() => setExplosions([]), 800);
       // Spawn particle animations on each target after a tiny delay for DOM to update
@@ -10750,6 +10932,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   const handleLeave = () => {
     showTextBox(null);
+    if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); }
     if (isSpectator) {
       socket.emit('leave_room', { roomId: gameState.roomId });
     } else {
@@ -10764,10 +10947,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Don't call onLeave — server will send updated game state with result
   };
   const handleRematch = () => {
+    if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); }
     socket.emit('request_rematch', { roomId: gameState.roomId });
   };
   const handleResultLeave = useCallback(() => {
     if (resultFading) return;
+    if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); }
     setResultFading(true);
     setTimeout(() => { setResultFading(false); handleLeave(); }, 800);
   }, [resultFading, handleLeave]);
@@ -10794,6 +10979,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       e.stopImmediatePropagation();
       if (showEndTurnConfirm) { cancelEndTurn(); return; }
       if (spellHeroPick) { setSpellHeroPick(null); return; }
+      if (abilityAttachPick) { setAbilityAttachPick(null); return; }
       if (pendingBouncePick) { setPendingBouncePick(null); return; }
       if (mulliganActive) { setMulliganDecided(true); socket.emit('mulligan_decision', { roomId: gameState.roomId, accept: false }); return; }
       if (pendingAbilityActivation) { setPendingAbilityActivation(null); return; }
@@ -11232,7 +11418,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const isTargeting = !isSpectator && !result && pt && pt.ownerIdx === myIdx;
   // Generic lock: blocks ALL effect activations (hero effects, abilities, creature effects)
   // whenever ANY targeting/prompt overlay is active
-  const isEffectLocked = !!(isTargeting || gameState.effectPrompt || gameState.surprisePending || gameState.mulliganPending || gameState.heroEffectPending || spellHeroPick || pendingAdditionalPlay || pendingAbilityActivation || showSurrender || showEndTurnConfirm);
+  const isEffectLocked = !!(isTargeting || gameState.effectPrompt || gameState.surprisePending || gameState.mulliganPending || gameState.heroEffectPending || spellHeroPick || abilityAttachPick || pendingAdditionalPlay || pendingAbilityActivation || showSurrender || showEndTurnConfirm);
   // Valid targets can be clicked/selected; ineligible targets are only
   // shown visually (dimmed) so the player can see which board Creatures
   // WOULD qualify for the effect but don't meet its filter (e.g. Dragon
@@ -11245,6 +11431,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (!isTargeting || !validTargetIds.has(targetId)) return;
     const target = pt.validTargets.find(t => t.id === targetId);
     if (!target || target.ineligible) return;
+    if (window.playSFX) window.playSFX('ui_click');
     setPotionSelection(prev => {
       if (prev.includes(targetId)) {
         // Deselect
@@ -11942,6 +12129,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             return false;
           })();
           const abilityTarget = !isOpp && abilityDrag && abilityDrag.targetHero === i && abilityDrag.targetZone < 0;
+          // Click-to-attach an Ability: highlight all eligible heroes + dim the rest.
+          const attachPickEligibleHero = !isOpp && abilityAttachPick && canHeroReceiveAbility(p, i, abilityAttachPick.cardName);
+          const attachPickHeroDim = !isOpp && abilityAttachPick && !attachPickEligibleHero;
           const equipTarget = !isOpp && playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1;
           const spellTarget = playDrag && playDrag.isSpell && playDrag.targetHero === i && (playDrag.charmedOwner != null ? isOpp : !isOpp);
           const pi = isOpp ? oppIdx : myIdx;
@@ -11975,7 +12165,37 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const isChainPickValid = chainPickValidIds.has(heroTargetId);
           const isChainPickSelected = chainPickSelectedIds.has(heroTargetId);
           const chainPickStep = chainPickSelected.findIndex(t => t.id === heroTargetId);
-          const onHeroClick = isChainPickValid
+          const onHeroClick = attachPickEligibleHero
+            ? () => {
+                // Click the Hero → auto-attach to the first eligible slot.
+                // Standard ability: stack onto existing copy (if any) or first empty zone.
+                // Custom-placement (Performance): first occupied zone with <3 cards.
+                const pick = abilityAttachPick;
+                const abList = (p.abilityZones || [])[i] || [[],[],[]];
+                const isCustom = (gameState.customPlacementCards || []).includes(pick.cardName);
+                let targetSlot = -1;
+                if (isCustom) {
+                  for (let zi = 0; zi < 3; zi++) {
+                    if ((abList[zi] || []).length > 0 && abList[zi].length < 3) { targetSlot = zi; break; }
+                  }
+                } else {
+                  for (let zi = 0; zi < 3; zi++) {
+                    if ((abList[zi] || []).length > 0 && abList[zi][0] === pick.cardName && abList[zi].length < 3) { targetSlot = zi; break; }
+                  }
+                  if (targetSlot < 0) {
+                    for (let zi = 0; zi < 3; zi++) {
+                      if ((abList[zi] || []).length === 0) { targetSlot = zi; break; }
+                    }
+                  }
+                }
+                if (targetSlot < 0) return;
+                setAbilityAttachPick(null);
+                socket.emit('play_ability', {
+                  roomId: gameState.roomId, cardName: pick.cardName,
+                  handIndex: pick.handIndex, heroIdx: i, zoneSlot: targetSlot,
+                });
+              }
+            : isChainPickValid
             ? () => {
                 const tgt = (chainPickData?.targets || []).find(t => t.id === heroTargetId);
                 if (tgt) setChainPickSelected(prev => [...prev, tgt]);
@@ -11989,10 +12209,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || attachPickEligibleHero) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
-                style={zsMerge('hero', { ...((isHeroEffectActive || isValidHeroTarget || isChainPickValid) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
+                style={zsMerge('hero', { ...((isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
                 {isChainPickSelected && <div className="chain-pick-number">{chainPickStep + 1}</div>}
                 {hero?.name && !isRamming ? (
                   <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={gameSkins}
@@ -12173,6 +12393,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               {[0, 1, 2].map(z => {
                 const cards = (abZones[i]||[])[z]||[];
                 const isAbTarget = !isOpp && abilityDrag && abilityDrag.targetHero === i && abilityDrag.targetZone === z;
+                // Click-to-attach an Ability: is THIS slot a valid attach target?
+                // - If the hero already has the ability, only that existing stack is clickable.
+                // - Otherwise, every empty slot is clickable.
+                // - For custom-placement cards (e.g. Performance), only occupied zones with <3 cards.
+                const attachPickZoneValid = !isOpp && abilityAttachPick && (() => {
+                  const heroData = p.heroes[i];
+                  if (!heroData || !heroData.name || heroData.hp <= 0) return false;
+                  if (!canHeroReceiveAbility(p, i, abilityAttachPick.cardName)) return false;
+                  const abList = (p.abilityZones || [])[i] || [[],[],[]];
+                  const isCustom = (gameState.customPlacementCards || []).includes(abilityAttachPick.cardName);
+                  if (isCustom) return (abList[z] || []).length > 0 && abList[z].length < 3;
+                  let existingIdx = -1;
+                  for (let zi = 0; zi < 3; zi++) {
+                    if ((abList[zi] || []).length > 0 && abList[zi][0] === abilityAttachPick.cardName) { existingIdx = zi; break; }
+                  }
+                  if (existingIdx >= 0) return z === existingIdx && abList[existingIdx].length < 3;
+                  return (abList[z] || []).length === 0;
+                })();
                 const pi = isOpp ? oppIdx : myIdx;
                 const abTargetId = `ability-${pi}-${i}-${z}`;
                 const isValidPotionTarget = isTargeting && validTargetIds.has(abTargetId);
@@ -12201,17 +12439,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isFriendshipActive = !isOpp && cards.includes('Friendship') && (gameState.additionalActions || []).some(aa =>
                   aa.typeId.startsWith('friendship_support') && aa.eligibleHandCards.length > 0 && aa.providers.some(p => p.heroIdx === i)
                 );
-                const onAbilityClick = (canActivate && !isEffectLocked) ? () => {
-                  if (isFreeActivatable) {
-                    // Free activation — no confirmation needed, activate directly
-                    socket.emit('activate_free_ability', { roomId: gameState.roomId, heroIdx: i, zoneIdx: z, charmedOwner: freeAbilityEntry?.charmedOwner });
-                  } else {
-                    setPendingAbilityActivation({ heroIdx: i, zoneIdx: z, abilityName: cards[0], level: cards.length, isHeroAction: isHeroActionActivatable, charmedOwner: activatableEntry?.charmedOwner });
-                  }
-                } : (isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined);
+                const onAbilityClick = attachPickZoneValid
+                  ? () => {
+                      const pick = abilityAttachPick;
+                      setAbilityAttachPick(null);
+                      socket.emit('play_ability', {
+                        roomId: gameState.roomId, cardName: pick.cardName,
+                        handIndex: pick.handIndex, heroIdx: i, zoneSlot: z,
+                      });
+                    }
+                  : (canActivate && !isEffectLocked) ? () => {
+                      if (isFreeActivatable) {
+                        // Free activation — no confirmation needed, activate directly
+                        socket.emit('activate_free_ability', { roomId: gameState.roomId, heroIdx: i, zoneIdx: z, charmedOwner: freeAbilityEntry?.charmedOwner });
+                      } else {
+                        setPendingAbilityActivation({ heroIdx: i, zoneIdx: z, abilityName: cards[0], level: cards.length, isHeroAction: isHeroActionActivatable, charmedOwner: activatableEntry?.charmedOwner });
+                      }
+                    } : (isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined);
                 return (
                   <div key={z}
-                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget ? ' board-zone-play-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '')}
+                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '')}
                     data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel} data-card-name={cards[0] || ''}
                     onClick={onAbilityClick}
                     onMouseEnter={() => {
@@ -12223,7 +12470,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       }
                     }}
                     onMouseLeave={() => { _activeLuckTooltipTarget = null; }}
-                    style={zsMerge('ability', canActivate ? { cursor: 'pointer' } : (isValidPotionTarget ? { cursor: 'pointer' } : undefined))}>
+                    style={zsMerge('ability', (canActivate || attachPickZoneValid || isValidPotionTarget) ? { cursor: 'pointer' } : undefined)}>
                     {cards.length > 0 ? (
                       <>
                         <AbilityStack cards={cards} />
@@ -12823,14 +13070,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   : (oppAreaActivatable ? () => socket.emit('activate_area_effect', {
                       roomId: gameState.roomId, areaOwner: oppIdx, areaName: oppAreaEntry.areaName,
                     }) : undefined);
+                // Hide until measured so the zones don't flash at left:auto and
+                // then "move" into place when the measurement resolves.
+                const measured = areaPositions[0] != null && areaPositions[1] != null;
+                const hiddenStyle = measured ? null : { visibility: 'hidden' };
                 return (<>
                   <BoardZone type="area" cards={gameState.areaZones?.[myIdx] || []} label="Area"
-                    style={{...myBoardZone('area'), left: areaPositions[0], cursor: (isMyAreaValid || myAreaActivatable) ? 'pointer' : undefined}}
+                    style={{...myBoardZone('area'), left: areaPositions[0], cursor: (isMyAreaValid || myAreaActivatable) ? 'pointer' : undefined, ...hiddenStyle}}
                     className={(myAreaCls + ' area-zone-me').trim()}
                     dataAttrs={{ 'data-area-zone': '1', 'data-area-owner': 'me' }}
                     onClick={onMyAreaClick} />
                   <BoardZone type="area" cards={gameState.areaZones?.[oppIdx] || []} label="Area"
-                    style={{...oppBoardZone('area'), left: areaPositions[1], cursor: (isOppAreaValid || oppAreaActivatable) ? 'pointer' : undefined}}
+                    style={{...oppBoardZone('area'), left: areaPositions[1], cursor: (isOppAreaValid || oppAreaActivatable) ? 'pointer' : undefined, ...hiddenStyle}}
                     className={(oppAreaCls + ' area-zone-opp').trim()}
                     dataAttrs={{ 'data-area-zone': '1', 'data-area-owner': 'opp' }}
                     onClick={onOppAreaClick} />
@@ -13829,7 +14080,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   return (
                     <div key={entry.name + '-' + entry.source + '-' + i} style={{ position: 'relative' }}>
                       <CardMini card={card}
-                        onClick={() => respondToPrompt({ cardName: entry.name, source: entry.source })}
+                        onClick={() => { if (window.playSFX) window.playSFX('ui_click'); respondToPrompt({ cardName: entry.name, source: entry.source }); }}
                         style={{ width: '100%', height: 120, cursor: 'pointer' }} />
                       {entry.count != null && (
                         <div style={{
@@ -14463,11 +14714,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
                 <button className="btn" style={{ padding: '10px 28px', fontSize: 13, width: 220, borderColor: 'var(--accent)', color: 'var(--accent)' }}
-                  onClick={() => { socket.emit('retry_puzzle', { roomId: gameState.roomId }); }}>
+                  onClick={() => { if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); } socket.emit('retry_puzzle', { roomId: gameState.roomId }); }}>
                   🔄 Retry
                 </button>
                 <button className="btn btn-danger" style={{ padding: '10px 28px', fontSize: 13, width: 220 }}
-                  onClick={() => { if (result?.isTutorial) window._tutorialGaveUp = true; onLeave(); }}>
+                  onClick={() => { if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); } if (result?.isTutorial) window._tutorialGaveUp = true; onLeave(); }}>
                   ✕ Give Up
                 </button>
               </div>

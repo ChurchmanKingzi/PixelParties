@@ -5482,6 +5482,12 @@ io.on('connection', (socket) => {
       if (willyIdx >= 0) {
         ps.heroes[willyIdx].atk = 9999;
         ps.heroes[willyIdx].baseAtk = 9999;
+        // Log an atk_grant so the client plays the buff SFX.
+        if (engine) {
+          engine.log('atk_grant', {
+            hero: ps.heroes[willyIdx].name, amount: 9999, source: 'Tutorial',
+          });
+        }
         // Clear old ability card instances for Willy
         if (engine) {
           engine.cardInstances = engine.cardInstances.filter(c =>

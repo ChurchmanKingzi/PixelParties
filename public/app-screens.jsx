@@ -63,7 +63,7 @@ function AuthScreen() {
 //  MAIN MENU
 // ═══════════════════════════════════════════
 function MainMenu() {
-  const { user, setScreen, setUser, notify } = useContext(AppContext);
+  const { user, setScreen, setUser, notify, setBgmMode } = useContext(AppContext);
   const [puzzleOpen, setPuzzleOpen] = useState(false);
   const [puzzleBrowserOpen, setPuzzleBrowserOpen] = useState(false);
   const [puzzleList, setPuzzleList] = useState(null); // null = not loaded, [] = empty
@@ -239,6 +239,14 @@ function MainMenu() {
       }
     }
   }, [tutorialAttemptState, notify]);
+
+  // Play bgm_puzzle while a puzzle attempt or tutorial attempt is active.
+  useEffect(() => {
+    if (!setBgmMode) return;
+    if (puzzleAttemptState || tutorialAttemptState) setBgmMode('puzzle');
+    else setBgmMode('menu');
+    return () => { if (setBgmMode) setBgmMode('menu'); };
+  }, [puzzleAttemptState, tutorialAttemptState, setBgmMode]);
 
   // Render GameBoard during tutorial attempt
   if (tutorialAttemptState) {
@@ -1240,7 +1248,7 @@ function ShopScreen() {
       const data = await api('/shop/buy', { method: 'POST', body: JSON.stringify({ itemType, itemId }) });
       setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], itemId] }));
       setUser(u => ({ ...u, sc: data.sc }));
-      setCelebration(pos);
+      setCelebration(pos); if (window.playSFX) window.playSFX('shop_purchase');
     } catch (e) { notify(e.message, 'error'); }
     setBuying(false);
   };
@@ -1255,7 +1263,7 @@ function ShopScreen() {
       const data = await api('/shop/buy-random-skin', { method: 'POST' });
       setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
       setUser(u => ({ ...u, sc: data.sc }));
-      setCelebration(pos);
+      setCelebration(pos); if (window.playSFX) window.playSFX('shop_purchase');
       setRandomReveal({
         imgUrl: '/cards/skins/' + encodeURIComponent(data.skinName) + '.png',
         label: data.skinName,
@@ -1275,7 +1283,7 @@ function ShopScreen() {
       const data = await api('/shop/buy-random', { method: 'POST', body: JSON.stringify({ itemType }) });
       setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
       setUser(u => ({ ...u, sc: data.sc }));
-      setCelebration(pos);
+      setCelebration(pos); if (window.playSFX) window.playSFX('shop_purchase');
       const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
       setRandomReveal({
         imgUrl: '/data/shop/' + subdir + '/' + encodeURIComponent(data.itemId) + '.png',

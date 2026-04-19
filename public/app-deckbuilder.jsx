@@ -360,19 +360,23 @@ function DeckBuilder() {
     if (!currentDeck) return false;
     const card = CARDS_BY_NAME[cardName];
     if (!card) return false;
+    const addOk = () => { if (window.playSFX) window.playSFX('draw'); };
     if (section === 'main') {
       if (!canAddCard(currentDeck, cardName, 'main')) return false;
       updateSections({ main: [...(currentDeck.mainDeck || []), cardName] });
+      addOk();
       return true;
     }
     if (section === 'potion') {
       if (!canAddCard(currentDeck, cardName, 'potion')) return false;
       updateSections({ potion: [...(currentDeck.potionDeck || []), cardName] });
+      addOk();
       return true;
     }
     if (section === 'side') {
       if (!canAddCard(currentDeck, cardName, 'side')) return false;
       updateSections({ side: [...(currentDeck.sideDeck || []), cardName] });
+      addOk();
       return true;
     }
     if (section === 'hero') {
@@ -382,6 +386,7 @@ function DeckBuilder() {
       if (slot < 0) return false;
       heroes[slot] = { hero: cardName, ability1: card.startingAbility1 || null, ability2: card.startingAbility2 || null };
       updateSections({ heroes });
+      addOk();
       return true;
     }
     return false;
@@ -393,10 +398,11 @@ function DeckBuilder() {
     if (!canAddCard(currentDeck, cardName, section)) return false;
     const keyMap = { main: 'mainDeck', potion: 'potionDeck', side: 'sideDeck' };
     const key = keyMap[section];
-    if (!key) return addCardTo(cardName, section);
+    if (!key) return addCardTo(cardName, section); // Delegated call plays its own SFX.
     const arr = [...(currentDeck[key] || [])];
     arr.splice(Math.min(idx, arr.length), 0, cardName);
     updateSections({ [section]: arr });
+    if (window.playSFX) window.playSFX('draw');
     return true;
   }, [currentDeck, unsaved, decks, activeIdx]);
 
@@ -428,11 +434,13 @@ function DeckBuilder() {
     } else {
       updateSections({ heroes });
     }
+    if (window.playSFX) window.playSFX('draw');
     return true;
   }, [currentDeck, unsaved, decks, activeIdx]);
 
   const removeFrom = useCallback((cardName, section, index) => {
     if (!currentDeck) return;
+    if (window.playSFX) window.playSFX('discard');
     const removeOne = (arr, idx) => { const n = [...arr]; if (idx != null) n.splice(idx, 1); else { const i = n.indexOf(cardName); if (i >= 0) n.splice(i, 1); } return n; };
     // "The Sacred Jewel" clause: removing this card may drop the deck's
     // Sacred Jewel count below the 4-copy threshold that grants every

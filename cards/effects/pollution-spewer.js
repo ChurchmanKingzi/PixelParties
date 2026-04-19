@@ -48,9 +48,12 @@ module.exports = {
       // Only react when a token was removed from OUR side.
       if (ownerIdx !== ctx.cardOwner) return;
 
-      // Per-instance HOPT — use the card instance's unique id so two
-      // Spewers on the same side each get their own once-per-turn.
-      const hoptKey = `pollution_spewer:${ctx.card.id}`;
+      // Per-instance HOPT keyed on (owner, heroIdx, zoneSlot) so two
+      // Spewers on the same side each get their own once-per-turn. The
+      // board position is guaranteed unique (no two cards share a slot)
+      // and stable across this turn, so each Spewer can react to one
+      // Pollution Token removal per turn without crossing signals.
+      const hoptKey = `pollution_spewer:${ctx.cardOriginalOwner}:${ctx.cardHeroIdx}:${ctx.card?.zoneSlot}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
 
       // Controller may decline — make the prompt cancellable. If declined,

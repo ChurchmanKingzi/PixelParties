@@ -18,7 +18,7 @@ const emptyPlayer = () => ({
 });
 
 function PuzzleCreator() {
-  const { user, setScreen, notify, setInBattle } = useContext(AppContext);
+  const { user, setScreen, notify, setBgmMode } = useContext(AppContext);
 
   // ── Load saved state from localStorage ──
   const loadSaved = () => {
@@ -219,6 +219,8 @@ function PuzzleCreator() {
     if (zoneEl) {
       const [si, zt, hi, slot] = zoneEl.dataset.pzZone.split('-');
       const siN = parseInt(si), hiN = parseInt(hi), slotN = parseInt(slot);
+      // Same-zone drop → no-op (don't wipe ability/support zones, no SFX).
+      if (td.sourceZone && td.sourceZone.zt === zt && td.sourceZone.si === siN && td.sourceZone.hi === hiN && td.sourceZone.slot === slotN) return;
       if (canDrop(td.cardName, zt, siN, hiN, slotN)) {
         // Remove from source
         if (td.handIdx != null) { if (td.handSource === 'oppHand') removeFromOppHand(td.handIdx); else removeFromHand(td.handIdx); }
@@ -241,6 +243,7 @@ function PuzzleCreator() {
       // Add to target hand
       if (handType === 'hand') addToHand({ name: td.cardName });
       else if (handType === 'oppHand') addToOppHand({ name: td.cardName });
+      if (window.playSFX) window.playSFX('draw');
     }
   }, [canDrop, clearZone, removeFromHand, removeFromOppHand, placeHero, placeAbility, placeSupport, placeSurprise, placeArea, placePermanent, addToHand, addToOppHand]);
 
@@ -261,7 +264,7 @@ function PuzzleCreator() {
       if (!state.isPuzzle || puzzleIgnoreRef.current) return;
       puzzleRoomRef.current = state.roomId;
       setPuzzleGameState(state);
-      setInBattle(true);
+      setBgmMode('puzzle');
     };
     const onPuzzleError = (msg) => {
       notify('Puzzle error: ' + msg, 'error');
@@ -272,7 +275,7 @@ function PuzzleCreator() {
       socket.off('game_state', onGameState);
       socket.off('puzzle_error', onPuzzleError);
     };
-  }, [notify, setInBattle]);
+  }, [notify, setBgmMode]);
 
   // ── Puzzle Battle: leave handler ──
   const onPuzzleLeave = useCallback(() => {
@@ -288,12 +291,12 @@ function PuzzleCreator() {
     // Return to creator
     setPuzzleGameState(null);
     puzzleRoomRef.current = null;
-    setInBattle(false);
+    setBgmMode('menu');
     if (result) {
       setValidated(success);
       notify(success ? '🧩 Puzzle validated! Export is now available.' : 'Puzzle not cleared — adjust and try again.', success ? 'success' : 'info');
     }
-  }, [puzzleGameState, notify, setInBattle]);
+  }, [puzzleGameState, notify, setBgmMode]);
 
   const handleReset = useCallback(() => {
     setPlayers([emptyPlayer(), emptyPlayer()]);
@@ -406,6 +409,9 @@ function PuzzleCreator() {
     invalidate();
   }, [invalidate]);
 
+  // add/remove helpers do NOT play SFX themselves — they're called both from
+  // user-facing actions AND as part of drag-to-place flows where they'd
+  // double up with placement/discard. Call sites play the sound instead.
   const addToHand = useCallback((card) => { setHand(prev => [...prev, card.name]); invalidate(); }, [invalidate]);
   const removeFromHand = useCallback((idx) => { setHand(prev => prev.filter((_, i) => i !== idx)); invalidate(); }, [invalidate]);
   const addToOppHand = useCallback((card) => { setOppHand(prev => [...prev, card.name]); invalidate(); }, [invalidate]);
@@ -414,6 +420,7 @@ function PuzzleCreator() {
   // ── Placement ──
   const placeHero = useCallback((cardName, si, hi) => {
     const c = getCard(cardName); if (!c || (c.cardType !== 'Hero' && c.cardType !== 'Ascended Hero')) return;
+    if (window.playSFX) window.playSFX('placement');
     updatePlayer(si, (p) => {
       const old = p.heroes[hi];
       if (old) setHand(prev => [...prev, old.name]);
@@ -436,6 +443,7 @@ function PuzzleCreator() {
   const placeAbility = useCallback((cardName, si, hi, slot) => {
     const c = getCard(cardName); if (!c || c.cardType !== 'Ability') return;
     if (!players[si].heroes[hi]) { notify('Place a Hero first!', 'error'); return; }
+    if (window.playSFX) window.playSFX('placement');
     const zone = players[si].abilityZones[hi][slot];
     if (zone.length > 0 && zone[0] === cardName && zone.length >= 3) { notify('Max level!', 'error'); return; }
     if (zone.length > 0 && zone[0] !== cardName) setHand(prev => [...prev, ...zone]);
@@ -479,6 +487,7 @@ function PuzzleCreator() {
   }, []);
 
   const placeSupport = useCallback((cardName, si, hi, slot) => {
+    if (window.playSFX) window.playSFX('placement');
     const zone = players[si].supportZones[hi][slot];
     if (zone.length > 0) {
       // Replacing a Flying Island — drop exactly 2 island zones (the
@@ -545,20 +554,24 @@ function PuzzleCreator() {
 
   const placeSurprise = useCallback((cardName, si, hi) => {
     if (!players[si].heroes[hi]) { notify('Place a Hero first!', 'error'); return; }
+    if (window.playSFX) window.playSFX('placement');
     if (players[si].surpriseZones[hi].length > 0) setHand(prev => [...prev, ...players[si].surpriseZones[hi]]);
     updatePlayer(si, (p) => { p.surpriseZones[hi] = [cardName]; return p; });
   }, [players, updatePlayer, notify]);
 
   const placeArea = useCallback((cardName, si) => {
+    if (window.playSFX) window.playSFX('placement');
     if (areaZones[si].length > 0) setHand(prev => [...prev, ...areaZones[si]]);
     updateArea(si, () => [cardName]);
   }, [areaZones, updateArea]);
 
   const placePermanent = useCallback((cardName, si) => {
+    if (window.playSFX) window.playSFX('placement');
     updatePlayer(si, (p) => { p.permanents.push({ name: cardName, id: 'p' + Date.now() + Math.random() }); return p; });
   }, [updatePlayer]);
 
   const removeCard = useCallback((si, zt, hi, slot) => {
+    if (window.playSFX) window.playSFX('discard');
     if (zt === 'hero') updatePlayer(si, (p) => { p.heroes[hi] = null; p.abilityZones[hi] = [[], [], []]; p.supportZones[hi] = [[], [], []]; p.surpriseZones[hi] = []; if (p.islandZoneCount) p.islandZoneCount[hi] = 0; return p; });
     else if (zt === 'ability') updatePlayer(si, (p) => { p.abilityZones[hi][slot] = []; return p; });
     else if (zt === 'support') updatePlayer(si, (p) => {
@@ -650,6 +663,13 @@ function PuzzleCreator() {
   const handleDrop = useCallback((zt, si, hi, slot) => {
     if (dragCardName == null) return;
     if (!canDrop(dragCardName, zt, si, hi, slot)) return;
+    // Same-zone drop (e.g. dragging a hero back onto its own zone): no-op.
+    // Skipping this is critical — otherwise clearZone + placeHero would
+    // wipe the hero's ability/support zones and play a stray placement SFX.
+    if (dragSource && dragSource.zt === zt && dragSource.si === si && dragSource.hi === hi && dragSource.slot === slot) {
+      setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null;
+      return;
+    }
     const entityData = dragEntityData.current;
     // Remove from source first (board zone or hand)
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
@@ -700,12 +720,15 @@ function PuzzleCreator() {
   const handleHandDrop = useCallback((e) => {
     e.preventDefault();
     if (dragCardName == null) return;
+    // Own hand → own hand is a no-op; don't emit SFX in that case.
+    const noop = dragHandSource === 'hand' && dragHandIdx != null;
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
     // From oppHand → remove from there and add here
     if (dragHandSource === 'oppHand' && dragHandIdx != null) { removeFromOppHand(dragHandIdx); setHand(prev => [...prev, dragCardName]); }
     // From board or gallery → add to hand
     else if (dragHandIdx == null) setHand(prev => [...prev, dragCardName]);
     // From own hand → no-op (reorder not needed)
+    if (!noop && window.playSFX) window.playSFX('draw');
     setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null;
   }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromOppHand]);
 
@@ -713,12 +736,14 @@ function PuzzleCreator() {
   const handleOppHandDrop = useCallback((e) => {
     e.preventDefault();
     if (dragCardName == null) return;
+    const noop = dragHandSource === 'oppHand' && dragHandIdx != null;
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
     // From player hand → remove from there and add here
     if (dragHandSource === 'hand' && dragHandIdx != null) { removeFromHand(dragHandIdx); setOppHand(prev => [...prev, dragCardName]); }
     // From board or gallery → add to opp hand
     else if (dragHandIdx == null) setOppHand(prev => [...prev, dragCardName]);
     // From own oppHand → no-op (reorder not needed)
+    if (!noop && window.playSFX) window.playSFX('draw');
     setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null;
   }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromHand]);
 
@@ -901,7 +926,7 @@ function PuzzleCreator() {
   }, [puzzleName, notify]);
 
   useEffect(() => {
-    const h = (e) => { if (e.key === 'Escape') { if (puzzleGameState) return; if (editTarget) setEditTarget(null); else setScreen('menu'); e.stopImmediatePropagation(); } };
+    const h = (e) => { if (e.key === 'Escape') { if (puzzleGameState) return; if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); if (editTarget) setEditTarget(null); else setScreen('menu'); e.stopImmediatePropagation(); } };
     window.addEventListener('keydown', h, true); return () => window.removeEventListener('keydown', h, true);
   }, [editTarget, puzzleGameState]);
 
@@ -1318,10 +1343,10 @@ function PuzzleCreator() {
               const img = cardImageUrl(c.name);
               return (
                 <div key={c.name + i} className="pz-search-card"
-                  onClick={!isTouchDevice ? () => { addToHand(c); setMobileSelected(null); } : undefined}
+                  onClick={!isTouchDevice ? () => { addToHand(c); if (window.playSFX) window.playSFX('draw'); setMobileSelected(null); } : undefined}
                   onTouchStart={(e) => touchDragStart(c.name, null, null, null, e)}
                   onTouchMove={touchDragMove}
-                  onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); addToHand(c); setMobileSelected(null); } }}
+                  onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); addToHand(c); if (window.playSFX) window.playSFX('draw'); setMobileSelected(null); } }}
                   draggable={!isTouchDevice} onDragStart={(e) => onDragStart(e, c.name, null, null)} onDragEnd={onDragEnd}
                   onMouseEnter={() => showTooltip(c, 'right')} onMouseLeave={hideTooltip}
                   title={c.name + ' (' + c.cardType + (c.subtype ? ' / ' + c.subtype : '') + ')'}>
@@ -1373,8 +1398,8 @@ function PuzzleCreator() {
                     } : undefined}
                     onTouchStart={(e) => touchDragStart(cardName, i, 'oppHand', null, e)}
                     onTouchMove={touchDragMove}
-                    onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); const now = Date.now(); const lt = lastTapRef.current; if (lt.handSource === 'oppHand' && lt.handIdx === i && now - lt.time < 350) { removeFromOppHand(i); setMobileSelected(null); lastTapRef.current = { time: 0, handSource: null, handIdx: -1 }; } else { lastTapRef.current = { time: now, handSource: 'oppHand', handIdx: i }; if (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'oppHand' }); } } }}
-                    onContextMenu={(e) => { e.preventDefault(); removeFromOppHand(i); }}
+                    onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); const now = Date.now(); const lt = lastTapRef.current; if (lt.handSource === 'oppHand' && lt.handIdx === i && now - lt.time < 350) { removeFromOppHand(i); if (window.playSFX) window.playSFX('discard'); setMobileSelected(null); lastTapRef.current = { time: 0, handSource: null, handIdx: -1 }; } else { lastTapRef.current = { time: now, handSource: 'oppHand', handIdx: i }; if (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'oppHand' }); } } }}
+                    onContextMenu={(e) => { e.preventDefault(); removeFromOppHand(i); if (window.playSFX) window.playSFX('discard'); }}
                     onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                     onMouseLeave={hideTooltip}
                     title={cardName}>
@@ -1435,8 +1460,8 @@ function PuzzleCreator() {
                 } : undefined}
                 onTouchStart={(e) => touchDragStart(cardName, i, 'hand', null, e)}
                 onTouchMove={touchDragMove}
-                onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); const now = Date.now(); const lt = lastTapRef.current; if (lt.handSource === 'hand' && lt.handIdx === i && now - lt.time < 350) { removeFromHand(i); setMobileSelected(null); lastTapRef.current = { time: 0, handSource: null, handIdx: -1 }; } else { lastTapRef.current = { time: now, handSource: 'hand', handIdx: i }; if (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'hand' }); } } }}
-                onContextMenu={(e) => { e.preventDefault(); removeFromHand(i); }}
+                onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); const now = Date.now(); const lt = lastTapRef.current; if (lt.handSource === 'hand' && lt.handIdx === i && now - lt.time < 350) { removeFromHand(i); if (window.playSFX) window.playSFX('discard'); setMobileSelected(null); lastTapRef.current = { time: 0, handSource: null, handIdx: -1 }; } else { lastTapRef.current = { time: now, handSource: 'hand', handIdx: i }; if (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'hand' }); } } }}
+                onContextMenu={(e) => { e.preventDefault(); removeFromHand(i); if (window.playSFX) window.playSFX('discard'); }}
                 onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                 onMouseLeave={hideTooltip}
                 title={cardName}>
@@ -1687,6 +1712,7 @@ function PuzzleCreator() {
         }} onClick={() => {
           if (mobileSelected.handSource === 'oppHand') removeFromOppHand(mobileSelected.handIdx);
           else removeFromHand(mobileSelected.handIdx);
+          if (window.playSFX) window.playSFX('discard');
           setMobileSelected(null);
         }}>✕ Remove</div>
       )}

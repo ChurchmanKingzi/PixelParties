@@ -310,6 +310,13 @@ async function tryBouncePlace(ctx) {
   const ps = gs.players[pi];
   const cardName = ctx.cardName;
 
+  // Shapeshift / Deepsea Castle swap context: the caller is already
+  // handling the bounce-out and placement. Skip bounce-place entirely
+  // so the player isn't prompted to pick ANOTHER Creature to bounce on
+  // top of the swap's own bounced target. Returning true lets the
+  // swap's atomicSwap proceed to place this Creature directly.
+  if (ctx._isSwap) return true;
+
   const bounceable = getBounceableDeepseaCreatures(engine, pi);
   if (bounceable.length === 0) {
     // No bounce target — normal summon is the only path. The
@@ -675,7 +682,13 @@ function ownSupportCreatures(engine, pi) {
   return out;
 }
 
-/** Different-named Creatures in hand with level ≤ maxLevel. */
+/**
+ * Different-named Creatures in hand with level ≤ maxLevel. Also filters out
+ * Creatures whose `canSummon` gate rejects the current state — this is what
+ * prevents Shapeshift / Castle from letting a tribute-summon Creature
+ * (Dragon Pilot, Dark Deepsea God, etc.) appear as a swap target when the
+ * player couldn't actually pay its cost.
+ */
 function eligibleSwapReplacements(engine, pi, excludeName, maxLevel) {
   const { hasCardType } = require('./_hooks');
   const ps = engine.gs.players[pi];
@@ -689,6 +702,11 @@ function eligibleSwapReplacements(engine, pi, excludeName, maxLevel) {
     const cd = cardDB[n];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if ((cd.level || 0) > maxLevel) continue;
+    // canSummon gate — e.g. Dragon Pilot / DDG's sacrifice-or-tribute
+    // requirement. isCreatureSummonable returns true when no script
+    // defines canSummon, so plain Creatures pass through untouched.
+    if (typeof engine.isCreatureSummonable === 'function'
+        && !engine.isCreatureSummonable(n, pi)) continue;
     seen.add(n);
     out.push({ name: n, source: 'hand', cost: cd.level || 0 });
   }
@@ -724,6 +742,26 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   const bouncedLevel = cardDB[bouncedName]?.level || 0;
   const bouncedHeroIdx = bouncedInst.heroIdx;
   const bouncedSlotIdx = bouncedInst.zoneSlot;
+
+  // Pre-placement gate: run the incoming Creature's `beforeSummon` hook
+  // so sacrifice / tribute costs (Dragon Pilot, Dark Deepsea God, etc.)
+  // are paid BEFORE the swap commits. Returning false aborts the swap —
+  // either the player cancelled the cost prompt, or the card placed
+  // itself and took over the summon (DDG sets _placementConsumedByCard
+  // and returns false; we don't want to double-place on top of that).
+  //
+  // The `_isSwap` flag is read by `tryBouncePlace` (the Deepsea
+  // creatures' beforeSummon) so it skips its own bounce-place prompt —
+  // the swap's bounce-out is already happening via the caller.
+  if (typeof engine._runBeforeSummon === 'function') {
+    const ok = await engine._runBeforeSummon(newCardName, pi, bouncedHeroIdx, { _isSwap: true });
+    if (!ok) {
+      engine.log('swap_blocked', {
+        card: newCardName, by: sourceName || 'Swap', reason: 'beforeSummon',
+      });
+      return null;
+    }
+  }
 
   // (A) Remove bounced creature name from its support slot.
   const slotArr = ps.supportZones?.[bouncedHeroIdx]?.[bouncedSlotIdx];

@@ -161,7 +161,12 @@ module.exports = {
     if (newName === chosenName) return false;
 
     // ── Step 3: atomic swap ─────────────────────────────────────
-    await atomicSwap(engine, activator, chosenInst, newName, CARD_NAME);
+    // atomicSwap runs the replacement Creature's beforeSummon hook. If
+    // it aborts (sacrifice/tribute cancelled, or the card placed itself
+    // via its own hook — e.g. Dark Deepsea God), return false so Castle
+    // doesn't log a swap that didn't happen.
+    const swap = await atomicSwap(engine, activator, chosenInst, newName, CARD_NAME);
+    if (!swap) return false;
     engine.log('deepsea_castle_swap', {
       player: ps.username, bounced: chosenName, placed: newName,
       bouncedLevel: chosenLevel, placedLevel: newLevel,
