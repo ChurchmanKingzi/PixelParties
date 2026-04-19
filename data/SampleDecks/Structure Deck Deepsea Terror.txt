@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
 Name: Structure Deck: Deepsea Terror
+Cover: Siphem, the Deepsea Demon
 
 == HEROES ==
 Teppes, the Deepsea Vampire

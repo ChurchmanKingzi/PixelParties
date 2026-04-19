@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
-Name: Sample Deck: Poison Torture
+Name: Structure Deck: Poison Torture
+Cover: Reiza, the Chief Tormentor
 
 == HEROES ==
 Fiona, the Princess of Blackport

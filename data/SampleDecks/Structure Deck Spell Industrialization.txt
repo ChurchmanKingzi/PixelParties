@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
-Name: Sample Deck: Spell Industrialization
+Name: Structure Deck: Spell Industrialization
+Cover: Pollution Token
 
 == HEROES ==
 Cooldin, King of Coolness

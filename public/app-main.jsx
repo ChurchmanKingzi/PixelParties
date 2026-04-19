@@ -53,7 +53,7 @@ function PlayScreen() {
         }
       } catch {}
       try {
-        const sd = await api('/sample-decks');
+        const sd = await api('/sample-decks/owned');
         if (sd.decks) setSampleDecks(sd.decks);
       } catch {}
     })();

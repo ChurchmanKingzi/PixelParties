@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
-Name: Sample Deck: One-Two-Punch!
+Name: Structure Deck: One-Two-Punch!
+Cover: Ghuanjun, the Undead Martial Artist
 
 == HEROES ==
 Bill, the Angry Auctioneer

@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
-Name: Sample Deck: Heal Burn
+Name: Structure Deck: Heal Burn
+Cover: Nao, the Barrier Priestess
 
 == HEROES ==
 Kazena, the Storming Rebel

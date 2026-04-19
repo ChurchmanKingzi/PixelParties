@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════
 const { useState, useEffect, useRef, useCallback, useMemo, useContext } = React;
 const { api, socket, AppContext, CardMini, cardImageUrl,
-        typeColor, skinImageUrl } = window;
+        typeColor, skinImageUrl, CardTooltipContent } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, SKINS_DB } = window;
 
 function AuthScreen() {
@@ -381,12 +381,17 @@ function MainMenu() {
                 <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>No tutorials available yet.</div>
               ) : (
                 tutorialList.map((t, i) => (
-                  <button key={t.tutorialId} className="btn" onClick={() => startTutorialAttempt(t)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: 'rgba(255,68,204,.25)', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start' }}>
-                    <span style={{ color: t.completed ? '#33ff88' : 'var(--bg4)', fontSize: 16, width: 20, textAlign: 'center' }}>{t.completed ? '✓' : '○'}</span>
-                    <span style={{ color: '#ff44cc', fontSize: 11, width: 24, flexShrink: 0 }}>{t.num}.</span>
+                  <button key={t.tutorialId} className="btn" disabled={t.locked}
+                    onClick={() => { if (!t.locked) startTutorialAttempt(t); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: 'rgba(255,68,204,.25)', color: t.locked ? 'var(--text2)' : 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', opacity: t.locked ? 0.55 : 1, cursor: t.locked ? 'not-allowed' : 'pointer' }}>
+                    <span style={{ color: t.locked ? 'var(--text2)' : (t.completed ? '#33ff88' : 'var(--bg4)'), fontSize: 16, width: 20, textAlign: 'center' }}>
+                      {t.locked ? '🔒' : (t.completed ? '✓' : '○')}
+                    </span>
+                    <span style={{ color: t.locked ? 'var(--text2)' : '#ff44cc', fontSize: 11, width: 24, flexShrink: 0 }}>{t.num}.</span>
                     <span style={{ flex: 1 }}>{t.name}</span>
-                    {t.completed && <span style={{ fontSize: 9, color: 'var(--text2)' }}>CLEARED</span>}
+                    {t.locked
+                      ? <span style={{ fontSize: 9, color: 'var(--text2)' }}>LOCKED</span>
+                      : (t.completed && <span style={{ fontSize: 9, color: 'var(--text2)' }}>CLEARED</span>)}
                   </button>
                 ))
               )}
@@ -1202,6 +1207,7 @@ function ShopScreen() {
   const { user, setUser, setScreen, notify } = useContext(AppContext);
   const [catalog, setCatalog] = useState(null);
   const [owned, setOwned] = useState({ avatar: [], sleeve: [], board: [], skin: [] });
+  const [structureCatalog, setStructureCatalog] = useState(null); // { decks, price, randomPrice, defaultDeckId }
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [tab, setTab] = useState('skins');
@@ -1209,20 +1215,101 @@ function ShopScreen() {
   const [selected, setSelected] = useState(null); // { type, id }
   const [celebration, setCelebration] = useState(null); // { cx, cy } or null
   const [randomReveal, setRandomReveal] = useState(null); // { imgUrl, label, subtitle } or null
+  const [hoverDeckCard, setHoverDeckCard] = useState(null); // cover card name being previewed
+  const [hoverSkin, setHoverSkin] = useState(null); // { skinName, heroName } being previewed
 
   useEffect(() => {
     (async () => {
       try {
-        const [catData, ownData] = await Promise.all([
+        const [catData, ownData, structData] = await Promise.all([
           api('/shop/catalog'),
-          api('/shop/owned')
+          api('/shop/owned'),
+          api('/shop/structure-decks'),
         ]);
         setCatalog(catData);
         setOwned(ownData.owned);
+        setStructureCatalog(structData);
       } catch (e) { notify(e.message, 'error'); }
       setLoading(false);
     })();
   }, []);
+
+  const refreshStructures = async () => {
+    try { const sd = await api('/shop/structure-decks'); setStructureCatalog(sd); } catch {}
+  };
+
+  const buyStructureDeck = async (structureId, e) => {
+    if (e) e.stopPropagation();
+    if (buying || !structureCatalog) return;
+    if ((user.sc || 0) < structureCatalog.price) { notify('Not enough SC!', 'error'); return; }
+    const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
+    setBuying(true);
+    try {
+      const data = await api('/shop/buy-structure-deck', { method: 'POST', body: JSON.stringify({ structureId }) });
+      setUser(u => ({ ...u, sc: data.sc }));
+      setCelebration(pos); if (window.playSFX) window.playSFX('shop_purchase');
+      await refreshStructures();
+    } catch (e2) { notify(e2.message, 'error'); }
+    setBuying(false);
+  };
+
+  const buyRandomStructureDeck = async (e) => {
+    if (buying || !structureCatalog) return;
+    if ((user.sc || 0) < structureCatalog.randomPrice) { notify('Not enough SC!', 'error'); return; }
+    const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
+    setBuying(true);
+    try {
+      const data = await api('/shop/buy-random-structure-deck', { method: 'POST' });
+      setUser(u => ({ ...u, sc: data.sc }));
+      setCelebration(pos); if (window.playSFX) window.playSFX('shop_purchase');
+      setRandomReveal({
+        imgUrl: (data.coverCard && window.cardImageUrl) ? (window.cardImageUrl(data.coverCard) || '/cardback.png') : '/cardback.png',
+        label: data.name,
+        subtitle: 'New Structure Deck!',
+      });
+      await refreshStructures();
+    } catch (e2) { notify(e2.message, 'error'); }
+    setBuying(false);
+  };
+
+  const pickStructureAsDefault = async (sampleDeckId) => {
+    try {
+      await api('/decks/set-default-sample', { method: 'POST', body: JSON.stringify({ sampleDeckId }) });
+      setUser(u => ({ ...u, defaultSampleDeckId: sampleDeckId }));
+      await refreshStructures();
+      if (window.playSFX) window.playSFX('ui_click');
+      notify('Set as default deck!', 'success');
+    } catch (e) { notify(e.message, 'error'); }
+  };
+
+  // Equip an owned avatar / sleeve / board straight from the shop, so the
+  // user doesn't have to detour through the profile screen. Mirrors the
+  // quickSave* helpers in ProfileScreen but uses the ShopScreen's user
+  // context. Board is stored as a plain id; avatar/sleeve as the asset URL.
+  const equipItem = async (type, id) => {
+    let avatar = user.avatar;
+    let cardback = user.cardback;
+    let board = user.board || null;
+    if (type === 'avatar') avatar = '/data/shop/avatars/' + id + '.png';
+    else if (type === 'sleeve') cardback = '/data/shop/sleeves/' + id + '.png';
+    else if (type === 'board') board = id;
+    else return;
+    try {
+      const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
+        color: user.color || '#00f0ff', avatar, cardback, bio: user.bio || '', board,
+      })});
+      setUser(data.user);
+      if (window.playSFX) window.playSFX('ui_click');
+    } catch (e) { notify(e.message, 'error'); }
+  };
+
+  // What is currently equipped? Used to label / highlight the active item.
+  const isEquipped = (type, id) => {
+    if (type === 'avatar') return user.avatar === '/data/shop/avatars/' + id + '.png';
+    if (type === 'sleeve') return user.cardback === '/data/shop/sleeves/' + id + '.png';
+    if (type === 'board')  return user.board === id;
+    return false;
+  };
 
   const toggleSelect = (type, id) => {
     setSelected(prev => (prev && prev.type === type && prev.id === id) ? null : { type, id });
@@ -1333,13 +1420,15 @@ function ShopScreen() {
         <div className="shop-grid">
           {items.map(item => {
             const isOwned = ownedSet[type].has(item.id);
-            const sel = isSelected(type, item.id);
+            const equipped = isOwned && isEquipped(type, item.id);
+            const sel = !isOwned && isSelected(type, item.id);
             return (
-              <div key={item.id} className={'shop-item' + (isOwned ? ' shop-owned' : '') + (sel ? ' shop-selected' : '')}
-                onClick={() => toggleSelect(type, item.id)}>
+              <div key={item.id} className={'shop-item' + (isOwned ? ' shop-owned' : '') + (equipped ? ' shop-equipped' : '') + (sel ? ' shop-selected' : '')}
+                onClick={() => isOwned ? (!equipped && equipItem(type, item.id)) : toggleSelect(type, item.id)}>
                 <div className="shop-item-img-wrap">
                   <img src={imgBase + encodeURIComponent(item.file)} draggable={false} />
-                  {isOwned && <div className="shop-owned-badge">OWNED</div>}
+                  {equipped ? <div className="shop-owned-badge shop-equipped-badge">EQUIPPED</div>
+                    : isOwned ? <div className="shop-owned-badge">OWNED</div> : null}
                 </div>
                 {!isOwned && (
                   <button className="btn shop-buy-btn" disabled={buying || (user.sc || 0) < prices[type]}
@@ -1384,6 +1473,8 @@ function ShopScreen() {
             const sel = isSelected('skin', skin.id);
             return (
               <div key={skin.id} className={'shop-item shop-skin-item' + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (sel ? ' shop-selected' : '')}
+                onMouseEnter={() => setHoverSkin({ skinName: skin.skinName, heroName: skin.heroName })}
+                onMouseLeave={() => setHoverSkin(null)}
                 onClick={() => toggleSelect('skin', skin.id)}>
                 <div className="shop-item-img-wrap">
                   <img src={'/cards/skins/' + encodeURIComponent(skin.skinName) + '.png'} draggable={false}
@@ -1406,11 +1497,89 @@ function ShopScreen() {
     );
   };
 
+  const renderStructureDecks = () => {
+    const decks = structureCatalog?.decks || [];
+    const price = structureCatalog?.price ?? 10;
+    const randomPrice = structureCatalog?.randomPrice ?? 5;
+    const unownedCount = decks.filter(d => !d.owned).length;
+    const allOwned = decks.length > 0 && unownedCount === 0;
+    return (
+      <>
+        {/* Random Structure Deck Button — matches the Skin / Avatar / Sleeve
+            random-button layout so the shop feels consistent. */}
+        <div className="shop-random-wrap">
+          <button className="btn shop-random-btn" disabled={buying || allOwned || (user.sc || 0) < randomPrice}
+            onClick={buyRandomStructureDeck}>
+            🎲 Random Structure Deck — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrice}
+          </button>
+          <span className="shop-random-hint">{unownedCount > 0 ? unownedCount + ' left to collect' : 'All collected!'}</span>
+        </div>
+        <div className="shop-grid">
+          {decks.map(d => {
+            const coverUrl = (d.coverCard && window.cardImageUrl) ? (window.cardImageUrl(d.coverCard) || '/cardback.png') : '/cardback.png';
+            const isCurrentDefault = !!d.isDefault;
+            const canAfford = (user.sc || 0) >= price;
+            // Golden border always; green overlay on top if it's the active
+            // default deck; semi-transparent if still locked.
+            // Owned & not-yet-default → gold frame (handled by .shop-owned).
+            // Owned & currently default → green frame (inline below).
+            // Not owned → default shop-item (dim) frame so it clearly reads
+            // as unpurchased, mirroring avatar/sleeve/board tiles.
+            const frameStyle = {
+              cursor: d.owned ? 'pointer' : 'default',
+              position: 'relative',
+            };
+            if (isCurrentDefault) {
+              frameStyle.borderColor = '#33ff88';
+              frameStyle.boxShadow = '0 0 16px rgba(51,255,136,.7), 0 0 28px rgba(51,255,136,.35)';
+            }
+            // shop-owned class adds the golden pulse + particle animations.
+            // When the deck is the active default, the green border should
+            // dominate, so we skip shop-owned and use a plain inline glow.
+            const classes = 'shop-item structure-deck-item'
+              + (d.owned && !isCurrentDefault ? ' shop-owned' : '')
+              + (isCurrentDefault ? ' structure-deck-default' : '');
+            return (
+              <div key={d.structureId} className={classes}
+                style={frameStyle}
+                onMouseEnter={() => d.coverCard && setHoverDeckCard(d.coverCard)}
+                onMouseLeave={() => setHoverDeckCard(null)}
+                onClick={d.owned ? () => pickStructureAsDefault(d.id) : undefined}>
+                <img src={coverUrl} alt={d.name} draggable={false}
+                  style={{ width: '100%', height: 148, objectFit: 'cover', objectPosition: 'center top', borderRadius: 4, opacity: d.owned ? 1 : 0.5 }} />
+                <div style={{ fontSize: 11, textAlign: 'center', padding: '6px 4px 2px', color: isCurrentDefault ? '#33ff88' : (d.owned ? '#ffd700' : 'var(--text2)'), fontWeight: 600 }}>
+                  {d.name}
+                </div>
+                {d.owned ? (
+                  <div className="shop-price" style={{ borderColor: isCurrentDefault ? '#33ff88' : '#ffd700', color: isCurrentDefault ? '#33ff88' : '#ffd700' }}>
+                    {isCurrentDefault ? 'DEFAULT' : 'Click to select'}
+                  </div>
+                ) : (
+                  <button className="btn" disabled={buying || !canAfford}
+                    onClick={(e) => buyStructureDeck(d.structureId, e)}
+                    style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#ffd700', color: canAfford ? '#ffd700' : 'var(--text2)' }}>
+                    🔒 {price} SC
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {decks.length === 0 && (
+          <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 40, fontSize: 13 }}>
+            No Structure Decks available yet.
+          </div>
+        )}
+      </>
+    );
+  };
+
   const tabs = [
     { id: 'skins', label: '🎨 Skins', count: (catalog.skins || []).length },
     { id: 'avatars', label: '👤 Avatars', count: (catalog.avatars || []).length },
     { id: 'sleeves', label: '🃏 Sleeves', count: (catalog.sleeves || []).length },
     { id: 'boards', label: '🎮 Boards', count: (catalog.boards || []).length },
+    { id: 'structures', label: '📜 Structure Decks', count: (structureCatalog?.decks || []).length },
   ];
 
   return (
@@ -1451,7 +1620,36 @@ function ShopScreen() {
         {tab === 'avatars' && renderItemGrid(catalog.avatars || [], 'avatar', '/data/shop/avatars/')}
         {tab === 'sleeves' && renderItemGrid(catalog.sleeves || [], 'sleeve', '/data/shop/sleeves/')}
         {tab === 'boards' && renderItemGrid(catalog.boards || [], 'board', '/data/shop/boards/')}
+        {tab === 'structures' && renderStructureDecks()}
       </div>
+      {/* Shared hover-preview tooltip for shop items that have an associated
+          card (structure deck covers, skins). Uses the same
+          `.tooltip.card-tooltip` chrome + dimensions as the in-game / deck
+          builder hover preview. Skin previews force the skin asset while
+          still listing the underlying hero's stats/effect. */}
+      {(() => {
+        if (!CardTooltipContent) return null;
+        let card = null, imageUrl = null;
+        if (hoverSkin && CARDS_BY_NAME?.[hoverSkin.heroName]) {
+          // Override displayName so the big title shows the skin name
+          // rather than the hero's canonical name.
+          card = { ...CARDS_BY_NAME[hoverSkin.heroName], displayName: hoverSkin.skinName };
+          imageUrl = '/cards/skins/' + encodeURIComponent(hoverSkin.skinName) + '.png';
+        } else if (hoverDeckCard && CARDS_BY_NAME?.[hoverDeckCard]) {
+          card = CARDS_BY_NAME[hoverDeckCard];
+        }
+        if (!card) return null;
+        return (
+          <div className="tooltip card-tooltip" style={{
+            right: 0, top: 41, width: 400,
+            height: 'calc(100vh - 41px)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            zIndex: 80000,
+          }}>
+            <CardTooltipContent card={card} imageUrl={imageUrl} />
+          </div>
+        );
+      })()}
     </div>
   );
 }

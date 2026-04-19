@@ -4986,6 +4986,26 @@ body:has(.reaction-chain-overlay) .board-tooltip {
   box-shadow: 0 0 18px rgba(255,215,0,.6), 0 0 36px rgba(255,215,0,.25), inset 0 0 10px rgba(255,215,0,.15);
 }
 
+/* Structure Decks — inherit frame styling from .shop-item / .shop-owned
+   so locked (default dim border) vs unlocked (gold) vs default (green) read
+   the same as other shop tiles. */
+.structure-deck-item {
+  padding: 8px;
+  gap: 4px;
+  transition: transform .15s, box-shadow .2s, border-color .2s;
+}
+.structure-deck-item:hover:not([disabled]) {
+  transform: translateY(-2px);
+}
+.structure-deck-item.structure-deck-default {
+  animation: structure-deck-equipped-pulse 2s ease-in-out infinite;
+  background: linear-gradient(180deg, rgba(51,255,136,.12) 0%, rgba(0,0,0,.25) 100%);
+}
+@keyframes structure-deck-equipped-pulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(51,255,136,.7), 0 0 28px rgba(51,255,136,.35); }
+  50%      { box-shadow: 0 0 22px rgba(80,255,160,.9), 0 0 44px rgba(51,255,136,.5); }
+}
+
 /* Slight gray-out on unbought non-skin items */
 .shop-item:not(.shop-owned):not(.shop-unowned-skin) .shop-item-img-wrap img {
   filter: grayscale(0.4) brightness(0.7);
@@ -5010,10 +5030,10 @@ body:has(.reaction-chain-overlay) .board-tooltip {
 }
 
 .shop-skin-locked {
-  filter: grayscale(1) brightness(0.08) contrast(0.5) blur(1px);
+  filter: grayscale(1) brightness(0.55) contrast(0.85);
 }
 .shop-unowned-skin:hover .shop-skin-locked {
-  filter: grayscale(1) brightness(0.15) contrast(0.6) blur(0.5px);
+  filter: grayscale(1) brightness(0.7) contrast(0.9);
 }
 
 .shop-owned-badge {
@@ -5028,6 +5048,13 @@ body:has(.reaction-chain-overlay) .board-tooltip {
   padding: 2px 6px;
   border-radius: 3px;
   letter-spacing: .5px;
+}
+.shop-equipped-badge {
+  background: rgba(51,255,136,.95);
+}
+.shop-item.shop-equipped {
+  border-color: #33ff88 !important;
+  animation: structure-deck-equipped-pulse 2s ease-in-out infinite;
 }
 
 .shop-item-name {

@@ -103,6 +103,9 @@ async function initDatabase() {
   try { await db.execute('ALTER TABLE users ADD COLUMN sc INTEGER DEFAULT 0'); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN board TEXT DEFAULT NULL"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN hide_tutorial INTEGER DEFAULT 0"); } catch {}
+  // Tracks which sample deck (starter or structure) the user has pinned as
+  // their default. Null when the default is a custom deck from `decks`.
+  try { await db.execute("ALTER TABLE users ADD COLUMN default_sample_deck_id TEXT DEFAULT NULL"); } catch {}
 
   await db.execute(`CREATE TABLE IF NOT EXISTS hero_stats (
     user_id TEXT NOT NULL,
@@ -270,7 +273,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0 };
+  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, defaultSampleDeckId: u.default_sample_deck_id || null };
 }
 
 // ===== PROFILE ROUTES =====
@@ -607,6 +610,8 @@ app.post('/api/decks/:id/set-default', authMiddleware, async (req, res) => {
   if (!deck) return res.status(404).json({ error: 'Deck not found' });
   await db.run('UPDATE decks SET is_default = 0 WHERE user_id = ?', [req.user.userId]);
   await db.run('UPDATE decks SET is_default = 1 WHERE id = ? AND user_id = ?', [req.params.id, req.user.userId]);
+  // A custom deck is now the default — clear any pinned sample-deck default.
+  await db.run('UPDATE users SET default_sample_deck_id = NULL WHERE id = ?', [req.user.userId]);
   res.json({ ok: true });
 });
 
@@ -654,7 +659,9 @@ function loadSampleDecks() {
       const lines = text.split(/\r?\n/);
       if (!lines[0] || !lines[0].includes('PIXEL PARTIES DECK')) continue;
 
-      let deckName = files[fi].replace('.txt', '');
+      const fileBase = files[fi].replace(/\.txt$/, '');
+      let deckName = fileBase;
+      let coverCard = '';
       let section = null;
       const heroNames = [];
       const mainCards = [];
@@ -665,6 +672,7 @@ function loadSampleDecks() {
         const line = lines[i].trim();
         if (!line) continue;
         if (line.startsWith('Name:')) { deckName = line.slice(5).trim(); continue; }
+        if (line.startsWith('Cover:')) { coverCard = line.slice(6).trim(); continue; }
         if (line.startsWith('===')) continue;
         if (line === '== HEROES ==') { section = 'heroes'; continue; }
         if (line === '== MAIN DECK ==') { section = 'main'; continue; }
@@ -690,23 +698,82 @@ function loadSampleDecks() {
         return { hero: name, ability1: card?.startingAbility1 || null, ability2: card?.startingAbility2 || null };
       });
 
+      // "Structure Deck …" files are gated behind a shop purchase. Others
+      // are "Starter Decks" — always visible in the deck list and used as
+      // the random default for new accounts.
+      const isStructure = /^Structure Deck\b/i.test(fileBase) || /^Structure Deck\b/i.test(deckName);
+      // Strip the "Structure Deck" / "Starter Deck" prefix (with optional
+      // colon) from the stored Name so the deck list / shop show just the
+      // real deck title.
+      const stripped = deckName.replace(/^(Structure|Starter) Deck\s*:?\s*/i, '').trim();
+      const displayName = stripped || deckName;
+
       decks.push({
         id: 'sample-' + fi,
-        name: deckName,
+        name: displayName,
         heroes,
         mainDeck: mainCards,
         potionDeck: potionCards,
         sideDeck: sideCards,
         isDefault: false,
         isSample: true,
+        isStructure,
+        // Stable id used for ownership tracking in user_shop_items.
+        structureId: isStructure ? fileBase : null,
+        coverCard,
       });
     } catch (err) { console.error('[SampleDecks] Error reading', files[fi], err.message); }
   }
   return decks;
 }
 
-app.get('/api/sample-decks', (req, res) => {
-  res.json({ decks: loadSampleDecks() });
+// Only the starter (non-structure) sample decks are returned to every
+// client. Structure decks ride on a separate owned-items catalog below.
+app.get('/api/sample-decks', async (req, res) => {
+  const all = loadSampleDecks();
+  res.json({ decks: all.filter(d => !d.isStructure) });
+});
+
+// Authenticated variant — includes any structure decks the caller has
+// unlocked, so they appear in the deck picker next to starter decks.
+app.get('/api/sample-decks/owned', authMiddleware, async (req, res) => {
+  const all = loadSampleDecks();
+  const ownedRows = await db.all(
+    "SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck'",
+    [req.user.userId]
+  );
+  const ownedSet = new Set(ownedRows.map(r => r.item_id));
+  const decks = all.filter(d => !d.isStructure || ownedSet.has(d.structureId));
+  res.json({ decks });
+});
+
+// Structure-deck shop catalog with per-deck ownership flags.
+app.get('/api/shop/structure-decks', authMiddleware, async (req, res) => {
+  const all = loadSampleDecks().filter(d => d.isStructure);
+  const ownedRows = await db.all(
+    "SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck'",
+    [req.user.userId]
+  );
+  const ownedSet = new Set(ownedRows.map(r => r.item_id));
+  // Which deck is currently flagged as this user's default? Used by the UI
+  // to draw the green "this is your active deck" border.
+  const defaultRow = await db.get('SELECT id FROM decks WHERE user_id = ? AND is_default = 1', [req.user.userId]);
+  const defaultDeckId = defaultRow?.id || null;
+  const userRow = await db.get('SELECT default_sample_deck_id FROM users WHERE id = ?', [req.user.userId]);
+  const defaultSampleId = userRow?.default_sample_deck_id || null;
+  res.json({
+    decks: all.map(d => ({
+      structureId: d.structureId,
+      id: d.id,
+      name: d.name,
+      coverCard: d.coverCard || '',
+      owned: ownedSet.has(d.structureId),
+      isDefault: defaultSampleId === d.id,
+    })),
+    price: STRUCTURE_DECK_PRICE,
+    randomPrice: STRUCTURE_DECK_RANDOM_PRICE,
+    defaultDeckId,
+  });
 });
 
 // ===== SKINS =====
@@ -717,6 +784,8 @@ app.get('/api/skins', (req, res) => res.json({ skins: SKINS_DATA }));
 // ===== SHOP SYSTEM =====
 const SHOP_PRICES = { avatar: 10, sleeve: 10, board: 10, skin: 10 };
 const RANDOM_PRICES = { skin: 5, avatar: 5, sleeve: 5 };
+const STRUCTURE_DECK_PRICE = 10;
+const STRUCTURE_DECK_RANDOM_PRICE = 5;
 
 // Scan a shop directory and return available items
 function scanShopDir(subdir) {
@@ -879,6 +948,86 @@ app.post('/api/shop/buy-random', authMiddleware, async (req, res) => {
 
   const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ ok: true, sc: updated.sc, itemId: pick, itemType });
+});
+
+// ───── Structure decks (shop-gated sample decks) ─────
+
+// POST /api/shop/buy-structure-deck — buy a specific structure deck by its file id.
+app.post('/api/shop/buy-structure-deck', authMiddleware, async (req, res) => {
+  const { structureId } = req.body;
+  if (!structureId) return res.status(400).json({ error: 'Missing structureId' });
+
+  const exists = loadSampleDecks().some(d => d.isStructure && d.structureId === structureId);
+  if (!exists) return res.status(404).json({ error: 'Structure deck not found' });
+
+  const already = await db.get(
+    "SELECT id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck' AND item_id = ?",
+    [req.user.userId, structureId]
+  );
+  if (already) return res.status(409).json({ error: 'Already owned' });
+
+  const user = await db.get('SELECT sc FROM users WHERE id = ?', [req.user.userId]);
+  if ((user.sc || 0) < STRUCTURE_DECK_PRICE) return res.status(400).json({ error: 'Not enough SC' });
+
+  await db.run('UPDATE users SET sc = sc - ? WHERE id = ?', [STRUCTURE_DECK_PRICE, req.user.userId]);
+  await db.run(
+    'INSERT INTO user_shop_items (id, user_id, item_type, item_id) VALUES (?, ?, ?, ?)',
+    [uuidv4(), req.user.userId, 'structure_deck', structureId]
+  );
+  const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
+  res.json({ ok: true, sc: updated.sc, structureId });
+});
+
+// POST /api/shop/buy-random-structure-deck — unlock a random unowned structure deck.
+app.post('/api/shop/buy-random-structure-deck', authMiddleware, async (req, res) => {
+  const all = loadSampleDecks().filter(d => d.isStructure);
+  if (all.length === 0) return res.status(400).json({ error: 'No structure decks available' });
+
+  const ownedRows = await db.all(
+    "SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck'",
+    [req.user.userId]
+  );
+  const ownedSet = new Set(ownedRows.map(r => r.item_id));
+  const unowned = all.filter(d => !ownedSet.has(d.structureId));
+  if (unowned.length === 0) return res.status(400).json({ error: 'You already own all Structure Decks!' });
+
+  const user = await db.get('SELECT sc FROM users WHERE id = ?', [req.user.userId]);
+  if ((user.sc || 0) < STRUCTURE_DECK_RANDOM_PRICE) return res.status(400).json({ error: 'Not enough SC' });
+
+  const pick = unowned[Math.floor(Math.random() * unowned.length)];
+  await db.run('UPDATE users SET sc = sc - ? WHERE id = ?', [STRUCTURE_DECK_RANDOM_PRICE, req.user.userId]);
+  await db.run(
+    'INSERT INTO user_shop_items (id, user_id, item_type, item_id) VALUES (?, ?, ?, ?)',
+    [uuidv4(), req.user.userId, 'structure_deck', pick.structureId]
+  );
+  const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
+  res.json({
+    ok: true, sc: updated.sc,
+    structureId: pick.structureId,
+    name: pick.name,
+    coverCard: pick.coverCard || '',
+  });
+});
+
+// POST /api/decks/set-default-sample — pin an unlocked sample/structure deck as default.
+app.post('/api/decks/set-default-sample', authMiddleware, async (req, res) => {
+  const { sampleDeckId } = req.body;
+  if (!sampleDeckId) return res.status(400).json({ error: 'Missing sampleDeckId' });
+  const deck = loadSampleDecks().find(d => d.id === sampleDeckId);
+  if (!deck) return res.status(404).json({ error: 'Sample deck not found' });
+
+  if (deck.isStructure) {
+    const owned = await db.get(
+      "SELECT id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck' AND item_id = ?",
+      [req.user.userId, deck.structureId]
+    );
+    if (!owned) return res.status(403).json({ error: 'Structure deck not unlocked' });
+  }
+
+  // Clear the default flag on all custom decks + pin the sample deck.
+  await db.run('UPDATE decks SET is_default = 0 WHERE user_id = ?', [req.user.userId]);
+  await db.run('UPDATE users SET default_sample_deck_id = ? WHERE id = ?', [sampleDeckId, req.user.userId]);
+  res.json({ ok: true, sampleDeckId });
 });
 
 // Standard avatars (free defaults in public/avatars/)
@@ -1976,10 +2125,20 @@ async function setupGameState(room) {
     if (room._currentDecks && room._currentDecks[idx]) {
       deck = room._currentDecks[idx];
     } else {
-      // Check if the selected deck is a sample deck
+      // Check if the selected deck is a sample deck (starter or owned structure).
       if (p.deckId && p.deckId.startsWith('sample-')) {
         const samples = loadSampleDecks();
-        deck = samples.find(s => s.id === p.deckId) || null;
+        const pick = samples.find(s => s.id === p.deckId) || null;
+        if (pick && pick.isStructure) {
+          // Verify ownership — a structure deck can only be used if unlocked.
+          const owned = await db.get(
+            "SELECT id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck' AND item_id = ?",
+            [p.userId, pick.structureId]
+          );
+          if (owned) deck = pick;
+        } else {
+          deck = pick;
+        }
       }
 
       if (!deck) {
@@ -1989,11 +2148,33 @@ async function setupGameState(room) {
         deck = deckRow ? parseDeck(deckRow) : null;
       }
 
+      // User has a pinned sample/structure default deck but no custom deck —
+      // use that pinned one (re-verifying ownership for structures).
+      if (!deck) {
+        const userRow = await db.get('SELECT default_sample_deck_id FROM users WHERE id = ?', [p.userId]);
+        const pinnedId = userRow?.default_sample_deck_id;
+        if (pinnedId) {
+          const samples = loadSampleDecks();
+          const pick = samples.find(s => s.id === pinnedId) || null;
+          if (pick && pick.isStructure) {
+            const owned = await db.get(
+              "SELECT id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck' AND item_id = ?",
+              [p.userId, pick.structureId]
+            );
+            if (owned) deck = pick;
+          } else if (pick) {
+            deck = pick;
+          }
+        }
+      }
+
       if (!deck || (!deck.mainDeck.length && !deck.heroes.some(h => h.hero))) {
-        const samples = loadSampleDecks();
-        if (samples.length > 0) {
+        // New-account fallback uses only STARTER decks (structure decks stay
+        // locked until purchased).
+        const starters = loadSampleDecks().filter(s => !s.isStructure);
+        if (starters.length > 0) {
           const hash = [...p.userId].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0);
-          deck = samples[Math.abs(hash) % samples.length];
+          deck = starters[Math.abs(hash) % starters.length];
         }
       }
 
@@ -5390,10 +5571,16 @@ io.on('connection', (socket) => {
         [currentUser.userId]
       );
       const completedSet = new Set(completions.map(r => r.puzzle_id));
+      const completedByNum = new Set(
+        tutorials.filter(t => completedSet.has(t.tutorialId)).map(t => t.num)
+      );
 
+      // Progression gate: tutorial N is locked until tutorial N-1 is cleared.
+      // Tutorial 1 is always unlocked.
       socket.emit('tutorial_list', tutorials.map(t => ({
         num: t.num, name: t.name, tutorialId: t.tutorialId,
         completed: completedSet.has(t.tutorialId),
+        locked: t.num > 1 && !completedByNum.has(t.num - 1),
       })));
     } catch (err) {
       console.error('[Tutorial] get_tutorials error:', err.message);
@@ -5410,6 +5597,24 @@ io.on('connection', (socket) => {
         const fileName = tutorialId.replace('tutorial/', '');
         const filePath = path.join(__dirname, 'data', 'puzzles', 'tutorial', fileName + '.json');
         if (!fs.existsSync(filePath)) { socket.emit('puzzle_error', 'Tutorial not found'); return; }
+
+        // Progression gate: parse this tutorial's number out of its file
+        // name and require the previous tutorial to already be cleared.
+        const numMatch = fileName.match(/^tutorial(\d+)/i);
+        const num = numMatch ? parseInt(numMatch[1], 10) : 1;
+        if (num > 1) {
+          const tutDir = path.dirname(filePath);
+          const prevPrefix = `tutorial${num - 1} `;
+          const prevFile = fs.readdirSync(tutDir).find(f => f.startsWith(prevPrefix) && f.endsWith('.json'));
+          if (prevFile) {
+            const prevId = 'tutorial/' + prevFile.replace(/\.json$/, '');
+            const cleared = await db.get(
+              'SELECT 1 FROM puzzle_completions WHERE user_id = ? AND puzzle_id = ?',
+              [currentUser.userId, prevId]
+            );
+            if (!cleared) { socket.emit('puzzle_error', 'Clear the previous tutorial first.'); return; }
+          }
+        }
 
         const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
         const puzzleData = decryptPuzzle(raw.data);
@@ -5528,6 +5733,21 @@ io.on('connection', (socket) => {
           for (let i = 0; i < 2; i++) sendGameState(room, i);
           sendSpectatorGameState(room);
         }, 600);
+      }
+    }
+
+    if (type === 'tutorial5_gold') {
+      // Antonia's "pocket change" — set the player's Gold to 999 and fire a
+      // gold_gain log so the standard SFX + float animation trigger.
+      const ps = gs.players[pi];
+      if (ps) {
+        const prev = ps.gold || 0;
+        ps.gold = 999;
+        if (engine) {
+          engine.log('gold_gain', { player: ps.username, amount: 999 - prev, total: 999 });
+        }
+        for (let i = 0; i < 2; i++) sendGameState(room, i);
+        sendSpectatorGameState(room);
       }
     }
 

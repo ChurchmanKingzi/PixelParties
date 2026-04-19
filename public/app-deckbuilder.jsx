@@ -102,7 +102,9 @@ function DeckBuilder() {
   useEffect(() => { _persistedUnsaved = unsaved; }, [unsaved]);
   const [loaded, setLoaded] = useState(false);
   const [sampleDecks, setSampleDecks] = useState([]);
-  const [showSamples, setShowSamples] = useState(true);
+  const [showSamples, setShowSamples] = useState(true); // legacy — kept so rename is minimal
+  const [showStructures, setShowStructures] = useState(true);
+  const [showStarters, setShowStarters] = useState(true);
   const [sampleActive, setSampleActive] = useState(-1);
   const isSampleMode = sampleActive >= 0;
   const [filters, setFilters] = useState({ name:'',effect:'',cardType:'',subtype:'',archetype:'',sa1:'',sa2:'',ss1:'',ss2:'',level:'',cost:'',hp:'',atk:'' });
@@ -139,7 +141,7 @@ function DeckBuilder() {
           setDecks([nd.deck]);
         }
       } catch (e) { notify(e.message, 'error'); }
-      try { const sd = await api('/sample-decks'); setSampleDecks(sd.decks || []); } catch (e) { /* ignore */ }
+      try { const sd = await api('/sample-decks/owned'); setSampleDecks(sd.decks || []); } catch (e) { /* ignore */ }
       setLoaded(true);
     })();
   }, []);
@@ -964,7 +966,11 @@ function DeckBuilder() {
   // ── Export deck to .txt ──
   const exportDeck = () => {
     if (!currentDeck) return;
-    const lines = ['=== PIXEL PARTIES DECK ===', 'Name: ' + (currentDeck.name || 'Unnamed'), ''];
+    const lines = ['=== PIXEL PARTIES DECK ===', 'Name: ' + (currentDeck.name || 'Unnamed')];
+    // Persist the chosen cover card so structure decks can display it in
+    // the shop catalog and anywhere else a deck thumbnail is shown.
+    if (currentDeck.coverCard) lines.push('Cover: ' + currentDeck.coverCard);
+    lines.push('');
 
     // Heroes
     lines.push('== HEROES ==');
@@ -1131,32 +1137,60 @@ function DeckBuilder() {
             {decks.map((d, i) => {
               const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
               return (
-                <div key={d.id} className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); }}>
+                <div key={d.id} role="button" className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); }}>
                   {d.isDefault && <span style={{ color: '#ffd700', fontSize: 10 }}>★</span>}
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
                   <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
                 </div>
               );
             })}
-            {sampleDecks.length > 0 && (
-              <>
-                <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
-                  <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, flex: 1 }}>SAMPLE DECKS</span>
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, color: 'var(--accent)', padding: 0 }}
-                    onClick={() => setShowSamples(v => !v)}>{showSamples ? 'Hide' : 'Show'}</button>
-                </div>
-                {showSamples && sampleDecks.map((d, i) => {
-                  const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
-                  return (
-                    <div key={d.id} className={'deck-list-item deck-list-sample' + (isSampleMode && sampleActive === i ? ' active' : '')}
-                      onClick={() => setSampleActive(i)}>
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
-                      <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
-                    </div>
-                  );
-                })}
-              </>
-            )}
+            {sampleDecks.length > 0 && (() => {
+              // Split sample decks into Structure (owned shop decks) and
+              // Starter (always-free) categories. Each section gets its
+              // own collapsible header. sampleActive still indexes the
+              // original sampleDecks array so persistent state / selection
+              // remains stable across renders.
+              const structureDecks = sampleDecks
+                .map((d, i) => ({ d, i }))
+                .filter(e => e.d.isStructure);
+              const starterDecks = sampleDecks
+                .map((d, i) => ({ d, i }))
+                .filter(e => !e.d.isStructure);
+              const renderSampleRow = ({ d, i }) => {
+                const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
+                return (
+                  <div key={d.id} role="button" className={'deck-list-item deck-list-sample' + (isSampleMode && sampleActive === i ? ' active' : '')}
+                    onClick={() => setSampleActive(i)}>
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
+                    <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
+                  </div>
+                );
+              };
+              return (
+                <>
+                  {structureDecks.length > 0 && (
+                    <>
+                      <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
+                        <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, flex: 1 }}>STRUCTURE DECKS</span>
+                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, color: 'var(--accent)', padding: 0 }}
+                          onClick={() => setShowStructures(v => !v)}>{showStructures ? 'Hide' : 'Show'}</button>
+                      </div>
+                      {showStructures && structureDecks.map(renderSampleRow)}
+                    </>
+                  )}
+                  {starterDecks.length > 0 && (
+                    <>
+                      <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
+                        <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, flex: 1 }}>STARTER DECKS</span>
+                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, color: 'var(--accent)', padding: 0 }}
+                          onClick={() => setShowStarters(v => !v)}>{showStarters ? 'Hide' : 'Show'}</button>
+                      </div>
+                      {showStarters && starterDecks.map(renderSampleRow)}
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </div>
           <button className="btn" style={{ margin: 8, padding: 6, fontSize: 10 }} onClick={async () => {
             try { const data = await api('/decks', { method: 'POST', body: JSON.stringify({ name: 'Deck ' + (decks.length + 1) }) }); setDecks([...decks, data.deck]); setActiveIdx(decks.length); } catch (e) { notify(e.message, 'error'); }

@@ -1,5 +1,5 @@
 === PIXEL PARTIES DECK ===
-Name: Sample Deck: Suicide Bombers
+Name: Starter Deck: Suicide Bombers
 
 == HEROES ==
 Bomb Berserker Bartas

@@ -383,6 +383,8 @@ function playSFXForLog(entry) {
     case 'creature_stolen':
     case 'ability_attached':
     case 'surprise_set':
+    case 'artifact_equipped':
+    case 'artifact_creature_placed':
       playSFX('placement');
       return;
 
@@ -402,6 +404,12 @@ function playSFXForLog(entry) {
     // paths that set gameState.result without going through the engine log.
 
     // ── Damage / heal / death ─────────────────
+    // AoE effects (Dark Deepsea God, etc.) hit multiple targets in quick
+    // succession — we collapse those into one cue each instead of a
+    // staccato burst. Dedupe windows are sized to cover the engine's
+    // inter-target delays (~200ms) while staying short enough that
+    // back-to-back SEPARATE events (two spells in the same turn) still
+    // each play.
     case 'damage':
     case 'creature_damage':
     case 'recoil':
@@ -410,20 +418,20 @@ function playSFXForLog(entry) {
       // burn_damage / poison_damage; the engine also emits this generic
       // damage log alongside them, so suppress it for status sources.
       if (entry.source === 'Burn' || entry.source === 'Poison') return;
-      playSFX('damage', { dedupe: 30 });
+      playSFX('damage', { dedupe: 250 });
       return;
     case 'heal':
     case 'heal_creature':
-      playSFX('heal', { dedupe: 30 });
+      playSFX('heal', { dedupe: 250 });
       return;
     case 'hero_ko':
     case 'force_kill':
-      playSFX('hero_death');
+      playSFX('hero_death', { dedupe: 300 });
       return;
     case 'destroy':
     case 'creature_destroyed':
     case 'island_zone_defeat':
-      playSFX('creature_destroyed', { dedupe: 30 });
+      playSFX('creature_destroyed', { dedupe: 250 });
       return;
     case 'hero_revived':
       playSFX('revive');
@@ -648,6 +656,9 @@ window.playSFXForZoneAnim = playSFXForZoneAnim;
 if (typeof document !== 'undefined') {
   // Any button / [role=button] click → ui_click.
   // Suppress inside the volume control so adjusting volume stays silent.
+  // Capture phase: the handler runs before child handlers on the way DOWN
+  // the tree, so any onClick higher up that calls e.stopPropagation()
+  // (modal wrappers, etc.) can't block this cue from firing.
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('button, [role="button"]');
     if (!btn) return;
@@ -664,7 +675,7 @@ if (typeof document !== 'undefined') {
     // ui_cancel keeps its explicit attenuation.
     if (isCancel) playSFX('ui_cancel', { dedupe: 40, volume: 0.4 });
     else playSFX('ui_click', { dedupe: 40 });
-  }, { capture: false });
+  }, { capture: true });
 
   // Escape key → ui_cancel.
   document.addEventListener('keydown', (e) => {
@@ -1062,8 +1073,8 @@ function trimOverLimitCopies(deck) {
 }
 
 function typeColor(ct) {
-  const m = { Hero:'#ffd700', Creature:'#44aaff', Spell:'#aa44ff', Artifact:'#ff8844',
-    Attack:'#ff4444', Potion:'#44ffaa', Ability:'#ffff44', 'Ascended Hero':'#ff44ff', Token:'#888' };
+  const m = { Hero:'#aa44ff', 'Ascended Hero':'#6622aa', Creature:'#44dd44', Spell:'#ff4444',
+    Attack:'#ff4444', Artifact:'#ffd700', Potion:'#a0703c', Ability:'#44aaff', Token:'#888' };
   return m[ct] || '#888';
 }
 
@@ -1643,14 +1654,17 @@ function BuffColumn({ buffs, cardName }) {
  * starting abilities, and spell schools.
  * Pass extra context-specific info via `children`.
  */
-function CardTooltipContent({ card, children }) {
+function CardTooltipContent({ card, children, imageUrl }) {
   if (!card) return null;
   // Image always keys on the canonical card name (matches the asset
   // filename). Tooltip titles can be overridden via `displayName` for
   // cards that show a transformed label without a matching asset —
   // e.g. Deepsea Spores prefixing "Deepsea " onto each creature's name
   // while the underlying card image (Haressassin.png) stays the same.
-  const imgUrl = cardImageUrl(card.name);
+  // imageUrl prop forces a specific asset (used by the shop to show a
+  // skin portrait in the hover preview while still listing the base
+  // hero's stats).
+  const imgUrl = imageUrl || cardImageUrl(card.name);
   const foilType = card.foil || null;
   const isFoil = foilType === 'secret_rare' || foilType === 'diamond_rare';
   const displayName = card.displayName || card.name;
@@ -2007,10 +2021,26 @@ function TextBox() {
   const isLastPage = pageIdx >= pages.length - 1;
   const page = pages[pageIdx];
   const activeSide = page?.side || 'left';
-  const leftName = (activeSide === 'left' && page?.speakerName) ? page.speakerName : opts.speakerName;
-  const leftNameColor = activeSide === 'left' && page?.nameColor ? page.nameColor : undefined;
-  const rightName = (activeSide === 'right' && page?.speakerName) ? page.speakerName : opts.rightSpeakerName;
-  const rightNameColor = activeSide === 'right' && page?.nameColor ? page.nameColor : undefined;
+  // Sticky speaker name + color: the label under each portrait shows the
+  // most recent speakerName that side spoke under, even when the other
+  // side is currently talking. This lets tutorials introduce Antonia as
+  // "Jetpack Raccoon" and later switch to "Antonia" without the label
+  // flashing back to opts.rightSpeakerName whenever Monia interjects.
+  const findLastName = (isRight) => {
+    for (let i = pageIdx; i >= 0; i--) {
+      const p = pages[i];
+      const pSide = p?.side || 'left';
+      if ((pSide === 'right') !== isRight) continue;
+      if (p?.speakerName) return { name: p.speakerName, color: p.nameColor };
+    }
+    return null;
+  };
+  const leftSticky = findLastName(false);
+  const rightSticky = findLastName(true);
+  const leftName = leftSticky?.name || opts.speakerName;
+  const leftNameColor = leftSticky?.color;
+  const rightName = rightSticky?.name || opts.rightSpeakerName;
+  const rightNameColor = rightSticky?.color;
   const hasRight = opts.rightSpeaker && rightVisible;
 
   return (
@@ -2165,6 +2195,49 @@ const TUTORIAL_SCRIPTS = {
       { text: "... this wasn't even...!", speakerName: 'Monia Bot', nameColor: 'silver' },
       { text: '...', speakerName: 'Monia Bot', nameColor: 'silver' },
       { text: 'Okay. Attacks. Big strong. See you next lesson.', speakerName: 'Monia Bot', nameColor: 'silver' },
+    ],
+  },
+  5: {
+    opts: { rightSpeaker: '/Antonia.png', rightSpeakerName: 'Antonia' },
+    intro: [
+      { text: 'Heya, welcome back! This time, let me tell you a bit about {#ffd700:**Gold**}.' },
+      // Textboxes 2–4: still called "Jetpack Raccoon" — she hasn't revealed
+      // her real name yet.
+      { text: 'KHEKHEKHE - GOLD?! I LOVE Gold! Wheah?!', side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', enterRight: true, shakeText: true },
+      { text: '...' },
+      { text: 'Again? What even **are** you?!' },
+      // Textbox 5: Antonia drops the alias — her portrait label flips to
+      // "Antonia" from this page on (and sticks, thanks to the sticky
+      // name logic).
+      { text: 'Khekhekhe - I am the GRRRRREAT Antonia! If you have Gold, it actually belongs to me!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: '... is that so?' },
+      { text: 'Aye! But the GRRRREAT Antonia is nothing if not **generous**!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: "Oi, amateur! Dere! Take some of dis pocket change I gots lyin' around!", side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
+        onShow: () => {
+          socket.emit('tutorial_modify', { type: 'tutorial5_gold' });
+        } },
+      { text: 'Gold is resource - Gold is POWAH! With dis, just go murk dem enemies khekhekhe!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'See de number on dose Artifact cards?', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
+        highlights: [
+          { selector: '.game-hand-me [data-card-type="Artifact"]', pulse: true },
+        ] },
+      { text: "It's dere Cost! Pay dat much Gold to use de Artifact! Easy, right?", side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
+        highlights: [
+          { selector: '.game-hand-me [data-card-type="Artifact"]', pulse: true },
+        ] },
+      { text: 'Some other effects are also greedy and want my hard-earned Golds!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
+        highlights: [
+          { selector: '[data-ability-owner="me"][data-card-name="Alchemy"]', pulse: true },
+        ] },
+      { text: 'But just dis once, you are allowed to spend as much as you can khekhe!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: "But ... that's... there's no learning when you just give out..." },
+    ],
+    outro: [
+      { text: 'Khekhe, good job! You be a GRRRREAT waster of my Golds! Now you owe me khekhe!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', enterRight: true, exitRight: true, shakeText: true },
+      { text: '...' },
+      { text: "Seriously, you didn't NEED that extra Gold, all the necessary resources were already..." },
+      { text: 'Welp. Looks like you have a raccoon loan now.' },
+      { text: 'See you next time beep-boop.' },
     ],
   },
   4: {

@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
-Name: Sample Deck: Slimy Infestation
+Name: Structure Deck: Slimy Infestation
+Cover: Slime Rancher
 
 == HEROES ==
 Diamond, the Keeper of Peace
