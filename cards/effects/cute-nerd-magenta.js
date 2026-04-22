@@ -21,6 +21,12 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // CPU threat assessment (draw supporter). Targeted-self-mill cycles the
+  // deck: counts as 2 draws worth of support per user calibration.
+  supportYield() {
+    return { drawsPerTurn: 2 };
+  },
+
   canActivateHeroEffect(ctx) {
     const ps = ctx.players[ctx.cardOwner];
     return (ps?.hand || []).length > 0 && (ps?.mainDeck || []).length > 0;

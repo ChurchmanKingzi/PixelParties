@@ -9,6 +9,12 @@
 module.exports = {
   isTargetingArtifact: true,
 
+  // MCTS gate undervalues Wheels because the evaluator sees hand churn as
+  // near-zero immediate delta (draw → discard nets ≈0 "eval units"), but
+  // Wheels is a strict tempo upgrade: HOPT-limited, cost-effective, never
+  // a trap. Always fire when legal — bypass the variation search.
+  cpuSkipMctsGate: true,
+
   canActivate(gs, pi) {
     // HOPT check
     const hoptKey = `wheels:${pi}`;

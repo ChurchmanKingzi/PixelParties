@@ -24,6 +24,15 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // CPU threat assessment (damage supporter). 50 damage × accumulated
+  // Deepsea Counters per activation. Counters persist across turns so the
+  // current count is a reasonable proxy for "accumulated this game thus far".
+  supportYield(ctx) {
+    const hero = ctx.engine.gs.players[ctx.pi]?.heroes?.[ctx.hi];
+    const counters = hero?.deepseaCounters || 0;
+    return { damagePerTurn: 50 * counters };
+  },
+
   // Counter-gated activation.
   canActivateHeroEffect(ctx) {
     const hero = ctx.attachedHero;

@@ -29,6 +29,12 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // CPU threat assessment (draw supporter). Tutors a known card from deck
+  // to hand once per turn — high-quality draw, counted as 2 regular draws.
+  supportYield() {
+    return { drawsPerTurn: 2 };
+  },
+
   canActivateHeroEffect(ctx) {
     const ps = ctx.players[ctx.cardOwner];
     if (!ps) return false;

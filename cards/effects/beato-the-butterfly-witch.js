@@ -50,6 +50,38 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // Base Beato can use any level-1 Spell/Creature regardless of school
+  // stacks. For CPU decision-making, treat her as if every spell school
+  // were at effective level 1 — so she ranks as a plausible caster for
+  // any level-1 Spell even without real ability stacks on her.
+  virtualSpellSchoolLevel: 1,
+
+  // CPU ascension targeting: a card "progresses" Beato's ascension if it's
+  // a Spell or Creature whose school matches an uncollected orb.
+  ascensionNeedsCard(_cardName, cardData, engine, pi, hi) {
+    const hero = engine.gs.players[pi]?.heroes?.[hi];
+    if (!hero?.ascensionOrbs || hero.ascensionReady) return false;
+    const ct = cardData?.cardType;
+    if (ct !== 'Spell' && ct !== 'Creature') return false;
+    const s1 = cardData.spellSchool1;
+    const s2 = cardData.spellSchool2;
+    for (const orb of hero.ascensionOrbs) {
+      if (orb.collected) continue;
+      if (orb.school === s1 || orb.school === s2) return true;
+    }
+    return false;
+  },
+
+  // CPU evaluator: 0..1 progress toward Ascension. Uses orb count.
+  ascensionProgress(engine, pi, hi) {
+    const hero = engine.gs.players[pi]?.heroes?.[hi];
+    if (!hero?.ascensionOrbs) return 0;
+    const total = hero.ascensionOrbs.length;
+    if (total === 0) return 0;
+    const collected = hero.ascensionOrbs.filter(o => o.collected).length;
+    return collected / total;
+  },
+
   // Passive setup in onGameStart must fire even if this hero starts
   // frozen / stunned / negated (e.g. a puzzle where she begins
   // incapacitated). Without this, her bypassLevelReq field and orb

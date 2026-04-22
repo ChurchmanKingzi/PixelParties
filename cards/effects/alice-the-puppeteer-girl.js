@@ -12,6 +12,18 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // CPU threat assessment (damage supporter). 50 damage per non-fresh
+  // Creature the owner controls, once per turn.
+  supportYield(ctx) {
+    const { engine, pi } = ctx;
+    const currentTurn = engine.gs.turn || 0;
+    let count = 0;
+    for (const inst of engine.cardInstances) {
+      if (inst.owner === pi && inst.zone === 'support' && inst.turnPlayed !== currentTurn) count++;
+    }
+    return { damagePerTurn: 50 * count };
+  },
+
   /**
    * Can activate if the player controls at least 1 Creature
    * that was NOT summoned during this turn.

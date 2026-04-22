@@ -17,6 +17,13 @@ module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
 
+  // CPU threat assessment: per level, sends top 5 cards to deleted pile in
+  // exchange for gold. We surface only the gold side; the 5-card cost is
+  // approximated as zero (those cards would typically be dead/extra draws).
+  supportYield(level) {
+    return { goldPerTurn: GOLD_BY_LEVEL[Math.min(level - 1, GOLD_BY_LEVEL.length - 1)] };
+  },
+
   /**
    * Can activate if the player has at least 5 cards in their deck.
    */

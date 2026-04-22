@@ -19,14 +19,50 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // CPU target override. Pick an opponent Hero that does NOT already
+  // carry an Overheal Shock (stacking has no extra value). Tiebreak by
+  // current HP descending — more HP = more damage-return per future heal.
+  // If every eligible hero already has OHS, decline (keeps the card in
+  // hand for a later turn when a new valid target appears).
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'target') return undefined;
+    const targets = promptData?.validTargets || [];
+    if (!targets.length) return undefined;
+    const heroHasOHS = (t) => {
+      if (t.type !== 'hero') return false;
+      const ps = engine.gs.players[t.owner];
+      const zones = ps?.supportZones?.[t.heroIdx] || [];
+      return zones.some(slot => (slot || []).includes('Overheal Shock'));
+    };
+    const heroEntries = targets.filter(t => t.type === 'hero');
+    // Prefer heroes without OHS already.
+    const freshHeroes = heroEntries.filter(t => !heroHasOHS(t));
+    if (freshHeroes.length === 0) return []; // decline — nothing new to attach
+    const hpOf = (t) => {
+      const ps = engine.gs.players[t.owner];
+      const hero = ps?.heroes?.[t.heroIdx];
+      return hero?.hp || 0;
+    };
+    const sorted = [...freshHeroes].sort((a, b) => hpOf(b) - hpOf(a));
+    return [sorted[0].id];
+  },
+
+  // Only report "can play" if at least one opponent Hero is eligible —
+  // living, has a free Support Zone, AND isn't already carrying an OHS.
+  // Without the OHS-absence check the card would spam-attach redundant
+  // copies to the same hero.
   spellPlayCondition(gs, pi) {
     const oi = pi === 0 ? 1 : 0;
     const ops = gs.players[oi];
     for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
       const hero = ops.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
+      const zones = ops.supportZones[hi] || [];
+      // Already has an OHS attached → skip this hero.
+      if (zones.some(slot => (slot || []).includes('Overheal Shock'))) continue;
+      // Needs a free zone to accept the attachment.
       for (let si = 0; si < 3; si++) {
-        if (((ops.supportZones[hi] || [])[si] || []).length === 0) return true;
+        if (((zones[si] || []).length === 0)) return true;
       }
     }
     return false;

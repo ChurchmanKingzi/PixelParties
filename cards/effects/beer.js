@@ -6,7 +6,7 @@
 //  remove. Beer bubbles animation on cleanse.
 // ═══════════════════════════════════════════
 
-const { STATUS_EFFECTS, getNegativeStatuses } = require('./_hooks');
+const { STATUS_EFFECTS, getCleansableStatuses } = require('./_hooks');
 
 function getTargetStatuses(target, engine) {
   // Hero statuses
@@ -14,7 +14,7 @@ function getTargetStatuses(target, engine) {
     const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
     if (!hero?.statuses) return [];
     return Object.keys(hero.statuses)
-      .filter(k => STATUS_EFFECTS[k]?.negative)
+      .filter(k => STATUS_EFFECTS[k]?.negative && STATUS_EFFECTS[k]?.cleansable !== false)
       .map(k => ({ key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon }));
   }
   // Creature statuses (stored in counters)
@@ -24,7 +24,7 @@ function getTargetStatuses(target, engine) {
       c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
     );
     if (!inst) return [];
-    return getNegativeStatuses()
+    return getCleansableStatuses()
       .filter(k => inst.counters[k])
       .map(k => ({ key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon }));
   }
@@ -40,7 +40,7 @@ module.exports = {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses && getNegativeStatuses().some(k => hero.statuses[k])) return true;
+      if (hero.statuses && getCleansableStatuses().some(k => hero.statuses[k])) return true;
       // Check creatures in support zones — need engine access, but canActivate doesn't have it
       // For now, just check heroes. The full check happens in getValidTargets.
     }
@@ -51,7 +51,7 @@ module.exports = {
 
   getValidTargets: (gs, pi, engine) => {
     if (!engine) return [];
-    const negKeys = getNegativeStatuses();
+    const negKeys = getCleansableStatuses();
 
     const heroes = engine.getHeroTargets(pi).filter(t => {
       const hero = gs.players[pi].heroes[t.heroIdx];

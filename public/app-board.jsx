@@ -5510,6 +5510,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // ── Tutorial outro: show textbox before victory screen ──
   const [tutorialOutroPending, setTutorialOutroPending] = useState(false);
   const [resultFading, setResultFading] = useState(false);
+  // Singleplayer rematch: pick the CPU's deck for the next game. Initialised
+  // once when the game-over screen first appears with a random legal deck.
+  const [cpuRematchDeckId, setCpuRematchDeckId] = useState('');
+  const cpuRematchInitRef = useRef(false);
   const tutorialOutroFiredRef = useRef(null);
   // Synchronous mirror of tutorialOutroPending — written alongside the
   // setState call so other effects running in the same commit can see the
@@ -7972,6 +7976,51 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => playAnimation('explosion', tgtEl, { duration: 800 }), 250);
       setTimeout(() => setBeamAnims(prev => prev.filter(a => a.id !== id)), dur);
     };
+    // Hand-to-board card-fly animation. The server fires this right before
+    // the sendGameState that removes the card from the owner's hand, so the
+    // source cardback is still in the DOM at the handIndex we were told.
+    const onHandToBoard = ({ ownerIdx, cardName, handIndex, zoneType, heroIdx, slotIdx, faceDown }) => {
+      // Don't animate for the owner — they already saw their own drag/drop.
+      if (ownerIdx === myIdx) return;
+      const sourceEl = document.querySelector(`.game-hand-opp [data-hand-idx="${handIndex}"]`);
+      let destEl = null;
+      if (zoneType === 'support') {
+        destEl = document.querySelector(`[data-support-zone][data-support-owner="opp"][data-support-hero="${heroIdx}"][data-support-slot="${slotIdx}"]`);
+      } else if (zoneType === 'ability') {
+        destEl = document.querySelector(`[data-ability-zone][data-ability-owner="opp"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`);
+      } else if (zoneType === 'surprise') {
+        destEl = document.querySelector(`[data-surprise-zone][data-surprise-owner="opp"][data-surprise-hero="${heroIdx}"]`);
+      } else if (zoneType === 'hero') {
+        // Attachment Spells: land on the hero's card itself.
+        destEl = document.querySelector(`[data-hero-zone][data-hero-owner="opp"][data-hero-idx="${heroIdx}"]`);
+      } else if (zoneType === 'permanent') {
+        // Permanent Artifacts: land on the opp permanents row if rendered,
+        // otherwise default to the center of the opp hero row.
+        destEl = document.querySelector('.board-permanents-opp')
+          || document.querySelector('[data-hero-zone][data-hero-owner="opp"][data-hero-idx="1"]');
+      }
+      if (!sourceEl || !destEl) return;
+      const sr = sourceEl.getBoundingClientRect();
+      const dr = destEl.getBoundingClientRect();
+      const fly = document.createElement('div');
+      fly.className = 'board-card hand-to-board-fly';
+      const imgUrl = !faceDown && cardName ? cardImageUrl(cardName) : null;
+      fly.innerHTML = imgUrl
+        ? `<img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" draggable="false" />`
+        : `<img src="${opp.cardback || '/cardback.png'}" style="width:100%;height:100%;object-fit:cover" draggable="false" />`;
+      const dx = (dr.left + dr.width / 2) - (sr.left + sr.width / 2);
+      const dy = (dr.top + dr.height / 2) - (sr.top + sr.height / 2);
+      fly.style.cssText = `position:fixed;left:${sr.left}px;top:${sr.top}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 20px rgba(255,200,80,.6);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
+      document.body.appendChild(fly);
+      // Next frame: kick off the transform so the transition plays.
+      requestAnimationFrame(() => {
+        fly.style.transform = `translate(${dx}px, ${dy}px) scale(${dr.width / sr.width})`;
+        fly.style.opacity = '0.2';
+      });
+      setTimeout(() => { fly.remove(); }, 700);
+    };
+    socket.on('hand_to_board_fly', onHandToBoard);
+
     socket.on('card_reveal', onReveal);
     socket.on('deck_search_add', onDeckSearchAdd);
     socket.on('reaction_chain_update', onChainUpdate);
@@ -10712,6 +10761,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('deck_to_deleted', onDeckToDeleted);
     return () => {
       socket.off('card_reveal', onReveal); socket.off('deck_search_add', onDeckSearchAdd);
+      socket.off('hand_to_board_fly', onHandToBoard);
       socket.off('reaction_chain_update', onChainUpdate); socket.off('reaction_chain_resolving_start', onChainResolvingStart);
       socket.off('reaction_chain_link_resolving', onChainLinkResolving); socket.off('reaction_chain_link_resolved', onChainLinkResolved);
       socket.off('reaction_chain_link_negated', onChainLinkNegated); socket.off('reaction_chain_done', onChainDone);
@@ -10948,6 +10998,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   };
   const handleRematch = () => {
     if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); }
+    if (gameState.isCpuBattle) {
+      // Singleplayer rematch: bypass the two-player rematch flow and ask the
+      // server to spin up a fresh CPU game with the currently-selected deck.
+      socket.emit('rematch_cpu_battle', { roomId: gameState.roomId, cpuDeckId: cpuRematchDeckId });
+      // Reset the init gate so the next game-over screen rolls a fresh random default.
+      cpuRematchInitRef.current = false;
+      return;
+    }
     socket.emit('request_rematch', { roomId: gameState.roomId });
   };
   const handleResultLeave = useCallback(() => {
@@ -14664,9 +14722,40 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 </select>
               </div>
             )}
+            {gameState.isCpuBattle && !isSpectator && (() => {
+              const legalPersonal = (decks || []).filter(d => isDeckLegal(d).legal);
+              const legalSample = (sampleDecks || []).filter(d => isDeckLegal(d).legal);
+              const hasAny = legalPersonal.length + legalSample.length > 0;
+              if (!cpuRematchInitRef.current && hasAny) {
+                const all = [...legalPersonal, ...legalSample];
+                const rnd = all[Math.floor(Math.random() * all.length)];
+                if (rnd && !cpuRematchDeckId) setCpuRematchDeckId(rnd.id);
+                cpuRematchInitRef.current = true;
+              }
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, color: '#aa88ff', letterSpacing: 2, textTransform: 'uppercase' }}>Next CPU Deck</div>
+                  <select className="select" value={cpuRematchDeckId} onChange={e => setCpuRematchDeckId(e.target.value)}
+                    style={{ fontSize: 12, padding: '4px 8px', minWidth: 240, borderColor: '#aa88ff', color: 'var(--text)' }}>
+                    {!hasAny && <option value="">No legal decks available</option>}
+                    {legalPersonal.length > 0 && <option disabled value="">── Your Decks ──</option>}
+                    {legalPersonal.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    {legalSample.length > 0 && <option disabled value="">── Sample Decks ──</option>}
+                    {legalSample.map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
+                  </select>
+                </div>
+              );
+            })()}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               {isSpectator ? (
                 <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+              ) : gameState.isCpuBattle ? (
+                <>
+                  <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch} disabled={!cpuRematchDeckId}>
+                    🔄 REMATCH
+                  </button>
+                  <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+                </>
               ) : !oppLeft && !oppDisconnected ? (
                 <>
                   <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch} disabled={myRematchSent}>

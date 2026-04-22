@@ -1,0 +1,3648 @@
+// ═══════════════════════════════════════════
+//  PIXEL PARTIES — CPU OPPONENT BRAIN
+//  Drives the CPU player's turn in Singleplayer mode.
+//  Puzzle mode does NOT use this module.
+// ═══════════════════════════════════════════
+//
+// Sub-phase 2a: Attach Abilities only (random eligible Hero).
+// Later sub-phases add Artifacts, Potions, Surprises, Creatures/Spells/Attacks,
+// active effects, Ascension, and the targeting engine.
+
+const { loadCardEffect } = require('./_loader');
+const { PHASES } = require('./_hooks');
+
+const PAUSE_BETWEEN_ACTIONS = 400;
+const PAUSE_BETWEEN_PHASES = 300;
+// Delay for each CPU prompt decision during card resolution (targeting, picks,
+// confirms). Puzzle mode keeps the original 50ms via the original prompt path.
+const CPU_PROMPT_DELAY = 350;
+
+// Set to false when the CPU is stable. Keep verbose while we're still shaking
+// out freeze bugs — every major decision point logs so a hang can be traced.
+const CPU_DEBUG = true;
+// Silenced during MCTS rollouts so the rollout's MainPhase/ActionPhase chatter
+// doesn't drown out the real turn's log. Toggled by mctsRunOneRollout.
+let _cpuLogSilent = false;
+// Externally controllable verbose toggle. DEFAULT OFF so live CPU-vs-human
+// games don't spam stdout on tester builds. Console-fired test tools
+// (self-play batches, A/B runs) can enable it explicitly via setCpuVerbose
+// when they want per-decision traces.
+let _cpuVerbose = false;
+// Optional transcription function. When set, cpuLog calls it INSTEAD of
+// console.log, regardless of _cpuVerbose. Used by self-play to capture
+// detailed decision traces for a subset of games without flooding stdout.
+// _cpuLogSilent (inner-rollout silencing) still applies, so transcripts
+// show real-turn decisions only, not the per-rollout chatter.
+let _cpuTranscribeFn = null;
+function cpuLog(...args) {
+  if (!CPU_DEBUG || _cpuLogSilent) return;
+  if (_cpuTranscribeFn) {
+    try { _cpuTranscribeFn(args.join(' ')); } catch {}
+    return;
+  }
+  if (!_cpuVerbose) return;
+  console.log('[CPU]', ...args);
+}
+function setCpuVerbose(v) { _cpuVerbose = !!v; }
+function getCpuVerbose() { return _cpuVerbose; }
+function setCpuTranscribeFn(fn) { _cpuTranscribeFn = typeof fn === 'function' ? fn : null; }
+
+// Legacy module-level delay — kept for any stray callers. Brain functions
+// should use engine._delay(ms) so MCTS fast-mode silences every pause.
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+function pauseAction(engine) { return engine._delay(PAUSE_BETWEEN_ACTIONS); }
+function pausePhase(engine) { return engine._delay(PAUSE_BETWEEN_PHASES); }
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function stillCpuTurn(engine, cpuIdx) {
+  return !engine.gs.result && engine.gs.activePlayer === cpuIdx;
+}
+
+function broadcast(helpers) {
+  for (let p = 0; p < 2; p++) helpers.sendGameState(helpers.room, p);
+  if (helpers.sendSpectatorGameState) helpers.sendSpectatorGameState(helpers.room);
+}
+
+/**
+ * Entry point. Called from the engine's _cpuDriver hook after the CPU's Start
+ * and Resource phases have auto-advanced us into Main Phase 1.
+ *
+ * Phase sequence: Main1 → Action → Main2 → End.
+ * advancePhase transitions one phase at a time, so skipping the Action Phase
+ * still requires two calls (Main1→Action, then Action→Main2).
+ */
+async function runCpuTurn(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  if (!stillCpuTurn(engine, cpuIdx)) return;
+
+  const turnStartT = Date.now();
+  cpuLog(`===== TURN START turn=${gs.turn} phase=${gs.currentPhase} hand=${ps.hand.length} gold=${ps.gold} fast=${!!engine._fastMode} =====`);
+  cpuLog('hand:', ps.hand);
+
+  cpuLog('→ Main Phase 1');
+  await runMainPhase(engine, helpers);
+  cpuLog('← Main Phase 1 done');
+
+  if (!stillCpuTurn(engine, cpuIdx)) return;
+  await pausePhase(engine);
+  cpuLog(`advancePhase Main1→Action`);
+  await engine.advancePhase(cpuIdx);
+  broadcast(helpers);
+
+  if (!stillCpuTurn(engine, cpuIdx)) return;
+  cpuLog(`→ Action Phase (currentPhase=${gs.currentPhase})`);
+  await runActionPhase(engine, helpers);
+
+  // Combo continuation: if an action left the phase open (Ghuanjun-style
+  // bonus actions — ps.bonusActions.remaining > 0, allowedTypes gated by the
+  // hero's canPlayCard), keep firing Action-Phase plays until either the
+  // bonus is exhausted, no legal play remains, or the phase advances on its
+  // own. Safety-capped in case a mechanic somehow keeps the gate open
+  // forever without actually consuming cards.
+  let comboSafety = 6;
+  while (stillCpuTurn(engine, cpuIdx)
+         && engine.gs.currentPhase === 3
+         && (gs.players[cpuIdx]?.bonusActions?.remaining || 0) > 0
+         && comboSafety-- > 0) {
+    cpuLog(`→ Action Phase (combo follow-up) bonus=${gs.players[cpuIdx].bonusActions.remaining}`);
+    const handBefore = gs.players[cpuIdx].hand.length;
+    await runActionPhase(engine, helpers);
+    if (gs.players[cpuIdx].hand.length >= handBefore) {
+      cpuLog('  (no combo Attack played — stopping loop)');
+      break;
+    }
+  }
+
+  cpuLog(`← Action Phase done (currentPhase=${engine.gs.currentPhase})`);
+  if (!stillCpuTurn(engine, cpuIdx)) return;
+  // Force-advance if still in Action Phase (no play, or combo ended with the
+  // gate held open for a fraction of a frame).
+  if (engine.gs.currentPhase === 3) {
+    await pausePhase(engine);
+    cpuLog('advancePhase Action→Main2 (phase still open)');
+    await engine.advancePhase(cpuIdx);
+    broadcast(helpers);
+  }
+
+  if (!stillCpuTurn(engine, cpuIdx)) return;
+  cpuLog(`→ Main Phase 2 (currentPhase=${gs.currentPhase})`);
+  await runMainPhase(engine, helpers);
+  cpuLog('← Main Phase 2 done');
+
+  if (!stillCpuTurn(engine, cpuIdx)) return;
+  cpuLog('→ tryAscend');
+  const ascended = await tryAscend(engine, helpers);
+  cpuLog(`← tryAscend done (ascended=${ascended})`);
+  if (!stillCpuTurn(engine, cpuIdx)) return;
+  if (ascended) {
+    // performAscension returns { skipEndPhase: true } by default — the
+    // normal SP flow reads that and auto-advances to End Phase. Self-play
+    // has to do it itself. Without this, the turn chain exits with the
+    // ascender stuck in Main Phase 2, startGame resolves with no winner,
+    // and we get a no-result tie (the Butterflies tie cluster).
+    if (engine.gs.currentPhase === PHASES.MAIN2 && !engine.gs.result) {
+      await engine.advancePhase(cpuIdx);
+      broadcast(helpers);
+    }
+    return;
+  }
+
+  await pausePhase(engine);
+  cpuLog(`advancePhase Main2→End`);
+  await engine.advancePhase(cpuIdx);
+  broadcast(helpers);
+  cpuLog(`===== TURN END (${Date.now() - turnStartT}ms) =====`);
+}
+
+// ─── Action Phase ──────────────────────────────────────────────────────
+// Per user spec: "the CPU will go into the Action Phase only once it cannot
+// do anything in Main 1 anymore. It will then use the highest-level
+// Creature > Spell > Attack in its hand that it can use (Creature has highest
+// prio, Attack lowest, but higher level trumps type priority)."
+
+async function runActionPhase(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  const cardDB = engine._getCardDB();
+
+  // Build candidate list: every (cardName, handIdx, heroIdx) that is a legal
+  // Action-Phase play right now (Spell/Attack/Creature with a hero able to
+  // cast it — including for Creatures, a free Support Zone). `let` not
+  // `const` because mctsRankCandidates returns a re-sorted array we assign
+  // back for the subsequent try-in-order loop.
+  let candidates = [];
+  const typePriority = { Creature: 3, Spell: 2, Attack: 1 };
+  for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
+    const cardName = ps.hand[handIdx];
+    const cd = cardDB[cardName];
+    if (!cd || typePriority[cd.cardType] == null) continue;
+    // Surprise cards (regardless of cardType) must be SET face-down in
+    // surprise zones, not played as a regular Spell/Attack/Creature.
+    // placeSurprises() handles them from the Main Phase. Including them
+    // here would let the CPU waste-cast Booby Trap (no effect) or play
+    // Pure Advantage Camel / Cactus Creature as a regular creature.
+    if ((cd.subtype || '').toLowerCase() === 'surprise') continue;
+    // Same Reaction-only opt-out as fireAdditionalActions.
+    const script = loadCardEffect(cardName);
+    if (script?.cpuSkipProactive) continue;
+    if (!isFirstTurnSafe(engine, cpuIdx, cardName, cd)) continue;
+    // Per user spec: if this is an Attack/Spell whose enemy-side targets are
+    // ALL immune right now, don't even consider it — better to skip the
+    // action entirely than waste a card on an immune target. Creatures are
+    // exempt (the body still lands even if their onPlay fizzles).
+    if (!cardHasAnyViableEnemyTarget(engine, cpuIdx, cardName, cd)) continue;
+
+    // Enumerate one candidate per eligible hero — MCTS evaluates hero
+    // assignment as a decision dimension instead of collapsing to the
+    // heuristic-picked hero. If no hero is eligible, skip the card.
+    const eligible = listEligibleHeroesForActionCard(engine, cpuIdx, cd);
+    if (!eligible.length) continue;
+
+    // For Creatures: always route to the hero with the LOWEST matching
+    // spell-school level among eligible heroes (tightest-fit rule —
+    // Lv0 creature goes on a Lv0 hero before a Lv2 hero, saving the
+    // higher-level slot for a higher-level summon later). Enumerate
+    // candidates only for that single hero's free zones so MCTS can't
+    // drift onto a higher-level hero by accident.
+    let heroPool;
+    if (cd.cardType === 'Creature') {
+      const lowHi = pickHeroForActionCard(engine, cpuIdx, cd, cardName);
+      heroPool = (lowHi >= 0) ? eligible.filter(e => e.hi === lowHi) : eligible;
+    } else {
+      heroPool = eligible;
+    }
+
+    for (const e of heroPool) {
+      const heroIdx = e.hi;
+      const v = engine.validateActionPlay(cpuIdx, cardName, handIdx, heroIdx, [cd.cardType]);
+      if (!v) continue;
+      if (!v.isActionPhase) continue;
+      // For Creatures, enumerate one candidate per free support-zone slot so
+      // MCTS evaluates zone placement (adjacency effects, Slippery-Skates /
+      // Cool-Fridge positioning, etc.) as a first-class decision. For Spells/
+      // Attacks there's no zone choice — emit a single candidate.
+      if (cd.cardType === 'Creature') {
+        const ps2 = engine.gs.players[cpuIdx];
+        const zones = ps2.supportZones?.[heroIdx] || [[], [], []];
+        for (let z = 0; z < zones.length; z++) {
+          if ((zones[z] || []).length !== 0) continue;
+          candidates.push({
+            cardName, handIdx, heroIdx, zoneSlot: z,
+            cardType: cd.cardType,
+            level: cd.level || 0,
+            typeScore: typePriority[cd.cardType],
+          });
+        }
+      } else {
+        candidates.push({
+          cardName, handIdx, heroIdx,
+          cardType: cd.cardType,
+          level: cd.level || 0,
+          typeScore: typePriority[cd.cardType],
+        });
+      }
+    }
+  }
+
+  // ── Action-costing Ability activations as first-class candidates ──
+  // Adventurousness, and any other Ability with `actionCost: true +
+  // onActivate`, consumes the turn's Action just like a Spell/Attack/
+  // Creature play from hand. Without these in the candidate list, the
+  // CPU skips its Action Phase whenever the hand has no playable card —
+  // even if Adventurousness could generate 20+ gold. HOPT is per-player-
+  // per-ability-name, so we emit ONE candidate per ability name, picking
+  // the highest-level-hero copy (Adventurousness scales with level).
+  const actionAbilityBest = new Map();
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+    const zones = ps.abilityZones?.[hi] || [];
+    for (let zi = 0; zi < zones.length; zi++) {
+      const slot = zones[zi] || [];
+      if (slot.length === 0) continue;
+      const abilityName = slot[0];
+      const script = loadCardEffect(abilityName);
+      if (!script?.actionCost || !script?.onActivate) continue;
+      const hoptKey = `ability-action:${abilityName}:${cpuIdx}`;
+      if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
+      if (script.canActivateAction && !script.canActivateAction(gs, cpuIdx, hi, slot.length, engine)) continue;
+      const prev = actionAbilityBest.get(abilityName);
+      if (!prev || slot.length > prev.level) {
+        actionAbilityBest.set(abilityName, { heroIdx: hi, zoneIdx: zi, level: slot.length });
+      }
+    }
+  }
+  for (const [abilityName, best] of actionAbilityBest) {
+    candidates.push({
+      cardType: 'AbilityAction',
+      cardName: abilityName,
+      abilityName,
+      heroIdx: best.heroIdx,
+      zoneIdx: best.zoneIdx,
+      level: best.level,
+      typeScore: 0,
+    });
+  }
+
+  cpuLog(`  Action Phase candidates: ${candidates.length}`);
+  if (candidates.length === 0) {
+    const picked = await tryActionCostingAbility(engine, helpers);
+    if (picked) return true;
+    return false;
+  }
+
+  // Rank candidates. MCTS evaluates each via rollout (snapshot → apply →
+  // play rest of turn → evaluate → restore, averaged over N trials) AND
+  // enumerates target-prompt alternatives within each rollout. Combo
+  // continuation (Ghuanjun bonus actions) skips MCTS — each re-run pays
+  // its full cost and attacks are simple enough to rank by level and
+  // type without rollouts.
+  const inBonusAction = (ps.bonusActions?.remaining || 0) > 0;
+  if (MCTS_ENABLED && candidates.length > 0 && !inBonusAction) {
+    candidates = await mctsRankCandidates(engine, helpers, candidates);
+  } else {
+    candidates.sort((a, b) => (b.level - a.level) || (b.typeScore - a.typeScore));
+  }
+
+  for (const pick of candidates) {
+    if (!stillCpuTurn(engine, cpuIdx)) return false;
+    if (engine.gs.currentPhase !== 3) {
+      cpuLog(`  Action Phase: currentPhase=${engine.gs.currentPhase}, early-exit`);
+      return true;
+    }
+
+    const handLenBefore = ps.hand.length;
+    const abilityHoptKey = pick.cardType === 'AbilityAction'
+      ? `ability-action:${pick.abilityName}:${cpuIdx}`
+      : null;
+    const hoptBefore = abilityHoptKey ? gs.hoptUsed?.[abilityHoptKey] : null;
+    cpuLog(`    → Action Phase try: ${pick.cardType} "${pick.cardName}" (lvl ${pick.level}) hero=${pick.heroIdx}${pick.scriptedTargetPlan ? ' [scripted targets]' : ''}`);
+    await pausePhase(engine);
+    // If MCTS found a better target plan than the heuristic, inject it so the
+    // real play follows it. The promptEffectTarget override consumes entries
+    // one-by-one and falls through to heuristics for null/invalid slots.
+    const hadPlan = Array.isArray(pick.scriptedTargetPlan) && pick.scriptedTargetPlan.length > 0;
+    if (hadPlan) engine._mctsTargetPlan = [...pick.scriptedTargetPlan];
+    try {
+      if (pick.cardType === 'AbilityAction') {
+        // Action-costing ability activation (Adventurousness, etc.) — no
+        // hand card, no zoneSlot; fires via doActivateAbility on the chosen
+        // hero+ability zone.
+        await helpers.doActivateAbility(helpers.room, cpuIdx, {
+          heroIdx: pick.heroIdx,
+          zoneIdx: pick.zoneIdx,
+        });
+      } else if (pick.cardType === 'Creature') {
+        // MCTS picked the zone slot during candidate enumeration; honor
+        // it if still free, else fall back to the heuristic picker.
+        let zoneSlot = pick.zoneSlot;
+        const ps3 = engine.gs.players[cpuIdx];
+        const slotTaken = zoneSlot != null
+          && (((ps3.supportZones?.[pick.heroIdx] || [])[zoneSlot] || []).length > 0);
+        if (zoneSlot == null || zoneSlot < 0 || slotTaken) {
+          zoneSlot = pickCreatureZoneSlot(engine, cpuIdx, pick.heroIdx);
+        }
+        if (zoneSlot < 0) { cpuLog(`    ← no free slot for creature`); continue; }
+        await helpers.doPlayCreature(helpers.room, cpuIdx, {
+          cardName: pick.cardName,
+          handIndex: pick.handIdx,
+          heroIdx: pick.heroIdx,
+          zoneSlot,
+        });
+      } else {
+        await helpers.doPlaySpell(helpers.room, cpuIdx, {
+          cardName: pick.cardName,
+          handIndex: pick.handIdx,
+          heroIdx: pick.heroIdx,
+        });
+      }
+    } finally {
+      if (hadPlan) delete engine._mctsTargetPlan;
+    }
+
+    const shrank = ps.hand.length < handLenBefore;
+    const phaseChanged = engine.gs.currentPhase !== 3;
+    const hoptClaimed = abilityHoptKey
+      && gs.hoptUsed?.[abilityHoptKey] === gs.turn
+      && hoptBefore !== gs.turn;
+    cpuLog(`    ← Action Phase result: shrank=${shrank} phaseChanged=${phaseChanged}${hoptClaimed ? ' hoptClaimed=true' : ''} newPhase=${engine.gs.currentPhase}`);
+    if (shrank || phaseChanged || hoptClaimed) return true;
+  }
+  return false;
+}
+
+// ─── Action-costing Ability fallback ───────────────────────────────────
+// Per user spec: if nothing else is available in the Action Phase, fire an
+// action-costing Ability instead. HOPT-gated, canActivateAction-gated.
+async function tryActionCostingAbility(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  if (!ps) return false;
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+    const zones = ps.abilityZones?.[hi] || [];
+    for (let zi = 0; zi < zones.length; zi++) {
+      const slot = zones[zi] || [];
+      if (slot.length === 0) continue;
+      const abilityName = slot[0];
+      const script = loadCardEffect(abilityName);
+      if (!script?.actionCost || !script?.onActivate) continue;
+      const hoptKey = `ability-action:${abilityName}:${cpuIdx}`;
+      if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
+      if (script.canActivateAction && !script.canActivateAction(gs, cpuIdx, hi, slot.length, engine)) continue;
+      cpuLog(`    → action-costing ability "${abilityName}" hero=${hi}`);
+      await helpers.doActivateAbility(helpers.room, cpuIdx, { heroIdx: hi, zoneIdx: zi });
+      return true;
+    }
+  }
+  return false;
+}
+
+// ─── Ascension ─────────────────────────────────────────────────────────
+// Per user spec: "If a CPU can Ascend, it will do so as the LAST game action
+// of its turn." Random pick if multiple Heroes are ready.
+
+async function tryAscend(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  const cardDB = engine._getCardDB();
+
+  // Find ascension candidates: (handIdx, heroIdx) where handIdx holds an
+  // Ascended Hero card and heroIdx points to a Hero that's ascensionReady.
+  const candidates = [];
+  for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
+    const cardName = ps.hand[handIdx];
+    const cd = cardDB[cardName];
+    if (!cd || cd.cardType !== 'Ascended Hero') continue;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (!hero.ascensionReady) continue;
+      candidates.push({ cardName, handIdx, heroIdx: hi });
+    }
+  }
+  if (!candidates.length) return false;
+
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  cpuLog(`  → ascend "${pick.cardName}" onto hero ${pick.heroIdx}`);
+  await pauseAction(engine);
+  // Route through the MCTS activation gate so ascension bonuses with
+  // card-gallery prompts (e.g. Beato's Eternal Butterfly pick-from-deck)
+  // get full variation exploration — otherwise the first heuristic pick
+  // is committed and MCTS has no say.
+  const actionFn = async () => {
+    await engine.performAscension(cpuIdx, pick.heroIdx, pick.cardName, pick.handIdx, {});
+  };
+  const committed = await mctsGatedActivation(engine, helpers, `ascend ${pick.cardName}`, actionFn, { cardName: pick.cardName });
+  if (!committed) {
+    cpuLog(`  ← ascension skipped by MCTS gate`);
+    return false;
+  }
+  cpuLog(`  ← ascension done`);
+  broadcast(helpers);
+  return true;
+}
+
+async function runMainPhase(engine, helpers) {
+  for (let guard = 0; guard < 12; guard++) {
+    const before = snapshotProgress(engine);
+    cpuLog(`  MainPhase pass ${guard + 1} — snapshot=${before}`);
+
+    cpuLog('    → playArtifacts');
+    await playArtifacts(engine, helpers);
+    cpuLog('    ← playArtifacts');
+    if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+
+    cpuLog('    → playPotions');
+    await playPotions(engine, helpers);
+    cpuLog('    ← playPotions');
+    if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+
+    cpuLog('    → attachAbilities');
+    await attachAbilities(engine, helpers);
+    cpuLog('    ← attachAbilities');
+    if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+
+    cpuLog('    → placeSurprises');
+    await placeSurprises(engine, helpers);
+    cpuLog('    ← placeSurprises');
+    if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+
+    cpuLog('    → fireAdditionalActions');
+    await fireAdditionalActions(engine, helpers);
+    cpuLog('    ← fireAdditionalActions');
+    if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+
+    cpuLog('    → activateBoardEffects');
+    await activateBoardEffects(engine, helpers);
+    cpuLog('    ← activateBoardEffects');
+    if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+
+    const after = snapshotProgress(engine);
+    cpuLog(`  MainPhase pass ${guard + 1} end — before=${before} after=${after}`);
+    if (after === before) { cpuLog('  MainPhase: no progress, breaking'); break; }
+  }
+}
+
+// ─── 2h: Active board effects ─────────────────────────────────────────
+// Per user spec: CPU activates every free active effect it can (Main Phase
+// only for 2h). Covers free-activation Abilities (script.freeActivation +
+// onFreeActivate). Hero effects, Creature/Equipment/Attachment actives, and
+// Area effects are deferred — their socket handlers aren't extracted yet.
+//
+// HOPT is per-ability-name per-player, so we only fire a given name once per
+// turn even if multiple Heroes stack the same Ability. The handler claims
+// HOPT on successful activation; we just need to skip if gs.hoptUsed says so.
+
+async function activateBoardEffects(engine, helpers) {
+  await activateFreeAbilities(engine, helpers);
+  if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+  await activateCreatureEffects(engine, helpers);
+  if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+  await activateHeroEffects(engine, helpers);
+  if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+  await activateEquipEffects(engine, helpers);
+  if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+  await activateAreaEffects(engine, helpers);
+  if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+  await activatePermanents(engine, helpers);
+}
+
+async function activateHeroEffects(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  if (!ps) return;
+  const tried = new Set();
+  for (let safety = 0; safety < 6; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+    let pickIdx = -1;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+      if (tried.has(hi)) continue;
+      // Check if hero has ANY available hero-effect we haven't claimed HOPT on.
+      const script = loadCardEffect(hero.name);
+      const hoptKey = `hero-effect:${hero.name}:${cpuIdx}:${hi}`;
+      const available = (script?.heroEffect && script?.onHeroEffect && gs.hoptUsed?.[hoptKey] !== gs.turn);
+      // Also check equipped hero-effect providers (e.g. Mummy Token, treatAsEquip heroes).
+      const hasEquippedEffect = engine.cardInstances.some(ci => {
+        if (ci.owner !== cpuIdx || ci.zone !== 'support' || ci.heroIdx !== hi) return false;
+        if (!ci.counters?.treatAsEquip) return false;
+        const eq = loadCardEffect(ci.name);
+        if (!eq?.heroEffect || !eq?.onHeroEffect) return false;
+        const hk = `hero-effect:${ci.name}:${cpuIdx}:${hi}`;
+        return gs.hoptUsed?.[hk] !== gs.turn;
+      });
+      if (available || hasEquippedEffect) { pickIdx = hi; break; }
+    }
+    if (pickIdx < 0) return;
+    cpuLog(`      → activate hero effect hero=${pickIdx}`);
+    const handBefore = JSON.stringify(gs.hoptUsed || {});
+    const committed = await mctsGatedActivation(engine, helpers, `hero-effect h${pickIdx}`,
+      () => helpers.doActivateHeroEffect(helpers.room, cpuIdx, { heroIdx: pickIdx }),
+      { cardName: gs.players[cpuIdx].heroes[pickIdx]?.name });
+    const handAfter = JSON.stringify(gs.hoptUsed || {});
+    if (!committed || handBefore === handAfter) {
+      cpuLog(`      ← hero effect hero=${pickIdx} did NOT claim HOPT — marking as tried`);
+      tried.add(pickIdx);
+    } else {
+      cpuLog(`      ← hero effect hero=${pickIdx} OK`);
+    }
+    await pauseAction(engine);
+  }
+}
+
+async function activateEquipEffects(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const tried = new Set();
+  for (let safety = 0; safety < 12; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+    let pick = null;
+    for (const inst of engine.cardInstances) {
+      if (inst.owner !== cpuIdx || inst.zone !== 'support') continue;
+      const key = inst.id;
+      if (tried.has(key)) continue;
+      const hoptKey = `equip-effect:${inst.id}`;
+      if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
+      const script = loadCardEffect(inst.name);
+      if (!script?.equipEffect || !script?.onEquipEffect) continue;
+      if (script.canActivateEquipEffect) {
+        const ctx = engine._createContext(inst, { event: 'canEquipEffectCheck' });
+        if (!script.canActivateEquipEffect(ctx)) continue;
+      }
+      pick = { instId: inst.id, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, name: inst.name };
+      break;
+    }
+    if (!pick) return;
+    // Per-card CPU activation guard: lets the card itself defer proactive
+    // activation based on current board context (e.g. Skates declining to
+    // clog up summoner zones during MP1 / Action Phase). Guarded with try
+    // so a buggy script can't hang the turn.
+    const pickScript = loadCardEffect(pick.name);
+    if (typeof pickScript?.cpuCanActivateEquip === 'function') {
+      let ok = true;
+      try { ok = !!pickScript.cpuCanActivateEquip(engine, cpuIdx, pick.heroIdx, pick.zoneSlot); }
+      catch { ok = true; }
+      if (!ok) {
+        cpuLog(`      ← equip effect "${pick.name}" deferred by card guard`);
+        tried.add(pick.instId);
+        await pauseAction(engine);
+        continue;
+      }
+    }
+    cpuLog(`      → activate equip effect "${pick.name}" hero=${pick.heroIdx}`);
+    const committed = await mctsGatedActivation(engine, helpers, `equip-effect ${pick.name}`,
+      () => helpers.doActivateEquipEffect(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneSlot: pick.zoneSlot }),
+      { cardName: pick.name });
+    const hoptKey = `equip-effect:${pick.instId}`;
+    if (!committed || gs.hoptUsed?.[hoptKey] !== gs.turn) tried.add(pick.instId);
+    await pauseAction(engine);
+  }
+}
+
+async function activateAreaEffects(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const tried = new Set();
+  for (let safety = 0; safety < 6; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+    let pick = null;
+    // Areas belong to a specific player but both players can activate each
+    // (the rules allow Area activations from either player). Scan both sides.
+    for (let owner = 0; owner < 2; owner++) {
+      const areas = gs.areaZones?.[owner] || [];
+      for (const areaName of areas) {
+        const key = `${owner}|${areaName}`;
+        if (tried.has(key)) continue;
+        const script = loadCardEffect(areaName);
+        if (!script?.onAreaEffect) continue;
+        if (script.canActivateAreaEffect) {
+          try {
+            if (!script.canActivateAreaEffect(gs, cpuIdx, owner, engine)) continue;
+          } catch { continue; }
+        }
+        pick = { owner, areaName, key };
+        break;
+      }
+      if (pick) break;
+    }
+    if (!pick) return;
+    cpuLog(`      → activate area effect "${pick.areaName}" owner=${pick.owner}`);
+    const handBefore = JSON.stringify(gs.hoptUsed || {});
+    const committed = await mctsGatedActivation(engine, helpers, `area ${pick.areaName}`,
+      () => helpers.doActivateAreaEffect(helpers.room, cpuIdx, { areaOwner: pick.owner, areaName: pick.areaName }),
+      { cardName: pick.areaName });
+    const handAfter = JSON.stringify(gs.hoptUsed || {});
+    if (!committed || handBefore === handAfter) tried.add(pick.key);
+    await pauseAction(engine);
+  }
+}
+
+async function activatePermanents(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const tried = new Set();
+  for (let safety = 0; safety < 10; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+    let pick = null;
+    // Permanents can belong to either player (stored in ps.permanents).
+    // canActivatePermanent gates whether the CPU (pi=cpuIdx) can act.
+    for (let owner = 0; owner < 2; owner++) {
+      for (const perm of (gs.players[owner]?.permanents || [])) {
+        const key = `${owner}|${perm.id}`;
+        if (tried.has(key)) continue;
+        const script = loadCardEffect(perm.name);
+        if (!script?.onActivatePermanent || !script?.canActivatePermanent) continue;
+        try {
+          if (!script.canActivatePermanent(gs, cpuIdx, owner, engine)) continue;
+        } catch { continue; }
+        pick = { owner, permId: perm.id, name: perm.name, key };
+        break;
+      }
+      if (pick) break;
+    }
+    if (!pick) return;
+    cpuLog(`      → activate permanent "${pick.name}"`);
+    await mctsGatedActivation(engine, helpers, `permanent ${pick.name}`,
+      () => helpers.doActivatePermanent(helpers.room, cpuIdx, { permId: pick.permId, ownerIdx: pick.owner }),
+      { cardName: pick.name });
+    // No simple HOPT proxy — add to tried after one attempt regardless.
+    tried.add(pick.key);
+    await pauseAction(engine);
+  }
+}
+
+async function activateFreeAbilities(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  if (!ps) return;
+
+  const tried = new Set();
+  for (let safety = 0; safety < 12; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+
+    let pick = null;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+      const zones = ps.abilityZones?.[hi] || [];
+      for (let zi = 0; zi < zones.length; zi++) {
+        const slot = zones[zi] || [];
+        if (slot.length === 0) continue;
+        const abilityName = slot[0];
+        const key = `${abilityName}|${hi}|${zi}`;
+        if (tried.has(key)) continue;
+        const script = loadCardEffect(abilityName);
+        if (!script?.freeActivation || !script.onFreeActivate) continue;
+        const hoptKey = `free-ability:${abilityName}:${cpuIdx}`;
+        if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
+        pick = { heroIdx: hi, zoneIdx: zi, abilityName, key };
+        break;
+      }
+      if (pick) break;
+    }
+    if (!pick) return;
+
+    const hoptKey = `free-ability:${pick.abilityName}:${cpuIdx}`;
+    const wasClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
+    cpuLog(`      → activate free ability "${pick.abilityName}" hero=${pick.heroIdx} zone=${pick.zoneIdx}`);
+    const committed = await mctsGatedActivation(engine, helpers, `free-ability ${pick.abilityName}`,
+      () => helpers.doActivateFreeAbility(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneIdx: pick.zoneIdx }),
+      { cardName: pick.abilityName });
+    const nowClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
+    cpuLog(`      ← free ability "${pick.abilityName}" ${committed && nowClaimed ? 'OK' : 'SKIPPED/FAILED'}`);
+    if (!committed || (!wasClaimed && !nowClaimed)) tried.add(pick.key);
+    await pauseAction(engine);
+  }
+}
+
+async function activateCreatureEffects(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  if (!ps) return;
+
+  const tried = new Set();
+  for (let safety = 0; safety < 12; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+
+    let pick = null;
+    for (let hi = 0; hi < (ps.supportZones || []).length; hi++) {
+      const zones = ps.supportZones[hi] || [];
+      for (let zi = 0; zi < zones.length; zi++) {
+        const slot = zones[zi] || [];
+        if (slot.length === 0) continue;
+        const cardName = slot[0];
+        const inst = engine.cardInstances.find(c =>
+          c.owner === cpuIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
+        );
+        if (!inst) continue;
+        if (inst.faceDown) continue; // face-down surprises aren't actives
+        if (inst.turnPlayed === gs.turn) continue; // summoning sickness
+        const hoptKey = `creature-effect:${inst.id}`;
+        if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
+
+        const effectName = inst.counters?._effectOverride || cardName;
+        const script = loadCardEffect(effectName);
+        if (!script?.creatureEffect || !script.onCreatureEffect) continue;
+
+        const key = `${cardName}|${hi}|${zi}|${inst.id}`;
+        if (tried.has(key)) continue;
+
+        pick = { heroIdx: hi, zoneSlot: zi, cardName, instId: inst.id, key };
+        break;
+      }
+      if (pick) break;
+    }
+    if (!pick) return;
+
+    const hoptKey = `creature-effect:${pick.instId}`;
+    const wasClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
+    cpuLog(`      → activate creature effect "${pick.cardName}" hero=${pick.heroIdx} zone=${pick.zoneSlot}`);
+    const committed = await mctsGatedActivation(engine, helpers, `creature-effect ${pick.cardName}`,
+      () => helpers.doActivateCreatureEffect(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneSlot: pick.zoneSlot }),
+      { cardName: pick.cardName });
+    const nowClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
+    cpuLog(`      ← creature effect "${pick.cardName}" ${committed && nowClaimed ? 'OK' : 'SKIPPED/FAILED'}`);
+    if (!committed || (!wasClaimed && !nowClaimed)) tried.add(pick.key);
+    await pauseAction(engine);
+  }
+}
+
+// Coarse fingerprint of CPU progress during a Main Phase. If a full loop pass
+// doesn't change this, there's nothing more to do.
+function snapshotProgress(engine) {
+  const ps = engine.gs.players[engine._cpuPlayerIdx];
+  const supportCount = (ps.supportZones || []).reduce(
+    (sum, hz) => sum + hz.reduce((s, slot) => s + (slot?.length || 0), 0), 0,
+  );
+  return ps.hand.length + '|' + ps.gold + '|' + supportCount + '|' + ps.abilityGivenThisTurn.filter(Boolean).length;
+}
+
+// ─── Artifacts ──────────────────────────────────────────────────────────
+// Per user spec: "Artifacts are played as soon as they can be afforded, with
+// Equips going on random Heroes, but any that give bonus atk will instead go
+// on the highest-atk own Hero." Non-Equipment Artifacts that need targeting
+// are skipped in 2b — they come back in sub-phase 2i with the targeting brain.
+
+async function playArtifacts(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  const cardDB = engine._getCardDB();
+  const tried = new Set(); // card names that look playable but failed to actually play
+
+  for (let safety = 0; safety < 20; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+
+    let pick = null;
+    for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
+      const cardName = ps.hand[handIdx];
+      if (tried.has(cardName)) continue;
+      const cd = cardDB[cardName];
+      if (!cd || cd.cardType !== 'Artifact') continue;
+      const plan = planArtifactPlay(engine, cpuIdx, cardName, handIdx, cd);
+      if (plan) { pick = plan; break; }
+    }
+    if (!pick) return;
+
+    const handLenBefore = ps.hand.length;
+    cpuLog(`      → play artifact "${pick.cardName}" (${pick.kind}) hero=${pick.heroIdx}`);
+    const actionFn = async () => {
+      if (pick.kind === 'equipment' || pick.kind === 'artifactCreature') {
+        await helpers.doPlayArtifact(helpers.room, cpuIdx, {
+          cardName: pick.cardName,
+          handIndex: pick.handIdx,
+          heroIdx: pick.heroIdx,
+          zoneSlot: -1,
+        });
+      } else {
+        await helpers.doUseArtifactEffect(helpers.room, cpuIdx, {
+          cardName: pick.cardName,
+          handIndex: pick.handIdx,
+        });
+        if (engine.gs.potionTargeting?.potionName === pick.cardName && engine.gs.potionTargeting.ownerIdx === cpuIdx) {
+          await resolveTargetingPrompt(engine, helpers);
+        }
+      }
+    };
+    const committed = await mctsGatedActivation(engine, helpers, `artifact ${pick.cardName}`, actionFn, { cardName: pick.cardName });
+    const shrank = ps.hand.length < handLenBefore;
+    cpuLog(`      ← artifact "${pick.cardName}" ${committed && shrank ? 'OK' : 'SKIPPED/FAILED'} (hand ${handLenBefore}→${ps.hand.length})`);
+    if (!committed || !shrank) tried.add(pick.cardName);
+    await pauseAction(engine);
+  }
+}
+
+function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+
+  if (ps.itemLocked && (ps.hand || []).length < 2) return null;
+  if (ps._creationLockedNames?.has(cardName)) return null;
+
+  const rawCost = cardData.cost || 0;
+  const costReduction = ps._nextArtifactCostReduction || 0;
+  const cost = Math.max(0, rawCost - costReduction);
+  if ((ps.gold || 0) < cost) return null;
+
+  const subLower = (cardData.subtype || '').toLowerCase();
+  const isEquip = subLower === 'equipment';
+  const isArtifactCreature = subLower.split('/').some(t => t.trim() === 'creature');
+
+  if (isEquip) {
+    const heroIdx = pickHeroForEquip(engine, pi, cardName, cardData);
+    if (heroIdx < 0) return null;
+    return { kind: 'equipment', cardName, handIdx, heroIdx };
+  }
+
+  if (isArtifactCreature) {
+    const heroIdx = pickHeroForArtifactCreature(engine, pi);
+    if (heroIdx < 0) return null;
+    return { kind: 'artifactCreature', cardName, handIdx, heroIdx };
+  }
+
+  // Normal / Reaction / Area Artifacts → doUseArtifactEffect path
+  const script = loadCardEffect(cardName);
+  if (!script) return null;
+  if (subLower === 'surprise') return null;
+  if (subLower === 'reaction' && !script.proactivePlay) return null;
+  if (script.canActivate && !script.canActivate(gs, pi)) return null;
+  if (script.blockedByHandLock && ps.handLocked) return null;
+  // Targeted artifacts (getValidTargets + targetingConfig) also go through
+  // doUseArtifactEffect — the CPU brain's post-play step picks targets and
+  // calls doConfirmPotion to finish resolution.
+  const isTargeted = !!(script.getValidTargets && script.targetingConfig);
+  if (!isTargeted && !script.resolve) return null;
+  return { kind: 'useEffect', cardName, handIdx, isTargeted };
+}
+
+function pickHeroForEquip(engine, pi, cardName, cardData) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  const script = loadCardEffect(cardName);
+
+  if (script?.oncePerGame) {
+    const opgKey = script.oncePerGameKey || cardName;
+    if (ps._oncePerGameUsed?.has(opgKey)) return -1;
+  }
+
+  const eligible = [];
+  for (let hi = 0; hi < 3; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    if (hero.statuses?.frozen) continue;
+    if (hero.statuses?.charmed) continue;
+    if (script?.canEquipToHero && !script.canEquipToHero(gs, pi, hi, engine)) continue;
+    const zones = ps.supportZones?.[hi] || [[], [], []];
+    let hasFree = false;
+    for (let z = 0; z < 3; z++) {
+      if ((zones[z] || []).length === 0) { hasFree = true; break; }
+    }
+    if (hasFree) eligible.push(hi);
+  }
+  if (!eligible.length) return -1;
+
+  // Ascension priority: if one of the eligible heroes needs this equipment
+  // for their ascension (Arthor's Sword/Circle, Layn's Hammer, etc.), send
+  // it there first — overrides every other selector.
+  const ascHi = ascensionTargetHero(engine, pi, cardName, cardData);
+  if (ascHi >= 0 && eligible.includes(ascHi)) return ascHi;
+
+  // Card-specific preference: Slippery Skates / future equipments can export
+  // `cpuPrefersEquipTarget(engine, pi, hi, cardData)` to narrow eligible to
+  // the heroes that actually benefit (e.g. Skates prefers summoner heroes).
+  // If ANY eligible hero matches, restrict to that subset; otherwise keep
+  // the full list so a suboptimal placement still beats not playing at all.
+  let pool = eligible;
+  if (typeof script?.cpuPrefersEquipTarget === 'function') {
+    const preferred = pool.filter(hi => {
+      try { return !!script.cpuPrefersEquipTarget(engine, pi, hi, cardData); }
+      catch { return false; }
+    });
+    if (preferred.length > 0) pool = preferred;
+  }
+
+  // Numeric ranking within the preferred pool. Skates uses this to send
+  // itself to the highest-summoning-level hero (Ascended Beato = Lv9
+  // virtual, beats any real-Lv1 summoner) instead of picking at random.
+  if (typeof script?.cpuEquipTargetScore === 'function') {
+    const scored = pool.map(hi => {
+      let score = 0;
+      try { score = Number(script.cpuEquipTargetScore(engine, pi, hi, cardData)) || 0; }
+      catch { score = 0; }
+      return { hi, score };
+    });
+    const maxScore = Math.max(...scored.map(s => s.score));
+    if (Number.isFinite(maxScore) && maxScore > 0) {
+      const top = scored.filter(s => s.score === maxScore).map(s => s.hi);
+      return top[Math.floor(Math.random() * top.length)];
+    }
+  }
+
+  // Atk-boost Equipments go on the highest-atk eligible hero; ties broken at random.
+  if (isAtkBoostEquip(cardData)) {
+    let topAtk = -Infinity;
+    for (const hi of pool) topAtk = Math.max(topAtk, ps.heroes[hi].atk || 0);
+    const tied = pool.filter(hi => (ps.heroes[hi].atk || 0) === topAtk);
+    return tied[Math.floor(Math.random() * tied.length)];
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function pickHeroForArtifactCreature(engine, pi) {
+  const ps = engine.gs.players[pi];
+  const eligible = [];
+  for (let hi = 0; hi < 3; hi++) {
+    const zones = ps.supportZones?.[hi] || [[], [], []];
+    let hasFree = false;
+    for (let z = 0; z < 3; z++) {
+      if ((zones[z] || []).length === 0) { hasFree = true; break; }
+    }
+    if (hasFree) eligible.push(hi);
+  }
+  if (!eligible.length) return -1;
+  return eligible[Math.floor(Math.random() * eligible.length)];
+}
+
+// ─── Potions ────────────────────────────────────────────────────────────
+// Per user spec: "Potions are always used as soon as possible (be mindful of
+// the 'You cannot use more Potions this turn' lock!)". Targeted Potions are
+// deferred to sub-phase 2i — the targeting brain.
+
+async function playPotions(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  const cardDB = engine._getCardDB();
+  const tried = new Set();
+
+  for (let safety = 0; safety < 20; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (ps.potionLocked) return;
+
+    let pick = null;
+    for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
+      const cardName = ps.hand[handIdx];
+      if (tried.has(cardName)) continue;
+      const cd = cardDB[cardName];
+      if (!cd || cd.cardType !== 'Potion') continue;
+      if (isPotionPlayable(engine, cpuIdx, cardName)) {
+        pick = { cardName, handIdx };
+        break;
+      }
+    }
+    if (!pick) return;
+
+    const handLenBefore = ps.hand.length;
+    cpuLog(`      → use potion "${pick.cardName}"`);
+    const actionFn = async () => {
+      await helpers.doUsePotion(helpers.room, cpuIdx, {
+        cardName: pick.cardName,
+        handIndex: pick.handIdx,
+      });
+      if (engine.gs.potionTargeting?.potionName === pick.cardName && engine.gs.potionTargeting.ownerIdx === cpuIdx) {
+        await resolveTargetingPrompt(engine, helpers);
+      }
+    };
+    const committed = await mctsGatedActivation(engine, helpers, `potion ${pick.cardName}`, actionFn, { cardName: pick.cardName });
+    const shrank = ps.hand.length < handLenBefore;
+    cpuLog(`      ← potion "${pick.cardName}" ${committed && shrank ? 'OK' : 'SKIPPED/FAILED'}`);
+    if (!committed || !shrank) tried.add(pick.cardName);
+    await pauseAction(engine);
+  }
+}
+
+function isPotionPlayable(engine, pi, cardName) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  if (ps.potionLocked) return false;
+  if (ps._creationLockedNames?.has(cardName)) return false;
+
+  const script = loadCardEffect(cardName);
+  if (!script?.isPotion) return false;
+  if (script.canActivate && !script.canActivate(gs, pi, engine)) return false;
+  if (script.blockedByHandLock && ps.handLocked) return false;
+  // Targeted Potions play via doUsePotion → gs.potionTargeting → resolveTargetingPrompt.
+  const isTargeted = !!(script.getValidTargets && script.targetingConfig);
+  if (!isTargeted && !script.resolve) return false;
+  return true;
+}
+
+// ─── Surprises ──────────────────────────────────────────────────────────
+// Per user spec: "CPU will only place Surprises face-down with Heroes that
+// can actually use them." Bakhm's Support Zones count as legal placements
+// for Surprise Creatures.
+
+async function placeSurprises(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  const cardDB = engine._getCardDB();
+  const tried = new Set();
+
+  for (let safety = 0; safety < 20; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+
+    let pick = null;
+    for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
+      const cardName = ps.hand[handIdx];
+      if (tried.has(cardName)) continue;
+      const cd = cardDB[cardName];
+      if (!cd || (cd.subtype || '').toLowerCase() !== 'surprise') continue;
+      const script = loadCardEffect(cardName);
+      if (!script?.isSurprise) continue;
+      const placement = pickSurprisePlacement(engine, cpuIdx, cd);
+      if (!placement) continue;
+      pick = { cardName, handIdx, ...placement };
+      break;
+    }
+    if (!pick) return;
+
+    const handLenBefore = ps.hand.length;
+    cpuLog(`      → set surprise "${pick.cardName}" hero=${pick.heroIdx} bakhmSlot=${pick.bakhmSlot}`);
+    await helpers.doPlaySurprise(helpers.room, cpuIdx, {
+      cardName: pick.cardName,
+      handIndex: pick.handIdx,
+      heroIdx: pick.heroIdx,
+      bakhmSlot: pick.bakhmSlot,
+    });
+    const shrank = ps.hand.length < handLenBefore;
+    cpuLog(`      ← surprise "${pick.cardName}" ${shrank ? 'OK' : 'FAILED'}`);
+    if (!shrank) tried.add(pick.cardName);
+    await pauseAction(engine);
+  }
+}
+
+// Returns { heroIdx, bakhmSlot } describing where to place the Surprise, or
+// null if no Hero can both host AND activate it. bakhmSlot is -1 for a normal
+// Surprise-Zone placement and 0..2 for a Bakhm Support-Zone slot.
+function pickSurprisePlacement(engine, pi, cardData) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  const options = [];
+
+  for (let hi = 0; hi < 3; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    // The rules allow preparing Surprises with Heroes that can't activate them,
+    // but the user's CPU spec explicitly requires placement only on Heroes that
+    // CAN — so we gate on the level-requirement check used by Attacks/Spells.
+    if (!engine.heroMeetsLevelReq(pi, hi, cardData)) continue;
+
+    // Regular Surprise-Zone placement — one per Hero.
+    if ((ps.surpriseZones?.[hi] || []).length === 0) {
+      options.push({ heroIdx: hi, bakhmSlot: -1 });
+    }
+
+    // Bakhm Support-Zone placement for Surprise Creatures only. Bakhm must
+    // not be Frozen / Stunned / Negated at placement time (the handler also
+    // enforces this, and will reject).
+    if (cardData.cardType === 'Creature'
+        && !hero.statuses?.frozen
+        && !hero.statuses?.stunned
+        && !hero.statuses?.negated) {
+      const heroScript = loadCardEffect(hero.name);
+      if (heroScript?.isBakhmHero) {
+        const zones = ps.supportZones?.[hi] || [[], [], []];
+        for (let z = 0; z < 3; z++) {
+          if ((zones[z] || []).length === 0) {
+            options.push({ heroIdx: hi, bakhmSlot: z });
+          }
+        }
+      }
+    }
+  }
+
+  if (!options.length) return null;
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+// Resolve the gs.potionTargeting picker that doUsePotion / doUseArtifactEffect
+// open for targeted Artifacts and Potions. Uses the targeting brain's picker
+// (same one that drives _getCpuTargetResponse) to choose, then calls
+// doConfirmPotion to finish the play. Safety-cap iteration in case resolution
+// triggers a re-enter-targeting flow (aborted picks).
+async function resolveTargetingPrompt(engine, helpers) {
+  for (let safety = 0; safety < 4; safety++) {
+    const tgt = engine.gs.potionTargeting;
+    if (!tgt || tgt.ownerIdx !== engine._cpuPlayerIdx) return;
+    const picks = engine._getCpuTargetResponse(tgt.validTargets || [], tgt.config || {});
+    const selectedIds = Array.isArray(picks) ? picks : [];
+    cpuLog(`      → confirm targeting "${tgt.potionName}" selectedIds=${JSON.stringify(selectedIds)}`);
+    await helpers.doConfirmPotion(helpers.room, engine._cpuPlayerIdx, { selectedIds });
+    // If doConfirmPotion re-opened targeting (aborted pick), loop to try again
+    // with fresh targets.
+    if (engine.gs.potionTargeting?.potionName !== tgt.potionName) return;
+  }
+  // Safety exceeded — clear stuck targeting so the turn can continue.
+  if (engine.gs.potionTargeting?.ownerIdx === engine._cpuPlayerIdx) {
+    cpuLog('      ← resolveTargetingPrompt safety cap hit — clearing');
+    engine.gs.potionTargeting = null;
+  }
+}
+
+// ─── First-turn safety ────────────────────────────────────────────────
+// Per user spec: on the CPU's first turn when going FIRST, the engine's
+// firstTurnProtectedPlayer shield makes any damage/debuff/enemy-targeting
+// effect fizzle. Skip cards that would be wasted.
+//   • Attacks → always skip (they exist to deal damage).
+//   • Spells → skip if getValidTargets only returns enemy-side targets.
+//     Spells without getValidTargets (draws, own-side buffs, areas) play.
+//   • Creatures → always play (the body lands on the board even if the
+//     onPlay effect fizzles — matches "mandatory effects still fire" from
+//     the user spec; Fiery Slime summons and its burn on the opponent
+//     simply no-ops under the shield).
+// A script can explicitly set `firstTurnSafe: true|false` to override.
+// Check whether this card has at least one non-immune viable target right
+// now. For Creatures we always return true — the body lands on the board
+// regardless of whether any onPlay effect would fizzle into immunity.
+// For Attacks / Spells with a `getValidTargets` function, we run it and
+// verify that either (a) any own-side or neutral target is present (the
+// spell is a buff/heal/area — self-targeting makes it useful), or (b) at
+// least one enemy-side target is not immune via isTargetImmune. Cards
+// that don't export getValidTargets get a "true" fallback — we can't
+// tell statically, so let the picker / MCTS handle it at runtime.
+function cardHasAnyViableEnemyTarget(engine, cpuIdx, cardName, cardData) {
+  if (!cardData) return true;
+  if (cardData.cardType === 'Creature') return true; // body always useful
+  const script = loadCardEffect(cardName);
+  if (!script?.getValidTargets) return true;
+  let targets;
+  try {
+    targets = script.getValidTargets(engine.gs, cpuIdx, engine);
+  } catch { return true; }
+  if (!Array.isArray(targets) || targets.length === 0) return true;
+  // Any own-side or ownerless target = usable (buff / heal / area).
+  if (targets.some(t => t.owner === cpuIdx || t.owner == null)) return true;
+  // All remaining targets are enemy-side. At least one must be non-immune.
+  return targets.some(t => !isTargetImmune(engine, t));
+}
+
+// ─── Ascension / virtual-school helpers ─────────────────────────────────
+// Hero card scripts may export:
+//   ascensionNeedsCard(cardName, cardData, engine, pi, hi) → bool
+//   ascensionProgress(engine, pi, hi) → 0..1
+//   virtualSpellSchoolLevel → number or (school, engine, pi, hi) → number
+//   rejectsAbility(abilityName, cardData) → bool
+// The helpers below read those off the live hero's script and let the CPU
+// route cards onto the hero that benefits most (Arthor's Sword, Beato's
+// spells of an unclaimed school, etc.) and block wasteful attachments
+// (Spell-School abilities onto Ascended Beato).
+
+function heroNeedsCardForAscension(engine, pi, hi, cardName, cardData) {
+  const hero = engine.gs.players[pi]?.heroes?.[hi];
+  if (!hero?.name || hero.hp <= 0) return false;
+  const script = loadCardEffect(hero.name);
+  if (typeof script?.ascensionNeedsCard !== 'function') return false;
+  try { return !!script.ascensionNeedsCard(cardName, cardData, engine, pi, hi); }
+  catch { return false; }
+}
+
+function ascensionTargetHero(engine, pi, cardName, cardData) {
+  const ps = engine.gs.players[pi];
+  if (!ps) return -1;
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    if (heroNeedsCardForAscension(engine, pi, hi, cardName, cardData)) return hi;
+  }
+  return -1;
+}
+
+function heroRejectsAbility(engine, pi, hi, abilityName, cardData) {
+  const hero = engine.gs.players[pi]?.heroes?.[hi];
+  if (!hero?.name) return false;
+  const script = loadCardEffect(hero.name);
+  if (typeof script?.rejectsAbility !== 'function') return false;
+  try { return !!script.rejectsAbility(abilityName, cardData); }
+  catch { return false; }
+}
+
+function effectiveSpellSchoolLevel(engine, pi, hi, school) {
+  const ps = engine.gs.players[pi];
+  const hero = ps?.heroes?.[hi];
+  if (!hero?.name) return 0;
+  const abZones = ps.abilityZones?.[hi] || [];
+  const real = engine.countAbilitiesForSchool(school, abZones);
+  const heroScript = loadCardEffect(hero.name);
+  const v = heroScript?.virtualSpellSchoolLevel;
+  let floor = 0;
+  if (typeof v === 'function') {
+    try { const f = v(school, engine, pi, hi); if (f != null) floor = f; } catch {}
+  } else if (typeof v === 'number') {
+    floor = v;
+  }
+  return Math.max(real, floor);
+}
+
+function isFirstTurnSafe(engine, cpuIdx, cardName, cardData) {
+  const gs = engine.gs;
+  const oppIdx = cpuIdx === 0 ? 1 : 0;
+  // Not turn 1, or opponent isn't the shielded side → all plays are fine.
+  if (gs.firstTurnProtectedPlayer !== oppIdx) return true;
+  // Creatures always play — only their effects might fizzle, not their presence.
+  if (cardData.cardType === 'Creature') return true;
+  if (cardData.cardType !== 'Attack' && cardData.cardType !== 'Spell') return true;
+
+  const script = loadCardEffect(cardName);
+  if (script?.firstTurnSafe === true) return true;
+  if (script?.firstTurnSafe === false) return false;
+
+  // Attacks all deal damage — always wasted under the first-turn shield.
+  if (cardData.cardType === 'Attack') return false;
+
+  // Spells: if there's no targeting at all, it's a generic effect (draw,
+  // self-buff, area) — safe. If targeting exists, play only if at least one
+  // non-enemy target is available (own-side, areas, or no-owner targets).
+  if (!script?.getValidTargets) return true;
+  try {
+    const targets = script.getValidTargets(gs, cpuIdx, engine) || [];
+    if (targets.length === 0) return true; // Nothing to hit either way; don't block on this.
+    return targets.some(t => t.owner === cpuIdx || t.owner == null);
+  } catch {
+    return true; // If the script throws, fall back to playing.
+  }
+}
+
+// ─── Additional-Action Attacks / Spells / Creatures in Main Phase ──────
+// Per user spec: "Use additional Actions as soon as they are available; if an
+// Attack/Spell/Creature summon is an inherent or conditional additional Action
+// and the condition is met, the CPU should just fire it out!"
+// Hero selection rules (Main-Phase firing):
+//   • Spells    → highest matching Spell-School level (preferred)
+//   • Creatures → lowest matching Spell-School level, tiebreak: most free
+//                 Support Zones, then random
+//   • Attacks   → highest atk
+// Targeting is left to the engine's default CPU auto-responder until 2i.
+
+async function fireAdditionalActions(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  const cardDB = engine._getCardDB();
+
+  // Remember which (card, hero) pairs we've already TRIED so we don't retry
+  // the same pick if the play silently fails and leaves the card in hand.
+  // This prevents a 20-iteration stall when a card passes eligibility but
+  // the handler rejects it on a deeper check we didn't foresee.
+  const tried = new Set();
+
+  for (let safety = 0; safety < 20; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+
+    let pick = null;
+    for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
+      const cardName = ps.hand[handIdx];
+      const cd = cardDB[cardName];
+      if (!cd) continue;
+      const ct = cd.cardType;
+      if (ct !== 'Spell' && ct !== 'Attack' && ct !== 'Creature') continue;
+      // Surprises must be set, not played (handled by placeSurprises).
+      if ((cd.subtype || '').toLowerCase() === 'surprise') continue;
+
+      // Per-card opt-out: card can declare itself "never proactively played"
+      // (e.g. Golden Wings — Reaction-only).
+      const script = loadCardEffect(cardName);
+      if (script?.cpuSkipProactive) continue;
+      // First-turn-protected-opponent check: skip damage/enemy-target plays
+      // that would fizzle under the shield.
+      if (!isFirstTurnSafe(engine, cpuIdx, cardName, cd)) continue;
+      // Don't waste Attacks/Spells when every enemy target is immune.
+      if (!cardHasAnyViableEnemyTarget(engine, cpuIdx, cardName, cd)) continue;
+
+      const heroIdx = pickHeroForActionCard(engine, cpuIdx, cd, cardName);
+      if (heroIdx < 0) continue;
+
+      const key = cardName + '|' + heroIdx;
+      if (tried.has(key)) continue;
+
+      const v = engine.validateActionPlay(cpuIdx, cardName, handIdx, heroIdx, [ct]);
+      if (!v) continue;
+      if (!v.isMainPhase) continue;
+      if (!v.isInherentAction) {
+        const typeId = engine.findAdditionalActionForCard(cpuIdx, cardName, heroIdx);
+        if (!typeId) continue;
+      }
+      pick = { cardName, handIdx, heroIdx, cardType: ct };
+      break;
+    }
+    if (!pick) return;
+
+    const handLenBefore = ps.hand.length;
+    cpuLog(`      → fire additional ${pick.cardType.toLowerCase()} "${pick.cardName}" hero=${pick.heroIdx}`);
+    let zoneSlot = -1;
+    if (pick.cardType === 'Creature') {
+      zoneSlot = pickCreatureZoneSlot(engine, cpuIdx, pick.heroIdx);
+      if (zoneSlot < 0) { tried.add(pick.cardName + '|' + pick.heroIdx); continue; }
+    }
+    const actionFn = async () => {
+      if (pick.cardType === 'Creature') {
+        await helpers.doPlayCreature(helpers.room, cpuIdx, {
+          cardName: pick.cardName,
+          handIndex: pick.handIdx,
+          heroIdx: pick.heroIdx,
+          zoneSlot,
+        });
+      } else {
+        await helpers.doPlaySpell(helpers.room, cpuIdx, {
+          cardName: pick.cardName,
+          handIndex: pick.handIdx,
+          heroIdx: pick.heroIdx,
+        });
+      }
+    };
+    const committed = await mctsGatedActivation(engine, helpers, `additional ${pick.cardType} ${pick.cardName}`, actionFn, { cardName: pick.cardName });
+    const shrank = ps.hand.length < handLenBefore;
+    cpuLog(`      ← additional "${pick.cardName}" ${committed && shrank ? 'OK' : 'SKIPPED/FAILED'}`);
+    if (!committed || !shrank) tried.add(pick.cardName + '|' + pick.heroIdx);
+    await pauseAction(engine);
+  }
+}
+
+// Hero selection per spec, given a card. Returns -1 if no hero qualifies.
+// Enumerate every hero that could legally play this Action-Phase card.
+// Returns an array of { hi, freeZones? }. Empty array means no hero is
+// eligible. Used by the MCTS candidate expander to evaluate per-hero
+// variations AND by pickHeroForActionCard (the non-MCTS heuristic path).
+function listEligibleHeroesForActionCard(engine, pi, cardData) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  const eligible = [];
+  for (let hi = 0; hi < 3; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+    if (hero.statuses?.negated && cardData.cardType === 'Spell') continue;
+    if (!engine.heroMeetsLevelReq(pi, hi, cardData)) continue;
+
+    if (cardData.cardType === 'Creature') {
+      const zones = ps.supportZones?.[hi] || [[], [], []];
+      let freeCount = 0;
+      for (let z = 0; z < 3; z++) {
+        if ((zones[z] || []).length === 0) freeCount++;
+      }
+      if (freeCount === 0) continue;
+      eligible.push({ hi, freeZones: freeCount });
+    } else {
+      eligible.push({ hi });
+    }
+  }
+  return eligible;
+}
+
+function pickHeroForActionCard(engine, pi, cardData, cardName) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  const eligible = listEligibleHeroesForActionCard(engine, pi, cardData);
+  if (!eligible.length) return -1;
+
+  // Ascension priority: if any eligible hero declares this card progresses
+  // their ascension (e.g. Beato wants a Spell of an uncollected school),
+  // route the play to that hero first. Overrides the heuristics below.
+  if (cardName) {
+    for (const e of eligible) {
+      if (heroNeedsCardForAscension(engine, pi, e.hi, cardName, cardData)) return e.hi;
+    }
+  }
+
+  if (cardData.cardType === 'Attack') {
+    let topAtk = -Infinity;
+    for (const e of eligible) topAtk = Math.max(topAtk, ps.heroes[e.hi].atk || 0);
+    const tied = eligible.filter(e => (ps.heroes[e.hi].atk || 0) === topAtk);
+    return tied[Math.floor(Math.random() * tied.length)].hi;
+  }
+
+  if (cardData.cardType === 'Spell' || cardData.cardType === 'Creature') {
+    const school1 = cardData.spellSchool1;
+    const school2 = cardData.spellSchool2;
+    let scored = eligible.map(e => {
+      let schoolLvl = 0;
+      if (school1) schoolLvl = Math.max(schoolLvl, effectiveSpellSchoolLevel(engine, pi, e.hi, school1));
+      if (school2) schoolLvl = Math.max(schoolLvl, effectiveSpellSchoolLevel(engine, pi, e.hi, school2));
+      return { ...e, schoolLvl };
+    });
+
+    // Card-specific summoner-hero preference hook. Cards whose effect
+    // depends on the host hero having specific abilities (e.g. Cosmic
+    // Skeleton needs a non-Summoning spell school attached) narrow the
+    // pool here. If any hero matches, restrict to those — otherwise
+    // fall back to the full pool so play isn't blocked.
+    if (cardName) {
+      const script = loadCardEffect(cardName);
+      if (typeof script?.cpuPrefersSummonerHero === 'function') {
+        const preferred = scored.filter(s => {
+          try { return !!script.cpuPrefersSummonerHero(engine, pi, s.hi, cardData); }
+          catch { return false; }
+        });
+        if (preferred.length > 0) scored = preferred;
+      }
+    }
+
+    if (cardData.cardType === 'Spell') {
+      // Highest matching Spell-School level preferred. Tie → random.
+      const topLvl = Math.max(...scored.map(s => s.schoolLvl));
+      const tied = scored.filter(s => s.schoolLvl === topLvl);
+      return tied[Math.floor(Math.random() * tied.length)].hi;
+    }
+
+    // Creatures: lowest matching Spell-School level preferred.
+    // Tiebreak 1: most free Support Zones. Tiebreak 2: random.
+    const lowLvl = Math.min(...scored.map(s => s.schoolLvl));
+    const lowest = scored.filter(s => s.schoolLvl === lowLvl);
+    const maxFree = Math.max(...lowest.map(s => s.freeZones));
+    const mostFree = lowest.filter(s => s.freeZones === maxFree);
+    return mostFree[Math.floor(Math.random() * mostFree.length)].hi;
+  }
+
+  return eligible[Math.floor(Math.random() * eligible.length)].hi;
+}
+
+function pickCreatureZoneSlot(engine, pi, heroIdx) {
+  const ps = engine.gs.players[pi];
+  const zones = ps.supportZones?.[heroIdx] || [[], [], []];
+  const free = [];
+  for (let z = 0; z < 3; z++) {
+    if ((zones[z] || []).length === 0) free.push(z);
+  }
+  if (!free.length) return -1;
+  return free[Math.floor(Math.random() * free.length)];
+}
+
+// Heuristic detection of "this Equipment increases the equipped Hero's Attack."
+// Pattern-based on the card effect text. False positives are harmless (CPU just
+// equips on highest-atk Hero instead of random); false negatives mean a buff
+// Equipment lands on a random Hero, which is the fallback the user accepted.
+function isAtkBoostEquip(cardData) {
+  const effect = (cardData.effect || '').toLowerCase();
+  if (!effect) return false;
+  if (/attack\s+stat\s+is\s+increased\s+by/.test(effect)) return true;
+  if (/\+\s*\d+\s*(?:base\s+)?attack\b/.test(effect)) return true;
+  if (/\battack\s*\+\s*\d+/.test(effect)) return true;
+  if (/gains?\s+\d+\s+attack/.test(effect)) return true;
+  return false;
+}
+
+// ─── Abilities ──────────────────────────────────────────────────────────
+// Per user spec: max 1 Ability per Hero per turn. Attach priority is
+// tiered — always keep stacking onto already-present abilities until none
+// can stack further, only then spread to new heroes:
+//
+//   TIER 1 STACK:  living hero ALREADY has this ability at lvl < 3.
+//   TIER 2 NEW:    the ability is on NO living hero yet — bring it in fresh.
+//   TIER 3 SPREAD: the ability is on ≥1 living hero but at max (lvl 3)
+//                  or only on dead heroes — attach to a hero who doesn't
+//                  have it yet, filling an empty slot.
+//
+// On each attach we pick the highest available tier; within a tier we pick
+// randomly so the CPU doesn't deterministically funnel every ability into
+// Hero 0. Resolves around abilityGivenThisTurn (1 attach per hero per turn).
+
+function heroHasAbility(ps, hi, cardName) {
+  const abZones = ps.abilityZones?.[hi] || [];
+  for (const slot of abZones) {
+    if ((slot || []).length > 0 && slot[0] === cardName) return true;
+  }
+  return false;
+}
+
+function heroHasAbilityAtMaxLevel(ps, hi, cardName) {
+  const abZones = ps.abilityZones?.[hi] || [];
+  for (const slot of abZones) {
+    if ((slot || []).length >= 3 && slot[0] === cardName) return true;
+  }
+  return false;
+}
+
+function anyLivingHeroHasAbility(ps, cardName) {
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    if (heroHasAbility(ps, hi, cardName)) return true;
+  }
+  return false;
+}
+
+async function attachAbilities(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  const cardDB = engine._getCardDB();
+
+  // Once an ability has been attached this turn (by ANY tier — stack,
+  // new, or spread), further copies in hand are barred from tier-3
+  // placements for the rest of the turn. The goal is to hold remaining
+  // copies until next turn, where they can stack on the holder(s) via
+  // tier 1 instead of thinly spreading across more heroes now.
+  const placedThisTurn = new Set();
+
+  // Safety cap: at most 6 passes — one pass can attach one (hero, ability).
+  // Each hero only gets one attach per turn, so the loop naturally terminates
+  // once every hero is filled or no tiered candidate remains.
+  for (let safety = 0; safety < 6; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+
+    const tier1 = [], tier2 = [], tier3 = [];
+    for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
+      const cardName = ps.hand[handIdx];
+      const cd = cardDB[cardName];
+      if (!cd || cd.cardType !== 'Ability') continue;
+
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        const hero = ps.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (ps.abilityGivenThisTurn[hi]) continue;
+
+        // Rule exception: hero already has this ability at lvl 3 — don't
+        // send another copy to THIS hero (nothing to stack onto, and the
+        // user explicitly excludes max-leveled heroes from stacking).
+        if (heroHasAbilityAtMaxLevel(ps, hi, cardName)) continue;
+
+        // Per-hero ability reject list (e.g. Ascended Beato refuses Spell-
+        // School abilities — she's already at effective level 9 in every
+        // school, so the copy is always better placed elsewhere).
+        if (heroRejectsAbility(engine, cpuIdx, hi, cardName, cd)) continue;
+
+        const slot = resolveAbilitySlot(engine, cpuIdx, hi, cardName);
+        if (slot === null) continue;
+
+        const entry = { handIdx, cardName, heroIdx: hi, zoneSlot: slot };
+        const thisHeroHasIt = heroHasAbility(ps, hi, cardName);
+        if (thisHeroHasIt) {
+          // Tier 1 (stack): always allowed — stacking improves an existing
+          // holder regardless of what was placed earlier this turn.
+          tier1.push(entry);
+        } else if (!anyLivingHeroHasAbility(ps, cardName)) {
+          // Tier 2 (new): still allowed even if another copy of the same
+          // name was placed earlier this turn — in practice this can't
+          // happen (the earlier placement would have made a living hero
+          // hold it, invalidating the tier-2 check here), but leave it
+          // for robustness.
+          tier2.push(entry);
+        } else {
+          // Tier 3 (spread to a fresh hero). Bar if this ability was
+          // already placed this turn — save the copy in hand instead.
+          if (placedThisTurn.has(cardName)) continue;
+          tier3.push(entry);
+        }
+      }
+    }
+
+    let pick = null;
+    let tierLabel = '';
+    if (tier1.length) { pick = tier1[Math.floor(Math.random() * tier1.length)]; tierLabel = 'stack'; }
+    else if (tier2.length) { pick = tier2[Math.floor(Math.random() * tier2.length)]; tierLabel = 'new'; }
+    else if (tier3.length) { pick = tier3[Math.floor(Math.random() * tier3.length)]; tierLabel = 'spread'; }
+    if (!pick) return;
+
+    // Record every placement regardless of tier so tier 3 is blocked for
+    // remaining copies of the same ability this turn.
+    placedThisTurn.add(pick.cardName);
+
+    cpuLog(`      → attach ability "${pick.cardName}" to hero ${pick.heroIdx} [${tierLabel}]`);
+    await helpers.doPlayAbility(helpers.room, cpuIdx, {
+      cardName: pick.cardName,
+      handIndex: pick.handIdx,
+      heroIdx: pick.heroIdx,
+      zoneSlot: pick.zoneSlot,
+    });
+    cpuLog(`      ← ability "${pick.cardName}" done`);
+    await pauseAction(engine);
+  }
+}
+
+/**
+ * Returns a zoneSlot to use when calling doPlayAbility, or null if the Ability
+ * cannot be attached to this Hero right now.
+ *   >=0  : the specific zone to place into (required for customPlacement cards)
+ *   -1   : let doPlayAbility auto-place (stack onto existing or first free zone)
+ *   null : not attachable
+ */
+function resolveAbilitySlot(engine, pi, hi, cardName) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  const hero = ps.heroes[hi];
+  if (!hero?.name || hero.hp <= 0) return null;
+  if (ps.abilityGivenThisTurn[hi]) return null;
+
+  const script = loadCardEffect(cardName);
+  if (script?.canAttachToHero && !script.canAttachToHero(gs, pi, hi, engine)) return null;
+
+  const abZones = ps.abilityZones[hi] || [[], [], []];
+
+  if (script?.customPlacement) {
+    // Custom placement cards (e.g. Performance) dictate which zones are legal.
+    const candidates = [];
+    for (let z = 0; z < 3; z++) {
+      if (script.customPlacement.canPlace(abZones[z] || [])) candidates.push(z);
+    }
+    if (!candidates.length) return null;
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  // Stack onto existing same-name zone (up to level 3)
+  for (let z = 0; z < 3; z++) {
+    const zone = abZones[z] || [];
+    if (zone.length > 0 && zone[0] === cardName && zone.length < 3) return -1;
+  }
+  // Otherwise need a free zone
+  for (let z = 0; z < 3; z++) {
+    if ((abZones[z] || []).length === 0) return -1;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════
+//  TARGETING & CHOICE BRAIN (2i + 2j)
+// ═══════════════════════════════════════════
+// Installed once per engine instance. Overrides _getCpuTargetResponse and
+// _getCpuGenericResponse so ALL CPU prompts follow the user's spec instead
+// of the puzzle defaults ("pick first option").
+
+// ─── MCTS plan format ─────────────────────────────────────────────────────
+// engine._mctsTargetPlan is an array of entries, each one of:
+//   • null
+//       → placeholder for "this slot uses heuristic" (still consumed)
+//   • { kind: 'target', ids: [id, ...] }
+//       → scripted promptEffectTarget pick (target IDs validated vs validTargets)
+//   • { kind: 'generic:<type>', value: ... }
+//       → scripted promptGeneric pick (value validated vs promptData), where
+//         <type> is one of 'zonePick', 'cardGallery', 'cardGalleryMulti',
+//         'playerPicker'. value is the shape the engine expects as the
+//         prompt's return value.
+// Each CPU-controlled prompt consumes one entry (by shifting plan[0]) IF it
+// matches the prompt's kind and passes validation. On mismatch, the entry
+// stays in the queue and the prompt falls through to heuristics — this keeps
+// the plan resilient to unexpected extra prompts in the real play.
+const MCTS_BRANCHABLE_GENERIC_TYPES = ['zonePick', 'cardGallery', 'cardGalleryMulti', 'playerPicker', 'optionPicker', 'confirm'];
+
+function mctsValidateTargetEntry(entry, validTargets) {
+  if (!entry || entry.kind !== 'target') return false;
+  if (!Array.isArray(entry.ids) || entry.ids.length === 0) return false;
+  return entry.ids.every(id => validTargets.some(t => t.id === id));
+}
+
+function mctsValidateGenericEntry(entry, promptData) {
+  if (!entry || typeof entry.kind !== 'string' || !entry.kind.startsWith('generic:')) return false;
+  const type = entry.kind.slice('generic:'.length);
+  if (type !== promptData.type) return false;
+  const v = entry.value;
+  if (!v) return false;
+  if (type === 'zonePick') {
+    const zones = promptData.zones || [];
+    return zones.some(z => z.heroIdx === v.heroIdx && z.slotIdx === v.slotIdx);
+  }
+  if (type === 'cardGallery') {
+    const cards = promptData.cards || [];
+    return cards.some(c => c.name === v.cardName);
+  }
+  if (type === 'cardGalleryMulti') {
+    if (!Array.isArray(v.selectedCards)) return false;
+    const names = new Set((promptData.cards || []).map(c => c.name));
+    return v.selectedCards.every(n => names.has(n));
+  }
+  if (type === 'playerPicker') {
+    return v.playerIdx === 0 || v.playerIdx === 1;
+  }
+  if (type === 'optionPicker') {
+    const options = promptData.options || [];
+    return options.some(o => o.id === v.optionId);
+  }
+  if (type === 'confirm') {
+    return v.confirmed === true;
+  }
+  return false;
+}
+
+// Enumerate alternative values for a branchable generic prompt. Returns an
+// array of { value, label } entries usable as plan values.
+function mctsEnumerateGenericAlternatives(promptData) {
+  const type = promptData.type;
+  if (type === 'zonePick') {
+    return (promptData.zones || []).map(z => ({
+      value: { heroIdx: z.heroIdx, slotIdx: z.slotIdx },
+      label: `zone=h${z.heroIdx}s${z.slotIdx}`,
+    }));
+  }
+  if (type === 'cardGallery') {
+    return (promptData.cards || []).map(c => ({
+      value: { cardName: c.name, source: c.source },
+      label: `card=${c.name}`,
+    }));
+  }
+  if (type === 'cardGalleryMulti') {
+    // Single-pick variations only (combinatorial explosion otherwise).
+    return (promptData.cards || []).map(c => ({
+      value: { selectedCards: [c.name] },
+      label: `pickOne=${c.name}`,
+    }));
+  }
+  if (type === 'playerPicker') {
+    return [
+      { value: { playerIdx: 0 }, label: 'player=0' },
+      { value: { playerIdx: 1 }, label: 'player=1' },
+    ];
+  }
+  if (type === 'optionPicker') {
+    return (promptData.options || []).map(opt => ({
+      value: { optionId: opt.id },
+      label: `opt=${opt.id}`,
+    }));
+  }
+  if (type === 'confirm') {
+    // Only cancellable confirms are interesting to branch on — non-
+    // cancellable ones have no alternative. The heuristic default
+    // declines (returns null) for cancellable, so the "confirm"
+    // alternative is the only thing to test.
+    if (!promptData.cancellable) return [];
+    return [{ value: { confirmed: true }, label: 'confirm' }];
+  }
+  return [];
+}
+
+function installCpuBrain(engine) {
+  if (engine._cpuBrainInstalled) return;
+  engine._cpuBrainInstalled = true;
+
+  const origTarget = engine._getCpuTargetResponse.bind(engine);
+  const origGeneric = engine._getCpuGenericResponse.bind(engine);
+
+  // Slow down CPU prompt responses so the human can see each decision. We
+  // override promptGeneric / promptEffectTarget to replace the engine's
+  // built-in 50ms delay (too fast to follow) with a human-pacing delay.
+  // Puzzle mode is unaffected — puzzles don't install the CPU brain.
+  const origPromptGeneric = engine.promptGeneric.bind(engine);
+  engine.promptGeneric = async function (playerIdx, promptData) {
+    // ── MCTS scripted plan (peek, consume only on match) ──
+    let scriptedValue = null;
+    if (engine.isCpuPlayer(playerIdx) && Array.isArray(engine._mctsTargetPlan) && engine._mctsTargetPlan.length > 0) {
+      const head = engine._mctsTargetPlan[0];
+      if (head === null) {
+        engine._mctsTargetPlan.shift(); // null placeholder → consume, use heuristic
+      } else if (mctsValidateGenericEntry(head, promptData)) {
+        engine._mctsTargetPlan.shift();
+        scriptedValue = head.value;
+      }
+      // else: leave in queue for a future matching prompt.
+    }
+
+    // During MCTS rollouts (fast mode), BOTH players' prompts auto-respond
+    // — otherwise non-CPU reaction-window prompts would hang forever since
+    // there's no socket to resolve them. Cancellable → decline, mandatory
+    // → CPU brain's default pick.
+    if (engine._fastMode && !engine.isCpuPlayer(playerIdx)) {
+      if (promptData.cancellable) return null;
+      return engine._getCpuGenericResponse(promptData, playerIdx);
+    }
+    if (engine.isCpuPlayer(playerIdx)) {
+      if (!engine._fastMode) await engine._delay(CPU_PROMPT_DELAY);
+      const picked = scriptedValue != null ? scriptedValue : engine._getCpuGenericResponse(promptData, playerIdx);
+      // ── MCTS recon recording ──
+      // Only record branchable types — confirms/forceDiscards don't enumerate
+      // alternatives we care to explore.
+      if (Array.isArray(engine._mctsTargetRecord) && MCTS_BRANCHABLE_GENERIC_TYPES.includes(promptData.type)) {
+        engine._mctsTargetRecord.push({
+          kind: `generic:${promptData.type}`,
+          title: promptData.title,
+          cancellable: !!promptData.cancellable,
+          alternatives: mctsEnumerateGenericAlternatives(promptData),
+          picked,
+          wasScripted: scriptedValue != null,
+        });
+      }
+      return picked;
+    }
+    return origPromptGeneric(playerIdx, promptData);
+  };
+
+  const origPromptEffectTarget = engine.promptEffectTarget.bind(engine);
+  engine.promptEffectTarget = async function (playerIdx, validTargets, config = {}) {
+    if (!validTargets || validTargets.length === 0) return [];
+
+    // ── MCTS scripted plan (peek, consume only on match) ──
+    let scriptedPick = null;
+    if (engine.isCpuPlayer(playerIdx) && Array.isArray(engine._mctsTargetPlan) && engine._mctsTargetPlan.length > 0) {
+      const head = engine._mctsTargetPlan[0];
+      if (head === null) {
+        engine._mctsTargetPlan.shift();
+      } else if (mctsValidateTargetEntry(head, validTargets)) {
+        engine._mctsTargetPlan.shift();
+        scriptedPick = head.ids;
+      }
+      // else: leave in queue.
+    }
+
+    // ── Fast-mode non-CPU: auto-respond (prevents hangs in rollouts) ──
+    if (engine._fastMode && !engine.isCpuPlayer(playerIdx)) {
+      if (config.cancellable) return [];
+      return engine._getCpuTargetResponse(validTargets, config, playerIdx);
+    }
+
+    if (engine.isCpuPlayer(playerIdx)) {
+      if (!engine._fastMode) await engine._delay(CPU_PROMPT_DELAY);
+      // Pass playerIdx through so the picker uses the CARD CONTROLLER's
+      // own/enemy sides — critical for reactive cards fired on the
+      // opponent's turn (Shield of Life, Cure, etc.).
+      const picked = scriptedPick || engine._getCpuTargetResponse(validTargets, config, playerIdx);
+      // ── MCTS recon recording ──
+      if (Array.isArray(engine._mctsTargetRecord)) {
+        const maxSel = Math.max(1, config.maxTotal || config.maxSelect || 1);
+        engine._mctsTargetRecord.push({
+          kind: 'target',
+          title: config.title,
+          cancellable: !!config.cancellable,
+          maxSelect: maxSel,
+          validTargets: validTargets.map(t => ({
+            id: t.id,
+            owner: t.owner,
+            heroIdx: t.heroIdx,
+            name: t.name,
+            hp: t.hp,
+            type: t.type,
+          })),
+          picked,
+          wasScripted: !!scriptedPick,
+        });
+      }
+      return picked;
+    }
+    return origPromptEffectTarget(playerIdx, validTargets, config);
+  };
+
+  // promptGeneric wrapper — same playerIdx passthrough guarantee. Without
+  // this, reactive/generic prompts fired during the opponent's turn hit
+  // the engine default's _cpuPlayerIdx fallback and flip own/enemy logic
+  // (same class of bug as promptEffectTarget above).
+
+  engine._getCpuTargetResponse = function (validTargets, config = {}, promptedPlayerIdx) {
+    try {
+      const picked = cpuPickTargets(engine, validTargets, config, promptedPlayerIdx);
+      if (picked !== undefined) return picked;
+    } catch (err) {
+      console.error('[CPU brain] target picker threw:', err.message);
+    }
+    return origTarget(validTargets, config, promptedPlayerIdx);
+  };
+
+  engine._getCpuGenericResponse = function (promptData, promptedPlayerIdx) {
+    try {
+      const res = cpuGenericChoice(engine, promptData, promptedPlayerIdx);
+      if (res !== undefined) return res;
+    } catch (err) {
+      console.error('[CPU brain] generic chooser threw:', err.message, err.stack);
+    }
+    return origGeneric(promptData, promptedPlayerIdx);
+  };
+}
+
+// ─── Target picker ─────────────────────────────────────────────────────
+// Returns an array of selected target IDs (same contract as
+// _getCpuTargetResponse) or undefined to let the default handler run.
+
+function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
+  if (!Array.isArray(validTargets) || validTargets.length === 0) {
+    return config.cancellable ? [] : undefined;
+  }
+  // `promptedPlayerIdx` is the CARD CONTROLLER — the player whose prompt
+  // this is. Fall back to _cpuPlayerIdx only if the caller didn't pass it
+  // (older call sites). Using the active player for reactive cards fired
+  // on the OPPONENT's turn (Shield of Life, Cure) flipped own/enemy and
+  // caused the CPU to heal the enemy.
+  const cpuIdx = promptedPlayerIdx != null ? promptedPlayerIdx : engine._cpuPlayerIdx;
+  const cardName = config.title;
+  const cd = cardName ? engine._getCardDB()[cardName] : null;
+
+  // Per-card target override: cards can export `cpuResponse(engine, 'target',
+  // { validTargets, config })` and return an array of selected IDs. Falls
+  // through to the generic targeting brain if the card returns undefined.
+  if (cardName) {
+    const script = loadCardEffect(cardName);
+    if (script?.cpuResponse) {
+      try {
+        const override = script.cpuResponse(engine, 'target', { validTargets, config });
+        if (override !== undefined) return override;
+      } catch (err) {
+        console.error(`[CPU] ${cardName} cpuResponse (target) threw:`, err.message);
+      }
+    }
+  }
+
+  // Classify by whom the targets affect. If everything points to the opponent,
+  // it's an enemy effect; all-own → ally effect; mixed → fall back to enemy
+  // logic (most damage cards let you pick enemy despite "any" side flag).
+  const ownTargets = validTargets.filter(t => t.owner === cpuIdx);
+  const enemyTargets = validTargets.filter(t => t.owner != null && t.owner !== cpuIdx);
+
+  // Determine intent. Healing/buff cards typically have side='own' or only
+  // own-targets valid. Damage cards have baseDamage or damageType, or target
+  // the opponent side.
+  const isHealCard = looksLikeHeal(cd, config);
+  const isBuffCard = !isHealCard && looksLikeBuff(cd, config);
+
+  // Multi-select bound: promptMultiTarget passes `maxTotal`, simpler callers
+  // pass `maxSelect`. Clamp to ≥1 and to total target count so we don't try
+  // to return more IDs than exist.
+  const totalEligible = ownTargets.length + enemyTargets.length;
+  const maxSelect = Math.min(totalEligible, Math.max(1, config.maxTotal || config.maxSelect || 1));
+
+  if (isHealCard) {
+    const picks = pickHealTargetsMulti(engine, ownTargets, enemyTargets, cardName, maxSelect);
+    if (picks.length) return picks.map(p => p.id);
+    // No sensible heal target (no injured own things, no Overheal-Shocked
+    // enemy). DO NOT fall through to enemy-damage targeting — that would
+    // heal an enemy hero for free. Decline the cancellable prompt so the
+    // heal stays in hand for a better moment.
+    if (config.cancellable !== false) return [];
+    // Forced heal with no great target — heal the highest-HP own hero as a
+    // no-op fallback. Never heal an enemy unless Overheal-Shocked.
+    const fallback = ownTargets.find(t => t.type === 'hero') || ownTargets[0];
+    return fallback ? [fallback.id] : [];
+  }
+
+  if (isBuffCard) {
+    const picks = pickBuffTargetsMulti(engine, ownTargets, cardName, maxSelect);
+    if (picks.length) return picks.map(p => p.id);
+  }
+
+  // Enemy-side damage targeting (or ambiguous — default to enemy side).
+  if (enemyTargets.length > 0) {
+    const damage = inferDamage(config);
+    const picks = pickEnemyTargets(engine, enemyTargets, damage, maxSelect);
+    if (picks.length) return picks.map(p => p.id);
+    // All enemy targets are immune. If the prompt is cancellable, decline
+    // to avoid wasting the Attack/Spell/effect; the card stays in hand.
+    // If it's not cancellable, fall through so we still pick SOMETHING.
+    const allEnemyImmune = enemyTargets.every(t => isTargetImmune(engine, t));
+    if (allEnemyImmune && config.cancellable !== false) return [];
+  }
+
+  // Ally-only fallthrough (e.g. cards whose side is 'own' but don't look
+  // like heal/buff by our heuristic — revive, restore, etc.).
+  if (ownTargets.length > 0) {
+    const shuffled = shuffle(ownTargets);
+    return shuffled.slice(0, maxSelect).map(t => t.id);
+  }
+
+  return undefined; // Let default pick from the full list
+}
+
+// Multi-select version of pickHealTarget. Picks up to maxSelect own targets
+// that most need healing/cleansing, plus any enemy hero with Overheal Shock
+// attached (free kill). Falls back to the single-pick ordering when only
+// one target is allowed.
+function pickHealTargetsMulti(engine, ownTargets, enemyTargets, cardName, maxSelect) {
+  if (maxSelect <= 1) {
+    const single = pickHealTarget(engine, ownTargets, enemyTargets, cardName, null);
+    return single ? [single] : [];
+  }
+  const gs = engine.gs;
+  const picks = [];
+  const seen = new Set();
+  const add = (t) => {
+    if (!t || seen.has(t.id) || picks.length >= maxSelect) return;
+    seen.add(t.id);
+    picks.push(t);
+  };
+  // 1) Overheal Shock lethal on enemy heroes (always valuable)
+  for (const t of enemyTargets) {
+    if (t.type === 'hero' && heroHasAttachment(engine, t, 'Overheal Shock')) add(t);
+  }
+  // 2) Own targets — skip own-hero with Overheal Shock (would kill us)
+  const safeOwn = ownTargets.filter(t =>
+    !(t.type === 'hero' && heroHasAttachment(engine, t, 'Overheal Shock')));
+  // 3) Fresh Lifeforce Howitzer priority
+  for (const t of safeOwn) {
+    if (targetHasFreshLifeforceHowitzer(engine, t)) add(t);
+  }
+  // 4) Injured heroes in HP-missing descending order
+  const ownHeroesByMissing = safeOwn
+    .filter(t => t.type === 'hero')
+    .map(t => {
+      const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
+      return { t, missing: (h?.maxHp || 0) - (h?.hp || 0) };
+    })
+    .filter(x => x.missing > 0)
+    .sort((a, b) => b.missing - a.missing);
+  for (const { t } of ownHeroesByMissing) add(t);
+  // 5) Own creatures by lowest HP
+  const ownCreatures = safeOwn
+    .filter(t => t.type === 'creature' || t.type === 'equip')
+    .map(t => {
+      const inst = t.cardInstance || findSupportInstance(engine, t);
+      return { t, hp: creatureCurrentHp(engine, inst, t) ?? Infinity };
+    })
+    .sort((a, b) => a.hp - b.hp);
+  for (const { t } of ownCreatures) add(t);
+  return picks;
+}
+
+// Multi-select version of pickBuffTarget. Prefers heroes without the buff
+// already applied; falls back to heroes with it, then creatures.
+function pickBuffTargetsMulti(engine, ownTargets, cardName, maxSelect) {
+  if (maxSelect <= 1) {
+    const single = pickBuffTarget(engine, ownTargets, cardName);
+    return single ? [single] : [];
+  }
+  const heroes = ownTargets.filter(t => t.type === 'hero');
+  const creatures = ownTargets.filter(t => t.type !== 'hero');
+  const heroesWithout = shuffle(heroes.filter(t => !targetHasBuff(engine, t, cardName)));
+  const heroesWith = shuffle(heroes.filter(t => targetHasBuff(engine, t, cardName)));
+  const creatureShuffled = shuffle(creatures);
+  const ordered = [...heroesWithout, ...heroesWith, ...creatureShuffled];
+  return ordered.slice(0, maxSelect);
+}
+
+// ─── Generic choice picker ─────────────────────────────────────────────
+
+function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
+  const type = promptData.type;
+  // Use the CARD CONTROLLER's pi (not the active player) so reactive
+  // prompts fired during the opponent's turn answer from their OWN side.
+  const cpuIdx = promptedPlayerIdx != null ? promptedPlayerIdx : engine._cpuPlayerIdx;
+
+  // Per-card override wins over the generic brain. Card authors export
+  // `cpuResponse(engine, promptKind, promptData)` to customize how the CPU
+  // responds to prompts their card raises (Barker hero-ability, etc.).
+  const cardName = promptData.title || promptData.source;
+  if (cardName) {
+    const script = loadCardEffect(cardName);
+    if (script?.cpuResponse) {
+      try {
+        const override = script.cpuResponse(engine, 'generic', promptData);
+        if (override !== undefined) return override;
+      } catch (err) {
+        console.error(`[CPU] ${cardName} cpuResponse threw:`, err.message);
+      }
+    }
+  }
+
+  // Reactions: prompt type='confirm' with a showCard and an 'Activate' button.
+  if (type === 'confirm' && promptData.confirmLabel && /activate/i.test(promptData.confirmLabel)) {
+    return cpuReactionDecision(engine, promptData);
+  }
+
+  // Confirm prompts fall into two shapes:
+  //   • `promptConfirmEffect` / similar: caller checks `result?.confirmed === true`
+  //   • Plain reaction/trigger confirm: caller checks `if (result)`
+  // Returning `{ confirmed: true }` satisfies both. Returning null declines.
+  if (type === 'confirm') {
+    // Cancellable confirms = OPTIONAL actions (combo follow-ups, sacrifice
+    // costs, "do you want to X" opt-ins). Default to DECLINE — opting into a
+    // follow-up without the CPU knowing how to execute it leaves the turn
+    // stuck (e.g. Ghuanjun combo sets _preventPhaseAdvance and expects a
+    // second action). Cards that need a "yes" on the CPU's behalf should
+    // export `cpuResponse` to override (checked above this branch).
+    // Reactions (confirmLabel ~ "Activate!") are handled in the branch above.
+    if (promptData.cancellable) return null;
+    return { confirmed: true };
+  }
+
+  // Player-picker prompts (Divine Gift of Fire, etc.). Default: pick the
+  // HUMAN — most player-picker effects are damage / debuff flavored. A card
+  // whose intent is self-affecting can opt out via its own `cpuResponse`.
+  if (type === 'playerPicker') {
+    return { playerIdx: cpuIdx === 0 ? 1 : 0 };
+  }
+
+  // Option-picker prompts (Siphem "remove N counters", Reincarnation mode,
+  // Wheels mode, etc.). The engine's default declines cancellable prompts;
+  // that was making Siphem never fire. Default to the LAST option — for
+  // ramp-style cards ("remove more for more damage") this is usually the
+  // "all in" choice. MCTS variations explore other options and pick the
+  // best-scoring one; this fallback is for live play without MCTS branching.
+  if (type === 'optionPicker') {
+    const options = promptData.options || [];
+    if (!options.length) return null;
+    return { optionId: options[options.length - 1].id };
+  }
+
+  // Card-gallery prompts (deck searches, tutors, ascension bonuses). MCTS
+  // handles the picks via `mctsBuildVariationsFromRecord` — the recon
+  // uses a random initial choice, then variations re-run with alternatives
+  // and the highest-scoring pick wins. This heuristic was removed in
+  // favor of letting the evaluator's synergy terms (OHS / Howitzer value)
+  // drive the decision through actual rollouts.
+  if (type === 'cardGallery') {
+    const cards = promptData.cards || [];
+    if (!cards.length) return null;
+    const c = cards[Math.floor(Math.random() * cards.length)];
+    return { cardName: c.name, source: c.source };
+  }
+  if (type === 'cardGalleryMulti') {
+    const cards = promptData.cards || [];
+    if (!cards.length) return { selectedCards: [] };
+    const c = cards[Math.floor(Math.random() * cards.length)];
+    return { selectedCards: [c.name] };
+  }
+  if (type === 'zonePick') {
+    const zones = promptData.zones || [];
+    if (!zones.length) return null;
+    const z = zones[Math.floor(Math.random() * zones.length)];
+    return { heroIdx: z.heroIdx, slotIdx: z.slotIdx };
+  }
+  // Hand-pick (mulligan) prompts: Leadership, Horn in a Bottle, etc.
+  // These expect `{ selectedCards: [{ cardName, handIndex }, ...] }`.
+  // Use the same valuation as forced-discard: scarce cards, Ascended Heroes,
+  // and evaluator-rewarded cards (Cardinal Beasts, OHS pieces) are preserved;
+  // low-value filler gets mulliganed. With minSelect=0 (Horn in a Bottle)
+  // we may return zero cards for a pure +1 draw; with minSelect≥1
+  // (Leadership) we always return at least that many of the worst cards.
+  if (type === 'handPick') {
+    const ps = engine.gs.players[cpuIdx];
+    if (!ps?.hand?.length) return null;
+    const eligible = promptData.eligibleIndices || ps.hand.map((_, i) => i);
+    if (!eligible.length) return null;
+    const maxSelect = promptData.maxSelect || 1;
+    const minSelect = promptData.minSelect != null ? promptData.minSelect : 1;
+    const cardDB = engine._getCardDB();
+    const baseScore = (() => {
+      try { return evaluateState(engine, cpuIdx); } catch { return 0; }
+    })();
+    const scored = eligible.map(idx => {
+      const name = ps.hand[idx];
+      const cd = cardDB[name];
+      let value = 0;
+      const countIn = (arr) => (arr || []).filter(c => c === name).length;
+      const copiesLeft = countIn(ps.hand) + countIn(ps.mainDeck) + countIn(ps.potionDeck);
+      if (copiesLeft === 1) value += 100;
+      else if (copiesLeft === 2) value += 25;
+      if (cd?.cardType === 'Ascended Hero') value += 200;
+      const removed = ps.hand[idx];
+      ps.hand.splice(idx, 1);
+      let scoreWithout = baseScore;
+      try { scoreWithout = evaluateState(engine, cpuIdx); } catch {}
+      ps.hand.splice(idx, 0, removed);
+      value += Math.max(0, baseScore - scoreWithout);
+      return { idx, name, value };
+    });
+    scored.sort((a, b) => a.value - b.value);
+    // Threshold 50 ≈ "not scarce, not a tracked combo piece" — safe to return.
+    // Past minSelect, stop once we'd be shuffling back something useful.
+    const selected = [];
+    for (const s of scored) {
+      if (selected.length >= maxSelect) break;
+      if (selected.length >= minSelect && s.value >= 50) break;
+      selected.push({ cardName: s.name, handIndex: s.idx });
+    }
+    return { selectedCards: selected };
+  }
+  if (type === 'pickHandCard') {
+    const ps = engine.gs.players[engine._cpuPlayerIdx];
+    if (!ps?.hand?.length) return null;
+    const eligible = promptData.eligibleIndices || ps.hand.map((_, i) => i);
+    if (!eligible.length) return null;
+    const idx = eligible[Math.floor(Math.random() * eligible.length)];
+    return { cardName: ps.hand[idx], handIndex: idx };
+  }
+  // Forced/voluntary discards: pick the LEAST valuable card. "Value" is
+  // derived from (a) the evaluator delta if the card were removed — this
+  // automatically protects Cardinal Beasts, OHS/Howitzer setup pieces,
+  // and any other card the evaluator already rewards as in-hand/in-deck,
+  // (b) scarcity (cards with only 1 copy remaining across hand+deck are
+  // preserved over plentiful copies), and (c) card type — Ascended Hero
+  // cards are irreplaceable plan pieces and almost always worth keeping.
+  // Avoids hard-coded per-card rules; the evaluator handles the logic.
+  if (type === 'forceDiscard' || type === 'forceDiscardCancellable') {
+    const ps = engine.gs.players[cpuIdx];
+    if (!ps?.hand?.length) return null;
+    const eligible = promptData.eligibleIndices || ps.hand.map((_, i) => i);
+    if (!eligible.length) return null;
+    const cardDB = engine._getCardDB();
+    const baseScore = (() => {
+      try { return evaluateState(engine, cpuIdx); } catch { return 0; }
+    })();
+    const scored = eligible.map(idx => {
+      const name = ps.hand[idx];
+      const cd = cardDB[name];
+      let value = 0;
+      // Scarcity: only copy anywhere accessible = irreplaceable
+      const countIn = (arr) => (arr || []).filter(c => c === name).length;
+      const copiesLeft = countIn(ps.hand) + countIn(ps.mainDeck) + countIn(ps.potionDeck);
+      if (copiesLeft === 1) value += 100;
+      else if (copiesLeft === 2) value += 25;
+      // Ascended Hero cards are critical win-condition pieces
+      if (cd?.cardType === 'Ascended Hero') value += 200;
+      // Evaluator delta — tentatively remove and re-score. Cards the
+      // evaluator rewards for being accessible (Cardinal Beasts, etc.)
+      // naturally score higher here. Restore hand afterwards.
+      const removed = ps.hand[idx];
+      ps.hand.splice(idx, 1);
+      let scoreWithout = baseScore;
+      try { scoreWithout = evaluateState(engine, cpuIdx); } catch {}
+      ps.hand.splice(idx, 0, removed);
+      value += Math.max(0, baseScore - scoreWithout);
+      return { idx, name, value };
+    });
+    scored.sort((a, b) => a.value - b.value);
+    const pick = scored[0];
+    // For forceDiscardCancellable ("discard a card OR take the effect"),
+    // refuse the discard if the least-bad card is still too precious to
+    // lose. Threshold 150 ≈ "this card is more valuable than ~150 HP
+    // of damage" — roughly what Bottled Lightning's heaviest tick hits
+    // for. Covers Ascended Heroes (score ~310), Cardinal Beasts (~150),
+    // and any eval-tracked combo piece. Regular scarce cards (~110)
+    // still get discarded; only clear win-condition pieces cancel.
+    if (type === 'forceDiscardCancellable' && pick.value >= 150) {
+      return null; // "Take it!" — eat the damage to save the card
+    }
+    return { cardName: pick.name, handIndex: pick.idx };
+  }
+  return undefined; // Defer to default
+}
+
+// ─── Reaction decisions ────────────────────────────────────────────────
+
+function cpuReactionDecision(engine, promptData) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const reactionName = promptData.title;
+  const rxCd = reactionName ? engine._getCardDB()[reactionName] : null;
+  const chainInit = engine.chain?.[0];
+  const chainOwnerIsCpu = chainInit && chainInit.owner === cpuIdx;
+
+  // Juice: CPU only plays it when one of their own targets can actually be healed.
+  if (reactionName === 'Juice') {
+    if (!hasHealableOwnTarget(engine)) return null; // decline
+    return true;
+  }
+
+  // Any other negation-style reaction: only fire against a player's card.
+  if (rxCd && isLikelyNegation(rxCd)) {
+    if (chainOwnerIsCpu) return null; // decline — don't negate own cards
+    return true;
+  }
+
+  // Default: fire reactions ASAP.
+  return true;
+}
+
+function isLikelyNegation(cd) {
+  const effect = (cd.effect || '').toLowerCase();
+  if (!effect) return false;
+  // Exclude phrases that say "cannot be negated" / "may not be negated" —
+  // those mention negation but aren't themselves negations.
+  const negatedProtections = /(cannot|can ?not|may not|will not) be negated/.test(effect);
+  if (negatedProtections && !/negate (the|this|that)/.test(effect)) return false;
+  // Positive detection: "negate this spell", "negate the effect", "negate the activation"
+  return /negate (the|this|an|its) /i.test(effect);
+}
+
+// ─── Heal / buff detection heuristics ───────────────────────────────────
+
+function looksLikeHeal(cd, config) {
+  if (!cd && !config) return false;
+  if (config?.isHeal === true) return true;
+  const effect = (cd?.effect || '').toLowerCase();
+  // "heal", "restore N HP", "recover"
+  if (/\bheal(s|ed|ing)?\b/.test(effect)) return true;
+  if (/restore .* hp/.test(effect)) return true;
+  if (/recover .* hp/.test(effect)) return true;
+  return false;
+}
+
+function looksLikeBuff(cd, config) {
+  if (!cd) return false;
+  if (config?.isBuff === true) return true;
+  const effect = (cd.effect || '').toLowerCase();
+  if (/\bincreas(e|es|ed) (the )?(attack|hp|max hp)/.test(effect)) return true;
+  if (/gain(s)? (\d+|an?) /.test(effect) && /attack|hp/.test(effect)) return true;
+  return false;
+}
+
+function inferDamage(config) {
+  const d = config.baseDamage ?? config.damage ?? 0;
+  return Number.isFinite(d) ? d : 0;
+}
+
+// ─── Enemy targeting ──────────────────────────────────────────────────
+// Rule (user spec):
+//   • If damage would defeat an enemy Hero → target that Hero (100%).
+//   • Else weighted random: 60% big-damage (≥50% HP) enemy Hero,
+//                           30% killable enemy Creature,
+//                           10% enemy Creature that survives the damage.
+// If we can't pick by those tiers (empty category), fall through to the
+// next tier so the CPU always picks SOMETHING when damage targeting an
+// enemy is legal.
+
+// Check whether a target is fully immune — damage / targeting effects
+// against it will fizzle entirely. Returns true for:
+//   • first-turn grace shield on the target's owner
+//   • hero-level generic `immune` status (CC immune)
+//   • hero petrified via Baihu (stunned + _baihuPetrify)
+//   • hero charmed by someone other than its owner (Charme Lv3 damage-immune)
+//   • creature that's face-down (surprise), targeting_immune, control_immune,
+//     _cardinalImmune, or _baihuPetrify
+// Conservative: when in doubt, treat as non-immune so we don't over-skip.
+function isTargetImmune(engine, target) {
+  const gs = engine.gs;
+  if (!target) return false;
+  if (target.owner != null && gs.firstTurnProtectedPlayer === target.owner) return true;
+
+  if (target.type === 'hero') {
+    const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
+    if (!hero || hero.hp <= 0) return true;
+    if (hero.statuses?.immune) return true;
+    if (hero.statuses?.stunned?._baihuPetrify) return true;
+    if (hero.charmedBy != null && hero.charmedBy !== target.owner) return true;
+    return false;
+  }
+
+  if (target.type === 'creature' || target.type === 'equip') {
+    const inst = target.cardInstance
+      || engine.cardInstances.find(c =>
+        c.owner === target.owner && c.zone === 'support' &&
+        c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx);
+    if (!inst) return true;
+    if (inst.faceDown) return true;
+    if (inst.counters?.targeting_immune) return true;
+    if (inst.counters?.control_immune) return true;
+    if (inst.counters?._cardinalImmune) return true;
+    if (inst.counters?._baihuPetrify) return true;
+    return false;
+  }
+  return false;
+}
+
+function pickEnemyTargets(engine, enemyTargets, damage, maxSelect) {
+  const gs = engine.gs;
+  // Drop fully immune targets up front — hitting them does nothing useful
+  // and the user explicitly wants to avoid wasting effects on them. If this
+  // empties the pool, the caller (cpuPickTargets) will decline cancellable
+  // prompts, which cancels the spell and leaves the card in hand.
+  const viable = enemyTargets.filter(t => !isTargetImmune(engine, t));
+  if (viable.length === 0) return [];
+  // Partition enemy targets. Immortal doesn't prevent damage — it only caps
+  // the target at 1 HP (prevents death). So:
+  //   • HP > damage (non-lethal chip): normal priority regardless of Immortal.
+  //   • HP ≤ damage (would-be lethal): Immortal demotes lethal → bigHero
+  //     (still deals hp-1 of chip, which is usually decent).
+  //   • HP == 1 and Immortal: the Immortal cap zeroes effective damage —
+  //     skip entirely when damage > 0 (the attack is wasted).
+  const lethalHero = [];
+  const bigHero = [];
+  const otherHero = [];
+  const killableCreature = [];
+  const unkillableCreature = [];
+
+  for (const t of viable) {
+    if (t.type === 'hero') {
+      const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
+      if (!h || h.hp <= 0) continue;
+      const immortal = !!h.buffs?.immortal;
+      if (immortal && h.hp <= 1 && damage > 0) continue; // damage → 0, wasted
+      if (damage >= h.hp) {
+        if (immortal) bigHero.push(t); // cap-to-1: still meaningful chip
+        else lethalHero.push(t);
+      } else if (damage >= h.hp * 0.5) {
+        bigHero.push(t);
+      } else {
+        otherHero.push(t);
+      }
+    } else if (t.type === 'creature' || t.type === 'equip') {
+      const inst = t.cardInstance || findSupportInstance(engine, t);
+      const hp = creatureCurrentHp(engine, inst, t);
+      if (hp == null) { otherHero.push(t); continue; } // unknown — treat as fallback
+      const immortal = !!inst?.counters?.buffs?.immortal;
+      if (immortal && hp <= 1 && damage > 0) continue;
+      if (damage >= hp) {
+        if (immortal) unkillableCreature.push(t); // can't kill; demote
+        else killableCreature.push(t);
+      } else {
+        unkillableCreature.push(t);
+      }
+    } else {
+      otherHero.push(t);
+    }
+  }
+
+  // ── Multi-target path (maxSelect > 1) ──
+  // Pyroblast-style "hit up to N targets" prompts: greedy-fill from best
+  // tier to worst, capped at maxSelect. No random tier-mixing — damage
+  // spells always want their best targets first when choosing multiple.
+  if (maxSelect > 1) {
+    const picks = [];
+    const takeFrom = (list) => {
+      if (!list.length) return;
+      const shuffled = shuffle(list);
+      for (const t of shuffled) {
+        if (picks.length >= maxSelect) return;
+        picks.push(t);
+      }
+    };
+    takeFrom(lethalHero);
+    takeFrom(bigHero);
+    takeFrom(killableCreature);
+    takeFrom(otherHero);
+    takeFrom(unkillableCreature);
+    return picks;
+  }
+
+  if (lethalHero.length) {
+    return [randomOf(lethalHero)];
+  }
+  const roll = Math.random();
+  const tiers = [];
+  if (bigHero.length) tiers.push({ weight: 0.60, list: bigHero });
+  if (killableCreature.length) tiers.push({ weight: 0.30, list: killableCreature });
+  if (unkillableCreature.length) tiers.push({ weight: 0.10, list: unkillableCreature });
+  if (otherHero.length) tiers.push({ weight: 0.60, list: otherHero }); // small-damage hero as hero-tier
+
+  if (tiers.length === 0) return [];
+  const totalW = tiers.reduce((s, t) => s + t.weight, 0);
+  let acc = 0;
+  for (const tier of tiers) {
+    acc += tier.weight / totalW;
+    if (roll <= acc) return [randomOf(tier.list)].filter(Boolean).map(x => x);
+  }
+  return [randomOf(tiers[tiers.length - 1].list)];
+}
+
+// ─── Ally targeting ───────────────────────────────────────────────────
+// Heal:
+//   • Always heal enemy Hero with Overheal Shock (kills them).
+//   • Never heal own Hero with Overheal Shock attached.
+//   • Prioritize own Hero/Creature equipped with Lifeforce Howitzer (fresh).
+//   • Else heal own Hero with most missing HP. If all Heroes full → heal
+//     own Creature with lowest HP.
+// Buff:
+//   • Prefer Hero targets; de-prioritize targets that already have the buff.
+//   • Random among top tier.
+
+function pickHealTarget(engine, ownTargets, enemyTargets, cardName, _config) {
+  const gs = engine.gs;
+  // 1) Overheal Shock on enemy Hero → kill shot: always target.
+  for (const t of enemyTargets) {
+    if (t.type !== 'hero') continue;
+    if (heroHasAttachment(engine, t, 'Overheal Shock')) return t;
+  }
+
+  // 2) Skip own Heroes with Overheal Shock attached.
+  const safeOwn = ownTargets.filter(t => {
+    if (t.type === 'hero' && heroHasAttachment(engine, t, 'Overheal Shock')) return false;
+    return true;
+  });
+
+  // 3) Priority: own target equipped with Lifeforce Howitzer that hasn't used effect yet.
+  const lifeforce = safeOwn.filter(t => targetHasFreshLifeforceHowitzer(engine, t));
+  if (lifeforce.length) return randomOf(lifeforce);
+
+  // 4) Most-missing-HP own Hero; else lowest-HP own Creature.
+  const ownHeroes = safeOwn.filter(t => t.type === 'hero').map(t => {
+    const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
+    return { t, missing: (h?.maxHp || 0) - (h?.hp || 0) };
+  }).filter(x => x.missing > 0);
+  if (ownHeroes.length) {
+    ownHeroes.sort((a, b) => b.missing - a.missing);
+    return ownHeroes[0].t;
+  }
+  const ownCreatures = safeOwn.filter(t => t.type === 'creature' || t.type === 'equip').map(t => {
+    const inst = t.cardInstance || findSupportInstance(engine, t);
+    return { t, hp: creatureCurrentHp(engine, inst, t) ?? Infinity };
+  });
+  if (ownCreatures.length) {
+    ownCreatures.sort((a, b) => a.hp - b.hp);
+    return ownCreatures[0].t;
+  }
+  return null;
+}
+
+function pickBuffTarget(engine, ownTargets, cardName) {
+  if (!ownTargets.length) return null;
+  // Prefer Hero targets; de-prioritize targets already carrying the buff
+  // (naive check by card name in their counters).
+  const heroes = ownTargets.filter(t => t.type === 'hero');
+  const creatures = ownTargets.filter(t => t.type !== 'hero');
+  const pool = heroes.length ? heroes : creatures;
+  const withoutBuff = pool.filter(t => !targetHasBuff(engine, t, cardName));
+  const final = withoutBuff.length ? withoutBuff : pool;
+  return randomOf(final);
+}
+
+// ─── Helpers for targeting ────────────────────────────────────────────
+
+function randomOf(arr) {
+  if (!arr?.length) return null;
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function findSupportInstance(engine, t) {
+  if (!t || t.owner == null || t.heroIdx == null || t.slotIdx == null) return null;
+  return engine.cardInstances.find(c =>
+    c.owner === t.owner && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx
+  ) || null;
+}
+
+function creatureCurrentHp(engine, inst, t) {
+  if (inst) {
+    const cd = engine.getEffectiveCardData(inst);
+    if (cd?.hp != null) {
+      const dmg = inst.counters?.damageTaken || 0;
+      return Math.max(0, cd.hp - dmg);
+    }
+  }
+  if (t?.cardName) {
+    const cd = engine._getCardDB()[t.cardName];
+    if (cd?.hp != null) return cd.hp;
+  }
+  return null;
+}
+
+function heroHasAttachment(engine, t, attachmentName) {
+  if (t?.type !== 'hero') return false;
+  const ps = engine.gs.players[t.owner];
+  const zones = ps?.supportZones?.[t.heroIdx] || [];
+  for (const slot of zones) {
+    if ((slot || []).includes(attachmentName)) return true;
+  }
+  return false;
+}
+
+function targetHasFreshLifeforceHowitzer(engine, t) {
+  if (t?.type !== 'hero') return false;
+  const ps = engine.gs.players[t.owner];
+  const zones = ps?.supportZones?.[t.heroIdx] || [];
+  for (let z = 0; z < zones.length; z++) {
+    if (!(zones[z] || []).includes('Lifeforce Howitzer')) continue;
+    const inst = engine.cardInstances.find(c =>
+      c.owner === t.owner && c.zone === 'support' && c.heroIdx === t.heroIdx
+      && c.zoneSlot === z && c.name === 'Lifeforce Howitzer'
+    );
+    // "Fresh" = this-turn effect not used. Lifeforce Howitzer tracks via a
+    // per-turn counter; if not present or not spent this turn, consider fresh.
+    if (!inst) continue;
+    const used = inst.counters?.lifeforceHowitzerUsedTurn;
+    if (used !== engine.gs.turn) return true;
+  }
+  return false;
+}
+
+function targetHasBuff(engine, t, cardName) {
+  if (!cardName) return false;
+  if (t?.type === 'hero') {
+    const h = engine.gs.players[t.owner]?.heroes?.[t.heroIdx];
+    if (h?.buffs && h.buffs[cardName]) return true;
+    if (h?.counters && h.counters[cardName]) return true;
+  }
+  // Creature-side buffs: check instance counters.
+  const inst = t.cardInstance || findSupportInstance(engine, t);
+  if (inst?.counters?.buffs?.[cardName]) return true;
+  return false;
+}
+
+function hasHealableOwnTarget(engine) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const ps = engine.gs.players[cpuIdx];
+  // Any alive hero missing HP?
+  for (const h of (ps?.heroes || [])) {
+    if (h?.name && h.hp > 0 && h.hp < h.maxHp) return true;
+  }
+  // Any own creature missing HP?
+  for (let hi = 0; hi < (ps?.supportZones || []).length; hi++) {
+    for (let zi = 0; zi < (ps.supportZones[hi] || []).length; zi++) {
+      const inst = engine.cardInstances.find(c =>
+        c.owner === cpuIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
+      );
+      if (!inst) continue;
+      const cd = engine.getEffectiveCardData(inst);
+      if (cd?.hp && (inst.counters?.damageTaken || 0) > 0) return true;
+    }
+  }
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  MCTS — 1-ply action evaluator
+//  For each candidate action, run N rollouts (apply → play to turn end
+//  → evaluate → restore). Rank candidates by average score, pick best.
+//  Currently wired into the Action Phase card pick only; expandable to
+//  any decision point.
+// ═══════════════════════════════════════════════════════════════════════
+
+const MCTS_ENABLED = true;
+// Dropped 5 → 3 with the multi-turn rollout extension (opp's full turn is
+// simulated after ours). Per-rollout cost roughly tripled; cutting rollout
+// count by 40% keeps total Action-Phase budget close to pre-extension.
+const MCTS_ROLLOUTS_PER_CANDIDATE = 3;
+// Rollout turn horizon. Number of FULL simulated turns after our current
+// turn's rest-of-play. 0 = no extension. 1 = opp's full turn. 2 = our
+// next full turn too. 3 = opp again. 4 = us again. Each +1 adds ~one
+// full turn of simulated play cost per rollout.
+let _rolloutHorizon = 2;
+function setRolloutHorizon(h) {
+  if (Number.isInteger(h) && h >= 0 && h <= 4) _rolloutHorizon = h;
+}
+function getRolloutHorizon() { return _rolloutHorizon; }
+
+// Rollout policy: controls how the CPU picks Action-Phase candidates
+// when running INSIDE a multi-turn rollout (the recursive runCpuTurn
+// calls for opp's turn and our next turn).
+//   'heuristic' = simple type priority (Creature > Spell > Attack) + level.
+//                 Cheap, fast, but can't see synergies (casts Creature
+//                 before Heal even when OHS is on the enemy).
+//   'evalGreedy' = for each candidate, tentatively apply + evaluate + undo.
+//                  Pick the highest-scoring. Orders of magnitude smarter —
+//                  lets the rollout actually discover combos at the cost
+//                  of O(candidates) extra snapshot/evaluate per decision.
+// A/B validated as 'evalGreedy' (h=2 23.3% WR vs heuristic 3.3% on the
+// Heal Burn / Spell Industrialization matchup).
+let _rolloutBrain = 'evalGreedy';
+function setRolloutBrain(b) {
+  if (b === 'heuristic' || b === 'evalGreedy') _rolloutBrain = b;
+}
+function getRolloutBrain() { return _rolloutBrain; }
+
+// Hard per-decision wall-clock cap. Some combos of decks (e.g. Heal Burn
+// vs Butterflies) produce pathological Action-Phase turns where each
+// rollout plays through long heal/ascension chains — without this cap a
+// single decision could run for minutes while the watchdog sees gs.turn
+// unchanged and never aborts. On timeout, mctsRankCandidates returns the
+// best-scored candidates so far (or falls back to heuristic if none).
+const MCTS_RANK_BUDGET_MS = 10000;
+// UCB1 total-pull cap per decision. Hard ceiling on how many rollouts a
+// single decision can burn; typically cut short by the wall-clock budget.
+const MCTS_UCB1_TOTAL_PULLS = 80;
+// UCB1 exploration constant. √2 is the textbook default. Higher = more
+// exploration (visit undervisited arms), lower = more exploitation.
+const MCTS_UCB1_EXPLORE_C = 1.414;
+// Late-game bypass: past this turn count, skip MCTS and fall through to the
+// heuristic sort / direct activation. Normal games end well under turn 50;
+// matches that pass turn 80 are almost always attritional stalls (Heal Burn
+// vs Lightning Caller, etc.) where MCTS's snapshot storm outruns GC before
+// its marginal decision quality gets to matter.
+const MCTS_LATE_GAME_TURN_THRESHOLD = 80;
+
+// Scalar evaluation of a game state from the CPU's perspective. Higher is
+// better for the CPU. Feature weights are educated guesses — tune after
+// playing games with MCTS active and observing where the brain under- or
+// over-values things.
+// ─── Threat weighting for enemy heroes ────────────────────────────────────
+// The base evaluator treats all enemy HP uniformly, so different enemy
+// targets tie whenever the damage dealt is equal. We weight enemy HP by a
+// threat multiplier that combines two signals:
+//   (a) Spell-school presence — hard-coded set of ability names below,
+//       since being a "caster" is a structural property of ability TYPE.
+//   (b) Support-kit yield — inferred dynamically from each script's
+//       `supportYield(level)` (abilities) or `supportYield()` (heroes).
+//       Cards self-declare the draws / potion-draws / gold they generate
+//       per turn; the CPU sums them into a single "support units" score
+//       with potion draw worth 3× a regular draw and gold discounted.
+const SPELL_SCHOOL_ABILITIES = new Set([
+  'Destruction Magic', 'Decay Magic', 'Magic Arts', 'Support Magic', 'Summoning Magic',
+]);
+
+// Weightings for combining a hero's declared supportYield into one number.
+// Matches the user-specified rule "potion draw = 3 regular draws"; the gold
+// weight approximates a typical cheap spell costing ~4 gold (so 4 gold ≈ 1
+// draw worth of support). Damage is surfaced separately (see
+// mctsHeroSupportDetails) because damage supporters get a dedicated threat
+// bonus instead of flowing through the generic support-units weight.
+const SUPPORT_UNIT_WEIGHTS = { draws: 1.0, potionDraws: 3.0, gold: 0.25 };
+
+// Read supportYield from each stacked Ability (called with `(level, ctx)`)
+// and from the hero's own card script (called with `(ctx)`). Returns the
+// per-turn support breakdown: `supportUnits` for draws/potions/gold, and
+// `damagePerTurn` for damage-supporter assessment (separate threat track).
+// ctx gives scripts access to the engine so their yields can scale with
+// current board state (creature counts, poison stacks, atk deltas, etc.).
+function mctsHeroSupportDetails(engine, pi, hi) {
+  const ps = engine.gs.players[pi];
+  const hero = ps?.heroes?.[hi];
+  if (!hero?.name || hero.hp <= 0) return { supportUnits: 0, damagePerTurn: 0 };
+  let draws = 0, potionDraws = 0, gold = 0, damage = 0;
+  const ctx = { engine, pi, hi, cpuIdx: engine._cpuPlayerIdx };
+  const apply = (y) => {
+    if (!y) return;
+    draws += y.drawsPerTurn || 0;
+    potionDraws += y.potionDrawsPerTurn || 0;
+    gold += y.goldPerTurn || 0;
+    damage += y.damagePerTurn || 0;
+  };
+  const abZones = ps.abilityZones?.[hi] || [];
+  for (const slot of abZones) {
+    if (!slot || slot.length === 0) continue;
+    const script = loadCardEffect(slot[0]);
+    if (typeof script?.supportYield !== 'function') continue;
+    try { apply(script.supportYield(slot.length, ctx)); } catch {}
+  }
+  const heroScript = loadCardEffect(hero.name);
+  if (typeof heroScript?.supportYield === 'function') {
+    try { apply(heroScript.supportYield(ctx)); } catch {}
+  }
+  const supportUnits =
+    SUPPORT_UNIT_WEIGHTS.draws * draws +
+    SUPPORT_UNIT_WEIGHTS.potionDraws * potionDraws +
+    SUPPORT_UNIT_WEIGHTS.gold * gold;
+  return { supportUnits, damagePerTurn: damage };
+}
+
+// Highest Spell-School ability level on pi's live team. Used to identify
+// which hero is "the team's main spellcaster" — higher threat than a
+// secondary spellcaster with the same spell-school ability at the same level.
+function mctsTeamMaxSchoolLvl(gs, pi) {
+  const ps = gs.players[pi];
+  if (!ps) return 0;
+  let topLvl = 0;
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    const abZones = ps.abilityZones?.[hi] || [];
+    for (const slot of abZones) {
+      if (!slot || slot.length === 0) continue;
+      if (SPELL_SCHOOL_ABILITIES.has(slot[0])) {
+        if (slot.length > topLvl) topLvl = slot.length;
+      }
+    }
+  }
+  return topLvl;
+}
+
+// Threat multiplier on a single enemy hero's HP. Base is 1.0. Layered:
+//   +0.5   Spell-School Ability at level ≥ 2 (established caster)
+//   +0.5   their top spell-school level ties the team's top (main carry)
+//   +0.25 × support units (draws/potions/gold, from supportYield)
+//   +1.2   flat bonus if the hero is a damage supporter (damagePerTurn > 0),
+//          +0.01 per damage point (capped at +1.5) — by user spec damage
+//          supporters outrank even main carries
+//   +0.3 × each full 20 atk over 120 — large-stick heroes are a scaling
+//          threat on their own attack actions, independent of kit
+function mctsEnemyHeroThreat(engine, oppIdx, hi, teamMaxSchoolLvl) {
+  const gs = engine.gs;
+  const ps = gs.players[oppIdx];
+  const hero = ps?.heroes?.[hi];
+  if (!hero?.name || hero.hp <= 0) return 1.0;
+  const abZones = ps.abilityZones?.[hi] || [];
+  let myMaxSchoolLvl = 0;
+  for (const slot of abZones) {
+    if (!slot || slot.length === 0) continue;
+    if (SPELL_SCHOOL_ABILITIES.has(slot[0]) && slot.length > myMaxSchoolLvl) {
+      myMaxSchoolLvl = slot.length;
+    }
+  }
+  let threat = 1.0;
+  if (myMaxSchoolLvl >= 2) threat += 0.5;
+  if (myMaxSchoolLvl >= 2 && myMaxSchoolLvl === teamMaxSchoolLvl) threat += 0.5;
+
+  const { supportUnits, damagePerTurn } = mctsHeroSupportDetails(engine, oppIdx, hi);
+  threat += 0.25 * supportUnits;
+  if (damagePerTurn > 0) {
+    threat += 1.2 + Math.min(1.5, 0.01 * damagePerTurn);
+  }
+
+  // High-attack heroes are dangerous on their Attack cards; +0.3 per 20 atk
+  // step past 120. Stepwise so atk 139 and 140 cleanly differ.
+  const atk = hero.atk || 0;
+  if (atk > 120) {
+    threat += Math.floor((atk - 120) / 20) * 0.3;
+  }
+  return threat;
+}
+
+function evaluateState(engine, cpuIdx) {
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  const oppIdx = cpuIdx === 0 ? 1 : 0;
+  const opp = gs.players[oppIdx];
+  if (!ps || !opp) return 0;
+
+  // Game end: terminal ±value.
+  if (gs.result) {
+    if (gs.result.winnerIdx === cpuIdx) return 100000;
+    return -100000;
+  }
+
+  let score = 0;
+
+  // Hero HP deltas. Own HP counts raw; opp HP is threat-weighted so damage
+  // to a carry/supporter breaks ties over damage to a plain bruiser.
+  let ownHp = 0;
+  for (const h of (ps.heroes || [])) if (h?.name && h.hp > 0) ownHp += h.hp;
+
+  const oppTeamMaxSchoolLvl = mctsTeamMaxSchoolLvl(gs, oppIdx);
+  let oppWeightedHp = 0;
+  let minOppHp = Infinity;
+  for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
+    const h = opp.heroes[hi];
+    if (!h?.name || h.hp <= 0) continue;
+    const threat = mctsEnemyHeroThreat(engine, oppIdx, hi, oppTeamMaxSchoolLvl);
+    oppWeightedHp += h.hp * threat;
+    if (h.hp < minOppHp) minOppHp = h.hp;
+  }
+  score += ownHp - oppWeightedHp;
+
+  // Final tiebreaker: focus-fire the enemy hero with the lowest current HP.
+  // Reducing minOppHp raises score, so among targets that deal the same
+  // weighted damage, the low-HP enemy wins — consistent focus across turns.
+  // Weight kept small so it doesn't overwhelm threat or board-state terms.
+  if (minOppHp !== Infinity) score -= 0.3 * minOppHp;
+
+  // Killed-hero swing — huge, because losing a hero is close to losing.
+  for (const h of (ps.heroes || [])) if (h?.name && h.hp <= 0) score -= 500;
+  for (const h of (opp.heroes || [])) if (h?.name && h.hp <= 0) score += 500;
+
+  // Support zone occupancy (creatures + equips). Own side good, enemy bad.
+  let ownSup = 0, oppSup = 0;
+  for (let hi = 0; hi < 3; hi++) {
+    for (let z = 0; z < 3; z++) {
+      if ((ps.supportZones?.[hi]?.[z] || []).length > 0) ownSup++;
+      if ((opp.supportZones?.[hi]?.[z] || []).length > 0) oppSup++;
+    }
+  }
+  score += 30 * (ownSup - oppSup);
+
+  // Ability totals — cumulative stacked abilities matter more than fresh ones.
+  let ownAb = 0, oppAb = 0;
+  for (let hi = 0; hi < 3; hi++) {
+    for (let z = 0; z < 3; z++) {
+      ownAb += (ps.abilityZones?.[hi]?.[z] || []).length;
+      oppAb += (opp.abilityZones?.[hi]?.[z] || []).length;
+    }
+  }
+  score += 15 * (ownAb - oppAb);
+
+  // Hand + gold as resource proxies.
+  // Hand-size differential. Each extra card is worth ~20 eval — covers
+  // the "drew two but that doesn't move the MCTS gate" problem on cards
+  // like Wheels. A drawn card is a FUTURE play option; undervaluing at
+  // 10/card makes the evaluator treat 10 gold spent on +2 cards as
+  // roughly neutral (gold differential is 2× per gold, so −20 from gold
+  // cost cancelled the +20 hand gain at 10/card). At 20/card, +2 cards
+  // (+40) clearly beats the 10-gold cost (−20), so the MCTS gate
+  // approves Wheels instead of rejecting it as zero-value.
+  score += 20 * ((ps.hand?.length || 0) - (opp.hand?.length || 0));
+  score += 2 * ((ps.gold || 0) - (opp.gold || 0));
+
+  // Opponent-turn lookahead via status damage anticipation. Burn/poison
+  // stacks on a living hero will tick on the respective owner's next turn;
+  // bake that expected damage into the score now so MCTS sees "my 40 HP
+  // hero with 2 burn stacks is effectively dead" and "their low-HP burn'd
+  // hero is worth leaving alone for the poison to finish". Pending kill
+  // = full kill-swing; pending non-lethal = ~0.5× expected HP loss.
+  const STATUS_DMG_PER_STACK = 30; // baseline; matches Medea's 30-per-stack doubling
+  for (const h of (ps.heroes || [])) {
+    if (!h?.name || h.hp <= 0) continue;
+    const stacks = (h.statuses?.burn || 0) + (h.statuses?.poison || 0);
+    if (stacks <= 0) continue;
+    const dmg = STATUS_DMG_PER_STACK * stacks;
+    if (dmg >= h.hp) score -= 400; // anticipated kill — treat near-death as crisis
+    else score -= 0.5 * dmg;
+  }
+  for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
+    const h = opp.heroes[hi];
+    if (!h?.name || h.hp <= 0) continue;
+    const stacks = (h.statuses?.burn || 0) + (h.statuses?.poison || 0);
+    if (stacks <= 0) continue;
+    const dmg = STATUS_DMG_PER_STACK * stacks;
+    if (dmg >= h.hp) score += 400; // anticipated kill
+    else {
+      const threat = mctsEnemyHeroThreat(engine, oppIdx, hi, oppTeamMaxSchoolLvl);
+      score += 0.5 * dmg * threat;
+    }
+  }
+
+  // Opponent-turn attack anticipation. The opp's highest-atk living,
+  // un-CC'd hero is a proxy for their next-turn damage output — assume one
+  // of their Attack cards scales with that stat and lands on the CPU's
+  // most vulnerable hero. This is the "my 40-HP hero dies next turn to
+  // their 180-atk bruiser" signal that status-anticipation alone misses.
+  // Deliberately conservative: we don't peek at their hand, we don't
+  // try to simulate their whole turn; one atk-worth of pressure per turn.
+  let oppMaxAtk = 0;
+  for (const h of (opp.heroes || [])) {
+    if (!h?.name || h.hp <= 0) continue;
+    if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.negated) continue;
+    const a = h.atk || 0;
+    if (a > oppMaxAtk) oppMaxAtk = a;
+  }
+  if (oppMaxAtk > 0) {
+    // Effective HP of our weakest hero — Immortal floors at 1 since the
+    // buff expires before the opp can actually attack, but it still buys
+    // a turn of survival in some corner cases.
+    let weakestOwnHp = Infinity;
+    for (const h of (ps.heroes || [])) {
+      if (!h?.name || h.hp <= 0) continue;
+      if (h.hp < weakestOwnHp) weakestOwnHp = h.hp;
+    }
+    if (weakestOwnHp !== Infinity) {
+      if (oppMaxAtk >= weakestOwnHp) score -= 400; // anticipated kill next turn
+      else score -= 0.4 * oppMaxAtk;                // expected chip damage
+    }
+  }
+
+  // Ascension progress. When a hero becomes ascensionReady, the next hand
+  // ascension play flips them into a far stronger form — credit this both
+  // at the incremental-progress level (so MCTS can see "equipping the Sword
+  // moved me from 0.0 → 0.5") and as a jump when fully ready. Symmetric
+  // penalty for opponent progress. Uses each hero's script-declared
+  // ascensionProgress(engine, pi, hi) → 0..1 when available.
+  const scoreAscension = (ownerIdx, sign) => {
+    const pss = gs.players[ownerIdx];
+    if (!pss) return;
+    for (let hi = 0; hi < (pss.heroes || []).length; hi++) {
+      const h = pss.heroes[hi];
+      if (!h?.name || h.hp <= 0) continue;
+      if (h.ascensionReady) { score += sign * 300; continue; }
+      const script = loadCardEffect(h.name);
+      if (typeof script?.ascensionProgress !== 'function') continue;
+      try {
+        const p = script.ascensionProgress(engine, ownerIdx, hi) || 0;
+        if (p > 0) score += sign * 250 * p;
+      } catch {}
+    }
+  };
+  scoreAscension(cpuIdx, +1);
+  scoreAscension(oppIdx, -1);
+
+  // ── Cardinal Beasts alt win condition ──
+  // All 4 Cardinal Beasts on your Support Zones = instant win. Reward
+  // progress aggressively so MCTS rollouts + candidate scoring steer
+  // decks like Dance of the Butterflies toward assembly rather than
+  // playing for HP-based victories they can't actually win.
+  //   - Per beast on board: +250 (comparable to ascension-ready bonus)
+  //   - Bonus for having 3 on board (one more = win): +500
+  //   - All 4 on board: +100000 (terminal-value equivalent to game win)
+  //   - Each accessible beast (hand/deck, not yet on board): +40
+  //   - Can-potentially-complete bonus (all 4 reachable): +400
+  // Symmetric penalty when the opponent is progressing.
+  const CARDINAL_BEAST_NAMES = [
+    'Cardinal Beast Baihu',
+    'Cardinal Beast Qinglong',
+    'Cardinal Beast Xuanwu',
+    'Cardinal Beast Zhuque',
+  ];
+  const scoreCardinalBeasts = (pi) => {
+    const pss = gs.players[pi];
+    if (!pss) return 0;
+    const onBoard = new Set();
+    for (let hi = 0; hi < (pss.heroes || []).length; hi++) {
+      for (let zi = 0; zi < (pss.supportZones?.[hi] || []).length; zi++) {
+        const slot = (pss.supportZones[hi] || [])[zi] || [];
+        if (slot.length > 0 && CARDINAL_BEAST_NAMES.includes(slot[0])) {
+          onBoard.add(slot[0]);
+        }
+      }
+    }
+    if (onBoard.size >= 4) return 100000;
+    const pool = [...(pss.hand || []), ...(pss.mainDeck || [])];
+    const accessible = new Set();
+    for (const n of CARDINAL_BEAST_NAMES) {
+      if (onBoard.has(n)) continue;
+      if (pool.includes(n)) accessible.add(n);
+    }
+    let s = onBoard.size * 250 + accessible.size * 40;
+    if (onBoard.size === 3) s += 500; // one away from the win
+    if (onBoard.size + accessible.size === 4) s += 400; // complete set reachable
+    return s;
+  };
+  score += scoreCardinalBeasts(cpuIdx);
+  score -= scoreCardinalBeasts(oppIdx);
+
+  return score;
+}
+
+// Dispatches an Action-Phase candidate to the right helper. Returns true
+// if the play actually shrank the CPU's hand (a real play occurred).
+async function applyActionCandidate(engine, helpers, candidate) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const handBefore = engine.gs.players[cpuIdx].hand.length;
+  const { cardName, cardType, handIdx, heroIdx } = candidate;
+  if (cardType === 'AbilityAction') {
+    // Ability-action activation during rollout. Track HOPT claim as the
+    // "did this fire" signal since hand won't shrink.
+    const hoptKey = `ability-action:${candidate.abilityName}:${cpuIdx}`;
+    const hoptBefore = engine.gs.hoptUsed?.[hoptKey];
+    await helpers.doActivateAbility(helpers.room, cpuIdx, {
+      heroIdx, zoneIdx: candidate.zoneIdx,
+    });
+    return engine.gs.hoptUsed?.[hoptKey] === engine.gs.turn && hoptBefore !== engine.gs.turn;
+  }
+  if (cardType === 'Creature') {
+    // Prefer the pre-chosen zone from candidate enumeration; fall back to
+    // the heuristic picker if the candidate didn't specify one (legacy /
+    // non-Action-Phase caller) or the chosen slot is no longer free.
+    let zoneSlot = candidate.zoneSlot;
+    const ps2 = engine.gs.players[cpuIdx];
+    const slotTaken = zoneSlot != null
+      && (((ps2.supportZones?.[heroIdx] || [])[zoneSlot] || []).length > 0);
+    if (zoneSlot == null || zoneSlot < 0 || slotTaken) {
+      zoneSlot = pickCreatureZoneSlot(engine, cpuIdx, heroIdx);
+    }
+    if (zoneSlot < 0) return false;
+    await helpers.doPlayCreature(helpers.room, cpuIdx, {
+      cardName, handIndex: handIdx, heroIdx, zoneSlot,
+    });
+  } else if (cardType === 'Spell' || cardType === 'Attack') {
+    await helpers.doPlaySpell(helpers.room, cpuIdx, {
+      cardName, handIndex: handIdx, heroIdx,
+    });
+  } else {
+    return false;
+  }
+  return engine.gs.players[cpuIdx].hand.length < handBefore;
+}
+
+// Plays out the rest of the CPU's turn after a candidate action. Advances
+// through the End Phase so onTurnEnd hooks fire (Ghuanjun removing self-
+// Immortal, timed buffs cleaning up, expiring effects, etc.) — evaluating
+// before those fire systematically overvalues self-buffs that clean up
+// at end-of-turn. Stops before switchTurn: the human's turn is not modeled.
+async function rolloutRestOfTurn(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  // If phase is still Action (combo mechanics held it open), advance once.
+  if (engine.gs.currentPhase === 3) {
+    try { await engine.advancePhase(cpuIdx); } catch {}
+  }
+  // Play Main Phase 2 if we're there. runMainPhase is idempotent — it
+  // stops when no further progress can be made.
+  if (engine.gs.currentPhase === 4) {
+    try { await runMainPhase(engine, helpers); } catch (err) {
+      // Swallow — evaluator scores the partial state.
+      cpuLog(`  [MCTS] rollout runMainPhase threw:`, err.message);
+    }
+  }
+  // tryAscend runs as the last Main-2 action — include it for accurate eval.
+  try { await tryAscend(engine, helpers); } catch {}
+  // Advance Main2 → End so onTurnEnd hooks fire. This is the key difference
+  // between "what the board looks like at end of Main 2" and "what the
+  // opponent will actually see" — timed self-buffs (e.g. Ghuanjun Immortal)
+  // are explicitly cleaned up here, so MCTS stops rewarding them.
+  if (engine.gs.currentPhase === 4) {
+    try { await engine.advancePhase(cpuIdx); } catch {}
+  }
+  // ── Opp-upkeep sim ─────────────────────────────────────────────────────
+  // Extend rollout past End Phase into the opponent's Start + Resource
+  // phases. Their status-damage ticks, onTurnStart hooks, draws, and
+  // resource gain all fire now — so the evaluator sees the REAL post-turn
+  // state rather than an approximation.
+  if (engine.gs.currentPhase === 5 && engine.gs.activePlayer === cpuIdx && !engine.gs.result) {
+    try { await engine.advancePhase(cpuIdx); } catch {}
+    // After advancePhase from End, switchTurn fires and activePlayer flips.
+    // Bounded loop: advance up to a handful of times until we reach opp's
+    // Main 1 (phase 2) or the game ends. A couple of phases are typically
+    // auto-advanced by the engine; this covers any manual steps left over.
+    let guard = 6;
+    while (guard-- > 0) {
+      if (engine.gs.result) break;
+      if (engine.gs.activePlayer === cpuIdx) break; // defensive: back to us
+      if (engine.gs.currentPhase >= 2) break; // reached opp Main 1
+      try { await engine.advancePhase(engine.gs.activePlayer); } catch { break; }
+    }
+  }
+
+  // ── Multi-turn simulation loop (horizon 1..4) ──────────────────────────
+  // Each iteration simulates ONE full turn. After each runCpuTurn, the
+  // engine's End→switchTurn→auto-advance cascade parks us in the NEXT
+  // player's Main 1. Flip `_cpuPlayerIdx` to the current active player
+  // each iteration so the brain plays for the right side. `_inMctsSim`
+  // is true throughout → nested MCTS short-circuits to heuristic/eval-
+  // greedy depending on _rolloutBrain.
+  const savedCpuIdx = engine._cpuPlayerIdx;
+  try {
+    for (let t = 1; t <= _rolloutHorizon; t++) {
+      if (engine.gs.result) break;
+      if (engine.gs.currentPhase !== 2) break; // not in Main 1, can't invoke
+      engine._cpuPlayerIdx = engine.gs.activePlayer;
+      try {
+        await runCpuTurn(engine, helpers);
+      } catch (err) {
+        cpuLog(`  [MCTS] horizon turn ${t} (pi=${engine._cpuPlayerIdx}) sim threw:`, err.message);
+        // Don't break — next turn might still run fine. Evaluator scores
+        // the partial state at the end.
+      }
+    }
+  } finally {
+    engine._cpuPlayerIdx = savedCpuIdx;
+  }
+}
+
+// One rollout of a candidate with an optional scripted target plan. Returns
+// { score, record, completed }. Record is only populated when requested.
+async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, record = false } = {}) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const snap = engine.snapshot();
+  // Mark "inside MCTS sim" so the engine's CPU driver (fired by switchTurn
+  // during opp-upkeep advances) doesn't recurse into the opp's brain. This
+  // is separate from _fastMode — self-play games run with _fastMode=true
+  // end-to-end, so we can't use that flag as the "don't invoke driver"
+  // signal any more.
+  const prevInSim = engine._inMctsSim;
+  engine._inMctsSim = true;
+  engine.enterFastMode();
+  engine._mctsTargetPlan = plan ? [...plan] : null;
+  const recordBuf = record ? [] : null;
+  if (recordBuf) engine._mctsTargetRecord = recordBuf;
+  // Save+restore _cpuLogSilent rather than blindly setting it to false at
+  // the end — nested rollouts (e.g. a Main-Phase gate fired inside an
+  // outer Action-Phase rollout) would otherwise unsilence the outer scope
+  // halfway through and spam stdout for the rest of the outer rollout.
+  const prevSilent = _cpuLogSilent;
+  _cpuLogSilent = true;
+  let score = -Infinity;
+  let completed = false;
+  try {
+    const applied = await applyActionCandidate(engine, helpers, candidate);
+    if (applied) await rolloutRestOfTurn(engine, helpers);
+    score = evaluateState(engine, cpuIdx);
+    completed = true;
+  } catch (err) {
+    _cpuLogSilent = prevSilent;
+    cpuLog(`  [MCTS] rollout threw on "${candidate.cardName}":`, err.message);
+    _cpuLogSilent = true;
+  } finally {
+    delete engine._mctsTargetPlan;
+    if (recordBuf) delete engine._mctsTargetRecord;
+    engine.exitFastMode();
+    engine.restore(snap);
+    engine._inMctsSim = prevInSim;
+    _cpuLogSilent = prevSilent;
+  }
+  return { score, record: recordBuf || [], completed };
+}
+
+// Gate a Main-Phase activation through MCTS-style evaluation. The caller
+// passes an actionFn that performs the activation via helpers.doXxx. We:
+//   1. Snapshot + fast-mode execute it once (recon), recording any CPU
+//      prompts along the way; score the resulting state.
+//   2. Compare against the "skip" score (don't do the activation at all).
+//   3. If a prompt branched (≥2 alternatives), re-run the action per
+//      alternative via a scripted plan, scoring each.
+//   4. Pick the best-scoring variation. Commit it for real ONLY if it
+//      beats the skip score by MCTS_ACTIVATION_GATE_THRESHOLD — otherwise
+//      leave state untouched and return false.
+//
+// Returns true if the action was committed for real, false if skipped.
+// Used by every Main-Phase sub-function so useless/net-negative
+// activations (Cool Fridge to a random hero, artifact-with-nothing-to-do)
+// get filtered out before firing.
+const MCTS_ACTIVATION_GATE_THRESHOLD = 3;
+
+// How many distinct branchable prompts to explore per recon. Each branchable
+// prompt contributes its own set of variations (one per alternative pick),
+// additively — NOT a Cartesian product, so cost scales linearly with branch
+// count rather than exponentially. 2 covers most real spells (damage spell
+// with two sequential target prompts, zonePick + cardGallery, etc.).
+const MCTS_MAX_BRANCHES_PER_RECON = 2;
+// Cap alternatives we score at any single branch. Prevents combinatorial
+// blowup on "pick a hero from 6 enemies" style prompts.
+const MCTS_MAX_ALTS_PER_BRANCH = 6;
+
+// Turn a recorded prompt sequence into a list of plan variations. Each
+// variation is `{ plan, label }`: plan is an array consumed by the target/
+// generic override (null = heuristic placeholder, entries = scripted pick).
+// We walk the record finding up to `maxBranches` branchable prompts with
+// ≥2 alternatives each; for each, we emit one variation per non-heuristic
+// alternative at that single position (other positions get null). Because
+// variations are independent (one scripted slot at a time), explored cost
+// is O(sum of alternatives), not O(product).
+function mctsBuildVariationsFromRecord(record, { maxBranches = MCTS_MAX_BRANCHES_PER_RECON, maxAltsPerBranch = MCTS_MAX_ALTS_PER_BRANCH } = {}) {
+  const variations = [];
+  let branchesFound = 0;
+  for (let i = 0; i < record.length; i++) {
+    if (branchesFound >= maxBranches) break;
+    const r = record[i];
+    if (r.wasScripted) continue;
+    const isTarget = r.kind === 'target' && (r.validTargets || []).length >= 2;
+    // >= 1 (not >= 2): for confirm prompts, the heuristic default is
+    // decline (null) and the only meaningful alternative is confirm.
+    // The emission loop below filters out alternatives matching the
+    // heuristic pick, so a 1-alt case with a mismatching alt still
+    // produces one variation; a matching 1-alt case produces none.
+    const isGeneric = r.kind && r.kind.startsWith('generic:') && (r.alternatives || []).length >= 1;
+    if (!isTarget && !isGeneric) continue;
+    branchesFound++;
+    const heuristicKey = JSON.stringify(r.picked);
+    const emitted = [];
+    if (isTarget) {
+      // ── Single-identity alternatives: pick just one different target ──
+      for (const alt of r.validTargets) {
+        if (emitted.length >= maxAltsPerBranch) break;
+        const entry = { kind: 'target', ids: [alt.id] };
+        if (JSON.stringify(entry.ids) === heuristicKey) continue;
+        const plan = new Array(i).fill(null);
+        plan.push(entry);
+        const label = `#${i} target=${alt.name || alt.id}` + (alt.owner != null ? ` (p${alt.owner})` : '');
+        variations.push({ plan, label });
+        emitted.push(alt);
+      }
+      // ── Subset-size variations (Pyroblast / Beer-style multi-select) ──
+      // When the prompt allows >1 targets and the heuristic actually picked
+      // multiple, also try SMALLER subset sizes of the same ordered picks.
+      // Useful when per-target costs (Beer's 4g each) make fewer picks
+      // score better, or when a Pollution-placing spell would clog zones.
+      const heuristicIds = Array.isArray(r.picked) ? r.picked : [];
+      const maxSel = r.maxSelect || 1;
+      if (maxSel > 1 && heuristicIds.length > 1) {
+        for (let k = heuristicIds.length - 1; k >= 1; k--) {
+          const subsetIds = heuristicIds.slice(0, k);
+          const entry = { kind: 'target', ids: subsetIds };
+          if (JSON.stringify(subsetIds) === heuristicKey) continue;
+          const plan = new Array(i).fill(null);
+          plan.push(entry);
+          variations.push({ plan, label: `#${i} top-${k} of ${heuristicIds.length}` });
+        }
+      }
+    } else {
+      for (const alt of r.alternatives) {
+        if (emitted.length >= maxAltsPerBranch) break;
+        const entry = { kind: r.kind, value: alt.value };
+        if (JSON.stringify(entry.value) === heuristicKey) continue;
+        const plan = new Array(i).fill(null);
+        plan.push(entry);
+        variations.push({ plan, label: `#${i} ${alt.label}` });
+        emitted.push(alt);
+      }
+    }
+  }
+  return variations;
+}
+
+async function mctsGatedActivation(engine, helpers, desc, actionFn, opts = {}) {
+  // ── Per-card opt-out ──
+  // Some utility cards (search, mulligan, card-draw) are strictly better
+  // than skipping but produce ~0 immediate evaluator delta, so the gate
+  // mistakenly rejects them. Authors can set `cpuSkipMctsGate: true` on
+  // the card script to bypass the gate entirely — the CPU will always
+  // fire the action when it reaches this point (i.e. when the earlier
+  // playability checks already said it's legal and useful).
+  if (opts.cardName) {
+    const script = loadCardEffect(opts.cardName);
+    if (script?.cpuSkipMctsGate) {
+      try { await actionFn(); return true; }
+      catch { return false; }
+    }
+  }
+
+  // ── Nested-rollout / late-game short-circuit ──
+  // Skip the gate when we're already inside an MCTS simulation — running
+  // another full recon+variation per gated activation compounds cost
+  // exponentially. The signal is `_inMctsSim`, not `_fastMode`; the
+  // latter also fires for whole-game self-play, which would disable the
+  // gate everywhere and never invoke the evaluator's synergy terms.
+  // Also bypass past MCTS_LATE_GAME_TURN_THRESHOLD — long stalls OOM
+  // before the gate's marginal filter value matters.
+  if (engine._inMctsSim || (engine.gs?.turn || 0) >= MCTS_LATE_GAME_TURN_THRESHOLD) {
+    try { await actionFn(); return true; }
+    catch { return false; }
+  }
+
+  const cpuIdx = engine._cpuPlayerIdx;
+  const skipScore = evaluateState(engine, cpuIdx);
+
+  // ── Recon rollout ──
+  const snap = engine.snapshot();
+  const prevInSim = engine._inMctsSim;
+  engine._inMctsSim = true;
+  engine.enterFastMode();
+  engine._mctsTargetRecord = [];
+  // Save+restore the silence flag so a nested gate (this one being called
+  // FROM inside an outer rollout's runMainPhase) doesn't unsilence the
+  // outer scope. See mctsRunOneRollout for the same pattern.
+  const prevSilent = _cpuLogSilent;
+  _cpuLogSilent = true;
+  let reconScore = -Infinity;
+  let reconCompleted = false;
+  try {
+    await actionFn();
+    reconScore = evaluateState(engine, cpuIdx);
+    reconCompleted = true;
+  } catch (err) {
+    // Action threw during recon — treat as unable-to-activate.
+  }
+  const record = engine._mctsTargetRecord || [];
+  delete engine._mctsTargetRecord;
+  _cpuLogSilent = prevSilent;
+  engine.exitFastMode();
+  engine.restore(snap);
+  engine._inMctsSim = prevInSim;
+
+  if (!reconCompleted) return false;
+
+  const variations = [{ plan: null, label: '(heuristic)', score: reconScore }];
+
+  // Enumerate variations across multiple branchable prompts (first
+  // MCTS_MAX_BRANCHES_PER_RECON non-scripted prompts with ≥2 alternatives).
+  const extras = mctsBuildVariationsFromRecord(record);
+  for (const v of extras) variations.push({ plan: v.plan, label: v.label, score: -Infinity });
+
+  if (extras.length > 0) {
+    for (const variation of variations) {
+      if (variation.plan === null) continue;
+      const snap2 = engine.snapshot();
+      const prevInSim2 = engine._inMctsSim;
+      engine._inMctsSim = true;
+      engine.enterFastMode();
+      engine._mctsTargetPlan = [...variation.plan];
+      const prevSilent2 = _cpuLogSilent;
+      _cpuLogSilent = true;
+      try {
+        await actionFn();
+        variation.score = evaluateState(engine, cpuIdx);
+      } catch {}
+      delete engine._mctsTargetPlan;
+      _cpuLogSilent = prevSilent2;
+      engine.exitFastMode();
+      engine.restore(snap2);
+      engine._inMctsSim = prevInSim2;
+    }
+  }
+
+  variations.sort((a, b) => b.score - a.score);
+  const best = variations[0];
+  const beats = best.score > skipScore + MCTS_ACTIVATION_GATE_THRESHOLD;
+  cpuLog(`      [gate] ${desc}: skip=${skipScore.toFixed(1)} best=${best.score.toFixed(1)} via ${best.label} → ${beats ? 'COMMIT' : 'SKIP'}`);
+
+  if (!beats) return false;
+
+  if (best.plan) engine._mctsTargetPlan = [...best.plan];
+  try {
+    await actionFn();
+  } finally {
+    delete engine._mctsTargetPlan;
+  }
+  return true;
+}
+
+// Evaluator-greedy candidate ranking, used as the in-rollout brain when
+// `_rolloutBrain === 'evalGreedy'`. For each candidate:
+//   snapshot → apply → evaluate → restore
+// Then sort by post-apply score. This is the action-selection equivalent
+// of "look one move ahead with the evaluator" — expensive (O(candidates)
+// snapshots per decision), but lets recursive rollouts actually discover
+// synergies (e.g. Heal triggering OHS for damage) which the pure-heuristic
+// type/level sort misses. Must be called with `_inMctsSim` already true
+// so nested MCTS short-circuits stay in place.
+async function rankCandidatesEvalGreedy(engine, helpers, candidates) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const scored = [];
+  for (const cand of candidates) {
+    const snap = engine.snapshot();
+    let score = -Infinity;
+    try {
+      const applied = await applyActionCandidate(engine, helpers, cand);
+      if (applied) score = evaluateState(engine, cpuIdx);
+    } catch {
+      // Throwing candidates are scored -Infinity → sorted last.
+    } finally {
+      engine.restore(snap);
+    }
+    scored.push({ cand, score });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map(s => s.cand);
+}
+
+// Rank candidates by MCTS with target enumeration. For each candidate:
+//   1. Recon rollout (heuristic targeting) — records all CPU target prompts.
+//   2. Identify the first non-cancellable prompt with ≥2 valid targets.
+//   3. Enumerate alternative targets as variations (plus the heuristic default).
+//   4. Run N rollouts per variation; average the scores.
+//   5. Return candidates sorted by best variation score, each decorated with
+//      a scriptedTargetPlan that the real play should follow.
+async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_ROLLOUTS_PER_CANDIDATE) {
+  // ── Nested-MCTS / late-game short-circuit ──
+  // Skip MCTS inside an outer rollout (nested simulations explode the cost
+  // of a single rollout exponentially). The correct signal is `_inMctsSim`,
+  // set only while simulating; `_fastMode` alone also fires for whole-game
+  // self-play, which would disable MCTS everywhere and defeat the point.
+  // Also skip past MCTS_LATE_GAME_TURN_THRESHOLD — at that point the match
+  // is stalling and snapshot pressure is the actual risk.
+  if (engine._inMctsSim || (engine.gs?.turn || 0) >= MCTS_LATE_GAME_TURN_THRESHOLD) {
+    // Inside rollouts: rank candidates per the configured rollout brain.
+    // evalGreedy: try each, score post-apply, pick highest (lets rollouts
+    // discover synergies). Late-game bypass uses heuristic regardless —
+    // it's explicitly the "stop thinking" cheap path.
+    if (engine._inMctsSim && _rolloutBrain === 'evalGreedy') {
+      return await rankCandidatesEvalGreedy(engine, helpers, candidates);
+    }
+    const sorted = [...candidates].sort((a, b) =>
+      (b.level - a.level) || (b.typeScore - a.typeScore));
+    return sorted;
+  }
+
+  const t0 = Date.now();
+  let totalRollouts = 0;
+  let budgetExceeded = false;
+
+  // ── Recon phase: one rollout per candidate to enumerate variations ──
+  // Seeds the heuristic arm of each candidate with the recon score; opens
+  // additional "arms" per target-plan variation found in the recon trace.
+  // Each arm = (candidate, variation). UCB1 allocates pulls across arms.
+  const arms = []; // { candidate, variation:{plan,label}, scoreSum, visits }
+  for (const candidate of candidates) {
+    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS) {
+      budgetExceeded = true;
+      break;
+    }
+    const recon = await mctsRunOneRollout(engine, helpers, candidate, { record: true });
+    totalRollouts++;
+
+    // Heuristic arm (seed score = recon's score if the rollout completed).
+    arms.push({
+      candidate,
+      variation: { plan: null, label: '(heuristic)' },
+      scoreSum: recon.completed ? recon.score : 0,
+      visits: recon.completed ? 1 : 0,
+    });
+
+    // Target-plan variation arms (unseeded — will be pulled at least once
+    // during the min-pulls phase below).
+    const extras = mctsBuildVariationsFromRecord(recon.record);
+    for (const v of extras) {
+      arms.push({
+        candidate,
+        variation: { plan: v.plan, label: v.label },
+        scoreSum: 0,
+        visits: 0,
+      });
+    }
+  }
+
+  // ── Ensure-min-pulls phase: pull each zero-visit arm once ──
+  for (const arm of arms) {
+    if (arm.visits > 0) continue;
+    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS) {
+      budgetExceeded = true;
+      break;
+    }
+    const r = await mctsRunOneRollout(engine, helpers, arm.candidate, { plan: arm.variation.plan });
+    totalRollouts++;
+    if (r.completed) {
+      arm.scoreSum += r.score;
+      arm.visits++;
+    }
+  }
+
+  // ── UCB1 phase: pull the highest-UCB arm, repeat until budget ──
+  // UCB1(arm) = avg(arm) + C * sqrt(ln(N) / visits(arm))
+  // where N is the sum of visits across all arms. Unvisited arms get
+  // infinite UCB (they'd have been pulled in the min-pulls phase — this
+  // is defensive).
+  while (!budgetExceeded && totalRollouts < MCTS_UCB1_TOTAL_PULLS) {
+    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS) {
+      budgetExceeded = true;
+      break;
+    }
+    const visitedArms = arms.filter(a => a.visits > 0);
+    if (visitedArms.length === 0) break;
+    const totalVisits = visitedArms.reduce((s, a) => s + a.visits, 0);
+    const lnN = Math.log(totalVisits);
+    let bestArm = null, bestUCB = -Infinity;
+    for (const arm of arms) {
+      const ucb = arm.visits === 0
+        ? Infinity
+        : (arm.scoreSum / arm.visits) + MCTS_UCB1_EXPLORE_C * Math.sqrt(lnN / arm.visits);
+      if (ucb > bestUCB) { bestUCB = ucb; bestArm = arm; }
+    }
+    if (!bestArm) break;
+    const r = await mctsRunOneRollout(engine, helpers, bestArm.candidate, { plan: bestArm.variation.plan });
+    totalRollouts++;
+    if (r.completed) {
+      bestArm.scoreSum += r.score;
+      bestArm.visits++;
+    } else {
+      // Rollout failed — give up on further UCB exploration to avoid loops.
+      break;
+    }
+  }
+
+  // ── Build ranked results from arm stats ──
+  const results = arms.map(arm => ({
+    candidate: arm.candidate,
+    variation: arm.variation,
+    avg: arm.visits > 0 ? arm.scoreSum / arm.visits : -Infinity,
+    visits: arm.visits,
+    scored: arm.visits > 0,
+  }));
+
+  // If no arm ever got scored, fall back to heuristic sort so the turn
+  // doesn't crash.
+  if (results.every(r => !r.scored)) {
+    const sorted = [...candidates].sort((a, b) =>
+      (b.level - a.level) || (b.typeScore - a.typeScore));
+    cpuLog(`  [MCTS] budget exhausted with 0 scored arms → heuristic fallback`);
+    return sorted;
+  }
+
+  // Scored arms first, by avg desc. Unscored drop to the tail.
+  results.sort((a, b) => {
+    if (a.scored !== b.scored) return a.scored ? -1 : 1;
+    return b.avg - a.avg;
+  });
+
+  const elapsed = Date.now() - t0;
+  cpuLog(`  [MCTS/UCB1] ${candidates.length} cand → ${arms.length} arms, ${totalRollouts} rollouts in ${elapsed}ms${budgetExceeded ? ' [BUDGET]' : ''}:`);
+  for (const r of results) {
+    const vStr = r.visits > 0 ? `v=${r.visits}` : '(unscored)';
+    cpuLog(`    ${r.avg.toFixed(1).padStart(8)} ${vStr.padStart(6)} — ${r.candidate.cardType} "${r.candidate.cardName}" (lvl ${r.candidate.level}) hero=${r.candidate.heroIdx} ${r.variation.label}`);
+  }
+
+  // De-dupe by candidate identity — keep the best-scoring variation per
+  // candidate. Sorted-by-avg means first occurrence wins.
+  const seen = new Set();
+  const out = [];
+  for (const r of results) {
+    if (seen.has(r.candidate)) continue;
+    seen.add(r.candidate);
+    out.push({ ...r.candidate, scriptedTargetPlan: r.variation.plan });
+  }
+  // Any candidate not touched at all (budget cut off recon loop) → append
+  // in heuristic order so the turn still has fallback plays.
+  const unseen = candidates.filter(c => !seen.has(c));
+  unseen.sort((a, b) => (b.level - a.level) || (b.typeScore - a.typeScore));
+  for (const c of unseen) out.push({ ...c, scriptedTargetPlan: null });
+  return out;
+}
+
+// ─── Turbo mode runner ─────────────────────────────────────────────────
+// Runs a full CPU turn (or any async fn that drives the engine) in fast
+// mode — all pacing delays, broadcasts, logs, and socket emissions are
+// silenced. Exposes timing so MCTS can budget its simulations.
+//
+// Callers typically snapshot engine state before, run N simulations via
+// this helper, then restore and pick the best action. Snapshot/restore is
+// the MCTS layer's responsibility — this helper only gates perf.
+async function runTurbo(engine, fn) {
+  const t0 = Date.now();
+  engine.enterFastMode();
+  try {
+    return await fn(engine);
+  } finally {
+    engine.exitFastMode();
+    const elapsed = Date.now() - t0;
+    if (CPU_DEBUG) console.log(`[CPU turbo] elapsed=${elapsed}ms`);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  SMART MULLIGAN
+//  Invoked once at game start to decide whether the CPU's opening hand is
+//  worth keeping or should be shuffled back and redrawn. Conservative: we
+//  only mulligan when the hand has almost nothing actionable in the first
+//  couple of turns. The 5-card shuffle-and-redraw has a real variance cost
+//  (you might draw worse), so bias toward keeping.
+// ═══════════════════════════════════════════
+
+/**
+ * Decide whether the CPU player `pi` should mulligan its starting hand.
+ * A card counts as "playable in the opening" if:
+ *   • Ability — always (will attach to some hero)
+ *   • Potion — always (no resource gate)
+ *   • Artifact — cost fits current gold
+ *   • Creature / Spell / Attack — at least one hero meets its level req
+ * Mulligan when fewer than max(3, 40% of handSize) cards qualify.
+ */
+function shouldMulliganStartingHand(engine, pi) {
+  const gs = engine.gs;
+  const ps = gs?.players?.[pi];
+  if (!ps?.hand?.length) return false;
+  const cardDB = engine._getCardDB();
+  const gold = ps.gold || 0;
+  let playable = 0;
+  for (const cardName of ps.hand) {
+    const cd = cardDB[cardName];
+    if (!cd) continue;
+    switch (cd.cardType) {
+      case 'Ability':
+      case 'Potion':
+        playable++;
+        break;
+      case 'Artifact': {
+        const cost = cd.cost || 0;
+        if (cost <= gold + 4) playable++; // allow room for 1 turn of gold gain
+        break;
+      }
+      case 'Creature':
+      case 'Spell':
+      case 'Attack': {
+        const eligible = listEligibleHeroesForActionCard(engine, pi, cd);
+        if (eligible.length > 0) playable++;
+        break;
+      }
+      default:
+        // Unknown types pessimistically don't count.
+        break;
+    }
+  }
+  const threshold = Math.max(3, Math.ceil(ps.hand.length * 0.4));
+  const mull = playable < threshold;
+  cpuLog(`  [mulligan] hand=${ps.hand.length} playable=${playable} threshold=${threshold} → ${mull ? 'MULLIGAN' : 'KEEP'}`);
+  return mull;
+}
+
+module.exports = { runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain };

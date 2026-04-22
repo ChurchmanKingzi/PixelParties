@@ -8,6 +8,21 @@ const { hasCardType } = require('./_hooks');
 module.exports = {
   activeIn: ['hero'],
 
+  // Accept Ghuanjun's combo prompt when the CPU controls him. The outer CPU
+  // turn driver has a loop that keeps firing Action-Phase plays while
+  // bonusActions.remaining > 0 and a legal Attack exists in hand, so opting
+  // into combo is always safe: the driver will run as many follow-up Attacks
+  // as it can and cleanly advance when it runs out.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData.type !== 'confirm') return undefined;
+    // The combo prompt uses confirmLabel '⚔️ Combo!' — match on that.
+    if (/combo/i.test(promptData.confirmLabel || '')) {
+      return { confirmed: true };
+    }
+    return undefined;
+  },
+
   canPlayCard: (gs, pi, heroIdx, cardData, engine) => {
     const ps = gs.players[pi];
     const hero = ps?.heroes?.[heroIdx];

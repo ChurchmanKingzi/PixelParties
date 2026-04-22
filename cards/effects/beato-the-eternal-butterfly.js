@@ -10,9 +10,26 @@
 //  (default behavior).
 // ═══════════════════════════════════════════
 
+const SPELL_SCHOOL_ABILITY_NAMES = new Set([
+  'Destruction Magic', 'Decay Magic', 'Magic Arts', 'Support Magic', 'Summoning Magic',
+]);
+
 module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
+
+  // Ascended Beato can cast any Spell of any school at any level. For CPU
+  // hero-ranking purposes she's treated as if every spell school were
+  // stacked to level 9 — so she's the top pick for any Spell candidate
+  // regardless of her ability-zone contents.
+  virtualSpellSchoolLevel: 9,
+
+  // CPU attach-ability filter: never attach a Spell-School ability to her.
+  // She already effectively has all of them at max, so another copy is
+  // wasted; the ability is more useful on a different hero.
+  rejectsAbility(abilityName, _cardData) {
+    return SPELL_SCHOOL_ABILITY_NAMES.has(abilityName);
+  },
 
   // Passive setup in onGameStart must fire even if this hero starts
   // frozen / stunned / negated (e.g. a puzzle where she begins

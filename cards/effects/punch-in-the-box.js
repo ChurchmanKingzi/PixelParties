@@ -19,6 +19,45 @@ module.exports = {
   isAfterDamageReaction: true,
   isPotion: true,
 
+  // CPU reactive-fire decision. Default would be "fire on every damage"
+  // which wastes Punch on small chip damage when a big hit is imminent.
+  // Heuristic: if the incoming damage is 100+ (Punch returns 50+), always
+  // fire. If smaller AND the opponent still has fresh creatures or an
+  // open Action Phase (hero atk available), decline and wait — Punch
+  // stays in hand for the next (likely larger) damage instance.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type !== 'confirm') return undefined;
+    const msgMatch = /took (\d+) damage/.exec(promptData.message || '');
+    const incoming = msgMatch ? parseInt(msgMatch[1], 10) : 0;
+    // Fire threshold: 100+ incoming (=> 50+ recoil) is always worth it.
+    if (incoming >= 100) return true;
+    const gs = engine.gs;
+    const pi = engine._cpuPlayerIdx;
+    const oppIdx = pi === 0 ? 1 : 0;
+    const oppPs = gs?.players?.[oppIdx];
+    if (!oppPs) return true; // can't inspect → take the sure recoil
+    // Is a larger hit plausibly still coming this turn?
+    // (a) Any opp creature on board that hasn't attacked yet?
+    const hasFreshCreature = engine.cardInstances?.some(c =>
+      c.owner === oppIdx && c.zone === 'support' && !c.faceDown
+      && !c.counters?.attackedThisTurn
+    );
+    // (b) Any opp hero with significant atk that hasn't acted?
+    const hasThreateningHero = (oppPs.heroes || []).some(h =>
+      h?.name && h.hp > 0
+      && !h.statuses?.frozen && !h.statuses?.stunned
+      && (h.atk || 0) >= 100
+      && !(oppPs.heroesAttackedThisTurn || []).includes(
+          (oppPs.heroes || []).indexOf(h)
+        )
+    );
+    // Defer if more damage likely incoming.
+    if (hasFreshCreature || hasThreateningHero) return null;
+    // Opp has nothing big left — take the small hit while we can.
+    return true;
+  },
+
   // Not proactively usable — grayed out in hand via unactivatableArtifacts
   canActivate: () => false,
 

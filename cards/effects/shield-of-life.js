@@ -55,8 +55,9 @@ module.exports = {
       const pi = ctx.cardOwner; // Effective controller
       const heroIdx = card.heroIdx;
 
-      // Prompt: select any hero or creature target
-      const target = await ctx.promptDamageTarget({
+      // Prompt: select any hero or creature target. Renamed from `target`
+      // to avoid shadowing the damaged-hero `target` from this hook's ctx.
+      const healTarget = await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
         title: 'Shield of Life',
@@ -67,31 +68,31 @@ module.exports = {
         noSpellCancel: true,
       });
 
-      if (!target) {
+      if (!healTarget) {
         card.counters.shieldFiredThisTurn = false; // Refund if cancelled
         return;
       }
 
       // Heal sparkle animation
       engine._broadcastEvent('play_zone_animation', {
-        type: 'heal_sparkle', owner: target.owner, heroIdx: target.heroIdx,
-        zoneSlot: target.type === 'hero' ? -1 : target.slotIdx,
+        type: 'heal_sparkle', owner: healTarget.owner, heroIdx: healTarget.heroIdx,
+        zoneSlot: healTarget.type === 'hero' ? -1 : healTarget.slotIdx,
       });
       await engine._delay(300);
 
       // Heal
       const healSource = { name: 'Shield of Life', owner: ctx.cardOriginalOwner, heroIdx };
-      if (target.type === 'hero') {
-        const h = gs.players[target.owner]?.heroes?.[target.heroIdx];
+      if (healTarget.type === 'hero') {
+        const h = gs.players[healTarget.owner]?.heroes?.[healTarget.heroIdx];
         if (h && h.hp > 0) await engine.actionHealHero(healSource, h, 100);
       } else {
-        const inst = target.cardInstance || engine.cardInstances.find(c =>
-          c.owner === target.owner && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
+        const inst = healTarget.cardInstance || engine.cardInstances.find(c =>
+          c.owner === healTarget.owner && c.zone === 'support' && c.heroIdx === healTarget.heroIdx && c.zoneSlot === healTarget.slotIdx
         );
         if (inst) await engine.actionHealCreature(healSource, inst, 100);
       }
 
-      engine.log('shield_of_life', { player: gs.players[pi].username, target: sel.cardName });
+      engine.log('shield_of_life', { player: gs.players[pi].username, target: healTarget.cardName });
       engine.sync();
     },
 

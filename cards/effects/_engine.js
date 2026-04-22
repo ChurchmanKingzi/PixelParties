@@ -9,6 +9,22 @@ const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeSta
 const { loadCardEffect } = require('./_loader');
 
 const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
+// Safety caps to terminate runaway trigger fan-out / infinite summons
+// before they exhaust heap. Normal matches stay well under both.
+const MAX_PENDING_TRIGGERS = 200;
+const MAX_CARD_INSTANCES = 2000;
+// Recursion depth cap for actionHealHero / actionDealDamage. Hook
+// handlers can call these engine methods DIRECTLY (not via
+// pendingTriggers), which bypasses MAX_PENDING_TRIGGERS. Known example:
+// Lifeforce Howitzer's `afterHeal` calls actionDealDamage → Shield of
+// Life's `afterDamage` calls actionHealHero → Howitzer fires again, ...
+// Legitimate combos resolve in <10 levels; this cap catches the runaway.
+const MAX_ACTION_RECURSION = 20;
+// Per-turn hook-call cap. Catches tight loops that don't go through
+// actionHeal / actionDealDamage — e.g. a card effect repeatedly firing
+// a hook via runHooks. Normal turns fire a few hundred hook invocations;
+// 10,000 in one turn is pathological. Counter resets in startTurn.
+const MAX_HOOKS_PER_TURN = 10000;
 const CHAIN_TIMEOUT_MS = 30000; // 30s to respond to chain prompt
 const EFFECT_TIMEOUT_MS = 5000; // 5s max for a single effect to execute
 
@@ -205,6 +221,31 @@ class GameEngine {
     this.chainDepth = 0;       // Nested chain counter
     this.pendingTriggers = []; // Triggers collected during resolution
     this.isResolving = false;  // True while a chain is resolving
+    // Recursion counter for heal/damage actions (see MAX_ACTION_RECURSION).
+    this._actionRecursionDepth = 0;
+    // Trace of in-flight heal/damage actions (one entry per active stack
+    // frame). Pushed on wrapper entry, popped in finally. When the
+    // recursion cap trips we dump the full trace so the logged error
+    // tells us exactly which cards chained each other into the loop.
+    this._actionRecursionTrace = [];
+    // Per-turn hook-invocation counter (see MAX_HOOKS_PER_TURN).
+    this._hooksFiredThisTurn = 0;
+    // Hook-name frequency map for the current turn — when the cap trips,
+    // the diagnostic names which hook is dominating so we can pinpoint
+    // the looping card.
+    this._hookHistogramThisTurn = Object.create(null);
+    // When the cap trips we set this flag, log once, then make every
+    // further runHooks call in the same turn a silent no-op so the
+    // turn can unwind through advancePhase → End → switchTurn instead
+    // of throwing on every subsequent hook call.
+    this._hookCapTrippedThisTurn = false;
+    // TURN-LEVEL (not snapshot-rolled-back) hook kill-switch. Once any
+    // rollout OR live play in this turn trips the hook cap, subsequent
+    // rollouts would otherwise re-trip it from a reset counter and pay
+    // the full 10k-hooks-of-allocation cost each time. This flag sticks
+    // for the whole turn (cleared only at startTurn), making further
+    // rollouts no-op instead of re-exploding heap.
+    this._turnHooksKilled = false;
 
     // Action log (sent to clients for animations/history)
     this.actionLog = [];
@@ -223,6 +264,267 @@ class GameEngine {
     //   If the human hasn't won by switchTurn, the puzzle is failed.
     this._cpuPlayerIdx = -1;
     this.isPuzzle = false;
+
+    // Fast-mode flag — when true, ALL pacing delays, logs, syncs, broadcasts,
+    // and socket emissions are silenced. Used by MCTS to run fast internal
+    // simulations without affecting real clients. Enter/exit via
+    // enterFastMode() / exitFastMode(). Clearing socketIds during fast mode
+    // also short-circuits every `io.to(sid).emit(...)` scattered in the
+    // action helpers, since those check `if (sid)` before emitting.
+    this._fastMode = false;
+    this._savedSocketIds = null;
+    // Separate from _fastMode. True ONLY while an MCTS rollout is in flight.
+    // Engine's CPU driver invocation is suppressed on this flag so rollouts
+    // can safely advance through opp-turn phases without recursively kicking
+    // off another CPU turn. Self-play sets _fastMode=true for the whole
+    // game (skip pacing/broadcasts) without setting this flag, so driver
+    // still fires per turn.
+    this._inMctsSim = false;
+  }
+
+  // ═══════════════════════════════════════════
+  //  SNAPSHOT / RESTORE — for MCTS simulations.
+  //  Clones every piece of mutable engine state that card effects can
+  //  touch, but NOT external refs (room, io, callbacks, script registry).
+  //  Restore reverts the engine to exactly that snapshot, preserving refs.
+  // ═══════════════════════════════════════════
+
+  snapshot() {
+    // Allocation gate: checked every ~20 snapshots (counter lives on
+    // engine, bounded). Every MCTS rollout takes a snapshot, so this
+    // fires at roughly rollout rate even in synchronous loops that
+    // bypass runHooks. 2.5GB ceiling is the same as inline runHooks.
+    this._snapshotsTaken = (this._snapshotsTaken || 0) + 1;
+    if (this._snapshotsTaken % 20 === 0) {
+      const heapMB = process.memoryUsage().heapUsed / 1024 / 1024;
+      if (heapMB > 2500) {
+        throw new Error(`Snapshot heap check tripped: heapUsed=${Math.round(heapMB)}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase}. Refusing to take more snapshots this turn.`);
+      }
+    }
+    const _clone = (v) => {
+      if (v === undefined || v === null) return v;
+      // Functions / symbols can't be cloned or JSONified — drop them. A card
+      // that needs a function-valued field to survive snapshot/restore must
+      // use the same detach/reattach dance as `_deferredSurprises` below.
+      if (typeof v === 'function' || typeof v === 'symbol') return undefined;
+      try { return structuredClone(v); }
+      catch {
+        // JSON fallback loses Set/Map instances — several game-state
+        // fields (ps._deepseaPerTurnSummoned, gs._surpriseCheckedHeroes,
+        // ps._oncePerGameUsed) rely on Set methods. Tag and rehydrate
+        // Sets and Maps so the fallback preserves them. Functions are
+        // dropped (replacer returns undefined → key is omitted).
+        const serialized = JSON.stringify(v, (_k, val) => {
+          if (typeof val === 'function' || typeof val === 'symbol') return undefined;
+          if (val instanceof Set) return { __set__: Array.from(val) };
+          if (val instanceof Map) return { __map__: Array.from(val) };
+          return val;
+        });
+        // Whole value was unserializable (top-level was a function, or all
+        // fields were stripped) — return undefined rather than `JSON.parse(undefined)`-ing.
+        if (serialized === undefined) return undefined;
+        return JSON.parse(serialized, (_k, val) => {
+          if (val && typeof val === 'object') {
+            if (Array.isArray(val.__set__)) return new Set(val.__set__);
+            if (Array.isArray(val.__map__)) return new Map(val.__map__);
+          }
+          return val;
+        });
+      }
+    };
+    const instSnaps = this.cardInstances.map(inst => {
+      // Capture every enumerable own field EXCEPT the cached script module
+      // (reloadable via loadScript()) — module functions can't clone.
+      // Also skip any top-level function-typed field — without this, every
+      // snapshot hits structuredClone's DataCloneError and falls through to
+      // the slow JSON path, which on a long match (hundreds of snapshots
+      // per turn × hundreds of turns) is enough to outrun GC and OOM.
+      const data = {};
+      for (const key of Object.keys(inst)) {
+        if (key === 'script') continue;
+        const val = inst[key];
+        if (typeof val === 'function' || typeof val === 'symbol') continue;
+        data[key] = _clone(val);
+      }
+      return data;
+    });
+    // `_deferredSurprises` entries contain function closures (Jumpscare's
+    // `execute`), which neither structuredClone nor JSON survives. Detach
+    // the array before cloning gs, shallow-copy it (preserving function
+    // refs), and re-attach to the live state. Restore replaces gs's slot
+    // with a fresh shallow copy so simulation mutations to the live array
+    // don't corrupt the snapshot.
+    const deferredRef = this.gs._deferredSurprises;
+    const deferredSnap = Array.isArray(deferredRef) ? [...deferredRef] : null;
+    if (deferredRef) delete this.gs._deferredSurprises;
+    let gsSnap;
+    try {
+      gsSnap = _clone(this.gs);
+    } finally {
+      if (deferredRef) this.gs._deferredSurprises = deferredRef;
+    }
+    return {
+      gs: gsSnap,
+      _deferredSurprisesSnap: deferredSnap,
+      cardInstances: instSnaps,
+      eventId: this.eventId,
+      chain: _clone(this.chain),
+      chainDepth: this.chainDepth,
+      pendingTriggers: _clone(this.pendingTriggers),
+      isResolving: this.isResolving,
+      actionLog: _clone(this.actionLog),
+      _inReactionCheck: this._inReactionCheck,
+      _inNomuResolution: this._inNomuResolution || false,
+      _inSurpriseResolution: this._inSurpriseResolution || false,
+      _surpriseResolutionDepth: this._surpriseResolutionDepth || 0,
+      _pendingSurpriseDraws: _clone(this._pendingSurpriseDraws),
+      _fastMode: this._fastMode,
+      // Safety counters MUST be snapshotted. Without this, a rollout that
+      // trips MAX_HOOKS_PER_TURN (during simulated turn N+2, say) leaves
+      // the counter at 10001+ even after restore rolls the game back to
+      // turn N — every subsequent real-turn hook call then trips the
+      // cap on the LIVE game. Same applies to the other counters below.
+      _hooksFiredThisTurn: this._hooksFiredThisTurn,
+      _hookHistogramThisTurn: { ...this._hookHistogramThisTurn },
+      _hookCapTrippedThisTurn: this._hookCapTrippedThisTurn,
+      _actionRecursionDepth: this._actionRecursionDepth,
+      _actionRecursionTrace: [...this._actionRecursionTrace],
+    };
+  }
+
+  restore(snap) {
+    const _clone = (v) => {
+      if (v === undefined || v === null) return v;
+      if (typeof v === 'function' || typeof v === 'symbol') return undefined;
+      try { return structuredClone(v); }
+      catch {
+        // Match snapshot()'s Set/Map preservation — same rationale.
+        const serialized = JSON.stringify(v, (_k, val) => {
+          if (typeof val === 'function' || typeof val === 'symbol') return undefined;
+          if (val instanceof Set) return { __set__: Array.from(val) };
+          if (val instanceof Map) return { __map__: Array.from(val) };
+          return val;
+        });
+        if (serialized === undefined) return undefined;
+        return JSON.parse(serialized, (_k, val) => {
+          if (val && typeof val === 'object') {
+            if (Array.isArray(val.__set__)) return new Set(val.__set__);
+            if (Array.isArray(val.__map__)) return new Map(val.__map__);
+          }
+          return val;
+        });
+      }
+    };
+    // IN-PLACE restore. MCTS invokes snapshot/restore from deep inside
+    // runCpuTurn, which at its top caches `const gs = engine.gs` and
+    // `const ps = gs.players[cpuIdx]`. Helpers in server.js similarly cache
+    // `const gs = room.gameState`. If we replace `this.gs` with a new
+    // object, those caches become stale and operate on the rollout-mutated
+    // old state. Instead we preserve the identity of this.gs, the players
+    // array, and each players[i] object — clearing their own properties and
+    // copying from the clone. Deeper references (heroes, hand, etc.) are
+    // swapped wholesale, which is fine because callers never cache those
+    // across a snapshot/restore boundary.
+    const newGs = _clone(snap.gs);
+    const origGs = this.gs;
+    const origPlayers = origGs.players;
+    const newPlayers = newGs.players;
+    // Preserve players[i] identity: copy props onto the existing player
+    // objects rather than replacing them.
+    for (let i = 0; i < newPlayers.length; i++) {
+      const newPs = newPlayers[i];
+      const origPs = origPlayers[i];
+      if (newPs && origPs) {
+        for (const k of Object.keys(origPs)) delete origPs[k];
+        for (const k of Object.keys(newPs)) origPs[k] = newPs[k];
+      } else if (newPs && !origPs) {
+        origPlayers[i] = newPs;
+      }
+    }
+    // Preserve players array identity: trim excess.
+    origPlayers.length = newPlayers.length;
+    // Preserve gs object identity: copy top-level gs props in place, skipping
+    // the players slot (already handled above).
+    for (const k of Object.keys(origGs)) {
+      if (k === 'players') continue;
+      delete origGs[k];
+    }
+    for (const k of Object.keys(newGs)) {
+      if (k === 'players') continue;
+      origGs[k] = newGs[k];
+    }
+    // this.gs retains its original identity. Make sure room.gameState
+    // still points at the same object (it always has, but belt-and-braces).
+    if (this.room) this.room.gameState = this.gs;
+    // Re-attach `_deferredSurprises` (entries contain Jumpscare's function
+    // closure, which can't survive cloning). Fresh shallow copy so a
+    // later simulation that mutates the live array can't retroactively
+    // corrupt earlier snapshots still floating around.
+    if (Array.isArray(snap._deferredSurprisesSnap)) {
+      this.gs._deferredSurprises = [...snap._deferredSurprisesSnap];
+    } else {
+      delete this.gs._deferredSurprises;
+    }
+    // Rebuild cardInstances as real CardInstance objects so methods work.
+    this.cardInstances = snap.cardInstances.map(data => {
+      const inst = new CardInstance(data.name, data.owner, data.zone, data.heroIdx ?? -1, data.zoneSlot ?? -1);
+      for (const key of Object.keys(data)) {
+        inst[key] = _clone(data[key]);
+      }
+      // Force script reload on next access — the module registry is shared.
+      inst.script = null;
+      return inst;
+    });
+    this.eventId = snap.eventId;
+    this.chain = _clone(snap.chain);
+    this.chainDepth = snap.chainDepth;
+    this.pendingTriggers = _clone(snap.pendingTriggers);
+    this.isResolving = snap.isResolving;
+    this.actionLog = _clone(snap.actionLog);
+    this._inReactionCheck = snap._inReactionCheck;
+    this._inNomuResolution = snap._inNomuResolution;
+    this._inSurpriseResolution = snap._inSurpriseResolution;
+    this._surpriseResolutionDepth = snap._surpriseResolutionDepth;
+    this._pendingSurpriseDraws = _clone(snap._pendingSurpriseDraws);
+    this._fastMode = snap._fastMode;
+    // Safety counters — see snapshot() for rationale. Default to pristine
+    // values if the snapshot pre-dates this field (backwards-compat).
+    this._hooksFiredThisTurn = snap._hooksFiredThisTurn || 0;
+    this._hookHistogramThisTurn = snap._hookHistogramThisTurn
+      ? { ...snap._hookHistogramThisTurn }
+      : Object.create(null);
+    this._hookCapTrippedThisTurn = !!snap._hookCapTrippedThisTurn;
+    this._actionRecursionDepth = snap._actionRecursionDepth || 0;
+    this._actionRecursionTrace = Array.isArray(snap._actionRecursionTrace)
+      ? [...snap._actionRecursionTrace]
+      : [];
+    // External refs (room, io, sendGameState, onGameOver, _cpuDriver,
+    // _additionalActionTypes) are intentionally preserved — they're the
+    // plumbing to the real game, not part of the game's mutable state.
+  }
+
+  /** Switch into simulation mode. Silences all pacing, logs, and socket
+   *  emissions. Caller must pair with exitFastMode(). */
+  enterFastMode() {
+    if (this._fastMode) return;
+    this._fastMode = true;
+    // Null out socketIds so any `io.to(sid).emit(...)` call in helpers
+    // short-circuits on the `if (sid)` guard.
+    this._savedSocketIds = this.gs.players.map(ps => ps?.socketId ?? null);
+    for (const ps of this.gs.players) if (ps) ps.socketId = null;
+  }
+
+  /** Leave simulation mode and restore socket routing. */
+  exitFastMode() {
+    if (!this._fastMode) return;
+    if (this._savedSocketIds) {
+      for (let i = 0; i < this.gs.players.length; i++) {
+        const ps = this.gs.players[i];
+        if (ps) ps.socketId = this._savedSocketIds[i];
+      }
+    }
+    this._savedSocketIds = null;
+    this._fastMode = false;
   }
 
   // ─── INITIALIZATION ───────────────────────
@@ -232,8 +534,11 @@ class GameEngine {
   // Card modules can export a cpuResponse(engine, promptType, promptData) function for
   // card-specific decision logic. The engine checks for it before falling back to defaults.
 
-  /** Check whether a player index is CPU-controlled. */
+  /** Check whether a player index is CPU-controlled. In self-play test mode
+   *  (`_isSelfPlay = true`) both players are treated as CPU so the brain
+   *  drives both turns. */
   isCpuPlayer(pi) {
+    if (this._isSelfPlay) return pi === 0 || pi === 1;
     return this._cpuPlayerIdx >= 0 && pi === this._cpuPlayerIdx;
   }
 
@@ -245,7 +550,15 @@ class GameEngine {
    * @param {object} promptData - The prompt data sent to the client
    * @returns {*} The response value (same shape the client would send)
    */
-  _getCpuGenericResponse(promptData) {
+  _getCpuGenericResponse(promptData, promptedPlayerIdx) {
+    // The prompt is FOR `promptedPlayerIdx` — which is not necessarily the
+    // active CPU. In self-play either player may receive a forceDiscard
+    // (Pollution) or other mandatory prompt during the opposite side's
+    // turn. Falling back to _cpuPlayerIdx here picks from the wrong hand
+    // and sends a mismatched response; the caller's validation then loops
+    // forever because the hand size never shrinks.
+    const promptPi = promptedPlayerIdx != null ? promptedPlayerIdx : this._cpuPlayerIdx;
+
     // ── Card-specific handler (extensible per-card CPU logic) ──
     const cardName = promptData.title || promptData.source;
     if (cardName) {
@@ -264,7 +577,7 @@ class GameEngine {
     if (type === 'confirm') return true;
 
     if (type === 'forceDiscard' || type === 'forceDiscardCancellable') {
-      const ps = this.gs.players[this._cpuPlayerIdx];
+      const ps = this.gs.players[promptPi];
       if (!ps || !ps.hand || ps.hand.length === 0) return null;
       // Pick first eligible card (respect eligibleIndices if provided)
       const eligible = promptData.eligibleIndices;
@@ -303,7 +616,7 @@ class GameEngine {
     if (type === 'pickHandCard') {
       // Single-pick from hand, restricted to eligibleIndices. CPU
       // just picks the first eligible card.
-      const ps = this.gs.players[this._cpuPlayerIdx];
+      const ps = this.gs.players[promptPi];
       if (!ps || !ps.hand || ps.hand.length === 0) return null;
       const eligible = promptData.eligibleIndices;
       const idx = eligible ? eligible[0] : 0;
@@ -404,7 +717,7 @@ class GameEngine {
    * @param {object} config - Targeting configuration
    * @returns {string[]} Array of selected target IDs
    */
-  _getCpuTargetResponse(validTargets, config = {}) {
+  _getCpuTargetResponse(validTargets, config = {}, _promptedPlayerIdx) {
     // Card-specific handler
     const cardName = config.title;
     if (cardName) {
@@ -496,6 +809,9 @@ class GameEngine {
 
   /** Create and register a CardInstance. */
   _trackCard(name, owner, zone, heroIdx = -1, zoneSlot = -1) {
+    if (this.cardInstances.length >= MAX_CARD_INSTANCES) {
+      throw new Error(`MAX_CARD_INSTANCES exceeded (${this.cardInstances.length}) tracking "${name}" — likely infinite summon loop`);
+    }
     const inst = new CardInstance(name, owner, zone, heroIdx, zoneSlot);
     inst.turnPlayed = this.gs.turn || 0;
     this.cardInstances.push(inst);
@@ -531,6 +847,44 @@ class GameEngine {
    * @returns {object} hookCtx (possibly modified by cards)
    */
   async runHooks(hookName, hookCtx = {}) {
+    // TURN-LEVEL kill-switch (survives snapshot/restore): once any
+    // rollout OR live play in this real turn tripped the cap, all
+    // subsequent runHooks calls this turn no-op. Prevents each rollout
+    // from re-tripping the cap and paying 10000 hooks of allocation
+    // before short-circuiting again.
+    if (this._turnHooksKilled) return;
+    // Inline heap check every 50 hook invocations (was 500 — tightened
+    // after overnight OOMs kept slipping through). setInterval-based
+    // watchdogs can't fire during sync allocation, so this inline check
+    // is the only reliable catch. 2.5GB ceiling leaves 5.5GB of GC
+    // headroom on the 8GB heap. Normal play stays under 500MB, so 2.5GB
+    // means something is allocating badly.
+    if (this._hooksFiredThisTurn > 0 && this._hooksFiredThisTurn % 50 === 0) {
+      const heapMB = process.memoryUsage().heapUsed / 1024 / 1024;
+      if (heapMB > 2500) {
+        this._turnHooksKilled = true;
+        this._hookCapTrippedThisTurn = true;
+        throw new Error(`Inline heap check tripped: heapUsed=${Math.round(heapMB)}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._hooksFiredThisTurn} hooks. Hooks disabled rest-of-turn. Likely runaway allocation.`);
+      }
+    }
+    // Within-snapshot cap short-circuit: once the cap trips in this
+    // snapshot's scope, skip further hooks until either the snapshot is
+    // restored (counter reverts) or the turn ends.
+    if (this._hookCapTrippedThisTurn) return;
+    // Per-turn invocation cap. Normal turns fire a few hundred hooks
+    // total; a cap at 10000 catches tight loops while leaving huge
+    // headroom for combo turns. When tripped, dump the top offender so
+    // the looping hook is obvious — ONCE.
+    this._hooksFiredThisTurn++;
+    this._hookHistogramThisTurn[hookName] = (this._hookHistogramThisTurn[hookName] || 0) + 1;
+    if (this._hooksFiredThisTurn > MAX_HOOKS_PER_TURN) {
+      this._hookCapTrippedThisTurn = true;
+      this._turnHooksKilled = true; // stick for the whole real turn
+      const top = Object.entries(this._hookHistogramThisTurn)
+        .sort((a, b) => b[1] - a[1]).slice(0, 8)
+        .map(([h, n]) => `${h}:${n}`).join(' ');
+      throw new Error(`MAX_HOOKS_PER_TURN exceeded (${this._hooksFiredThisTurn}) at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} active p${this.gs?.activePlayer}. Top hooks: ${top}. Hooks disabled for rest of this turn (incl. other rollouts). Likely infinite hook-firing loop.`);
+    }
     // Add engine reference and defaults to context
     hookCtx._engine = this;
     hookCtx._hookName = hookName;
@@ -601,6 +955,9 @@ class GameEngine {
       // If this hook created pending triggers, collect them
       if (ctx._triggers?.length) {
         this.pendingTriggers.push(...ctx._triggers);
+        if (this.pendingTriggers.length > MAX_PENDING_TRIGGERS) {
+          throw new Error(`MAX_PENDING_TRIGGERS exceeded (${this.pendingTriggers.length}) in hook "${hookName}" — likely infinite trigger fan-out`);
+        }
       }
     }
 
@@ -1987,6 +2344,41 @@ class GameEngine {
   // Each action fires before/after hooks and logs itself.
 
   async actionDealDamage(source, target, amount, type, opts) {
+    const depth = ++this._actionRecursionDepth;
+    this._actionRecursionTrace.push({
+      kind: 'damage', depth,
+      source: source?.name || '?',
+      target: target?.name || '?',
+      amount, type,
+    });
+    if (depth > MAX_ACTION_RECURSION) {
+      const msg = this._buildActionRecursionReport('actionDealDamage', target, amount, type);
+      this._actionRecursionDepth--;
+      this._actionRecursionTrace.pop();
+      throw new Error(msg);
+    }
+    try {
+      return await this._actionDealDamageImpl(source, target, amount, type, opts);
+    } finally {
+      this._actionRecursionDepth--;
+      this._actionRecursionTrace.pop();
+    }
+  }
+
+  async _actionDealDamageImpl(source, target, amount, type, opts) {
+    // ── Already-dead guard ──
+    // If the target hero is already at 0 HP AT ENTRY, skip the damage
+    // pipeline entirely. This doesn't block lethal damage (hp is still
+    // > 0 when lethal damage is applied — it's the damage that drops it
+    // to 0), only re-damage to heroes that entered the call with hp 0.
+    // Without this: reactive effects calling actionDealDamage on the
+    // same dead hero produce an unbounded onHeroKO→damage→onHeroKO
+    // cascade because hp stays clamped to 0 and the hp<=0 KO check
+    // is always true. Creatures use a separate damage path.
+    if (target && target.hp !== undefined && target.hp <= 0) {
+      return { dealt: 0, cancelled: true, targetAlreadyDead: true };
+    }
+
     // ── Anti Magic Enchantment shield ──
     // Fires here, AFTER the spell's own animations have already broadcast
     // (projectile, impact, etc.), so accepting the negation prompt cancels
@@ -2371,7 +2763,53 @@ class GameEngine {
   }
 
   async actionHealHero(source, target, amount) {
+    const depth = ++this._actionRecursionDepth;
+    this._actionRecursionTrace.push({
+      kind: 'heal', depth,
+      source: source?.name || '?',
+      target: target?.name || '?',
+      amount,
+    });
+    if (depth > MAX_ACTION_RECURSION) {
+      const msg = this._buildActionRecursionReport('actionHealHero', target, amount, null);
+      this._actionRecursionDepth--;
+      this._actionRecursionTrace.pop();
+      throw new Error(msg);
+    }
+    try {
+      return await this._actionHealHeroImpl(source, target, amount);
+    } finally {
+      this._actionRecursionDepth--;
+      this._actionRecursionTrace.pop();
+    }
+  }
+
+  /** Build a multi-line diagnostic for a recursion-cap trip.
+   *  Includes every call frame in the chain that led up to the throw. */
+  _buildActionRecursionReport(fnName, target, amount, type) {
+    const turn = this.gs?.turn;
+    const active = this.gs?.activePlayer;
+    const header = `MAX_ACTION_RECURSION exceeded in ${fnName} (target=${target?.name || '?'}${amount != null ? ` amount=${amount}` : ''}${type ? ` type=${type}` : ''}) at turn ${turn}, activePlayer=p${active}.`;
+    const trace = this._actionRecursionTrace.map(e => {
+      const kind = e.kind.padEnd(6);
+      const meta = e.kind === 'damage'
+        ? `${e.amount}${e.type ? ' ' + e.type : ''}`
+        : `${e.amount}`;
+      return `  [#${String(e.depth).padStart(2)}] ${kind} ${e.source} → ${e.target} (${meta})`;
+    }).join('\n');
+    return `${header}\n  Full recursion chain (outermost → innermost):\n${trace}\n  This almost always means two reactive cards are triggering each other via hook handlers that call action methods directly (bypassing pendingTriggers). Known loop: Heal → Lifeforce Howitzer's afterHeal → actionDealDamage → Shield of Life's afterDamage → actionHealHero → repeat.`;
+  }
+
+  async _actionHealHeroImpl(source, target, amount) {
     if (!target || target.hp === undefined) return;
+    // Already-dead guard. Healing a corpse is a no-op. A heal cast on
+    // an OHS-attached dead hero would otherwise convert to damage and
+    // hit the actionDealDamage on-corpse loop. Dropping the
+    // `_koProcessed` requirement from the earlier version — that gated
+    // the guard on "death cleanup finished" which is set AFTER the
+    // onHeroKO hook chain; a handler in that chain calling heal/damage
+    // on the same hero would slip through before the gate was set.
+    if (target.hp <= 0) return;
 
     // Anti Magic Enchantment shield — spell-sourced heals on a shielded
     // hero are skipped along with all other spell effects.
@@ -3819,7 +4257,21 @@ class GameEngine {
       const handIdx = result.handIndex;
       if (handIdx == null || handIdx < 0 || handIdx >= ps.hand.length || ps.hand[handIdx] !== result.cardName) {
         const fallbackIdx = ps.hand.indexOf(result.cardName);
-        if (fallbackIdx < 0) continue;
+        if (fallbackIdx < 0) {
+          // Stale/mismatched response — the named card isn't in hand. Pop
+          // the last card so we still make progress; without this, `continue`
+          // loops forever when the hand mutated between response and check.
+          const cardName = ps.hand.pop();
+          if (cardName != null) {
+            ps[pileArr].push(cardName);
+            const inst0 = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0];
+            if (inst0) inst0.zone = destZone;
+            this.log('hand_limit_' + pile, { player: ps.username, card: cardName });
+            await this.runHooks(hookName, { playerIdx, cardName, discardedCardName: cardName, _fromHand: true, _skipReactionCheck: true });
+            this.sync();
+          }
+          continue;
+        }
         ps.hand.splice(fallbackIdx, 1);
       } else {
         ps.hand.splice(handIdx, 1);
@@ -3950,6 +4402,10 @@ class GameEngine {
     for (const key of statusKeys) {
       if (!hero.statuses[key]) continue;
       if (hero.statuses[key]?.unhealable) continue;
+      // Hard engine-level block on non-cleansable statuses (negated,
+      // nulled). Cards that try to include these in their cleanse
+      // list will silently no-op rather than sneak past the rule.
+      if (STATUS_EFFECTS[key]?.cleansable === false) continue;
       delete hero.statuses[key];
       this.log('status_remove', { target: hero.name, status: key, by: source });
       removed.push(key);
@@ -3972,6 +4428,10 @@ class GameEngine {
       if (!inst.counters[key]) continue;
       // Creature unhealable: stored as separate counter flag
       if (inst.counters[key + 'Unhealable']) continue;
+      // Hard engine-level block on non-cleansable statuses (negated,
+      // nulled). Keeps Dark Gear / Diplomacy / Necromancy negation
+      // permanent regardless of which card is trying to cleanse.
+      if (STATUS_EFFECTS[key]?.cleansable === false) continue;
       delete inst.counters[key];
       delete inst.counters[key + 'Stacks'];
       delete inst.counters[key + 'AppliedBy'];
@@ -3991,7 +4451,9 @@ class GameEngine {
     if (!hero?.statuses) return [];
     const negativeKeys = getNegativeStatuses();
     return negativeKeys.filter(key =>
-      hero.statuses[key] && !hero.statuses[key]?.unhealable
+      hero.statuses[key]
+      && !hero.statuses[key]?.unhealable
+      && STATUS_EFFECTS[key]?.cleansable !== false
     );
   }
 
@@ -4004,7 +4466,9 @@ class GameEngine {
     if (!inst) return [];
     const negativeKeys = getNegativeStatuses();
     return negativeKeys.filter(key =>
-      inst.counters[key] && !inst.counters[key + 'Unhealable']
+      inst.counters[key]
+      && !inst.counters[key + 'Unhealable']
+      && STATUS_EFFECTS[key]?.cleansable !== false
     );
   }
 
@@ -5228,6 +5692,27 @@ class GameEngine {
     }
     await this.runHooks(HOOKS.ON_GAME_START, {});
     await this.startTurn();
+
+    // Singleplayer CPU turn driver — turn 1 enters here (not via switchTurn),
+    // so we fire the same driver hook that switchTurn uses. Puzzle mode uses
+    // its own CPU flow (status damage only), so we gate on !isPuzzle.
+    // Self-play mode treats both players as CPU; we re-sync _cpuPlayerIdx
+    // to the active player so the brain identifies as the right side.
+    // We MUST NOT fire the driver while inside an MCTS simulation rollout —
+    // the rollout's opp-upkeep advance would otherwise recursively invoke
+    // the opp's brain. `_inMctsSim` is the authoritative "we are simulating,
+    // not playing for real" flag. Separate from `_fastMode`, which self-play
+    // uses to suppress pacing/broadcasts without blocking the real driver.
+    const isCpuActive = this._isSelfPlay
+      ? true
+      : (this._cpuPlayerIdx >= 0 && this.gs.activePlayer === this._cpuPlayerIdx);
+    if (!this.isPuzzle && isCpuActive && !this._inMctsSim
+        && typeof this._cpuDriver === 'function'
+        && !this.gs.result) {
+      if (this._isSelfPlay) this._cpuPlayerIdx = this.gs.activePlayer;
+      try { await this._cpuDriver(this); }
+      catch (err) { console.error('[CPU] driver error (turn 1):', err); }
+    }
   }
 
   /**
@@ -5358,6 +5843,12 @@ class GameEngine {
     }
     this.log('turn_start', { turn: this.gs.turn, activePlayer: this.gs.activePlayer, username: activePs?.username });
 
+    // Reset per-turn hook invocation counter (see MAX_HOOKS_PER_TURN).
+    this._hooksFiredThisTurn = 0;
+    this._hookHistogramThisTurn = Object.create(null);
+    this._hookCapTrippedThisTurn = false;
+    this._turnHooksKilled = false;
+
     // Process status effects FIRST — before any card hooks fire
     // This ensures burn damage only hits burns from previous turns,
     // not burns applied during this turn's ON_TURN_START (e.g. Barker → Fiery Slime)
@@ -5453,8 +5944,10 @@ class GameEngine {
     }
   }
 
-  /** Async delay helper for pacing phase transitions. */
+  /** Async delay helper for pacing phase transitions.
+   *  In fast mode (MCTS simulations), returns immediately — no setTimeout. */
   _delay(ms) {
+    if (this._fastMode) return Promise.resolve();
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
@@ -5619,6 +6112,23 @@ class GameEngine {
     this.gs.activePlayer = this.gs.activePlayer === 0 ? 1 : 0;
     this.gs.turn++;
     await this.startTurn();
+
+    // Singleplayer CPU turn driver. Only fires in non-puzzle CPU games, where
+    // _cpuDriver is attached by the server on game creation. The puzzle branch
+    // above has already returned for puzzle mode, so this never runs there.
+    // Self-play: drive both players' turns; sync _cpuPlayerIdx to the new
+    // active so the brain reads itself as the right side. NEVER fire the
+    // driver from inside an MCTS rollout (`_inMctsSim`) — see startGame note.
+    const isCpuActive2 = this._isSelfPlay
+      ? true
+      : (this._cpuPlayerIdx >= 0 && this.gs.activePlayer === this._cpuPlayerIdx);
+    if (!this.isPuzzle && isCpuActive2 && !this._inMctsSim
+        && typeof this._cpuDriver === 'function'
+        && !this.gs.result) {
+      if (this._isSelfPlay) this._cpuPlayerIdx = this.gs.activePlayer;
+      try { await this._cpuDriver(this); }
+      catch (err) { console.error('[CPU] driver error:', err); }
+    }
   }
 
   // ─── GOLD ACTIONS ─────────────────────────
@@ -6587,10 +7097,16 @@ class GameEngine {
    */
   async promptEffectTarget(playerIdx, validTargets, config = {}) {
     if (!validTargets || validTargets.length === 0) return [];
-    // CPU auto-response: resolve immediately
+    // CPU auto-response: resolve immediately. Pass playerIdx through so
+    // the brain can distinguish "my own targets" from "enemy targets" for
+    // the CARD CONTROLLER, not the active player. Reactive cards (Shield
+    // of Life, Cure, etc.) fire during the opponent's turn but belong to
+    // the non-active controller; without this the brain used
+    // engine._cpuPlayerIdx (active player) and flipped own/enemy, healing
+    // enemy heroes.
     if (this.isCpuPlayer(playerIdx)) {
       await this._delay(50);
-      return this._getCpuTargetResponse(validTargets, config);
+      return this._getCpuTargetResponse(validTargets, config, playerIdx);
     }
     return new Promise((resolve) => {
       this._pendingPrompt = { resolve };
@@ -6959,7 +7475,7 @@ class GameEngine {
     // CPU auto-response: resolve immediately without socket round-trip
     if (this.isCpuPlayer(playerIdx)) {
       await this._delay(50); // Minimal delay to let event loop breathe
-      const response = this._getCpuGenericResponse(promptData);
+      const response = this._getCpuGenericResponse(promptData, playerIdx);
       return response;
     }
     return new Promise((resolve) => {
@@ -8152,7 +8668,18 @@ class GameEngine {
       };
     } finally {
       this._inReactionCheck = false;
-      await this._flushSurpriseDrawChecks();
+      // Flush pending surprise draws ONLY if this card actually resolved
+      // an effect here. For cards with no resolve (e.g. free-activated
+      // abilities whose effect runs EXTERNALLY in doActivateFreeAbility
+      // AFTER executeCardWithChain returns), flushing here would prompt
+      // draw-triggered surprises (Pure Advantage Camel) BEFORE the
+      // ability has a chance to actually draw — matching the bug where
+      // Camel was "chained to Leadership's activation" instead of its
+      // resolution. The caller (server-side handler) still flushes
+      // after running the external effect.
+      if (resolve) {
+        await this._flushSurpriseDrawChecks();
+      }
     }
   }
 
@@ -10900,11 +11427,11 @@ class GameEngine {
   }
 
   _broadcastEvent(event, data) {
+    if (this._fastMode) return; // Silent during MCTS simulations.
     for (let i = 0; i < 2; i++) {
       const sid = this.gs.players[i]?.socketId;
       if (sid) this.io.to(sid).emit(event, data);
     }
-    // Also send to spectators
     if (this.room.spectators) {
       for (const spec of this.room.spectators) {
         if (spec.socketId) this.io.to(spec.socketId).emit(event, data);
@@ -10915,6 +11442,7 @@ class GameEngine {
   // ─── LOGGING ──────────────────────────────
 
   log(type, data) {
+    if (this._fastMode) return; // Skip logging during simulations — huge perf win.
     const entry = { id: ++this.eventId, type, turn: this.gs.turn, phase: PHASE_NAMES[this.gs.currentPhase || 0], ...data };
     this.actionLog.push(entry);
     this._broadcastEvent('action_log', entry);
@@ -10928,6 +11456,7 @@ class GameEngine {
   // ─── SYNC STATE TO CLIENTS ────────────────
 
   sync() {
+    if (this._fastMode) return; // Skip state-broadcast + SC-tracking during simulations.
     // ── SC tracking: check ability/support zone states ──
     if (this.gs._scTracking) {
       for (let pi = 0; pi < 2; pi++) {

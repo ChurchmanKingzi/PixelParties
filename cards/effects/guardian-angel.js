@@ -15,6 +15,27 @@ module.exports = {
   oncePerGame: true,
   oncePerGameKey: 'guardianAngel',
 
+  // CPU target override. Guardian Angel's effect text contains "heal"
+  // which makes the generic target picker classify it as a heal spell —
+  // and heal spells prefer enemy heroes with Overheal Shock attached
+  // (healing them converts to damage for a kill). But Guardian Angel
+  // is a DEFENSIVE attachment: it revives the equipped hero once. An
+  // OHS-on-enemy plan doesn't apply. Force the pick to an OWN hero,
+  // preferring the highest-max-HP living hero (biggest effective revive).
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'target') return undefined;
+    const cpuIdx = engine._cpuPlayerIdx;
+    const targets = promptData?.validTargets || [];
+    const ownHeroes = targets.filter(t => t.type === 'hero' && t.owner === cpuIdx);
+    if (ownHeroes.length === 0) return undefined; // no own hero available → defer to default
+    const maxHpOf = (t) => {
+      const h = engine.gs.players[t.owner]?.heroes?.[t.heroIdx];
+      return h?.maxHp || 0;
+    };
+    const sorted = [...ownHeroes].sort((a, b) => maxHpOf(b) - maxHpOf(a));
+    return [sorted[0].id];
+  },
+
   spellPlayCondition(gs, pi) {
     // Need at least 1 alive hero (either side) with a free support zone
     for (let p = 0; p < 2; p++) {

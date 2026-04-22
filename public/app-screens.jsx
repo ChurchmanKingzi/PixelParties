@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════
 const { useState, useEffect, useRef, useCallback, useMemo, useContext } = React;
 const { api, socket, AppContext, CardMini, cardImageUrl,
-        typeColor, skinImageUrl, CardTooltipContent } = window;
+        typeColor, skinImageUrl, CardTooltipContent, isDeckLegal } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, SKINS_DB } = window;
 
 function AuthScreen() {
@@ -76,6 +76,14 @@ function MainMenu() {
   const [tutorialList, setTutorialList] = useState(null);
   const [tutorialAttemptState, setTutorialAttemptState] = useState(null);
   const tutorialAttemptRoom = useRef(null);
+
+  // Singleplayer state (CPU opponent — deck selection + active battle)
+  const [singleplayerOpen, setSingleplayerOpen] = useState(false);
+  const [spDecks, setSpDecks] = useState([]);
+  const [spSampleDecks, setSpSampleDecks] = useState([]);
+  const [cpuDeckId, setCpuDeckId] = useState('');
+  const [cpuBattleState, setCpuBattleState] = useState(null);
+  const cpuBattleRoom = useRef(null);
 
   const logout = async () => {
     try { await api('/auth/logout', { method: 'POST' }); } catch {}
@@ -240,13 +248,73 @@ function MainMenu() {
     }
   }, [tutorialAttemptState, notify]);
 
+  // Singleplayer: load decks + pick a fresh random legal deck for the CPU every time the submenu opens.
+  useEffect(() => {
+    if (!singleplayerOpen) return;
+    let cancelled = false;
+    (async () => {
+      let personal = spDecks;
+      let samples = spSampleDecks;
+      try {
+        const data = await api('/decks');
+        if (!cancelled && data?.decks) { personal = data.decks; setSpDecks(personal); }
+      } catch {}
+      try {
+        const sd = await api('/sample-decks/owned');
+        if (!cancelled && sd?.decks) { samples = sd.decks; setSpSampleDecks(samples); }
+      } catch {}
+      if (cancelled) return;
+      const legal = [...personal, ...samples].filter(d => isDeckLegal(d).legal);
+      if (legal.length) {
+        const pick = legal[Math.floor(Math.random() * legal.length)];
+        setCpuDeckId(pick.id);
+      } else {
+        setCpuDeckId('');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [singleplayerOpen]);
+
+  // Singleplayer: listen for CPU battle game_state and errors.
+  useEffect(() => {
+    const onGameState = (state) => {
+      if (state.isCpuBattle) {
+        cpuBattleRoom.current = state.roomId;
+        setCpuBattleState(state);
+      }
+    };
+    const onError = (msg) => notify('CPU battle error: ' + msg, 'error');
+    socket.on('game_state', onGameState);
+    socket.on('cpu_battle_error', onError);
+    return () => { socket.off('game_state', onGameState); socket.off('cpu_battle_error', onError); };
+  }, [notify]);
+
+  const startCpuBattle = () => {
+    const legalPersonal = spDecks.filter(d => isDeckLegal(d).legal);
+    const legalSample = spSampleDecks.filter(d => isDeckLegal(d).legal);
+    const playerDeck = legalPersonal.find(d => d.isDefault) || legalPersonal[0] || legalSample[0] || null;
+    if (!playerDeck) { notify('You need a legal deck to play', 'error'); return; }
+    if (!cpuDeckId) { notify('Pick a CPU deck first', 'error'); return; }
+    socket.emit('start_cpu_battle', { playerDeckId: playerDeck.id, cpuDeckId });
+    if (window.playSFX) window.playSFX('match_found');
+  };
+
+  const onCpuBattleLeave = useCallback(() => {
+    const roomId = cpuBattleRoom.current;
+    if (roomId) socket.emit('leave_game', { roomId });
+    setCpuBattleState(null);
+    cpuBattleRoom.current = null;
+  }, []);
+
   // Play bgm_puzzle while a puzzle attempt or tutorial attempt is active.
+  // CPU battles play the normal battle music.
   useEffect(() => {
     if (!setBgmMode) return;
-    if (puzzleAttemptState || tutorialAttemptState) setBgmMode('puzzle');
+    if (cpuBattleState && !cpuBattleState.result) setBgmMode('battle');
+    else if (puzzleAttemptState || tutorialAttemptState) setBgmMode('puzzle');
     else setBgmMode('menu');
     return () => { if (setBgmMode) setBgmMode('menu'); };
-  }, [puzzleAttemptState, tutorialAttemptState, setBgmMode]);
+  }, [puzzleAttemptState, tutorialAttemptState, cpuBattleState, setBgmMode]);
 
   // Render GameBoard during tutorial attempt
   if (tutorialAttemptState) {
@@ -279,6 +347,22 @@ function MainMenu() {
       />
     );
   }
+
+  // Render GameBoard during a singleplayer CPU battle
+  if (cpuBattleState) {
+    const GameBoard = window.GameBoard;
+    return (
+      <GameBoard
+        gameState={cpuBattleState}
+        lobby={{ id: cpuBattleState.roomId }}
+        onLeave={onCpuBattleLeave}
+        decks={spDecks}
+        sampleDecks={spSampleDecks}
+        selectedDeck={null}
+        setSelectedDeck={() => {}}
+      />
+    );
+  }
   return (
     <div className="screen-center main-menu-screen" style={{ flexDirection: 'column', gap: 20, position: 'relative' }}>
       <div style={{ position: 'absolute', top: 12, right: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -292,7 +376,31 @@ function MainMenu() {
           {!user.hide_tutorial && (
             <button className="btn btn-big" onClick={() => setTutorialBrowserOpen(true)} style={{ fontSize: 16, borderColor: '#ff44cc', color: '#ff44cc', background: 'rgba(255,68,204,.08)' }}>📖 TUTORIAL</button>
           )}
-          <button className="btn btn-big" onClick={() => setScreen('play')} style={{ fontSize: 16 }}>⚔ PLAY</button>
+          <button className="btn btn-big" onClick={() => setSingleplayerOpen(v => !v)} style={{ fontSize: 16, borderColor: '#aa88ff', color: '#aa88ff', background: 'rgba(170,136,255,.08)' }}>🤖 SINGLEPLAYER {singleplayerOpen ? '▲' : '▼'}</button>
+          {singleplayerOpen && (() => {
+            const legalPersonal = spDecks.filter(d => isDeckLegal(d).legal);
+            const legalSample = spSampleDecks.filter(d => isDeckLegal(d).legal);
+            const hasAnyLegal = legalPersonal.length + legalSample.length > 0;
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: -4, padding: '10px 12px', border: '1px solid rgba(170,136,255,.35)', background: 'rgba(170,136,255,.05)', borderRadius: 4 }}>
+                <div style={{ fontSize: 10, color: '#aa88ff', letterSpacing: 2, textTransform: 'uppercase' }}>CPU Deck</div>
+                <select className="select" value={cpuDeckId} onChange={e => setCpuDeckId(e.target.value)}
+                  style={{ fontSize: 12, padding: '4px 8px', borderColor: '#aa88ff', color: 'var(--text)' }}>
+                  {!hasAnyLegal && <option value="">No legal decks available</option>}
+                  {legalPersonal.length > 0 && <option disabled value="">── Your Decks ──</option>}
+                  {legalPersonal.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  {legalSample.length > 0 && <option disabled value="">── Sample Decks ──</option>}
+                  {legalSample.map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
+                </select>
+                <button className="btn btn-big" disabled={!hasAnyLegal || !cpuDeckId}
+                  onClick={startCpuBattle}
+                  style={{ fontSize: 14, marginTop: 4, borderColor: '#aa88ff', color: '#aa88ff', background: 'rgba(170,136,255,.12)' }}>
+                  ▶ PLAY!
+                </button>
+              </div>
+            );
+          })()}
+          <button className="btn btn-big" onClick={() => setScreen('play')} style={{ fontSize: 16 }}>⚔ FIND OPPONENT</button>
           <button className="btn btn-big btn-accent2" onClick={() => setScreen('deckbuilder')} style={{ fontSize: 16 }}>✦ EDIT DECK</button>
           <button className="btn btn-big" onClick={() => setScreen('shop')} style={{ fontSize: 16, borderColor: '#ffd700', color: '#ffd700', background: 'rgba(255,215,0,.08)' }}>✦ SHOP</button>
           <button className="btn btn-big btn-success" onClick={() => setScreen('profile')} style={{ fontSize: 16 }}>♛ VIEW PROFILE</button>

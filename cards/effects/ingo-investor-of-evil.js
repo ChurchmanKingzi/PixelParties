@@ -16,6 +16,19 @@ const { hasCardType } = require('./_hooks');
 module.exports = {
   activeIn: ['hero'],
 
+  // CPU threat assessment (gold supporter). +4 gold per Creature summoned
+  // into own side. Scales with the summon-rate proxy used by Pes'zet/Maya.
+  supportYield(ctx) {
+    const gs = ctx.engine.gs;
+    const ps = gs.players[ctx.pi];
+    let count = 0;
+    for (const heroZones of (ps?.supportZones || [])) {
+      for (const z of (heroZones || [])) if ((z || []).length > 0) count++;
+    }
+    const avg = count / Math.max(1, gs.turn || 1);
+    return { goldPerTurn: 4 * avg };
+  },
+
   hooks: {
     onCardEnterZone: async (ctx) => {
       const engine = ctx._engine;

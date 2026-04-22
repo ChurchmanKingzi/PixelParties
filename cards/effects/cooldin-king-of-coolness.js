@@ -132,6 +132,13 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // CPU threat assessment: plays an extra Area per activation (≈1 card of
+  // value). Doesn't cost a card from hand but ends the turn early — the
+  // trade-off isn't modeled here, just the raw tempo.
+  supportYield() {
+    return { drawsPerTurn: 1 };
+  },
+
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;

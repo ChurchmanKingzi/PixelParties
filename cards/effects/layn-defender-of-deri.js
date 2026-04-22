@@ -97,6 +97,8 @@ function removeBonusFromAll(engine, pi) {
 
 // ─── Card module ──────────────────────────
 
+const LAYN_ASCENSION_ITEM = 'Earth-Shattering Hammer, Relic of Deri';
+
 module.exports = {
   activeIn: ['hero'],
 
@@ -105,6 +107,26 @@ module.exports = {
 
   // Must fire even when Layn is CC'd (e.g. to react the moment she is frozen)
   bypassStatusFilter: true,
+
+  // CPU ascension targeting: the Hammer is the only card that progresses Layn.
+  ascensionNeedsCard(cardName, _cardData, engine, pi, hi) {
+    const hero = engine.gs.players[pi]?.heroes?.[hi];
+    if (!hero || hero.name !== CARD_NAME) return false;
+    if (hero.ascensionReady) return false;
+    if (cardName !== LAYN_ASCENSION_ITEM) return false;
+    const alreadyHas = engine.cardInstances.some(c =>
+      c.owner === pi && c.zone === 'support' &&
+      c.heroIdx === hi && c.name === cardName);
+    return !alreadyHas;
+  },
+
+  // CPU evaluator: 0 or 1 — binary for Layn (only one required item).
+  ascensionProgress(engine, pi, hi) {
+    const has = engine.cardInstances.some(c =>
+      c.owner === pi && c.zone === 'support' &&
+      c.heroIdx === hi && c.name === LAYN_ASCENSION_ITEM);
+    return has ? 1 : 0;
+  },
 
   hooks: {
     // ── Apply bonus when Layn enters / game starts ────────────────────────

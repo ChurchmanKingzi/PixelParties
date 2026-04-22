@@ -17,6 +17,11 @@
 module.exports = {
   activeIn: ['ability'],
 
+  // CPU threat assessment: +4 gold per level, every Resource Phase.
+  supportYield(level) {
+    return { goldPerTurn: 4 * level };
+  },
+
   hooks: {
     onResourceGain: (ctx) => {
       // Only boost during Resource Phase

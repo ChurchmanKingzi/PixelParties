@@ -17,6 +17,14 @@ module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
 
+  // CPU threat assessment. Potion draw per turn at all levels; net gold cost
+  // varies. Returning numbers lets the CPU rank hero supporters dynamically
+  // (see _cpu.js heroSupportUnits).
+  supportYield(level) {
+    const cost = level >= 3 ? 0 : level >= 2 ? 4 : 8;
+    return { potionDrawsPerTurn: 1, goldPerTurn: -cost };
+  },
+
   /**
    * Check if Alchemy can be activated right now.
    * Requires enough gold and at least 1 card in potion deck.

@@ -12,6 +12,28 @@ const { hasCardType } = require('./_hooks');
 module.exports = {
   activeIn: ['hero'],
 
+  // CPU prompt override. Barker's on-play card-gallery lists every Lv ≤ 1
+  // Creature in hand + deck. The CPU should prefer Lv 1 over Lv 0; ties
+  // broken at random. We also accept the initial confirm and the
+  // zone-picker as their defaults (confirm → yes, zonePick → random).
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData.type !== 'cardGallery') return undefined;
+    const cards = promptData.cards || [];
+    if (!cards.length) return undefined;
+    const cardDB = engine._getCardDB();
+    // Partition by card level.
+    let bestLevel = -Infinity;
+    for (const c of cards) {
+      const cd = cardDB[c.name];
+      const lvl = cd?.level || 0;
+      if (lvl > bestLevel) bestLevel = lvl;
+    }
+    const top = cards.filter(c => (cardDB[c.name]?.level || 0) === bestLevel);
+    const pick = top[Math.floor(Math.random() * top.length)];
+    return { cardName: pick.name, source: pick.source };
+  },
+
   hooks: {
     onTurnStart: async (ctx) => {
       if (!ctx.isMyTurn) return;
@@ -114,19 +136,17 @@ module.exports = {
 
         // Track card instance in engine with placement flag
         const inst = engine._trackCard(cardName, pi, 'support', heroIdx, zone.slotIdx);
-        inst.counters.isPlacement = 1; // Flag: this was a special "placement", not a normal summon
+        inst.counters.isPlacement = 1;
 
         engine.log('placement', { card: cardName, by: 'Barker, the Monster Tamer', from: selected.source, heroIdx, zoneSlot: zone.slotIdx });
 
-        // Emit summon effect for visual glow
         engine._broadcastEvent('summon_effect', { owner: pi, heroIdx, zoneSlot: zone.slotIdx, cardName });
 
-        // Fire on-summon hooks (creature's own onPlay effects)
         await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: zone.slotIdx });
         await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
 
         engine.sync();
-        break; // Done!
+        break;
       }
     },
   },

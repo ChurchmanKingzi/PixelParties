@@ -16,6 +16,12 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // CPU threat assessment: draws up to 7 cards, averaging ~3 net per turn
+  // from mid-turn activation (hand typically at 3–4 before refill).
+  supportYield() {
+    return { drawsPerTurn: 3 };
+  },
+
   /**
    * Can only activate if hand has fewer than 7 cards
    * and hand isn't already locked.

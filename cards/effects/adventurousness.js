@@ -8,6 +8,13 @@
 module.exports = {
   actionCost: true,
 
+  // CPU threat assessment: +10 gold per level when activated. HOPT is
+  // team-wide (only 1 per turn across all heroes), but per-hero potential
+  // is the full yield — good enough for ranking.
+  supportYield(level) {
+    return { goldPerTurn: 10 * level };
+  },
+
   onActivate: async (ctx, level) => {
     const goldGain = 10 * level;
     await ctx.gainGold(goldGain);

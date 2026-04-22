@@ -131,18 +131,31 @@ const ZONES = {
 //  Add new statuses here to auto-integrate.
 // ═══════════════════════════════════════════
 const STATUS_EFFECTS = {
-  frozen:  { negative: true, label: 'Frozen',  icon: '❄️', immuneKey: 'freeze_immune' },
-  stunned: { negative: true, label: 'Stunned', icon: '💫', immuneKey: 'stun_immune' },
-  negated: { negative: true, label: 'Negated', icon: '⚡', immuneKey: 'negate_immune' },
-  burned:  { negative: true, label: 'Burned',  icon: '🔥', immuneKey: 'burn_immune' },
-  poisoned:{ negative: true, label: 'Poisoned', icon: '☠️', immuneKey: 'poison_immune' },
-  nulled:  { negative: true, label: 'Nulled',  icon: '🔇', immuneKey: 'null_immune' },
+  frozen:  { negative: true, cleansable: true,  label: 'Frozen',  icon: '❄️', immuneKey: 'freeze_immune' },
+  stunned: { negative: true, cleansable: true,  label: 'Stunned', icon: '💫', immuneKey: 'stun_immune' },
+  // `negated` is applied by effects like Dark Gear / Diplomacy / Necromancy
+  // that take control of or silence a creature. It's NOT cleanseable —
+  // Juice / Beer / Cure etc. should not undo the opponent's negation.
+  negated: { negative: true, cleansable: false, label: 'Negated', icon: '⚡', immuneKey: 'negate_immune' },
+  burned:  { negative: true, cleansable: true,  label: 'Burned',  icon: '🔥', immuneKey: 'burn_immune' },
+  poisoned:{ negative: true, cleansable: true,  label: 'Poisoned', icon: '☠️', immuneKey: 'poison_immune' },
+  // `nulled` is used by permanent silence effects (Null Zone, Shadow etc).
+  // Same rationale as `negated` — shouldn't be cleanseable.
+  nulled:  { negative: true, cleansable: false, label: 'Nulled',  icon: '🔇', immuneKey: 'null_immune' },
   immune:  { negative: false, label: 'Immune',  icon: '🛡️' },
   shielded:{ negative: false, label: 'Shielded', icon: '✨' },
 };
 
 function getNegativeStatuses() {
   return Object.entries(STATUS_EFFECTS).filter(([, v]) => v.negative).map(([k]) => k);
+}
+
+/** Negative statuses that healing/cleanse cards (Juice, Beer, Cure, etc.)
+ *  are allowed to remove. Excludes permanent lockouts like `negated` and
+ *  `nulled` which represent the opponent having taken control / silenced
+ *  the target — undoing those would break intended card balance. */
+function getCleansableStatuses() {
+  return Object.entries(STATUS_EFFECTS).filter(([, v]) => v.negative && v.cleansable !== false).map(([k]) => k);
 }
 
 // ═══════════════════════════════════════════
@@ -227,7 +240,7 @@ function isCreatureNegated(inst) {
 
 module.exports = {
   SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES,
-  STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS,
+  STATUS_EFFECTS, getNegativeStatuses, getCleansableStatuses, BUFF_EFFECTS,
   hasCardType, isArtifactCreature, hasNumericCreatureLevel, isCreatureNegated,
   POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,
 };

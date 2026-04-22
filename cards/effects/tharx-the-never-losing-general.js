@@ -13,6 +13,17 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // CPU threat assessment (draw supporter). Draws ceil(N/2) cards, where N
+  // is the number of Creatures the owner currently controls.
+  supportYield(ctx) {
+    const ps = ctx.engine.gs.players[ctx.pi];
+    let count = 0;
+    for (const heroZones of (ps?.supportZones || [])) {
+      for (const z of (heroZones || [])) if ((z || []).length > 0) count++;
+    }
+    return { drawsPerTurn: Math.ceil(count / 2) };
+  },
+
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;

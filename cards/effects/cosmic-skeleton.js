@@ -20,6 +20,23 @@ module.exports = {
   creatureEffect: true,
 
   /**
+   * CPU hint: only summon on heroes that can actually fire the effect
+   * (host must have Destruction / Decay / Magic Arts / Support Magic at
+   * Lv1+). If any eligible hero has a valid school, the CPU narrows the
+   * pool to them; if NO hero has one, falls back to normal placement so
+   * play isn't blocked entirely (the card still lands; it just can't
+   * activate yet).
+   */
+  cpuPrefersSummonerHero(engine, pi, hi, cardData) {
+    const abZones = engine.gs.players[pi]?.abilityZones?.[hi] || [];
+    for (const slot of abZones) {
+      if (!slot || slot.length === 0) continue;
+      if (VALID_SCHOOLS.includes(slot[0])) return true;
+    }
+    return false;
+  },
+
+  /**
    * Can activate if the hero has 1+ non-Summoning spell school ability at Lv1+.
    */
   canActivateCreatureEffect(ctx) {

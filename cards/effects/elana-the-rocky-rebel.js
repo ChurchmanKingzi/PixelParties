@@ -11,6 +11,11 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // CPU threat assessment: net +1 draw per activation (refills hand + 1).
+  supportYield() {
+    return { drawsPerTurn: 1 };
+  },
+
   /**
    * Can activate if the player has at least 1 card in hand.
    */

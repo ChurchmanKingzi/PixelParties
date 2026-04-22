@@ -177,6 +177,11 @@ module.exports = {
   proactivePlay: true,
   inherentAction: true,
 
+  // CPU opt-out: only fire reactively (when a Creature is about to be hit).
+  // Without this, the brain would spam Golden Wings proactively every turn
+  // since it's an inherent Additional Action.
+  cpuSkipProactive: true,
+
   // Gray out in hand when the caster couldn't meaningfully resolve it.
   spellPlayCondition(gs, pi, engine) {
     return hasValidContext(gs, pi, engine);

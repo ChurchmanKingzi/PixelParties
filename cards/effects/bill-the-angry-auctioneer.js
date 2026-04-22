@@ -14,6 +14,61 @@ const { hasCardType } = require('./_hooks');
 module.exports = {
   activeIn: ['hero'],
 
+  // CPU response override for Bill's prompts.
+  //
+  // cardGalleryMulti (equip selection) — greedy max-value fill: pick the
+  // most expensive equips that fit within the 20-gold budget, up to
+  // selectCount cards. Because we return the sorted-by-cost selection,
+  // selectedCards[0] is the MOST expensive.
+  //
+  // target (hero/zone pick) — Bill's placement prompt: route the first
+  // equip (the expensive one) to the HIGHER-ATK eligible hero. For single-
+  // equip prompts this means the expensive equip lands on the stronger
+  // hero; for two-equip prompts, the handler auto-assigns the second
+  // (cheaper) equip to the remaining hero.
+  cpuResponse(engine, kind, promptData) {
+    if (kind === 'generic' && promptData.type === 'cardGalleryMulti') {
+      const cards = promptData.cards || [];
+      if (!cards.length) return { selectedCards: [] };
+      const budget = promptData.maxBudget != null ? promptData.maxBudget : 20;
+      const maxCount = promptData.selectCount || 2;
+      const sorted = [...cards].sort((a, b) => (b.cost || 0) - (a.cost || 0));
+      const chosen = [];
+      let spent = 0;
+      for (const c of sorted) {
+        if (chosen.length >= maxCount) break;
+        const cost = c.cost || 0;
+        if (spent + cost > budget) continue;
+        chosen.push(c.name);
+        spent += cost;
+      }
+      if (chosen.length === 0 && sorted.length) chosen.push(sorted[sorted.length - 1].name);
+      return { selectedCards: chosen };
+    }
+
+    if (kind === 'target') {
+      const { validTargets } = promptData;
+      if (!Array.isArray(validTargets) || validTargets.length === 0) return undefined;
+      // Bill's target list is a mix of 'hero' entries and 'equip' entries
+      // (the hero's free Support Zone slots). Picking a hero-type target
+      // lets Bill's parseTarget use its first free zone — which is the
+      // behaviour we want (dropping on the hero card itself).
+      const gs = engine.gs;
+      const heroes = validTargets.filter(t => t.type === 'hero');
+      const candidates = heroes.length ? heroes : validTargets;
+      let bestAtk = -Infinity;
+      let pickedId = null;
+      for (const t of candidates) {
+        const ps = gs.players[t.owner];
+        const h = ps?.heroes?.[t.heroIdx];
+        const atk = h?.atk || 0;
+        if (atk > bestAtk) { bestAtk = atk; pickedId = t.id; }
+      }
+      return pickedId ? [pickedId] : undefined;
+    }
+    return undefined;
+  },
+
   hooks: {
     onBeforeHandDraw: async (ctx) => {
       const engine = ctx._engine;
@@ -58,14 +113,12 @@ module.exports = {
       engine.sync();
 
       try {
-      // Confirm
       const confirmed = await ctx.promptConfirmEffect({
         title: 'Bill, the Angry Auctioneer',
         message: 'Provide Equips to your other Heroes?',
       });
       if (!confirmed) { gs.heroEffectPending = null; engine.sync(); return; }
 
-      // Multi-select gallery with budget constraint
       const selection = await ctx.promptCardGalleryMulti(eligibleCards, {
         title: 'Bill, the Angry Auctioneer',
         description: `Select up to ${maxEquips} different Equipment Artifact${maxEquips > 1 ? 's' : ''} to equip.`,
@@ -172,7 +225,6 @@ module.exports = {
         }
       }
 
-      // Execute assignments: remove from deck, place into support zones
       for (const { equipName, heroIdx, slotIdx } of assignments) {
         // Remove from deck
         const deckIdx = ps.mainDeck.indexOf(equipName);

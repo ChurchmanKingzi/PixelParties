@@ -15,6 +15,17 @@
 module.exports = {
   activeIn: ['hero'],
 
+  // CPU threat assessment (damage supporter). 100 damage per Surprise
+  // activation; rough per-turn yield scales with the owner's current
+  // Surprise count (face-down Creatures in surprise zones + bakhm slots).
+  supportYield(ctx) {
+    const { engine, pi } = ctx;
+    const ps = engine.gs.players[pi];
+    let surprises = 0;
+    for (const zone of (ps?.surpriseZones || [])) surprises += (zone || []).length;
+    return { damagePerTurn: 50 * surprises };
+  },
+
   hooks: {
     /**
      * After any Surprise is activated (by any player),

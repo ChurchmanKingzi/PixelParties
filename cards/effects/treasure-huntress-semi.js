@@ -7,6 +7,11 @@
 module.exports = {
   activeIn: ['hero'],
 
+  // CPU threat assessment (gold supporter). Passive +6 gold each Resource Phase.
+  supportYield() {
+    return { goldPerTurn: 6 };
+  },
+
   hooks: {
     onResourceGain: (ctx) => {
       // Only boost during Resource Phase

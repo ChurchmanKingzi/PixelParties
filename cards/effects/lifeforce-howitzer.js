@@ -48,6 +48,7 @@ module.exports = {
       const heroIdx = card.heroIdx;
       const hero = ctx.attachedHero;
       if (!hero?.name || hero.hp <= 0) return;
+      const ps = gs.players[pi];
 
       const healedAmount = ctx.healedAmount || 0;
       if (healedAmount <= 0) return;

@@ -21,6 +21,21 @@ const HP_BOOST = 50;
 module.exports = {
   activeIn: ['hero'],
 
+  // CPU threat assessment (damage supporter). Maya buffs her team's HP by
+  // 50 per Creature summoned — effectively "defensive damage" that makes her
+  // team harder to kill. Scales with the same summon-rate proxy as Pes'zet.
+  supportYield(ctx) {
+    const gs = ctx.engine.gs;
+    let total = 0;
+    for (const ps of gs.players) {
+      for (const heroZones of (ps?.supportZones || [])) {
+        for (const z of (heroZones || [])) if ((z || []).length > 0) total++;
+      }
+    }
+    const avg = total / Math.max(1, gs.turn || 1);
+    return { damagePerTurn: HP_BOOST * avg };
+  },
+
   hooks: {
     onCardEnterZone: async (ctx) => {
       const engine  = ctx._engine;

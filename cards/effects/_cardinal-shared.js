@@ -46,8 +46,9 @@ async function _checkCardinalWin(ctx) {
       engine._broadcastEvent('cardinal_beast_win', { owner: pi });
       engine.sync();
 
-      // Wait for celebration animation before ending game
-      await new Promise(r => setTimeout(r, 3500));
+      // Wait for celebration animation before ending game. Use engine._delay
+      // so fast-mode (self-play) skips the 3.5s real-time wait.
+      await engine._delay(3500);
 
       if (engine.onGameOver) {
         await engine.onGameOver(engine.room, pi, 'cardinal_beast');

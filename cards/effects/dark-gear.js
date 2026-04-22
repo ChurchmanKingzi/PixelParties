@@ -140,6 +140,7 @@ module.exports = {
     const gs = engine.gs;
     const ps = gs.players[pi];
     const oppIdx = pi === 0 ? 1 : 0;
+    const oppPs = gs.players[oppIdx];
     const cardDB = engine._getCardDB();
     const cd = cardDB[target.cardName];
     const level = cd?.level || 1;

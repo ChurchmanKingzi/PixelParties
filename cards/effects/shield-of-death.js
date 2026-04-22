@@ -55,8 +55,10 @@ module.exports = {
       const pi = ctx.cardOwner; // Effective controller
       const heroIdx = card.heroIdx;
 
-      // Prompt: select any hero or creature target
-      const target = await ctx.promptDamageTarget({
+      // Prompt: select any hero or creature target. Renamed from `target` to
+      // avoid shadowing the damaged-hero `target` from this hook's context
+      // (declared at the top of this function).
+      const retaliateTarget = await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'artifact',
@@ -69,33 +71,33 @@ module.exports = {
         noSpellCancel: true,
       });
 
-      if (!target) {
+      if (!retaliateTarget) {
         card.counters.shieldFiredThisTurn = false; // Refund if cancelled
         return;
       }
 
       // Dark skulls animation on target
       engine._broadcastEvent('play_zone_animation', {
-        type: 'death_skulls', owner: target.owner, heroIdx: target.heroIdx,
-        zoneSlot: target.type === 'hero' ? -1 : target.slotIdx,
+        type: 'death_skulls', owner: retaliateTarget.owner, heroIdx: retaliateTarget.heroIdx,
+        zoneSlot: retaliateTarget.type === 'hero' ? -1 : retaliateTarget.slotIdx,
       });
       await engine._delay(400);
 
       // Deal damage
       const dmgSource = { name: 'Shield of Death', owner: ctx.cardOriginalOwner, heroIdx };
-      if (target.type === 'hero') {
-        const h = gs.players[target.owner]?.heroes?.[target.heroIdx];
+      if (retaliateTarget.type === 'hero') {
+        const h = gs.players[retaliateTarget.owner]?.heroes?.[retaliateTarget.heroIdx];
         if (h && h.hp > 0) await engine.actionDealDamage(dmgSource, h, 100, 'artifact');
       } else {
-        const inst = target.cardInstance || engine.cardInstances.find(c =>
-          c.owner === target.owner && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
+        const inst = retaliateTarget.cardInstance || engine.cardInstances.find(c =>
+          c.owner === retaliateTarget.owner && c.zone === 'support' && c.heroIdx === retaliateTarget.heroIdx && c.zoneSlot === retaliateTarget.slotIdx
         );
         if (inst) {
           await engine.actionDealCreatureDamage(dmgSource, inst, 100, 'artifact', { sourceOwner: pi, canBeNegated: true });
         }
       }
 
-      engine.log('shield_of_death', { player: gs.players[pi].username, target: target.cardName });
+      engine.log('shield_of_death', { player: gs.players[pi].username, target: retaliateTarget.cardName });
       engine.sync();
     },
 

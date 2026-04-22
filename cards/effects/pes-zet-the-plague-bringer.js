@@ -16,6 +16,24 @@ const { hasCardType } = require('./_hooks');
 module.exports = {
   activeIn: ['hero'],
 
+  // CPU threat assessment (damage supporter). Pes'zet inflicts 1 Poison
+  // stack on ANY Creature summon. Per-turn value scales with "how many
+  // summons are happening" — we approximate this with (total creatures on
+  // the board) / (turn number), i.e. the running average summon rate.
+  // Each stack is ~30 damage over its lifetime; so damage per turn trigger
+  // ≈ 30 × estSummonsPerTurn.
+  supportYield(ctx) {
+    const gs = ctx.engine.gs;
+    let total = 0;
+    for (const ps of gs.players) {
+      for (const heroZones of (ps?.supportZones || [])) {
+        for (const z of (heroZones || [])) if ((z || []).length > 0) total++;
+      }
+    }
+    const avg = total / Math.max(1, gs.turn || 1);
+    return { damagePerTurn: 30 * avg };
+  },
+
   hooks: {
     onCardEnterZone: async (ctx) => {
       const engine = ctx._engine;

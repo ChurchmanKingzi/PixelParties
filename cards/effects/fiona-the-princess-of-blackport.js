@@ -18,6 +18,19 @@ module.exports = {
   // This hero's effects fire even while Frozen/Stunned/Negated
   bypassStatusFilter: true,
 
+  // CPU threat assessment (gold supporter). +20 gold per triggered status
+  // instance on her — use her current statuses as a proxy for "has been
+  // statused this game". If she's currently carrying any negative status,
+  // treat her as generating the full 20 gold-per-turn; otherwise 0.
+  supportYield(ctx) {
+    const hero = ctx.engine.gs.players[ctx.pi]?.heroes?.[ctx.hi];
+    const statuses = hero?.statuses || {};
+    for (const k of Object.keys(statuses)) {
+      if (statuses[k]) return { goldPerTurn: 20 };
+    }
+    return { goldPerTurn: 0 };
+  },
+
   hooks: {
     onStatusApplied: async (ctx) => {
       // Only trigger when THIS hero receives the status

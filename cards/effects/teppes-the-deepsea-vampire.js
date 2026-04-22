@@ -21,6 +21,13 @@ const MAX_DRAWS_PER_TURN = 5;
 module.exports = {
   activeIn: ['hero'],
 
+  // CPU threat assessment (draw supporter). Up to 5 draws/turn triggered by
+  // creature bounces. We don't track per-turn bounce history here; use a
+  // flat estimate of 2 triggered draws per turn in a typical Deepsea build.
+  supportYield() {
+    return { drawsPerTurn: 2 };
+  },
+
   hooks: {
     onCardsReturnedToHand: async (ctx) => {
       if (ctx.ownerIdx !== ctx.cardOriginalOwner) return;

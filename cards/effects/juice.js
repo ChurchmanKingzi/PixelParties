@@ -7,13 +7,13 @@
 //  Can also be activated proactively on own turn.
 // ═══════════════════════════════════════════
 
-const { STATUS_EFFECTS, getNegativeStatuses } = require('./_hooks');
+const { STATUS_EFFECTS, getCleansableStatuses } = require('./_hooks');
 
 function getTargetStatuses(target, engine) {
   if (target.type === 'hero') {
     const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
     if (!hero?.statuses) return [];
-    return getNegativeStatuses()
+    return getCleansableStatuses()
       .filter(k => hero.statuses[k])
       .map(k => ({ key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon }));
   }
@@ -23,7 +23,7 @@ function getTargetStatuses(target, engine) {
       c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
     );
     if (!inst) return [];
-    return getNegativeStatuses()
+    return getCleansableStatuses()
       .filter(k => inst.counters[k])
       .map(k => ({ key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon }));
   }
@@ -32,7 +32,7 @@ function getTargetStatuses(target, engine) {
 
 function getValidTargets(gs, engine) {
   if (!engine) return [];
-  const negKeys = getNegativeStatuses();
+  const negKeys = getCleansableStatuses();
   const targets = [];
   for (let pi = 0; pi < 2; pi++) {
     const heroes = engine.getHeroTargets(pi).filter(t => {
@@ -67,7 +67,7 @@ module.exports = {
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
-        if (hero.statuses && getNegativeStatuses().some(k => hero.statuses[k])) return true;
+        if (hero.statuses && getCleansableStatuses().some(k => hero.statuses[k])) return true;
       }
     }
     return false;

@@ -23,9 +23,35 @@ const { checkArthorAscension } = require('./_arthor-shared');
 const CARD_NAME = 'Arthor, the King of Blackport';
 const EYE_NAME  = 'The White Eye';
 
+const ARTHOR_ASCENSION_ITEMS = ['Legendary Sword of a Barbarian King', 'Summoning Circle'];
+
 module.exports = {
   activeIn: ['hero'],
   cheatAscensionBlocked: true,
+
+  // CPU ascension targeting: a card "progresses" Arthor's ascension if it's
+  // one of the required Equipment pieces and he doesn't already have it.
+  ascensionNeedsCard(cardName, _cardData, engine, pi, hi) {
+    const hero = engine.gs.players[pi]?.heroes?.[hi];
+    if (!hero || hero.name !== CARD_NAME) return false;
+    if (hero.ascensionReady) return false;
+    if (!ARTHOR_ASCENSION_ITEMS.includes(cardName)) return false;
+    const alreadyHas = engine.cardInstances.some(c =>
+      c.owner === pi && c.zone === 'support' &&
+      c.heroIdx === hi && c.name === cardName);
+    return !alreadyHas;
+  },
+
+  // CPU evaluator: 0..1 progress — fraction of required items equipped.
+  ascensionProgress(engine, pi, hi) {
+    let count = 0;
+    for (const n of ARTHOR_ASCENSION_ITEMS) {
+      if (engine.cardInstances.some(c =>
+          c.owner === pi && c.zone === 'support' &&
+          c.heroIdx === hi && c.name === n)) count++;
+    }
+    return count / ARTHOR_ASCENSION_ITEMS.length;
+  },
 
   hooks: {
     // ── Ascension: initial check at game start ────────────────────────────

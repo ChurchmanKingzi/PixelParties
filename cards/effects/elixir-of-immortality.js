@@ -65,6 +65,11 @@ module.exports = {
      * Do NOT revive here — wait for a batch checkpoint.
      */
     onHeroKO: async (ctx) => {
+      // Defensive: skip if this instance has already been deleted from the
+      // permanent zone. Without this, a dying hero can fire onHeroKO on
+      // dozens of already-removed Elixir instances during a KO cascade.
+      if (ctx.card?.zone !== 'permanent') return;
+
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
@@ -74,7 +79,11 @@ module.exports = {
       const heroIdx = ps.heroes.findIndex(h => h === hero);
       if (heroIdx < 0) return;
 
-      const perm = (ps.permanents || []).find(p => p.name === 'Elixir of Immortality');
+      // Match THIS card instance's perm (by permId) rather than by name —
+      // with `cardOriginalOwner`/duplicate protection this keeps each
+      // Elixir bookkeeping isolated if two ever co-exist.
+      const permId = ctx.card.counters?.permId;
+      const perm = (ps.permanents || []).find(p => p.id === permId || (!permId && p.name === 'Elixir of Immortality'));
       if (!perm || perm._triggered) return;
 
       if (!perm._pendingHeroes) perm._pendingHeroes = [];
@@ -89,11 +98,13 @@ module.exports = {
      * damage source (e.g. Pyroblast). Resolution happens at later checkpoints.
      */
     afterCreatureDamageBatch: async (ctx) => {
+      if (ctx.card?.zone !== 'permanent') return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
+      const permId = ctx.card.counters?.permId;
 
-      const perm = (ps.permanents || []).find(p => p.name === 'Elixir of Immortality');
+      const perm = (ps.permanents || []).find(p => p.id === permId || (!permId && p.name === 'Elixir of Immortality'));
       if (!perm || perm._triggered) return;
 
       const entries = ctx.entries || [];
@@ -117,11 +128,13 @@ module.exports = {
 
     /** After all status damage: resolve pending hero deaths from burn/poison. */
     afterAllStatusDamage: async (ctx) => {
+      if (ctx.card?.zone !== 'permanent') return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
+      const permId = ctx.card.counters?.permId;
 
-      const perm = (ps.permanents || []).find(p => p.name === 'Elixir of Immortality');
+      const perm = (ps.permanents || []).find(p => p.id === permId || (!permId && p.name === 'Elixir of Immortality'));
       if (!perm || perm._triggered) return;
       if (!(perm._pendingHeroes?.length > 0 || perm._pendingCreatures?.length > 0)) return;
 
@@ -130,11 +143,13 @@ module.exports = {
 
     /** After a spell resolves: resolve pending hero deaths from AoE. */
     afterSpellResolved: async (ctx) => {
+      if (ctx.card?.zone !== 'permanent') return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
+      const permId = ctx.card.counters?.permId;
 
-      const perm = (ps.permanents || []).find(p => p.name === 'Elixir of Immortality');
+      const perm = (ps.permanents || []).find(p => p.id === permId || (!permId && p.name === 'Elixir of Immortality'));
       if (!perm || perm._triggered) return;
       if (!(perm._pendingHeroes?.length > 0 || perm._pendingCreatures?.length > 0)) return;
 
@@ -143,11 +158,13 @@ module.exports = {
 
     /** Phase end: catch-all for deaths from combat, attacks, or other sources. */
     onPhaseEnd: async (ctx) => {
+      if (ctx.card?.zone !== 'permanent') return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
+      const permId = ctx.card.counters?.permId;
 
-      const perm = (ps.permanents || []).find(p => p.name === 'Elixir of Immortality');
+      const perm = (ps.permanents || []).find(p => p.id === permId || (!permId && p.name === 'Elixir of Immortality'));
       if (!perm || perm._triggered) return;
       if (!(perm._pendingHeroes?.length > 0 || perm._pendingCreatures?.length > 0)) return;
 

@@ -19,6 +19,23 @@
 module.exports = {
   activeIn: ['hero'],
 
+  // CPU threat assessment (damage supporter). Each Medea doubles poison
+  // damage dealt to the CPU's side — so the more poison stacks on OUR
+  // heroes, the more extra damage she pumps through. Modeled as
+  // 30 damage × poison-stacks on cpuIdx's heroes (a single Medea's ×2
+  // contribution above baseline).
+  supportYield(ctx) {
+    const { engine, cpuIdx } = ctx;
+    if (cpuIdx == null || cpuIdx < 0) return { damagePerTurn: 0 };
+    const cpuPs = engine.gs.players[cpuIdx];
+    if (!cpuPs) return { damagePerTurn: 0 };
+    let stacks = 0;
+    for (const h of (cpuPs.heroes || [])) {
+      if (h?.statuses?.poison) stacks += h.statuses.poison;
+    }
+    return { damagePerTurn: 30 * stacks };
+  },
+
   hooks: {
     /**
      * Modify poison damage dealt to a player.

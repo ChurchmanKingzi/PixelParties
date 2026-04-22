@@ -21,6 +21,13 @@ const BONUS_MILL = 2;
 module.exports = {
   activeIn: ['hero'],
 
+  // CPU threat assessment (damage supporter). Jean's value is opponent-deck
+  // denial — 2 extra mills per any mill event. Modeled as a modest per-turn
+  // "damage" equivalent (deck erosion → fewer future draws for the target).
+  supportYield() {
+    return { damagePerTurn: 20 };
+  },
+
   hooks: {
     onMill: async (ctx) => {
       const engine = ctx._engine;

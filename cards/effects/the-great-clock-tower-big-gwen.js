@@ -73,6 +73,10 @@ module.exports = {
       const pi = ctx.cardOwner;
       const BIG_GWEN = 'The Great Clock Tower "Big Gwen"';
       setImmediate(() => {
+        // Engine may have been torn down between when setImmediate was
+        // scheduled and when it fires (self-play batch cleanup nulls
+        // engine.room/.gs). Bail early if the engine state is missing.
+        if (!engine || !engine.gs || !engine.cardInstances) return;
         const remaining = engine.cardInstances.filter(c =>
           c.zone === 'area' && c.owner === pi && c.name === BIG_GWEN
         );
