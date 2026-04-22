@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════
-//  CARD EFFECT: "Poison Pollen"
+//  CARD EFFECT: "Toxic Fumes"
 //  Spell (Decay Magic Lv1, Normal)
 //
 //  Apply 1 Stack of Poison to every Creature on
@@ -9,21 +9,20 @@
 //  Artifact Creatures, etc. Each creature's normal
 //  poison-immunity rules still apply.
 //
-//  If at least one Creature you control ends up
-//  poisoned by this effect, the cast doesn't
-//  consume your Main/Action-Phase Action
-//  (`inherentAction` predicate returns true when
-//  such a creature exists pre-cast).
+//  Inherent additional Action: while the caster
+//  owns at least one non-face-down Creature that
+//  currently accepts a Poison stack, the cast
+//  doesn't consume the Main/Action-Phase Action.
 //
-//  Animation: purple spore rain on all creature
-//  instances that take a stack.
+//  Animation: swirling purple gas cloud on every
+//  creature instance, via the shared
+//  `toxic_fumes_gas` zone animation.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
 
 // Scan own support-zone card instances for any that would currently accept
-// a poison stack. Returns true if at least one qualifies — that's the
-// trigger for the "additional Action" clause in the card's text.
+// a poison stack — that's the trigger for the "additional Action" clause.
 function hasPoisonableOwnCreature(gs, pi, engine) {
   const cardDB = engine._getCardDB();
   for (const inst of engine.cardInstances) {
@@ -36,9 +35,9 @@ function hasPoisonableOwnCreature(gs, pi, engine) {
 }
 
 module.exports = {
-  // Inherent action when the caster has at least one non-immune Creature
-  // on their board (the effect will definitely poison one of them, which
-  // satisfies the card's "if you poison your own creature" clause).
+  // Inherent action while the caster has at least one non-immune Creature
+  // on their board — the effect will land a stack on it, satisfying the
+  // "additional Action" clause.
   inherentAction: (gs, pi, _heroIdx, engine) => hasPoisonableOwnCreature(gs, pi, engine),
 
   hooks: {
@@ -62,27 +61,27 @@ module.exports = {
         return;
       }
 
-      // Visual spore rain on every creature — even immune ones still
-      // "get hit" visually, to convey the effect's area-wide nature.
+      // Purple toxic gas on every creature — even immune ones still get
+      // the visual so the area-wide nature of the effect reads clearly.
       for (const inst of creatureInsts) {
         engine._broadcastEvent('play_zone_animation', {
-          type: 'poison_pollen_rain',
+          type: 'toxic_fumes_gas',
           owner: inst.owner,
           heroIdx: inst.heroIdx,
           zoneSlot: inst.zoneSlot,
         });
       }
-      await engine._delay(600);
+      await engine._delay(700);
 
-      // Apply the stacks. actionApplyCreaturePoison respects canApplyCreatureStatus
-      // internally, so immune creatures just no-op.
-      const source = { name: 'Poison Pollen', owner: pi };
+      // Apply the stacks. actionApplyCreaturePoison respects
+      // canApplyCreatureStatus internally, so immune creatures just no-op.
+      const source = { name: 'Toxic Fumes', owner: pi };
       for (const inst of creatureInsts) {
         if (inst.zone !== 'support') continue; // could have moved mid-resolve
         await engine.actionApplyCreaturePoison(source, inst);
       }
 
-      engine.log('poison_pollen', {
+      engine.log('toxic_fumes', {
         player: gs.players[pi]?.username,
         affected: creatureInsts.length,
       });

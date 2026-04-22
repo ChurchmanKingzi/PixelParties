@@ -1,0 +1,187 @@
+{
+  "gamesDone": 100,
+  "total": 100,
+  "elapsedMs": 1289800,
+  "stats": {
+    "p0wins": 50,
+    "p1wins": 48,
+    "draws": 2,
+    "totalTurns": 1251,
+    "totalMs": 840677
+  },
+  "decks": [
+    {
+      "id": "sample-7",
+      "name": "Shifting Sandlands",
+      "games": 20,
+      "wins": 14,
+      "losses": 6,
+      "winReasons": {
+        "Heroes dead": 14
+      },
+      "winRate": 0.7
+    },
+    {
+      "id": "sample-8",
+      "name": "Slimy Infestation",
+      "games": 14,
+      "wins": 9,
+      "losses": 4,
+      "winReasons": {
+        "Heroes dead": 9
+      },
+      "winRate": 0.643
+    },
+    {
+      "id": "sample-5",
+      "name": "One-Two-Punch!",
+      "games": 16,
+      "wins": 10,
+      "losses": 5,
+      "winReasons": {
+        "Heroes dead": 9,
+        "Deck-out": 1
+      },
+      "winRate": 0.625
+    },
+    {
+      "id": "sample-10",
+      "name": "Steam Dwarf Mines",
+      "games": 21,
+      "wins": 13,
+      "losses": 7,
+      "winReasons": {
+        "Heroes dead": 13
+      },
+      "winRate": 0.619
+    },
+    {
+      "id": "76824228-afe5-4f07-910c-333dfbde3f3c",
+      "name": "Sample Deck: Suicide Bombers",
+      "games": 12,
+      "wins": 7,
+      "losses": 5,
+      "winReasons": {
+        "Heroes dead": 7
+      },
+      "winRate": 0.583
+    },
+    {
+      "id": "sample-0",
+      "name": "Suicide Bombers",
+      "games": 11,
+      "wins": 6,
+      "losses": 5,
+      "winReasons": {
+        "Heroes dead": 6
+      },
+      "winRate": 0.545
+    },
+    {
+      "id": "sample-2",
+      "name": "Deepsea Terror",
+      "games": 12,
+      "wins": 6,
+      "losses": 6,
+      "winReasons": {
+        "Heroes dead": 5,
+        "Deck-out": 1
+      },
+      "winRate": 0.5
+    },
+    {
+      "id": "1c0c6d29-a3a4-47f2-80d2-95c269ba4e38",
+      "name": "Steam Dwarf Mines",
+      "games": 20,
+      "wins": 10,
+      "losses": 10,
+      "winReasons": {
+        "Heroes dead": 10
+      },
+      "winRate": 0.5
+    },
+    {
+      "id": "sample-4",
+      "name": "Lightning Caller",
+      "games": 14,
+      "wins": 7,
+      "losses": 7,
+      "winReasons": {
+        "Heroes dead": 5,
+        "Deck-out": 2
+      },
+      "winRate": 0.5
+    },
+    {
+      "id": "sample-6",
+      "name": "Poison Torture",
+      "games": 21,
+      "wins": 8,
+      "losses": 13,
+      "winReasons": {
+        "Heroes dead": 7,
+        "Deck-out": 1
+      },
+      "winRate": 0.381
+    },
+    {
+      "id": "sample-9",
+      "name": "Spell Industrialization",
+      "games": 9,
+      "wins": 3,
+      "losses": 5,
+      "winReasons": {
+        "Heroes dead": 2,
+        "Deck-out": 1
+      },
+      "winRate": 0.333
+    },
+    {
+      "id": "sample-3",
+      "name": "Heal Burn",
+      "games": 17,
+      "wins": 3,
+      "losses": 14,
+      "winReasons": {
+        "Heroes dead": 2,
+        "Deck-out": 1
+      },
+      "winRate": 0.176
+    },
+    {
+      "id": "sample-1",
+      "name": "Dance of the Butterflies",
+      "games": 13,
+      "wins": 2,
+      "losses": 11,
+      "winReasons": {
+        "Deck-out": 1,
+        "Heroes dead": 1
+      },
+      "winRate": 0.154
+    }
+  ],
+  "tieDetails": [
+    {
+      "gameIdx": 97,
+      "deckP0": "One-Two-Punch!",
+      "deckP1": "Steam Dwarf Mines",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 956,
+      "reason": "heap-abort@2383MB",
+      "diagnosis": "heap-abort: heapUsed=2383MB at turn 1 phase 0 active p0. Offending matchup: One-Two-Punch! vs Steam Dwarf Mines. Likely card-effect loop allocating unboundedly within this game."
+    },
+    {
+      "gameIdx": 99,
+      "deckP0": "Slimy Infestation",
+      "deckP1": "Spell Industrialization",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 131,
+      "reason": "no-result",
+      "diagnosis": "p0(heroes 3/3 alive, 1450hp, deck 55, hand 5) | p1(heroes 3/3 alive, 1150hp, deck 51, hand 6) | turn 1 phase 2 active p1 | cause: CPU driver threw 1× (last: t1 p1: Snapshot heap check tripped: heapUsed=2503MB at turn 1 phase 2. Refusing to take more snapshots this turn. @ at mctsGatedActivation (C:\\Pixel Parties WEB\\PixelPartiesWeb\\cards\\effects\\_cpu.js:3359:28))"
+    }
+  ],
+  "savedAt": "2026-04-22T16:31:26.950Z"
+}

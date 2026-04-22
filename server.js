@@ -141,6 +141,19 @@ async function initDatabase() {
   await db.execute('CREATE INDEX IF NOT EXISTS idx_hero_stats_user ON hero_stats(user_id)');
   await db.execute('CREATE INDEX IF NOT EXISTS idx_game_history_user ON game_history(user_id)');
 
+  // Per-opponent win/loss for singleplayer CPU battles. Keyed by the
+  // deckId the player faced — sample decks (`sample-N`) and structure
+  // decks share this key space since both come from loadSampleDecks().
+  await db.execute(`CREATE TABLE IF NOT EXISTS npc_stats (
+    user_id TEXT NOT NULL,
+    opponent_deck_id TEXT NOT NULL,
+    wins INTEGER DEFAULT 0,
+    losses INTEGER DEFAULT 0,
+    PRIMARY KEY (user_id, opponent_deck_id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`);
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_npc_stats_user ON npc_stats(user_id)');
+
   // Cardback storage table (replaces filesystem storage)
   await db.execute(`CREATE TABLE IF NOT EXISTS user_cardbacks (
     id TEXT PRIMARY KEY,
@@ -755,6 +768,38 @@ app.get('/api/sample-decks/owned', authMiddleware, async (req, res) => {
   const ownedSet = new Set(ownedRows.map(r => r.item_id));
   const decks = all.filter(d => !d.isStructure || ownedSet.has(d.structureId));
   res.json({ decks });
+});
+
+// Singleplayer opponent-gallery feed. Returns every sample deck the caller
+// can face (starter decks + owned structure decks), each enriched with the
+// middle-hero name and the caller's W/L record vs that opponent. The
+// client crops the hero's skin image to render a clean portrait tile.
+app.get('/api/sample-decks/gallery', authMiddleware, async (req, res) => {
+  const all = loadSampleDecks();
+  const ownedRows = await db.all(
+    "SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck'",
+    [req.user.userId]
+  );
+  const ownedSet = new Set(ownedRows.map(r => r.item_id));
+  const decks = all.filter(d => !d.isStructure || ownedSet.has(d.structureId));
+  const statRows = await db.all(
+    'SELECT opponent_deck_id, wins, losses FROM npc_stats WHERE user_id = ?',
+    [req.user.userId]
+  );
+  const statMap = new Map(statRows.map(r => [r.opponent_deck_id, r]));
+  const enriched = decks.map(d => {
+    const middleHero = d.heroes?.[1]?.hero || null;
+    const stat = statMap.get(d.id);
+    return {
+      id: d.id,
+      name: d.name,
+      isStructure: !!d.isStructure,
+      middleHero,
+      wins: stat?.wins || 0,
+      losses: stat?.losses || 0,
+    };
+  });
+  res.json({ opponents: enriched });
 });
 
 // Structure-deck shop catalog with per-deck ownership flags.
@@ -2134,7 +2179,7 @@ function puzzleEndGame(room, winnerIdx, reason) {
 // Singleplayer CPU battle end — no Elo/ranked/hero stats writes, mirrors puzzleEndGame's
 // minimal pattern. The human earns a small SC reward on a non-surrender win, gated by
 // light anti-farm guards (min turns + min cards played).
-const CPU_WIN_SC = 2;
+const CPU_WIN_SC = 1;
 const CPU_WIN_MIN_TURN = 3;
 const CPU_WIN_MIN_CARDS = 3;
 function endCpuBattle(room, winnerIdx, reason) {
@@ -2154,6 +2199,29 @@ function endCpuBattle(room, winnerIdx, reason) {
   };
   gs.rematchRequests = [];
   room.status = 'finished';
+
+  // Record per-opponent W/L for the human player so the singleplayer
+  // gallery can show their record vs this deck. Only counts when a human
+  // userId and opponent deckId are both known (skips anon/dev runs).
+  const humanUserId = room.players?.[0]?.userId;
+  const opponentDeckId = room.players?.[1]?.deckId;
+  if (humanUserId && opponentDeckId && reason !== 'surrender') {
+    const humanWon = winnerIdx === 0 ? 1 : 0;
+    const humanLost = winnerIdx === 0 ? 0 : 1;
+    (async () => {
+      try {
+        await db.run(`
+          INSERT INTO npc_stats (user_id, opponent_deck_id, wins, losses)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id, opponent_deck_id) DO UPDATE SET
+            wins = wins + excluded.wins,
+            losses = losses + excluded.losses
+        `, [humanUserId, opponentDeckId, humanWon, humanLost]);
+      } catch (err) {
+        console.error('[CPU battle] npc_stats update error:', err.message);
+      }
+    })();
+  }
 
   // SC reward: only the human (idx 0), only on an actual victory (no surrender
   // wins), and only if the game reached a real play state.
@@ -2533,6 +2601,15 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   if (!v) return false;
   const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
 
+  // Consume Silence's one-use bypass token as soon as validation succeeds.
+  // After this point the Spell lock fully applies — any further Spell attempts
+  // this turn are blocked.
+  if (cardData.cardType === 'Spell'
+      && ps._spellLockTurn === gs.turn
+      && ps._silenceBonusSpell === gs.turn) {
+    ps._silenceBonusSpell = -1;
+  }
+
   const heroOwner = charmedOwner != null ? charmedOwner : pi;
   const wisdomDiscardCost = room.engine.getWisdomDiscardCost(heroOwner, heroIdx, cardData);
 
@@ -2561,6 +2638,20 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
   const nth = ps.hand.slice(0, handIndex + 1).filter(c => c === cardName).length;
   ps._resolvingCard = { name: cardName, nth };
+
+  // Spell-in-flight counter — gates advancePhase so the turn can't end
+  // while a Spell is still mid-resolve (e.g. Rain of Arrows waiting on
+  // Ida's single-target prompt). Bumped here before onPlay; released
+  // explicitly below the moment effect resolution finishes (so the
+  // engine's own auto-advance to Main Phase 2 isn't blocked by its own
+  // counter), and the finally serves as a double-release-safe safety net.
+  gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
+  let _spellDepthReleased = false;
+  const _releaseSpellDepth = () => {
+    if (_spellDepthReleased) return;
+    _spellDepthReleased = true;
+    gs._spellResolutionDepth = Math.max(0, (gs._spellResolutionDepth || 1) - 1);
+  };
 
   try {
     const inst = room.engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
@@ -2606,7 +2697,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         if (hero.ghuanjunAttacksUsed && !hero.ghuanjunAttacksUsed.includes(cardName)) hero.ghuanjunAttacksUsed.push(cardName);
       }
       if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
-      if (!isInherentAction && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+      if (!isInherentAction && !additionalConsumed && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
       if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
       if (isActionPhase && !additionalConsumed && !isInherentAction) {
         await room.engine.advanceToPhase(pi, 4);
@@ -2644,6 +2735,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       if (additionalConsumed && consumedInst) {
         consumedInst.counters.additionalActionAvail = 1;
       }
+      // Spell was cancelled pre-resolution — release the in-flight lock
+      // now (the finally would also catch this, but being explicit makes
+      // the intent clear and matches the post-resolution release below).
+      _releaseSpellDepth();
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -2666,7 +2761,12 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     }
 
     if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
-    if (!isInherentAction && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+    // Additional-action plays (Friendship etc.) do NOT consume the hero's
+    // normal turn slot — they're explicitly "extra beyond the normal".
+    // Marking the hero here would force any follow-up normal action in
+    // Action Phase to need ANOTHER additional action, which isn't the
+    // intended semantics of `additionalConsumed`.
+    if (!isInherentAction && !additionalConsumed && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
     if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
 
     if (!gs._spellNegatedByEffect) {
@@ -2679,6 +2779,11 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
     await room.engine.resolveDeferredRecoil();
     await room.engine._executeDeferredSurprises();
+
+    // Effect resolution is complete — release the in-flight lock BEFORE
+    // the engine's own auto-advance to Main Phase 2 below, otherwise
+    // advanceToPhase would refuse its own call. The finally is idempotent.
+    _releaseSpellDepth();
 
     delete gs._spellDamageLog;
     delete gs._spellExcludeTargets;
@@ -2702,12 +2807,19 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     if (cardData.cardType === 'Spell' && cardData.spellSchool1 === 'Support Magic') {
       ps.supportSpellUsedThisTurn = true;
       if (additionalConsumed && consumedInst?.counters?.additionalActionType?.startsWith('friendship_support')) {
-        const abZones = ps.abilityZones[heroIdx] || [];
+        // Read ability zones from the HERO OWNER's side — for charmed
+        // casts this differs from the acting player. Using ps.abilityZones
+        // here would give the wrong level when the hero is on the opponent.
+        const heroPs = gs.players[heroOwner];
+        const abZones = heroPs?.abilityZones?.[heroIdx] || [];
         let friendshipLevel = 0;
         for (const slot of abZones) {
           if ((slot || []).includes('Friendship')) { friendshipLevel = (slot || []).length; break; }
         }
-        if (friendshipLevel <= 1) {
+        // ONLY Lv1 applies the "no more Support Spells this turn" debuff.
+        // Strict equality defends against friendshipLevel=0 (detection
+        // miss — treat as "no Friendship present, don't add a penalty").
+        if (friendshipLevel === 1) {
           ps.supportSpellLocked = true;
           room.engine.log('support_spell_locked', { player: ps.username, by: 'Friendship' });
         }
@@ -2762,6 +2874,11 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     }
   } catch (err) {
     console.error('[Engine] doPlaySpell error:', err.message, err.stack);
+  } finally {
+    // Safety-net release — idempotent via _releaseSpellDepth's flag, so
+    // this is a no-op if resolution already released normally above. Only
+    // fires on error / early returns that skipped the explicit release.
+    _releaseSpellDepth();
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -2991,6 +3108,15 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     }
     if (!allowOccupied) return false;
     ps._requestedBouncePlaceSlot = { heroIdx, slotIdx: zoneSlot };
+  } else {
+    // Player picked an EMPTY slot — they want a regular summon into this
+    // zone, not a bounce-place swap. Set an intent flag so beforeSummon
+    // hooks (tryBouncePlace for Deepsea) can short-circuit and let the
+    // normal placeCreature path run instead of prompting to bounce an
+    // on-board Deepsea. Flag is cleared either by the hook that reads it
+    // or, as a safety net, at turn start. Co-exists with the bounce-place
+    // flag — only one of the two is ever set for a given play.
+    ps._requestedNormalSummonSlot = { heroIdx, slotIdx: zoneSlot };
   }
 
   let additionalConsumed = false;
@@ -5973,7 +6099,7 @@ io.on('connection', (socket) => {
     socket.emit('debug_self_play_config_result', { ok: true, ...cfg });
   });
 
-  socket.on('debug_self_play_run', ({ count = 5, deckIdA, deckIdB, random, silent = true, minMatchupGames = 5, standbyOnComplete = false, excludeDeckNames = [] } = {}) => {
+  socket.on('debug_self_play_run', ({ count = 5, deckIdA, deckIdB, random, silent = true, minMatchupGames = 5, excludeDeckNames = [] } = {}) => {
     if (!currentUser) {
       socket.emit('debug_self_play_result', { ok: false, msg: 'not authenticated' });
       return;
@@ -6460,23 +6586,6 @@ io.on('connection', (socket) => {
       }
 
       socket.emit('debug_self_play_result', summary);
-
-      // ── Optional: put the machine into standby ──
-      // Fires AFTER socket emit + file save so no data is lost. Windows
-      // only: uses SetSuspendState via rundll32. If the OS blocks sleep
-      // (policy / recent user activity), the command silently no-ops.
-      if (standbyOnComplete) {
-        console.log(`[self-play] standbyOnComplete=true — suspending system in 10s...`);
-        setTimeout(() => {
-          try {
-            require('child_process').exec('rundll32.exe powrprof.dll,SetSuspendState 0,1,0', (err) => {
-              if (err) console.error('[self-play] standby command failed:', err.message);
-            });
-          } catch (e) {
-            console.error('[self-play] standby invocation threw:', e.message);
-          }
-        }, 10000); // 10s grace so the final report flushes + user can abort if near
-      }
     })().catch(err => {
       console.error('[self-play] runner threw:', err.message, err.stack);
       setCpuVerbose(_prevVerbose_sp);

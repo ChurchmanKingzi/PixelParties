@@ -317,6 +317,17 @@ async function tryBouncePlace(ctx) {
   // swap's atomicSwap proceed to place this Creature directly.
   if (ctx._isSwap) return true;
 
+  // Player explicitly dropped this Creature into an EMPTY Support Zone
+  // (server set `_requestedNormalSummonSlot` in doPlayCreature). They
+  // are spending the Action to summon normally, not bounce-swap. Clear
+  // the flag and let placeCreature run without prompting for a bounce
+  // target. If the bounce-place flag is ALSO set somehow, prefer
+  // normal-summon — the empty-slot intent is clearer.
+  if (ps._requestedNormalSummonSlot) {
+    delete ps._requestedNormalSummonSlot;
+    return true;
+  }
+
   const bounceable = getBounceableDeepseaCreatures(engine, pi);
   if (bounceable.length === 0) {
     // No bounce target — normal summon is the only path. The
@@ -516,15 +527,25 @@ async function tryBouncePlace(ctx) {
 
   // New Creature's on-summon hooks fire now. Delayed until after the
   // visual swap so animations / damage numbers from the on-summon
-  // effect render on top of an already-placed creature.
+  // effect render on top of an already-placed creature. The
+  // `_bypassDeadHeroFilter` flag is required when the bounce-place
+  // landed in a DEAD Hero's zone — runHooks normally filters out
+  // listeners attached to dead heroes (`c.heroIdx`'s hero.hp <= 0),
+  // which would swallow the new Creature's own onPlay. Deepsea swap
+  // explicitly supports placing into dead-hero zones, so the on-summon
+  // effect MUST still fire.
+  const bouncedHero = gs.players[pi]?.heroes?.[bouncedHeroIdx];
+  const landedOnDeadHero = !bouncedHero?.name || bouncedHero.hp <= 0;
   await engine.runHooks('onPlay', {
     _onlyCard: newInst, playedCard: newInst, cardName,
     zone: 'support', heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx,
     _skipReactionCheck: true,
+    _bypassDeadHeroFilter: landedOnDeadHero,
   });
   await engine.runHooks('onCardEnterZone', {
     enteringCard: newInst, toZone: 'support', toHeroIdx: bouncedHeroIdx,
     _skipReactionCheck: true,
+    _bypassDeadHeroFilter: landedOnDeadHero,
   });
 
   // Apply Infected Squirrel's summon-lock penalty AFTER the replacement
@@ -837,14 +858,22 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   });
   engine._untrackCard(bouncedInst.id);
 
+  // Bypass the runHooks dead-hero filter when the swap landed in a dead
+  // Hero's zone (same rationale as tryBouncePlace above) — Deepsea swap
+  // explicitly supports dead-hero destinations and the new Creature's
+  // on-summon must still fire.
+  const bouncedHero2 = gs.players[pi]?.heroes?.[bouncedHeroIdx];
+  const landedOnDeadHero2 = !bouncedHero2?.name || bouncedHero2.hp <= 0;
   await engine.runHooks('onPlay', {
     _onlyCard: newInst, playedCard: newInst, cardName: newCardName,
     zone: 'support', heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx,
     _skipReactionCheck: true,
+    _bypassDeadHeroFilter: landedOnDeadHero2,
   });
   await engine.runHooks('onCardEnterZone', {
     enteringCard: newInst, toZone: 'support', toHeroIdx: bouncedHeroIdx,
     _skipReactionCheck: true,
+    _bypassDeadHeroFilter: landedOnDeadHero2,
   });
   engine.sync();
   return { newInst, bouncedLevel };

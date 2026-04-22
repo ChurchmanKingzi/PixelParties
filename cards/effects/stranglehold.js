@@ -3,7 +3,8 @@
 //  Attack (Fighting Lv0, Normal) — Choose a
 //  target. Deal 50 damage × number of negative
 //  status effects on it. If the user has
-//  Fighting Lv1+, also add the hero's ATK stat.
+//  Fighting Lv1+, also add the hero's BASE ATK
+//  stat (ignoring equipment/buff modifiers).
 //  Equipment hooks (Sacred Hammer, Sun Sword)
 //  still fire via 'attack' damage type.
 //
@@ -68,7 +69,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
 
       const fightingLevel = getFightingLevel(ps, heroIdx);
-      const atkBonus = fightingLevel >= 1 ? (hero.atk || 0) : 0;
+      const atkBonus = fightingLevel >= 1 ? (hero.baseAtk || 0) : 0;
 
       // Prompt for target (any living target except the caster)
       const target = await ctx.promptDamageTarget({

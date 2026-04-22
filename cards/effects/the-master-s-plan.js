@@ -7,11 +7,11 @@
 //  and negate that card.
 //  If the negated card cost an Action (Attack,
 //  Spell, Creature without inherentAction, or
-//  action-cost Ability), the opponent may
+//  action-cost Ability), the opponent MAY
 //  immediately perform a different Action with
 //  any of their Heroes (like a normal Action
-//  Phase). The replacement action is forfeited
-//  if not used.
+//  Phase). The replacement action is optional —
+//  the target can cancel the prompt to skip it.
 //
 //  Hard once per turn (across all copies).
 // ═══════════════════════════════════════════
@@ -121,12 +121,13 @@ module.exports = {
 
     if (!costsAction) return;
 
-    // Grant opponent an immediate Action with any hero — no cancel, forfeited if unused
+    // Grant opponent an immediate Action with any hero — optional, they may
+    // cancel to skip (the replacement is a "may", not a "must").
     const oppIdx = targetLink.owner;
     await engine.performImmediateActionAnyHero(oppIdx, {
       title: "The Master's Plan",
-      description: 'Your card was negated. Perform a different Action with any Hero!',
-      cancellable: false,
+      description: 'Your card was negated. You may perform a different Action with any Hero — or skip.',
+      cancellable: true,
     });
 
     engine.sync();

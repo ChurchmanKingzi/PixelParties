@@ -51,7 +51,9 @@
       "Bash(node -c cards/effects/_placement-shared.js)",
       "Bash(node -e \"require\\('./cards/effects/deepsea-castle.js'\\)\")",
       "Bash(node -e \"const m = require\\('./cards/effects/deepsea-castle.js'\\); console.log\\(Object.keys\\(m\\)\\);\")",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(sqlite3 data/pixel-parties.db \"SELECT name, cardType, cost FROM cards WHERE name IN \\('Wheels', 'Magnetic Glove', 'Horn in a Bottle', 'Leadership'\\);\")",
+      "Bash(xargs -I {} grep -l \"allowedCategories\" {})"
     ]
   }
 }

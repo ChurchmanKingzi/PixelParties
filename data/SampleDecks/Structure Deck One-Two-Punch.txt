@@ -1,11 +1,11 @@
 === PIXEL PARTIES DECK ===
-Name: Structure Deck: One-Two-Punch!
+Name: One-Two-Punch!
 Cover: Ghuanjun, the Undead Martial Artist
 
 == HEROES ==
 Bill, the Angry Auctioneer
-Elana, the Rocky Rebel
 Ghuanjun, the Undead Martial Artist
+Elana, the Rocky Rebel
 
 == MAIN DECK ==
 4x Blow of the Venom Snake

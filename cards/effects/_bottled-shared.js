@@ -40,11 +40,23 @@ async function runDiscardChain(engine, potionOwner, potionName) {
       return currentPlayer;
     }
 
-    // Discard the chosen card
+    // Discard the chosen card — must fire the ON_DISCARD hook so effects
+    // like Steam Dwarf that subscribe to hand discards see the event.
     const { cardName, handIndex } = result;
     if (handIndex >= 0 && handIndex < hand.length && hand[handIndex] === cardName) {
       hand.splice(handIndex, 1);
       ps.discardPile.push(cardName);
+      const inst = engine.findCards({ owner: currentPlayer, zone: 'hand', name: cardName })[0];
+      if (inst) {
+        inst.zone = 'discard';
+        await engine.runHooks('onDiscard', {
+          playerIdx: currentPlayer,
+          card: inst,
+          cardName,
+          discardedCardName: cardName,
+          _fromHand: true,
+        });
+      }
       engine.log('bottled_discard', { player: ps.username, card: cardName, by: potionName });
       engine.sync();
       await engine._delay(300);

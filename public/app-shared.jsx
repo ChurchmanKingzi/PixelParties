@@ -143,6 +143,12 @@ const SFX_VOLUME_OVERRIDES = {
   ui_click: 0.5,
 };
 
+// Global SFX attenuation applied on top of EVERY other gain factor
+// (master volume, intrinsic override, per-call `opts.volume`). The mix
+// was hot overall; this pulls every effect down by a third without
+// touching the user-facing volume slider or any per-sound tuning.
+const SFX_MASTER_MULTIPLIER = 0.66;
+
 /**
  * Play a sound effect.
  *   name        — filename without extension, e.g. 'draw', 'damage', 'victory'
@@ -193,7 +199,7 @@ function playSFX(name, opts = {}) {
     // ends. The source is tracked in _activeOneShots so callers can stop
     // it mid-play via window.stopSFX (e.g. leaving the result overlay
     // while the fanfare is still running).
-    const gainMul = _sfxVolume() * intrinsic * (opts.volume != null ? opts.volume : 1);
+    const gainMul = _sfxVolume() * intrinsic * (opts.volume != null ? opts.volume : 1) * SFX_MASTER_MULTIPLIER;
     // If a previous fanfare is still playing, cut it off first.
     if (_activeOneShots[name]) {
       try { _activeOneShots[name].src.stop(); } catch {}
@@ -239,7 +245,7 @@ function _playBuffer(ctx, buf, opts, intrinsic, delaySec) {
   src.buffer = buf;
   src.playbackRate.value = opts.rate != null ? opts.rate : 1;
   const gain = ctx.createGain();
-  gain.gain.value = _sfxVolume() * intrinsic * (opts.volume != null ? opts.volume : 1);
+  gain.gain.value = _sfxVolume() * intrinsic * (opts.volume != null ? opts.volume : 1) * SFX_MASTER_MULTIPLIER;
   src.connect(gain).connect(ctx.destination);
   try { src.start(delaySec > 0 ? ctx.currentTime + delaySec : 0); } catch {}
 }

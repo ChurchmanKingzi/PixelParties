@@ -280,6 +280,13 @@ class GameEngine {
     // game (skip pacing/broadcasts) without setting this flag, so driver
     // still fires per turn.
     this._inMctsSim = false;
+    // Progress counter for the hook timeout. Incremented on every sync() —
+    // any engine state broadcast counts as "something is happening". The
+    // hook timeout only fires after EFFECT_TIMEOUT_MS of complete idle
+    // (no sync, no pending prompt), which prevents spurious timeouts on
+    // legit-long hooks like Bill's game-start equip flow that issue many
+    // fast sync() calls while the CPU resolves nested prompts.
+    this._hookProgressTick = 0;
   }
 
   // ═══════════════════════════════════════════
@@ -907,6 +914,15 @@ class GameEngine {
         if (hero.hp <= 0 && !hookCtx._bypassDeadHeroFilter) return false;
         if ((hero.statuses?.frozen || hero.statuses?.stunned) && (c.zone === 'hero' || c.zone === 'ability') && !loadCardEffect(c.name)?.bypassStatusFilter) return false;
         if (hero.statuses?.negated && (c.zone === 'hero' || c.zone === 'ability') && !loadCardEffect(c.name)?.bypassStatusFilter) return false;
+        // Mummy Token in the hero's support zone silences ALL of that
+        // hero's effects — not just the active hero effect the engine
+        // swaps for Mummy Token's own (see server.js doActivateHeroEffect),
+        // but passives too. Matches the "fully wrapped / silenced" theme
+        // and ensures e.g. Nomu's draw bonus hook filter also drops out.
+        // `bypassStatusFilter` (Beato's onGameStart) still wins so orb
+        // tracking can be initialised even on a mummified Beato.
+        if ((c.zone === 'hero' || c.zone === 'ability') && !loadCardEffect(c.name)?.bypassStatusFilter
+            && this._isHeroMummified(c.controller ?? c.owner, c.heroIdx)) return false;
       }
       // Creature-level negation/freeze/stun (Dark Gear, Necromancy, Slimes, Null Zone, etc.)
       if (c.zone === 'support' && (c.counters?.negated || c.counters?.nulled || c.counters?.frozen || c.counters?.stunned)) return false;
@@ -934,9 +950,16 @@ class GameEngine {
         await Promise.race([
           Promise.resolve(hookFn(ctx)),
           new Promise((_, rej) => {
+            // Reschedule the timeout as long as the engine shows signs of
+            // progress — any interactive prompt pending, OR any sync() since
+            // the last check. Only reject when the hook is truly idle for
+            // EFFECT_TIMEOUT_MS. Prevents false-positive timeouts on complex
+            // hero effects (Bill, Fiona) that issue many fast CPU prompts.
+            let lastTick = this._hookProgressTick;
             const check = () => {
-              // Don't timeout while an interactive prompt is pending
-              if (this._pendingGenericPrompt || this._pendingPrompt) {
+              if (this._pendingGenericPrompt || this._pendingPrompt ||
+                  this._hookProgressTick !== lastTick) {
+                lastTick = this._hookProgressTick;
                 setTimeout(check, EFFECT_TIMEOUT_MS);
               } else {
                 rej(new Error('Hook timeout'));
@@ -2398,9 +2421,15 @@ class GameEngine {
     // ── Surprise window for direct damage (creature effects, etc.) ──
     // Only fires for hero targets with a card source, skips status/self damage and recursive calls
     // Also skips if the caller already ran the surprise window (e.g. via promptDamageTarget)
+    //
+    // Note: we no longer gate on the GLOBAL _inSurpriseResolution flag here —
+    // that used to block legitimate cross-hero chains (e.g. Booby Trap
+    // damaging the attacker should still let the attacker's Spider Avalanche
+    // open on them). The per-hero lock in _checkSurpriseWindow /
+    // _activeSurpriseHeroes handles true self-recursion, and the depth
+    // counter in _activateSurprise still caps runaway nesting.
     const SURPRISE_SKIP_TYPES = new Set(['status', 'burn', 'poison', 'recoil', 'other']);
     if (
-      !this._inSurpriseResolution &&
       !opts?.skipSurpriseCheck &&
       target && target.hp !== undefined &&
       amount > 0 &&
@@ -2818,6 +2847,13 @@ class GameEngine {
       return;
     }
 
+    // Stinky Stables: poisoned heroes cannot be healed while the Area
+    // is in play (either side).
+    if (target.statuses?.poisoned && this._isPoisonHealLocked()) {
+      this.log('heal_blocked', { target: this._heroLabel(target), reason: 'Stinky Stables' });
+      return;
+    }
+
     // Check if target has Overheal Shock — converts healing to damage
     let targetPi = -1, targetHi = -1;
     for (let p = 0; p < 2; p++) {
@@ -2881,6 +2917,11 @@ class GameEngine {
   async actionHealCreature(source, target, amount) {
     if (!target || !target.counters) return;
     if (target.faceDown) return; // Face-down surprises cannot be healed
+    // Stinky Stables: poisoned creatures can't be healed while the Area is up.
+    if (target.counters.poisoned && this._isPoisonHealLocked()) {
+      this.log('heal_blocked', { target: target.name, reason: 'Stinky Stables' });
+      return;
+    }
     const cd = this._getCardDB()[target.name];
     const baseHp = target.counters.maxHp ?? cd?.hp ?? 0;
     if (baseHp <= 0) return;
@@ -4399,6 +4440,7 @@ class GameEngine {
   cleanseHeroStatuses(hero, playerIdx, heroIdx, statusKeys, source) {
     if (!hero?.statuses) return [];
     const removed = [];
+    const poisonLocked = this._isPoisonHealLocked();
     for (const key of statusKeys) {
       if (!hero.statuses[key]) continue;
       if (hero.statuses[key]?.unhealable) continue;
@@ -4406,6 +4448,8 @@ class GameEngine {
       // nulled). Cards that try to include these in their cleanse
       // list will silently no-op rather than sneak past the rule.
       if (STATUS_EFFECTS[key]?.cleansable === false) continue;
+      // Stinky Stables: poison stays while the Area is up.
+      if (key === 'poisoned' && poisonLocked) continue;
       delete hero.statuses[key];
       this.log('status_remove', { target: hero.name, status: key, by: source });
       removed.push(key);
@@ -4424,6 +4468,7 @@ class GameEngine {
   cleanseCreatureStatuses(inst, statusKeys, source) {
     if (!inst) return [];
     const removed = [];
+    const poisonLocked = this._isPoisonHealLocked();
     for (const key of statusKeys) {
       if (!inst.counters[key]) continue;
       // Creature unhealable: stored as separate counter flag
@@ -4432,6 +4477,8 @@ class GameEngine {
       // nulled). Keeps Dark Gear / Diplomacy / Necromancy negation
       // permanent regardless of which card is trying to cleanse.
       if (STATUS_EFFECTS[key]?.cleansable === false) continue;
+      // Stinky Stables: poison stays while the Area is up.
+      if (key === 'poisoned' && poisonLocked) continue;
       delete inst.counters[key];
       delete inst.counters[key + 'Stacks'];
       delete inst.counters[key + 'AppliedBy'];
@@ -5038,7 +5085,10 @@ class GameEngine {
         // Generic per-player Spell lock (Eraser Beam / any future "only Spell
         // this turn" card). Blocks further Spell plays once the lock is set;
         // cleared in the turn-start reset path alongside other per-turn flags.
-        if (cd.cardType === 'Spell' && ps._spellLockTurn === gs.turn) continue;
+        // Silence grants _silenceBonusSpell for one extra Spell past the lock.
+        if (cd.cardType === 'Spell'
+            && ps._spellLockTurn === gs.turn
+            && ps._silenceBonusSpell !== gs.turn) continue;
         // Area cards (any type with subtype 'Area') can only be cast while
         // the caster's own area zone is empty. Mirrors the play-time gate.
         if ((cd.subtype || '').toLowerCase() === 'area'
@@ -5159,7 +5209,10 @@ class GameEngine {
           if (cd.cardType === 'Spell' && hero.statuses?.nulled) continue;
           // Generic per-player Spell lock — `ps` here is the acting player,
           // since Spell-play restrictions follow the caster not the hero owner.
-          if (cd.cardType === 'Spell' && ps._spellLockTurn === gs.turn) continue;
+          // _silenceBonusSpell is Silence's one-use bypass token.
+          if (cd.cardType === 'Spell'
+              && ps._spellLockTurn === gs.turn
+              && ps._silenceBonusSpell !== gs.turn) continue;
           // Level/school check uses opponent's ability zones (where the charmed hero lives)
           if (!this.heroMeetsLevelReq(oppIdx, hi, cd)) continue;
           // Wisdom hand-size check: acting player (ps) must have enough cards to pay
@@ -5261,8 +5314,12 @@ class GameEngine {
 
     // Generic per-player Spell lock — set by cards that declare themselves
     // "the only Spell you play this turn" (Eraser Beam). Cleared at turn
-    // start alongside other per-turn flags.
-    if (cardData.cardType === 'Spell' && ps._spellLockTurn === gs.turn) return null;
+    // start alongside other per-turn flags. Silence grants a one-use
+    // bypass token (_silenceBonusSpell) that lets ONE more Spell through
+    // after the lock is set; consumed in doPlaySpell.
+    if (cardData.cardType === 'Spell'
+        && ps._spellLockTurn === gs.turn
+        && ps._silenceBonusSpell !== gs.turn) return null;
 
     // Area-play lock (Reality Crack): once set, no further Area Spells
     // may be cast this turn by this player. Flag is cleared at turn end.
@@ -5330,10 +5387,15 @@ class GameEngine {
       if (equipScript?.canPlayCard && !equipScript.canPlayCard(gs, pi, heroIdx, cardData, this)) return null;
     }
 
-    // Inherent action detection
-    const isInherentAction = typeof script?.inherentAction === 'function'
+    // Inherent action detection. A Spell played via Silence's bonus
+    // (bypassing the lock) doesn't consume the Main/Action-Phase Action —
+    // that's the "additional Action" clause in Silence's text.
+    const usingSilenceBonus = cardData.cardType === 'Spell'
+      && ps._spellLockTurn === gs.turn
+      && ps._silenceBonusSpell === gs.turn;
+    const isInherentAction = usingSilenceBonus || (typeof script?.inherentAction === 'function'
       ? script.inherentAction(gs, pi, heroIdx, this)
-      : script?.inherentAction === true;
+      : script?.inherentAction === true);
 
     return { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction };
   }
@@ -5467,29 +5529,37 @@ class GameEngine {
       if (!hadPriorLog) this.gs._spellDamageLog = [];
       // Apply target exclusion if configured (Invisibility Cloak, etc.)
       if (config.excludeTargets) this.gs._spellExcludeTargets = config.excludeTargets;
-      await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
-      if (config.excludeTargets) delete this.gs._spellExcludeTargets;
-      delete this.gs._immediateActionContext;
+      // Spell-in-flight counter — gates advancePhase so the active player
+      // can't end the turn while this spell is mid-resolve. Bumped before
+      // onPlay (which may open targeting prompts) and released in finally.
+      this.gs._spellResolutionDepth = (this.gs._spellResolutionDepth || 0) + 1;
+      try {
+        await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
+        if (config.excludeTargets) delete this.gs._spellExcludeTargets;
+        delete this.gs._immediateActionContext;
 
-      // Fire afterSpellResolved for Spells — parity with the normal spell-
-      // play path in server.js so hero passives like Bartas (Bomb Berserker),
-      // Andras, Beato, Luck, etc. trigger off immediate-action spells too.
-      if (cardData.cardType === 'Spell' && !this.gs._spellNegatedByEffect) {
-        const uniqueTargets = [];
-        const seenIds = new Set();
-        for (const t of (this.gs._spellDamageLog || [])) {
-          if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
+        // Fire afterSpellResolved for Spells — parity with the normal spell-
+        // play path in server.js so hero passives like Bartas (Bomb Berserker),
+        // Andras, Beato, Luck, etc. trigger off immediate-action spells too.
+        if (cardData.cardType === 'Spell' && !this.gs._spellNegatedByEffect) {
+          const uniqueTargets = [];
+          const seenIds = new Set();
+          for (const t of (this.gs._spellDamageLog || [])) {
+            if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
+          }
+          await this.runHooks('afterSpellResolved', {
+            spellName: cardName, spellCardData: cardData,
+            heroIdx, casterIdx: playerIdx,
+            damageTargets: uniqueTargets,
+            isSecondCast: !!this.gs._bartasSecondCast,
+            _skipReactionCheck: true,
+          });
         }
-        await this.runHooks('afterSpellResolved', {
-          spellName: cardName, spellCardData: cardData,
-          heroIdx, casterIdx: playerIdx,
-          damageTargets: uniqueTargets,
-          isSecondCast: !!this.gs._bartasSecondCast,
-          _skipReactionCheck: true,
-        });
+        if (!hadPriorLog) delete this.gs._spellDamageLog;
+        delete this.gs._spellNegatedByEffect;
+      } finally {
+        this.gs._spellResolutionDepth = Math.max(0, (this.gs._spellResolutionDepth || 1) - 1);
       }
-      if (!hadPriorLog) delete this.gs._spellDamageLog;
-      delete this.gs._spellNegatedByEffect;
 
       ps.discardPile.push(cardName);
       this._untrackCard(inst.id);
@@ -5988,6 +6058,12 @@ class GameEngine {
   async advancePhase(playerIdx) {
     // Only the active player can advance
     if (playerIdx !== this.gs.activePlayer) return false;
+    // Spell-resolution-in-flight guard. If a Spell is still mid-resolve
+    // (e.g. Rain of Arrows waiting on Ida's single-target prompt), refuse
+    // phase advance — otherwise the spell's later damage ticks can land
+    // after the turn has already switched, or get dropped entirely. The
+    // counter is incremented in doPlaySpell (server.js) + performImmediateAction.
+    if ((this.gs._spellResolutionDepth || 0) > 0) return false;
 
     const current = this.gs.currentPhase;
     let nextPhase = null;
@@ -6023,6 +6099,8 @@ class GameEngine {
    */
   async advanceToPhase(playerIdx, targetPhase) {
     if (playerIdx !== this.gs.activePlayer) return false;
+    // Spell-resolution-in-flight guard — see advancePhase() comment.
+    if ((this.gs._spellResolutionDepth || 0) > 0) return false;
 
     const current = this.gs.currentPhase;
 
@@ -6902,6 +6980,19 @@ class GameEngine {
   }
 
   /** Place an Area card from a casting spell onto its owner's area zone. */
+  /**
+   * Returns true if any active "Stinky Stables" Area is in play (either
+   * side). While locked, poisoned targets can't be healed (HP heals are
+   * no-ops) and their Poison status can't be removed / cleansed. Tied
+   * to the card script cards/effects/stinky-stables.js.
+   */
+  _isPoisonHealLocked() {
+    const gs = this.gs;
+    if (!gs?.areaZones) return false;
+    return (gs.areaZones[0] || []).includes('Stinky Stables')
+        || (gs.areaZones[1] || []).includes('Stinky Stables');
+  }
+
   async placeArea(playerIdx, cardInstance, opts = {}) {
     const gs = this.gs;
     const ps = gs.players[playerIdx];
@@ -7261,8 +7352,33 @@ class GameEngine {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+      // Mummy Token silences hero passives (see runHooks filter + bug 7).
+      if (this._isHeroMummified(playerIdx, hi)) continue;
       const script = loadCardEffect(hero.name);
       if (script?.isNomuHero) return true;
+    }
+    return false;
+  }
+
+  /**
+   * True if the given (playerIdx, heroIdx) has a Mummy Token occupying any
+   * of its Support Zones. Mummy Token's card text is "Replaces the
+   * corresponding Hero's active effect" but gameplay-wise it fully silences
+   * the hero — both the active effect (handled in server.js
+   * doActivateHeroEffect, which already prefers Mummy Token's heroEffect)
+   * AND all passives (handled here via the runHooks filter and direct-
+   * poll sites like _hasActiveNomu). Behaves like `statuses.negated` for
+   * the hero + ability zones. Support-zone creatures remain unaffected.
+   */
+  _isHeroMummified(playerIdx, heroIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return false;
+    const supportZones = ps.supportZones?.[heroIdx] || [];
+    for (const slot of supportZones) {
+      if (!slot) continue;
+      for (const cardName of slot) {
+        if (cardName === 'Mummy Token') return true;
+      }
     }
     return false;
   }
@@ -7957,8 +8073,14 @@ class GameEngine {
    */
   async _checkSurpriseWindow(targetedHeroes, sourceCard) {
     if (!targetedHeroes || targetedHeroes.length === 0) return null;
-    // Prevent recursive/double surprise prompts
-    if (this._inSurpriseResolution) return null;
+    // NOTE: we deliberately do NOT bail out on `_inSurpriseResolution` here.
+    // That flag goes up whenever ANY surprise is mid-resolution, which used
+    // to block e.g. Spider Avalanche from firing on the attacker when a
+    // Booby Trap on the defender damages them back. We now gate per-hero
+    // via `_activeSurpriseHeroes` inside the loop below: a specific hero
+    // can't re-fire their own surprise while it's still resolving, but
+    // OTHER heroes (different owner/slot) may still open their windows.
+    // The depth counter in `_activateSurprise` still caps runaway nesting.
 
     this.gs._surprisePendingCount = (this.gs._surprisePendingCount || 0) + 1;
     this.gs.surprisePending = true;
@@ -7970,6 +8092,14 @@ class GameEngine {
       const tHeroIdx = target.heroIdx;
       const ps = this.gs.players[tOwner];
       if (!ps) continue;
+
+      // Per-hero re-entry guard. If THIS specific hero is already in the
+      // middle of firing their own surprise, don't let the same slot fire
+      // again during nested resolution — that would be self-recursion
+      // (the card is face-up but still physically in the zone until
+      // discard at the end of _activateSurprise).
+      const heroKey = `${tOwner}-${tHeroIdx}`;
+      if (this._activeSurpriseHeroes?.has(heroKey)) continue;
 
       const surpriseZone = ps.surpriseZones?.[tHeroIdx] || [];
       if (surpriseZone.length === 0) continue;
@@ -8258,15 +8388,15 @@ class GameEngine {
         // Spell/Attack reactions: at least 1 hero must be able to cast it
         // Artifacts: skip hero check (only need gold)
         const isArtifact = cardData?.cardType === 'Artifact';
+        let castingHeroIdx = -1;
         if (!isArtifact) {
-          let canCast = false;
           for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
             if (this._canHeroActivateSurprise(pi, heroI, cardName)) {
-              canCast = true;
+              castingHeroIdx = heroI;
               break;
             }
           }
-          if (!canCast) continue;
+          if (castingHeroIdx < 0) continue;
         }
 
         // Build prompt message
@@ -8296,6 +8426,14 @@ class GameEngine {
 
         this.log('post_target_reaction', { card: cardName, player: ps.username });
 
+        // Wisdom (level-gap coverage) cost — same contract as doPlaySpell:
+        // spells played above the casting hero's school level require paying
+        // N discards. Calculated now but prompted AFTER resolution so the
+        // reaction's effect lands first (matching how regular spells pay).
+        const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
+          ? this.getWisdomDiscardCost(pi, castingHeroIdx, cardData)
+          : 0;
+
         this._inPostTargetReaction = true;
         let resolveResult = null;
         try {
@@ -8306,9 +8444,42 @@ class GameEngine {
           this._inPostTargetReaction = false;
         }
 
+        // Fire afterSpellResolved for Spell-type reactions so hero passives
+        // that listen on cast completion (Beato's orb collector, Reiza's
+        // post-cast stun, Andras, Luck, etc.) treat reactions the same as
+        // normal spell plays. Without this, casting e.g. Anti Magic Shield
+        // never counted as a Magic Arts cast for Beato's Ascension.
+        // Matches the contract used in performImmediateAction
+        // (see _engine.js ~L5524) for copy/free casts.
+        // NOTE: the REACTION itself was not negated — it's the opponent's
+        // source spell that gets negated when the reaction returns
+        // { effectNegated: true }. So we always fire for the reaction,
+        // independent of resolveResult.
+        if (!isArtifact && cardData?.cardType === 'Spell' && castingHeroIdx >= 0) {
+          try {
+            await this.runHooks('afterSpellResolved', {
+              spellName: cardName,
+              spellCardData: cardData,
+              heroIdx: castingHeroIdx,
+              casterIdx: pi,
+              damageTargets: [],
+              isSecondCast: false,
+              _skipReactionCheck: true,
+            });
+          } catch (err) {
+            console.error('[Engine] afterSpellResolved (reaction) error:', err.message);
+          }
+        }
+
         // Discard the card
         ps.discardPile.push(cardName);
         this.sync();
+
+        if (wisdomCost > 0) {
+          await this.actionPromptForceDiscard(pi, wisdomCost, {
+            title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+          });
+        }
 
         // Return result (e.g. { effectNegated: true } for Invisibility Cloak)
         return resolveResult || null;
@@ -8462,6 +8633,13 @@ class GameEngine {
   async _activateSurprise(playerIdx, heroIdx, cardName, sourceInfo, script, opts = {}) {
     this._surpriseResolutionDepth = (this._surpriseResolutionDepth || 0) + 1;
     this._inSurpriseResolution = true;
+    // Per-hero re-entry guard (see _checkSurpriseWindow). Identifies the
+    // specific (owner, heroIdx) slot that's currently mid-resolution so
+    // nested damage back on the SAME slot can't re-fire the same surprise.
+    // Other heroes remain free to open their own windows.
+    if (!this._activeSurpriseHeroes) this._activeSurpriseHeroes = new Set();
+    const heroKey = `${playerIdx}-${heroIdx}`;
+    this._activeSurpriseHeroes.add(heroKey);
     try {
     const ps = this.gs.players[playerIdx];
     const hero = ps.heroes[heroIdx];
@@ -8592,6 +8770,7 @@ class GameEngine {
     } finally {
       this._surpriseResolutionDepth = Math.max(0, (this._surpriseResolutionDepth || 1) - 1);
       if (this._surpriseResolutionDepth === 0) this._inSurpriseResolution = false;
+      this._activeSurpriseHeroes?.delete(heroKey);
     }
   }
 
@@ -9987,7 +10166,28 @@ class GameEngine {
   heroMeetsLevelReq(playerIdx, heroIdx, cardData) {
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
-    if (!hero?.name || hero.hp <= 0) return false;
+    if (!hero?.name) return false;
+    // Dead hero: the only legal plays are cards that explicitly bypass the
+    // Hero-as-caster requirement — i.e. Placement-style cards (Deepsea
+    // bounce-place, any future "install into this slot regardless of
+    // caster" mechanic). They opt in via `canBypassLevelReq`. Without this
+    // dead-hero-aware branch, dropping a Deepsea Creature onto a bounce
+    // target in a DEAD Hero's zone was silently rejected here, before
+    // validateActionPlay could consult `canBypassFreeZoneRequirement` and
+    // before the card's own beforeSummon ran the swap. Attacks / Spells /
+    // vanilla Creatures still correctly fail at the unchanged `return
+    // false` below.
+    if (hero.hp <= 0) {
+      const cardScript = loadCardEffect(cardData.name);
+      if (typeof cardScript?.canBypassLevelReq === 'function') {
+        try {
+          if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this)) return true;
+        } catch (err) {
+          console.error(`[canBypassLevelReq dead-hero] ${cardData.name} threw:`, err.message);
+        }
+      }
+      return false;
+    }
     let rawLevel = cardData.level || 0;
     // Per-card level override (e.g. Sol Rym treats Chain Lightning as level 0)
     if (hero.levelOverrideCards && cardData.name && hero.levelOverrideCards[cardData.name] != null) {
@@ -10310,6 +10510,11 @@ class GameEngine {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero || !hero.name || !hero.statuses?.[statusName]) return;
     if (hero.statuses[statusName]?.unhealable) return;
+    // Stinky Stables: poison can't be removed while the Area is in play.
+    if (statusName === 'poisoned' && this._isPoisonHealLocked()) {
+      this.log('poison_remove_blocked', { target: hero.name, reason: 'Stinky Stables' });
+      return;
+    }
     delete hero.statuses[statusName];
     this.log('status_remove', { target: hero.name, status: statusName, owner: playerIdx });
     await this.runHooks(HOOKS.ON_STATUS_REMOVED, { target: hero, heroOwner: playerIdx, heroIdx, statusName });
@@ -11456,6 +11661,9 @@ class GameEngine {
   // ─── SYNC STATE TO CLIENTS ────────────────
 
   sync() {
+    // Tick progress counter even in fast mode — the hook timeout watches
+    // it, and MCTS rollouts that call sync() should count as progress too.
+    this._hookProgressTick = (this._hookProgressTick || 0) + 1;
     if (this._fastMode) return; // Skip state-broadcast + SC-tracking during simulations.
     // ── SC tracking: check ability/support zone states ──
     if (this.gs._scTracking) {

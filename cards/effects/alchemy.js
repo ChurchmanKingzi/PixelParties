@@ -25,6 +25,22 @@ module.exports = {
     return { potionDrawsPerTurn: 1, goldPerTurn: -cost };
   },
 
+  // Gold demand signal for the evaluator. Returns the gold Alchemy would
+  // consume if activated RIGHT NOW — or 0 if activation isn't possible
+  // (HOPT claimed, potion deck empty, hero KO'd/frozen/stunned). Used to
+  // tell "gold gain is valuable because we could spend it on Alchemy".
+  cpuGoldCostForActivation(engine, pi, heroIdx, level) {
+    const gs = engine.gs;
+    const ps = gs.players?.[pi];
+    if (!ps) return 0;
+    if (gs.hoptUsed?.[`free-ability:Alchemy:${pi}`] === gs.turn) return 0;
+    if ((ps.potionDeck || []).length === 0) return 0;
+    const hero = ps.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return 0;
+    if (hero.statuses?.frozen || hero.statuses?.stunned) return 0;
+    return level >= 3 ? 0 : level >= 2 ? 4 : 8;
+  },
+
   /**
    * Check if Alchemy can be activated right now.
    * Requires enough gold and at least 1 card in potion deck.

@@ -59,14 +59,25 @@ module.exports = {
       if (enteringController !== selfController) return;
 
       // Entering card must be a Creature with an on-summon effect. A
-      // passive-only Creature (no onPlay) has no "on-summon effect" per
-      // the card text — don't react.
+      // passive-only Creature (no on-summon hook) has no "on-summon
+      // effect" per the card text — don't react. Two hook shapes count
+      // as an on-summon effect:
+      //   • `hooks.onPlay` — the standard shape (Deepsea Werewolf, most
+      //     creatures with an on-summon payload).
+      //   • top-level `beforeSummon` — used by Creatures that need to
+      //     orchestrate their entrance around the placement itself
+      //     (Dark Deepsea God runs its tribute + AoE damage here and
+      //     deliberately leaves `hooks.onPlay` empty so the animation
+      //     midpoint split works). Without this second check Sandy Blob
+      //     silently ignored DDG even though its on-summon IS firing.
       const cardDB = engine._getCardDB();
       const cd = cardDB[entering.name];
       if (!cd || !hasCardType(cd, 'Creature')) return;
       if (cd.cardType === 'Token') return;
       const enteringScript = loadCardEffect(entering.name);
-      if (!enteringScript?.hooks?.onPlay) return;
+      const hasOnSummon = !!(enteringScript?.hooks?.onPlay)
+        || typeof enteringScript?.beforeSummon === 'function';
+      if (!hasOnSummon) return;
 
       // Sandy Blob must be live on the board.
       if (!inst || inst.zone !== 'support') return;

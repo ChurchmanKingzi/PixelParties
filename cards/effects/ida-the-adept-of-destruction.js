@@ -21,19 +21,38 @@ module.exports = {
 
   hooks: {
     /**
-     * On game start + on play: register the single-target override flag.
-     * Stored on gameState so spell scripts can access it.
+     * On game start + on play + every turn start: register the single-
+     * target override flag. Merged rather than replaced so other flags
+     * set on the same hero-slot key (Monia / Nao / Toras / etc.) survive.
+     * `onTurnStart` re-asserts defensively in case Ida was KO'd earlier
+     * (which deletes the flag) and later revived — revival doesn't fire
+     * onGameStart or onPlay, so without this the passive would stay off
+     * after any resurrection.
      */
     onGameStart: (ctx) => {
       const gs = ctx.gameState;
       if (!gs.heroFlags) gs.heroFlags = {};
-      gs.heroFlags[`${ctx.cardOriginalOwner}-${ctx.cardHeroIdx}`] = { forcesSingleTarget: true };
+      const key = `${ctx.cardOriginalOwner}-${ctx.cardHeroIdx}`;
+      gs.heroFlags[key] = { ...(gs.heroFlags[key] || {}), forcesSingleTarget: true };
     },
 
     onPlay: (ctx) => {
       const gs = ctx.gameState;
       if (!gs.heroFlags) gs.heroFlags = {};
-      gs.heroFlags[`${ctx.cardOriginalOwner}-${ctx.cardHeroIdx}`] = { forcesSingleTarget: true };
+      const key = `${ctx.cardOriginalOwner}-${ctx.cardHeroIdx}`;
+      gs.heroFlags[key] = { ...(gs.heroFlags[key] || {}), forcesSingleTarget: true };
+    },
+
+    onTurnStart: (ctx) => {
+      // Ida is alive + active (hooks filter dead / frozen / stunned /
+      // negated heroes). Re-assert the flag so revives don't leave her
+      // passive silently disabled.
+      const hero = ctx.attachedHero;
+      if (!hero?.name || hero.hp <= 0) return;
+      const gs = ctx.gameState;
+      if (!gs.heroFlags) gs.heroFlags = {};
+      const key = `${ctx.cardOriginalOwner}-${ctx.cardHeroIdx}`;
+      gs.heroFlags[key] = { ...(gs.heroFlags[key] || {}), forcesSingleTarget: true };
     },
 
     /**

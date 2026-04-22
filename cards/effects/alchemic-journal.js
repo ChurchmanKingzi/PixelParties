@@ -3,6 +3,7 @@
 //  Artifact (Normal, Cost 8) — Draw a Potion,
 //  or pay 5 extra Gold to search Potion Deck
 //  for a specific card (locked for the turn).
+//  Hard once per turn.
 // ═══════════════════════════════════════════
 
 module.exports = {
@@ -10,6 +11,7 @@ module.exports = {
   deferBroadcast: true,
 
   canActivate(gs, pi) {
+    if (gs.hoptUsed?.[`alchemic-journal:${pi}`] === gs.turn) return false;
     const ps = gs.players[pi];
     return (ps?.potionDeck || []).length > 0;
   },
@@ -18,6 +20,7 @@ module.exports = {
     const gs = engine.gs;
     const ps = gs.players[pi];
     if (!ps || (ps.potionDeck || []).length === 0) return { cancelled: true };
+    if (!engine.claimHOPT('alchemic-journal', pi)) return { cancelled: true };
 
     const baseCost = 8;
     const extraGold = (ps.gold || 0) - baseCost;

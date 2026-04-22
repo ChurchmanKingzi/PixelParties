@@ -154,6 +154,14 @@ module.exports = {
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
 
+  // CPU hint: sacrificing an own hero in Main Phase 1 costs that hero's
+  // Action Phase. The correct order is "use the about-to-be-sacrificed
+  // caster first, THEN sacrifice in Main Phase 2". This flag tells the
+  // CPU brain to defer the proactive play until Main Phase 2 so the
+  // caster is still alive when the Action Phase opens. See
+  // `fireAdditionalActions` in cards/effects/_cpu.js.
+  cpuDelayToMainPhase2: true,
+
   /**
    * Post-target condition: fires when an opponent's card targets
    * the player's heroes. Requires 2+ sacrifice-eligible heroes.

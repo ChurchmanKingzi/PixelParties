@@ -23,6 +23,12 @@ const { loadCardEffect } = require('./_loader');
 module.exports = {
   isSurprise: true,
 
+  // Magic Mirror's whole effect depends on a triggering Spell to reflect
+  // (sourceInfo.cardName / level / etc.). Telekinesis supplies no such
+  // source, so the card would be a silent no-op if it were selectable.
+  // Like Defending the Gate, we simply disallow Telekinesis activation.
+  canTelekinesisActivate: false,
+
   /**
    * Trigger: fires when the user (host Hero) is being targeted by a Spell.
    * sourceInfo = { cardName, owner, heroIdx, cardInstance }.

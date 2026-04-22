@@ -48,10 +48,13 @@ module.exports = {
 
     if (sourceInfo.telekinesis) {
       // ── Telekinesis mode: pick any target to deal 100 damage to ──
-      await ctx.promptDamageTarget({
+      // promptDamageTarget only SELECTS a target — it does not deal damage.
+      // The caller must dispatch to actionDealDamage / actionDealCreatureDamage
+      // itself (see cannon-tower.js for the canonical pattern).
+      const target = await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
-        damageType: 'attack',
+        damageType: 'destruction_spell',
         baseDamage: 100,
         title: 'Booby Trap',
         description: 'Deal 100 damage to any target.',
@@ -59,12 +62,31 @@ module.exports = {
         confirmClass: 'btn-danger',
         cancellable: false,
         noSpellCancel: true,
-        damage: 100,
-        damageType: 'destruction_spell',
-        animationType: 'explosion',
-        animDelay: 600,
       });
-      return null; // No effect negation in telekinesis mode
+      if (!target) return null;
+
+      const tSlot = target.type === 'hero' ? -1 : target.slotIdx;
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'explosion', owner: target.owner,
+        heroIdx: target.heroIdx, zoneSlot: tSlot,
+      });
+      await engine._delay(600);
+
+      if (target.type === 'hero') {
+        const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
+        if (tgtHero && tgtHero.hp > 0) {
+          await ctx.dealDamage(tgtHero, 100, 'destruction_spell');
+        }
+      } else if (target.cardInstance) {
+        await engine.actionDealCreatureDamage(
+          { name: 'Booby Trap', owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx },
+          target.cardInstance, 100, 'destruction_spell',
+          { sourceOwner: ctx.cardOwner, canBeNegated: true }
+        );
+      }
+      engine.sync();
+      await engine._delay(400);
+      return null; // No effect negation in telekinesis mode (no source to negate)
     }
 
     const srcInst = sourceInfo.cardInstance;

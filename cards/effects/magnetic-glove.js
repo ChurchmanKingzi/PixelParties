@@ -12,11 +12,6 @@ module.exports = {
   blockedByHandLock: true,
   isTargetingArtifact: true,
 
-  // MCTS gate rejects searches because the hand-add of a single card
-  // produces near-zero immediate evaluator delta — but searching for the
-  // highest-impact deck card is always a strict upgrade. Always fire.
-  cpuSkipMctsGate: true,
-
   canActivate(gs, pi) {
     // HOPT check
     const hoptKey = `magnetic-glove:${pi}`;

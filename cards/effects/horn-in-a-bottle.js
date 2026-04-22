@@ -11,12 +11,6 @@ module.exports = {
   isPotion: true,
   deferBroadcast: true,
 
-  // MCTS gate rejects this because mulligan + draw N+1 looks like near-zero
-  // evaluator delta (old hand → new hand of similar total value), but the
-  // +1 bonus plus card-filtering is a strict upgrade. Always fire when the
-  // CPU reaches this point (caller already verified it's playable).
-  cpuSkipMctsGate: true,
-
   resolve: async (engine, pi) => {
     const gs = engine.gs;
     const ps = gs.players[pi];

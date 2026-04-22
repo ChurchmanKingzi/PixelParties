@@ -16,11 +16,6 @@ module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
 
-  // MCTS gate can't appreciate a mulligan — replacing hand cards has ~0
-  // immediate evaluator delta, but the card-filtering value is real. Always
-  // fire when legal; the handPick handler will mulligan only unusable cards.
-  cpuSkipMctsGate: true,
-
   // CPU threat assessment: mulligan nets zero cards at Lv1/2 (replaces same
   // count); only Lv3 adds +1 bonus draw. Card-filtering value not modeled.
   supportYield(level) {

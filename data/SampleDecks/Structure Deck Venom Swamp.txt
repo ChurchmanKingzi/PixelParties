@@ -1,0 +1,42 @@
+=== PIXEL PARTIES DECK ===
+Name: Structure Deck: Venom Swamp
+Cover: Poisoned Well
+
+== HEROES ==
+Medea, the Swamp Witch
+Zsos'Ssar, the Serpent Warlord
+Fiona, the Princess of Blackport
+
+== MAIN DECK ==
+4x Alchemic Journal
+2x Coffee
+6x Decay Magic
+1x Divine Gift of Sacrifice
+2x Divine Punishment
+2x Golden Ankh
+4x Magnetic Glove
+2x Pet Snake
+2x Poison Pollen
+2x Poisoned Well
+4x Rap Harpyformer
+3x Rusty Touch
+2x Shamanic Curse
+4x Sickly Cheese
+1x Silence
+1x Stinky Stables
+2x Tea
+4x The Master's Plan
+4x The Warlord's Bite
+1x Toxic Fumes
+3x Venom Infusion
+4x Wheels
+
+== POTION DECK ==
+2x Acid Vial
+2x Elixir of Quickness
+2x Magic Lamp
+2x Magnetic Potion
+2x Poison Vial
+1x Resuscitation Potion
+
+== SIDE DECK ==

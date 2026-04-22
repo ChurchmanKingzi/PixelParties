@@ -77,13 +77,8 @@ function MainMenu() {
   const [tutorialAttemptState, setTutorialAttemptState] = useState(null);
   const tutorialAttemptRoom = useRef(null);
 
-  // Singleplayer state (CPU opponent — deck selection + active battle)
-  const [singleplayerOpen, setSingleplayerOpen] = useState(false);
-  const [spDecks, setSpDecks] = useState([]);
-  const [spSampleDecks, setSpSampleDecks] = useState([]);
-  const [cpuDeckId, setCpuDeckId] = useState('');
-  const [cpuBattleState, setCpuBattleState] = useState(null);
-  const cpuBattleRoom = useRef(null);
+  // Singleplayer lives in its own screen now (see SingleplayerScreen).
+  // MainMenu just routes to it via setScreen('singleplayer').
 
   const logout = async () => {
     try { await api('/auth/logout', { method: 'POST' }); } catch {}
@@ -248,73 +243,13 @@ function MainMenu() {
     }
   }, [tutorialAttemptState, notify]);
 
-  // Singleplayer: load decks + pick a fresh random legal deck for the CPU every time the submenu opens.
-  useEffect(() => {
-    if (!singleplayerOpen) return;
-    let cancelled = false;
-    (async () => {
-      let personal = spDecks;
-      let samples = spSampleDecks;
-      try {
-        const data = await api('/decks');
-        if (!cancelled && data?.decks) { personal = data.decks; setSpDecks(personal); }
-      } catch {}
-      try {
-        const sd = await api('/sample-decks/owned');
-        if (!cancelled && sd?.decks) { samples = sd.decks; setSpSampleDecks(samples); }
-      } catch {}
-      if (cancelled) return;
-      const legal = [...personal, ...samples].filter(d => isDeckLegal(d).legal);
-      if (legal.length) {
-        const pick = legal[Math.floor(Math.random() * legal.length)];
-        setCpuDeckId(pick.id);
-      } else {
-        setCpuDeckId('');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [singleplayerOpen]);
-
-  // Singleplayer: listen for CPU battle game_state and errors.
-  useEffect(() => {
-    const onGameState = (state) => {
-      if (state.isCpuBattle) {
-        cpuBattleRoom.current = state.roomId;
-        setCpuBattleState(state);
-      }
-    };
-    const onError = (msg) => notify('CPU battle error: ' + msg, 'error');
-    socket.on('game_state', onGameState);
-    socket.on('cpu_battle_error', onError);
-    return () => { socket.off('game_state', onGameState); socket.off('cpu_battle_error', onError); };
-  }, [notify]);
-
-  const startCpuBattle = () => {
-    const legalPersonal = spDecks.filter(d => isDeckLegal(d).legal);
-    const legalSample = spSampleDecks.filter(d => isDeckLegal(d).legal);
-    const playerDeck = legalPersonal.find(d => d.isDefault) || legalPersonal[0] || legalSample[0] || null;
-    if (!playerDeck) { notify('You need a legal deck to play', 'error'); return; }
-    if (!cpuDeckId) { notify('Pick a CPU deck first', 'error'); return; }
-    socket.emit('start_cpu_battle', { playerDeckId: playerDeck.id, cpuDeckId });
-    if (window.playSFX) window.playSFX('match_found');
-  };
-
-  const onCpuBattleLeave = useCallback(() => {
-    const roomId = cpuBattleRoom.current;
-    if (roomId) socket.emit('leave_game', { roomId });
-    setCpuBattleState(null);
-    cpuBattleRoom.current = null;
-  }, []);
-
   // Play bgm_puzzle while a puzzle attempt or tutorial attempt is active.
-  // CPU battles play the normal battle music.
   useEffect(() => {
     if (!setBgmMode) return;
-    if (cpuBattleState && !cpuBattleState.result) setBgmMode('battle');
-    else if (puzzleAttemptState || tutorialAttemptState) setBgmMode('puzzle');
+    if (puzzleAttemptState || tutorialAttemptState) setBgmMode('puzzle');
     else setBgmMode('menu');
     return () => { if (setBgmMode) setBgmMode('menu'); };
-  }, [puzzleAttemptState, tutorialAttemptState, cpuBattleState, setBgmMode]);
+  }, [puzzleAttemptState, tutorialAttemptState, setBgmMode]);
 
   // Render GameBoard during tutorial attempt
   if (tutorialAttemptState) {
@@ -348,21 +283,6 @@ function MainMenu() {
     );
   }
 
-  // Render GameBoard during a singleplayer CPU battle
-  if (cpuBattleState) {
-    const GameBoard = window.GameBoard;
-    return (
-      <GameBoard
-        gameState={cpuBattleState}
-        lobby={{ id: cpuBattleState.roomId }}
-        onLeave={onCpuBattleLeave}
-        decks={spDecks}
-        sampleDecks={spSampleDecks}
-        selectedDeck={null}
-        setSelectedDeck={() => {}}
-      />
-    );
-  }
   return (
     <div className="screen-center main-menu-screen" style={{ flexDirection: 'column', gap: 20, position: 'relative' }}>
       <div style={{ position: 'absolute', top: 12, right: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -376,30 +296,7 @@ function MainMenu() {
           {!user.hide_tutorial && (
             <button className="btn btn-big" onClick={() => setTutorialBrowserOpen(true)} style={{ fontSize: 16, borderColor: '#ff44cc', color: '#ff44cc', background: 'rgba(255,68,204,.08)' }}>📖 TUTORIAL</button>
           )}
-          <button className="btn btn-big" onClick={() => setSingleplayerOpen(v => !v)} style={{ fontSize: 16, borderColor: '#aa88ff', color: '#aa88ff', background: 'rgba(170,136,255,.08)' }}>🤖 SINGLEPLAYER {singleplayerOpen ? '▲' : '▼'}</button>
-          {singleplayerOpen && (() => {
-            const legalPersonal = spDecks.filter(d => isDeckLegal(d).legal);
-            const legalSample = spSampleDecks.filter(d => isDeckLegal(d).legal);
-            const hasAnyLegal = legalPersonal.length + legalSample.length > 0;
-            return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: -4, padding: '10px 12px', border: '1px solid rgba(170,136,255,.35)', background: 'rgba(170,136,255,.05)', borderRadius: 4 }}>
-                <div style={{ fontSize: 10, color: '#aa88ff', letterSpacing: 2, textTransform: 'uppercase' }}>CPU Deck</div>
-                <select className="select" value={cpuDeckId} onChange={e => setCpuDeckId(e.target.value)}
-                  style={{ fontSize: 12, padding: '4px 8px', borderColor: '#aa88ff', color: 'var(--text)' }}>
-                  {!hasAnyLegal && <option value="">No legal decks available</option>}
-                  {legalPersonal.length > 0 && <option disabled value="">── Your Decks ──</option>}
-                  {legalPersonal.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  {legalSample.length > 0 && <option disabled value="">── Sample Decks ──</option>}
-                  {legalSample.map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
-                </select>
-                <button className="btn btn-big" disabled={!hasAnyLegal || !cpuDeckId}
-                  onClick={startCpuBattle}
-                  style={{ fontSize: 14, marginTop: 4, borderColor: '#aa88ff', color: '#aa88ff', background: 'rgba(170,136,255,.12)' }}>
-                  ▶ PLAY!
-                </button>
-              </div>
-            );
-          })()}
+          <button className="btn btn-big" onClick={() => setScreen('singleplayer')} style={{ fontSize: 16, borderColor: '#aa88ff', color: '#aa88ff', background: 'rgba(170,136,255,.08)' }}>🤖 SINGLEPLAYER</button>
           <button className="btn btn-big" onClick={() => setScreen('play')} style={{ fontSize: 16 }}>⚔ FIND OPPONENT</button>
           <button className="btn btn-big btn-accent2" onClick={() => setScreen('deckbuilder')} style={{ fontSize: 16 }}>✦ EDIT DECK</button>
           <button className="btn btn-big" onClick={() => setScreen('shop')} style={{ fontSize: 16, borderColor: '#ffd700', color: '#ffd700', background: 'rgba(255,215,0,.08)' }}>✦ SHOP</button>
@@ -2233,6 +2130,242 @@ function RulesScreen() {
 
 
 // ═══════════════════════════════════════════
+//  SINGLEPLAYER — opponent gallery + active battle
+// ═══════════════════════════════════════════
+
+// Renders a hero's card cropped to just the artwork region. Every hero
+// card shares a fixed frame layout — art occupies (78, 175)..(672, 573)
+// in native-pixel coordinates, a 594x398 block. We scale the raw image
+// with CSS transform so a tile can be sized arbitrarily without
+// distorting the aspect ratio. Image source routes through cardImageUrl
+// so we get the hero's default card file (/cards/<filename>) rather than
+// a non-existent /cards/skins/<name>.png.
+function HeroArtCrop({ heroName, width = 160 }) {
+  const src = heroName ? cardImageUrl(heroName) : null;
+  if (!src) {
+    return (
+      <div style={{
+        width, height: width * (398 / 594),
+        background: '#1a1a28', display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        color: 'var(--text2)', fontSize: 10, letterSpacing: 2,
+      }}>NO ART</div>
+    );
+  }
+  const scale = width / 594;
+  const height = 398 * scale;
+  return (
+    <div style={{
+      width, height,
+      overflow: 'hidden',
+      position: 'relative',
+      background: '#0a0a12',
+    }}>
+      <img src={src} draggable={false}
+        style={{
+          position: 'absolute',
+          left: -78 * scale,
+          top: -175 * scale,
+          transform: 'scale(' + scale + ')',
+          transformOrigin: 'top left',
+          imageRendering: 'pixelated',
+        }}
+      />
+    </div>
+  );
+}
+
+function SingleplayerScreen() {
+  const { setScreen, notify, setBgmMode } = useContext(AppContext);
+  const [opponents, setOpponents] = useState(null);          // null = loading
+  const [personalDecks, setPersonalDecks] = useState([]);
+  const [sampleDecks, setSampleDecks] = useState([]);
+  const [cpuBattleState, setCpuBattleState] = useState(null);
+  const [starting, setStarting] = useState(false);
+  const cpuBattleRoom = useRef(null);
+
+  // Load gallery + caller's own decks (needed to resolve the player deck
+  // for the match — we auto-pick their default, same as the old dropdown).
+  const refreshGallery = useCallback(async () => {
+    try {
+      const gal = await api('/sample-decks/gallery');
+      setOpponents(gal?.opponents || []);
+    } catch (err) {
+      notify(err.message || 'Load failed', 'error');
+      setOpponents([]);
+    }
+  }, [notify]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [gal, mine, samples] = await Promise.all([
+          api('/sample-decks/gallery'),
+          api('/decks'),
+          api('/sample-decks/owned'),
+        ]);
+        if (cancelled) return;
+        setOpponents(gal?.opponents || []);
+        setPersonalDecks(mine?.decks || []);
+        setSampleDecks(samples?.decks || []);
+      } catch (err) {
+        if (!cancelled) { notify(err.message || 'Load failed', 'error'); setOpponents([]); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [notify]);
+
+  // CPU battle socket listeners
+  useEffect(() => {
+    const onGameState = (state) => {
+      if (state.isCpuBattle) {
+        cpuBattleRoom.current = state.roomId;
+        setCpuBattleState(state);
+      }
+    };
+    const onError = (msg) => notify('CPU battle error: ' + msg, 'error');
+    socket.on('game_state', onGameState);
+    socket.on('cpu_battle_error', onError);
+    return () => { socket.off('game_state', onGameState); socket.off('cpu_battle_error', onError); };
+  }, [notify]);
+
+  // BGM
+  useEffect(() => {
+    if (!setBgmMode) return;
+    if (cpuBattleState && !cpuBattleState.result) setBgmMode('battle');
+    else setBgmMode('menu');
+    return () => { if (setBgmMode) setBgmMode('menu'); };
+  }, [cpuBattleState, setBgmMode]);
+
+  // Esc → back to menu (battle's own Esc handling takes priority)
+  useEffect(() => {
+    const h = (e) => {
+      if (e.key === 'Escape' && !cpuBattleState) {
+        e.stopImmediatePropagation();
+        setScreen('menu');
+      }
+    };
+    window.addEventListener('keydown', h, true);
+    return () => window.removeEventListener('keydown', h, true);
+  }, [cpuBattleState, setScreen]);
+
+  const startBattle = useCallback((opponentId) => {
+    if (starting) return;
+    const legalPersonal = personalDecks.filter(d => isDeckLegal(d).legal);
+    const legalSample = sampleDecks.filter(d => isDeckLegal(d).legal);
+    const playerDeck = legalPersonal.find(d => d.isDefault) || legalPersonal[0] || legalSample[0] || null;
+    if (!playerDeck) { notify('You need a legal deck to play', 'error'); return; }
+    setStarting(true);
+    socket.emit('start_cpu_battle', { playerDeckId: playerDeck.id, cpuDeckId: opponentId });
+    if (window.playSFX) window.playSFX('match_found');
+    // Safety reset in case no game_state arrives
+    setTimeout(() => setStarting(false), 3000);
+  }, [personalDecks, sampleDecks, starting, notify]);
+
+  const onBattleLeave = useCallback(() => {
+    const roomId = cpuBattleRoom.current;
+    if (roomId) socket.emit('leave_game', { roomId });
+    setCpuBattleState(null);
+    cpuBattleRoom.current = null;
+    setStarting(false);
+    // Refresh so the gallery W/L reflects the outcome
+    refreshGallery();
+  }, [refreshGallery]);
+
+  // Active CPU battle — render the board and nothing else
+  if (cpuBattleState) {
+    const GameBoard = window.GameBoard;
+    return (
+      <GameBoard
+        gameState={cpuBattleState}
+        lobby={{ id: cpuBattleState.roomId }}
+        onLeave={onBattleLeave}
+        decks={personalDecks}
+        sampleDecks={sampleDecks}
+        selectedDeck={null}
+        setSelectedDeck={() => {}}
+      />
+    );
+  }
+
+  const hasAnyLegal = personalDecks.some(d => isDeckLegal(d).legal)
+                   || sampleDecks.some(d => isDeckLegal(d).legal);
+
+  return (
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)', overflow: 'auto' }}>
+      <div className="top-bar">
+        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
+        <h2 className="orbit-font" style={{ fontSize: 16, color: '#aa88ff' }}>🤖 CHOOSE OPPONENT!</h2>
+        <div style={{ flex: 1 }} />
+        <VolumeControl />
+      </div>
+      <div style={{ padding: '20px 40px 40px', boxSizing: 'border-box', width: '100%', maxWidth: 1500, alignSelf: 'center' }}>
+        {!hasAnyLegal && (
+          <div style={{ color: '#ff7777', textAlign: 'center', padding: '12px 16px', marginBottom: 20, border: '1px solid #ff7777', borderRadius: 4, background: 'rgba(255,119,119,.08)', fontSize: 12 }}>
+            You need at least one legal deck to play. Edit a deck or pick a starter deck first.
+          </div>
+        )}
+        {opponents === null ? (
+          <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 60, fontSize: 13 }}>Loading opponents...</div>
+        ) : opponents.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 60, fontSize: 13 }}>No opponents available.</div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, 264px)',
+            justifyContent: 'center',
+            gap: 14,
+          }}>
+            {opponents.map(op => {
+              const imgWidth = 240;
+              const total = (op.wins || 0) + (op.losses || 0);
+              const frameColor = '#ff4444';
+              return (
+                <button
+                  key={op.id}
+                  disabled={!hasAnyLegal || starting}
+                  onClick={() => startBattle(op.id)}
+                  title={op.name}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    gap: 6, padding: 8,
+                    background: 'rgba(255,68,68,.06)',
+                    border: '2px solid ' + frameColor,
+                    borderRadius: 6,
+                    boxShadow: '0 0 10px ' + frameColor + '33',
+                    cursor: hasAnyLegal && !starting ? 'pointer' : 'not-allowed',
+                    opacity: hasAnyLegal && !starting ? 1 : 0.55,
+                    transition: 'transform .15s ease, box-shadow .15s ease',
+                    fontFamily: 'inherit', color: 'inherit',
+                  }}
+                  onMouseEnter={e => { if (hasAnyLegal && !starting) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 18px ' + frameColor + '66'; } }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 10px ' + frameColor + '33'; }}
+                >
+                  <HeroArtCrop heroName={op.middleHero} width={imgWidth} />
+                  <div className="orbit-font" style={{ fontSize: 16, color: frameColor, textAlign: 'center', fontWeight: 700, lineHeight: 1.2 }}>
+                    {op.middleHero || op.name}
+                  </div>
+                  <div style={{ display: 'flex', gap: 14, fontSize: 14 }}>
+                    {total > 0 ? (
+                      <>
+                        <span style={{ color: frameColor }}>W {op.wins || 0}</span>
+                        <span style={{ color: frameColor }}>L {op.losses || 0}</span>
+                      </>
+                    ) : (
+                      <span style={{ color: frameColor, opacity: 0.7 }}>No matches yet</span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
 
 // Context menu sub-component
 
@@ -2243,4 +2376,6 @@ window.getRank = getRank;
 window.ProfileScreen = ProfileScreen;
 window.PurchaseCelebration = PurchaseCelebration;
 window.ShopScreen = ShopScreen;
+window.SingleplayerScreen = SingleplayerScreen;
+window.HeroArtCrop = HeroArtCrop;
 window.RulesScreen = RulesScreen;

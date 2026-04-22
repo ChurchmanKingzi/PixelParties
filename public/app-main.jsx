@@ -646,6 +646,7 @@ function App() {
       {!user ? <AuthScreen /> :
         screen === 'menu' ? <MainMenu /> :
         screen === 'play' ? <PlayScreen /> :
+        screen === 'singleplayer' ? <SingleplayerScreen /> :
         screen === 'deckbuilder' ? <DeckBuilder /> :
         screen === 'shop' ? <ShopScreen /> :
         screen === 'profile' ? <ProfileScreen /> :

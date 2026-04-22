@@ -4,7 +4,8 @@
 //  is targeted by an opponent's single/multi-target
 //  Attack, Spell, or Creature effect (NOT AoE).
 //  After the effect fully resolves, choose any
-//  target and Stun it for 1 turn.
+//  target and Stun it for 2 turns (end of
+//  opponent's next turn).
 // ═══════════════════════════════════════════
 
 module.exports = {
@@ -56,7 +57,7 @@ module.exports = {
 
         const selectedIds = await eng.promptEffectTarget(pi, allTargets, {
           title: 'Jumpscare',
-          description: 'Choose any target to Stun for 1 turn!',
+          description: 'Choose any target to Stun for 2 turns!',
           confirmLabel: '😱 Stun!',
           confirmClass: 'btn-danger',
           cancellable: false,
@@ -76,8 +77,10 @@ module.exports = {
         });
         await eng._delay(700);
 
-        // Apply Stun (respects immunities)
-        await eng.addHeroStatus(picked.owner, picked.heroIdx, 'stunned', { duration: 1 });
+        // Apply Stun (respects immunities). Duration 2 = ticks down at the
+        // end of each of the target's turns, expiring at the end of their
+        // NEXT turn — matches Baihu's "lasts through next turn" pattern.
+        await eng.addHeroStatus(picked.owner, picked.heroIdx, 'stunned', { duration: 2 });
 
         eng.log('jumpscare_stun', {
           player: eng.gs.players[pi]?.username,

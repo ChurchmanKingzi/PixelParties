@@ -1,9 +1,9 @@
 === PIXEL PARTIES DECK ===
-Name: Starter Deck: Suicide Bombers
+Name: Suicide Bombers
 
 == HEROES ==
-Bomb Berserker Bartas
 Ida, the Adept of Destruction
+Bomb Berserker Bartas
 Treasure Huntress Semi
 
 == MAIN DECK ==

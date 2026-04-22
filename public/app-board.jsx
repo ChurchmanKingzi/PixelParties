@@ -806,6 +806,192 @@ function AcidRainOverlay() {
   );
 }
 
+// Stinky Stables — enormous face-less dung piles pinned to the LEFT/RIGHT
+// margins of the battlefield (zones live in the central ~80%). Unicode has
+// no face-less poop emoji (💩 always has eyes/mouth), so each pile is drawn
+// as stacked SVG swirls with brown radial gradients. Rendered as the first
+// sibling inside .board-center with NO explicit z-index — later flex
+// siblings (player sides, area zones, cards) therefore paint on top at
+// equal-auto stacking. Stink lines drift up from each pile, flies orbit
+// them in little elliptical loops, and a few free-fliers cross the air.
+function StinkyStablesOverlay() {
+  // 4 piles per side, vertically spread. Horizontal jitter stays inside
+  // the safe outer-margin strip (≈3–7% on each side) so piles never drift
+  // into the zone-filled middle.
+  const piles = useMemo(() => {
+    const makeSide = (xBase, flip) => Array.from({ length: 4 }, (_, i) => ({
+      left: xBase + (Math.random() * 3 - 1.5),
+      top: 6 + i * 23 + (Math.random() * 6 - 3),
+      size: 80 + Math.random() * 55,
+      skew: -8 + Math.random() * 16,
+      flipX: flip,
+      tint: Math.floor(Math.random() * 3),
+    }));
+    return [...makeSide(4, 1), ...makeSide(96, -1)];
+  }, []);
+  // Flies orbiting each pile — per-fly elliptical radii + phase so the
+  // swarm doesn't read as marching in lockstep.
+  const orbitFlies = useMemo(() => piles.flatMap((p, pi) =>
+    Array.from({ length: 3 + Math.floor(Math.random() * 2) }, () => ({
+      pileIdx: pi,
+      anchorLeft: p.left,
+      anchorTop: p.top,
+      rx: 18 + Math.random() * 20,
+      ry: 10 + Math.random() * 14,
+      phase: Math.random(),
+      dur: 2.6 + Math.random() * 2.2,
+      size: 2.3 + Math.random() * 1.8,
+    }))
+  ), [piles]);
+  // A handful of free flies meander across the battlefield air.
+  const freeFlies = useMemo(() => Array.from({ length: 8 }, () => ({
+    left: 3 + Math.random() * 94,
+    top: 8 + Math.random() * 80,
+    delay: -Math.random() * 3.5,
+    dur: 3.5 + Math.random() * 2.5,
+    size: 2 + Math.random() * 1.4,
+  })), []);
+  // Two or three wavy smoke trails rising above each pile.
+  const stinkLines = useMemo(() => piles.flatMap((p) =>
+    Array.from({ length: 2 + Math.floor(Math.random() * 2) }, () => ({
+      left: p.left + (Math.random() * 5 - 2.5),
+      top: p.top - 3 + (Math.random() * 3 - 1.5),
+      delay: -Math.random() * 3,
+      dur: 2.8 + Math.random() * 1.6,
+      sway: -6 + Math.random() * 12,
+    }))
+  ), [piles]);
+  const tints = [
+    { light: '#8a5a2a', mid: '#5a3616', dark: '#321e0a' },
+    { light: '#7a4a20', mid: '#4a2a10', dark: '#2a1808' },
+    { light: '#94643a', mid: '#624020', dark: '#3a220e' },
+  ];
+  // Per-fly orbital keyframes — each fly needs its own ellipse. Build the
+  // <style> body once via useMemo so it doesn't churn every render.
+  const orbitKeyframes = useMemo(() => orbitFlies.map((f, i) =>
+    `@keyframes stinkyOrbit${i} {
+       0%   { transform: translate(${f.rx.toFixed(1)}px, 0); }
+       25%  { transform: translate(0, ${(-f.ry).toFixed(1)}px); }
+       50%  { transform: translate(${(-f.rx).toFixed(1)}px, 0); }
+       75%  { transform: translate(0, ${f.ry.toFixed(1)}px); }
+       100% { transform: translate(${f.rx.toFixed(1)}px, 0); }
+     }`
+  ).join('\n'), [orbitFlies]);
+  return (
+    <div className="stinky-stables-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      overflow: 'hidden',
+      // Mild miasma — kept light so it doesn't fight card readability.
+      background: 'radial-gradient(ellipse at center, rgba(70,58,24,0.10) 0%, rgba(40,35,15,0.20) 100%)',
+    }}>
+      {piles.map((p, i) => {
+        const c = tints[p.tint];
+        const gid = `stinkyPoo${i}`;
+        return (
+          <div key={'p' + i} style={{
+            position: 'absolute',
+            left: p.left + '%', top: p.top + '%',
+            width: p.size + 'px', height: p.size + 'px',
+            transform: `translate(-50%, -50%) scaleX(${p.flipX}) skewX(${p.skew}deg)`,
+            filter: 'drop-shadow(0 6px 8px rgba(0,0,0,0.55))',
+          }}>
+            <svg viewBox="0 0 100 100" width="100%" height="100%">
+              <defs>
+                <radialGradient id={gid} cx="40%" cy="30%" r="80%">
+                  <stop offset="0%" stopColor={c.light} />
+                  <stop offset="55%" stopColor={c.mid} />
+                  <stop offset="100%" stopColor={c.dark} />
+                </radialGradient>
+              </defs>
+              <ellipse cx="50" cy="94" rx="44" ry="5" fill="rgba(0,0,0,0.45)" />
+              <path d="M 8,80 Q 8,60 26,56 Q 50,40 74,56 Q 92,60 92,80 Q 92,93 50,93 Q 8,93 8,80 Z"
+                    fill={`url(#${gid})`} />
+              <path d="M 22,62 Q 22,44 36,40 Q 50,28 64,40 Q 78,44 78,62 Q 78,73 50,73 Q 22,73 22,62 Z"
+                    fill={`url(#${gid})`} />
+              <path d="M 36,44 Q 36,28 44,26 Q 50,18 56,26 Q 64,28 64,44 Q 64,54 50,54 Q 36,54 36,44 Z"
+                    fill={`url(#${gid})`} />
+              <ellipse cx="50" cy="17" rx="3" ry="4.5" fill={c.dark} />
+              <ellipse cx="32" cy="66" rx="8" ry="3" fill="rgba(210,170,110,0.32)" />
+              <ellipse cx="42" cy="46" rx="6" ry="2.5" fill="rgba(210,170,110,0.32)" />
+              <ellipse cx="47" cy="28" rx="3" ry="1.5" fill="rgba(210,170,110,0.38)" />
+            </svg>
+          </div>
+        );
+      })}
+      {/* Stink lines — wavy green-brown smoke rising above each pile */}
+      {stinkLines.map((s, i) => (
+        <div key={'s' + i} style={{
+          position: 'absolute',
+          left: s.left + '%', top: s.top + '%',
+          width: 24, height: 70,
+          transform: 'translate(-50%, -100%)',
+          animation: `stinkyStink ${s.dur}s ease-in-out ${s.delay}s infinite`,
+          opacity: 0,
+          '--stinkSway': s.sway + 'px',
+        }}>
+          <svg viewBox="0 0 24 70" width="100%" height="100%" preserveAspectRatio="none">
+            <path d="M 12,70 C 18,56 4,44 18,30 C 30,16 6,8 14,0"
+                  stroke="rgba(120,150,80,0.75)" strokeWidth="2.2" fill="none"
+                  strokeLinecap="round" />
+            <path d="M 12,70 C 8,58 20,46 10,34 C 0,22 18,14 12,2"
+                  stroke="rgba(100,130,60,0.55)" strokeWidth="1.6" fill="none"
+                  strokeLinecap="round" />
+          </svg>
+        </div>
+      ))}
+      {/* Orbital flies — anchor wrap + inner transform keeps orbit keyframes
+          transform-only while the pile position stays in percent units. */}
+      {orbitFlies.map((f, i) => (
+        <div key={'of' + i} style={{
+          position: 'absolute',
+          left: f.anchorLeft + '%', top: f.anchorTop + '%',
+          width: 0, height: 0,
+        }}>
+          <span style={{
+            position: 'absolute',
+            left: -f.size / 2, top: -f.size / 2,
+            width: f.size + 'px', height: f.size + 'px',
+            background: '#0a0a0a', borderRadius: '50%',
+            boxShadow: '0 0 2px rgba(0,0,0,0.9)',
+            animation: `stinkyOrbit${i} ${f.dur}s linear infinite`,
+            animationDelay: `-${(f.phase * f.dur).toFixed(2)}s`,
+            willChange: 'transform',
+          }} />
+        </div>
+      ))}
+      {/* Free-flying flies meandering across the battlefield */}
+      {freeFlies.map((f, i) => (
+        <span key={'ff' + i} style={{
+          position: 'absolute',
+          left: f.left + '%', top: f.top + '%',
+          width: f.size + 'px', height: f.size + 'px',
+          background: '#0a0a0a', borderRadius: '50%',
+          boxShadow: '0 0 2px rgba(0,0,0,0.9)',
+          animation: `stinkyFlyFree ${f.dur}s ease-in-out ${f.delay}s infinite`,
+        }} />
+      ))}
+      <style>{`
+        @keyframes stinkyStink {
+          0%   { opacity: 0; transform: translate(-50%, -100%) scale(0.5); }
+          25%  { opacity: 0.85; }
+          70%  { opacity: 0.45; }
+          100% { opacity: 0; transform: translate(calc(-50% + var(--stinkSway, 0px)), -160%) scale(1.1); }
+        }
+        @keyframes stinkyFlyFree {
+          0%   { transform: translate(0, 0); }
+          15%  { transform: translate(14px, -8px); }
+          30%  { transform: translate(-8px, -18px); }
+          50%  { transform: translate(22px, -10px); }
+          70%  { transform: translate(6px, -22px); }
+          85%  { transform: translate(-14px, -12px); }
+          100% { transform: translate(0, 0); }
+        }
+        ${orbitKeyframes}
+      `}</style>
+    </div>
+  );
+}
+
 // Burned overlay — persistent small flame particles on the hero
 function BurnedOverlay({ ticking }) {
   const flames = useMemo(() => Array.from({ length: 10 }, () => ({
@@ -3756,6 +3942,98 @@ const ANIM_REGISTRY = {
               15% { opacity: 0.9; transform: translate(calc(var(--pollen-drift) * 0.3), 8px) scale(1); }
               70% { opacity: 0.7; transform: translate(var(--pollen-drift), 35px) scale(0.9); }
               100% { opacity: 0; transform: translate(calc(var(--pollen-drift) * 1.3), 55px) scale(0.4); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // Toxic Fumes — a cloud of sickly purple gas boils out over the target.
+  // Used by Toxic Fumes (Spell): thick billowing puffs that expand and
+  // dissipate, a green-tinged haze behind, and small skull bubbles rising
+  // through the cloud to sell the "toxic" flavor.
+  toxic_fumes_gas: (() => {
+    return function ToxicFumesGasEffect({ x, y, w, h }) {
+      const cw = w || 90;
+      const ch = h || 120;
+      const puffs = useMemo(() => Array.from({ length: 10 }, () => ({
+        xOff: -cw / 2 + Math.random() * cw,
+        yOff: -ch / 2 + Math.random() * ch,
+        size: 32 + Math.random() * 26,
+        delay: Math.random() * 260,
+        dur: 900 + Math.random() * 500,
+        driftX: -10 + Math.random() * 20,
+        driftY: -14 - Math.random() * 12,
+        hue: Math.random() < 0.5
+          ? ['rgba(130,40,180,0.75)','rgba(110,30,160,0.7)','rgba(150,60,200,0.7)'][Math.floor(Math.random() * 3)]
+          : ['rgba(80,120,50,0.55)','rgba(100,140,60,0.5)'][Math.floor(Math.random() * 2)],
+      })), [cw, ch]);
+      const skulls = useMemo(() => Array.from({ length: 4 }, () => ({
+        xOff: -cw / 2 + 10 + Math.random() * (cw - 20),
+        startY: ch / 3 + Math.random() * 10,
+        size: 10 + Math.random() * 6,
+        delay: 200 + Math.random() * 400,
+        dur: 900 + Math.random() * 300,
+      })), [cw, ch]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Greenish haze behind to suggest the toxic atmosphere */}
+          <div style={{
+            position: 'absolute',
+            left: -cw / 2, top: -ch / 2,
+            width: cw, height: ch,
+            background: 'radial-gradient(ellipse at center, rgba(90,160,60,0.35) 0%, rgba(60,120,40,0.2) 50%, transparent 85%)',
+            filter: 'blur(2px)',
+            animation: 'toxicFumesHaze 1200ms ease-in-out forwards',
+            opacity: 0,
+          }} />
+          {/* Billowing gas puffs */}
+          {puffs.map((p, i) => (
+            <div key={'tp' + i} style={{
+              position: 'absolute',
+              left: p.xOff - p.size / 2,
+              top: p.yOff - p.size / 2,
+              width: p.size, height: p.size,
+              borderRadius: '50%',
+              background: `radial-gradient(circle at 35% 35%, ${p.hue}, transparent 75%)`,
+              filter: 'blur(3px)',
+              mixBlendMode: 'screen',
+              opacity: 0,
+              animation: `toxicFumesPuff ${p.dur}ms ease-out ${p.delay}ms forwards`,
+              ['--tfDriftX']: p.driftX + 'px',
+              ['--tfDriftY']: p.driftY + 'px',
+            }} />
+          ))}
+          {/* Rising skull bubbles */}
+          {skulls.map((s, i) => (
+            <span key={'ts' + i} style={{
+              position: 'absolute',
+              left: s.xOff, top: s.startY,
+              fontSize: s.size,
+              color: '#d6b3f2',
+              textShadow: '0 0 6px rgba(150,60,200,0.9)',
+              opacity: 0,
+              animation: `toxicFumesSkull ${s.dur}ms ease-in-out ${s.delay}ms forwards`,
+            }}>☠</span>
+          ))}
+          <style>{`
+            @keyframes toxicFumesHaze {
+              0%   { opacity: 0; transform: scale(0.6); }
+              40%  { opacity: 0.9; transform: scale(1.05); }
+              80%  { opacity: 0.7; transform: scale(1.1); }
+              100% { opacity: 0; transform: scale(1.2); }
+            }
+            @keyframes toxicFumesPuff {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.3); }
+              30%  { opacity: 0.95; transform: translate(calc(var(--tfDriftX) * 0.4), calc(var(--tfDriftY) * 0.4)) scale(1); }
+              70%  { opacity: 0.6; transform: translate(calc(var(--tfDriftX) * 0.8), calc(var(--tfDriftY) * 0.8)) scale(1.25); }
+              100% { opacity: 0; transform: translate(var(--tfDriftX), var(--tfDriftY)) scale(1.5); }
+            }
+            @keyframes toxicFumesSkull {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.5); }
+              30%  { opacity: 1; transform: translate(0, -18px) scale(1); }
+              70%  { opacity: 0.8; transform: translate(3px, -38px) scale(1.05); }
+              100% { opacity: 0; transform: translate(-2px, -56px) scale(0.8); }
             }
           `}</style>
         </div>
@@ -6753,6 +7031,40 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return playableList.includes(card.name);
   };
 
+  // Stricter sibling of canHeroPlayCard: "can this hero summon this Creature
+  // NORMALLY, into a free Support Zone?" Skips the card-level bypass (Deepsea
+  // canBypassLevelReq) that canHeroPlayCard honors, so cards with a
+  // placement-style alternate path don't wrongly light up empty slots on
+  // heroes that can only host them via bounce-place / tribute. Replicates the
+  // engine's countAbilitiesForSchool + bypassLevelReq logic — close enough for
+  // the drop/highlight UI; the server still re-validates on play.
+  const canHeroNormalSummon = (playerData, heroIdx, card) => {
+    if (!card || card.cardType !== 'Creature') return false;
+    const hero = playerData.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
+    const level = card.level || 0;
+    if (level <= 0 && !card.spellSchool1) return true;
+    // Negated heroes contribute no abilities for level-req purposes — only
+    // Lv0 creatures without a school requirement can still land on them.
+    const abZones = hero.statuses?.negated ? [] : (playerData.abilityZones?.[heroIdx] || []);
+    const countSchool = (school) => {
+      let count = 0;
+      for (const slot of abZones) {
+        if (!slot || slot.length === 0) continue;
+        for (const ab of slot) if (ab === school) count++;
+      }
+      return count;
+    };
+    if (card.spellSchool1 && countSchool(card.spellSchool1) >= level) return true;
+    if (card.spellSchool2 && countSchool(card.spellSchool2) >= level) return true;
+    // Generic hero-level bypass — Ascended Beato, etc. Card-level bypasses
+    // are deliberately NOT consulted here; see function docstring above.
+    const blr = hero.bypassLevelReq;
+    if (blr && level <= blr.maxLevel && (blr.types || []).includes(card.cardType)) return true;
+    return false;
+  };
+
   // Find free support zone slot for a hero
   const findFreeSupportSlot = (playerData, heroIdx) => {
     const supZones = playerData.supportZones[heroIdx] || [[], [], []];
@@ -7110,16 +7422,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const slotCards = (me.supportZones[hi] || [])[si] || [];
               const isOccupied = slotCards.length > 0;
               const isBounceSlot = bpSet.has(hi + ':' + si);
-              if (hasBounceTargets) {
-                // Bounce mode — only the specific bounce-target slots
-                // are legal drops.
-                if (isOccupied && isBounceSlot) { targetHero = hi; targetSlot = si; }
+              // Unified drop resolution. A Deepsea Creature in hand publishes
+              // `bouncePlacementTargets` listing occupied bounce-target slots,
+              // but normal summoning into a free slot of an eligible Hero
+              // remains a valid alternative — the player's Action covers the
+              // summon and the server handles both paths (occupied slot →
+              // bounce-place, empty slot → normal summon). Empty-slot drops
+              // use the STRICT eligibility check (canHeroNormalSummon) so
+              // the bypass that lets Deepsea swap onto any hero doesn't
+              // leak into "which heroes can summon this normally" — an
+              // empty slot on a Lv0-summoner hero shouldn't accept a Lv1
+              // Deepsea Creature even if a bounceable exists elsewhere.
+              if (isOccupied) {
+                if (hasBounceTargets && isBounceSlot) { targetHero = hi; targetSlot = si; }
+              } else if (card.cardType === 'Creature') {
+                const canPlayHere = isHeroAction || canHeroNormalSummon(me, hi, card);
+                if (!canPlayHere) continue;
+                if (si >= ((me.supportZones[hi] || []).length || 3)) continue;
+                targetHero = hi; targetSlot = si;
               } else {
-                // Normal mode — require a hero that can cast this card
-                // AND an empty slot.
                 const canPlayHere = isHeroAction || canHeroPlayCard(me, hi, card);
                 if (!canPlayHere) continue;
-                if (isOccupied) continue;
                 if (si >= ((me.supportZones[hi] || []).length || 3)) continue;
                 targetHero = hi; targetSlot = si;
               }
@@ -7421,15 +7744,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             //     Island extension).
             const bpTargets = (gameState.bouncePlacementTargets || {})[cardName] || [];
             if (bpTargets.length > 0) {
-              // Enter "pick a swap target" mode — highlight ONLY the
-              // valid swap targets (occupied slots containing eligible
-              // creatures). No free-Support-Zone highlights: click-to-
-              // swap is strictly a swap-in gesture. If the player
-              // wants to normal-summon onto an empty slot instead,
-              // they drag to it.
+              // Enter "pick a target" mode — highlight BOTH occupied
+              // bounce-target slots (swap-in) AND empty slots on Heroes
+              // that can legally summon the card (normal summon). The
+              // server routes the resulting `play_creature` based on
+              // whether the picked slot is occupied. Users shouldn't
+              // lose the ability to normal-summon just because a
+              // bounce-candidate also exists — both plays stay legal.
+              // Normal-summon uses the strict eligibility check so
+              // low-level / dead heroes aren't offered as targets.
+              const normalTargets = [];
+              for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+                if (!canHeroNormalSummon(me, hi, card)) continue;
+                const slot = findFreeSupportSlot(me, hi);
+                if (slot < 0) continue;
+                normalTargets.push({ heroIdx: hi, slotIdx: slot });
+              }
               setPendingBouncePick({
                 cardName, handIndex: idx, card,
-                bounceTargets: bpTargets,
+                bounceTargets: [...bpTargets, ...normalTargets],
               });
             } else {
               const eligible = [];
@@ -11314,7 +11647,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
     prevHpRef.current = currentHp;
 
-    // Build current creature HP map — include ALL creatures on the board
+    // Build current creature-slot map — include ALL creatures on the board.
+    // Tracks both the HP and the CARD NAME at each slot so the damage-number
+    // pass can distinguish "same creature, lower HP" (real damage) from
+    // "different creature took this slot" (replacement / bounce-place swap).
+    // Without the name check, a Deepsea Primordium (1 max HP) bounce-placed
+    // on top of a 50-HP creature reads as a "-49" hit even though the old
+    // creature wasn't damaged at all — it was returned to hand.
     const currentCreatureHp = {};
     for (let pi = 0; pi < 2; pi++) {
       const p = gameState.players[pi];
@@ -11325,10 +11664,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (slot.length === 0) continue;
           const cKey = `${pi}-${hi}-${si}`;
           const counters = (gameState.creatureCounters || {})[cKey];
-          // Use currentHp from counters if available, otherwise max HP from card DB or override
           const maxHp = counters?.maxHp ?? counters?._cardDataOverride?.hp ?? CARDS_BY_NAME[slot[0]]?.hp;
           if (maxHp != null) {
-            currentCreatureHp[cKey] = counters?.currentHp ?? maxHp;
+            currentCreatureHp[cKey] = { hp: counters?.currentHp ?? maxHp, name: slot[0] };
           }
         }
       }
@@ -11336,14 +11674,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Compare creature HP
     if (prevCreatureHpRef.current) {
       const newCreatureDmg = [];
-      for (const [key, curHp] of Object.entries(currentCreatureHp)) {
-        const prevHp = prevCreatureHpRef.current[key];
-        if (prevHp != null && curHp < prevHp) {
+      for (const [key, cur] of Object.entries(currentCreatureHp)) {
+        const prev = prevCreatureHpRef.current[key];
+        if (!prev) continue;
+        // Creature identity changed in this slot — replacement (bounce-
+        // place, swap, etc.), not damage. Skip the diff entirely.
+        if (prev.name !== cur.name) continue;
+        if (cur.hp < prev.hp) {
           const [ownerStr, heroIdxStr, slotStr] = key.split('-');
           const ownerIdx = parseInt(ownerStr);
           newCreatureDmg.push({
             id: Date.now() + Math.random(),
-            amount: prevHp - curHp,
+            amount: prev.hp - cur.hp,
             ownerLabel: ownerIdx === myIdx ? 'me' : 'opp',
             heroIdx: parseInt(heroIdxStr),
             zoneSlot: parseInt(slotStr),
@@ -11351,8 +11693,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
       // Detect lethal damage: creature existed last frame but is now gone (destroyed)
-      for (const [key, prevHp] of Object.entries(prevCreatureHpRef.current)) {
-        if (!(key in currentCreatureHp) && prevHp > 0) {
+      for (const [key, prev] of Object.entries(prevCreatureHpRef.current)) {
+        if (!(key in currentCreatureHp) && prev.hp > 0) {
           // Skip if creature moved zones (not destroyed)
           if (creatureMoveSuppressRef.current[key]) {
             delete creatureMoveSuppressRef.current[key];
@@ -11362,7 +11704,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const ownerIdx = parseInt(ownerStr);
           newCreatureDmg.push({
             id: Date.now() + Math.random(),
-            amount: prevHp,
+            amount: prev.hp,
             ownerLabel: ownerIdx === myIdx ? 'me' : 'opp',
             heroIdx: parseInt(heroIdxStr),
             zoneSlot: parseInt(slotStr),
@@ -12662,20 +13004,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // (occupied) and free-slot targets.
               const _bpPickOwn = !isOpp && pendingBouncePick;
               const isPendingBounceTarget = _bpPickOwn && (pendingBouncePick.bounceTargets || []).some(t => t.heroIdx === i && t.slotIdx === z);
-              // Valid drop zones come in two flavors, mirroring the
-              // drag-target resolution above:
-              //  • Bounce mode — a dragged Creature with bouncePlacement
-              //    Targets lights up ONLY those specific occupied slots.
-              //    Empty slots must stay un-highlighted even on heroes
-              //    who could otherwise cast the card, because the server
-              //    wouldn't actually land the card there.
-              //  • Normal mode — empty slots on heroes that can cast
-              //    the card.
-              const _bpTargetsForThisDrag = _bpTargetsForDrag; // alias for readability
-              const _bpDragActive = _bpTargetsForThisDrag.length > 0;
+              // Valid drop zones come in two flavors that now coexist:
+              //  • Bounce target — occupied slots listed in
+              //    bouncePlacementTargets. Painted via the separate
+              //    `isBouncePlaceTarget` class.
+              //  • Normal summon — empty slots on heroes that can cast
+              //    the card. Painted via `zone-drag-valid`.
+              // When a Deepsea Creature is being dragged, BOTH modes are
+              // legal simultaneously: the player may either swap an
+              // existing bounceable Deepsea OR spend their Action to
+              // summon into a free slot of an eligible Hero. The server
+              // routes to the right path based on whether the dropped
+              // slot is occupied.
+              // For Creature drags on empty slots, require STRICT summon
+              // eligibility: heroPlayableCards includes heroes that can
+              // only host via bounce-place bypass, but only heroes who
+              // can *normally* summon this card should light up an empty
+              // slot. Attachment Spells and other non-Creature drags keep
+              // using the broad canHeroPlayCard check.
+              const emptyCanPlayHere = isDraggingCreature && playDrag?.card
+                ? canHeroNormalSummon(me, i, playDrag.card)
+                : canPlayHere;
               const isDragValidZone = (isDraggingCreature || isDraggingAttachment)
-                && !_bpDragActive
-                && cards.length === 0 && canPlayHere
+                && cards.length === 0 && emptyCanPlayHere
                 && z < ((me.supportZones[i] || []).length || 3)
                 && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
               const isDragInvalidZone = (isDraggingCreature || isDraggingAttachment) && !isDragValidZone && !isBouncePlaceTarget;
@@ -13044,7 +13395,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div className="board-phase-tracker">
               {['Start Phase', 'Resource Phase', 'Main Phase 1', 'Action Phase', 'Main Phase 2', 'End Phase'].map((phase, i) => {
                 const isActive = currentPhase === i;
-                const canClick = !tutorialPhaseLocked && isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && (
+                const spellResolving = (gameState._spellResolutionDepth || 0) > 0;
+                const canClick = !tutorialPhaseLocked && isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && (
                   (currentPhase === 2 && (i === 3 || i === 5)) ||
                   (currentPhase === 3 && (i === 4 || i === 5)) ||
                   (currentPhase === 4 && i === 5)
@@ -13061,7 +13413,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               })}
             </div>
             {!isSpectator && (() => {
-              const canAdvance = !tutorialPhaseLocked && isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && currentPhase >= 2 && currentPhase <= 4;
+              // Mirror the server-side guard in advancePhase/advanceToPhase:
+              // while a Spell is mid-resolve (e.g. Rain of Arrows waiting on
+              // Ida's target prompt), phase advance is refused. Greying out
+              // the buttons here avoids the confusing silent reject.
+              const spellResolving = (gameState._spellResolutionDepth || 0) > 0;
+              const canAdvance = !tutorialPhaseLocked && isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && currentPhase >= 2 && currentPhase <= 4;
               const nextMap = { 2: 3, 3: 4, 4: 5 };
               return (
                 <div className="phase-buttons-row">
@@ -13091,6 +13448,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div className="board-center" ref={boardCenterRef} style={{ position: 'relative' }}>
             {(((gameState.areaZones?.[0] || []).includes('Acid Rain')) || ((gameState.areaZones?.[1] || []).includes('Acid Rain'))) && <AcidRainOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Deepsea Castle')) || ((gameState.areaZones?.[1] || []).includes('Deepsea Castle'))) && <DeepseaCastleOverlay />}
+            {(((gameState.areaZones?.[0] || []).includes('Stinky Stables')) || ((gameState.areaZones?.[1] || []).includes('Stinky Stables'))) && <StinkyStablesOverlay />}
             {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
             <div className="board-area-zones-center">
