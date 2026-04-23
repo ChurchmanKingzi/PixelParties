@@ -177,7 +177,7 @@ module.exports = {
     });
 
     if (!statusResult) return { aborted: true }; // Back to targeting
-    const removedStatuses = statusResult.selectedStatuses || [];
+    let removedStatuses = statusResult.selectedStatuses || [];
     if (removedStatuses.length === 0) return; // Nothing selected — done (fizzle)
 
     // Get poison stacks if removing poison
@@ -187,11 +187,16 @@ module.exports = {
       poisonStacks = ps?.stacks || 1;
     }
 
-    // Step 2: Remove statuses from first target
+    // Step 2: Remove statuses from first target. The cleanse helpers skip
+    // unhealable statuses and poison while Stinky Stables is up — keep only
+    // the ones that actually got removed. Statuses that couldn't be healed
+    // stay on the first target AND don't transfer to a second target; from
+    // Tea's perspective they were never selected at all.
+    let actuallyRemoved = [];
     if (firstTarget.type === 'hero') {
       const hero = engine.gs.players[firstTarget.owner]?.heroes?.[firstTarget.heroIdx];
       if (hero?.statuses) {
-        engine.cleanseHeroStatuses(hero, firstTarget.owner, firstTarget.heroIdx, removedStatuses, 'Tea');
+        actuallyRemoved = engine.cleanseHeroStatuses(hero, firstTarget.owner, firstTarget.heroIdx, removedStatuses, 'Tea') || [];
       }
     } else if (firstTarget.type === 'equip') {
       const inst = engine.cardInstances.find(c =>
@@ -199,9 +204,13 @@ module.exports = {
         c.heroIdx === firstTarget.heroIdx && c.zoneSlot === firstTarget.slotIdx
       );
       if (inst) {
-        engine.cleanseCreatureStatuses(inst, removedStatuses, 'Tea');
+        actuallyRemoved = engine.cleanseCreatureStatuses(inst, removedStatuses, 'Tea') || [];
       }
     }
+
+    removedStatuses = actuallyRemoved;
+    if (removedStatuses.length === 0) return; // Everything selected was unhealable/locked — full fizzle
+    if (!removedStatuses.includes('poisoned')) poisonStacks = 0;
 
     // Play tea steam on first target
     const zs1 = firstTarget.type === 'equip' ? firstTarget.slotIdx : -1;

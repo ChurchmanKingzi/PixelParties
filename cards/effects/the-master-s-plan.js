@@ -2,9 +2,16 @@
 //  CARD EFFECT: "The Master's Plan"
 //  Spell (Reaction) — Decay Magic Lv3
 //
-//  When the opponent plays ANY card from hand
-//  or activates/attaches an Ability, chain this
-//  and negate that card.
+//  When the opponent plays ANY card FROM THEIR
+//  HAND, chain this and negate that card. Board
+//  activations — hero effects (Mizune etc.),
+//  active and free-activated abilities, creature
+//  / permanent / equip effects — do NOT trigger
+//  this reaction. The `fromBoard` flag on the
+//  initial chain link is the signal: the three
+//  activate-from-board server helpers set it,
+//  every from-hand play path leaves it unset.
+//
 //  If the negated card cost an Action (Attack,
 //  Spell, Creature without inherentAction, or
 //  action-cost Ability), the opponent MAY
@@ -26,9 +33,11 @@ module.exports = {
   canActivate: () => false,
 
   /**
-   * Reaction fires when the chain's initial card belongs to the opponent
-   * and the Plan owner has at least one hero with Decay Magic Lv3
-   * that is alive and not incapacitated.
+   * Reaction fires when the chain's most recent card was played by the
+   * opponent from their hand (not a board activation), and the Plan
+   * owner has at least one hero with Decay Magic Lv3 that is alive and
+   * not incapacitated. Mid-chain reactions from the opponent's hand
+   * are still valid targets — they come off the hand too.
    */
   reactionCondition: (gs, pi, engine, chainCtx) => {
     if (!chainCtx?.chain || chainCtx.chain.length < 1) return false;
@@ -37,9 +46,16 @@ module.exports = {
     const hoptKey = `masters_plan:${pi}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
 
-    // Must react to the most recent card played by the opponent (initial or reaction)
+    // Must react to the most recent card played by the opponent.
     const lastLink = chainCtx.chain[chainCtx.chain.length - 1];
     if (lastLink.owner === pi) return false;
+
+    // Board activations (hero effects, board-ability activate/free-
+    // activate) carry fromBoard=true — the card text explicitly
+    // restricts to from-hand plays, so we skip those here. Mid-chain
+    // reactions from the opponent's hand have fromBoard unset and
+    // remain eligible targets.
+    if (lastLink.fromBoard) return false;
 
     // Owner must have at least one hero with Decay Magic Lv3, alive and not incapacitated
     const ps = gs.players[pi];

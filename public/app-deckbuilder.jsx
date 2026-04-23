@@ -1229,7 +1229,7 @@ function DeckBuilder() {
               handleDrop('hero', { ...d, targetSlot: slot }, mx, my);
             }} onDragPos={onGalleryDragPos} className="deck-section">
               <SecHeader sec="heroes" color="#bb77ff" icon="👑" label="HEROES" count={heroes.filter(h=>h&&h.hero).length} max={3} />
-              <div className="deck-section-body db-hero-row" data-deck-section="hero" style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-evenly', gap: 40, padding: 12 }}>
+              <div className="db-hero-row" data-deck-section="hero">
                 {heroes.map((h, i) => {
                   const isDropTarget = (() => {
                     if (galleryDragOver && galleryDragOver.section === 'hero') return true;
@@ -1241,30 +1241,32 @@ function DeckBuilder() {
                   })();
                   return (
                   <HeroSlot key={i} slotIndex={i} onSwap={swapHeroes}>
-                    <div data-hero-slot={i} style={{ display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', outline: isDropTarget ? '2px solid var(--accent)' : 'none', borderRadius: 4, padding: 4 }}>
-                      {/* Hero card first (166×230) */}
+                    <div data-hero-slot={i} className={'db-hero-slot' + (isDropTarget ? ' drop-target' : '')}>
+                      {/* Hero card — scales with the row width via .db-hero-card (aspect 5:7) */}
                       {h && h.hero && CARDS_BY_NAME[h.hero] ? (
-                        <div style={{ position: 'relative' }} data-touch-drag="1"
+                        <div className="db-hero-card" data-touch-drag="1"
                           onMouseDown={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}
                           onTouchStart={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}
                           onContextMenu={(e) => { e.preventDefault(); removeFrom(h.hero, 'hero'); }}>
                           <CardMini card={CARDS_BY_NAME[h.hero]}
                             onClick={(e) => showCoverMenu(h.hero, e, 'hero')}
-                            style={{ width: 166, height: 230, aspectRatio: 'unset' }} isCover={h.hero === currentDeck?.coverCard} skins={currentDeck?.skins} />
+                            isCover={h.hero === currentDeck?.coverCard} skins={currentDeck?.skins} />
                           <button style={{ position: 'absolute', top: -5, right: -5, background: 'var(--danger)', color: '#fff',
                             border: 'none', width: 18, height: 18, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
                             onClick={() => removeFrom(h.hero, 'hero')}>✕</button>
                         </div>
                       ) : (
-                        <div className="card-slot" style={{ width: 166, height: 230, aspectRatio: 'unset', fontSize: 12 }}><span>Hero {i + 1}</span></div>
+                        <div className="db-hero-card">
+                          <div className="card-slot"><span>Hero {i + 1}</span></div>
+                        </div>
                       )}
-                      {/* Starting Abilities stacked vertically */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {/* Starting Abilities: two cards stacked, each at aspect 5:7 — see .db-hero-abilities */}
+                      <div className="db-hero-abilities">
                         {[h?.ability1, h?.ability2].map((ab, ai) => {
                           const abCard = ab ? CARDS_BY_NAME[ab] : null;
-                          if (abCard) return <CardMini key={ai} card={abCard} onClick={() => {}} style={{ width: 'var(--card-w)', height: 'var(--card-h)', aspectRatio: 'unset' }} />;
+                          if (abCard) return <CardMini key={ai} card={abCard} onClick={() => {}} />;
                           return (
-                            <div key={ai} className="ability-slot" style={{ width: 'var(--card-w)', height: 'var(--card-h)', aspectRatio: 'unset', fontSize: 10, padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div key={ai} className="ability-slot" style={{ padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               {ab ? <span style={{ color: '#ffff44' }}>{ab}</span> : <span style={{ color: 'var(--text2)' }}>Ability {ai + 1}</span>}
                             </div>
                           );

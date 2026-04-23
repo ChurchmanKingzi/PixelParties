@@ -11,7 +11,7 @@ const { GameBoard } = window;
 let _pendingGameState = null;
 
 function PlayScreen() {
-  const { user, setScreen, notify, setBgmMode } = useContext(AppContext);
+  const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
   const [decks, setDecks] = useState([]);
   const [sampleDecks, setSampleDecks] = useState([]);
   const [selectedDeck, setSelectedDeck] = useState('');
@@ -40,22 +40,34 @@ function PlayScreen() {
     return () => setBgmMode('menu');
   }, [gameState, setBgmMode]);
 
-  // Load decks + sample decks
+  // Load decks + sample decks. Bootstrap `selectedDeck` from the user's
+  // saved default — prefer a custom deck flagged is_default, fall back to
+  // the pinned sample/structure deck (user.defaultSampleDeckId), then to
+  // the first legal option of either list.
   useEffect(() => {
     (async () => {
+      let personal = [];
+      let samples = [];
       try {
         const data = await api('/decks');
-        if (data.decks) {
-          setDecks(data.decks);
-          const def = data.decks.find(d => d.isDefault);
-          if (def) setSelectedDeck(def.id);
-          else if (data.decks.length) setSelectedDeck(data.decks[0].id);
-        }
+        personal = data?.decks || [];
+        setDecks(personal);
       } catch {}
       try {
         const sd = await api('/sample-decks/owned');
-        if (sd.decks) setSampleDecks(sd.decks);
+        samples = sd?.decks || [];
+        setSampleDecks(samples);
       } catch {}
+      const customDefault = personal.find(d => d.isDefault);
+      const pinnedSampleId = user?.defaultSampleDeckId || null;
+      const pinnedSample = pinnedSampleId ? samples.find(s => s.id === pinnedSampleId) : null;
+      if (customDefault) setSelectedDeck(customDefault.id);
+      else if (pinnedSample) setSelectedDeck(pinnedSample.id);
+      else if (personal.length) setSelectedDeck(personal[0].id);
+      else {
+        const firstLegalSample = samples.find(s => isDeckLegal(s).legal);
+        if (firstLegalSample) setSelectedDeck(firstLegalSample.id);
+      }
     })();
   }, []);
 
@@ -247,19 +259,29 @@ function PlayScreen() {
         <div style={{ flex: 1 }} />
         <label style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
           🃏 Deck:
-          <select className="select" value={selectedDeck} onChange={e => {
+          <select className="select" value={selectedDeck} onChange={async e => {
               const id = e.target.value;
               setSelectedDeck(id);
-              // Auto-save as default deck (skip sample decks)
-              if (decks.some(d => d.id === id)) {
-                api('/decks/' + id + '/set-default', { method: 'POST' }).then(() => {
+              // Auto-save as default deck. Custom decks use the per-deck
+              // endpoint; starter / structure decks use the sample-default
+              // pin endpoint. Local state mirrors what the server does
+              // (sample pin clears any custom default; custom default
+              // clears the sample pin).
+              try {
+                if (decks.some(d => d.id === id)) {
+                  await api('/decks/' + id + '/set-default', { method: 'POST' });
                   setDecks(prev => prev.map(d => ({ ...d, isDefault: d.id === id })));
-                }).catch(() => {});
-              }
+                  setUser(u => u ? { ...u, defaultSampleDeckId: null } : u);
+                } else if (sampleDecks.some(d => d.id === id)) {
+                  await api('/decks/set-default-sample', { method: 'POST', body: JSON.stringify({ sampleDeckId: id }) });
+                  setDecks(prev => prev.map(d => ({ ...d, isDefault: false })));
+                  setUser(u => u ? { ...u, defaultSampleDeckId: id } : u);
+                }
+              } catch {}
             }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
             {decks.map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}{d.isDefault ? ' ★' : ''}</option>)}
             {sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
-            {sampleDecks.filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
+            {sampleDecks.filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}{user?.defaultSampleDeckId === d.id ? ' ★' : ''}</option>)}
           </select>
         </label>
         <button className="btn btn-accent2" onClick={() => setCreating(true)}>+ CREATE GAME</button>

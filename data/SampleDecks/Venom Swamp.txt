@@ -1,5 +1,5 @@
 === PIXEL PARTIES DECK ===
-Name: Structure Deck: Venom Swamp
+Name: Venom Swamp
 Cover: Poisoned Well
 
 == HEROES ==

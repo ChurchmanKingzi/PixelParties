@@ -6038,6 +6038,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         prevHandLenRef.current = newHand.length;
         return;
       }
+      // Length-neutral hand change with a pending pile-transfer-to-hand —
+      // this is the Deepsea bounce-place swap: hand contents changed
+      // (bounced creature in, played creature out) but the length stayed
+      // the same. No auto-draw phantom would fire here (it's gated on
+      // delta > 0), but we still have to burn the credit so the NEXT
+      // genuine hand-grew event (e.g. Deepsea Witch's on-summon tutor)
+      // isn't wrongly muted by the handshake block above.
+      if (delta <= 0 && pileTransferToHandPendingMeRef.current > 0) {
+        pileTransferToHandPendingMeRef.current = Math.max(0, pileTransferToHandPendingMeRef.current - 1);
+      }
       if (newHand.length > prevLen && !stealInProgressRef.current && deckDecreased) {
         // If cards arrived via steal, skip draw animation for them
         const skipCount = stealSkipDrawRef.current;

@@ -2198,6 +2198,16 @@ function endCpuBattle(room, winnerIdx, reason) {
     scAwarded: 0,
   };
   gs.rematchRequests = [];
+
+  // MCTS rollouts share the live room.gameState (snapshot/restore rolls
+  // back gs, but NOT fire-and-forget DB writes or socket emits). Without
+  // this guard, every simulated rollout that killed all heroes would
+  // stack another npc_stats + SC update on the real user — that's the
+  // "60+ wins and multi-stacked SC after a few games" bug. gs.result is
+  // still set above so the rollout's termination checks work; restore()
+  // then clears it for the next simulation.
+  if (room.engine?._fastMode) return;
+
   room.status = 'finished';
 
   // Record per-opponent W/L for the human player so the singleplayer
@@ -3011,7 +3021,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner 
   try {
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, cardType: 'Ability', goldCost: 0,
-      resolve: null,
+      resolve: null, fromBoard: true,
     });
 
     if (chainResult.negated) {
@@ -3293,6 +3303,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner }) {
 
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, cardType: 'Ability', goldCost: 0, resolve: null,
+      fromBoard: true,
     });
 
     if (chainResult.negated) {
@@ -3469,6 +3480,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
 
     const chainResult = await room.engine.executeCardWithChain({
       cardName: chosen.name, owner: pi, cardType: 'Hero', goldCost: 0, resolve: null,
+      fromBoard: true,
     });
 
     if (chainResult.negated) {

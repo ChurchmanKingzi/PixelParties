@@ -1860,6 +1860,12 @@ function TextBox() {
   const [highlightRects, setHighlightRects] = useState([]);
   const [rightVisible, setRightVisible] = useState(false);
   const [rightExiting, setRightExiting] = useState(false);
+  // Left portrait visibility mirrors the right-side machinery so a
+  // tutorial can have its left speaker "exit stage left" mid- or
+  // post-dialog. Default: visible (old behavior for every existing
+  // tutorial with a left speaker).
+  const [leftVisible, setLeftVisible] = useState(true);
+  const [leftExiting, setLeftExiting] = useState(false);
   const [fading, setFading] = useState(false);
   const timerRef = useRef(null);
   const parsedRef = useRef({ segments: [], plainText: '' });
@@ -1879,7 +1885,7 @@ function TextBox() {
   }, []);
 
   useLayoutEffect(() => {
-    if (!opts) { setPages([]); setPageIdx(0); setCharCount(0); setDone(false); setHighlightRects([]); setRightVisible(false); setRightExiting(false); setFading(false); onShowFiredRef.current = new Set(); return; }
+    if (!opts) { setPages([]); setPageIdx(0); setCharCount(0); setDone(false); setHighlightRects([]); setRightVisible(false); setRightExiting(false); setLeftVisible(true); setLeftExiting(false); setFading(false); onShowFiredRef.current = new Set(); return; }
 
     if (opts.pages && Array.isArray(opts.pages)) {
       setPages(opts.pages);
@@ -1933,6 +1939,7 @@ function TextBox() {
 
     // Per-page events
     if (page?.enterRight) setRightVisible(true);
+    if (page?.enterLeft) setLeftVisible(true);
     if (page?.onShow && !onShowFiredRef.current.has(pageIdx)) {
       onShowFiredRef.current.add(pageIdx);
       page.onShow();
@@ -1978,10 +1985,12 @@ function TextBox() {
     } else if (pageIdx < pages.length - 1) {
       const currentPage = pages[pageIdx];
       if (currentPage?.exitRight) { setRightExiting(true); setTimeout(() => { setRightVisible(false); setRightExiting(false); }, 600); }
+      if (currentPage?.exitLeft) { setLeftExiting(true); setTimeout(() => { setLeftVisible(false); setLeftExiting(false); }, 600); }
       setPageIdx(pageIdx + 1);
     } else {
       const currentPage = pages[pageIdx];
       if (currentPage?.exitRight) { setRightExiting(true); setTimeout(() => { setRightVisible(false); setRightExiting(false); }, 600); }
+      if (currentPage?.exitLeft) { setLeftExiting(true); setTimeout(() => { setLeftVisible(false); setLeftExiting(false); }, 600); }
       // Fade out then dismiss
       setFading(true);
       const cb = opts.onDismiss;
@@ -2062,8 +2071,8 @@ function TextBox() {
         </div>
       ))}
       <div className="textbox">
-        {opts.speaker && (
-          <div className={'textbox-portrait' + (hasRight && activeSide !== 'left' ? ' textbox-portrait-inactive' : '')}>
+        {opts.speaker && leftVisible && (
+          <div className={'textbox-portrait' + (hasRight && activeSide !== 'left' ? ' textbox-portrait-inactive' : '') + (leftExiting ? ' textbox-portrait-exit-left' : '')}>
             <div className="textbox-portrait-frame">
               <img src={opts.speaker} alt={opts.speakerName || ''} draggable={false} />
               {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.35) + 's', top: [10,60,5,50,30,65,15,45][i] + '%', left: [5,70,55,10,80,35,90,60][i] + '%' }} />)}
@@ -2287,6 +2296,43 @@ const TUTORIAL_SCRIPTS = {
     ],
     outro: [
       { text: "Perfect! You can use {yellow:**Stun**}, {#88ddff:**Freeze**} and other inhibiting effects to slow your opponent down while {purple:**Poison**} and {orange:**Burn**} whittle them down!" },
+    ],
+  },
+  6: {
+    // Antonia is the sole speaker and lives on the LEFT side throughout —
+    // no enter / exit animation, no Monia Bot involvement. Per-line
+    // `speakerName` + `nameColor` still set so the red name label shows
+    // (the sticky-name lookup reads them off each page).
+    opts: { speaker: '/Antonia.png', speakerName: 'Antonia' },
+    intro: [
+      { text: "Khekhekhe! Welcome to the GRRRREAT Antonia's lair!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'Or ... my {red:**Area**} you could say.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: "Areas are mighty useful! They come as Spells, Attacks, maybe even Creatures. Not sure, didn't check.", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: "Don't care too much either - what am I, your database or somethin'? Khekhe!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'The important thing is: Areas can be super useful once you transform the battlefield with them!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'Just look at that {green:**Deepsea Castle**} in ya hand!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
+        highlights: [
+          { selector: '.game-hand-me [data-card-name="Deepsea Castle"]', pulse: true },
+        ] },
+      { text: 'Lets ya swap out one of ya Creatures on board for one in hand.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
+        highlights: [
+          { selector: '.game-hand-me [data-card-name="Deepsea Castle"]', pulse: true },
+        ] },
+      { text: 'Mighty convenient if your Creatures do stuff when summoned!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
+        highlights: [
+          { selector: '.game-hand-me [data-card-name="Deepsea Castle"]', pulse: true },
+        ] },
+      { text: 'And unlike lame-ass *Creatures*, Areas can activate their effects immediately! So convenient!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'The GRRRREAT Antonia has mercifully set this up as a simple little puzzle for ya.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: "Go solve it and show me your gratitude by learnin' somethin', will ya?!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+    ],
+    outro: [
+      { text: 'About time, khekhe! Fell asleep at least twice while you were trying to figure dis out.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'My jetpack barely has any fuel left, can ya imagine?!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'Buuuuut now ya know what Areas are and can do the absolute basics of simple puzzle solving and combo play.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: "Ya {purple:**Ascended**} to the mental level of a six-year-old. Ya wouldn't believe how proud I am of your *progress*!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'Imma see you next time for a REAL test. To see if that {purple:**Ascension**} of yours is da real deal and I can let ya out into the wild.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'As my loyal subject, khekhe! Still owe me ungodly amounts of da Gold!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, exitLeft: true },
     ],
   },
 };

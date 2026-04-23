@@ -1,20 +1,15 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Divine Gift of Sacrifice"
-//  Spell (Reaction, Decay Magic Lv1)
+//  Spell (Normal, Decay Magic Lv1)
 //
 //  Once per game (shared "Divine Gift" key).
 //  Sacrifice a Hero you originally control to
 //  increase another Hero's current and max HP
 //  by the sacrificed Hero's max HP.
 //
-//  Post-target reaction: fires AFTER an
-//  opponent's card selects its target but
-//  BEFORE the effect resolves. If the
-//  sacrificed hero was the target, the
-//  opponent must retarget (handled by engine).
-//
-//  Also playable proactively during own turn
-//  as an inherent action (no action cost).
+//  Sorcery speed: can only be played on the
+//  user's own turn as an inherent additional
+//  Action. No reaction / chain behavior.
 //
 //  Animation: snake devour on sacrifice, golden
 //  sparkles on buffed hero.
@@ -41,7 +36,7 @@ function getSacrificeTargets(gs, pi) {
 }
 
 /**
- * Core sacrifice logic used by both proactive and reaction paths.
+ * Core sacrifice logic: pick a hero to sacrifice, kill it, buff another.
  */
 async function doSacrifice(engine, pi) {
   const gs = engine.gs;
@@ -145,11 +140,7 @@ async function doSacrifice(engine, pi) {
 }
 
 module.exports = {
-  // Post-target reaction: fires AFTER opponent's spell/attack selects a target
-  isPostTargetReaction: true,
-  proactivePlay: true,
-
-  // Also playable proactively during own turn
+  // Inherent additional Action — played during own Main Phase at Sorcery speed.
   inherentAction: true,
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
@@ -163,42 +154,14 @@ module.exports = {
   cpuDelayToMainPhase2: true,
 
   /**
-   * Post-target condition: fires when an opponent's card targets
-   * the player's heroes. Requires 2+ sacrifice-eligible heroes.
-   */
-  postTargetCondition: (gs, pi, engine, targetedHeroes, sourceCard) => {
-    // Divine Gift already used this game?
-    if (gs.players[pi]?._oncePerGameUsed?.has('divineGift')) return false;
-
-    // Need 2+ originally-owned alive heroes
-    if (getSacrificeTargets(gs, pi).length < 2) return false;
-
-    // Source must be from the opponent
-    const sourceOwner = sourceCard?.controller ?? sourceCard?.owner ?? -1;
-    if (sourceOwner === pi) return false;
-
-    // At least 1 of the targets must belong to this player
-    return targetedHeroes.some(t => t.owner === pi);
-  },
-
-  /**
-   * Post-target resolve: run the sacrifice logic.
-   */
-  postTargetResolve: async (engine, pi, targetedHeroes, sourceCard) => {
-    return await doSacrifice(engine, pi);
-  },
-
-  /**
-   * Proactive play condition: 2+ sacrifice targets.
+   * Play condition: need 2+ originally-owned alive heroes (one to sacrifice,
+   * one to receive the buff).
    */
   spellPlayCondition(gs, pi) {
     return getSacrificeTargets(gs, pi).length >= 2;
   },
 
   hooks: {
-    /**
-     * Proactive play path (from hand during Main Phase).
-     */
     onPlay: async (ctx) => {
       const engine = ctx._engine;
       const gs = engine.gs;

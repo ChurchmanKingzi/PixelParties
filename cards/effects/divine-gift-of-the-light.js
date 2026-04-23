@@ -118,9 +118,10 @@ module.exports = {
             cardName: h.name,
           });
         }
-        // Creatures only (not Artifacts/Attachments)
+        // Creatures only (not Artifacts/Attachments) — creatures persist on
+        // dead heroes, so don't gate on host hero HP.
         for (let hi = 0; hi < (gs.players[p].heroes || []).length; hi++) {
-          if (!gs.players[p].heroes[hi]?.name || gs.players[p].heroes[hi].hp <= 0) continue;
+          if (!gs.players[p].heroes[hi]?.name) continue;
           for (let si = 0; si < (gs.players[p].supportZones[hi] || []).length; si++) {
             const slot = (gs.players[p].supportZones[hi] || [])[si] || [];
             if (slot.length === 0) continue;

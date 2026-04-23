@@ -19,8 +19,8 @@ const CARD_NAME = 'Steam Dwarf Brewer';
 /**
  * Build the list of candidate brewing targets: other friendly
  * creatures in support zones, not this Brewer, not face-down, whose
- * controller is the Brewer's controller. Dead-hero columns are
- * filtered out.
+ * controller is the Brewer's controller. Creatures persist after
+ * their host hero dies, so dead-hero columns are NOT filtered out.
  */
 function getBrewTargets(engine, pi, selfInstId) {
   const gs = engine.gs;
@@ -30,7 +30,7 @@ function getBrewTargets(engine, pi, selfInstId) {
   const targets = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
+    if (!hero?.name) continue;
     for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
       const slot = (ps.supportZones[hi] || [])[si] || [];
       if (slot.length === 0) continue;

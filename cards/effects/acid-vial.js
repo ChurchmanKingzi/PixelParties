@@ -44,9 +44,10 @@ module.exports = {
         });
       }
 
-      // Creatures in support zones
+      // Creatures in support zones — creatures persist after their host
+      // hero dies, so don't skip dead-hero support zones here.
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (!ps.heroes[hi]?.name || ps.heroes[hi].hp <= 0) continue;
+        if (!ps.heroes[hi]?.name) continue;
         for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
           const slot = (ps.supportZones[hi] || [])[si] || [];
           if (slot.length === 0) continue;

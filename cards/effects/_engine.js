@@ -1666,7 +1666,9 @@ class GameEngine {
           const ps2 = gs.players[playerIdx];
           const cardDB = engine._getCardDB();
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
-            if (!ps2.heroes[hi]?.name || ps2.heroes[hi].hp <= 0) continue;
+            // Hero slot must exist, but dead heroes still have targetable
+            // creatures in their support zones (creatures persist on death).
+            if (!ps2.heroes[hi]?.name) continue;
             for (let si = 0; si < (ps2.supportZones[hi] || []).length; si++) {
               const slot = (ps2.supportZones[hi] || [])[si] || [];
               if (slot.length === 0) continue;
@@ -1933,7 +1935,9 @@ class GameEngine {
           const ps2 = gs.players[playerIdx];
           const cardDB = engine._getCardDB();
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
-            if (!ps2.heroes[hi]?.name || ps2.heroes[hi].hp <= 0) continue;
+            // Hero slot must exist, but dead heroes still have targetable
+            // creatures in their support zones (creatures persist on death).
+            if (!ps2.heroes[hi]?.name) continue;
             for (let si = 0; si < (ps2.supportZones[hi] || []).length; si++) {
               const slot = (ps2.supportZones[hi] || [])[si] || [];
               if (slot.length === 0) continue;
@@ -7465,6 +7469,10 @@ class GameEngine {
     const ps = this.gs.players[targetOwnerIdx];
     if (!ps) return null;
 
+    // Turn-1 lockout: the first-turn-protected player cannot activate any
+    // hand cards during the opening turn (no interaction allowed).
+    if (this.gs.firstTurnProtectedPlayer === targetOwnerIdx) return null;
+
     // Scan hand for redirect cards
     const seen = new Set();
     for (let hi = 0; hi < ps.hand.length; hi++) {
@@ -8000,6 +8008,10 @@ class GameEngine {
     const ps = this.gs.players[targetOwner];
     if (!ps) return;
 
+    // Turn-1 lockout: the first-turn-protected player cannot activate any
+    // hand cards during the opening turn (no interaction allowed).
+    if (this.gs.firstTurnProtectedPlayer === targetOwner) return;
+
     const seen = new Set();
     for (let hi = 0; hi < ps.hand.length; hi++) {
       const cardName = ps.hand[hi];
@@ -8363,6 +8375,10 @@ class GameEngine {
       const ps = this.gs.players[pi];
       if (!ps) continue;
 
+      // Turn-1 lockout: the first-turn-protected player cannot activate any
+      // hand cards during the opening turn (no interaction allowed).
+      if (this.gs.firstTurnProtectedPlayer === pi) continue;
+
       for (let hi = 0; hi < ps.hand.length; hi++) {
         const cardName = ps.hand[hi];
         const script = loadCardEffect(cardName);
@@ -8486,6 +8502,123 @@ class GameEngine {
       }
     }
     return null;
+  }
+
+  /**
+   * Check the ascending player's hand for Ascension-reaction cards —
+   * currently Trample Sounds in the Forest, but anything with
+   * `isAscensionReaction: true` is picked up. Mirrors the shape of
+   * `_checkPostTargetHandReactions` but for the Ascension window.
+   *
+   * Called from `performAscension` AFTER the card-specific Ascension
+   * Bonus and BEFORE the skip-to-End-Phase decision — matching the
+   * spec: "after the bonus, before the proceed-to-turn-end."
+   *
+   * @param {number} pi - Ascending player's index
+   * @param {number} ascendedHeroIdx - Slot of the hero that just ascended
+   */
+  async _checkAscensionHandReactions(pi, ascendedHeroIdx) {
+    if (this._inAscensionReactionCheck) return;
+    const ps = this.gs.players[pi];
+    if (!ps) return;
+    const allCards = this._getCardDB();
+    const ascendedHero = ps.heroes?.[ascendedHeroIdx];
+    const ascendedName = ascendedHero?.name || 'Your Hero';
+
+    for (let hi = 0; hi < ps.hand.length; hi++) {
+      const cardName = ps.hand[hi];
+      const script = loadCardEffect(cardName);
+      if (!script?.isAscensionReaction) continue;
+
+      const cardData = allCards[cardName];
+      const cost = cardData?.cost || 0;
+      if (cost > 0 && (ps.gold || 0) < cost) continue;
+
+      // Card-specific condition (HOPT gate etc.)
+      if (script.ascensionReactionCondition &&
+          !script.ascensionReactionCondition(this.gs, pi, this)) continue;
+
+      // Spell/Attack reactions need a casting hero that meets school + level.
+      // Artifacts don't require a caster.
+      const isArtifact = cardData?.cardType === 'Artifact';
+      let castingHeroIdx = -1;
+      if (!isArtifact) {
+        for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
+          if (this._canHeroActivateSurprise(pi, heroI, cardName)) {
+            castingHeroIdx = heroI;
+            break;
+          }
+        }
+        if (castingHeroIdx < 0) continue;
+      }
+
+      // Prompt the ascending player to confirm activation.
+      const confirmed = await this.promptGeneric(pi, {
+        type: 'confirm',
+        title: cardName,
+        message: `${ascendedName} just Ascended! Activate ${cardName}?`,
+        showCard: cardName,
+        confirmLabel: '✨ Activate!',
+        cancelLabel: 'No',
+        cancellable: true,
+      });
+      if (!confirmed) continue;
+
+      // Consume from hand + pay gold
+      ps.hand.splice(hi, 1);
+      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      if (this.gs._scTracking && pi >= 0 && pi < 2) this.gs._scTracking[pi].cardsPlayedFromHand++;
+
+      // Reveal the card to the opponent + spectators
+      this._broadcastEvent('card_reveal', { cardName, playerIdx: pi });
+      await this._delay(300);
+
+      this.log('ascension_reaction', { card: cardName, player: ps.username, hero: ascendedName });
+
+      // Wisdom (level-gap coverage) — same contract as post-target reactions.
+      const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
+        ? this.getWisdomDiscardCost(pi, castingHeroIdx, cardData)
+        : 0;
+
+      // Resolve
+      this._inAscensionReactionCheck = true;
+      try {
+        if (script.ascensionReactionResolve) {
+          await script.ascensionReactionResolve(this, pi, castingHeroIdx, ascendedHeroIdx);
+        }
+      } finally {
+        this._inAscensionReactionCheck = false;
+      }
+
+      // Parity with post-target reactions: fire afterSpellResolved for
+      // Spell-type ascension reactions so hero passives like Zsos'Ssar
+      // (Decay-Spell Poison cost), Beato's orb collector, etc., still
+      // trigger on this cast. Artifacts don't fire spell hooks.
+      if (!isArtifact && cardData?.cardType === 'Spell' && castingHeroIdx >= 0) {
+        try {
+          await this.runHooks('afterSpellResolved', {
+            spellName: cardName, spellCardData: cardData,
+            heroIdx: castingHeroIdx, casterIdx: pi,
+            damageTargets: [], isSecondCast: false,
+            _skipReactionCheck: true,
+          });
+        } catch (err) {
+          console.error('[Engine] afterSpellResolved (ascension) error:', err.message);
+        }
+      }
+
+      // Discard the spent card
+      ps.discardPile.push(cardName);
+      this.sync();
+
+      if (wisdomCost > 0) {
+        await this.actionPromptForceDiscard(pi, wisdomCost, {
+          title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+        });
+      }
+
+      return; // Only one Ascension reaction fires per Ascension
+    }
   }
 
   /**
@@ -8690,13 +8823,34 @@ class GameEngine {
       result = await script.onSurpriseActivate(ctx, sourceInfo);
     }
 
+    // Fire afterSpellResolved for Spell-type surprises (Toxic Trap, Magic
+    // Mirror, Booby Trap, etc.) so hero passives that listen on cast
+    // completion (Zsos'Ssar's Poison cost, Beato's orb collector, Andras,
+    // Luck, etc.) treat surprise-cast spells the same as normal plays.
+    // Creature-type surprises (Bakhm flips, Jumpscare, etc.) are not
+    // spells and naturally skip this.
+    const cardDataForDelay = this._getCardDB()[cardName];
+    if (cardDataForDelay?.cardType === 'Spell') {
+      try {
+        await this.runHooks('afterSpellResolved', {
+          spellName: cardName,
+          spellCardData: cardDataForDelay,
+          heroIdx, casterIdx: playerIdx,
+          damageTargets: [],
+          isSecondCast: false,
+          _skipReactionCheck: true,
+        });
+      } catch (err) {
+        console.error('[Engine] afterSpellResolved (surprise) error:', err.message);
+      }
+    }
+
     // Brief pause after effect resolution before placement. Only needed for
     // Creature surprises (which have a face-up placement animation after) —
     // for non-Creature surprises (Magic Mirror, Booby Trap, etc.) we go
     // straight to discard, so the long delay is just dead air between the
     // reflected effect and the surprise going to the discard pile.
     this.sync();
-    const cardDataForDelay = this._getCardDB()[cardName];
     const isCreatureSurprise = isBakhmSlot || hasCardType(cardDataForDelay, 'Creature');
     await this._delay(isCreatureSurprise ? 500 : 150);
 
@@ -8813,12 +8967,17 @@ class GameEngine {
    * @returns {{ negated: boolean, chainFormed: boolean, resolveResult: any }}
    */
   async executeCardWithChain(cardInfo) {
-    const { cardName, owner, cardType, resolve, goldCost, heroIdx } = cardInfo;
+    const { cardName, owner, cardType, resolve, goldCost, heroIdx, fromBoard } = cardInfo;
 
     const initialLink = {
       id: uuidv4().substring(0, 12),
       cardName, owner, heroIdx: heroIdx ?? -1,
       cardType: cardType || 'Unknown',
+      // `fromBoard` distinguishes from-hand plays (default, undefined/false)
+      // from board activations (hero effect, board-ability activate/free-
+      // activate). Reactions like "The Master's Plan" gate on this so they
+      // only fire when the opponent actually plays a card from hand.
+      fromBoard: !!fromBoard,
       goldCost: goldCost || 0,
       isInitialCard: true,
       negated: false,
@@ -8943,6 +9102,10 @@ class GameEngine {
       const ps = this.gs.players[pi];
       if (!ps) continue;
 
+      // Turn-1 lockout: the first-turn-protected player cannot activate any
+      // hand cards during the opening turn (no interaction allowed).
+      if (this.gs.firstTurnProtectedPlayer === pi) continue;
+
       for (let hi = 0; hi < ps.hand.length; hi++) {
         const cardName = ps.hand[hi];
         // Skip cards currently being played/resolved (prevents self-chaining)
@@ -8987,10 +9150,26 @@ class GameEngine {
         // Reveal the reaction card to the opponent and spectators
         this._broadcastEvent('card_reveal', { cardName });
 
+        // Record the casting hero for Spell/Attack reactions — needed so
+        // `afterSpellResolved` at chain-resolve time can identify who cast
+        // the spell, letting hero-bound passives like Zsos'Ssar's
+        // "Poison cost on Decay Spell cast" trigger on chain reactions too.
+        // Artifacts don't have a casting hero.
+        let reactionCasterHeroIdx = -1;
+        if (cardData?.cardType === 'Spell' || cardData?.cardType === 'Attack') {
+          for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
+            if (this._canHeroActivateSurprise(pi, heroI, cardName)) {
+              reactionCasterHeroIdx = heroI;
+              break;
+            }
+          }
+        }
+
         const link = {
           id: uuidv4().substring(0, 12),
           cardName, owner: pi,
           cardType: cardData?.cardType || 'Unknown',
+          casterHeroIdx: reactionCasterHeroIdx,
           goldCost: cost,
           isInitialCard: false,
           negated: false, chainClosed: false,
@@ -9061,6 +9240,32 @@ class GameEngine {
             if (link.isInitialCard) link.resolveResult = result;
           } catch (err) {
             console.error(`[Engine] Chain resolve failed for "${link.cardName}":`, err.message);
+          }
+        }
+
+        // Fire afterSpellResolved for Spell-type reactions that actually
+        // resolved, so hero passives that listen on cast completion
+        // (Zsos'Ssar's Poison cost, Beato's orb collector, Andras, Luck,
+        // etc.) treat chain-cast reaction spells the same as normal
+        // plays. Initial cards already got their own afterSpellResolved
+        // firing through their normal play path. Artifacts and cards
+        // without a valid casting hero are skipped.
+        if (!link.isInitialCard && link.cardType === 'Spell' && link.casterHeroIdx >= 0) {
+          const linkCardData = this._getCardDB()[link.cardName];
+          if (linkCardData) {
+            try {
+              await this.runHooks('afterSpellResolved', {
+                spellName: link.cardName,
+                spellCardData: linkCardData,
+                heroIdx: link.casterHeroIdx,
+                casterIdx: link.owner,
+                damageTargets: [],
+                isSecondCast: false,
+                _skipReactionCheck: true,
+              });
+            } catch (err) {
+              console.error('[Engine] afterSpellResolved (chain) error:', err.message);
+            }
           }
         }
 
@@ -9309,7 +9514,11 @@ class GameEngine {
     const targets = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
+      // Hero slot must exist, but dead-hero columns still have targetable
+      // creatures — they persist past their host hero's death (matches the
+      // dead-hero creature-targeting rule enforced in promptDamageTarget /
+      // Cure / Acid Vial / Steam Dwarf Brewer / etc.).
+      if (!hero?.name) continue;
       for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
         const slot = (ps.supportZones[hi] || [])[si] || [];
         if (slot.length === 0) continue;
@@ -11804,6 +12013,14 @@ class GameEngine {
     }
 
     this.sync();
+
+    // ── Ascension-reaction window ──
+    // Fires AFTER the Ascension Bonus but BEFORE the proceed-to-End-Phase
+    // decision. Trample Sounds in the Forest lives here: it injects a
+    // free additional Action with any Hero before the turn wraps up.
+    // The helper iterates the ascending player's hand for cards flagged
+    // `isAscensionReaction: true`, HOPT-guarded via each card's own key.
+    await this._checkAscensionHandReactions(pi, heroIdx);
 
     // ── Determine if turn should skip to End Phase ──
     let skipEndPhase = false;

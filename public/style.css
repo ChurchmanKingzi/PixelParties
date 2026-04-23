@@ -464,6 +464,62 @@ body {
   background: rgba(170,255,0,.04);
 }
 
+/* Heroes section in the deck editor: 3 columns that grow/shrink with the
+   center panel. Each slot holds a big hero card (flex 2) and a vertical
+   stack of two ability cards (flex 1). Children use `aspect-ratio: 5/7`
+   so heights derive from the available width — the 2:1 flex split makes
+   the ability stack end up the same height as the hero card. */
+.db-hero-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding: 12px;
+  align-items: start;
+}
+/* HeroSlot wraps each column in a plain div — allow it to shrink below
+   intrinsic content width so the 1fr columns actually honor their share
+   on narrower windows. */
+.db-hero-row > * { min-width: 0; }
+.db-hero-slot {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  align-items: stretch;
+  min-width: 0;
+  padding: 4px;
+  border-radius: 4px;
+}
+.db-hero-slot.drop-target { outline: 2px solid var(--accent); }
+.db-hero-card {
+  flex: 2 1 0;
+  min-width: 0;
+  position: relative;
+  aspect-ratio: 5 / 7;
+}
+.db-hero-card > .card-mini,
+.db-hero-card > .card-slot {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: unset;
+  font-size: 12px;
+}
+.db-hero-abilities {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.db-hero-abilities > .card-mini,
+.db-hero-abilities > .ability-slot {
+  flex: 1 1 0;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  aspect-ratio: 5 / 7;
+  font-size: 10px;
+}
+
 /* ===== MODALS ===== */
 .modal-overlay {
   position: fixed;
@@ -6257,6 +6313,11 @@ body:has(.textbox-overlay) .tooltip {
 .textbox-portrait-exit {
   animation: textbox-portrait-leave .5s ease-in forwards;
 }
+/* Mirror of .textbox-portrait-exit for the left-side speaker — slides
+   out to the LEFT instead of the right. */
+.textbox-portrait-exit-left {
+  animation: textbox-portrait-leave-left .5s ease-in forwards;
+}
 @keyframes textbox-portrait-enter {
   from { transform: translateX(100%); opacity: 0; }
   to   { transform: translateX(0); opacity: 1; }
@@ -6264,6 +6325,10 @@ body:has(.textbox-overlay) .tooltip {
 @keyframes textbox-portrait-leave {
   from { transform: translateX(0); opacity: 1; }
   to   { transform: translateX(100%); opacity: 0; }
+}
+@keyframes textbox-portrait-leave-left {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(-100%); opacity: 0; }
 }
 .textbox-portrait-frame {
   position: relative;
@@ -6781,9 +6846,9 @@ body:has(.textbox-overlay) .tooltip {
     padding: 2px 4px !important;
     font-size: 9px !important;
   }
-  /* Deck section hero row */
+  /* Deck section hero row — tighter gaps at narrow widths. Sizes come
+     from the responsive grid + aspect-ratio, so no pixel overrides. */
   .db-hero-row { gap: 8px !important; padding: 4px !important; }
-  .db-hero-row .card-slot { width: 60px !important; height: 84px !important; }
 
   /* ── Card tooltip: match right column width, image-only ── */
   .card-tooltip {

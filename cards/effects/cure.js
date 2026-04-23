@@ -40,9 +40,9 @@ function getValidTargets(gs, engine, excludeHeroKey) {
         });
       }
     }
-    // Creatures
+    // Creatures — persist on dead heroes, so don't gate on host hero HP.
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (!ps.heroes[hi]?.name || ps.heroes[hi].hp <= 0) continue;
+      if (!ps.heroes[hi]?.name) continue;
       for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
         const slot = (ps.supportZones[hi] || [])[si] || [];
         if (slot.length === 0) continue;

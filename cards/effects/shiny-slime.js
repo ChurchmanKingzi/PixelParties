@@ -24,11 +24,13 @@ module.exports = {
       // Use engine's cached card database
       const cardDB = engine._getCardDB();
 
-      // Count unique Creature names with original level 0 across all support zones
+      // Count unique Creature names with original level 0 across all support
+      // zones. Creatures persist after their host hero dies, so include
+      // dead-hero columns too.
       const uniqueNames = new Set();
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
+        if (!hero?.name) continue;
         for (const slot of (ps.supportZones[hi] || [])) {
           for (const cardName of (slot || [])) {
             const c = cardDB[cardName];

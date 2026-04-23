@@ -2007,7 +2007,7 @@ function RulesScreen() {
                 <span className="rules-phase-num">1</span>
                 <span className="rules-phase-name orbit-font">Start Phase</span>
               </div>
-              <p>The turn begins. Effects that last "until the beginning of the turn" end and effects that trigger "at the beginning of the turn" activate. The turn player freely decides the order in which effects trigger/end.</p>
+              <p>The turn begins. Effects that last "until the beginning of the turn" end and effects that trigger "at the beginning of the turn" activate.</p>
             </div>
 
             <div className="rules-phase">
@@ -2028,7 +2028,7 @@ function RulesScreen() {
                 <div className="rules-restriction-item rules-phase-action">Attach up to 1 Ability from their hand to each of their Heroes.</div>
                 <div className="rules-restriction-item rules-phase-action">Play any number of Artifacts from their hand, as long as they can pay their Costs.</div>
                 <div className="rules-restriction-item rules-phase-action">Play any number of Potions from their hand.</div>
-                <div className="rules-restriction-item rules-phase-action">Activate the active effects of any number of cards they control (Heroes, Abilities, Creatures, Equipments, Attachments).</div>
+                <div className="rules-restriction-item rules-phase-action">Activate the active effects of any number of cards they control (Heroes, Abilities, Creatures, Equipments, Attachments, Areas).</div>
                 <div className="rules-restriction-item rules-phase-action">Play Attacks/Spells/Creatures that "count as an additional Action", including Reactions that are not limited to react to specific actions.</div>
                 <div className="rules-restriction-item rules-phase-action">Set as many Surprises as they have free Zones to do so.</div>
               </div>
@@ -2176,10 +2176,11 @@ function HeroArtCrop({ heroName, width = 160 }) {
 }
 
 function SingleplayerScreen() {
-  const { setScreen, notify, setBgmMode } = useContext(AppContext);
+  const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
   const [opponents, setOpponents] = useState(null);          // null = loading
   const [personalDecks, setPersonalDecks] = useState([]);
   const [sampleDecks, setSampleDecks] = useState([]);
+  const [selectedDeck, setSelectedDeck] = useState('');
   const [cpuBattleState, setCpuBattleState] = useState(null);
   const [starting, setStarting] = useState(false);
   const cpuBattleRoom = useRef(null);
@@ -2205,9 +2206,23 @@ function SingleplayerScreen() {
           api('/sample-decks/owned'),
         ]);
         if (cancelled) return;
+        const personal = mine?.decks || [];
+        const sampleList = samples?.decks || [];
         setOpponents(gal?.opponents || []);
-        setPersonalDecks(mine?.decks || []);
-        setSampleDecks(samples?.decks || []);
+        setPersonalDecks(personal);
+        setSampleDecks(sampleList);
+        // Bootstrap the dropdown from the user's saved default (custom
+        // deck, then pinned starter / structure deck, then first legal).
+        const customDefault = personal.find(d => d.isDefault);
+        const pinnedSampleId = user?.defaultSampleDeckId || null;
+        const pinnedSample = pinnedSampleId ? sampleList.find(s => s.id === pinnedSampleId) : null;
+        if (customDefault) setSelectedDeck(customDefault.id);
+        else if (pinnedSample) setSelectedDeck(pinnedSample.id);
+        else if (personal.length) setSelectedDeck(personal[0].id);
+        else {
+          const firstLegalSample = sampleList.find(s => isDeckLegal(s).legal);
+          if (firstLegalSample) setSelectedDeck(firstLegalSample.id);
+        }
       } catch (err) {
         if (!cancelled) { notify(err.message || 'Load failed', 'error'); setOpponents([]); }
       }
@@ -2251,16 +2266,25 @@ function SingleplayerScreen() {
 
   const startBattle = useCallback((opponentId) => {
     if (starting) return;
+    // Resolve the deck the player picked in the dropdown first, with
+    // fallbacks to any legal deck in case the selection is stale.
     const legalPersonal = personalDecks.filter(d => isDeckLegal(d).legal);
     const legalSample = sampleDecks.filter(d => isDeckLegal(d).legal);
-    const playerDeck = legalPersonal.find(d => d.isDefault) || legalPersonal[0] || legalSample[0] || null;
+    const selected = personalDecks.find(d => d.id === selectedDeck)
+                  || sampleDecks.find(d => d.id === selectedDeck);
+    const legalSelected = selected && isDeckLegal(selected).legal ? selected : null;
+    const playerDeck = legalSelected
+                    || legalPersonal.find(d => d.isDefault)
+                    || legalPersonal[0]
+                    || legalSample[0]
+                    || null;
     if (!playerDeck) { notify('You need a legal deck to play', 'error'); return; }
     setStarting(true);
     socket.emit('start_cpu_battle', { playerDeckId: playerDeck.id, cpuDeckId: opponentId });
     if (window.playSFX) window.playSFX('match_found');
     // Safety reset in case no game_state arrives
     setTimeout(() => setStarting(false), 3000);
-  }, [personalDecks, sampleDecks, starting, notify]);
+  }, [personalDecks, sampleDecks, selectedDeck, starting, notify]);
 
   const onBattleLeave = useCallback(() => {
     const roomId = cpuBattleRoom.current;
@@ -2297,6 +2321,33 @@ function SingleplayerScreen() {
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 16, color: '#aa88ff' }}>🤖 CHOOSE OPPONENT!</h2>
         <div style={{ flex: 1 }} />
+        <label style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+          🃏 Deck:
+          <select className="select" value={selectedDeck} onChange={async e => {
+              const id = e.target.value;
+              setSelectedDeck(id);
+              // Mirror the Find Player dropdown: save the picked deck as
+              // the user's default. Custom decks go through /decks/:id/
+              // set-default; starter / structure decks go through /decks/
+              // set-default-sample (which enforces structure-deck
+              // ownership server-side).
+              try {
+                if (personalDecks.some(d => d.id === id)) {
+                  await api('/decks/' + id + '/set-default', { method: 'POST' });
+                  setPersonalDecks(prev => prev.map(d => ({ ...d, isDefault: d.id === id })));
+                  setUser(u => u ? { ...u, defaultSampleDeckId: null } : u);
+                } else if (sampleDecks.some(d => d.id === id)) {
+                  await api('/decks/set-default-sample', { method: 'POST', body: JSON.stringify({ sampleDeckId: id }) });
+                  setPersonalDecks(prev => prev.map(d => ({ ...d, isDefault: false })));
+                  setUser(u => u ? { ...u, defaultSampleDeckId: id } : u);
+                }
+              } catch {}
+            }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: '#aa88ff', color: 'var(--text)' }}>
+            {personalDecks.map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}{d.isDefault ? ' ★' : ''}</option>)}
+            {sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
+            {sampleDecks.filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}{user?.defaultSampleDeckId === d.id ? ' ★' : ''}</option>)}
+          </select>
+        </label>
         <VolumeControl />
       </div>
       <div style={{ padding: '20px 40px 40px', boxSizing: 'border-box', width: '100%', maxWidth: 1500, alignSelf: 'center' }}>
@@ -2342,10 +2393,14 @@ function SingleplayerScreen() {
                   onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 10px ' + frameColor + '33'; }}
                 >
                   <HeroArtCrop heroName={op.middleHero} width={imgWidth} />
-                  <div className="orbit-font" style={{ fontSize: 16, color: frameColor, textAlign: 'center', fontWeight: 700, lineHeight: 1.2 }}>
+                  {/* Fixed 2-line height on the name so the W/L row below
+                      lines up across cards regardless of whether the name
+                      wraps to one or two lines. 1-line names are
+                      vertically centered in the reserved space. */}
+                  <div className="orbit-font" style={{ fontSize: 16, color: frameColor, textAlign: 'center', fontWeight: 700, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {op.middleHero || op.name}
                   </div>
-                  <div style={{ display: 'flex', gap: 14, fontSize: 14 }}>
+                  <div style={{ display: 'flex', gap: 14, fontSize: 14, marginTop: 'auto' }}>
                     {total > 0 ? (
                       <>
                         <span style={{ color: frameColor }}>W {op.wins || 0}</span>
