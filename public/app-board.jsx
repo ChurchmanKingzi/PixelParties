@@ -1065,6 +1065,10 @@ const hideGameTooltip = window.hideGameTooltip;
 const GameTooltip = window.GameTooltip;
 const StatusBadges = window.StatusBadges;
 const BuffColumn = window.BuffColumn;
+// HeroArtCrop lives in app-screens.jsx (the Singleplayer opponent-picker
+// uses it) — borrowed here to render CPU / avatar-less player portraits
+// next to the hand in-game using the same cropped hero art.
+const HeroArtCrop = window.HeroArtCrop;
 
 // Status badges — small icons showing active negative statuses at a glance
 // StatusBadges and BuffColumn — now defined in app-shared.jsx
@@ -5788,10 +5792,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // ── Tutorial outro: show textbox before victory screen ──
   const [tutorialOutroPending, setTutorialOutroPending] = useState(false);
   const [resultFading, setResultFading] = useState(false);
-  // Singleplayer rematch: pick the CPU's deck for the next game. Initialised
-  // once when the game-over screen first appears with a random legal deck.
-  const [cpuRematchDeckId, setCpuRematchDeckId] = useState('');
-  const cpuRematchInitRef = useRef(false);
   const tutorialOutroFiredRef = useRef(null);
   // Synchronous mirror of tutorialOutroPending — written alongside the
   // setState call so other effects running in the same commit can see the
@@ -11340,16 +11340,49 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Don't call onLeave — server will send updated game state with result
   };
   const handleRematch = () => {
-    if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); }
-    if (gameState.isCpuBattle) {
-      // Singleplayer rematch: bypass the two-player rematch flow and ask the
-      // server to spin up a fresh CPU game with the currently-selected deck.
-      socket.emit('rematch_cpu_battle', { roomId: gameState.roomId, cpuDeckId: cpuRematchDeckId });
-      // Reset the init gate so the next game-over screen rolls a fresh random default.
-      cpuRematchInitRef.current = false;
-      return;
+    try {
+      // Tripwire: if NONE of the logs fire, the click never reached this
+      // function (CSS overlay stealing pointer events, disabled attribute,
+      // etc.). If only the first fires but nothing after, `gameState` was
+      // unexpectedly null. If "emitting" fires but no server log shows up,
+      // the socket is disconnected or the handler wasn't bound.
+      console.log('[handleRematch] click', {
+        hasGameState: !!gameState,
+        isCpuBattle: gameState?.isCpuBattle,
+        roomId: gameState?.roomId,
+        resultReason: gameState?.result?.reason,
+        resultIsCpuBattle: gameState?.result?.isCpuBattle,
+        socketConnected: socket?.connected,
+        socketId: socket?.id,
+      });
+      if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); }
+      if (!gameState) {
+        console.error('[handleRematch] aborting — gameState is null');
+        return;
+      }
+      // Prefer top-level `isCpuBattle` (computed from room.type in
+      // sendGameState), but fall back to the flag `endCpuBattle` stamps
+      // on the result object. Either signal is enough — without this
+      // fallback, any race where the top-level flag is missing would
+      // route the click through the PvP `request_rematch` path, which
+      // waits for the opponent to also click Rematch (the CPU never
+      // does) and silently stalls forever.
+      const isCpu = gameState.isCpuBattle || gameState.result?.isCpuBattle;
+      if (isCpu) {
+        // Singleplayer rematch: bypass the two-player rematch flow and ask
+        // the server to spin up a fresh CPU game. Player deck comes from
+        // `change_deck` (already synced via the dropdown). CPU deck is
+        // omitted — the server defaults to the previous match's CPU deck,
+        // so "Rematch" means "same opponent, your chosen deck".
+        console.log('[handleRematch] emitting rematch_cpu_battle', { roomId: gameState.roomId });
+        socket.emit('rematch_cpu_battle', { roomId: gameState.roomId });
+        return;
+      }
+      console.log('[handleRematch] emitting request_rematch (PvP)', { roomId: gameState.roomId });
+      socket.emit('request_rematch', { roomId: gameState.roomId });
+    } catch (err) {
+      console.error('[handleRematch] threw:', err);
     }
-    socket.emit('request_rematch', { roomId: gameState.roomId });
   };
   const handleResultLeave = useCallback(() => {
     if (resultFading) return;
@@ -13293,7 +13326,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         {/* Opponent hand */}
         <div className="game-hand game-hand-opp">
           <div className="game-hand-info">
-            {opp.avatar && <img src={opp.avatar} className={'game-hand-avatar game-hand-avatar-big' + (!result && (isMyTurn ? ' avatar-inactive' : ' avatar-active'))} />}
+            {opp.avatar
+              ? <img src={opp.avatar} className={'game-hand-avatar game-hand-avatar-big' + (!result && (isMyTurn ? ' avatar-inactive' : ' avatar-active'))} />
+              : opp.heroes?.[1]?.name && HeroArtCrop
+                ? (
+                  <div className={'game-hand-avatar-crop' + (!result && (isMyTurn ? ' avatar-inactive' : ' avatar-active'))}>
+                    <HeroArtCrop heroName={opp.heroes[1].name} width={72} />
+                  </div>
+                )
+                : null}
             <span className="orbit-font" style={{ fontSize: 18, fontWeight: 800, color: opp.color }}>{opp.username}</span>
             {oppDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
           </div>
@@ -13622,7 +13663,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         {/* My hand (bottom player) — drag to reorder for players, face-down for spectators */}
         <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef}>
           <div className="game-hand-info">
-            {me.avatar && <img src={me.avatar} className={'game-hand-avatar game-hand-avatar-big' + (!result && (isMyTurn ? ' avatar-active' : ' avatar-inactive'))} />}
+            {me.avatar
+              ? <img src={me.avatar} className={'game-hand-avatar game-hand-avatar-big' + (!result && (isMyTurn ? ' avatar-active' : ' avatar-inactive'))} />
+              : me.heroes?.[1]?.name && HeroArtCrop
+                ? (
+                  <div className={'game-hand-avatar-crop' + (!result && (isMyTurn ? ' avatar-active' : ' avatar-inactive'))}>
+                    <HeroArtCrop heroName={me.heroes[1].name} width={72} />
+                  </div>
+                )
+                : null}
             <span className="orbit-font" style={{ fontSize: 18, fontWeight: 800, color: me.color }}>{me.username}</span>
             {meDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
           </div>
@@ -15076,50 +15125,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </div>
             )}
             {renderSCEarned()}
-            {!isSpectator && decks && decks.length > 0 && (
-              <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <label style={{ fontSize: 11, color: 'var(--text2)' }}>🃏 Deck:</label>
-                <select className="select" value={selectedDeck} onChange={e => {
+            {!isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
+              <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>
+                <select className="select" value={selectedDeck || ''} onChange={e => {
                   const id = e.target.value;
                   setSelectedDeck(id);
                   socket.emit('change_deck', { roomId: gameState.roomId, deckId: id });
-                }} style={{ fontSize: 11, minWidth: 160, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
+                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
                   {(decks||[]).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                   {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
                   {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
                 </select>
               </div>
             )}
-            {gameState.isCpuBattle && !isSpectator && (() => {
-              const legalPersonal = (decks || []).filter(d => isDeckLegal(d).legal);
-              const legalSample = (sampleDecks || []).filter(d => isDeckLegal(d).legal);
-              const hasAny = legalPersonal.length + legalSample.length > 0;
-              if (!cpuRematchInitRef.current && hasAny) {
-                const all = [...legalPersonal, ...legalSample];
-                const rnd = all[Math.floor(Math.random() * all.length)];
-                if (rnd && !cpuRematchDeckId) setCpuRematchDeckId(rnd.id);
-                cpuRematchInitRef.current = true;
-              }
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                  <div style={{ fontSize: 11, color: '#aa88ff', letterSpacing: 2, textTransform: 'uppercase' }}>Next CPU Deck</div>
-                  <select className="select" value={cpuRematchDeckId} onChange={e => setCpuRematchDeckId(e.target.value)}
-                    style={{ fontSize: 12, padding: '4px 8px', minWidth: 240, borderColor: '#aa88ff', color: 'var(--text)' }}>
-                    {!hasAny && <option value="">No legal decks available</option>}
-                    {legalPersonal.length > 0 && <option disabled value="">── Your Decks ──</option>}
-                    {legalPersonal.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    {legalSample.length > 0 && <option disabled value="">── Sample Decks ──</option>}
-                    {legalSample.map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
-                  </select>
-                </div>
-              );
-            })()}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               {isSpectator ? (
                 <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
               ) : gameState.isCpuBattle ? (
                 <>
-                  <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch} disabled={!cpuRematchDeckId}>
+                  <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch}>
                     🔄 REMATCH
                   </button>
                   <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
@@ -15140,16 +15165,52 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* ── Puzzle / Tutorial Result Overlay ── */}
-      {result && result.isPuzzle && !tutorialOutroPending && (
-        <div className={'modal-overlay result-overlay-fade' + (resultFading ? ' result-overlay-fading' : '')} style={{ background: 'rgba(0,0,0,.8)' }}>
-          <div className="animate-in" style={{ textAlign: 'center' }}>
+      {result && result.isPuzzle && !tutorialOutroPending && (() => {
+        // The final tutorial (script flagged `isFinalTutorial: true`) gets
+        // a celebratory upgrade: big multi-colored fireworks + a beefier
+        // "TUTORIAL CLEARED!" banner instead of the usual "STAGE CLEARED!".
+        // Identified by reading TUTORIAL_SCRIPTS for the running tutorial
+        // num; any non-final tutorial and regular puzzles render normally.
+        const finalTutorialCleared =
+          result.isTutorial
+          && result.puzzleResult === 'success'
+          && !!(window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.isFinalTutorial;
+        return (
+        <div className={'modal-overlay result-overlay-fade' + (resultFading ? ' result-overlay-fading' : '')}
+          style={{ background: 'rgba(0,0,0,.85)' }}>
+          {finalTutorialCleared && (
+            <div className="set-fireworks">
+              {Array.from({ length: 60 }).map((_, i) => (
+                <div key={i} className="firework-particle firework-big" style={{
+                  '--fw-x': (Math.random() * 400 - 200) + 'px',
+                  '--fw-y': (Math.random() * -400 - 80) + 'px',
+                  '--fw-color': ['#ffd700','#ff3366','#33ff88','#44aaff','#ff8800','#cc44ff','#ff6b00','#00f0ff'][i % 8],
+                  '--fw-delay': (Math.random() * 2.5) + 's',
+                  '--fw-dur': (1.2 + Math.random() * 0.8) + 's',
+                  left: (12 + Math.random() * 76) + '%',
+                  top: (22 + Math.random() * 46) + '%',
+                }} />
+              ))}
+            </div>
+          )}
+          <div className="animate-in" style={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
             {result.puzzleResult === 'success' ? (
               <>
-                <div className="pixel-font" style={{ fontSize: 42, marginBottom: 12, color: '#ffd700', textShadow: '0 0 40px rgba(255,215,0,.6)' }}>
-                  {result.isTutorial ? '📖 STAGE CLEARED! 📖' : '🧩 PUZZLE CLEARED! 🧩'}
+                <div className="pixel-font" style={{
+                  fontSize: finalTutorialCleared ? 56 : 42,
+                  marginBottom: 12, color: '#ffd700',
+                  textShadow: finalTutorialCleared
+                    ? '0 0 60px rgba(255,215,0,.85), 0 0 100px rgba(255,215,0,.45)'
+                    : '0 0 40px rgba(255,215,0,.6)'
+                }}>
+                  {finalTutorialCleared
+                    ? '🎉 TUTORIAL CLEARED! 🎉'
+                    : result.isTutorial ? '📖 STAGE CLEARED! 📖' : '🧩 PUZZLE CLEARED! 🧩'}
                 </div>
-                <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 24 }}>
-                  {result.isTutorial ? 'Great job!' : 'All enemy heroes defeated in one turn!'}
+                <div style={{ fontSize: finalTutorialCleared ? 16 : 14, color: 'var(--text2)', marginBottom: 24 }}>
+                  {finalTutorialCleared
+                    ? 'You have completed every tutorial — go forth and battle!'
+                    : result.isTutorial ? 'Great job!' : 'All enemy heroes defeated in one turn!'}
                 </div>
               </>
             ) : (
@@ -15182,7 +15243,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Win/Loss overlay — Bo1 or fallback */}
       {result && !result.isPuzzle && !showFirstChoice && (result.setOver || !result.format || result.format === 1) && !(result.format > 1) && (
@@ -15218,14 +15280,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </div>
             )}
             {renderSCEarned()}
-            {!isSpectator && decks && decks.length > 0 && (
-              <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <label style={{ fontSize: 11, color: 'var(--text2)' }}>🃏 Deck:</label>
-                <select className="select" value={selectedDeck} onChange={e => {
+            {!isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
+              <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>
+                <select className="select" value={selectedDeck || ''} onChange={e => {
                   const id = e.target.value;
                   setSelectedDeck(id);
                   socket.emit('change_deck', { roomId: gameState.roomId, deckId: id });
-                }} style={{ fontSize: 11, minWidth: 160, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
+                }} style={{ fontSize: 14, minWidth: 240, padding: '8px 14px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
                   {(decks||[]).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                   {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
                   {(sampleDecks||[]).filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}</option>)}
@@ -15235,6 +15297,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               {isSpectator ? (
                 <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+              ) : gameState.isCpuBattle ? (
+                <>
+                  <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch}>
+                    🔄 REMATCH
+                  </button>
+                  <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+                </>
               ) : !oppLeft && !oppDisconnected ? (
                 <>
                   <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch} disabled={myRematchSent}>

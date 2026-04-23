@@ -1805,6 +1805,27 @@ function parseInlineMarkdown(raw) {
   return { segments, plainText };
 }
 
+// Split a string into React-renderable chunks that wrap every "~" in a
+// span with the `textbox-tilde` class — see CSS for the visual nudge.
+// Non-tilde characters pass through as plain strings so React keeps the
+// text continuous. Returns a string (no tildes present) or an array.
+function wrapTildes(text, keyPrefix) {
+  if (typeof text !== 'string' || !text.includes('~')) return text;
+  const parts = [];
+  let buf = '';
+  let idx = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '~') {
+      if (buf) { parts.push(buf); buf = ''; }
+      parts.push(React.createElement('span', { key: `${keyPrefix}-t${idx++}`, className: 'textbox-tilde' }, '~'));
+    } else {
+      buf += text[i];
+    }
+  }
+  if (buf) parts.push(buf);
+  return parts;
+}
+
 // Render segments up to charCount visible characters
 function renderMarkdownSlice(segments, charCount) {
   const els = [];
@@ -1814,18 +1835,24 @@ function renderMarkdownSlice(segments, charCount) {
     const slice = seg.text.slice(0, remaining);
     remaining -= slice.length;
     const style = seg.color ? { color: seg.color } : undefined;
+    const content = wrapTildes(slice, `s${i}`);
     let el;
-    if (seg.bold && seg.italic) el = <strong key={i} style={style}><em>{slice}</em></strong>;
-    else if (seg.bold) el = <strong key={i} style={style}>{slice}</strong>;
-    else if (seg.italic) el = <em key={i} style={style}>{slice}</em>;
-    else if (style) el = <span key={i} style={style}>{slice}</span>;
-    else el = <span key={i}>{slice}</span>;
+    if (seg.bold && seg.italic) el = <strong key={i} style={style}><em>{content}</em></strong>;
+    else if (seg.bold) el = <strong key={i} style={style}>{content}</strong>;
+    else if (seg.italic) el = <em key={i} style={style}>{content}</em>;
+    else if (style) el = <span key={i} style={style}>{content}</span>;
+    else el = <span key={i}>{content}</span>;
     els.push(el);
   }
   return els;
 }
 
-// Wrap each character in a shake span for erratic text animation
+// Wrap each character in a shake span for erratic text animation.
+// Note: tilde nudging is handled UPSTREAM by `renderMarkdownSlice` via
+// the `textbox-tilde` wrapper span — shake then recurses into that
+// wrapper's '~' string child, producing <tilde-wrapper><shake>~</shake>
+// </tilde-wrapper>. The outer transform and the inner animated `top`
+// compose cleanly (different CSS properties).
 function applyShake(node, counterRef) {
   if (!counterRef) counterRef = { i: 0 };
   if (typeof node === 'string') {
@@ -2333,6 +2360,29 @@ const TUTORIAL_SCRIPTS = {
       { text: "Ya {purple:**Ascended**} to the mental level of a six-year-old. Ya wouldn't believe how proud I am of your *progress*!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
       { text: 'Imma see you next time for a REAL test. To see if that {purple:**Ascension**} of yours is da real deal and I can let ya out into the wild.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
       { text: 'As my loyal subject, khekhe! Still owe me ungodly amounts of da Gold!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, exitLeft: true },
+    ],
+  },
+  7: {
+    // Antonia alone again, left side, permanent. `isFinalTutorial: true`
+    // makes the victory overlay (app-board.jsx) swap in the "TUTORIAL
+    // CLEARED!" banner + big fireworks when this tutorial resolves.
+    opts: { speaker: '/Antonia.png', speakerName: 'Antonia' },
+    isFinalTutorial: true,
+    intro: [
+      { text: 'Khekhekhe, welcome back! I was looking forward to this *a lot*~', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'No more paw-holding - you can look at your cards, look at your deck, make smart decisions.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: "You're a clever little minion, aren't ya?!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'Imma be *ever so gracious* and give ya 3 hints tho: **Ascension is key**.', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'And **Ascension immediately ends ya turn!**', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'When ya Ascend a Hero, it gets a nice little bonus *before ending the turn*! Ya should really check out what it can get ya!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'Now get started already before I die of old age, khekhe!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+    ],
+    outro: [
+      { text: 'Eeeexcellent job, my cute minion!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'The GRRRRREAT Antonia graciously accepts you as Her personal subordinate!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: "Aren't you a lucky little thing!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: 'Now go! Go and earn tons of beautiful {#ffd700:**Smug Coins**} to spend in my Shop!', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
+      { text: "I'll see you dere!", speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, exitLeft: true },
     ],
   },
 };

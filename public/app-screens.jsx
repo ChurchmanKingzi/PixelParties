@@ -1222,6 +1222,18 @@ function ShopScreen() {
   const [randomReveal, setRandomReveal] = useState(null); // { imgUrl, label, subtitle } or null
   const [hoverDeckCard, setHoverDeckCard] = useState(null); // cover card name being previewed
   const [hoverSkin, setHoverSkin] = useState(null); // { skinName, heroName } being previewed
+  // Tutorial 5 is where Antonia reveals her name in-story — until that
+  // tutorial is cleared we call the shopkeep "Raccoon Shopkeep" instead.
+  const [tutorial5Cleared, setTutorial5Cleared] = useState(false);
+  // Speech bubble state. `key` forces the DOM node to remount on each
+  // bubble so the bubble animation replays from 0. `text` is the message;
+  // `chatter` flags long-form idle chatter so the bubble can wrap and
+  // hang around longer than the quick "Khekhekhe!" purchase pop.
+  const [bubble, setBubble] = useState({ visible: false, key: 0, text: 'Khekhekhe!', chatter: false });
+  const bubbleTimerRef = useRef(null);
+  // Timestamp of last purchase; gates idle chatter so Antonia pipes down
+  // right after a sale instead of talking over the "Khekhekhe!" pop.
+  const lastPurchaseAtRef = useRef(0);
 
   useEffect(() => {
     (async () => {
@@ -1239,6 +1251,78 @@ function ShopScreen() {
     })();
   }, []);
 
+  // Fetch tutorial completion list to gate the shopkeep's displayed name.
+  // Piggy-backs on the existing `get_tutorials` socket endpoint — no new
+  // server wiring needed.
+  useEffect(() => {
+    const onList = (list) => {
+      const t5 = (list || []).find(t => t.num === 5);
+      setTutorial5Cleared(!!t5?.completed);
+    };
+    socket.on('tutorial_list', onList);
+    socket.emit('get_tutorials');
+    return () => socket.off('tutorial_list', onList);
+  }, []);
+
+  // Fires the "Khekhekhe!" speech bubble + celebration + SFX trio that
+  // every purchase path shares. Centralized so adding a new buy handler
+  // automatically gets the shopkeep reaction.
+  const triggerPurchaseFanfare = useCallback((pos) => {
+    setCelebration(pos);
+    if (window.playSFX) window.playSFX('shop_purchase');
+    lastPurchaseAtRef.current = Date.now();
+    setBubble(prev => ({ visible: true, key: prev.key + 1, text: 'Khekhekhe!', chatter: false }));
+    if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
+    bubbleTimerRef.current = setTimeout(() => {
+      setBubble(prev => ({ ...prev, visible: false }));
+    }, 1400);
+  }, []);
+  useEffect(() => () => { if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current); }, []);
+
+  // Idle chatter. Every 4-10s (random), if it's been >10s since a purchase
+  // AND no bubble is already on screen, Antonia pipes up with a random
+  // line. Post-tutorial-5 she has two extra lines that name-drop the
+  // player directly.
+  useEffect(() => {
+    const BASE_LINES = [
+      "Oi, ya gotta gimme some of dose coins or what?",
+      "Look-see here, I got da nicest stuffs for ya!",
+      "Ya brought me some pretty Smug Coins? Gimme gimme gimme!",
+      "Hurry up already, will ya?!",
+    ];
+    const REVEALED_LINES = [
+      "Oh, it's you! C'mon, minion, gimme your Coins already!",
+      "Khekhe - looks like the investment'll pay off now, eh?",
+    ];
+    let cancelled = false;
+    let idleTimer = null;
+    const scheduleNext = () => {
+      if (cancelled) return;
+      const delay = 4000 + Math.random() * 6000;
+      idleTimer = setTimeout(() => {
+        if (cancelled) return;
+        const quietEnough = Date.now() - lastPurchaseAtRef.current > 10000;
+        if (quietEnough) {
+          const pool = tutorial5Cleared ? [...BASE_LINES, ...REVEALED_LINES] : BASE_LINES;
+          const text = pool[Math.floor(Math.random() * pool.length)];
+          setBubble(prev => {
+            // Don't stomp on a currently-visible bubble (purchase pop or
+            // prior chatter still fading out).
+            if (prev.visible) return prev;
+            return { visible: true, key: prev.key + 1, text, chatter: true };
+          });
+          if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
+          bubbleTimerRef.current = setTimeout(() => {
+            setBubble(prev => ({ ...prev, visible: false }));
+          }, 3600);
+        }
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
+    return () => { cancelled = true; if (idleTimer) clearTimeout(idleTimer); };
+  }, [tutorial5Cleared]);
+
   const refreshStructures = async () => {
     try { const sd = await api('/shop/structure-decks'); setStructureCatalog(sd); } catch {}
   };
@@ -1252,7 +1336,7 @@ function ShopScreen() {
     try {
       const data = await api('/shop/buy-structure-deck', { method: 'POST', body: JSON.stringify({ structureId }) });
       setUser(u => ({ ...u, sc: data.sc }));
-      setCelebration(pos); if (window.playSFX) window.playSFX('shop_purchase');
+      triggerPurchaseFanfare(pos);
       await refreshStructures();
     } catch (e2) { notify(e2.message, 'error'); }
     setBuying(false);
@@ -1266,7 +1350,7 @@ function ShopScreen() {
     try {
       const data = await api('/shop/buy-random-structure-deck', { method: 'POST' });
       setUser(u => ({ ...u, sc: data.sc }));
-      setCelebration(pos); if (window.playSFX) window.playSFX('shop_purchase');
+      triggerPurchaseFanfare(pos);
       setRandomReveal({
         imgUrl: (data.coverCard && window.cardImageUrl) ? (window.cardImageUrl(data.coverCard) || '/cardback.png') : '/cardback.png',
         label: data.name,
@@ -1340,7 +1424,7 @@ function ShopScreen() {
       const data = await api('/shop/buy', { method: 'POST', body: JSON.stringify({ itemType, itemId }) });
       setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], itemId] }));
       setUser(u => ({ ...u, sc: data.sc }));
-      setCelebration(pos); if (window.playSFX) window.playSFX('shop_purchase');
+      triggerPurchaseFanfare(pos);
     } catch (e) { notify(e.message, 'error'); }
     setBuying(false);
   };
@@ -1355,7 +1439,7 @@ function ShopScreen() {
       const data = await api('/shop/buy-random-skin', { method: 'POST' });
       setOwned(prev => ({ ...prev, skin: [...prev.skin, data.skinName] }));
       setUser(u => ({ ...u, sc: data.sc }));
-      setCelebration(pos); if (window.playSFX) window.playSFX('shop_purchase');
+      triggerPurchaseFanfare(pos);
       setRandomReveal({
         imgUrl: '/cards/skins/' + encodeURIComponent(data.skinName) + '.png',
         label: data.skinName,
@@ -1375,7 +1459,7 @@ function ShopScreen() {
       const data = await api('/shop/buy-random', { method: 'POST', body: JSON.stringify({ itemType }) });
       setOwned(prev => ({ ...prev, [itemType]: [...prev[itemType], data.itemId] }));
       setUser(u => ({ ...u, sc: data.sc }));
-      setCelebration(pos); if (window.playSFX) window.playSFX('shop_purchase');
+      triggerPurchaseFanfare(pos);
       const subdir = itemType === 'avatar' ? 'avatars' : 'sleeves';
       setRandomReveal({
         imgUrl: '/data/shop/' + subdir + '/' + encodeURIComponent(data.itemId) + '.png',
@@ -1588,7 +1672,26 @@ function ShopScreen() {
   ];
 
   return (
-    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)' }}>
+    <div className="screen-full shop-screen" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)' }}>
+      {/* Shopkeep — pinned to the top-left corner at the same vertical
+          level as the "Random X" buttons inside each sub-tab. The sprite
+          bobs via a slow CSS float animation (see .shop-antonia-float);
+          the name label below stays stationary. Her displayed name gates
+          on tutorial 5 completion: pre-reveal she's "Raccoon Shopkeep",
+          post-reveal she's "Antonia" (same beat as the tutorial 5 scene
+          where she introduces herself). Pointer-events disabled so she
+          never intercepts clicks. */}
+      <div className="shop-antonia" aria-hidden="true">
+        <div className="shop-antonia-float">
+          {bubble.visible && (
+            <div className={'shop-antonia-bubble' + (bubble.chatter ? ' shop-antonia-bubble-chatter' : '')} key={bubble.key}>{bubble.text}</div>
+          )}
+          <img src="/Antonia.png" className="shop-antonia-img" alt="" draggable={false} />
+        </div>
+        <span className="shop-antonia-name">
+          {tutorial5Cleared ? 'Antonia' : 'Raccoon Shopkeep'}
+        </span>
+      </div>
       {celebration && <PurchaseCelebration cx={celebration.cx} cy={celebration.cy} onDone={() => setCelebration(null)} />}
       {randomReveal && (
         <div className="modal-overlay" style={{ zIndex: 90000 }} onClick={() => setRandomReveal(null)}>
@@ -2233,12 +2336,21 @@ function SingleplayerScreen() {
   // CPU battle socket listeners
   useEffect(() => {
     const onGameState = (state) => {
+      console.log('[SP game_state recv]', {
+        roomId: state?.roomId,
+        isCpuBattle: state?.isCpuBattle,
+        turn: state?.turn,
+        hasResult: !!state?.result,
+      });
       if (state.isCpuBattle) {
         cpuBattleRoom.current = state.roomId;
         setCpuBattleState(state);
       }
     };
-    const onError = (msg) => notify('CPU battle error: ' + msg, 'error');
+    const onError = (msg) => {
+      console.error('[SP cpu_battle_error]', msg);
+      notify('CPU battle error: ' + msg, 'error');
+    };
     socket.on('game_state', onGameState);
     socket.on('cpu_battle_error', onError);
     return () => { socket.off('game_state', onGameState); socket.off('cpu_battle_error', onError); };
@@ -2306,8 +2418,8 @@ function SingleplayerScreen() {
         onLeave={onBattleLeave}
         decks={personalDecks}
         sampleDecks={sampleDecks}
-        selectedDeck={null}
-        setSelectedDeck={() => {}}
+        selectedDeck={selectedDeck}
+        setSelectedDeck={setSelectedDeck}
       />
     );
   }

@@ -2213,9 +2213,11 @@ function endCpuBattle(room, winnerIdx, reason) {
   // Record per-opponent W/L for the human player so the singleplayer
   // gallery can show their record vs this deck. Only counts when a human
   // userId and opponent deckId are both known (skips anon/dev runs).
+  // Surrenders count as a loss for the human — bailing out shouldn't be
+  // a free escape from the record.
   const humanUserId = room.players?.[0]?.userId;
   const opponentDeckId = room.players?.[1]?.deckId;
-  if (humanUserId && opponentDeckId && reason !== 'surrender') {
+  if (humanUserId && opponentDeckId) {
     const humanWon = winnerIdx === 0 ? 1 : 0;
     const humanLost = winnerIdx === 0 ? 0 : 1;
     (async () => {
@@ -4439,9 +4441,12 @@ io.on('connection', (socket) => {
           activeGames.delete(currentUser.userId);
         }
         else if (room.type === 'singleplayer') {
+          // Don't cleanup — the client's handleSurrender intentionally keeps
+          // the user on the result screen so they can rematch. endCpuBattle
+          // sets gs.result and sends a final game_state; the room stays alive
+          // until the user explicitly rematches (rematch_cpu_battle) or
+          // leaves (post-result leave_game, handled below).
           endCpuBattle(room, winnerIdx, 'surrender');
-          socket.leave('room:' + roomId);
-          cleanupRoom(roomId);
         }
         else await endGame(room, winnerIdx, 'surrender');
       }
@@ -6909,25 +6914,39 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Rematch: human clicks REMATCH on the singleplayer win/lose screen. Reuses
-  // their original deck; accepts a new CPU deck choice from the client. The
-  // current room is destroyed (activeGames cleared) so createCpuBattle can
+  // Rematch: human clicks REMATCH on the singleplayer win/lose screen.
+  // Reuses the player's currently-selected deck (as synced via
+  // `change_deck` through the dropdown) and re-uses the previous CPU
+  // opponent's deck by default — the client sends no cpuDeckId, so
+  // "Rematch" means "same opponent, your chosen deck". The current
+  // room is destroyed (activeGames cleared) so createCpuBattle can
   // spin up a fresh one without tripping the "already in a game" guard.
   socket.on('rematch_cpu_battle', ({ roomId, cpuDeckId }) => {
-    if (!currentUser) return;
+    console.log('[CPU rematch] received', { roomId, cpuDeckId, user: currentUser?.username });
+    if (!currentUser) { console.warn('[CPU rematch] no currentUser — aborting'); return; }
     const room = rooms.get(roomId);
-    if (!room || room.type !== 'singleplayer') return;
+    if (!room) { console.warn('[CPU rematch] room not found:', roomId); return; }
+    if (room.type !== 'singleplayer') { console.warn('[CPU rematch] wrong room type:', room.type); return; }
     const playerEntry = room.players?.find(p => p.userId === currentUser.userId);
-    if (!playerEntry) return;
+    if (!playerEntry) { console.warn('[CPU rematch] playerEntry not found in room', roomId); return; }
     const playerDeckId = playerEntry.deckId;
+    // CPU is always player index 1 in singleplayer rooms (set by
+    // createCpuBattle at line ~5617). Fall back to the prior CPU deck
+    // when the client doesn't pass one.
+    const cpuEntry = room.players?.[1];
+    const cpuDeckIdToUse = cpuDeckId || cpuEntry?.deckId;
+    console.log('[CPU rematch] resolved decks', { playerDeckId, cpuDeckIdToUse });
     // Clean up the old room synchronously — don't even need to emit a
     // departure; the client is about to receive a brand-new game_state.
     socket.leave('room:' + roomId);
     cleanupRoom(roomId);
-    createCpuBattle({ playerDeckId, cpuDeckId }).catch(err => {
-      console.error('[CPU rematch] creation error:', err.message, err.stack);
-      socket.emit('cpu_battle_error', 'Failed to rematch: ' + (err.message || 'unknown'));
-    });
+    console.log('[CPU rematch] cleanup done, calling createCpuBattle');
+    createCpuBattle({ playerDeckId, cpuDeckId: cpuDeckIdToUse })
+      .then(() => console.log('[CPU rematch] createCpuBattle resolved'))
+      .catch(err => {
+        console.error('[CPU rematch] creation error:', err.message, err.stack);
+        socket.emit('cpu_battle_error', 'Failed to rematch: ' + (err.message || 'unknown'));
+      });
   });
 
   // ── Tutorial system ──
@@ -7190,6 +7209,11 @@ io.on('connection', (socket) => {
         }
         return;
       }
+      // Post-result singleplayer / puzzle rooms: preserve across transient
+      // disconnects (socket.io heartbeat blips, tab backgrounding) so the
+      // user's rematch opportunity isn't destroyed. Explicit leave_game /
+      // rematch_cpu_battle handlers handle cleanup on purpose.
+      if (room && (room.type === 'singleplayer' || room.type === 'puzzle')) return;
     }
     for (const [rid, room] of rooms) {
       if (room.players.some(p => p.username === currentUser.username) || room.spectators.some(s => s.username === currentUser.username))

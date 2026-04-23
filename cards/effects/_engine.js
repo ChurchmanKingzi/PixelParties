@@ -5271,6 +5271,21 @@ class GameEngine {
     const ps = gs.players[pi];
     if (!ps) return null;
 
+    // Re-entry guard. A card is mid-resolve for this player (e.g. a
+    // Spell awaiting a picker / target prompt inside its own onPlay).
+    // Reject further hand plays — without this, spam-clicking the same
+    // (or a different) hand card spawns a second doPlaySpell /
+    // doPlayCreature invocation that sails through validation and
+    // `_trackCard`s a duplicate CardInstance, leaving one copy in hand
+    // and one in discard once both resolves finish. The user-reported
+    // "Divine Gift of Fire clone" bug is exactly this race: the first
+    // click opens the player-picker, the spam-click queues a second
+    // play in parallel, and the hand-splice only consumes one.
+    // `_resolvingCard` is set AFTER validation in the play handlers
+    // and cleared on every success / failure / cancel path, so
+    // sequential plays are unaffected.
+    if (ps._resolvingCard) return null;
+
     // Hand validation
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return null;
 

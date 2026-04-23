@@ -1207,6 +1207,38 @@ body {
   width: calc(44px * var(--board-scale)); height: calc(44px * var(--board-scale));
   border: 2px solid var(--bg4);
 }
+/* CPU / avatar-less player portrait. Wraps a `<HeroArtCrop>` (the same
+   cropped hero art used on the singleplayer opponent-picker tiles) in a
+   bordered SQUARE frame. HeroArtCrop outputs a 594:398 rectangle at
+   the requested width (72x48 here); this wrapper clips it to a square
+   by fixing width == height and centering the inner div, so equal
+   amounts are cropped from the left and right edges while the vertical
+   slice stays the same. Matches .game-hand-avatar-big's chrome. */
+.game-hand-avatar-crop {
+  display: inline-flex;
+  flex-shrink: 0;
+  /* Match HeroArtCrop's rendered height (72 * 398/594 ≈ 48px) on both
+     axes so the result is a hero-height square. */
+  width: calc(72px * 398 / 594);
+  height: calc(72px * 398 / 594);
+  border: 2px solid var(--bg4);
+  line-height: 0;
+  overflow: hidden;
+  justify-content: center;  /* horizontally center the wider inner crop */
+  align-items: center;
+}
+.game-hand-avatar-crop > div {
+  display: block;
+  flex-shrink: 0;           /* don't let the inner crop compress — let it overflow and be clipped */
+}
+/* Mobile: scale the whole wrapper so it stays in proportion on narrow
+   screens without crowding the player-name next to it. */
+@media (max-width: 900px) {
+  .game-hand-avatar-crop { transform: scale(0.75); transform-origin: left center; }
+}
+@media (max-width: 600px) {
+  .game-hand-avatar-crop { transform: scale(0.55); transform-origin: left center; }
+}
 /* Game start announcement */
 @keyframes announceFadeIn {
   0% { opacity: 0; transform: scale(1.5); }
@@ -4875,6 +4907,14 @@ body:has(.reaction-chain-overlay) .board-tooltip {
   animation: fireworkBurst var(--fw-dur) ease-out var(--fw-delay) infinite;
   opacity: 0;
 }
+/* Beefier particle variant for the final tutorial's victory overlay —
+   larger body + more saturated glow so the celebration actually reads
+   as a BIG fireworks show instead of the compact "set complete" spray. */
+.firework-particle.firework-big {
+  width: 10px;
+  height: 10px;
+  box-shadow: 0 0 14px var(--fw-color), 0 0 28px var(--fw-color), 0 0 48px var(--fw-color);
+}
 
 @keyframes fireworkBurst {
   0%   { transform: translate(0, 0) scale(1); opacity: 1; }
@@ -4956,6 +4996,145 @@ body:has(.reaction-chain-overlay) .board-tooltip {
   padding: 16px;
   overflow-y: auto;
   flex: 1;
+}
+
+/* Shopkeep — decorative portrait pinned to the top-left corner of the
+   ShopScreen at roughly the same vertical level as each sub-tab's
+   "Random X" button. The SPRITE floats up/down via a slow CSS animation
+   (.shop-antonia-float); the name label below is on the outer container
+   so it stays put. Pointer-events disabled so clicks still reach the
+   shop content behind her. */
+.shop-antonia {
+  position: fixed;
+  left: 24px;
+  /* ~10vh lower than the old pinned position so she sits comfortably in
+     the tab body rather than crowding the tabs row. Viewport-relative
+     so the offset scales with screen height. */
+  top: calc(110px + 10vh);
+  width: 220px;
+  pointer-events: none;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: shopAntoniaIn .6s ease-out;
+}
+.shop-antonia-float {
+  position: relative;           /* anchor for .shop-antonia-bubble */
+  width: 100%;
+  animation: shopAntoniaFloat 3.5s ease-in-out infinite;
+  will-change: transform;
+}
+.shop-antonia-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  -ms-interpolation-mode: nearest-neighbor;
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,.6))
+          drop-shadow(0 0 28px rgba(255,68,68,.22));
+}
+.shop-antonia-name {
+  margin-top: 10px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #ff4444;
+  text-shadow: 0 0 12px rgba(255,68,68,.6), 0 2px 0 rgba(0,0,0,.8);
+  white-space: nowrap;
+}
+/* Khekhekhe! speech bubble — pops above the sprite on every purchase.
+   Lives inside .shop-antonia-float, so it floats with her. */
+.shop-antonia-bubble {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  background: #ffffff;
+  color: #1a1a2e;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  padding: 10px 16px;
+  border: 3px solid #1a1a2e;
+  border-radius: 14px;
+  box-shadow: 0 6px 14px rgba(0,0,0,.55);
+  white-space: nowrap;
+  animation: shopAntoniaBubble 1.4s ease-out forwards;
+  transform-origin: 50% 100%;
+}
+/* Idle chatter variant — longer lines need to wrap and stay on screen
+   long enough to read. Animation timing is re-scaled in
+   @keyframes shopAntoniaBubbleChatter so the hold phase is longer. */
+.shop-antonia-bubble-chatter {
+  white-space: normal;
+  max-width: 280px;
+  min-width: 180px;
+  line-height: 1.55;
+  text-align: center;
+  animation: shopAntoniaBubbleChatter 3.6s ease-out forwards;
+}
+/* Speech-bubble tail — two stacked triangles so the border reads cleanly.
+   ::before is the outer dark triangle; ::after is the inner white fill
+   overlapping it by a pixel, same trick as standard CSS comic bubbles. */
+.shop-antonia-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 12px solid #1a1a2e;
+}
+.shop-antonia-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 8px solid #ffffff;
+}
+@keyframes shopAntoniaIn {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shopAntoniaFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+/* Bubble pop: scale-up entrance, brief hold, soft fade-out. Uses
+   `translate(-50%, ...)` throughout so the bubble stays horizontally
+   centered over Antonia while its vertical position animates. */
+@keyframes shopAntoniaBubble {
+  0%   { opacity: 0; transform: translate(-50%, 10px) scale(.6); }
+  18%  { opacity: 1; transform: translate(-50%, -4px) scale(1.12); }
+  28%  { opacity: 1; transform: translate(-50%, 0)   scale(1); }
+  78%  { opacity: 1; transform: translate(-50%, 0)   scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -8px) scale(1); }
+}
+/* Chatter bubble — same pop-in, much longer hold so the reader has time
+   to actually parse the sentence. Percentages recomputed against 3.6s. */
+@keyframes shopAntoniaBubbleChatter {
+  0%   { opacity: 0; transform: translate(-50%, 10px) scale(.6); }
+  7%   { opacity: 1; transform: translate(-50%, -4px) scale(1.08); }
+  12%  { opacity: 1; transform: translate(-50%, 0)   scale(1); }
+  90%  { opacity: 1; transform: translate(-50%, 0)   scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -6px) scale(1); }
+}
+@media (max-width: 900px) {
+  .shop-antonia { width: 150px; left: 12px; top: calc(96px + 10vh); }
+  .shop-antonia-name { font-size: 9px; margin-top: 7px; }
+  .shop-antonia-bubble { font-size: 10px; padding: 7px 12px; }
+  .shop-antonia-bubble-chatter { max-width: 220px; min-width: 150px; }
+}
+@media (max-width: 600px) {
+  .shop-antonia { width: 92px; left: 6px; top: calc(110px + 10vh); }
+  .shop-antonia-name { font-size: 7px; margin-top: 4px; letter-spacing: 0; }
+  .shop-antonia-bubble { font-size: 9px; padding: 5px 9px; border-width: 2px; }
+  .shop-antonia-bubble::before { border-top-width: 10px; border-left-width: 8px; border-right-width: 8px; }
+  .shop-antonia-bubble::after { border-top-width: 6px; border-left-width: 5px; border-right-width: 5px; }
+  .shop-antonia-bubble-chatter { max-width: 170px; min-width: 120px; }
 }
 
 .shop-grid {
@@ -6408,6 +6587,17 @@ body:has(.textbox-overlay) .tooltip {
 @keyframes textbox-char-shake {
   0%   { top: -1.5px; }
   100% { top: 1.5px; }
+}
+/* Tilde nudge — the pixel font ('Pixel Intv' / 'Press Start 2P') draws
+   "~" as a high diacritic instead of an inline squiggle, which leaves
+   it floating above the baseline. Shift it down so it sits after the
+   preceding word (e.g. "lot~" reads inline instead of "lot" with a
+   loose tilde hovering above). Applied via a wrapper span added by
+   `applyShake` / `renderMarkdownSlice` — composes cleanly with the
+   shake animation (which only touches `top`, not transform). */
+.textbox-text .textbox-tilde {
+  display: inline-block;
+  transform: translateY(0.45em);
 }
 /* Tutorial boost — card grows dramatically */
 .tutorial-boost-anim {
