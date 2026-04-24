@@ -53,7 +53,15 @@
       "Bash(node -e \"const m = require\\('./cards/effects/deepsea-castle.js'\\); console.log\\(Object.keys\\(m\\)\\);\")",
       "Bash(node *)",
       "Bash(sqlite3 data/pixel-parties.db \"SELECT name, cardType, cost FROM cards WHERE name IN \\('Wheels', 'Magnetic Glove', 'Horn in a Bottle', 'Leadership'\\);\")",
-      "Bash(xargs -I {} grep -l \"allowedCategories\" {})"
+      "Bash(xargs -I {} grep -l \"allowedCategories\" {})",
+      "Bash(xargs grep *)",
+      "Bash(find \"C:\\\\\\\\Pixel Parties WEB\\\\\\\\PixelPartiesWeb\" -type f -name \"*.js\")",
+      "Bash(find *)",
+      "Bash(grep -n \"getCpuTargetResponse\\\\|_getCpuTargetResponse\" \"C:\\\\\\\\Pixel Parties WEB\\\\\\\\PixelPartiesWeb/cards/effects/_cpu.js\")",
+      "Bash(grep -l \"onStatusApplied\" \"C:\\\\\\\\Pixel Parties WEB\\\\\\\\PixelPartiesWeb/cards/effects/\"*.js)",
+      "Bash(grep -n \"supportYield\" \"C:\\\\\\\\Pixel Parties WEB\\\\\\\\PixelPartiesWeb/cards/effects/_cpu.js\")",
+      "Bash(grep -l \"onStatusApplied\\\\|statusName.*negative\\\\|poisoned.*gain\\\\|heroOwner.*cardOwner\" \"C:\\\\\\\\Pixel Parties WEB\\\\\\\\PixelPartiesWeb/cards/effects/\"*.js)",
+      "Bash(grep -l \"countPoisoned\\\\|poisoned.*count\\\\|count.*Poison\\\\|poisoned.*damage\\\\|statuses.*poison\" \"C:\\\\\\\\Pixel Parties WEB\\\\\\\\PixelPartiesWeb/cards/effects/\"*.js)"
     ]
   }
 }

@@ -5686,7 +5686,13 @@ function GameBoard({ gameState, lobby, onLeave }) {
     }
     // Per-hero duplicate Attack ban (Ghuanjun)
     if (card.cardType === 'Attack' && hero.ghuanjunAttacksUsed?.includes(card.name)) return false;
-    const level = card.level || 0;
+    // Apply board-wide level reductions from `reduceCardLevel` hooks (Elven
+    // Forager, …). The server provides the per-card delta in
+    // `cardLevelReductions`; we subtract it so the UI agrees with the
+    // server's `heroMeetsLevelReq`.
+    const rawLevel = card.level || 0;
+    const reduction = (gameState.cardLevelReductions || {})[card.name] || 0;
+    const level = Math.max(0, rawLevel - reduction);
     if (level === 0 && !card.spellSchool1) return true; // No requirements
     const abZones = playerData.abilityZones[heroIdx] || [];
     const countAbility = (school) => {

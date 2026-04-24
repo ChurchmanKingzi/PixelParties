@@ -145,9 +145,10 @@ const SFX_VOLUME_OVERRIDES = {
 
 // Global SFX attenuation applied on top of EVERY other gain factor
 // (master volume, intrinsic override, per-call `opts.volume`). The mix
-// was hot overall; this pulls every effect down by a third without
-// touching the user-facing volume slider or any per-sound tuning.
-const SFX_MASTER_MULTIPLIER = 0.66;
+// is hot overall; this pulls every effect down without touching the
+// user-facing volume slider or any per-sound tuning. 0.66 wasn't
+// enough; dropped to 0.33 based on user feedback.
+const SFX_MASTER_MULTIPLIER = 0.33;
 
 /**
  * Play a sound effect.
@@ -562,6 +563,7 @@ const ZONE_ANIM_SFX = {
   // Biomancy
   biomancy_bloom:          { name: 'elem_biomancy' },
   biomancy_vines:          { name: 'elem_biomancy' },
+  druid_leaf_storm:        { name: 'elem_biomancy' },
   // Water / deepsea
   deepsea_spores_rain:     { name: 'elem_water' },
   deepsea_spores_growth:   { name: 'elem_water' },

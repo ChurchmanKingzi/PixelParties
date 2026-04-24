@@ -107,6 +107,9 @@ module.exports = {
           confirmClass: 'btn-danger',
           cancellable: false,
           maxTotal: 1,
+          // CPU hint: route through the self-status target scorer so
+          // Fiona / Stellan get preferred and Layn gets avoided.
+          appliesStatus: 'poisoned',
         });
 
         if (!selectedIds || selectedIds.length === 0) {

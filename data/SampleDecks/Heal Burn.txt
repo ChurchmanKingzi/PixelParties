@@ -1,5 +1,5 @@
 === PIXEL PARTIES DECK ===
-Name: Structure Deck: Heal Burn
+Name: Heal Burn
 Cover: Nao, the Barrier Priestess
 
 == HEROES ==

@@ -5151,7 +5151,7 @@ class GameEngine {
 
         // ── Phase-aware action economy (single source of truth) ──
 
-        // Action Phase: after a hero has already acted, cards need bonus action or additional action coverage
+        // Action Phase: after a hero has already acted, cards need bonus action, inherent action, or additional action coverage
         if (isActionPhase && heroActed) {
           if (hasBonusMainAction) {
             // Generic bonus main action (Torchure, Dragon Pilot Lv1 sacrifice, etc.):
@@ -5162,8 +5162,14 @@ class GameEngine {
             const allowed = ps.bonusActions.allowedTypes || [];
             if (allowed.length > 0 && !allowed.includes(cd.cardType)) continue;
           } else {
-            // Normal: must have an additional action provider for this card + hero
-            if (!this.findAdditionalActionForCard(playerIdx, cd.name, hi)) continue;
+            // Normal: inherent action or additional-action provider covers the slot.
+            // Mirrors the server's validatePlayActionCardCommon gate — `inherent
+            // Action` is the same facility in both phases (Main Phase or Action
+            // Phase after the hero has acted), so the UI must honour it in both.
+            const cardScript = loadCardEffect(cd.name);
+            const isInherent = cardScript?.inherentAction === true
+              || (typeof cardScript?.inherentAction === 'function' && cardScript.inherentAction(gs, playerIdx, hi, this));
+            if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi)) continue;
           }
         }
 
@@ -10423,7 +10429,13 @@ class GameEngine {
     // Apply generic pre-reductions (Mana Mining and any future ability
     // that silently lowers spell levels). Abilities opt in by exporting
     // `reduceSpellLevel(cardData, abilityLevel, engine) → number`.
-    const level = this._applySpellLevelReductions(cardData, rawLevel, abZones);
+    const levelAfterAbility = this._applySpellLevelReductions(cardData, rawLevel, abZones);
+    // Additional board-wide reductions — any tracked instance the player
+    // owns may contribute via `reduceCardLevel(cardData, engine, ownerIdx)`.
+    // Sibling hook to reduceSpellLevel, but walks the entire board (any
+    // zone), not a single hero's abilities, and applies to any card type
+    // (not just Spells). Used e.g. by Elven Forager.
+    const level = this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx);
 
     let levelFail = false;
     if (cardData.spellSchool1 && this.countAbilitiesForSchool(cardData.spellSchool1, abZones) < level) levelFail = true;
@@ -10490,6 +10502,55 @@ class GameEngine {
         const r = Number(script.reduceSpellLevel(cardData, copies, this)) || 0;
         if (r > 0) total += r;
       } catch { /* ability threw — ignore, no reduction */ }
+    }
+    return Math.max(0, rawLevel - total);
+  }
+
+  /**
+   * Walk every tracked card instance owned by `playerIdx` and apply any
+   * `reduceCardLevel(cardData, engine, ownerIdx) → number` hook the
+   * card's script exports. Reductions are summed and subtracted from
+   * the supplied level — the engine never knows which cards participate.
+   *
+   * Generic sibling of `_applySpellLevelReductions`. Differences:
+   *   - Scoped to the entire player side, not a single hero's ability
+   *     slots. Cards opt in from any zone (support, area, permanent,
+   *     surprise, …) — whatever `activeIn` allows.
+   *   - Not restricted to Spells. Applies to any card type whose level
+   *     is being checked (Creatures included) — the `cardData` arg is
+   *     opaque to the engine and each hook decides what to reduce.
+   *   - Stacking is per-instance, not per-slot-copy. Two Foragers on
+   *     the board yield -2 naturally; each instance's hook returns 1.
+   *
+   * Typical usage (from a card module):
+   *
+   *     reduceCardLevel(cardData) {
+   *       // -1 to Elven Creatures' level while we're in play
+   *       return (cardData.archetype === 'Elven' &&
+   *               cardData.cardType === 'Creature') ? 1 : 0;
+   *     }
+   *
+   * @param {object} cardData - The card being level-checked.
+   * @param {number} rawLevel - Level after per-card overrides + ability
+   *                            reductions.
+   * @param {number} playerIdx - Player whose side contributes reducers.
+   * @returns {number} effective level (≥ 0).
+   */
+  _applyCardLevelReductions(cardData, rawLevel, playerIdx) {
+    if (!cardData || rawLevel <= 0) return rawLevel;
+    let total = 0;
+    for (const inst of this.cardInstances) {
+      if (inst.controller !== playerIdx) continue;
+      if (inst.faceDown) continue;
+      // Respect the script's `activeIn` restriction — a card with
+      // `activeIn: ['support']` should not reduce levels from the hand.
+      if (!inst.isActiveIn()) continue;
+      const script = loadCardEffect(inst.name);
+      if (typeof script?.reduceCardLevel !== 'function') continue;
+      try {
+        const r = Number(script.reduceCardLevel(cardData, this, playerIdx)) || 0;
+        if (r > 0) total += r;
+      } catch { /* card threw — ignore, no reduction */ }
     }
     return Math.max(0, rawLevel - total);
   }
@@ -10563,7 +10624,11 @@ class GameEngine {
     if (rawLevel <= 0 && !cardData.spellSchool1) return 0;
 
     const abZones = hero.statuses?.negated ? [] : (ps.abilityZones[heroIdx] || []);
-    const level = this._applySpellLevelReductions(cardData, rawLevel, abZones);
+    const levelAfterAbility = this._applySpellLevelReductions(cardData, rawLevel, abZones);
+    // Mirror the board-wide reduction applied in heroMeetsLevelReq — same
+    // generic `reduceCardLevel` walker — so Wisdom's discard cost is
+    // computed against the true effective level the card will face.
+    const level = this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx);
 
     const gap = this._spellLevelGap(cardData, level, abZones);
     if (gap === 0) return 0; // Playable at effective level

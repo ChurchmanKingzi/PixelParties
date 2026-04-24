@@ -49,15 +49,20 @@ module.exports = {
     const count = hero.deepseaCounters || 0;
     if (count <= 0) return false;
 
-    // Prompt: how many counters?
+    // Prompt: how many counters? The list can get long when the Hero has
+    // stacked many counters across turns — one row-button per choice eats
+    // a lot of vertical space, so we opt into the dropdown variant of
+    // optionPicker here via `renderAs: 'dropdown'`.
     const options = [];
     for (let n = 1; n <= count; n++) {
-      options.push({ id: `n-${n}`, label: `Remove ${n} Counter${n > 1 ? 's' : ''} — ${50 * n} damage` });
+      options.push({ id: `n-${n}`, label: `${n} counter${n > 1 ? 's' : ''} → ${50 * n} damage` });
     }
     const optRes = await engine.promptGeneric(pi, {
       type: 'optionPicker',
+      renderAs: 'dropdown',
       title: CARD_NAME,
-      description: `You have ${count} Deepsea Counter${count > 1 ? 's' : ''}. Remove how many?`,
+      description: `You have ${count} Deepsea Counter${count > 1 ? 's' : ''}. Spend how many?`,
+      confirmLabel: 'Confirm',
       options,
       cancellable: true,
     });

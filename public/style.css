@@ -107,6 +107,28 @@ body {
 }
 .btn-big { padding: 16px 32px; font-size: 15px; }
 
+/* Main-menu button hover emphasis. The generic `.btn:hover` above only
+   swaps the `background` colour, but every main-menu button sets
+   `background` inline (each has its own tint — pink, purple, gold, …),
+   and an inline style outranks class-level `:hover`. The result was that
+   Tutorial and Singleplayer had almost-invisible hovers while Play /
+   Edit Deck / View Profile (which don't set background inline) lit up
+   normally. Fix: scope an additive hover that uses glow + scale +
+   outline + brightness — none of which touch `background`, so the
+   effect works on top of whatever tint each button was born with.
+   `currentColor` makes the glow track the button's own text/border hue. */
+.menu-buttons .btn { transition: filter .15s, transform .15s, box-shadow .15s, outline-color .15s; }
+.menu-buttons .btn:hover {
+  filter: brightness(1.45) saturate(1.25);
+  transform: translateY(-1px) scale(1.03);
+  box-shadow:
+    0 0 22px currentColor,
+    inset 0 0 16px rgba(255, 255, 255, .10);
+  text-shadow: 0 0 8px currentColor;
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+
 .btn-flash-save {
   animation: flashSave .8s ease-in-out infinite !important;
   border-color: #ff3366 !important;
@@ -3192,6 +3214,22 @@ body {
   60% { transform: translate(var(--bdx), var(--bdy)) scale(1.1) rotate(20deg); opacity: 1; }
   100% { transform: translate(calc(var(--bdx) * 1.2), calc(var(--bdy) * 1.2)) scale(0.8) rotate(40deg); opacity: 0; }
 }
+/* Druid's nature-storm summon: leaves spawn at centre and fan outwards,
+   spinning as they go. Fade-out happens past the outer radius so the leaves
+   feel "blown past" the slot rather than absorbed by it. */
+.anim-druid-leaf {
+  position: absolute;
+  animation: animDruidLeaf var(--dur, 1000ms) ease-out forwards;
+  opacity: 0;
+  left: 0; top: 0;
+  filter: drop-shadow(0 0 4px rgba(60,170,50,.75));
+}
+@keyframes animDruidLeaf {
+  0%   { transform: translate(0, 0) scale(0.35) rotate(0deg); opacity: 0; }
+  15%  { opacity: 1; }
+  70%  { transform: translate(var(--ldx), var(--ldy)) scale(1.05) rotate(var(--lspin)); opacity: 1; }
+  100% { transform: translate(calc(var(--ldx) * 1.35), calc(var(--ldy) * 1.35)) scale(0.8) rotate(var(--lspin)); opacity: 0; }
+}
 
 /* Plague Smoke styles */
 .anim-plague-smoke {
@@ -3920,6 +3958,58 @@ body {
 .board-zone-play-target {
   box-shadow: 0 0 12px rgba(51,255,136,.5) inset;
   border-color: var(--success) !important;
+}
+
+/* Attach-pick target: a much louder highlight for the Alex-style "click a
+   hero or zone to attach" prompts. Pulsing outer ring + inner glow + a slight
+   scale-up so the eye locks onto valid drop targets immediately. Stacks on
+   top of `.board-zone-play-target` (both classes are applied together). */
+.attach-pick-target {
+  position: relative;
+  z-index: 4;
+  animation: attachPickPulse 1.1s ease-in-out infinite;
+  outline: 3px solid #7fffaa;
+  outline-offset: 2px;
+}
+@keyframes attachPickPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(140, 255, 180, 0.55),
+      0 0 18px 4px rgba(80, 230, 140, 0.55),
+      inset 0 0 14px rgba(120, 255, 170, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px rgba(140, 255, 180, 0),
+      0 0 36px 12px rgba(120, 255, 170, 0.85),
+      inset 0 0 22px rgba(160, 255, 200, 0.7);
+  }
+}
+
+/* Extra-dim overlay for ineligible heroes during an attach-pick. Adds a
+   cool-grey desaturation on top of the existing dead-zone darken so the
+   eligible/ineligible split reads at a glance. */
+.attach-pick-dim::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 10, 20, 0.82);
+  z-index: 3;
+  pointer-events: none;
+}
+.attach-pick-dim {
+  filter: saturate(0.25) brightness(0.55);
+}
+
+/* Panel glow so the instruction card pulls the eye at the same rhythm as
+   the board targets. */
+.attach-pick-panel {
+  box-shadow: 0 0 28px rgba(120, 255, 170, 0.55), 0 0 0 1px rgba(120, 255, 170, 0.4);
+  animation: attachPickPanelPulse 1.1s ease-in-out infinite;
+}
+@keyframes attachPickPanelPulse {
+  0%, 100% { box-shadow: 0 0 28px rgba(120, 255, 170, 0.55), 0 0 0 1px rgba(120, 255, 170, 0.4); }
+  50%      { box-shadow: 0 0 48px rgba(160, 255, 200, 0.85), 0 0 0 2px rgba(160, 255, 200, 0.6); }
 }
 
 /* Stacked abilities */

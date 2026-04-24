@@ -352,7 +352,13 @@ function DraggablePanel({ children, className, style }) {
   const panelRef = useRef(null);
   const cleanupRef = useRef(null);
   const onDown = (e) => {
-    if (e.target.tagName === 'BUTTON') return; // Don't drag when clicking buttons
+    // Don't start a drag when the pointer-down lands on an interactive
+    // form control. `preventDefault()` below would otherwise swallow the
+    // native mousedown that opens a <select> dropdown, focuses an <input>,
+    // or toggles a checkbox.
+    const tag = e.target.tagName;
+    if (tag === 'BUTTON' || tag === 'SELECT' || tag === 'OPTION'
+        || tag === 'INPUT' || tag === 'TEXTAREA') return;
     const r = panelRef.current?.getBoundingClientRect();
     if (!r) return;
     const pt = window.getPointerXY(e);
@@ -740,6 +746,93 @@ function DeepseaCastleOverlay() {
         `}</style>
       </div>
     </>
+  );
+}
+
+// Slippery Ice — a translucent frosted sheet pinned UNDER the zones and
+// cards (zIndex omitted → default auto, lower than zone-has-card's 10),
+// plus a swarm of slow cold-white sparkles that glint across the sheet
+// like sun catching ice crystals. The sparkles sit in the same under-
+// cards layer so they peek through gaps between zones rather than
+// glittering on top of artwork.
+function SlipperyIceOverlay() {
+  const sparkles = useMemo(() => Array.from({ length: 48 }, () => ({
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    size: 1.5 + Math.random() * 3,
+    delay: -Math.random() * 3.4,
+    dur: 1.8 + Math.random() * 2.6,
+    // A fraction of sparkles use the 4-pointed "star glint" shape; the
+    // rest are round glitter points. The split reads as a mix of "light
+    // catching a facet" vs "tiny snow dust".
+    star: Math.random() < 0.3,
+  })), []);
+  const cracks = useMemo(() => Array.from({ length: 8 }, () => ({
+    x: Math.random() * 100,
+    y: 10 + Math.random() * 80,
+    len: 30 + Math.random() * 60,
+    rot: -20 + Math.random() * 40,
+    opacity: 0.08 + Math.random() * 0.1,
+  })), []);
+  return (
+    <div className="slippery-ice-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      overflow: 'hidden',
+      // Pale cyan-tinted frost sheet. The radial gradient fakes a
+      // soft "centre of the rink" highlight; the top linear layer adds
+      // a faint sky-reflection. mixBlendMode 'screen' keeps it readable
+      // over both the light and dark areas of the playmat.
+      background:
+        'radial-gradient(ellipse at 50% 55%, rgba(220,245,255,0.22) 0%, rgba(180,225,245,0.14) 55%, rgba(120,195,225,0.10) 100%),'
+        + 'linear-gradient(180deg, rgba(230,250,255,0.10) 0%, rgba(180,220,240,0.04) 100%)',
+      mixBlendMode: 'screen',
+    }}>
+      {cracks.map((c, i) => (
+        <span key={'crack' + i} style={{
+          position: 'absolute',
+          left: c.x + '%', top: c.y + '%',
+          width: c.len + 'px', height: '1px',
+          background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,' + c.opacity + ') 50%, transparent 100%)',
+          transform: 'rotate(' + c.rot + 'deg)',
+          filter: 'blur(0.4px)',
+        }} />
+      ))}
+      {sparkles.map((s, i) => (
+        <span key={'spk' + i} style={{
+          position: 'absolute',
+          left: s.x + '%', top: s.y + '%',
+          width: s.size + 'px', height: s.size + 'px',
+          transform: 'translate(-50%, -50%)',
+          background: s.star
+            ? 'transparent'
+            : 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(220,245,255,0.85) 45%, rgba(180,225,245,0) 100%)',
+          borderRadius: '50%',
+          boxShadow: s.star
+            ? ''
+            : '0 0 ' + (s.size * 2.5) + 'px rgba(200,240,255,0.9), 0 0 ' + (s.size * 5) + 'px rgba(150,210,240,0.5)',
+          animation: 'slipperyIceSparkle ' + s.dur + 's ease-in-out ' + s.delay + 's infinite',
+        }}>
+          {s.star && (
+            <span style={{
+              position: 'absolute', inset: 0,
+              background:
+                'linear-gradient(0deg, transparent 45%, rgba(255,255,255,1) 49%, rgba(255,255,255,1) 51%, transparent 55%),'
+                + 'linear-gradient(90deg, transparent 45%, rgba(255,255,255,1) 49%, rgba(255,255,255,1) 51%, transparent 55%)',
+              filter: 'blur(0.4px)',
+              boxShadow: '0 0 ' + (s.size * 3) + 'px rgba(200,240,255,0.9)',
+            }} />
+          )}
+        </span>
+      ))}
+      <style>{`
+        @keyframes slipperyIceSparkle {
+          0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+          45%      { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+          55%      { opacity: 1; transform: translate(-50%, -50%) scale(1);    }
+          75%      { opacity: 0.25; transform: translate(-50%, -50%) scale(0.85); }
+        }
+      `}</style>
+    </div>
   );
 }
 
@@ -1712,6 +1805,39 @@ const ANIM_REGISTRY = {
               '--vdx': v.dx + 'px', '--vdy': v.dy + 'px', '--vrot': v.rot + 'deg', fontSize: v.size + 'px',
               animationDelay: v.delay + 'ms', animationDuration: v.dur + 'ms',
             }}>{v.emoji}</span>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  druid_leaf_storm: (() => {
+    return function DruidLeafStormEffect({ x, y }) {
+      // Leaves spawn at (0,0) and fan outwards in all directions — each one
+      // picks a random angle (not evenly spaced, so the burst feels chaotic
+      // rather than geometric) and a random distance. Rotation spins during
+      // flight for the "wind-blown" feel.
+      const leaves = useMemo(() => Array.from({ length: 36 }, (_, i) => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 70 + Math.random() * 90;
+        const spin = (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 540);
+        return {
+          dx: Math.cos(angle) * dist,
+          dy: Math.sin(angle) * dist * 0.75, // slight vertical squash — airflow shape
+          spin,
+          delay: Math.random() * 220,
+          dur: 750 + Math.random() * 500,
+          emoji: ['🌿', '🌱', '☘️', '🍃', '🌾', '🍀'][Math.floor(Math.random() * 6)],
+          size: 14 + Math.random() * 14,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {leaves.map((l, i) => (
+            <span key={i} className="anim-druid-leaf" style={{
+              '--ldx': l.dx + 'px', '--ldy': l.dy + 'px', '--lspin': l.spin + 'deg',
+              fontSize: l.size + 'px',
+              animationDelay: l.delay + 'ms', animationDuration: l.dur + 'ms',
+            }}>{l.emoji}</span>
           ))}
         </div>
       );
@@ -5551,6 +5677,40 @@ function AbilityStack({ cards }) {
 
 // Card name picker prompt component (for Luck, etc.) — must be a proper component to preserve state across re-renders
 const CARD_NAME_TYPE_COLORS = { Hero:'#aa44ff', 'Ascended Hero':'#7722cc', Ability:'#4488ff', Artifact:'#ddaa22', Creature:'#44bb44', Attack:'#ff4444', Spell:'#ff4444', Potion:'#8B4513' };
+// Dropdown variant of the generic Option Picker prompt. Used when a prompt
+// has many scalar choices (Siphem spending 1..N counters) and the usual
+// stack of wide buttons would eat too much vertical space.
+function OptionPickerDropdown({ ep, respondToPrompt }) {
+  const options = ep.options || [];
+  const [selectedId, setSelectedId] = useState(options[0]?.id || '');
+  const confirm = () => {
+    if (!selectedId) return;
+    respondToPrompt({ optionId: selectedId });
+  };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <select value={selectedId} onChange={e => setSelectedId(e.target.value)} autoFocus
+        style={{
+          width: '100%', padding: '8px 12px', fontSize: 13,
+          background: 'var(--bg2)', border: '1px solid var(--accent)', borderRadius: 6,
+          color: 'var(--text1)', outline: 'none', boxSizing: 'border-box', cursor: 'pointer',
+        }}>
+        {options.map(opt => (
+          <option key={opt.id} value={opt.id}>{opt.label}</option>
+        ))}
+      </select>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" style={{ flex: 1, padding: '10px 18px', fontSize: 12, borderColor: 'var(--accent)', color: 'var(--accent)' }}
+          onClick={confirm}>{ep.confirmLabel || 'Confirm'}</button>
+        {ep.cancellable !== false && (
+          <button className="btn" style={{ padding: '10px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+            onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CardNamePickerPrompt({ ep, onRespond }) {
   const [filter, setFilter] = useState('');
   // Only show cards that have images (exist in AVAILABLE_MAP), exclude Tokens
@@ -6981,9 +7141,38 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Click-to-attach an Ability. When set, eligible hero zones + their valid
   // ability slots (or existing stacks of the same ability) light up; clicking
   // one dispatches play_ability. Cleared on cancel / turn change / etc.
-  const [abilityAttachPick, setAbilityAttachPick] = useState(null); // { cardName, handIndex, card }
-  // Clear spell hero pick when game state changes
-  useEffect(() => { setSpellHeroPick(null); setPendingBouncePick(null); setAbilityAttachPick(null); }, [gameState.activePlayer, gameState.currentPhase, gameState.effectPrompt, gameState.turn]);
+  // { cardName, handIndex?, card?, source?: 'hand'|'effectPrompt',
+  //   eligibleHeroIdxs?, skipAbilityGiven?, cancellable? }
+  // Two sources feed this state:
+  //   - `source === 'hand'` (default): set when the player clicks an Ability
+  //     hand card to "pick it up". Click emits `play_ability` with handIndex.
+  //   - `source === 'effectPrompt'`: synced from a server-side
+  //     `abilityAttachTarget` prompt (Alex's deck-search tutor, etc.). Click
+  //     emits `effect_prompt_response` with `{ heroIdx, zoneSlot }`.
+  const [abilityAttachPick, setAbilityAttachPick] = useState(null);
+  // Clear transient picks when the game state shifts. Preserve an
+  // effectPrompt-driven attach-pick while its prompt is still the active
+  // server prompt, since the prompt IS the source of truth for that state.
+  useEffect(() => {
+    setSpellHeroPick(null);
+    setPendingBouncePick(null);
+    const ep = gameState.effectPrompt;
+    const epIsAttachTarget = ep?.type === 'abilityAttachTarget' && ep.ownerIdx === myIdx;
+    if (!epIsAttachTarget) setAbilityAttachPick(null);
+  }, [gameState.activePlayer, gameState.currentPhase, gameState.effectPrompt, gameState.turn, myIdx]);
+  // Sync the attach-pick state from a server-side `abilityAttachTarget` prompt.
+  useEffect(() => {
+    const ep = gameState.effectPrompt;
+    if (ep?.type === 'abilityAttachTarget' && ep.ownerIdx === myIdx) {
+      setAbilityAttachPick({
+        cardName: ep.cardName,
+        source: 'effectPrompt',
+        eligibleHeroIdxs: Array.isArray(ep.eligibleHeroIdxs) ? ep.eligibleHeroIdxs : null,
+        skipAbilityGiven: !!ep.skipAbilityGiven,
+        cancellable: ep.cancellable !== false,
+      });
+    }
+  }, [gameState.effectPrompt, myIdx]);
 
   // Play a single open cue whenever any hand-card target picker appears.
   useEffect(() => { if (spellHeroPick && window.playSFX) window.playSFX('ui_prompt_open'); }, [spellHeroPick]);
@@ -7053,7 +7242,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const hero = playerData.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
-    const level = card.level || 0;
+    // Apply board-wide level reductions from `reduceCardLevel` hooks (Elven
+    // Forager, …) so the highlight agrees with `heroMeetsLevelReq`. Only
+    // meaningful for the own player — the charmed-summon path calls this
+    // with `me` too, so the opponent's side does not need its own delta.
+    const rawLevel = card.level || 0;
+    const reduction = (playerData === me ? (gameState.cardLevelReductions || {})[card.name] : 0) || 0;
+    const level = Math.max(0, rawLevel - reduction);
     if (level <= 0 && !card.spellSchool1) return true;
     // Negated heroes contribute no abilities for level-req purposes — only
     // Lv0 creatures without a school requirement can still land on them.
@@ -11413,7 +11608,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       e.stopImmediatePropagation();
       if (showEndTurnConfirm) { cancelEndTurn(); return; }
       if (spellHeroPick) { setSpellHeroPick(null); return; }
-      if (abilityAttachPick) { setAbilityAttachPick(null); return; }
+      if (abilityAttachPick) {
+        // effectPrompt-driven picks (Alex, …) resolve the prompt via Esc;
+        // hand-driven picks are purely client state and just dismiss.
+        if (abilityAttachPick.source === 'effectPrompt' && abilityAttachPick.cancellable !== false) {
+          socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
+        }
+        setAbilityAttachPick(null);
+        return;
+      }
       if (pendingBouncePick) { setPendingBouncePick(null); return; }
       if (mulliganActive) { setMulliganDecided(true); socket.emit('mulligan_decision', { roomId: gameState.roomId, accept: false }); return; }
       if (pendingAbilityActivation) { setPendingAbilityActivation(null); return; }
@@ -11859,9 +12062,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // ── Potion targeting helpers ──
   const pt = gameState.potionTargeting;
   const isTargeting = !isSpectator && !result && pt && pt.ownerIdx === myIdx;
-  // Generic lock: blocks ALL effect activations (hero effects, abilities, creature effects)
-  // whenever ANY targeting/prompt overlay is active
-  const isEffectLocked = !!(isTargeting || gameState.effectPrompt || gameState.surprisePending || gameState.mulliganPending || gameState.heroEffectPending || spellHeroPick || abilityAttachPick || pendingAdditionalPlay || pendingAbilityActivation || showSurrender || showEndTurnConfirm);
+  // Generic lock: blocks ALL effect activations (hero effects, abilities,
+  // creature effects, equip/permanent/area activations) whenever ANY
+  // targeting/prompt overlay is active OR a reaction chain / spell is
+  // mid-resolve. Without the chain/resolution gates, a player could click
+  // a once-per-turn effect a second time during the async window between
+  // "activation sent to the chain" and "HOPT counter incremented on return"
+  // — the Alchemy-during-Cure-chain race.
+  const isEffectLocked = !!(isTargeting || gameState.effectPrompt || gameState.surprisePending || gameState.mulliganPending || gameState.heroEffectPending || spellHeroPick || abilityAttachPick || pendingAdditionalPlay || pendingAbilityActivation || showSurrender || showEndTurnConfirm || reactionChain || (gameState._spellResolutionDepth || 0) > 0);
   // Valid targets can be clicked/selected; ineligible targets are only
   // shown visually (dimmed) so the player can see which board Creatures
   // WOULD qualify for the effect but don't meet its filter (e.g. Dragon
@@ -12572,8 +12780,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             return false;
           })();
           const abilityTarget = !isOpp && abilityDrag && abilityDrag.targetHero === i && abilityDrag.targetZone < 0;
-          // Click-to-attach an Ability: highlight all eligible heroes + dim the rest.
-          const attachPickEligibleHero = !isOpp && abilityAttachPick && canHeroReceiveAbility(p, i, abilityAttachPick.cardName);
+          // Click-to-attach an Ability: highlight all eligible heroes + dim
+          // the rest. Honours both the `skipAbilityGiven` flag (server-driven
+          // tutor flows bypass the per-turn gate) and the `eligibleHeroIdxs`
+          // allowlist (so Alex can't attach to himself via the deck-search).
+          const attachPickEligibleHero = !isOpp && abilityAttachPick && (() => {
+            if (Array.isArray(abilityAttachPick.eligibleHeroIdxs)
+                && !abilityAttachPick.eligibleHeroIdxs.includes(i)) return false;
+            return canHeroReceiveAbility(p, i, abilityAttachPick.cardName, {
+              skipAbilityGiven: !!abilityAttachPick.skipAbilityGiven,
+            });
+          })();
           const attachPickHeroDim = !isOpp && abilityAttachPick && !attachPickEligibleHero;
           const equipTarget = !isOpp && playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1;
           const spellTarget = playDrag && playDrag.isSpell && playDrag.targetHero === i && (playDrag.charmedOwner != null ? isOpp : !isOpp);
@@ -12632,6 +12849,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   }
                 }
                 if (targetSlot < 0) return;
+                if (pick.source === 'effectPrompt') {
+                  // Server-driven tutor (Alex, …) — resolve the pending prompt.
+                  // The server owns the actual placement; we just report
+                  // where the player chose to land.
+                  socket.emit('effect_prompt_response', {
+                    roomId: gameState.roomId,
+                    response: { heroIdx: i, zoneSlot: targetSlot },
+                  });
+                  setAbilityAttachPick(null);
+                  return;
+                }
                 setAbilityAttachPick(null);
                 socket.emit('play_ability', {
                   roomId: gameState.roomId, cardName: pick.cardName,
@@ -12652,7 +12880,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || attachPickEligibleHero) ? ' board-zone-play-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || attachPickEligibleHero) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
                 style={zsMerge('hero', { ...((isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
@@ -12843,7 +13071,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const attachPickZoneValid = !isOpp && abilityAttachPick && (() => {
                   const heroData = p.heroes[i];
                   if (!heroData || !heroData.name || heroData.hp <= 0) return false;
-                  if (!canHeroReceiveAbility(p, i, abilityAttachPick.cardName)) return false;
+                  if (Array.isArray(abilityAttachPick.eligibleHeroIdxs)
+                      && !abilityAttachPick.eligibleHeroIdxs.includes(i)) return false;
+                  if (!canHeroReceiveAbility(p, i, abilityAttachPick.cardName, {
+                    skipAbilityGiven: !!abilityAttachPick.skipAbilityGiven,
+                  })) return false;
                   const abList = (p.abilityZones || [])[i] || [[],[],[]];
                   const isCustom = (gameState.customPlacementCards || []).includes(abilityAttachPick.cardName);
                   if (isCustom) return (abList[z] || []).length > 0 && abList[z].length < 3;
@@ -12885,6 +13117,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const onAbilityClick = attachPickZoneValid
                   ? () => {
                       const pick = abilityAttachPick;
+                      if (pick.source === 'effectPrompt') {
+                        socket.emit('effect_prompt_response', {
+                          roomId: gameState.roomId,
+                          response: { heroIdx: i, zoneSlot: z },
+                        });
+                        setAbilityAttachPick(null);
+                        return;
+                      }
                       setAbilityAttachPick(null);
                       socket.emit('play_ability', {
                         roomId: gameState.roomId, cardName: pick.cardName,
@@ -12901,7 +13141,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     } : (isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined);
                 return (
                   <div key={z}
-                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '')}
+                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (attachPickZoneValid ? ' attach-pick-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '')}
                     data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel} data-card-name={cards[0] || ''}
                     onClick={onAbilityClick}
                     onMouseEnter={() => {
@@ -13499,6 +13739,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div className="board-center" ref={boardCenterRef} style={{ position: 'relative' }}>
             {(((gameState.areaZones?.[0] || []).includes('Acid Rain')) || ((gameState.areaZones?.[1] || []).includes('Acid Rain'))) && <AcidRainOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Deepsea Castle')) || ((gameState.areaZones?.[1] || []).includes('Deepsea Castle'))) && <DeepseaCastleOverlay />}
+            {(((gameState.areaZones?.[0] || []).includes('Slippery Ice')) || ((gameState.areaZones?.[1] || []).includes('Slippery Ice'))) && <SlipperyIceOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Stinky Stables')) || ((gameState.areaZones?.[1] || []).includes('Stinky Stables'))) && <StinkyStablesOverlay />}
             {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
@@ -13574,7 +13815,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   const permTargetId = `perm-${oppIdx}-${perm.id}`;
                   const isValidPermTarget = isTargeting && validTargetIds.has(permTargetId);
                   const isSelectedPermTarget = selectedSet.has(permTargetId);
-                  const isActivatable = !isSpectator && (gameState.activatablePermanents || []).some(a => a.permId === perm.id && a.ownerIdx === oppIdx);
+                  const isActivatable = !isSpectator && !isEffectLocked && (gameState.activatablePermanents || []).some(a => a.permId === perm.id && a.ownerIdx === oppIdx);
                   const handlePermClick = isValidPermTarget ? () => togglePotionTarget(permTargetId)
                     : isActivatable ? () => socket.emit('activate_permanent', { roomId: gameState.roomId, permId: perm.id, ownerIdx: oppIdx })
                     : undefined;
@@ -13596,7 +13837,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   const permTargetId = `perm-${myIdx}-${perm.id}`;
                   const isValidPermTarget = isTargeting && validTargetIds.has(permTargetId);
                   const isSelectedPermTarget = selectedSet.has(permTargetId);
-                  const isActivatable = !isSpectator && (gameState.activatablePermanents || []).some(a => a.permId === perm.id && a.ownerIdx === myIdx);
+                  const isActivatable = !isSpectator && !isEffectLocked && (gameState.activatablePermanents || []).some(a => a.permId === perm.id && a.ownerIdx === myIdx);
                   const handlePermClick = isValidPermTarget ? () => togglePotionTarget(permTargetId)
                     : isActivatable ? () => socket.emit('activate_permanent', { roomId: gameState.roomId, permId: perm.id, ownerIdx: myIdx })
                     : undefined;
@@ -14495,34 +14736,42 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {(ep.options || []).map(opt => {
-              // Resolve a tooltip card: explicit `opt.tooltipCardName` wins,
-              // else auto-detect any CARDS_BY_NAME key mentioned in the
-              // option label (so "Place 1 Pollution Token" naturally pulls
-              // the Pollution Token tooltip, "Spawn a Mummy Token" pulls
-              // the Mummy Token tooltip, etc.).
-              let tooltipCard = opt.tooltipCardName ? CARDS_BY_NAME[opt.tooltipCardName] : null;
-              if (!tooltipCard && opt.label) {
-                for (const cardName of Object.keys(CARDS_BY_NAME || {})) {
-                  if (opt.label.includes(cardName)) { tooltipCard = CARDS_BY_NAME[cardName]; break; }
+          {ep.renderAs === 'dropdown' ? (
+            // Dropdown variant for prompts with many scalar choices (e.g. Siphem's
+            // "spend N counters" list). Keeps the panel compact and prevents a
+            // tall button stack. `selectedOptionId` is stored in a ref so we
+            // don't need to lift state; the initial value is the first option.
+            <OptionPickerDropdown ep={ep} respondToPrompt={respondToPrompt} />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {(ep.options || []).map(opt => {
+                // Resolve a tooltip card: explicit `opt.tooltipCardName` wins,
+                // else auto-detect any CARDS_BY_NAME key mentioned in the
+                // option label (so "Place 1 Pollution Token" naturally pulls
+                // the Pollution Token tooltip, "Spawn a Mummy Token" pulls
+                // the Mummy Token tooltip, etc.).
+                let tooltipCard = opt.tooltipCardName ? CARDS_BY_NAME[opt.tooltipCardName] : null;
+                if (!tooltipCard && opt.label) {
+                  for (const cardName of Object.keys(CARDS_BY_NAME || {})) {
+                    if (opt.label.includes(cardName)) { tooltipCard = CARDS_BY_NAME[cardName]; break; }
+                  }
                 }
-              }
-              return (
-                <button key={opt.id} className={'btn' + (tooltipCard ? ' option-tooltip-hover' : '')} style={{ padding: '10px 18px', fontSize: 12, borderColor: opt.color || 'var(--accent)', color: opt.color || 'var(--accent)', textAlign: 'left' }}
-                  onMouseEnter={() => tooltipCard && window._boardTooltipSetter?.(tooltipCard)}
-                  onMouseLeave={() => tooltipCard && window._boardTooltipSetter?.(null)}
-                  onClick={() => respondToPrompt({ optionId: opt.id })}>
-                  <div style={{ fontWeight: 600 }}>{opt.label}</div>
-                  {opt.description && <div style={{ fontSize: 10, opacity: .7, marginTop: 2 }}>{opt.description}</div>}
-                </button>
-              );
-            })}
-            {ep.cancellable !== false && (
-              <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
-                onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
-            )}
-          </div>
+                return (
+                  <button key={opt.id} className={'btn' + (tooltipCard ? ' option-tooltip-hover' : '')} style={{ padding: '10px 18px', fontSize: 12, borderColor: opt.color || 'var(--accent)', color: opt.color || 'var(--accent)', textAlign: 'left' }}
+                    onMouseEnter={() => tooltipCard && window._boardTooltipSetter?.(tooltipCard)}
+                    onMouseLeave={() => tooltipCard && window._boardTooltipSetter?.(null)}
+                    onClick={() => respondToPrompt({ optionId: opt.id })}>
+                    <div style={{ fontWeight: 600 }}>{opt.label}</div>
+                    {opt.description && <div style={{ fontSize: 10, opacity: .7, marginTop: 2 }}>{opt.description}</div>}
+                  </button>
+                );
+              })}
+              {ep.cancellable !== false && (
+                <button className="btn" style={{ padding: '8px 18px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
+                  onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+              )}
+            </div>
+          )}
         </DraggablePanel>
       )}
 
@@ -14881,6 +15130,38 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
               onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
           </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Ability Attach Target Prompt (Alex's deck-search tutor, etc.) ─
+           The ability has already been chosen by the server; the player's
+           remaining job is to pick WHICH hero / zone receives it. Eligible
+           heroes and zones are highlighted by the same machinery as the
+           hand-driven click-to-attach flow — this panel is just an anchor
+           showing what's being attached + a cancel. Clicks go through the
+           hero / zone handlers, which emit effect_prompt_response when
+           the pick source is 'effectPrompt'. */}
+      {isMyEffectPrompt && ep.type === 'abilityAttachTarget' && (
+        <DraggablePanel className="first-choice-panel animate-in attach-pick-panel" style={{ borderColor: '#7fffaa' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#7fffaa', marginBottom: 4, textShadow: '0 0 8px rgba(120,255,170,.6)' }}>✦ {ep.title || 'Attach Ability'}</div>
+          {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
+          {ep.cardName && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+              <BoardCard cardName={ep.cardName} style={{ width: 110, height: 154, borderRadius: 6, boxShadow: '0 0 18px rgba(120,255,170,.55)' }} />
+            </div>
+          )}
+          <div style={{
+            fontSize: 12, color: '#baffcf', marginBottom: 12, textAlign: 'center',
+            fontWeight: 600, letterSpacing: 0.3,
+          }}>
+            👉 Click a highlighted Hero or Ability Zone
+          </div>
+          {ep.cancellable !== false && (
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>
+            </div>
+          )}
         </DraggablePanel>
       )}
 

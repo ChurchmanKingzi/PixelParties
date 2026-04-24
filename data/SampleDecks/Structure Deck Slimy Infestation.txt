@@ -3,19 +3,21 @@ Name: Structure Deck: Slimy Infestation
 Cover: Slime Rancher
 
 == HEROES ==
-Diamond, the Keeper of Peace
 Alice, the Puppeteer Girl
+Stellan, the Calm Cat
 Barker, the Monster Tamer
 
 == MAIN DECK ==
-8x Alchemy
+4x Alchemy
 4x Cloudy Slime
-4x Cute Camera
+2x Cute Camera
 4x Cute Cheese
-4x Cuteness Sensor
+2x Cuteness Sensor
 4x Fiery Slime
 3x Icy Slime
 4x Magnetic Glove
+4x Martyry
+4x Performance
 4x Rain of Arrows
 4x Shadowy Slime
 4x Shiny Slime

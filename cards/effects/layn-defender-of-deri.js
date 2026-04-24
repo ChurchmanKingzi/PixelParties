@@ -108,6 +108,15 @@ module.exports = {
   // Must fire even when Layn is CC'd (e.g. to react the moment she is frozen)
   bypassStatusFilter: true,
 
+  // CPU self-status penalty. Frozen / Stunned / Negated knocks Layn
+  // out of "active" and strips her +100 HP aura from every ally creature
+  // — a much bigger hit than the status itself. Heavy negative so the
+  // CPU never picks Layn for self-CC over a neutral hero.
+  cpuStatusSelfValue(statusName) {
+    if (statusName === 'frozen' || statusName === 'stunned' || statusName === 'negated') return -80;
+    return 0;
+  },
+
   // CPU ascension targeting: the Hammer is the only card that progresses Layn.
   ascensionNeedsCard(cardName, _cardData, engine, pi, hi) {
     const hero = engine.gs.players[pi]?.heroes?.[hi];

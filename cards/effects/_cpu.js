@@ -2146,6 +2146,18 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
   const ownTargets = validTargets.filter(t => t.owner === cpuIdx);
   const enemyTargets = validTargets.filter(t => t.owner != null && t.owner !== cpuIdx);
 
+  // Self-status cards (Sickly Cheese self-poison, Zsos'Ssar Decay-cost
+  // self-poison, …). The card's `targetingConfig.appliesStatus` names the
+  // status it lands, and the picker routes to status-beneficiary scoring
+  // so Fiona / Stellan get preferentially hit (and Layn is avoided).
+  // Runs BEFORE the heal/buff heuristics because those would otherwise
+  // win ties by shuffling randomly and wash out the signal.
+  const appliesStatus = typeof config.appliesStatus === 'string' ? config.appliesStatus : null;
+  if (appliesStatus && ownTargets.length > 0) {
+    const picked = pickSelfStatusTarget(engine, ownTargets, appliesStatus);
+    if (picked) return [picked.id];
+  }
+
   // Determine intent. Healing/buff cards typically have side='own' or only
   // own-targets valid. Damage cards have baseDamage or damageType, or target
   // the opponent side.
@@ -2833,6 +2845,55 @@ function pickHealTarget(engine, ownTargets, enemyTargets, cardName, _config) {
     return ownCreatures[0].t;
   }
   return null;
+}
+
+// ─── Self-status target scoring ───────────────────────────────────────
+// For cards that apply a NEGATIVE status to one of the caster's own
+// targets (Sickly Cheese self-poisons, Zsos'Ssar's Decay-Spell cost
+// self-poisons, …), the CPU needs to know *which* own-side target
+// actually wants the status. Card scripts opt in by exporting
+//   `cpuStatusSelfValue(statusName, { engine, owner, heroIdx, hero })
+//     → number`
+// returning a positive score when the target benefits (Fiona gains
+// gold per negative status; Stellan triggers a free-summon on any
+// negative status) or a negative score when it hurts (Layn loses her
+// creature-HP bonus on CC).
+//
+// The picker walks the hero's own script + every ability attached to
+// the hero and sums their scores. A self-status card's
+// `targetingConfig.appliesStatus = 'poisoned' | 'frozen' | …` opts the
+// prompt into this picker; otherwise the generic own-side fall-through
+// at the end of cpuPickTargets picks randomly.
+function scoreSelfStatusTarget(engine, target, statusName) {
+  if (!target || target.type !== 'hero' || target.heroIdx == null) return 0;
+  const gs = engine.gs;
+  const ps = gs.players[target.owner];
+  const hero = ps?.heroes?.[target.heroIdx];
+  if (!hero?.name) return 0;
+  let total = 0;
+  const ctx = { engine, owner: target.owner, heroIdx: target.heroIdx, hero };
+  const applyScript = (script) => {
+    if (typeof script?.cpuStatusSelfValue !== 'function') return;
+    try {
+      const v = Number(script.cpuStatusSelfValue(statusName, ctx)) || 0;
+      total += v;
+    } catch { /* ignore card errors, treat as 0 */ }
+  };
+  applyScript(loadCardEffect(hero.name));
+  const abZones = ps.abilityZones?.[target.heroIdx] || [[], [], []];
+  for (const slot of abZones) {
+    for (const abName of (slot || [])) applyScript(loadCardEffect(abName));
+  }
+  return total;
+}
+
+function pickSelfStatusTarget(engine, ownTargets, statusName) {
+  if (!ownTargets || ownTargets.length === 0) return null;
+  const scored = ownTargets.map(t => ({ t, s: scoreSelfStatusTarget(engine, t, statusName) }));
+  let maxScore = -Infinity;
+  for (const x of scored) if (x.s > maxScore) maxScore = x.s;
+  const top = scored.filter(x => x.s === maxScore).map(x => x.t);
+  return randomOf(top);
 }
 
 function pickBuffTarget(engine, ownTargets, cardName) {

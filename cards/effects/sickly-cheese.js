@@ -56,6 +56,12 @@ module.exports = {
     greenSelect: false,
     exclusiveTypes: true,
     maxPerType: { hero: 1 },
+    // CPU hint: this is a self-poison card. The brain's target picker
+    // routes through cpuStatusSelfValue so Fiona / Stellan get hit first
+    // (both benefit from a negative status) and Layn gets avoided. If no
+    // beneficiary is present the picker still picks something so the
+    // deck-search payoff isn't skipped.
+    appliesStatus: 'poisoned',
   },
 
   validateSelection(selectedIds, validTargets) {

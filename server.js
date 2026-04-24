@@ -37,6 +37,13 @@ function decryptPuzzle(encryptedStr) {
   return JSON.parse(decrypted);
 }
 
+// ===== DEBUG FLAGS =====
+// Reveal the CPU/NPC opponent's hand to the human player during singleplayer
+// matches. Useful while debugging CPU behaviour — you can see exactly what
+// the CPU is holding and predict its plays. MUST be `false` for public
+// builds (leaks opponent information).
+const DEBUG_REVEAL_NPC_HAND = false;
+
 // ===== CARD DATABASE CACHE =====
 // Module-level card DB cache — loaded once, used everywhere.
 // Replaces per-request JSON.parse(fs.readFileSync(...)) calls.
@@ -771,17 +778,13 @@ app.get('/api/sample-decks/owned', authMiddleware, async (req, res) => {
 });
 
 // Singleplayer opponent-gallery feed. Returns every sample deck the caller
-// can face (starter decks + owned structure decks), each enriched with the
-// middle-hero name and the caller's W/L record vs that opponent. The
-// client crops the hero's skin image to render a clean portrait tile.
+// can face (all Starter + all Structure decks, regardless of shop-ownership),
+// each enriched with the middle-hero name and the caller's W/L record vs
+// that opponent. The client crops the hero's skin image to render a clean
+// portrait tile. Note: structure-deck ownership still gates use of the deck
+// in the deckbuilder — this endpoint just opens every AI opponent.
 app.get('/api/sample-decks/gallery', authMiddleware, async (req, res) => {
-  const all = loadSampleDecks();
-  const ownedRows = await db.all(
-    "SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck'",
-    [req.user.userId]
-  );
-  const ownedSet = new Set(ownedRows.map(r => r.item_id));
-  const decks = all.filter(d => !d.isStructure || ownedSet.has(d.structureId));
+  const decks = loadSampleDecks();
   const statRows = await db.all(
     'SELECT opponent_deck_id, wins, losses FROM npc_stats WHERE user_id = ?',
     [req.user.userId]
@@ -1480,13 +1483,14 @@ function sendGameState(room, playerIdx, extra) {
       // see what the CPU is holding. Has no effect on MP games or the
       // CPU itself (the CPU brain reads from gs directly, not the
       // redacted client-side state).
-      hand: (pi === playerIdx || room.type === 'singleplayer') ? ps.hand : [], handCount: ps.hand.length,
+      hand: (pi === playerIdx || (room.type === 'singleplayer' && DEBUG_REVEAL_NPC_HAND)) ? ps.hand : [], handCount: ps.hand.length,
       revealedHandCards: pi !== playerIdx ? (() => {
         // SINGLEPLAYER debug reveal: show every card in the CPU's hand.
         // The client renders `revealedHandCards` as face-up tiles, so
         // populating all indexes here surfaces the whole hand without
-        // requiring client-side changes.
-        if (room.type === 'singleplayer') {
+        // requiring client-side changes. Gated on DEBUG_REVEAL_NPC_HAND
+        // so public builds don't leak CPU information.
+        if (room.type === 'singleplayer' && DEBUG_REVEAL_NPC_HAND) {
           return ps.hand.map((name, index) => ({ index, name }));
         }
         const counts = ps._revealedCardCounts;
@@ -1623,6 +1627,30 @@ function sendGameState(room, playerIdx, extra) {
       return cc;
     })() : {},
     additionalActions: room.engine ? room.engine.getAdditionalActions(playerIdx) : [],
+    // Per-card level reductions contributed by board-wide `reduceCardLevel`
+    // hooks (Elven Forager, …). Map of cardName → non-negative reduction.
+    // Client subtracts this from the card's raw level before running the
+    // spell-school-count check, so the UI agrees with the server's
+    // `heroMeetsLevelReq` — without forcing the client to replay every
+    // board-side hook.
+    cardLevelReductions: room.engine ? (() => {
+      const result = {};
+      const ps2 = gs.players[playerIdx];
+      const cardDB = getCardDB();
+      const seen = new Set();
+      for (const cn of (ps2?.hand || [])) {
+        if (seen.has(cn)) continue;
+        seen.add(cn);
+        const cd = cardDB[cn];
+        if (!cd) continue;
+        const raw = cd.level || 0;
+        if (raw <= 0) continue;
+        const reduced = room.engine._applyCardLevelReductions(cd, raw, playerIdx);
+        const delta = raw - reduced;
+        if (delta > 0) result[cn] = delta;
+      }
+      return result;
+    })() : {},
     inherentActionCards: (() => {
       if (!room.engine) return [];
       const { loadCardEffect } = require('./cards/effects/_loader');
@@ -3020,6 +3048,20 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner 
     if (!script.canFreeActivate(checkCtx, level)) return false;
   }
 
+  // Reserve the HOPT slot BEFORE any `await`. Without this, the chain
+  // window opened by `executeCardWithChain` below yields to the event
+  // loop, and a second `activate_free_ability` socket message from the
+  // same client (fired while the chain is still resolving a reaction
+  // like Cure on top of Alchemy) passes the HOPT check at line 3043
+  // and enters a parallel activation. Reserving at entry and rolling
+  // back on cancel closes the race.
+  if (!gs.hoptUsed) gs.hoptUsed = {};
+  gs.hoptUsed[hoptKey] = gs.turn;
+  let hoptReserved = true;
+  const releaseHopt = () => {
+    if (hoptReserved) { delete gs.hoptUsed[hoptKey]; hoptReserved = false; }
+  };
+
   try {
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, cardType: 'Ability', goldCost: 0,
@@ -3027,8 +3069,8 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner 
     });
 
     if (chainResult.negated) {
-      if (!gs.hoptUsed) gs.hoptUsed = {};
-      gs.hoptUsed[hoptKey] = gs.turn;
+      // Negation keeps HOPT consumed — the ability fired (and was countered).
+      hoptReserved = false;
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -3055,13 +3097,13 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner 
     }
 
     if (resolved !== false) {
+      // Reservation becomes the final consumption — nothing to do.
+      hoptReserved = false;
       if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
       else room.engine._firePendingPlayLog();
       if (!script.noDefaultFlash) {
         room.engine._broadcastEvent('ability_activated', { owner: heroOwner, heroIdx, zoneIdx });
       }
-      if (!gs.hoptUsed) gs.hoptUsed = {};
-      gs.hoptUsed[hoptKey] = gs.turn;
       if (isActionPhase) {
         const actingPs = gs.players[pi];
         actingPs._actionsPlayedThisPhase = (actingPs._actionsPlayedThisPhase || 0) + 1;
@@ -3071,11 +3113,17 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner 
         await room.engine.advanceToPhase(pi, 4);
       }
     } else {
+      // Ability cancelled (user backed out, no legal target, etc.) — roll
+      // back the HOPT reservation so the player keeps their once-per-turn.
+      releaseHopt();
       delete gs._pendingCardReveal;
       delete gs._pendingPlayLog;
     }
   } catch (err) {
     console.error('[Engine] doActivateFreeAbility error:', err.message);
+    // Unexpected error mid-activation — release the reservation so the
+    // player isn't silently robbed of their HOPT by a crash.
+    releaseHopt();
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;

@@ -31,6 +31,13 @@ module.exports = {
     return { goldPerTurn: 0 };
   },
 
+  // CPU self-status target score. Fiona gains 20 gold per negative-status
+  // application, so the CPU should eagerly aim self-status cards
+  // (Sickly Cheese, Zsos'Ssar cost, …) at her when she's on its side.
+  cpuStatusSelfValue(statusName) {
+    return STATUS_EFFECTS[statusName]?.negative ? 40 : 0;
+  },
+
   hooks: {
     onStatusApplied: async (ctx) => {
       // Only trigger when THIS hero receives the status
