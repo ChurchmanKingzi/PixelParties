@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
 Name: Structure Deck: Great Weapon Master
+Cover: Toras, Master of all Weapons
 
 == HEROES ==
 Arthor, the King of Blackport

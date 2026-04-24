@@ -61,7 +61,8 @@
       "Bash(grep -l \"onStatusApplied\" \"C:\\\\\\\\Pixel Parties WEB\\\\\\\\PixelPartiesWeb/cards/effects/\"*.js)",
       "Bash(grep -n \"supportYield\" \"C:\\\\\\\\Pixel Parties WEB\\\\\\\\PixelPartiesWeb/cards/effects/_cpu.js\")",
       "Bash(grep -l \"onStatusApplied\\\\|statusName.*negative\\\\|poisoned.*gain\\\\|heroOwner.*cardOwner\" \"C:\\\\\\\\Pixel Parties WEB\\\\\\\\PixelPartiesWeb/cards/effects/\"*.js)",
-      "Bash(grep -l \"countPoisoned\\\\|poisoned.*count\\\\|count.*Poison\\\\|poisoned.*damage\\\\|statuses.*poison\" \"C:\\\\\\\\Pixel Parties WEB\\\\\\\\PixelPartiesWeb/cards/effects/\"*.js)"
+      "Bash(grep -l \"countPoisoned\\\\|poisoned.*count\\\\|count.*Poison\\\\|poisoned.*damage\\\\|statuses.*poison\" \"C:\\\\\\\\Pixel Parties WEB\\\\\\\\PixelPartiesWeb/cards/effects/\"*.js)",
+      "Bash(grep -v \"ps\\\\.hand\\\\s*=\\\\s*\\\\[\\\\]\\\\s*$\\\\|ps\\\\.hand\\\\s*=\\\\s*\\\\\\(ps\\\\|ps\\\\.hand\\\\.splice\\\\|ps\\\\.hand\\\\.push\\\\|_hasRevealInterceptor\")"
     ]
   }
 }

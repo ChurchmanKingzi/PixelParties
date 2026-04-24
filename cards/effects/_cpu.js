@@ -2884,6 +2884,22 @@ function scoreSelfStatusTarget(engine, target, statusName) {
   for (const slot of abZones) {
     for (const abName of (slot || [])) applyScript(loadCardEffect(abName));
   }
+  // Also scan the target's owner's HAND for cards that value a self-status.
+  // Luna Kiai, for example, wants all own Heroes Burned so she can be free-
+  // summoned — her `cpuStatusSelfValueInHand` returns a positive score
+  // while she's in hand. Deduplicated per card name so holding 3 copies
+  // doesn't triple-count.
+  const seenHandNames = new Set();
+  for (const cn of (ps.hand || [])) {
+    if (seenHandNames.has(cn)) continue;
+    seenHandNames.add(cn);
+    const script = loadCardEffect(cn);
+    if (typeof script?.cpuStatusSelfValueInHand !== 'function') continue;
+    try {
+      const v = Number(script.cpuStatusSelfValueInHand(statusName, ctx)) || 0;
+      total += v;
+    } catch { /* ignore */ }
+  }
   return total;
 }
 

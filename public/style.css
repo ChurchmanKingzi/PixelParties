@@ -606,6 +606,27 @@ body {
   background: linear-gradient(135deg, #0a0a12 0%, #1a0a2e 50%, #0a1a1e 100%);
 }
 
+/* Auth screen: the 1920x1080 title artwork sits behind the login panel.
+   `100% 100%` squashes/stretches the piece to fully cover the viewport
+   — no letterbox bars at any aspect ratio, at the cost of distorting
+   the image on non-16:9 windows. The gradient fallback stays for the
+   brief pre-load frame. The login panel has its own dark backdrop so
+   the form stays readable on top of the stretched image. */
+.auth-screen {
+  background-image: url('/title.png'), linear-gradient(135deg, #0a0a12 0%, #1a0a2e 50%, #0a1a1e 100%);
+  background-size: 100% 100%, auto;
+  background-position: center center, center center;
+  background-repeat: no-repeat, no-repeat;
+  background-color: #050510;
+}
+.auth-screen .panel {
+  background: rgba(10, 10, 20, .82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 0 40px rgba(0, 0, 0, .75), 0 0 60px rgba(170, 136, 255, .15);
+  border: 1px solid rgba(170, 136, 255, .35);
+}
+
 .screen-full {
   height: 100vh;
   display: flex;
@@ -2584,6 +2605,23 @@ body {
   text-shadow: 0 0 12px rgba(255, 0, 0, .6), 0 0 24px rgba(255, 0, 0, .3);
   filter: drop-shadow(0 2px 4px rgba(0,0,0,.8));
   line-height: 1;
+}
+
+/* Hand card revealed (Luna Kiai's reveal-to-Burn, etc.) — the owner
+   sees the copy they spent semi-transparent so it's clear which card
+   already triggered its activation this turn. Opponent sees the reveal
+   through the normal face-up `revealedHandCards` flow. */
+.hand-slot.hand-card-revealed .board-card {
+  opacity: 0.55;
+  filter: saturate(0.75);
+}
+.hand-slot.hand-card-revealed::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px dashed rgba(255, 215, 70, .85);
+  border-radius: 4px;
+  pointer-events: none;
 }
 
 

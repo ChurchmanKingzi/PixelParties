@@ -6901,6 +6901,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // The specific resolving card instance is always dimmed (non-interactive)
     if (handIdx != null && resolvingHandIndex >= 0 && resolvingHandIndex === handIdx) return true;
 
+    // Hand-activated-effect: if THIS specific hand index is still
+    // activatable (not already revealed, per-copy check), keep it
+    // clickable. The rest of the dim logic below only bears on SUMMON
+    // eligibility — reveal remains a valid click for this slot.
+    if (handIdx != null && (gameState.handActivatableCards || []).some(h => h.handIndex === handIdx)) return false;
+
     // Hero Action mode (Coffee) — only eligible cards are playable
     const heroActionPrompt = gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
     if (heroActionPrompt) {
@@ -7057,7 +7063,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // indexMap[newIdx] = oldIdx
     handAnimDataRef.current = { oldRects, indexMap: indices };
     setHand(newHand);
-    socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand });
+    socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand, indexMap: indices });
   };
 
   const sortHand = () => {
@@ -7076,7 +7082,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const indexMap = entries.map(e => e.oldIdx); // indexMap[newIdx] = oldIdx
     handAnimDataRef.current = { oldRects, indexMap };
     setHand(newHand);
-    socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand });
+    socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand, indexMap });
   };
 
   // FLIP animation effect — runs after React re-renders the hand
@@ -7420,7 +7426,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
 
     // Block hand play while any dialog/submenu is open
-    if (showSurrender || showEndTurnConfirm || spellHeroPick || abilityAttachPick) return;
+    if (showSurrender || showEndTurnConfirm || spellHeroPick || abilityAttachPick || summonOrRevealPick) return;
     if (gameState.surprisePending) return; // Lock hand during surprise prompts for both players
     const activePrompt = gameState.effectPrompt;
     if (activePrompt && activePrompt.ownerIdx === myIdx
@@ -7883,6 +7889,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
     const onUp = (upX, upY) => {
       if (!dragging) {
+        // Hand-activated-effect intercept (Luna Kiai's "Summon or Reveal").
+        // PER-COPY: this specific hand slot is activatable iff its index
+        // is listed in `handActivatableByIdx`. Already-revealed copies are
+        // not in that list, so they drop through to the normal click flow.
+        const canHandActivate = handActivatableByIdx.has(idx);
+        if (canHandActivate && isMyTurn && (currentPhase === 2 || currentPhase === 3 || currentPhase === 4)) {
+          let summonEligible = [];
+          if (isPlayable && card?.cardType === 'Creature') {
+            for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+              if (!canHeroPlayCard(me, hi, card)) continue;
+              const slot = findFreeSupportSlot(me, hi);
+              if (slot < 0) continue;
+              summonEligible.push({ idx: hi, name: me.heroes[hi].name, zoneSlot: slot });
+            }
+          }
+          if (summonEligible.length > 0) {
+            setSummonOrRevealPick({ cardName, handIndex: idx, card, summonEligible });
+          } else {
+            if (window.playSFX) window.playSFX('ui_click');
+            socket.emit('activate_hand_card', { roomId: gameState.roomId, cardName, handIndex: idx });
+          }
+          setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
+          return;
+        }
         // Click (no drag) — check for potion or non-equip artifact activation
         if (!dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 3 || currentPhase === 4) && card) {
           if (card.cardType === 'Potion') {
@@ -8034,13 +8064,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const droppedInHand = isInsideHandZone(upX, upY);
 
       if (droppedInHand) {
-        // Dropped inside hand zone — ALWAYS reorder, regardless of card type
+        // Dropped inside hand zone — ALWAYS reorder, regardless of card type.
+        // Build an indexMap (newIdx → oldIdx) so the server can remap any
+        // per-index state (Luna Kiai's reveal marker, etc.) — without it,
+        // revealed copies "lose" their state when their position changes.
         const newHand = [...hand];
         newHand.splice(idx, 1);
         const dropIdx = calcDropIdx(upX, idx);
         newHand.splice(dropIdx, 0, cardName);
+        const indexMap = hand.map((_, i) => i);
+        const [movedOldIdx] = indexMap.splice(idx, 1);
+        indexMap.splice(dropIdx, 0, movedOldIdx);
         setHand(newHand);
-        socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand });
+        socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand, indexMap });
         setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
         return;
       }
@@ -8237,6 +8273,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
     return items;
   }, [hand, handDrag, playDrag, abilityDrag]);
+
+  // Per-copy revealed hand indices (Luna Kiai). Server stamps the
+  // specific clicked index and returns the list here — the client just
+  // renders them semi-transparent.
+  const revealedHandIdxSet = useMemo(() => {
+    return new Set(gameState.revealedOwnHandIndices || []);
+  }, [gameState.revealedOwnHandIndices]);
+  // Per-copy activatable map: handIndex → { cardName, label }. A given
+  // copy is clickable for Reveal iff its index is in this map. This is
+  // what lets the owner click a SPECIFIC Luna Kiai (and not some other
+  // copy) to reveal it.
+  const handActivatableByIdx = useMemo(() => {
+    const out = new Map();
+    for (const h of (gameState.handActivatableCards || [])) {
+      if (typeof h?.handIndex === 'number') out.set(h.handIndex, h);
+    }
+    return out;
+  }, [gameState.handActivatableCards]);
+
+  // Click-without-drag picker for cards that can be BOTH summoned and
+  // hand-activated (Luna Kiai). `null` when nothing is pending. Shape:
+  // `{ cardName, handIndex, card, onSummon, onReveal }`.
+  const [summonOrRevealPick, setSummonOrRevealPick] = useState(null);
+  useEffect(() => { if (summonOrRevealPick && window.playSFX) window.playSFX('ui_prompt_open'); }, [summonOrRevealPick]);
 
   const [showSurrender, setShowSurrender] = useState(false);
   const surrenderOpenedAt = React.useRef(0);
@@ -11607,6 +11667,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (e.key !== 'Escape') return;
       e.stopImmediatePropagation();
       if (showEndTurnConfirm) { cancelEndTurn(); return; }
+      if (summonOrRevealPick) { setSummonOrRevealPick(null); return; }
       if (spellHeroPick) { setSpellHeroPick(null); return; }
       if (abilityAttachPick) {
         // effectPrompt-driven picks (Alex, …) resolve the prompt via Esc;
@@ -12069,7 +12130,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // a once-per-turn effect a second time during the async window between
   // "activation sent to the chain" and "HOPT counter incremented on return"
   // — the Alchemy-during-Cure-chain race.
-  const isEffectLocked = !!(isTargeting || gameState.effectPrompt || gameState.surprisePending || gameState.mulliganPending || gameState.heroEffectPending || spellHeroPick || abilityAttachPick || pendingAdditionalPlay || pendingAbilityActivation || showSurrender || showEndTurnConfirm || reactionChain || (gameState._spellResolutionDepth || 0) > 0);
+  const isEffectLocked = !!(isTargeting || gameState.effectPrompt || gameState.surprisePending || gameState.mulliganPending || gameState.heroEffectPending || spellHeroPick || abilityAttachPick || summonOrRevealPick || pendingAdditionalPlay || pendingAbilityActivation || showSurrender || showEndTurnConfirm || reactionChain || (gameState._spellResolutionDepth || 0) > 0);
   // Valid targets can be clicked/selected; ineligible targets are only
   // shown visually (dimmed) so the player can see which board Creatures
   // WOULD qualify for the effect but don't meet its filter (e.g. Dragon
@@ -13966,9 +14027,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isStealMarked = stealMarkedMe.has(item.origIdx);
                 const isStealHighlighted = stealHighlightMe.has(item.origIdx);
                 const isStealHidden = stealHiddenMe.has(item.origIdx) && hand.length === stealExpectedMeCountRef.current;
+                // Luna-Kiai-style hand activation: card has a
+                // `handActivatedEffect` currently available. No badge —
+                // `getCardDimmed` un-dims it so it looks playable, and
+                // `onHandMouseDown` routes a click-without-drag through
+                // a Summon/Reveal picker (or straight to reveal when only
+                // that option is live). Revealed copies render semi-
+                // transparent via `hand-card-revealed`.
+                const isRevealed = revealedHandIdxSet.has(item.origIdx);
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '')}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '')}
                     style={(isDrawAnim || isPendingPlay || isStealHidden || bounceReturnHidden.has(`${myIdx}-${item.origIdx}`)) ? { visibility: 'hidden' } : undefined}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
@@ -14793,7 +14862,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 </span>
                 {ep.cancellable !== false && (
                   <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }}
-                    onClick={() => respondToPrompt({ cancelled: true })}>✕ CANCEL</button>
+                    onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || '✕ CANCEL'}</button>
                 )}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
@@ -14824,6 +14893,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   );
                 })}
               </div>
+              {ep.footer && (
+                <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text2)', textAlign: 'center', fontStyle: 'italic' }}>
+                  {ep.footer}
+                </div>
+              )}
             </DraggablePanel>
           </div>
         );
@@ -15041,6 +15115,52 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
         </DraggablePanel>
       )}
+
+      {/* ── Summon-or-Reveal Picker (hand-activated Creatures like Luna Kiai) ── */}
+      {summonOrRevealPick && !result && (() => {
+        const p = summonOrRevealPick;
+        const revealLabel = (gameState.handActivatableCards || []).find(h => h.cardName === p.cardName)?.label || 'Reveal';
+        return (
+          <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
+            <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>
+              ✨ {p.cardName}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>
+              Choose an action:
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: 'var(--accent)', color: 'var(--accent)', textAlign: 'left' }}
+                onClick={() => {
+                  const { cardName: cn, handIndex: hi, card: c, summonEligible } = p;
+                  setSummonOrRevealPick(null);
+                  if (!summonEligible || summonEligible.length === 0) return;
+                  if (summonEligible.length === 1) {
+                    socket.emit('play_creature', {
+                      roomId: gameState.roomId, cardName: cn,
+                      handIndex: hi, heroIdx: summonEligible[0].idx,
+                      zoneSlot: summonEligible[0].zoneSlot,
+                    });
+                  } else {
+                    setSpellHeroPick({ cardName: cn, handIndex: hi, card: c, eligible: summonEligible, isCreature: true });
+                  }
+                }}>
+                🐾 Summon
+              </button>
+              <button className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: '#ffc84a', color: '#ffc84a', textAlign: 'left' }}
+                onClick={() => {
+                  const { cardName: cn, handIndex: hi } = p;
+                  setSummonOrRevealPick(null);
+                  if (window.playSFX) window.playSFX('ui_click');
+                  socket.emit('activate_hand_card', { roomId: gameState.roomId, cardName: cn, handIndex: hi });
+                }}>
+                ⚡ {revealLabel}
+              </button>
+              <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
+                onClick={() => setSummonOrRevealPick(null)}>Cancel</button>
+            </div>
+          </DraggablePanel>
+        );
+      })()}
 
       {/* ── Force Discard Prompt (Wheels) ── */}
       {isMyEffectPrompt && ep.type === 'forceDiscard' && (

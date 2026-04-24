@@ -32,7 +32,7 @@ function AuthScreen() {
   };
 
   return (
-    <div className="screen-center">
+    <div className="screen-center auth-screen">
       <div className="panel animate-in" style={{ width: 380, textAlign: 'center' }}>
         <h1 className="pixel-font" style={{ fontSize: 18, color: 'var(--accent)', marginBottom: 4, textShadow: '0 0 20px var(--accent)' }}>
           PIXEL PARTIES

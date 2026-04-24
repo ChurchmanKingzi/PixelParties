@@ -691,6 +691,29 @@ if (typeof document !== 'undefined') {
   });
 }
 
+// ── ESCAPE DEDUPE ──
+// When an Escape handler updates React state, useEffect cleanup+re-setup
+// races OS-level key-repeat: a second keydown lands on the re-registered
+// handler with the new state and cascades (e.g. the first Escape closes a
+// submenu, the second sees no submenu and opens Surrender). Registered
+// in CAPTURE phase on window so it runs BEFORE every feature handler;
+// calling stopImmediatePropagation() suppresses the ghost Escape entirely.
+// 150ms is comfortably longer than any OS repeat cadence and shorter than
+// a deliberate double-tap.
+(function installEscapeDedupe() {
+  let lastAt = 0;
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const now = Date.now();
+    if (now - lastAt < 150) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
+    lastAt = now;
+  }, { capture: true });
+})();
+
 // ── CAPTURE-PHASE TOUCH PREVENTION ──
 // This listener fires BEFORE React's event delegation and before the browser's
 // compositor decides to scroll. Without this, React's delegated onTouchStart

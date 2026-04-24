@@ -299,7 +299,18 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
       user.avatar = defaultAvatar;
     }
   }
-  res.json({ user: sanitizeUser(user), token: req.authToken });
+  // Repair the user's default-deck pin if it's missing or illegal. Safe
+  // to run on every session check (no-op when the existing default is
+  // fine). Re-fetch the user row afterwards so `sanitizeUser` sees the
+  // possibly-updated `default_sample_deck_id`.
+  let userForResponse = user;
+  try {
+    await ensureValidDefaultDeck(user.id);
+    userForResponse = await db.get('SELECT * FROM users WHERE id = ?', [user.id]) || user;
+  } catch (err) {
+    console.error('[auth/me] ensureValidDefaultDeck threw:', err.message);
+  }
+  res.json({ user: sanitizeUser(userForResponse), token: req.authToken });
 });
 
 function sanitizeUser(u) {
@@ -644,6 +655,81 @@ app.post('/api/decks/:id/set-default', authMiddleware, async (req, res) => {
   await db.run('UPDATE users SET default_sample_deck_id = NULL WHERE id = ?', [req.user.userId]);
   res.json({ ok: true });
 });
+
+/**
+ * Same deck-legality rule the profile "Deck Wall" uses: exactly 60 main
+ * cards, exactly 3 heroes, and the potion deck is either empty or sized
+ * 5–15. Duplicated inline here rather than refactored because the rule
+ * already lives inline at `/api/profile/deck-stats` — keeping them in
+ * sync is the maintenance note.
+ */
+function isCustomDeckRowLegal(row) {
+  if (!row) return false;
+  try {
+    const main = JSON.parse(row.main_deck || '[]');
+    const heroes = JSON.parse(row.heroes || '[]').filter(h => h && h.hero);
+    const potions = JSON.parse(row.potion_deck || '[]');
+    const pc = potions.length;
+    return main.length === 60 && heroes.length === 3 && (pc === 0 || (pc >= 5 && pc <= 15));
+  } catch { return false; }
+}
+
+/**
+ * If the user's currently-selected default deck is missing or not legal,
+ * pick and persist a replacement:
+ *   1. Random LEGAL user-built deck, if any exist.
+ *   2. Otherwise, a random Starter (non-structure) sample deck.
+ * Idempotent — a no-op when the existing default is already valid.
+ *
+ * Called on /api/auth/me (every session check) so the client always
+ * sees a usable default in its deck picker. Writes go through the same
+ * mutually-exclusive convention the two set-default endpoints use:
+ *   custom default   → flip `decks.is_default`, null `users.default_sample_deck_id`
+ *   sample default   → null all `decks.is_default`, set `users.default_sample_deck_id`
+ */
+async function ensureValidDefaultDeck(userId) {
+  const decks = await db.all('SELECT * FROM decks WHERE user_id = ? ORDER BY created_at', [userId]);
+  const userRow = await db.get('SELECT default_sample_deck_id FROM users WHERE id = ?', [userId]);
+
+  // 1. Current custom default still legal? No-op.
+  const customDefault = decks.find(d => d.is_default);
+  if (customDefault && isCustomDeckRowLegal(customDefault)) return;
+
+  // 2. Pinned sample-deck default still valid?
+  //    • Starter (non-structure): always legal — content shipped by us.
+  //    • Structure: requires the user to still own it in the shop table.
+  if (userRow?.default_sample_deck_id) {
+    const samples = loadSampleDecks();
+    const sample = samples.find(s => s.id === userRow.default_sample_deck_id);
+    if (sample) {
+      if (!sample.isStructure) return;
+      const owned = await db.get(
+        "SELECT id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck' AND item_id = ?",
+        [userId, sample.structureId]
+      );
+      if (owned) return;
+    }
+  }
+
+  // 3. Random legal user-built deck, if any.
+  const legalCustoms = decks.filter(isCustomDeckRowLegal);
+  if (legalCustoms.length > 0) {
+    const pick = legalCustoms[Math.floor(Math.random() * legalCustoms.length)];
+    await db.run('UPDATE decks SET is_default = 0 WHERE user_id = ?', [userId]);
+    await db.run('UPDATE decks SET is_default = 1 WHERE id = ? AND user_id = ?', [pick.id, userId]);
+    await db.run('UPDATE users SET default_sample_deck_id = NULL WHERE id = ?', [userId]);
+    return;
+  }
+
+  // 4. Fall back to a random Starter deck. Structure decks are excluded —
+  //    they're paywall content; the user may not own them.
+  const starters = loadSampleDecks().filter(s => !s.isStructure);
+  if (starters.length > 0) {
+    const pick = starters[Math.floor(Math.random() * starters.length)];
+    await db.run('UPDATE decks SET is_default = 0 WHERE user_id = ?', [userId]);
+    await db.run('UPDATE users SET default_sample_deck_id = ? WHERE id = ?', [pick.id, userId]);
+  }
+}
 
 app.post('/api/decks/:id/saveas', authMiddleware, async (req, res) => {
   try {
@@ -1493,16 +1579,30 @@ function sendGameState(room, playerIdx, extra) {
         if (room.type === 'singleplayer' && DEBUG_REVEAL_NPC_HAND) {
           return ps.hand.map((name, index) => ({ index, name }));
         }
-        const counts = ps._revealedCardCounts;
-        if (!counts || Object.keys(counts).length === 0) return [];
-        if (ps._revealedCardExpiry && Date.now() >= ps._revealedCardExpiry) return [];
-        const remaining = { ...counts };
         const result = [];
-        for (let i = ps.hand.length - 1; i >= 0; i--) {
-          const name = ps.hand[i];
-          if (remaining[name] > 0) {
-            result.push({ index: i, name });
-            remaining[name]--;
+        // Per-index reveals (Luna Kiai): exact copy was revealed.
+        const indexMap = ps._revealedHandIndices || {};
+        for (const kStr of Object.keys(indexMap)) {
+          const idx = +kStr;
+          if (idx >= 0 && idx < ps.hand.length) {
+            result.push({ index: idx, name: ps.hand[idx] });
+          }
+        }
+        // Legacy count-based reveals (Madaga's temporary reveal): pick
+        // the last-N matching copies. Skip indices already exposed by
+        // the per-index map to avoid double-listing.
+        const counts = ps._revealedCardCounts;
+        if (counts && Object.keys(counts).length > 0
+            && (!ps._revealedCardExpiry || Date.now() < ps._revealedCardExpiry)) {
+          const used = new Set(result.map(r => r.index));
+          const remaining = { ...counts };
+          for (let i = ps.hand.length - 1; i >= 0; i--) {
+            if (used.has(i)) continue;
+            const name = ps.hand[i];
+            if (remaining[name] > 0) {
+              result.push({ index: i, name });
+              remaining[name]--;
+            }
           }
         }
         return result;
@@ -1699,6 +1799,28 @@ function sendGameState(room, playerIdx, extra) {
     freeActivatableAbilities: room.engine ? room.engine.getFreeActivatableAbilities(playerIdx) : [],
     activeHeroEffects: room.engine ? room.engine.getActiveHeroEffects(playerIdx) : [],
     activatableCreatures: room.engine ? room.engine.getActivatableCreatures(playerIdx) : [],
+    // Hand slots with a clickable "activate in hand without playing"
+    // effect (Luna Kiai's "reveal to Burn a Hero" — any future card
+    // with the same shape). Each entry is `{ cardName, handIndex,
+    // label }`, one per eligible hand slot. The client gates activation
+    // per-index so a specific copy can be clicked and revealed.
+    handActivatableCards: room.engine ? room.engine.getHandActivatableCards(playerIdx) : [],
+    // Own-hand revealed indices — the specific hand slots the owner
+    // has spent on `handActivatedEffect` this turn. The client marks
+    // them semi-transparent and blocks clicks on them. Cleared on
+    // turn start along with other reveal state.
+    revealedOwnHandIndices: (() => {
+      const myPs = gs.players[playerIdx];
+      const map = myPs?._revealedHandIndices;
+      if (!map) return [];
+      const out = [];
+      const handLen = myPs.hand?.length || 0;
+      for (const kStr of Object.keys(map)) {
+        const k = +kStr;
+        if (k >= 0 && k < handLen) out.push(k);
+      }
+      return out;
+    })(),
     // True only while Deepsea Spores' per-turn override is live — the
     // client tints every board Creature dark-red and prefixes "Deepsea"
     // onto the tooltip name. Cleared automatically on the next turn
@@ -2735,6 +2857,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         if (!ps.heroesAttackedThisTurn) ps.heroesAttackedThisTurn = [];
         if (!ps.heroesAttackedThisTurn.includes(heroIdx)) ps.heroesAttackedThisTurn.push(heroIdx);
         if (hero.ghuanjunAttacksUsed && !hero.ghuanjunAttacksUsed.includes(cardName)) hero.ghuanjunAttacksUsed.push(cardName);
+        // Drop any arrows armed for this negated attack — otherwise a
+        // follow-up attack this turn would inherit them.
+        const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
+        clearArmedArrows(room.engine, pi);
       }
       if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
       if (!isInherentAction && !additionalConsumed && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
@@ -2815,6 +2941,16 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         damageTargets: uniqueTargets, isSecondCast: !!gs._bartasSecondCast,
         _skipReactionCheck: true,
       });
+    }
+
+    // Clean up any armed-arrow modifiers that chained onto THIS attack —
+    // see `cards/effects/_arrows-shared.js`. Happens regardless of
+    // negate, so a negated attack still drops the arrows (otherwise a
+    // later same-turn attack would inherit them). Idempotent / no-op
+    // when nothing is armed.
+    if (cardData.cardType === 'Attack') {
+      const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
+      clearArmedArrows(room.engine, pi);
     }
 
     await room.engine.resolveDeferredRecoil();
@@ -4527,19 +4663,55 @@ io.on('connection', (socket) => {
   });
 
   // Reorder hand (cosmetic, persists across reconnect)
-  socket.on('reorder_hand', ({ roomId, hand }) => {
+  socket.on('reorder_hand', ({ roomId, hand, indexMap }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    // Validate: same cards, just reordered
-    const current = room.gameState.players[pi].hand;
+    // Validate: same cards, just reordered.
+    const ps = room.gameState.players[pi];
+    const current = ps.hand;
     if (hand.length !== current.length) return;
     const sorted1 = [...hand].sort();
     const sorted2 = [...current].sort();
     if (sorted1.some((c, i) => c !== sorted2[i])) return;
-    room.gameState.players[pi].hand = hand;
+    // Validate the optional permutation. `indexMap[newIdx] = oldIdx`.
+    // Must be a permutation of [0..n) and each hand entry must match
+    // the source-old position (newHand[newIdx] === oldHand[oldIdx]).
+    let validMap = null;
+    if (Array.isArray(indexMap) && indexMap.length === hand.length) {
+      const seen = new Set();
+      let ok = true;
+      for (let newIdx = 0; newIdx < hand.length; newIdx++) {
+        const oldIdx = indexMap[newIdx];
+        if (typeof oldIdx !== 'number' || oldIdx < 0 || oldIdx >= current.length || seen.has(oldIdx)) { ok = false; break; }
+        if (current[oldIdx] !== hand[newIdx]) { ok = false; break; }
+        seen.add(oldIdx);
+      }
+      if (ok) validMap = indexMap;
+    }
+    // Per-copy reveal state (Luna Kiai) is keyed by hand index. With a
+    // valid indexMap we can remap old→new positions so reveals follow
+    // their physical copy. Without one, we fall back to clearing.
+    const oldReveals = ps._revealedHandIndices;
+    const newReveals = {};
+    if (oldReveals && validMap) {
+      for (let newIdx = 0; newIdx < hand.length; newIdx++) {
+        if (oldReveals[validMap[newIdx]]) newReveals[newIdx] = true;
+      }
+    }
+    ps._revealedHandIndices = newReveals;
+    ps.hand = hand;
+    // Array reassignment wiped the splice interceptor — re-install.
+    if (room.engine) room.engine._installHandRevealInterceptor(pi);
+    // Push a fresh snapshot so the reordering player's client picks up
+    // the remapped `handActivatableCards` / `revealedOwnHandIndices`.
+    // Without this, per-index UI state (Luna Kiai's clickable halo +
+    // revealed semi-transparency) stays pinned to the OLD positions
+    // until the next unrelated event drives a snapshot.
+    for (let i = 0; i < 2; i++) sendGameState(room, i);
+    sendSpectatorGameState(room);
   });
 
   // Advance phase (player clicks a phase button)
@@ -4737,6 +4909,29 @@ io.on('connection', (socket) => {
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
     doActivatePermanent(room, pi, params).catch(err => console.error('[activate_permanent]', err.message));
+  });
+
+  // Activate a hand card's "handActivatedEffect" without playing it.
+  // Luna Kiai's "reveal to Burn" — and any future card with the same shape.
+  socket.on('activate_hand_card', (params) => {
+    if (!currentUser) return;
+    const room = rooms.get(params?.roomId);
+    if (!room?.gameState || !room.engine) return;
+    const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+    const cardName = params?.cardName;
+    const handIndex = params?.handIndex;
+    if (typeof cardName !== 'string') return;
+    if (typeof handIndex !== 'number' || handIndex < 0) return;
+    (async () => {
+      try {
+        await room.engine.doHandActivate(pi, cardName, handIndex);
+      } catch (err) {
+        console.error('[activate_hand_card]', err.message);
+      }
+      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      sendSpectatorGameState(room);
+    })();
   });
 
   // Play a creature from hand to support zone

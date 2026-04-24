@@ -13,6 +13,24 @@ const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
 // before they exhaust heap. Normal matches stay well under both.
 const MAX_PENDING_TRIGGERS = 200;
 const MAX_CARD_INSTANCES = 2000;
+
+// Cardinal Beast name allowlist — the engine's absolute-immunity shield
+// is supposed to be stamped on each Cardinal Beast's instance via its
+// onPlay hook (`_setCardinalImmune` in `_cardinal-shared.js`). The
+// name-based fallback below catches edge cases where the flag is
+// missed — summon paths that skip onPlay, tutor summons that re-clone
+// the instance, ascension swaps, etc. — so the card-text guarantee
+// ("immune to everything") holds no matter how the Beast got onto the
+// board.
+const CARDINAL_BEAST_NAMES = new Set([
+  'Cardinal Beast Baihu',
+  'Cardinal Beast Qinglong',
+  'Cardinal Beast Xuanwu',
+  'Cardinal Beast Zhuque',
+]);
+function isCardinalBeastByName(name) {
+  return !!name && CARDINAL_BEAST_NAMES.has(name);
+}
 // Recursion depth cap for actionHealHero / actionDealDamage. Hook
 // handlers can call these engine methods DIRECTLY (not via
 // pendingTriggers), which bypasses MAX_PENDING_TRIGGERS. Known example:
@@ -809,9 +827,59 @@ class GameEngine {
       for (const cardName of (ps.hand || [])) {
         this._trackCard(cardName, pi, ZONES.HAND);
       }
+
+      // Install the hand-reveal interceptor so per-index reveal state
+      // (Luna Kiai's "this specific copy is revealed") auto-shifts when
+      // cards get spliced out of hand. Safe to re-call; it's idempotent.
+      this._installHandRevealInterceptor(pi);
     }
 
     return this;
+  }
+
+  /**
+   * Monkey-patch `ps.hand.splice` so that `ps._revealedHandIndices`
+   * stays consistent across hand mutations. Covers every caller that
+   * already does `ps.hand.splice(i, 1)` — no refactor needed.
+   *
+   * Rules applied to each revealed index k when splicing (start, delCount,
+   * ...items):
+   *   • k < start                       → unchanged
+   *   • k in [start, start+delCount)    → dropped (the card was removed)
+   *   • k >= start + delCount           → shifted by (items.length − delCount)
+   *
+   * `push` doesn't affect existing indices, so no patch is needed.
+   * Hand reassignment (`ps.hand = newArray` via reorder_hand) wipes the
+   * override; callers must re-invoke this method after assignment.
+   */
+  _installHandRevealInterceptor(pi) {
+    const ps = this.gs.players?.[pi];
+    if (!ps?.hand) return;
+    if (ps.hand._hasRevealInterceptor) return;
+    const origSplice = Array.prototype.splice;
+    Object.defineProperty(ps.hand, 'splice', {
+      configurable: true, writable: true, enumerable: false,
+      value: function(start, delCount, ...items) {
+        const result = origSplice.call(this, start, delCount, ...items);
+        const oldMap = ps._revealedHandIndices;
+        if (oldMap && Object.keys(oldMap).length > 0) {
+          const effectiveDel = Math.min(delCount ?? 0, result.length);
+          const netShift = items.length - effectiveDel;
+          const next = {};
+          for (const kStr of Object.keys(oldMap)) {
+            const k = +kStr;
+            if (k < start) next[k] = oldMap[kStr];
+            else if (k >= start + effectiveDel) next[k + netShift] = oldMap[kStr];
+            // else: was in the removed range, drop it.
+          }
+          ps._revealedHandIndices = next;
+        }
+        return result;
+      },
+    });
+    Object.defineProperty(ps.hand, '_hasRevealInterceptor', {
+      configurable: true, writable: true, enumerable: false, value: true,
+    });
   }
 
   /** Create and register a CardInstance. */
@@ -1087,6 +1155,18 @@ class GameEngine {
       negate() { hookCtx.negated = true; },
       /** Set a flag on the hookCtx (survives through all hooks → read by engine after) */
       setFlag(key, value) { hookCtx[key] = value; },
+      /**
+       * Accumulate a FLAT damage bonus that bypasses buff multipliers
+       * (Cloudy ×0.5, creature damage multipliers, …). The engine reads
+       * `hookCtx._flatBonus` immediately AFTER the multiplier pass in
+       * both the hero and creature damage paths and adds it verbatim.
+       * Intended for "this bonus is unaffected by effects that double
+       * damage"-type card texts (Bow Sniper Darge).
+       */
+      addFlatBonus(delta) {
+        if (typeof delta !== 'number' || !delta) return;
+        hookCtx._flatBonus = (hookCtx._flatBonus || 0) + delta;
+      },
 
       // ── Game Actions (each fires its own hooks) ──
       async dealDamage(target, amount, type) {
@@ -2479,6 +2559,14 @@ class GameEngine {
     await this.runHooks(HOOKS.BEFORE_DAMAGE, hookCtx);
     if (hookCtx.cancelled) return { dealt: 0, cancelled: true };
 
+    // Armed-arrow attack modifiers (flat damage bumps and hard-zero from
+    // Hydra Blood). Runs AFTER beforeDamage hooks so Sacred Hammer / any
+    // future card-level beforeDamage-boost composes correctly, and
+    // BEFORE the buff-multiplier pass below so Cloudy halves the arrow-
+    // buffed total (arrows are part of the attack's base damage).
+    const { applyArrowsBeforeDamage } = require('./_arrows-shared');
+    applyArrowsBeforeDamage(this, source, target, hookCtx);
+
     // Apply buff damage modifiers (Cloudy, etc.) — skipped for un-reducible damage (Ida)
     if (!hookCtx.cannotBeNegated && target?.buffs) {
       for (const [, buffData] of Object.entries(target.buffs)) {
@@ -2487,6 +2575,11 @@ class GameEngine {
         }
       }
     }
+
+    // Flat bonus that bypasses buff multipliers (Bow Sniper Darge's
+    // per-arrow Attack bonus). Added AFTER the multiplier pass so
+    // halving / doubling effects can't touch it.
+    if (hookCtx._flatBonus) hookCtx.amount += hookCtx._flatBonus;
 
     // Shielded heroes (first-turn protection) are immune to ALL damage
     if (this.gs.firstTurnProtectedPlayer != null && target && target.hp !== undefined) {
@@ -2587,6 +2680,7 @@ class GameEngine {
     }
 
     const actualAmount = Math.max(0, hookCtx.amount);
+    const hpBefore = (target && target.hp !== undefined) ? target.hp : actualAmount;
     if (target && target.hp !== undefined) {
       target.hp = Math.max(0, target.hp - actualAmount);
       // Generic damage-tracking flag: records the turn number when the
@@ -2595,9 +2689,22 @@ class GameEngine {
       // Not card-specific — any future "damaged this turn" lookup uses this.
       if (actualAmount > 0) target._damagedOnTurn = this.gs.turn;
     }
+    // "Real" dealt: HP-drop, capped at the target's pre-hit HP so
+    // overkill doesn't count. Consumers (Golden Arrow's gold ratio, any
+    // future "per N damage dealt" effect) get the true HP loss, not the
+    // attempted damage.
+    const realDealt = Math.min(actualAmount, hpBefore);
 
     this.log('damage', { source: source?.name, target: this._heroLabel(target), amount: actualAmount, damageType: type });
     await this.runHooks(HOOKS.AFTER_DAMAGE, { source, target, amount: actualAmount, type, sourceHeroIdx: source?.heroIdx ?? -1 });
+
+    // Armed-arrow post-hit riders (Burn, Poison, gold-per-damage, …).
+    // Runs once per target hit; armed arrows are NOT popped here so they
+    // keep firing on every remaining target of a multi-target Attack.
+    // Cleanup happens in server.js after the triggering Attack's
+    // afterSpellResolved hook (and on the negate branch).
+    const { applyArrowsAfterDamage } = require('./_arrows-shared');
+    await applyArrowsAfterDamage(this, source, target, realDealt, hookCtx.amount, type);
 
     // ── After-damage hand reaction check (Fireshield, etc.) ──
     // Only fires if target survived and damage was actually dealt
@@ -5895,6 +6002,7 @@ class GameEngine {
         ps.summonLocked = false;
         ps.handLocked = false;
         ps.damageLocked = false;
+        ps.goldLocked = false;
         ps.dealtDamageToOpponent = false;
         ps.potionLocked = false;
         ps.supportSpellLocked = false;
@@ -5908,6 +6016,7 @@ class GameEngine {
         ps._creaturesSummonedThisTurn = 0;
         delete ps._creationLockedNames;
         delete ps._revealedCardCounts;
+        delete ps._revealedHandIndices;
         // Clear discard-to-delete redirect (Madaga's Forsaken, etc.)
         if (ps._discardToDeleteActive) this.disableDiscardToDelete(this.gs.players.indexOf(ps));
         ps.bonusActions = null;
@@ -6353,6 +6462,13 @@ class GameEngine {
   async actionGainGold(playerIdx, amount) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
+    // Gold-lock (Golden Arrow): cannot gain any gold for the rest of the
+    // turn. Absolute — bypasses hooks entirely so no listener sees the
+    // gain either.
+    if (ps.goldLocked) {
+      this.log('gold_gain_blocked', { player: ps.username, amount, reason: 'goldLocked' });
+      return;
+    }
     const hookCtx = { playerIdx, amount, cancelled: false };
     await this.runHooks(HOOKS.ON_RESOURCE_GAIN, hookCtx);
     if (hookCtx.cancelled) return;
@@ -6369,6 +6485,12 @@ class GameEngine {
   async actionSpendGold(playerIdx, amount) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return false;
+    // Gold-lock (Golden Arrow): cannot spend gold either — the card text
+    // says "You cannot gain or spend Gold for the rest of the turn."
+    if (ps.goldLocked) {
+      this.log('gold_spend_blocked', { player: ps.username, amount, reason: 'goldLocked' });
+      return false;
+    }
     if ((ps.gold || 0) < amount) return false;
     const hookCtx = { playerIdx, amount, cancelled: false };
     await this.runHooks(HOOKS.ON_RESOURCE_SPEND, hookCtx);
@@ -9127,9 +9249,19 @@ class GameEngine {
       // hand cards during the opening turn (no interaction allowed).
       if (this.gs.firstTurnProtectedPlayer === pi) continue;
 
+      // Collect every eligible reaction, DEDUPED BY CARD NAME — so a
+      // player holding two Angelfeather Arrows + one Flame Arrow sees
+      // two choices, not three prompts. We keep the first matching
+      // hand slot for each name; consumption re-verifies by indexOf so
+      // a shifted hand still resolves cleanly.
+      const chainCtx = { chain, eventDesc };
+      const eligibleByName = new Map();
+      const countByName = new Map();
       for (let hi = 0; hi < ps.hand.length; hi++) {
         const cardName = ps.hand[hi];
-        // Skip cards currently being played/resolved (prevents self-chaining)
+        // Skip the card currently being played/resolved (prevents self-
+        // chaining, e.g. a Reaction Spell trying to chain onto itself
+        // while it's still in hand mid-play).
         if (ps._resolvingCard) {
           const nth = ps.hand.slice(0, hi + 1).filter(c => c === ps._resolvingCard.name).length;
           if (cardName === ps._resolvingCard.name && nth === ps._resolvingCard.nth) continue;
@@ -9139,85 +9271,124 @@ class GameEngine {
 
         const cardData = allCards[cardName];
         const baseCost = cardData?.cost || 0;
-        // Support dynamic cost (Tool Freezer, etc.) — overrides card data cost
-        const chainCtx = { chain, eventDesc };
+        // Support dynamic cost (Tool Freezer, etc.) — overrides card data cost.
         const cost = script.dynamicCost
           ? script.dynamicCost(this.gs, pi, this, chainCtx)
           : baseCost;
         if ((ps.gold || 0) < cost) continue;
 
-        // Check reaction condition with chain context
         if (script.reactionCondition && !script.reactionCondition(this.gs, pi, this, chainCtx)) continue;
 
-        // Prompt the player
+        // Track per name — handIdx from the FIRST eligible copy, but
+        // tally the count for the ×N badge in the gallery.
+        if (!eligibleByName.has(cardName)) {
+          eligibleByName.set(cardName, { handIdx: hi, cost, script, cardData, cardName });
+        }
+        countByName.set(cardName, (countByName.get(cardName) || 0) + 1);
+      }
+
+      if (eligibleByName.size === 0) continue;
+
+      // ── Prompt the player ─────────────────────────────────────────
+      // One unique option → classic Yes/No confirm (keeps the prompt
+      // lightweight for the common case). Two or more → dedup gallery
+      // with an explicit "No Reaction" cancel button.
+      let chosenName = null;
+      if (eligibleByName.size === 1) {
+        const [onlyName] = [...eligibleByName.keys()];
         const confirmed = await this.promptGeneric(pi, {
           type: 'confirm',
-          title: cardName,
-          message: `${eventDesc}. Activate ${cardName}?`,
+          title: onlyName,
+          message: `${eventDesc}. Activate ${onlyName}?`,
           showCard: chain[0]?.cardName || null,
           confirmLabel: 'Activate!',
           cancelLabel: 'No',
           cancellable: true,
         });
-
         if (!confirmed) continue;
+        chosenName = onlyName;
+      } else {
+        const cards = [...eligibleByName.keys()]
+          .sort((a, b) => a.localeCompare(b))
+          .map(name => ({
+            name,
+            source: 'hand',
+            count: countByName.get(name) || 1,
+          }));
+        const picked = await this.promptGeneric(pi, {
+          type: 'cardGallery',
+          cards,
+          title: 'Chain a Reaction?',
+          description: `${eventDesc}. Click a card to chain it, or decline.`,
+          cancelLabel: 'No Reaction',
+          cancellable: true,
+        });
+        if (!picked || picked.cancelled || !picked.cardName) continue;
+        if (!eligibleByName.has(picked.cardName)) continue; // defensive
+        chosenName = picked.cardName;
+      }
 
-        // Activate the reaction
-        if (cost > 0) ps.gold -= cost;
-        ps.hand.splice(hi, 1);
+      // ── Activate the chosen reaction ──────────────────────────────
+      const info = eligibleByName.get(chosenName);
+      if (!info) continue;
+      const { cost, script, cardData } = info;
+      // Re-lookup hand index (defensive — hand may have shifted between
+      // eligibility scan and consumption if a hook ran in between).
+      const actualHandIdx = ps.hand.indexOf(chosenName);
+      if (actualHandIdx < 0) continue;
 
-        this.log('reaction_activated', { card: cardName, player: ps.username, chainPosition: chain.length });
+      if (cost > 0) ps.gold -= cost;
+      ps.hand.splice(actualHandIdx, 1);
 
-        // Reveal the reaction card to the opponent and spectators
-        this._broadcastEvent('card_reveal', { cardName });
+      this.log('reaction_activated', { card: chosenName, player: ps.username, chainPosition: chain.length });
+      this._broadcastEvent('card_reveal', { cardName: chosenName });
 
-        // Record the casting hero for Spell/Attack reactions — needed so
-        // `afterSpellResolved` at chain-resolve time can identify who cast
-        // the spell, letting hero-bound passives like Zsos'Ssar's
-        // "Poison cost on Decay Spell cast" trigger on chain reactions too.
-        // Artifacts don't have a casting hero.
-        let reactionCasterHeroIdx = -1;
-        if (cardData?.cardType === 'Spell' || cardData?.cardType === 'Attack') {
-          for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
-            if (this._canHeroActivateSurprise(pi, heroI, cardName)) {
-              reactionCasterHeroIdx = heroI;
-              break;
-            }
+      // Record the casting hero for Spell/Attack reactions — needed so
+      // `afterSpellResolved` at chain-resolve time can identify who cast
+      // the spell, letting hero-bound passives like Zsos'Ssar's
+      // "Poison cost on Decay Spell cast" trigger on chain reactions too.
+      // Artifacts don't have a casting hero.
+      let reactionCasterHeroIdx = -1;
+      if (cardData?.cardType === 'Spell' || cardData?.cardType === 'Attack') {
+        for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
+          if (this._canHeroActivateSurprise(pi, heroI, chosenName)) {
+            reactionCasterHeroIdx = heroI;
+            break;
           }
         }
-
-        const link = {
-          id: uuidv4().substring(0, 12),
-          cardName, owner: pi,
-          cardType: cardData?.cardType || 'Unknown',
-          casterHeroIdx: reactionCasterHeroIdx,
-          goldCost: cost,
-          isInitialCard: false,
-          negated: false, chainClosed: false,
-          resolve: script.resolve
-            ? async (ch, idx) => await script.resolve(this, pi, null, null, ch, idx)
-            : null,
-          script,
-        };
-
-        chain.push(link);
-        if (chain.length >= 2) this._broadcastChainUpdate(chain);
-
-        // Fire onReactionActivated hook (for board passives)
-        await this.runHooks('onReactionActivated', {
-          reactionCardName: cardName, reactionOwner: pi, chain,
-          _skipReactionCheck: true, _isReaction: true,
-        });
-
-        // Script-specific post-add logic (Camera's 3G close prompt)
-        if (script.onChainAdd) {
-          await script.onChainAdd(this, pi, chain, link);
-          if (chain.length >= 2) this._broadcastChainUpdate(chain);
-        }
-
-        this.sync();
-        return true; // Restart check loop
       }
+
+      const link = {
+        id: uuidv4().substring(0, 12),
+        cardName: chosenName, owner: pi,
+        cardType: cardData?.cardType || 'Unknown',
+        casterHeroIdx: reactionCasterHeroIdx,
+        goldCost: cost,
+        isInitialCard: false,
+        negated: false, chainClosed: false,
+        resolve: script.resolve
+          ? async (ch, idx) => await script.resolve(this, pi, null, null, ch, idx)
+          : null,
+        script,
+      };
+
+      chain.push(link);
+      if (chain.length >= 2) this._broadcastChainUpdate(chain);
+
+      // Fire onReactionActivated hook (for board passives)
+      await this.runHooks('onReactionActivated', {
+        reactionCardName: chosenName, reactionOwner: pi, chain,
+        _skipReactionCheck: true, _isReaction: true,
+      });
+
+      // Script-specific post-add logic (Camera's 3G close prompt)
+      if (script.onChainAdd) {
+        await script.onChainAdd(this, pi, chain, link);
+        if (chain.length >= 2) this._broadcastChainUpdate(chain);
+      }
+
+      this.sync();
+      return true; // Restart check loop — next pass reopens window for the outer builder.
     }
     return false;
   }
@@ -9572,6 +9743,112 @@ class GameEngine {
 
   /**
    * Get all abilities on the board that can be activated (cost an action) for a player.
+   * Enumerate hand cards whose script exports `handActivatedEffect: true`
+   * and can fire right now. "Hand-activated" means the player can click the
+   * card IN HAND to trigger a side-effect without playing (and without
+   * discarding it). Used by Luna Kiai's "reveal to burn a Hero" — and
+   * designed to be reusable by future cards that need a clickable
+   * in-hand trigger.
+   *
+   * Gates:
+   *   • Active player only, during a Main Phase (2 or 4).
+   *   • No potion-targeting / effect-prompt in flight.
+   *   • Card's `canHandActivate(gs, pi, engine)` must return truthy.
+   *   • Per-copy: hand indices already stamped in
+   *     `_revealedHandIndices` are NOT returned — each physical copy
+   *     is revealed at most once, and the specific clicked copy is the
+   *     one that burns.
+   *
+   * Returns per-INDEX `[{ cardName, handIndex, label }]` — one entry
+   * per eligible hand slot. Callers that only care about card-name-
+   * granularity can dedupe themselves; the client per-index dim/
+   * highlight logic needs the indices.
+   */
+  getHandActivatableCards(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+    if (this.gs.activePlayer !== playerIdx) return [];
+    const phase = this.gs.currentPhase;
+    if (phase !== 2 && phase !== 4) return [];
+    if (this.gs.potionTargeting) return [];
+    if (this.gs.effectPrompt) return [];
+    const result = [];
+    const revealed = ps._revealedHandIndices || {};
+    // Cache per-name script lookups + canHandActivate results — many
+    // copies of the same name share the same answer.
+    const scriptCache = new Map();
+    const canCache = new Map();
+    for (let handIndex = 0; handIndex < (ps.hand || []).length; handIndex++) {
+      if (revealed[handIndex]) continue;
+      const cardName = ps.hand[handIndex];
+      let script;
+      if (scriptCache.has(cardName)) script = scriptCache.get(cardName);
+      else { script = loadCardEffect(cardName); scriptCache.set(cardName, script); }
+      if (!script?.handActivatedEffect) continue;
+      if (typeof script.canHandActivate === 'function') {
+        let ok;
+        if (canCache.has(cardName)) ok = canCache.get(cardName);
+        else {
+          try { ok = !!script.canHandActivate(this.gs, playerIdx, this); }
+          catch { ok = false; }
+          canCache.set(cardName, ok);
+        }
+        if (!ok) continue;
+      }
+      result.push({ cardName, handIndex, label: script.handActivateLabel || cardName });
+    }
+    return result;
+  }
+
+  /**
+   * Run a hand-activated effect on the specific hand-slot the player
+   * clicked. The card STAYS in hand; activation stamps the index in
+   * `_revealedHandIndices` so it isn't clickable again and so the
+   * client can mark THIS specific copy semi-transparent.
+   *
+   * `onHandActivate(ctx)` receives the standard context plus a
+   * `handIndex` field so scripts can know which exact copy was spent.
+   * The script is responsible for writing `ps._revealedHandIndices[
+   * handIndex] = true` when the effect actually fires — deferring the
+   * stamp lets cancellable prompts preserve the activation slot on a
+   * cancel.
+   */
+  async doHandActivate(playerIdx, cardName, handIndex) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return false;
+    if (this.gs.activePlayer !== playerIdx) return false;
+    const phase = this.gs.currentPhase;
+    if (phase !== 2 && phase !== 4) return false;
+    if (this.gs.potionTargeting) return false;
+    if (this.gs.effectPrompt) return false;
+    if (typeof handIndex !== 'number' || handIndex < 0) return false;
+    if (handIndex >= (ps.hand || []).length) return false;
+    if (ps.hand[handIndex] !== cardName) return false;
+    // This specific copy already revealed — ignore.
+    if (ps._revealedHandIndices?.[handIndex]) return false;
+    const script = loadCardEffect(cardName);
+    if (!script?.handActivatedEffect || typeof script.onHandActivate !== 'function') return false;
+    if (typeof script.canHandActivate === 'function') {
+      try { if (!script.canHandActivate(this.gs, playerIdx, this)) return false; }
+      catch { return false; }
+    }
+    try {
+      const fakeInst = {
+        name: cardName, owner: playerIdx, originalOwner: playerIdx,
+        controller: playerIdx, zone: 'hand', heroIdx: -1, zoneSlot: -1,
+        counters: {}, statuses: {}, faceDown: false, turnPlayed: this.gs.turn,
+        id: `hand-activate-${playerIdx}-${cardName}-${Date.now()}`,
+      };
+      const ctx = this._createContext(fakeInst, { event: 'handActivate', handIndex });
+      const result = await script.onHandActivate(ctx);
+      return result !== false;
+    } catch (err) {
+      console.error(`[Engine] doHandActivate(${cardName}) threw:`, err.message);
+      return false;
+    }
+  }
+
+  /**
    * Checks: script has actionCost, hero alive/not frozen/stunned, HOPT not used.
    * Returns array of { heroIdx, zoneIdx, abilityName, level }
    */
@@ -11153,13 +11430,20 @@ class GameEngine {
 
     // Mark Cardinal Beast immune, Baihu-petrified, and Guardian-shielded creatures
     // — they stay in batch for animations but damage will be cancelled before HP reduction
-    // Guardian immunity is pierced by true damage (canBeNegated: false)
+    // Guardian immunity is pierced by true damage (canBeNegated: false).
+    // The NAME check below is a belt-and-suspenders fallback: every Cardinal
+    // Beast is supposed to stamp `_cardinalImmune` on its own instance via
+    // its onPlay hook, but if a summon path fires onPlay with a stale or
+    // swapped instance (tutor summons, ascension swaps, …), the flag can
+    // be missed. Names beat state for this card family.
     for (const e of entries) {
-      if (e.inst?.counters?._cardinalImmune || e.inst?.counters?._baihuPetrify) {
+      const inst = e.inst;
+      if (inst?.counters?._cardinalImmune || inst?.counters?._baihuPetrify
+          || isCardinalBeastByName(inst?.name)) {
         e._immuneCreature = true;
-      } else if (e.inst?.counters?._guardianImmune && e.canBeNegated !== false) {
+      } else if (inst?.counters?._guardianImmune && e.canBeNegated !== false) {
         e._immuneCreature = true;
-      } else if (e.inst?.counters?._stealImmortal) {
+      } else if (inst?.counters?._stealImmortal) {
         // Temporarily stolen (Deepsea Succubus): cannot take damage while stolen.
         e._immuneCreature = true;
       }
@@ -11189,6 +11473,22 @@ class GameEngine {
       entries,
       _skipReactionCheck: true,
     });
+
+    // Armed-arrow attack modifiers (flat damage + Hydra Blood zero).
+    // Same policy as the hero-damage path: applies AFTER the batch hook so
+    // Diamond / Sacred Hammer etc. compose correctly, BEFORE the buff
+    // multiplier + damageLocked pass below so Cloudy halves the arrow-
+    // buffed total. Only entries whose damage is an actual Attack are
+    // affected (helper gates on `type === 'attack'` internally).
+    {
+      const { applyArrowsBeforeDamage } = require('./_arrows-shared');
+      for (const e of entries) {
+        if (e.cancelled || e._immuneCreature) continue;
+        const proxy = { amount: e.amount, type: e.type, cancelled: false };
+        applyArrowsBeforeDamage(this, e.source, e.inst, proxy);
+        e.amount = proxy.amount;
+      }
+    }
 
     // Defending the Gate: check if any entries would hit an opponent's support zones
     const gateCheckedPlayers = new Set();
@@ -11222,6 +11522,11 @@ class GameEngine {
           }
         }
       }
+      // Flat bonus that bypasses multipliers (parity with the hero
+      // damage path). Darge's beforeCreatureDamageBatch hook stamps
+      // `e._flatBonus = 50 * arrowCount` on matching entries; we add
+      // it AFTER the multiplier so halving / doubling can't touch it.
+      if (e._flatBonus) e.amount += e._flatBonus;
       if (e.sourceOwner >= 0 && this.gs.players[e.sourceOwner]?.damageLocked) {
         if (e.inst.owner !== e.sourceOwner) {
           e.amount = 0;
@@ -11232,8 +11537,25 @@ class GameEngine {
     // Apply damage to non-cancelled entries
     for (const e of entries) {
       if (e.cancelled) continue;
-      // Cardinal/Baihu immune: animation played but damage is blocked
-      if (e._immuneCreature) continue;
+
+      // Play the entry's animation FIRST, regardless of immunity, so an
+      // immune target still shows the "attack hits and bounces off" visual.
+      // Only the HP drop is gated; the animation is visual feedback.
+      if (e.animType) {
+        this._broadcastEvent('play_zone_animation', { type: e.animType, owner: e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot });
+        await this._delay(300);
+      }
+
+      // Cardinal/Baihu/Guardian/Steal immune: damage is blocked AFTER
+      // the animation already showed. Log explicitly so the fizzle is
+      // visible in the action log alongside the would-be damage source.
+      if (e._immuneCreature) {
+        this.log('creature_immune_block', {
+          card: e.inst?.name, by: e.source?.name || '?',
+          amount: e.amount, damageType: e.type,
+        });
+        continue;
+      }
       let actualAmount = Math.max(0, e.amount);
       if (actualAmount === 0) continue;
 
@@ -11241,12 +11563,6 @@ class GameEngine {
       if (e.sourceOwner >= 0 && e.inst.owner !== e.sourceOwner) {
         const srcPs = this.gs.players[e.sourceOwner];
         if (srcPs) srcPs.dealtDamageToOpponent = true;
-      }
-
-      // Play animation if specified
-      if (e.animType) {
-        this._broadcastEvent('play_zone_animation', { type: e.animType, owner: e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot });
-        await this._delay(300);
       }
 
       // Immortal buff: damage cannot drop HP below 1
@@ -11267,10 +11583,22 @@ class GameEngine {
         }
       }
 
+      const creatureHpBefore = e.inst.counters.currentHp;
       e.inst.counters.currentHp -= actualAmount;
       // Generic damage-tracking flag — mirrors the hero path above.
       e.inst.counters._damagedOnTurn = this.gs.turn;
       this.log('creature_damage', { source: e.source?.name || e.source, target: e.inst.name, amount: actualAmount, damageType: e.type, owner: e.inst.owner });
+
+      // Armed-arrow post-hit riders (Burn, Poison, gold-per-damage, …)
+      // for creature targets. Mirror of the hero-damage path. Fires even
+      // if the hit was lethal — the status counter on a dying creature
+      // is harmless (it gets untracked in the death branch below). `dealt`
+      // is capped at pre-hit HP so gold-per-damage doesn't reward overkill.
+      {
+        const { applyArrowsAfterDamage } = require('./_arrows-shared');
+        const realDealt = Math.min(actualAmount, Math.max(0, creatureHpBefore));
+        await applyArrowsAfterDamage(this, e.source, e.inst, realDealt, e.amount, e.type);
+      }
 
       // ── SC tracking: creature overkill ──
       if (this.gs._scTracking && e.sourceOwner >= 0 && e.sourceOwner < 2) {
@@ -11339,7 +11667,11 @@ class GameEngine {
 
   /**
    * Deal damage to a single creature (convenience wrapper around batch).
-   * Used by card effects like Alice.
+   * Used by card effects like Alice. The batch honours absolute-immunity
+   * shields (`_cardinalImmune`, `_baihuPetrify`, `_guardianImmune`,
+   * `_stealImmortal`) internally — it plays the caller-specified
+   * animation on immune targets and skips only the HP drop, so the
+   * player gets visual feedback that the attack hit but shrugged off.
    */
   async actionDealCreatureDamage(source, inst, amount, type, opts = {}) {
     await this.processCreatureDamageBatch([{

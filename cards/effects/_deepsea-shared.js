@@ -206,10 +206,34 @@ async function returnSupportCreatureToHand(engine, inst, sourceName) {
   const slotIdx = inst.zoneSlot;
   const cardName = inst.name;
 
-  // Bounce animation — ripple-to-hand.
+  // Bounce animation plays FIRST, even on Cardinal-immune targets —
+  // visual feedback that the bounce attempted to hit. The actual
+  // board-state change is gated below.
   engine._broadcastEvent('play_zone_animation', {
     type: 'deep_sea_bubbles', owner: ownerIdx, heroIdx, zoneSlot: slotIdx,
   });
+
+  // Cardinal Beast immunity is the engine's absolute "this card cannot
+  // be affected by anything" shield — already honoured for damage,
+  // destroy, move, buff add/remove, and status application. Bouncing
+  // a creature to hand is a board-state change of the same severity,
+  // so the shield applies here too. Golden Wings also sets this flag.
+  // We play the bounce animation above first (so the player sees the
+  // attempt hit and fizzle), then bail BEFORE the actual pile-transfer
+  // animation and state mutation. Name-based fallback matches the
+  // engine's damage-path check — if a Beast's onPlay missed stamping
+  // the counter (rare but possible), the name catches it.
+  const CARDINAL_BEAST_NAMES = new Set([
+    'Cardinal Beast Baihu', 'Cardinal Beast Qinglong',
+    'Cardinal Beast Xuanwu', 'Cardinal Beast Zhuque',
+  ]);
+  if (inst.counters?._cardinalImmune || CARDINAL_BEAST_NAMES.has(inst.name)) {
+    engine.log('cardinal_immune_block', {
+      card: inst.name, by: sourceName, action: 'return_to_hand',
+    });
+    return { returned: false };
+  }
+
   // Pile-transfer animation needs the SOURCE slot coordinates (to anchor
   // the flying card on the creature's current Support Zone) and the
   // DESTINATION index (the hand slot it's about to occupy — end of hand
