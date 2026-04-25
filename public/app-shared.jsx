@@ -549,6 +549,11 @@ const ZONE_ANIM_SFX = {
   fireball:                { name: 'elem_fire' },
   flame_avalanche:         { name: 'elem_fire' },
   flamethrower_douse:      { name: 'elem_fire' },
+  firewall:                { name: 'elem_fire' },
+  cataclysm:               { name: 'elem_fire' },
+  // Hell Fox death — black-flame eruption. Fire SFX, slightly muted
+  // since the eruption is a death tag rather than an attack landing.
+  hell_fox_death:          { name: 'elem_fire', opts: { rate: 0.85 } },
   // Lightning — covered by dedicated qinglong/red_lightning_rain socket events
   // Ice
   cold_coffin_encase:      { name: 'elem_ice' },
@@ -601,6 +606,8 @@ const ZONE_ANIM_SFX = {
   snake_devour:            { name: 'slash' },
   cactus_burst:            { name: 'slash' },
   stranglehold_squeeze:    { name: 'slash' },
+  // Dog bite (Loyal Terrier and any future fang-tribe cards)
+  dog_bite:                { name: 'slash' },
   // Heavy impact
   magic_hammer:            { name: 'heavy_impact', opts: { delay: 400 } },
   tiger_impact:            { name: 'heavy_impact' },
@@ -1597,6 +1604,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
   }
   if (s.negated || c.negated) badges.push({ key: 'negated', icon: '🚫', tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.') + dur(s.negated || c.negated) });
   if (s.nulled || c.nulled) badges.push({ key: 'nulled', icon: '🔇', tooltip: (isHero ? 'Nulled: Cannot cast Spells.' : 'Nulled: Has its effects negated.') + dur(s.nulled || c.nulled) });
+  if (s.bound) badges.push({ key: 'bound', icon: '⛓️', tooltip: 'Bound: Cannot perform Actions.' + dur(s.bound) });
   if (s.immune) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
   if (s.shielded) badges.push({ key: 'shielded', icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + durStart(s.shielded) });
   if (s.untargetable) badges.push({ key: 'untargetable', icon: '🦋', tooltip: 'Untargetable: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen.' });
@@ -1652,10 +1660,19 @@ function BuffColumn({ buffs, cardName }) {
   const tooltipCard = cardName && window.CARDS_BY_NAME ? window.CARDS_BY_NAME[cardName] : null;
   const showBoardTip = () => { if (tooltipCard) window._boardTooltipSetter?.(tooltipCard); };
   const hideBoardTip = () => { if (tooltipCard) window._boardTooltipSetter?.(null); };
+  // snake_case → "Title-Case-Hyphenated" for buff keys with no
+  // BUFF_ICONS entry. Auto-generated negate-style buffs (Forbidden Zone,
+  // any future "<Source> negated" effect) inherit the same conventional
+  // label without each card needing a hand-crafted tooltip.
+  const humanizeBuffKey = (k) =>
+    String(k || '').split('_')
+      .filter(Boolean)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join('-');
   return (
     <div className="buff-column">
       {Object.entries(buffs).filter(([key]) => !BUFF_HIDDEN.has(key)).map(([key]) => {
-        const def = BUFF_ICONS[key] || { icon: '✦', tooltip: key };
+        const def = BUFF_ICONS[key] || { icon: '✦', tooltip: humanizeBuffKey(key) };
         return (
           <div key={key} className="buff-icon"
             onMouseEnter={e => { showGameTooltip(e, def.tooltip); showBoardTip(); }}

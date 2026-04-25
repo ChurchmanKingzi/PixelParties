@@ -105,8 +105,20 @@ module.exports = {
       // Step 2: invoke the copied creature's on-summon effect with
       // Monstrosity's instance as the firing card, BUT the copied name
       // as the cardName (per design A8).
+      //
+      // On-summon effects can live in two places:
+      //   (a) `hooks.onPlay`  — the usual slot.
+      //   (b) `beforeSummon`  — module-level; some cards (e.g. Dark
+      //       Deepsea God) put their tribute / conditional logic here
+      //       so Blood Moon retriggers don't double-fire it.
+      // Monstrosity fires BOTH, with `_monstrosityCopy: true` on the
+      // ctx so scripts that care (DDG skips its own placement, the
+      // shared `tryBouncePlace` no-ops) can branch. Cards whose effect
+      // is purely in `onPlay` see no change from this addition.
       const copiedScript = loadCardEffect(copiedName);
-      if (!copiedScript?.hooks?.onPlay) {
+      const hasOnPlay = !!copiedScript?.hooks?.onPlay;
+      const hasBeforeSummon = typeof copiedScript?.beforeSummon === 'function';
+      if (!hasOnPlay && !hasBeforeSummon) {
         engine.log('monstrosity_copy_noeffect', { copied: copiedName });
         return;
       }
@@ -122,15 +134,35 @@ module.exports = {
       selfInst.name = copiedName;
       selfInst.script = null;
       try {
-        const fakeHookCtx = {
-          _onlyCard: selfInst, playedCard: selfInst,
-          cardName: copiedName,
-          zone: 'support',
-          heroIdx: selfInst.heroIdx, zoneSlot: selfInst.zoneSlot,
-          _skipReactionCheck: true,
-          _monstrosityCopy: true,
-        };
-        await engine.runHooks('onPlay', fakeHookCtx);
+        // (b) beforeSummon copy — invoked directly since it isn't
+        // dispatched via runHooks. `_createContext` spreads the hookCtx
+        // we pass as the second arg, so `_monstrosityCopy` survives
+        // onto ctx.
+        if (hasBeforeSummon) {
+          const beforeCtx = engine._createContext(selfInst, {
+            event: 'beforeSummonCopy',
+            _monstrosityCopy: true,
+            _skipReactionCheck: true,
+          });
+          try {
+            await copiedScript.beforeSummon(beforeCtx);
+          } catch (err) {
+            engine.log('monstrosity_copy_beforesummon_error', { copied: copiedName, err: err.message });
+          }
+        }
+        // (a) onPlay copy via runHooks — the instance is already
+        // renamed, so the iterator loads the copied creature's script.
+        if (hasOnPlay) {
+          const fakeHookCtx = {
+            _onlyCard: selfInst, playedCard: selfInst,
+            cardName: copiedName,
+            zone: 'support',
+            heroIdx: selfInst.heroIdx, zoneSlot: selfInst.zoneSlot,
+            _skipReactionCheck: true,
+            _monstrosityCopy: true,
+          };
+          await engine.runHooks('onPlay', fakeHookCtx);
+        }
       } catch (err) {
         engine.log('monstrosity_copy_error', { copied: copiedName, err: err.message });
       } finally {

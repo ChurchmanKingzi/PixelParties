@@ -334,6 +334,12 @@ async function tryBouncePlace(ctx) {
   const ps = gs.players[pi];
   const cardName = ctx.cardName;
 
+  // Monstrosity is copying THIS card's "on-summon effect". `tryBouncePlace`
+  // is a placement mechanism, not a copyable effect — there's no second
+  // physical creature being summoned, so prompting for another bounce
+  // target is nonsensical. No-op.
+  if (ctx._monstrosityCopy) return true;
+
   // Shapeshift / Deepsea Castle swap context: the caller is already
   // handling the bounce-out and placement. Skip bounce-place entirely
   // so the player isn't prompted to pick ANOTHER Creature to bounce on

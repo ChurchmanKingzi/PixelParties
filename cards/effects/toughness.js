@@ -68,6 +68,10 @@ module.exports = {
     onCardLeaveZone: async (ctx) => {
       // Only react when an ability card leaves (not creatures dying in support zones)
       if (ctx.fromZone !== 'ability') return;
+      // Self-only: ctx.card is the LISTENING Toughness. Comparing
+      // instance ids prevents this hero from losing maxHp every time
+      // some OTHER ability left the board.
+      if (ctx.leavingCard && ctx.leavingCard.id !== ctx.card?.id) return;
       const hpGranted = ctx.card.counters.hpGranted || 0;
       if (hpGranted <= 0) return;
 

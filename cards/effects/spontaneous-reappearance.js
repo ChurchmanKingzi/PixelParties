@@ -84,10 +84,14 @@ module.exports = {
       const movedNames = [];
       for (let i = 0; i < selected.length; i++) {
         const name = selected[i];
-        const idx = ps.discardPile.indexOf(name);
-        if (idx < 0) continue;
-        ps.discardPile.splice(idx, 1);
-        ps.hand.push(name);
+        // Centralised discard → hand transfer fires
+        // ON_CARD_ADDED_FROM_DISCARD_TO_HAND so listeners (Bamboo
+        // Staff free-attack chain, Bamboo Shield cost reveal, …)
+        // can react per-card as they arrive.
+        const moved = await engine.addCardFromDiscardToHand(pi, name, pi, {
+          source: 'Spontaneous Reappearance',
+        });
+        if (!moved) continue;
         movedNames.push(name);
 
         // Sync + small pause so each card animates in separately, like a

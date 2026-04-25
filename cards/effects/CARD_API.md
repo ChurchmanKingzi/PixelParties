@@ -64,6 +64,58 @@ At least one of these must be present, or the loader will ignore the file.
 | `deferBroadcast` | `bool` | `false` | Don't broadcast the card reveal to the opponent before resolution (card handles it manually). |
 | `noDefaultFlash` | `bool` | `false` | Skip the default activation flash animation. |
 | `animationType` | `string` | `'explosion'` | Animation played on resolved potion/artifact targets. Use `'none'` to skip. |
+| `cpuMeta` | `object` | — | CPU evaluation hints — see "CPU Metadata (cpuMeta)" below. |
+
+---
+
+## CPU Metadata (`cpuMeta`)
+
+Per-card declarations the CPU's `evaluateState` reads to weigh boards
+correctly without hand-coding card names. Add to a card's `module.exports`
+as needed; omit entirely if the card has no special CPU semantics.
+
+```js
+cpuMeta: {
+  // Creatures: value to OWNER when this Creature dies. Used to
+  // discount the slot's "alive value" — own copies become attractive
+  // sacrifice targets, opp copies become unattractive Attack targets
+  // (don't fuel their plan). Magnitude is rough score-units.
+  // Example: Hell Fox = 12 (deck-search → +20 hand value, less the
+  // corpse delete and animation cost).
+  onDeathBenefit: <number>,
+
+  // Creatures: I'm a "chain source" — when an ALLY Creature dies and
+  // my `triggersOn` predicate matches, my owner gets `valuePerTrigger`
+  // worth of value. The eval credits this bonus to OTHER ally
+  // Creatures' effective on-death value, so the CPU sacrifices them
+  // to feed the chain. Chain sources themselves are NEVER discounted
+  // by chain bonuses (would-kill-its-own-engine). Example: Loyal
+  // Terrier and Loyal Shepherd.
+  chainSource: {
+    // True iff the source is currently armed (window up, HOPT
+    // unfired, etc.). Returning false skips this source for the
+    // duration of the eval call.
+    isArmed(engine, inst) → bool,
+    // True iff a death of `tributeInst` would trigger this source.
+    // Use to filter by tribe / archetype / specific names.
+    triggersOn(engine, tributeInst, sourceInst) → bool,
+    // Score-units per chain trigger. Estimate the actual benefit
+    // (50-dmg hit ≈ 50; deck-tutor ≈ 25; etc.).
+    valuePerTrigger: <number>,
+  },
+
+  // Abilities: this is a deck-defining "engine" ability. The eval
+  // adds `engineValue × stack_size` to the owner's score for every
+  // matching ability stack on their heroes. Performance copies on
+  // top of the engine inherit the base's role. Example: Divinity
+  // = 120 (≈ "as valuable as a Lv4 Creature").
+  engineValue: <number>,
+}
+```
+
+The CPU brain reads these declarations generically — **never** hard-codes
+card names. New cards opt in by exporting the relevant fields; no CPU
+brain edits required.
 
 ---
 
@@ -349,7 +401,43 @@ card scripts have to the game engine.
 | `ctx.chooseCards(zone, count, filter)` | `Promise` | Low-level card chooser |
 | `ctx.chooseOption(options)` | `Promise` | Low-level option chooser |
 | `ctx.confirm(message)` | `Promise<bool>` | Low-level confirm dialog |
-| `ctx.performImmediateAction(heroIdx, config)` | `Promise<{played, cardName?, cardType?}>` | Open pseudo-Action-Phase for a hero |
+| `ctx.performImmediateAction(heroIdx, config)` | `Promise<{played, cardName?, cardType?}>` | Hero-locked additional Action — see below |
+
+### Immediate Additional Actions (hero-locked)
+
+For "[Hero] may immediately perform an additional Action" effects
+(Coffee, Trample Sounds in the Forest, Compulsory Body Swap,
+Mana Beacon, Legendary Sword's combo, Invisibility Cloak's Counter-
+Attack, etc.), call **`ctx.performImmediateAction(heroIdx, config)`**.
+This is the canonical helper — do NOT roll your own by setting
+`_spellFreeAction`, `_bonusMainActions`, or pushing into
+`heroesActedThisTurn`.
+
+```js
+const heroName = engine.gs.players[pi].heroes[heroIdx]?.name || 'the user';
+await ctx.performImmediateAction(heroIdx, {
+  title: CARD_NAME,
+  description: `You may perform an additional Action with ${heroName}!`,
+});
+```
+
+What you get:
+- A banner popup showing the configured title + description.
+- Click / drag-drop hard-locked to that hero — Spells, Attacks, and
+  Creatures clicked in hand auto-route to the locked hero (no hero
+  picker), and only cards the hero can legally cast are highlighted /
+  clickable. Action-cost Abilities on the same hero are clickable
+  on their ability zones; effects on other heroes (e.g. another
+  hero's Adventurousness) are invisible to the prompt.
+- Auto-skip when the hero has nothing eligible to do — no empty popup.
+- Standard `onPlay` / `afterSpellResolved` lifecycle on the picked
+  card, so Wisdom, Bartas, Reiza, chain reactions, etc. all compose
+  normally.
+- The action does NOT count as the player's main turn-Action — it's
+  truly additional.
+
+`config` options: `title`, `description`, `allowedCardTypes` (subset
+of `['Attack','Spell','Creature']`), `skipAbilities` (boolean).
 
 ### Additional Action System
 

@@ -125,11 +125,19 @@ module.exports = {
     /**
      * When Howitzer leaves its zone (moved, bounced, destroyed),
      * reset the fired flag so it can fire again if re-equipped.
+     *
+     * NOTE: `ctx.card` is the LISTENING card (this Howitzer), not the
+     * card that's actually leaving — the legacy `name === 'Lifeforce
+     * Howitzer'` check used to always pass for every Howitzer
+     * listener, so any unrelated zone movement (a spell discarding,
+     * a creature dying, …) would reset every Howitzer's flag and
+     * lift the once-per-turn cap. Compare instance ids against
+     * `ctx.leavingCard` so we only reset when THIS Howitzer is
+     * actually leaving.
      */
     onCardLeaveZone: async (ctx) => {
-      if (ctx.card?.name === 'Lifeforce Howitzer') {
-        ctx.card.counters.howitzerFiredThisTurn = false;
-      }
+      if (ctx.leavingCard?.id !== ctx.card?.id) return;
+      ctx.card.counters.howitzerFiredThisTurn = false;
     },
   },
 };

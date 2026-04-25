@@ -17,6 +17,129 @@ const emptyPlayer = () => ({
   mainDeck: [], potionDeck: [], discardPile: [], deletedPile: [],
 });
 
+// ── Player-level debuff registry ──
+//
+// Each entry maps a stable key (used in saved puzzle data) to a label
+// shown in the Puzzle Creator UI and to the matching player-state
+// flag the server applies at puzzle start. Keep in sync with the
+// `applyPuzzleDebuffs` function on the server (server.js → createPuzzleGame).
+//
+// `flagKey` is the player-state property the server sets to `true`
+// when this debuff is active. `flashbanged` is special: it also
+// requires a tracked Flashbang instance in the deleted pile, handled
+// server-side. Any new debuff just needs a registry entry plus a
+// matching server-side branch.
+const PLAYER_DEBUFF_REGISTRY = [
+  { key: 'flashbanged',       label: '⚪ Flashbanged (turn ends after first action)', flagKey: '_flashbangedDebuff' },
+  { key: 'summonLocked',      label: '🚫 Summon-locked',                              flagKey: 'summonLocked'        },
+  { key: 'damageLocked',      label: '🛡️ Damage-locked',                              flagKey: 'damageLocked'        },
+  { key: 'oppHandLocked',     label: '🫲 Opp-hand-locked',                            flagKey: 'oppHandLocked'       },
+  { key: 'itemLocked',        label: '🔨 Item-locked (must delete to play artifact)', flagKey: 'itemLocked'          },
+  { key: 'potionLocked',      label: '🧪 Potion-locked',                              flagKey: 'potionLocked'        },
+  { key: 'supportSpellLocked',label: '💚 Support-spell-locked',                       flagKey: 'supportSpellLocked'  },
+  { key: 'forsaken',          label: '🏴‍☠️ Forsaken (discards delete instead)',         flagKey: '_discardToDeleteActive' },
+  { key: 'handLocked',        label: '🔒 Hand-locked (no draw/search)',               flagKey: 'handLocked'          },
+];
+
+// ── Per-side multi-select dropdown for starting debuffs ──
+//
+// Renders a small "⚠️ Debuffs (N)" toggle button. Clicking it opens
+// a panel of checkboxes pulled from PLAYER_DEBUFF_REGISTRY; toggling
+// a checkbox updates the selected list via `onChange`. The parent
+// PuzzleCreator owns `isOpen` so it can ensure only one side's menu
+// is open at a time and so an outside click closes it.
+//
+// The `me` side sits in the staging hand at the BOTTOM of the
+// viewport, so its dropdown opens UPWARD (bottom: calc(100% + 4px))
+// to avoid landing below the visible area. The `opp` side sits near
+// the top of the board, so its dropdown opens DOWNWARD.
+function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose }) {
+  const isOpp = side === 'opp';
+  const accent = isOpp ? '#ff8844' : '#88ccff';
+  const containerRef = useRef(null);
+
+  // Click-outside dismissal — close the dropdown when the user clicks
+  // anywhere that isn't this selector's tree.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [isOpen, onClose]);
+
+  const toggle = (key) => {
+    const has = selected.includes(key);
+    onChange(has ? selected.filter(k => k !== key) : [...selected, key]);
+  };
+
+  // Pop direction: opp opens downward (it sits near the top of the
+  // viewport); me opens upward (it sits in the bottom hand row, so
+  // a downward dropdown would land off-screen).
+  const dropdownPosStyle = isOpp
+    ? { top: 'calc(100% + 4px)' }
+    : { bottom: 'calc(100% + 4px)' };
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', alignSelf: 'stretch', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          padding: '6px 10px', fontSize: 11, fontWeight: 700,
+          background: isOpen ? `rgba(${isOpp ? '255,136,68' : '136,204,255'},.18)` : 'rgba(0,0,0,.25)',
+          border: `1px solid ${accent}55`,
+          color: accent,
+          borderRadius: 4, cursor: 'pointer',
+          marginLeft: 8, whiteSpace: 'nowrap',
+        }}
+        title={`${isOpp ? 'Opponent' : 'Player'}'s starting debuffs`}>
+        ⚠️ Debuffs ({selected.length})
+      </button>
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          right: 0,
+          ...dropdownPosStyle,
+          width: 270, maxHeight: 320, overflowY: 'auto',
+          background: 'rgba(15,15,25,0.97)',
+          border: `1px solid ${accent}66`,
+          borderRadius: 6,
+          padding: '6px 4px',
+          zIndex: 10001,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+        }}>
+          <div style={{ padding: '4px 8px 6px', fontSize: 10, color: accent, opacity: 0.85, borderBottom: `1px solid ${accent}33`, marginBottom: 4 }}>
+            {isOpp ? "Opponent's" : "Your"} starting debuffs
+          </div>
+          {PLAYER_DEBUFF_REGISTRY.map(d => {
+            const checked = selected.includes(d.key);
+            return (
+              <label key={d.key} style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '5px 8px', cursor: 'pointer',
+                color: checked ? accent : 'var(--text2)',
+                fontSize: 11,
+                background: checked ? `rgba(${isOpp ? '255,136,68' : '136,204,255'},.10)` : 'transparent',
+                borderRadius: 3,
+              }}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggle(d.key)}
+                  style={{ accentColor: accent, cursor: 'pointer', flexShrink: 0 }}
+                />
+                <span>{d.label}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PuzzleCreator() {
   const { user, setScreen, notify, setBgmMode } = useContext(AppContext);
 
@@ -35,6 +158,13 @@ function PuzzleCreator() {
   const [hand, setHand] = useState(saved?.hand || []);
   const [oppHand, setOppHand] = useState(saved?.oppHand || []);
   const [puzzleName, setPuzzleName] = useState(saved?.puzzleName || '');
+  // Per-player starting debuff lists. Each entry is a key from
+  // PLAYER_DEBUFF_REGISTRY below; the server applies them at puzzle
+  // start (sets the matching player-state flag, tracks any helper
+  // instances like Flashbang's deleted-pile sentinel, etc.).
+  const [meDebuffs, setMeDebuffs]   = useState(saved?.meDebuffs   || []);
+  const [oppDebuffs, setOppDebuffs] = useState(saved?.oppDebuffs  || []);
+  const [debuffMenuOpen, setDebuffMenuOpen] = useState(null); // 'me' | 'opp' | null
   const [search, setSearch] = useState('');
   const [validated, setValidated] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -253,8 +383,8 @@ function PuzzleCreator() {
 
   // ── Auto-save state to localStorage on every change ──
   useEffect(() => {
-    try { localStorage.setItem('pz-creator-state', JSON.stringify({ players, areaZones, hand, oppHand, puzzleName })); } catch (_) {}
-  }, [players, areaZones, hand, oppHand, puzzleName]);
+    try { localStorage.setItem('pz-creator-state', JSON.stringify({ players, areaZones, hand, oppHand, puzzleName, meDebuffs, oppDebuffs })); } catch (_) {}
+  }, [players, areaZones, hand, oppHand, puzzleName, meDebuffs, oppDebuffs]);
 
   const puzzleIgnoreRef = useRef(false); // true after leaving — blocks inflight game_state updates
 
@@ -303,6 +433,8 @@ function PuzzleCreator() {
     setAreaZones([[], []]);
     setHand([]);
     setOppHand([]);
+    setMeDebuffs([]);
+    setOppDebuffs([]);
     setValidated(false);
     setEditTarget(null);
     setViewPile(null);
@@ -901,14 +1033,14 @@ function PuzzleCreator() {
     }
     // Send puzzle to server — starts a real battle against a CPU opponent
     puzzleIgnoreRef.current = false;
-    socket.emit('start_puzzle', { players, areaZones, hand, oppHand });
-  }, [players, areaZones, hand, oppHand, notify]);
+    socket.emit('start_puzzle', { players, areaZones, hand, oppHand, playerDebuffs: [meDebuffs, oppDebuffs] });
+  }, [players, areaZones, hand, oppHand, meDebuffs, oppDebuffs, notify]);
 
   const handleExport = useCallback(() => {
     if (!validated) return;
-    const data = { players, areaZones, hand, oppHand, version: 1 };
+    const data = { players, areaZones, hand, oppHand, playerDebuffs: [meDebuffs, oppDebuffs], version: 1 };
     socket.emit('export_puzzle', data);
-  }, [validated, players, areaZones, hand, oppHand]);
+  }, [validated, players, areaZones, hand, oppHand, meDebuffs, oppDebuffs]);
 
   // Listen for encrypted puzzle from server
   useEffect(() => {
@@ -926,9 +1058,27 @@ function PuzzleCreator() {
   }, [puzzleName, notify]);
 
   useEffect(() => {
-    const h = (e) => { if (e.key === 'Escape') { if (puzzleGameState) return; if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); if (editTarget) setEditTarget(null); else setScreen('menu'); e.stopImmediatePropagation(); } };
+    const h = (e) => {
+      if (e.key !== 'Escape') return;
+      // While the embedded GameBoard puzzle battle is running, let its
+      // own Escape handler take precedence — don't tear down the
+      // creator from underneath it.
+      if (puzzleGameState) return;
+      // Pop-ups close one level at a time so a "viewing a deck pile"
+      // Escape doesn't boot the whole creator. Order matters: most
+      // transient overlay first, navigation away last.
+      if (viewPile)           { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setViewPile(null);            return; }
+      if (debuffMenuOpen)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setDebuffMenuOpen(null);      return; }
+      if (removePopupPos)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setRemovePopupPos(null);      return; }
+      if (mobileSelected)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setMobileSelected(null);      return; }
+      if (editTarget)         { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setEditTarget(null);          return; }
+      // No open overlay — actually leave the creator.
+      e.stopImmediatePropagation();
+      if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 });
+      setScreen('menu');
+    };
     window.addEventListener('keydown', h, true); return () => window.removeEventListener('keydown', h, true);
-  }, [editTarget, puzzleGameState]);
+  }, [editTarget, puzzleGameState, viewPile, debuffMenuOpen, removePopupPos, mobileSelected]);
 
   // ── Surprise eligibility: check if hero has abilities matching the surprise's spell schools ──
   const isSurpriseUsable = useCallback((p, hi, cardName) => {
@@ -950,6 +1100,7 @@ function PuzzleCreator() {
     { key: 'burned', label: '🔥 Burned', color: '#ff6633' },
     { key: 'poisoned', label: '☠️ Poisoned', color: '#aa44ff', stacks: true },
     { key: 'negated', label: '🚫 Negated', color: '#888' },
+    { key: 'bound', label: '⛓️ Bound', color: '#9988aa' },
     { key: 'shielded', label: '🛡️ Shielded', color: '#44ddff' },
     { key: 'immune', label: '✨ Immune', color: '#ffdd88' },
     { key: 'healReversed', label: '💔 Heal Reversed', color: '#ff4488' },
@@ -1092,7 +1243,7 @@ function PuzzleCreator() {
                   {hero.statuses?.healReversed && <HealReversedOverlay />}
                   {hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                   {hero.statuses?.immune && !hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
-                  {(hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.burned || hero.statuses?.poisoned || hero.statuses?.negated || hero.statuses?.nulled || hero.statuses?.healReversed || hero.statuses?.untargetable || hero.statuses?.charmed) &&
+                  {(hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.burned || hero.statuses?.poisoned || hero.statuses?.negated || hero.statuses?.nulled || hero.statuses?.healReversed || hero.statuses?.untargetable || hero.statuses?.charmed || hero.statuses?.bound) &&
                     <StatusBadges statuses={hero.statuses} isHero={true} />}
                   {hero.buffs && <BuffColumn buffs={hero.buffs} />}
                 </> : <div className="board-zone-empty">Hero</div>}
@@ -1417,6 +1568,14 @@ function PuzzleCreator() {
                 onChange={(e) => { const v = Math.max(0, parseInt(e.target.value) || 0); updatePlayer(1, p => { p.gold = v; return p; }); }}
                 style={{ width: 52, padding: '6px 4px', fontSize: 16, textAlign: 'center', borderColor: 'rgba(255,215,0,.4)', color: '#ffd700', fontWeight: 700 }} />
             </div>
+            <DebuffSelector
+              side="opp"
+              selected={oppDebuffs}
+              onChange={(next) => { setOppDebuffs(next); setValidated(false); }}
+              isOpen={debuffMenuOpen === 'opp'}
+              onToggle={() => setDebuffMenuOpen(debuffMenuOpen === 'opp' ? null : 'opp')}
+              onClose={() => setDebuffMenuOpen(null)}
+            />
           </div>
 
           <div className="pz-side-label orbit-font">OPPONENT</div>
@@ -1479,6 +1638,14 @@ function PuzzleCreator() {
             onChange={(e) => { const v = Math.max(0, parseInt(e.target.value) || 0); updatePlayer(0, p => { p.gold = v; return p; }); }}
             style={{ width: 52, padding: '6px 4px', fontSize: 16, textAlign: 'center', borderColor: 'rgba(255,215,0,.4)', color: '#ffd700', fontWeight: 700 }} />
         </div>
+        <DebuffSelector
+          side="me"
+          selected={meDebuffs}
+          onChange={(next) => { setMeDebuffs(next); setValidated(false); }}
+          isOpen={debuffMenuOpen === 'me'}
+          onToggle={() => setDebuffMenuOpen(debuffMenuOpen === 'me' ? null : 'me')}
+          onClose={() => setDebuffMenuOpen(null)}
+        />
       </div>
 
       {/* ── Card Tooltip Panel ── */}

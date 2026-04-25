@@ -1,0 +1,41 @@
+=== PIXEL PARTIES DECK ===
+Name: Structure Deck: Gather That Storm!
+Cover: Gathering Storm
+
+== HEROES ==
+Nicolas, the Hidden Alchemist
+Tarleinn the Traveler
+Treasure Huntress Semi
+
+== MAIN DECK ==
+2x Acid Vial
+1x Cataclysm
+2x Chain Lightning
+2x Cloud in a Bottle
+2x Dark Gear
+9x Destruction Magic
+1x Divine Gift of Fire
+1x Elixir of Immortality
+2x Fire Bomb
+2x Firewall
+2x Flame Avalanche
+2x Flashbang
+4x Gathering Storm
+2x Homerun!
+8x Leadership
+1x Lifeforce Howitzer
+4x Magnetic Glove
+1x Resuscitation Potion
+2x Snow Cannon
+1x Tarleinn's Floating Island
+3x Tea
+1x The White Eye
+4x The Yeeting
+1x Treasure Hunter's Backpack
+
+== POTION DECK ==
+2x Elixir of Quickness
+1x Magic Lamp
+2x Magnetic Potion
+
+== SIDE DECK ==

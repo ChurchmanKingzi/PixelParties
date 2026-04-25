@@ -189,11 +189,13 @@ module.exports = {
     const oppSid = gs.players[oi]?.socketId;
 
     for (const cn of retrievedCards) {
-      // Remove from discard pile
-      const discIdx = ps.discardPile.indexOf(cn);
-      if (discIdx >= 0) ps.discardPile.splice(discIdx, 1);
-      // Add to hand
-      ps.hand.push(cn);
+      // Centralised discard → hand transfer fires
+      // ON_CARD_ADDED_FROM_DISCARD_TO_HAND so listeners (Bamboo Staff
+      // free-attack chain, Bamboo Shield cost reveal, …) can react.
+      const moved = await engine.addCardFromDiscardToHand(pi, cn, pi, {
+        source: 'Shard of Chaos',
+      });
+      if (!moved) continue;
       // Stream to opponent
       if (oppSid && engine.io) {
         engine.io.to(oppSid).emit('card_reveal', { cardName: cn });

@@ -139,11 +139,126 @@ async function doSacrifice(engine, pi) {
   return true;
 }
 
+// ── CPU helper: hero "value" heuristic ─────────────────────────────
+// Used to pick the LEAST valuable hero for sacrifice and the MOST
+// valuable hero for the buff. Combines several "this hero is doing
+// work" signals into a single score:
+//
+//   • Ability stack size — more abilities attached = more invested
+//     (Wisdom, Toughness, Fighting, Friendship stacks on a carry).
+//   • Spell-school strength — the hero's max school level scales
+//     directly with which Spells/Attacks they can resolve. A hero
+//     with Magic Arts Lv3 is the deck's spellcaster carry by
+//     definition.
+//   • Engine-ability bonus — Divinity / Wisdom / future engine
+//     abilities (whatever declares `cpuMeta.engineValue`) compound
+//     the carry signal.
+//   • Equipped artifacts — each support zone occupancy is investment.
+//   • Hero's own ATK — small modifier so beefy attackers register
+//     above pure utility heroes when nothing else differentiates.
+//
+// Deliberately does NOT use current HP — the user's bug report had
+// the carry sitting at 50 HP precisely BECAUSE it was the most
+// active hero. Penalising "already-damaged" would re-cause the
+// "sacrifice the useful one" picker bug.
+const SPELL_SCHOOLS = [
+  'Destruction Magic', 'Support Magic', 'Magic Arts',
+  'Decay Magic', 'Summoning Magic',
+];
+function cpuHeroValue(engine, ownerIdx, heroIdx) {
+  const ps = engine.gs.players[ownerIdx];
+  const hero = ps?.heroes?.[heroIdx];
+  if (!hero?.name || hero.hp <= 0) return -Infinity;
+  let value = 0;
+  const abZones = ps.abilityZones?.[heroIdx] || [];
+  // 1. Ability stack size (15 per stack — same weight evaluateState uses).
+  for (const slot of abZones) {
+    if (!slot || slot.length === 0) continue;
+    value += slot.length * 15;
+  }
+  // 2. Max spell-school level — caster carry signal. Multiplied
+  //    aggressively because a Lv3 caster is what wins the game.
+  let maxSchool = 0;
+  for (const school of SPELL_SCHOOLS) {
+    let lvl = 0;
+    try { lvl = engine.countAbilitiesForSchool(school, abZones); } catch {}
+    if (lvl > maxSchool) maxSchool = lvl;
+  }
+  value += maxSchool * 30;
+  // 3. Engine abilities (Divinity = 120, future engines TBD).
+  //    Lazy-load to avoid pulling _loader at module top.
+  let engineBonus = 0;
+  try {
+    const { loadCardEffect } = require('./_loader');
+    for (const slot of abZones) {
+      if (!slot || slot.length === 0) continue;
+      const base = loadCardEffect(slot[0]);
+      const ev = base?.cpuMeta?.engineValue || 0;
+      if (ev > 0) engineBonus += ev * slot.length;
+    }
+  } catch {}
+  value += engineBonus;
+  // 4. Equipped artifacts (every support occupant = +10).
+  const sup = ps.supportZones?.[heroIdx] || [];
+  for (const slot of sup) {
+    if ((slot || []).length > 0) value += 10;
+  }
+  // 5. Hero ATK as a tiebreaker.
+  value += (hero.atk || 0) * 0.1;
+  return value;
+}
+
 module.exports = {
   // Inherent additional Action — played during own Main Phase at Sorcery speed.
   inherentAction: true,
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
+
+  /**
+   * CPU target picker — fires for both prompts (sacrifice pick + buff
+   * pick) since both go through the engine's promptEffectTarget. The
+   * description text disambiguates which prompt we're answering:
+   *   • "Choose a Hero to sacrifice." → pick LEAST valuable.
+   *   • "Choose a Hero to receive +N max HP …" → pick MOST valuable.
+   *
+   * Without this override, both prompts fall through to the generic
+   * "shuffle own targets, ascended-first" picker — which doesn't
+   * distinguish a 50-HP main caster from an idle utility hero, and
+   * happily sacrifices the wrong one. Picking by `cpuHeroValue` (see
+   * top of file) lifts the heuristic to "engine investment + spell
+   * school + equipped artifacts" so the carry is recognised.
+   */
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'target') return undefined;
+    const targets = promptData?.validTargets || [];
+    if (targets.length === 0) return undefined;
+    const description = promptData?.config?.description || '';
+    const isBuffPick = /receive\s+\+|to receive/i.test(description);
+    // Score every valid hero target by carry-value heuristic.
+    const scored = targets
+      .filter(t => t.type === 'hero')
+      .map(t => ({ id: t.id, score: cpuHeroValue(engine, t.owner, t.heroIdx) }));
+    if (scored.length === 0) return undefined;
+    if (isBuffPick) {
+      // Buff: pick HIGHEST value. Ties broken by lower current HP
+      // (already-damaged carry needs the cushion more).
+      const gs = engine.gs;
+      scored.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        const heroA = gs.players?.[
+          targets.find(t => t.id === a.id)?.owner
+        ]?.heroes?.[targets.find(t => t.id === a.id)?.heroIdx];
+        const heroB = gs.players?.[
+          targets.find(t => t.id === b.id)?.owner
+        ]?.heroes?.[targets.find(t => t.id === b.id)?.heroIdx];
+        return (heroA?.hp || Infinity) - (heroB?.hp || Infinity);
+      });
+    } else {
+      // Sacrifice: pick LOWEST value (least useful hero).
+      scored.sort((a, b) => a.score - b.score);
+    }
+    return [scored[0].id];
+  },
 
   // CPU hint: sacrificing an own hero in Main Phase 1 costs that hero's
   // Action Phase. The correct order is "use the about-to-be-sacrificed

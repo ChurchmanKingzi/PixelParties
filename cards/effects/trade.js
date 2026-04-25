@@ -24,6 +24,23 @@ module.exports = {
     return { goldPerTurn: GOLD_BY_LEVEL[Math.min(level - 1, GOLD_BY_LEVEL.length - 1)] };
   },
 
+  // Hard refuse when deck-out is a real threat. The global MCTS eval
+  // already penalizes thin-deck states, but Trade's confirm prompt is
+  // reached via the generic activation path and deserves an explicit
+  // guard: once the deck is ≤ 20 OR the opponent has shown any mill
+  // capability, the 5-card burn is net-negative regardless of gold
+  // payoff. This composes with the eval term (defence in depth).
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic' || promptData?.type !== 'confirm') return undefined;
+    if (!/^Trade$/i.test(promptData.title || '')) return undefined;
+    const pi = engine._cpuPlayerIdx;
+    const ps = engine.gs.players[pi];
+    if (!ps) return undefined;
+    const deckSize = (ps.mainDeck || []).length;
+    if (deckSize <= 20 || ps._oppHasMilledMe) return { confirmed: false };
+    return undefined;
+  },
+
   /**
    * Can activate if the player has at least 5 cards in their deck.
    */

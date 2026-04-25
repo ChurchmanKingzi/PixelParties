@@ -161,6 +161,11 @@ function DeckBuilder() {
     const handleEsc = (e) => {
       if (e.key !== 'Escape') return;
       const s = escStateRef.current;
+      // Pop-ups close one level at a time. Rename input cancels back to
+      // the deck header without leaving the deck editor; same for skin
+      // gallery and context menu. Only when no overlay is open does
+      // Escape navigate away (with the unsaved-changes guard).
+      if (s.renaming) { e.preventDefault(); e.stopImmediatePropagation(); setRenaming(false); setRenameVal(''); return; }
       if (s.showLeaveConfirm) { e.preventDefault(); e.stopImmediatePropagation(); setShowLeaveConfirm(false); setScreen('menu'); return; }
       if (s.skinGallery) { e.preventDefault(); e.stopImmediatePropagation(); setSkinGallery(null); return; }
       if (s.ctxMenu) { e.preventDefault(); e.stopImmediatePropagation(); setCtxMenu(null); return; }
@@ -803,7 +808,7 @@ function DeckBuilder() {
 
   const validation = currentDeck ? isDeckLegal(currentDeck) : { legal: false, reasons: [] };
   const hasUnsaved = currentDeck && unsaved[currentDeck.id];
-  escStateRef.current = { showLeaveConfirm, skinGallery, ctxMenu, hasUnsaved, isSampleMode };
+  escStateRef.current = { showLeaveConfirm, skinGallery, ctxMenu, renaming, hasUnsaved, isSampleMode };
   const heroes = currentDeck?.heroes || [{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null }];
 
   const importFileRef = useRef(null);

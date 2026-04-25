@@ -167,9 +167,13 @@ function CreatureDamageNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
   }, [ownerLabel, heroIdx, zoneSlot]);
 
   if (!pos) return null;
+  // Damage absorbed to 0 → render the bare "0" (no minus sign), so
+  // the player sees that the hit was absorbed rather than blocked
+  // entirely. Anything > 0 keeps the standard `-N` form.
+  const label = amount > 0 ? `-${amount}` : '0';
   return (
     <div className="damage-number" style={{ left: pos.x, top: pos.y }}>
-      -{amount}
+      {label}
     </div>
   );
 }
@@ -836,6 +840,581 @@ function SlipperyIceOverlay() {
   );
 }
 
+// The Cosmic Depths — a black starfield pinned under the zones and
+// cards (same z-index convention as Slippery Ice). The dark cosmos
+// backdrop is its own layer; the stars render in a SEPARATE layer
+// above it with no blend mode so the whites stay bright. (The earlier
+// version stacked them in a single `mixBlendMode: multiply` div, which
+// multiplied every white star against the background and made the
+// twinkle lattice vanish entirely.)
+function CosmicDepthsOverlay() {
+  const stars = useMemo(() => Array.from({ length: 140 }, () => ({
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    // Mostly tiny specks; a few bigger to add depth.
+    size: 1.2 + Math.pow(Math.random(), 3) * 3.2,
+    delay: -Math.random() * 4.2,
+    dur: 2.2 + Math.random() * 3.6,
+    // A fraction become 4-pointed "sparkle" glints; the rest are round.
+    sparkle: Math.random() < 0.35,
+  })), []);
+  return (
+    <div className="cosmic-depths-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      overflow: 'hidden',
+    }}>
+      {/* Layer 1: deep cosmos gradient. Solid-opaque so the stars read
+          on true black; no blend mode (an earlier multiply blend
+          zeroed out white stars on top). */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background:
+          'radial-gradient(ellipse at 50% 50%, rgba(22,14,50,0.96) 0%, rgba(8,5,22,0.98) 55%, rgba(0,0,0,1) 100%)',
+      }} />
+      {/* Layer 2: star field on its own. `mixBlendMode: screen` keeps
+          the whites bright even if a future theme tints the layer
+          beneath (screen of white + anything = white). */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        mixBlendMode: 'screen',
+      }}>
+        {stars.map((s, i) => (
+          <span key={'star' + i} style={{
+            position: 'absolute',
+            left: s.x + '%', top: s.y + '%',
+            width: s.size + 'px', height: s.size + 'px',
+            transform: 'translate(-50%, -50%)',
+            background: s.sparkle
+              ? 'transparent'
+              : 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(230,235,255,0.95) 45%, rgba(200,210,255,0) 100%)',
+            borderRadius: '50%',
+            boxShadow: s.sparkle
+              ? ''
+              : '0 0 ' + (s.size * 2.5) + 'px rgba(255,255,255,0.95), 0 0 ' + (s.size * 6) + 'px rgba(180,200,255,0.45)',
+            animation: 'cosmicDepthsTwinkle ' + s.dur + 's ease-in-out ' + s.delay + 's infinite',
+          }}>
+            {s.sparkle && (
+              <span style={{
+                position: 'absolute', inset: 0,
+                background:
+                  'linear-gradient(0deg, transparent 44%, rgba(255,255,255,1) 49%, rgba(255,255,255,1) 51%, transparent 56%),'
+                  + 'linear-gradient(90deg, transparent 44%, rgba(255,255,255,1) 49%, rgba(255,255,255,1) 51%, transparent 56%)',
+                filter: 'blur(0.4px)',
+                boxShadow: '0 0 ' + (s.size * 3) + 'px rgba(255,255,255,0.95)',
+              }} />
+            )}
+          </span>
+        ))}
+      </div>
+      <style>{`
+        @keyframes cosmicDepthsTwinkle {
+          0%, 100% { opacity: 0.2; transform: translate(-50%, -50%) scale(0.7); }
+          50%      { opacity: 1;   transform: translate(-50%, -50%) scale(1.2); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// Tarleinn's Floating Island — a wide sky background with a single
+// large grass-topped island floating in the middle, cut by a blue
+// river that snakes across the grass plateau.
+//
+// The island silhouette and river path are FIXED (hardcoded points),
+// so the artwork never reshuffles — only the cloud layer is animated.
+// (Earlier versions seeded a per-play randomised layout, but that
+// added complexity for no real benefit; a static, hand-tuned shape
+// reads cleaner and lets us focus the eye on the gameplay.)
+function FloatingIslandOverlay() {
+  // Hardcoded island geometry. Coordinate space is the SVG viewBox
+  // 0..100 in both axes; preserveAspectRatio="none" lets it stretch
+  // to fill the board-center container.
+  const island = {
+    cx: 50, cy: 52, rxBase: 34, ryBase: 14,
+    // 18 radial samples — top arc tighter (grass plateau), bottom arc
+    // jaggier (rocky underside). Picked once and frozen for the
+    // life of the game.
+    points: [
+      { x: 84.0, y: 53.5 }, { x: 80.6, y: 58.4 }, { x: 75.0, y: 63.8 },
+      { x: 67.0, y: 67.1 }, { x: 58.5, y: 69.2 }, { x: 50.0, y: 70.0 },
+      { x: 41.5, y: 69.5 }, { x: 33.0, y: 67.6 }, { x: 25.0, y: 64.0 },
+      { x: 19.4, y: 58.7 }, { x: 16.0, y: 53.6 }, { x: 16.4, y: 49.2 },
+      { x: 19.5, y: 45.8 }, { x: 25.5, y: 43.4 }, { x: 34.0, y: 41.9 },
+      { x: 50.0, y: 41.0 }, { x: 66.0, y: 41.9 }, { x: 78.0, y: 44.7 },
+    ],
+  };
+
+  // Fixed river S-curve across the grass surface.
+  const river = {
+    d: 'M 31 43.0 C 38 41.5, 46 45.5, 50 43.4 C 54 41.3, 62 45.5, 69 43.0',
+    width: 2.6,
+  };
+
+  // Clouds — 7 of them, evenly distributed across the sky. Each has
+  // its own scale / opacity / speed / starting offset, all hardcoded
+  // so the layout doesn't reshuffle on re-render. Negative delays
+  // stagger them mid-traversal at frame 0.
+  const clouds = [
+    { y: 10, scale: 1.05, delay:  -6, dur:  90, opacity: 0.78 },
+    { y: 18, scale: 0.85, delay: -32, dur: 110, opacity: 0.65 },
+    { y: 28, scale: 1.20, delay: -58, dur:  95, opacity: 0.72 },
+    { y: 14, scale: 0.70, delay: -82, dur: 120, opacity: 0.55 },
+    { y: 24, scale: 0.95, delay: -22, dur: 100, opacity: 0.68 },
+    { y: 36, scale: 0.80, delay: -68, dur: 115, opacity: 0.60 },
+    { y:  6, scale: 1.10, delay: -45, dur:  85, opacity: 0.74 },
+  ];
+
+  // Build the island polygon path — a closed Catmull-Rom-ish smooth via
+  // simple Bezier between samples works fine; we use a quadratic-ish
+  // smooth by routing through midpoints, which keeps the look soft
+  // without introducing self-intersections from sharp jitters.
+  const polyPath = useMemo(() => {
+    const pts = island.points;
+    if (pts.length === 0) return '';
+    const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    let d = '';
+    const first = mid(pts[pts.length - 1], pts[0]);
+    d += `M ${first.x} ${first.y} `;
+    for (let i = 0; i < pts.length; i++) {
+      const cur = pts[i];
+      const nxt = pts[(i + 1) % pts.length];
+      const m = mid(cur, nxt);
+      d += `Q ${cur.x} ${cur.y}, ${m.x} ${m.y} `;
+    }
+    d += 'Z';
+    return d;
+  }, [island]);
+
+  return (
+    <div className="floating-island-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      overflow: 'hidden',
+    }}>
+      {/* Layer 1: sky gradient (deep blue at top, lighter near horizon). */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background:
+          'linear-gradient(180deg, rgba(95,165,225,0.55) 0%, rgba(155,205,235,0.45) 55%, rgba(195,225,240,0.40) 100%)',
+      }} />
+      {/* Layer 2: drifting clouds. Each cloud is a couple of stacked
+          ellipses + soft white blur. They animate horizontally on a
+          long loop so the sky reads as alive without distracting. */}
+      <div style={{ position: 'absolute', inset: 0, mixBlendMode: 'screen' }}>
+        {clouds.map((c, i) => (
+          <div key={'fic' + i} style={{
+            position: 'absolute',
+            // `left` is driven entirely by the keyframe animation — it
+            // sweeps from -25% (off-screen left) to 125% (off-screen
+            // right) of the parent. Each cloud's `delay` is negative
+            // so they start mid-traversal at varied points, giving the
+            // sky a continuous-flow feel from frame 0.
+            top: c.y + '%',
+            opacity: c.opacity,
+            '--ficScale': c.scale,
+            animation: `floatingIslandCloud ${c.dur}s linear ${c.delay}s infinite`,
+          }}>
+            <div style={{
+              position: 'absolute', left: -50, top: -16,
+              width: 100, height: 32, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(245,250,255,0.6) 60%, transparent 90%)',
+              filter: 'blur(2px)',
+            }} />
+            <div style={{
+              position: 'absolute', left: -25, top: -28,
+              width: 60, height: 32, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(245,250,255,0.5) 60%, transparent 90%)',
+              filter: 'blur(2px)',
+            }} />
+            <div style={{
+              position: 'absolute', left: 5, top: -22,
+              width: 50, height: 26, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(245,250,255,0.55) 60%, transparent 90%)',
+              filter: 'blur(2px)',
+            }} />
+          </div>
+        ))}
+      </div>
+      {/* Layer 3: the island itself, plus the river that runs through
+          its grass-top surface. Drawn in one SVG so we can clip the
+          river to the island silhouette via a clipPath — no matter how
+          the random control points fall, the river never spills off
+          the rocky underside. */}
+      <svg
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        style={{
+          position: 'absolute', inset: 0,
+          width: '100%', height: '100%',
+          filter: 'drop-shadow(0 6px 14px rgba(20,40,80,0.35))',
+        }}
+      >
+        <defs>
+          {/* Grass-to-rock vertical gradient: lush green up top, brown
+              dirt mid, deep stone at the underside. */}
+          <linearGradient id="floatingIslandBody" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stopColor="#5cb85c" />
+            <stop offset="22%" stopColor="#3d9a4a" />
+            <stop offset="35%" stopColor="#7c5a36" />
+            <stop offset="60%" stopColor="#553a22" />
+            <stop offset="100%" stopColor="#2c1f12" />
+          </linearGradient>
+          {/* River gradient: brighter cyan-blue down the middle, deeper
+              at the edges, so it reads as flowing water. */}
+          <linearGradient id="floatingIslandRiver" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stopColor="#5fc1ee" />
+            <stop offset="50%" stopColor="#2c8dd6" />
+            <stop offset="100%" stopColor="#1f6db0" />
+          </linearGradient>
+          {/* Clip the river to the island so it can't overshoot the
+              silhouette regardless of where the random control points
+              landed. */}
+          <clipPath id="floatingIslandClip">
+            <path d={polyPath} />
+          </clipPath>
+        </defs>
+        {/* Island body */}
+        <path d={polyPath} fill="url(#floatingIslandBody)" opacity="0.92" />
+        {/* Subtle highlight along the grass surface — a thin lighter
+            band hugging the top arc of the island. Cheap shading hack:
+            a second copy of the path, scaled vertically, with a green
+            tint and additive blend. */}
+        <path
+          d={polyPath}
+          fill="rgba(140,210,140,0.45)"
+          transform={`translate(0 -${island.ryBase * 0.35}) scale(1 0.32)`}
+          style={{ transformOrigin: `${island.cx}% ${island.cy}%` }}
+          clipPath="url(#floatingIslandClip)"
+          opacity="0.7"
+        />
+        {/* River — drawn with two stacked strokes for the highlight */}
+        <g clipPath="url(#floatingIslandClip)">
+          <path d={river.d} stroke="url(#floatingIslandRiver)"
+                strokeWidth={river.width} fill="none" strokeLinecap="round" />
+          <path d={river.d} stroke="rgba(220,240,255,0.6)"
+                strokeWidth={Math.max(0.35, river.width * 0.35)}
+                fill="none" strokeLinecap="round"
+                style={{ mixBlendMode: 'screen' }} />
+        </g>
+        {/* A few dangling roots / rocks under the bottom of the island,
+            to sell the "floating" silhouette. Hardcoded positions so
+            the underside doesn't shift between re-renders. */}
+        {[
+          { ox: -19.0, len:  6.5, drift:  1.2, w: 0.7 },
+          { ox:  -9.5, len:  9.2, drift: -0.8, w: 0.65 },
+          { ox:   0.5, len: 11.0, drift:  0.6, w: 0.8 },
+          { ox:   9.0, len:  8.0, drift: -1.4, w: 0.6 },
+          { ox:  18.0, len:  6.0, drift:  0.9, w: 0.55 },
+        ].map((t, i) => (
+          <path
+            key={'fitend' + i}
+            d={`M ${island.cx + t.ox} ${island.cy + island.ryBase * 0.65} q ${t.drift} ${t.len * 0.5}, 0 ${t.len}`}
+            stroke="#3a2a18" strokeWidth={t.w}
+            fill="none" strokeLinecap="round" opacity="0.85"
+          />
+        ))}
+      </svg>
+      <style>{`
+        @keyframes floatingIslandCloud {
+          0%   { left: -25%; transform: translateY(-50%) scale(var(--ficScale, 1)); }
+          100% { left: 125%; transform: translateY(-50%) scale(var(--ficScale, 1)); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// Gathering Storm — dark-red storm clouds drifting across the
+// battlefield with red lightning bolts arcing inside and between them.
+// Renders while ANY Gathering Storm card is attached in either player's
+// support zone (it's an Attachment Spell, not an Area, so we walk
+// support zones rather than areaZones).
+//
+// The overlay is composed of three layers:
+//   1. Faint blood-red sky tint over the board so the clouds read as
+//      "ominous storm front" rather than just "purple smudges".
+//   2. A pool of crimson cloud sprites animating horizontally across
+//      the battlefield at varied heights / speeds. Each cloud is a
+//      handful of stacked elliptical blurs in deep-red gradients.
+//   3. Lightning bursts that fire on randomised intervals — each is an
+//      SVG polyline with a couple of branching forks, drawn in bright
+//      red with a hot-pink core stroke for the glow.
+//
+// The lightning timing is driven by a single lightweight effect that
+// rotates which "bolt slot" is currently flashing, keeping the React
+// state churn cheap regardless of how many bolts the user sees.
+function GatheringStormOverlay() {
+  // Heavy, fast-moving cloud cover. Bigger sprites, more of them,
+  // shorter loop durations — the storm reads as gale-force wind
+  // ripping clouds across the battlefield. The slight reverse-flow
+  // current (~25% of clouds going against the prevailing wind) adds
+  // chaos without breaking the "wind direction" feel.
+  const clouds = useMemo(() => Array.from({ length: 22 }, () => ({
+    y:        -8 + Math.random() * 116,             // Wider vertical spread
+    scale:    1.4 + Math.random() * 1.5,            // Much bigger (was 0.7–1.7)
+    delay:    -Math.random() * 14,                  // Spread starts across the cycle
+    dur:      8 + Math.random() * 7,                // Way faster (was 24–46s)
+    opacity:  0.6 + Math.random() * 0.3,
+    // Mostly forward, some against — strong prevailing wind with the
+    // occasional updraft cross-current.
+    reverse:  Math.random() < 0.25,
+  })), []);
+
+  // 6 lightning slots: each slot owns a randomised path; a rotating
+  // index makes one slot "hot" at a time, restarting its CSS animation
+  // by toggling a `key`. This keeps the lightning visually unpredictable
+  // without re-mounting the whole overlay.
+  const bolts = useMemo(() => Array.from({ length: 6 }, () => {
+    // Bolts typically jag from one cloud strata down to another (not
+    // floor-to-ceiling). x1/x2 are within the central battlefield band;
+    // y1/y2 keep the bolt within the cloud strata.
+    const x1 = 12 + Math.random() * 76;
+    const y1 = 8  + Math.random() * 30;
+    const x2 = x1 + (-25 + Math.random() * 50);
+    const y2 = 35 + Math.random() * 50;
+    // 3-segment zig-zag with a random fork off the midpoint.
+    const midX = (x1 + x2) / 2 + (-8 + Math.random() * 16);
+    const midY = (y1 + y2) / 2 + (-5 + Math.random() * 10);
+    const forkX = midX + (-12 + Math.random() * 24);
+    const forkY = midY + (4 + Math.random() * 14);
+    return {
+      main: `M ${x1} ${y1} L ${midX} ${midY} L ${x2} ${y2}`,
+      fork: `M ${midX} ${midY} L ${forkX} ${forkY}`,
+      // Per-bolt jitter for variety — 0.45–0.85s flash duration.
+      dur:  450 + Math.random() * 400,
+    };
+  }), []);
+  const [activeBolt, setActiveBolt] = useState(-1);
+  const [boltSerial, setBoltSerial] = useState(0); // re-key trigger
+  useEffect(() => {
+    let cancelled = false;
+    const fire = () => {
+      if (cancelled) return;
+      const idx = Math.floor(Math.random() * bolts.length);
+      setActiveBolt(idx);
+      setBoltSerial(s => s + 1);
+      // Per-strike audio cue — distant thunder. Volume kept very low
+      // so a long Gathering Storm session doesn't overwhelm the rest
+      // of the soundscape.
+      if (window.playSFX) {
+        window.playSFX('elem_lightning', { volume: 0.12, dedupe: 250, category: 'effect' });
+      }
+      // The selected bolt visually disappears after its CSS animation;
+      // schedule the NEXT bolt 400–1100ms later to keep the strikes
+      // feeling stochastic.
+      const gap = 380 + Math.random() * 750;
+      setTimeout(fire, gap);
+    };
+    const initial = setTimeout(fire, 250 + Math.random() * 600);
+    return () => { cancelled = true; clearTimeout(initial); };
+  }, [bolts.length]);
+
+  return (
+    <div className="gathering-storm-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      overflow: 'hidden',
+    }}>
+      {/* Layer 1: blood-red atmospheric tint. Soft radial so the
+          centre of the battlefield feels "thicker" with storm. */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background:
+          'radial-gradient(ellipse at 50% 50%, rgba(80,8,12,0.32) 0%, rgba(50,4,8,0.22) 55%, rgba(20,2,4,0.18) 100%)',
+        mixBlendMode: 'multiply',
+      }} />
+      {/* Layer 2: drifting crimson cloud sprites. The keyframe drives
+          `left` from off-screen left (-25%) to off-screen right (125%)
+          so each cloud actually traverses the entire battlefield —
+          the previous percentage-based `transform: translate(...)`
+          implementation only swept the cloud's own width and parked
+          everything near the left edge. */}
+      <div style={{ position: 'absolute', inset: 0 }}>
+        {clouds.map((c, i) => (
+          <div key={'gsc' + i} style={{
+            position: 'absolute',
+            top: c.y + '%',
+            opacity: c.opacity,
+            '--gscScale': c.scale,
+            animation: `gatheringStormCloud${c.reverse ? 'Rev' : ''} ${c.dur}s linear ${c.delay}s infinite`,
+            filter: 'drop-shadow(0 4px 18px rgba(120,12,16,0.5))',
+          }}>
+            {/* Stacked ellipses make a single cloud sprite. */}
+            <div style={{
+              position: 'absolute', left: -65, top: -18,
+              width: 130, height: 36, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(105,12,18,0.92) 0%, rgba(75,8,14,0.7) 55%, rgba(30,2,6,0) 95%)',
+              filter: 'blur(3px)',
+            }} />
+            <div style={{
+              position: 'absolute', left: -32, top: -32,
+              width: 78, height: 36, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(125,18,24,0.88) 0%, rgba(85,10,16,0.6) 60%, rgba(30,2,6,0) 95%)',
+              filter: 'blur(3px)',
+            }} />
+            <div style={{
+              position: 'absolute', left: 5, top: -26,
+              width: 65, height: 30, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(95,10,16,0.85) 0%, rgba(60,6,12,0.55) 60%, rgba(20,1,4,0) 95%)',
+              filter: 'blur(3px)',
+            }} />
+            {/* A crimson "underbelly" smear hints at active rain inside
+                the cloud. */}
+            <div style={{
+              position: 'absolute', left: -45, top: 4,
+              width: 95, height: 14, borderRadius: '50%',
+              background: 'radial-gradient(ellipse, rgba(60,4,8,0.7) 0%, rgba(30,2,4,0) 80%)',
+              filter: 'blur(4px)',
+            }} />
+          </div>
+        ))}
+      </div>
+      {/* Layer 3: lightning bolts. We render an SVG with all bolts laid
+          out, but only the `activeBolt` is visible at any moment via
+          opacity. Re-keying the visible <g> on `boltSerial` restarts
+          the strike-flash animation. */}
+      <svg
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+      >
+        <defs>
+          <filter id="gatheringStormGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="1.2" />
+          </filter>
+        </defs>
+        {bolts.map((b, i) => activeBolt === i ? (
+          <g
+            key={'gsb' + i + '-' + boltSerial}
+            style={{
+              animation: `gatheringStormBolt ${b.dur}ms ease-out forwards`,
+            }}
+          >
+            {/* Outer red glow */}
+            <path d={b.main} stroke="#ff1830" strokeWidth="1.4"
+                  fill="none" strokeLinecap="round"
+                  filter="url(#gatheringStormGlow)" opacity="0.9" />
+            <path d={b.fork} stroke="#ff1830" strokeWidth="1.0"
+                  fill="none" strokeLinecap="round"
+                  filter="url(#gatheringStormGlow)" opacity="0.85" />
+            {/* Inner bright core */}
+            <path d={b.main} stroke="#ffd0d8" strokeWidth="0.55"
+                  fill="none" strokeLinecap="round" />
+            <path d={b.fork} stroke="#ffd0d8" strokeWidth="0.4"
+                  fill="none" strokeLinecap="round" />
+          </g>
+        ) : null)}
+      </svg>
+      <style>{`
+        @keyframes gatheringStormCloud {
+          0%   { left: -25%;  transform: translateY(-50%) scale(var(--gscScale, 1)); }
+          100% { left: 125%;  transform: translateY(-50%) scale(var(--gscScale, 1)); }
+        }
+        @keyframes gatheringStormCloudRev {
+          0%   { left: 125%;  transform: translateY(-50%) scale(var(--gscScale, 1)); }
+          100% { left: -25%;  transform: translateY(-50%) scale(var(--gscScale, 1)); }
+        }
+        @keyframes gatheringStormBolt {
+          0%   { opacity: 0; }
+          12%  { opacity: 1; }
+          25%  { opacity: 0.7; }
+          40%  { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// Tempeste rain — permanent rain background painted while at least one
+// Prophecy of Tempeste is attached. Stormy slate-blue drops with a brief
+// lightning flicker every few seconds. Lighter on the atmospheric tint
+// than Acid Rain since Tempeste isn't supposed to be a hostile area
+// effect — it's the host's chosen burden, ambient and ominous.
+function TempesteRainOverlay() {
+  const drops = useMemo(() => Array.from({ length: 130 }, () => ({
+    left: Math.random() * 100,
+    delay: -Math.random() * 1.4,
+    dur: 0.45 + Math.random() * 0.55,
+    w: 1 + Math.random() * 1.4,
+    h: 16 + Math.random() * 26,
+    opacity: 0.4 + Math.random() * 0.5,
+  })), []);
+  const splashes = useMemo(() => Array.from({ length: 18 }, () => ({
+    left: Math.random() * 100,
+    top: 60 + Math.random() * 36,
+    delay: -Math.random() * 1.4,
+    dur: 0.5 + Math.random() * 0.4,
+    size: 5 + Math.random() * 9,
+  })), []);
+  // Sporadic lightning flickers behind the rain — re-keyed via interval.
+  const [flickerSerial, setFlickerSerial] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const fire = () => {
+      if (cancelled) return;
+      setFlickerSerial(s => s + 1);
+      setTimeout(fire, 3500 + Math.random() * 4500);
+    };
+    const initial = setTimeout(fire, 1200 + Math.random() * 2000);
+    return () => { cancelled = true; clearTimeout(initial); };
+  }, []);
+  return (
+    <div className="tempeste-rain-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 178,
+      overflow: 'hidden',
+      background: 'linear-gradient(180deg, rgba(20,30,55,0.18) 0%, rgba(10,20,40,0.30) 100%)',
+    }}>
+      {/* Background lightning flicker — full-overlay desaturated flash. */}
+      <div key={'tflk' + flickerSerial} style={{
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(ellipse at 50% 30%, rgba(220,230,255,0.45) 0%, rgba(160,180,220,0.18) 35%, transparent 70%)',
+        opacity: 0,
+        animation: 'tempesteFlicker 700ms ease-out forwards',
+      }} />
+      {drops.map((d, i) => (
+        <span key={'td'+i} style={{
+          position: 'absolute',
+          left: d.left + '%', top: '-10%',
+          width: d.w + 'px', height: d.h + 'px',
+          background: 'linear-gradient(180deg, rgba(80,110,160,0) 0%, rgba(120,150,200,' + d.opacity + ') 30%, rgba(170,200,235,' + d.opacity + ') 70%, rgba(220,235,255,' + d.opacity + ') 100%)',
+          boxShadow: '0 0 3px rgba(150,180,220,' + (d.opacity * 0.5) + ')',
+          borderRadius: d.w + 'px',
+          animation: 'tempesteRainDrop ' + d.dur + 's linear ' + d.delay + 's infinite',
+        }} />
+      ))}
+      {splashes.map((s, i) => (
+        <span key={'ts'+i} style={{
+          position: 'absolute',
+          left: s.left + '%', top: s.top + '%',
+          width: s.size + 'px', height: (s.size * 0.45) + 'px',
+          border: '1.5px solid rgba(190,215,245,0.7)',
+          borderTop: 'transparent',
+          borderRadius: '50%',
+          animation: 'tempesteRainSplash ' + s.dur + 's ease-out ' + s.delay + 's infinite',
+          opacity: 0,
+        }} />
+      ))}
+      <style>{`
+        @keyframes tempesteRainDrop {
+          0%   { transform: translateY(0) translateX(0); }
+          100% { transform: translateY(115vh) translateX(-6px); }
+        }
+        @keyframes tempesteRainSplash {
+          0%   { opacity: 0; transform: scale(0.3); }
+          35%  { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1.6); }
+        }
+        @keyframes tempesteFlicker {
+          0%   { opacity: 0; }
+          15%  { opacity: 0.85; }
+          30%  { opacity: 0.4;  }
+          45%  { opacity: 0.95; }
+          100% { opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 function AcidRainOverlay() {
   // Spawn a large pool of drops with staggered delays / durations so the
   // rain reads as "continuous" without any visible reset point.
@@ -1401,8 +1980,127 @@ function PoisonedWellEffect({ x, y, w, h }) {
   );
 }
 
+// Cosmic Summon — a black-and-purple portal tears open in the summon
+// slot: void expands from the centre, star-sparkles converge inward
+// from the rim, a lilac core flashes white, then everything collapses
+// back to let the freshly-placed creature render. Pure dark-theme, no
+// fire/ice colour families so it reads as "pulled from the depths of
+// space" rather than any existing elemental strike.
+function CosmicSummonEffect({ x, y }) {
+  const sparkles = useMemo(() => Array.from({ length: 18 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    // Start somewhere between 70–130px from centre; each sparkle
+    // converges all the way to the middle at peak.
+    const startDist = 70 + Math.random() * 60;
+    return {
+      startX: Math.cos(angle) * startDist,
+      startY: Math.sin(angle) * startDist,
+      size: 4 + Math.random() * 6,
+      delay: Math.random() * 220,
+      dur: 420 + Math.random() * 260,
+    };
+  }), []);
+  const dust = useMemo(() => Array.from({ length: 12 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 20 + Math.random() * 50;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 3 + Math.random() * 5,
+      color: ['#b488ff','#8a4bff','#d0a8ff','#ffffff','#6a2dcf'][Math.floor(Math.random() * 5)],
+      delay: 350 + Math.random() * 150,
+      dur: 400 + Math.random() * 300,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      {/* Void portal — black core with purple nebula halo. Grows then
+          collapses. */}
+      <div className="anim-cosmic-void" />
+      {/* Ring flash — a quick purple/white halo at peak expansion. */}
+      <div className="anim-cosmic-ring" />
+      {/* Converging star sparkles: each starts offset, shrinks to centre. */}
+      {sparkles.map((s, i) => (
+        <div key={'cs' + i} className="anim-cosmic-star" style={{
+          '--cstartX': s.startX + 'px', '--cstartY': s.startY + 'px',
+          '--csize': s.size + 'px',
+          animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+      {/* Outward dust burst at the peak — uses the shared explosion
+          particle keyframes (CSS var-driven). */}
+      {dust.map((d, i) => (
+        <div key={'cd' + i} className="anim-explosion-particle" style={{
+          '--dx': d.dx + 'px', '--dy': d.dy + 'px', '--size': d.size + 'px',
+          '--color': d.color,
+          animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+        }} />
+      ))}
+      <style>{`
+        @keyframes cosmic-void-pulse {
+          0%   { opacity: 0;   transform: translate(-50%, -50%) scale(0.15); }
+          35%  { opacity: 0.95; transform: translate(-50%, -50%) scale(1.0); }
+          65%  { opacity: 0.85; transform: translate(-50%, -50%) scale(1.15); }
+          100% { opacity: 0;   transform: translate(-50%, -50%) scale(0.4); }
+        }
+        @keyframes cosmic-ring-expand {
+          0%   { opacity: 0;   transform: translate(-50%, -50%) scale(0.3); }
+          30%  { opacity: 0.9; transform: translate(-50%, -50%) scale(0.95); }
+          60%  { opacity: 0.5; transform: translate(-50%, -50%) scale(1.35); }
+          100% { opacity: 0;   transform: translate(-50%, -50%) scale(1.75); }
+        }
+        @keyframes cosmic-star-converge {
+          0%   { opacity: 0; transform: translate(calc(-50% + var(--cstartX)), calc(-50% + var(--cstartY))) scale(0.6); }
+          25%  { opacity: 1; }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(0.15); }
+        }
+        .anim-cosmic-void {
+          position: absolute; left: 0; top: 0;
+          width: 140px; height: 140px;
+          border-radius: 50%;
+          background:
+            radial-gradient(circle at 50% 50%,
+              #000 0%,
+              rgba(40, 8, 80, 0.95) 30%,
+              rgba(120, 40, 220, 0.55) 60%,
+              rgba(80, 24, 180, 0.0) 100%);
+          box-shadow:
+            0 0 40px rgba(140, 60, 255, 0.75),
+            inset 0 0 30px rgba(20, 0, 50, 0.9);
+          transform: translate(-50%, -50%) scale(0.1);
+          animation: cosmic-void-pulse 900ms ease-out forwards;
+          filter: blur(0.5px);
+        }
+        .anim-cosmic-ring {
+          position: absolute; left: 0; top: 0;
+          width: 100px; height: 100px;
+          border-radius: 50%;
+          border: 3px solid rgba(220, 180, 255, 0.9);
+          box-shadow:
+            0 0 20px rgba(180, 100, 255, 0.9),
+            inset 0 0 14px rgba(255, 255, 255, 0.65);
+          transform: translate(-50%, -50%) scale(0.3);
+          animation: cosmic-ring-expand 700ms ease-out forwards;
+          animation-delay: 120ms;
+        }
+        .anim-cosmic-star {
+          position: absolute; left: 0; top: 0;
+          width: var(--csize); height: var(--csize);
+          border-radius: 50%;
+          background: radial-gradient(circle, #fff 0%, rgba(220, 200, 255, 0.95) 45%, rgba(180, 140, 255, 0) 100%);
+          box-shadow:
+            0 0 10px rgba(255, 255, 255, 0.95),
+            0 0 20px rgba(180, 120, 255, 0.75);
+          transform: translate(calc(-50% + var(--cstartX)), calc(-50% + var(--cstartY))) scale(0.6);
+          animation: cosmic-star-converge ease-in forwards;
+        }
+      `}</style>
+    </div>
+  );
+}
+
 const ANIM_REGISTRY = {
   explosion: ExplosionEffect,
+  cosmic_summon: CosmicSummonEffect,
   creature_death: CreatureDeathEffect,
   freeze: FreezeEffect,
   ice_encase: IceEncaseEffect,
@@ -5593,6 +6291,520 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ── Firewall (Surprise Spell) ────────────────────────────────────
+  // Tall wall of flames erupting from the ground around the host Hero
+  // who set up the Surprise. Tower of layered flames bursts upward,
+  // anchored to the bottom edge of the zone.
+  firewall: (() => {
+    return function FirewallEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      // Twelve vertical flame columns spanning the width, each rising
+      // upward with an independent stagger.
+      const cols = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+        offsetX: -cw * 0.55 + (cw * 1.1 / 13) * i + (-6 + Math.random() * 12),
+        size:    34 + Math.random() * 20,
+        delay:   Math.random() * 220,
+        dur:     780 + Math.random() * 320,
+        char:    ['🔥','🔥','🔥','🔥','💥','✦'][Math.floor(Math.random() * 6)],
+      })), [cw]);
+      // Embers shooting upward around the wall.
+      const embers = useMemo(() => Array.from({ length: 28 }, () => ({
+        offsetX: -cw * 0.55 + Math.random() * cw * 1.1,
+        riseY:   -(ch * 0.7 + Math.random() * ch * 1.2),
+        size:    4 + Math.random() * 7,
+        delay:   Math.random() * 600,
+        dur:     500 + Math.random() * 500,
+        color:   ['#ff2200','#ff5500','#ff8800','#ffaa00','#ffd700'][Math.floor(Math.random() * 5)],
+      })), [cw, ch]);
+      // Ground plume — wide hot glow at the base.
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute',
+            left: -cw * 0.6, top: ch * 0.35,
+            width: cw * 1.2, height: 50,
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(255,140,0,.85) 0%, rgba(255,60,0,.5) 50%, transparent 80%)',
+            opacity: 0,
+            animation: 'fwGroundFlash 900ms ease-out forwards',
+          }} />
+          {cols.map((c, i) => (
+            <div key={'fwc'+i} style={{
+              position: 'absolute',
+              left: c.offsetX + 'px',
+              top: ch * 0.45 + 'px',
+              fontSize: c.size + 'px',
+              opacity: 0,
+              filter: 'drop-shadow(0 0 8px rgba(255,120,0,.85)) drop-shadow(0 0 14px rgba(255,60,0,.5))',
+              animation: `fwColumnRise ${c.dur}ms ease-out ${c.delay}ms forwards`,
+              transformOrigin: '50% 100%',
+            }}>{c.char}</div>
+          ))}
+          {embers.map((e, i) => (
+            <div key={'fwe'+i} style={{
+              position: 'absolute',
+              left: e.offsetX + 'px', top: ch * 0.45 + 'px',
+              width: e.size + 'px', height: e.size + 'px',
+              borderRadius: '50%',
+              background: e.color,
+              boxShadow: `0 0 8px ${e.color}`,
+              opacity: 0,
+              '--fwEy': e.riseY + 'px',
+              animation: `fwEmberRise ${e.dur}ms ease-out ${e.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes fwGroundFlash {
+              0%   { opacity: 0; transform: scaleX(0.3); }
+              30%  { opacity: 1; transform: scaleX(1); }
+              100% { opacity: 0; transform: scaleX(1.05); }
+            }
+            @keyframes fwColumnRise {
+              0%   { opacity: 0; transform: translateY(20px) scaleY(0.4); }
+              25%  { opacity: 1; transform: translateY(-30px) scaleY(1.2); }
+              60%  { opacity: 1; transform: translateY(-90px) scaleY(1.6); }
+              100% { opacity: 0; transform: translateY(-150px) scaleY(2); }
+            }
+            @keyframes fwEmberRise {
+              0%   { opacity: 0; transform: translate(0, 0); }
+              25%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(0, var(--fwEy)); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Cataclysm (Spell) ────────────────────────────────────────────
+  // GIANT orange-red burning meteor falling from the top-right of the
+  // viewport, smashing into the centre of the battlefield. Routed via
+  // play_zone_animation with `heroIdx: -1, zoneSlot: -1` — the dispatch
+  // selector falls back to the player's hero row, so we deliberately
+  // ignore (x,y) and anchor everything to the viewport ourselves.
+  cataclysm: (() => {
+    return function CataclysmEffect() {
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 720;
+      const startX = vw + 240;     // off-screen top-right
+      const startY = -240;
+      const endX   = vw / 2;
+      const endY   = vh / 2;
+      const sparks = useMemo(() => Array.from({ length: 40 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 80 + Math.random() * 200;
+        return {
+          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+          size: 5 + Math.random() * 9,
+          color: ['#ff2200','#ff4400','#ff8800','#ffcc00','#ffaa00','#ff0000'][Math.floor(Math.random() * 6)],
+          delay: 1300 + Math.random() * 200,
+          dur: 600 + Math.random() * 500,
+        };
+      }), []);
+      const flames = useMemo(() => Array.from({ length: 32 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 60 + Math.random() * 280;
+        return {
+          x: Math.cos(angle) * dist,
+          y: Math.sin(angle) * dist,
+          size: 30 + Math.random() * 36,
+          delay: 1300 + Math.random() * 250,
+          dur: 700 + Math.random() * 500,
+          char: ['🔥','🔥','💥','☄️','✦'][Math.floor(Math.random() * 5)],
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: 0, top: 0, width: '100vw', height: '100vh',
+                       pointerEvents: 'none', zIndex: 10200, overflow: 'hidden' }}>
+          {/* Meteor — falls from top-right to centre over 1.3s, then explodes */}
+          <div style={{
+            position: 'absolute',
+            left: startX + 'px', top: startY + 'px',
+            fontSize: '180px',
+            filter: 'drop-shadow(0 0 30px #ff5500) drop-shadow(0 0 60px #ff2200) drop-shadow(0 0 90px #ff0000)',
+            '--cataDx': (endX - startX) + 'px',
+            '--cataDy': (endY - startY) + 'px',
+            animation: 'cataclysmFall 1300ms cubic-bezier(0.4, 0.0, 0.6, 1) forwards',
+          }}>☄️</div>
+          {/* Trail behind meteor */}
+          <div style={{
+            position: 'absolute',
+            left: startX + 'px', top: startY + 'px',
+            width: '0', height: '0',
+            '--cataDx': (endX - startX) + 'px',
+            '--cataDy': (endY - startY) + 'px',
+            animation: 'cataclysmFall 1300ms cubic-bezier(0.4, 0.0, 0.6, 1) forwards',
+          }}>
+            <div style={{
+              position: 'absolute',
+              left: '20px', top: '40px',
+              width: '380px', height: '12px',
+              borderRadius: '6px',
+              background: 'linear-gradient(90deg, transparent, rgba(255,90,0,.4) 30%, rgba(255,200,0,.85) 70%, #fff)',
+              filter: 'blur(8px)',
+              transformOrigin: '100% 50%',
+              transform: `rotate(${Math.atan2(endY - startY, endX - startX) * 180 / Math.PI + 180}deg)`,
+            }} />
+          </div>
+          {/* Impact flash — bright white-yellow shockwave */}
+          <div style={{
+            position: 'absolute',
+            left: endX - 250 + 'px', top: endY - 250 + 'px',
+            width: '500px', height: '500px',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,200,.9) 0%, rgba(255,180,0,.7) 25%, rgba(255,80,0,.4) 55%, transparent 80%)',
+            opacity: 0,
+            animation: 'cataclysmFlash 900ms ease-out 1300ms forwards',
+          }} />
+          {/* Outer shockwave */}
+          <div style={{
+            position: 'absolute',
+            left: endX - 50 + 'px', top: endY - 50 + 'px',
+            width: '100px', height: '100px',
+            border: '8px solid rgba(255,140,0,.8)',
+            borderRadius: '50%',
+            opacity: 0,
+            animation: 'cataclysmShockwave 1100ms ease-out 1300ms forwards',
+          }} />
+          {/* Lingering flames at impact */}
+          {flames.map((f, i) => (
+            <div key={'cat-f'+i} style={{
+              position: 'absolute',
+              left: endX + f.x + 'px', top: endY + f.y + 'px',
+              fontSize: f.size + 'px',
+              opacity: 0,
+              filter: 'drop-shadow(0 0 6px #ff4400)',
+              animation: `cataclysmEmber ${f.dur}ms ease-out ${f.delay}ms forwards`,
+            }}>{f.char}</div>
+          ))}
+          {/* Outward-flying sparks */}
+          {sparks.map((s, i) => (
+            <div key={'cat-s'+i} style={{
+              position: 'absolute',
+              left: endX + 'px', top: endY + 'px',
+              width: s.size + 'px', height: s.size + 'px',
+              borderRadius: '50%',
+              background: s.color,
+              boxShadow: `0 0 10px ${s.color}`,
+              opacity: 0,
+              '--cataSx': s.dx + 'px',
+              '--cataSy': s.dy + 'px',
+              animation: `cataclysmSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes cataclysmFall {
+              0%   { transform: translate(0, 0) rotate(0deg); }
+              100% { transform: translate(var(--cataDx), var(--cataDy)) rotate(180deg); }
+            }
+            @keyframes cataclysmFlash {
+              0%   { opacity: 0; transform: scale(0.2); }
+              25%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+            @keyframes cataclysmShockwave {
+              0%   { opacity: 0.9; transform: scale(0.4); border-width: 8px; }
+              100% { opacity: 0;   transform: scale(8);   border-width: 1px; }
+            }
+            @keyframes cataclysmEmber {
+              0%   { opacity: 0; transform: scale(0.3); }
+              25%  { opacity: 1; transform: scale(1.2); }
+              100% { opacity: 0; transform: scale(0.7) translateY(20px); }
+            }
+            @keyframes cataclysmSpark {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              20%  { opacity: 1; transform: translate(calc(var(--cataSx) * 0.2), calc(var(--cataSy) * 0.2)) scale(1); }
+              100% { opacity: 0; transform: translate(var(--cataSx), var(--cataSy)) scale(0.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Sacrifice (Sacrifice to Divinity, future tribute cards) ────────
+  // A dagger plunges down into the target zone, pauses on contact, and
+  // a small spray of blood droplets bursts outward. Composes the same
+  // particle / shockwave primitives the rest of the registry uses.
+  knife_sacrifice: (() => {
+    return function KnifeSacrificeEffect({ x, y }) {
+      const droplets = useMemo(() => Array.from({ length: 14 }, () => {
+        const angle = -Math.PI + Math.random() * Math.PI; // -180° to 0°: outward + upward
+        const speed = 28 + Math.random() * 36;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed * 0.5 + 8 + Math.random() * 12,
+          size: 4 + Math.random() * 5,
+          delay: 380 + Math.random() * 120,
+          dur: 380 + Math.random() * 220,
+          color: ['#a01010', '#c01818', '#7f0808', '#d62a2a'][Math.floor(Math.random() * 4)],
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Dagger — falls from ~80px above to the centre, then sticks */}
+          <div style={{
+            position: 'absolute', left: -20, top: 0,
+            fontSize: 56, lineHeight: '40px',
+            filter: 'drop-shadow(0 0 6px rgba(0,0,0,0.85)) drop-shadow(0 0 3px rgba(255,255,255,0.4))',
+            animation: 'knifeSacPlunge 480ms cubic-bezier(0.4, 0, 0.85, 1) forwards',
+          }}>🗡️</div>
+          {/* Impact flash + dust ring on contact */}
+          <div style={{
+            position: 'absolute', left: -28, top: -4,
+            width: 56, height: 56, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.85) 0%, rgba(255,200,200,0.4) 40%, transparent 75%)',
+            opacity: 0,
+            animation: 'knifeSacImpact 320ms ease-out 380ms forwards',
+          }} />
+          {/* Outer crimson shockwave */}
+          <div style={{
+            position: 'absolute', left: -16, top: -2,
+            width: 32, height: 32, borderRadius: '50%',
+            border: '3px solid rgba(180, 20, 20, 0.85)',
+            opacity: 0,
+            animation: 'knifeSacShockwave 480ms ease-out 380ms forwards',
+          }} />
+          {/* Blood droplets — burst outward from the impact point */}
+          {droplets.map((d, i) => (
+            <div key={'kbd' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: d.size + 'px', height: d.size + 'px',
+              borderRadius: '50% 55% 40% 60% / 60% 40% 60% 40%',
+              background: `radial-gradient(circle at 35% 30%, ${d.color}, ${d.color}aa 70%)`,
+              boxShadow: `0 0 ${d.size * 1.5}px ${d.color}88`,
+              opacity: 0,
+              '--ksDx': d.dx + 'px',
+              '--ksDy': d.dy + 'px',
+              animation: `knifeSacDroplet ${d.dur}ms ease-out ${d.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes knifeSacPlunge {
+              0%   { transform: translate(0, -90px) rotate(20deg); opacity: 0; }
+              25%  { transform: translate(0, -45px) rotate(15deg); opacity: 1; }
+              80%  { transform: translate(0, 4px)   rotate(0deg);  opacity: 1; }
+              100% { transform: translate(0, 6px)   rotate(0deg);  opacity: 1; }
+            }
+            @keyframes knifeSacImpact {
+              0%   { opacity: 0; transform: scale(0.4); }
+              30%  { opacity: 1; transform: scale(1.1); }
+              100% { opacity: 0; transform: scale(1.6); }
+            }
+            @keyframes knifeSacShockwave {
+              0%   { opacity: 0.95; transform: scale(0.5); border-width: 3px; }
+              100% { opacity: 0; transform: scale(3.2); border-width: 0.5px; }
+            }
+            @keyframes knifeSacDroplet {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.3); }
+              25%  { opacity: 1; transform: translate(calc(var(--ksDx) * 0.3), calc(var(--ksDy) * 0.3)) scale(1); }
+              100% { opacity: 0; transform: translate(var(--ksDx), var(--ksDy)) scale(0.6); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Hell Fox death: black-flame eruption ───────────────────────────
+  // When a Hell Fox is defeated, a column of pitch-black flames erupts
+  // from its support slot. Stacks a few jagged flame sprites with
+  // upward jitter + a brief shadow halo so the eruption reads as
+  // hellish rather than ordinary fire.
+  hell_fox_death: (() => {
+    return function HellFoxDeathEffect({ x, y }) {
+      const flames = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+        startX: -22 + Math.random() * 44,
+        riseY:  -(60 + Math.random() * 70),
+        scale:  0.7 + Math.random() * 0.7,
+        delay:  i * 28 + Math.random() * 90,
+        dur:    520 + Math.random() * 320,
+        glyph:  ['🔥', '🔥', '🜲', '∆'][Math.floor(Math.random() * 4)],
+      })), []);
+      const sparks = useMemo(() => Array.from({ length: 22 }, () => {
+        const angle = -Math.PI + Math.random() * Math.PI;
+        const speed = 26 + Math.random() * 36;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed * 0.6 - 6,
+          size: 3 + Math.random() * 4,
+          delay: 60 + Math.random() * 280,
+          dur: 460 + Math.random() * 260,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Ground halo — deep crimson-into-black ring on the slot. */}
+          <div style={{
+            position: 'absolute', left: -42, top: -18,
+            width: 84, height: 36, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(60,0,0,0.85) 0%, rgba(20,0,0,0.7) 50%, rgba(0,0,0,0) 90%)',
+            filter: 'blur(2px)',
+            opacity: 0,
+            animation: 'hellFoxHalo 760ms ease-out forwards',
+          }} />
+          {/* Black flame sprites — each is a darkened emoji + crimson
+              under-glow that rises and dissipates. We stack 'em close to
+              the centre so the column reads as one belching pyre. */}
+          {flames.map((f, i) => (
+            <div key={'hff' + i} style={{
+              position: 'absolute',
+              left: f.startX,
+              top: 0,
+              fontSize: 32 * f.scale,
+              lineHeight: '32px',
+              filter: 'brightness(0.35) drop-shadow(0 0 6px rgba(120,0,0,0.95)) drop-shadow(0 0 14px rgba(180,0,0,0.5))',
+              '--hffRise': f.riseY + 'px',
+              opacity: 0,
+              animation: `hellFoxFlame ${f.dur}ms ease-out ${f.delay}ms forwards`,
+            }}>{f.glyph}</div>
+          ))}
+          {/* Crimson sparks — outward burst on impact. */}
+          {sparks.map((s, i) => (
+            <div key={'hfs' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: s.size + 'px', height: s.size + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, #ff3030 0%, #c00000 60%, transparent 100%)',
+              boxShadow: '0 0 8px #c00000aa',
+              '--hfsDx': s.dx + 'px',
+              '--hfsDy': s.dy + 'px',
+              opacity: 0,
+              animation: `hellFoxSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes hellFoxHalo {
+              0%   { opacity: 0; transform: scale(0.4); }
+              25%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.6); }
+            }
+            @keyframes hellFoxFlame {
+              0%   { opacity: 0; transform: translate(0, 16px) scale(0.5); }
+              30%  { opacity: 1; transform: translate(0, calc(var(--hffRise) * 0.35)) scale(1); }
+              100% { opacity: 0; transform: translate(0, var(--hffRise)) scale(0.7); }
+            }
+            @keyframes hellFoxSpark {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              25%  { opacity: 1; transform: translate(calc(var(--hfsDx) * 0.3), calc(var(--hfsDy) * 0.3)) scale(1); }
+              100% { opacity: 0; transform: translate(var(--hfsDx), var(--hfsDy)) scale(0.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Dog bite (Loyal Terrier, future fang-tribe cards) ──────────────
+  // Two fang silhouettes snap shut on the target's slot, paired with a
+  // shock-line halo and a couple of saliva droplets that fly outward
+  // post-impact. Mirrors the knife_sacrifice / punch_impact tempo so
+  // the existing ZONE_ANIM_SFX system can hook a bark / chomp later
+  // without re-tuning timing.
+  dog_bite: (() => {
+    return function DogBiteEffect({ x, y }) {
+      const drops = useMemo(() => Array.from({ length: 10 }, () => {
+        const angle = -Math.PI + Math.random() * Math.PI; // upward arc
+        const speed = 24 + Math.random() * 28;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed * 0.55 + 6 + Math.random() * 8,
+          size: 3 + Math.random() * 3,
+          delay: 220 + Math.random() * 140,
+          dur: 320 + Math.random() * 200,
+        };
+      }), []);
+      const shockLines = useMemo(() => Array.from({ length: 8 }, (_, i) => ({
+        rot: -90 + i * 22.5 + (Math.random() * 14 - 7),
+        len: 22 + Math.random() * 14,
+        delay: 200 + Math.random() * 80,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Top fang — descends from upper-left, rotates to bite */}
+          <div style={{
+            position: 'absolute', left: -20, top: -28,
+            fontSize: 38, lineHeight: '32px',
+            filter: 'drop-shadow(0 0 4px rgba(40,20,10,0.8))',
+            transformOrigin: '60% 90%',
+            animation: 'dogBiteTopFang 360ms cubic-bezier(0.4, 0, 0.85, 1) forwards',
+          }}>🦷</div>
+          {/* Bottom fang — descends from lower-right, mirrored. Using
+              the same tooth glyph rotated 180° with `scaleY(-1)` to
+              make the bite read as upper + lower jaw closing. */}
+          <div style={{
+            position: 'absolute', left: -2, top: 4,
+            fontSize: 38, lineHeight: '32px',
+            filter: 'drop-shadow(0 0 4px rgba(40,20,10,0.8))',
+            transform: 'scaleY(-1)',
+            transformOrigin: '40% 10%',
+            animation: 'dogBiteBottomFang 360ms cubic-bezier(0.4, 0, 0.85, 1) forwards',
+          }}>🦷</div>
+          {/* Impact flash — quick pale flash at the bite point. */}
+          <div style={{
+            position: 'absolute', left: -22, top: -12,
+            width: 44, height: 32, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,235,200,0.85) 0%, rgba(255,200,140,0.35) 50%, transparent 80%)',
+            opacity: 0,
+            animation: 'dogBiteImpact 280ms ease-out 320ms forwards',
+          }} />
+          {/* Shock-line halo — short rays radiating outward from the
+              bite at impact, sells the pinch. */}
+          {shockLines.map((s, i) => (
+            <div key={'dbs' + i} style={{
+              position: 'absolute', left: -1, top: -1,
+              width: s.len + 'px', height: 2,
+              background: 'linear-gradient(90deg, rgba(70,40,20,0.95), rgba(70,40,20,0))',
+              transform: `rotate(${s.rot}deg)`,
+              transformOrigin: '0 50%',
+              opacity: 0,
+              animation: `dogBiteShock 280ms ease-out ${s.delay}ms forwards`,
+            }} />
+          ))}
+          {/* Saliva / fur droplets bursting outward post-impact. */}
+          {drops.map((d, i) => (
+            <div key={'dbd' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: d.size + 'px', height: d.size + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, #f5f1d8 0%, #cfc7a0 70%, transparent 100%)',
+              boxShadow: '0 0 4px rgba(220,210,170,0.7)',
+              opacity: 0,
+              '--dbDx': d.dx + 'px',
+              '--dbDy': d.dy + 'px',
+              animation: `dogBiteDroplet ${d.dur}ms ease-out ${d.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes dogBiteTopFang {
+              0%   { opacity: 0; transform: translate(-26px, -28px) rotate(-25deg); }
+              50%  { opacity: 1; transform: translate(-6px, -8px) rotate(-8deg); }
+              80%  { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+              100% { opacity: 0; transform: translate(0, 0) rotate(2deg); }
+            }
+            @keyframes dogBiteBottomFang {
+              0%   { opacity: 0; transform: scaleY(-1) translate(22px, -28px) rotate(28deg); }
+              50%  { opacity: 1; transform: scaleY(-1) translate(6px, -10px) rotate(10deg); }
+              80%  { opacity: 1; transform: scaleY(-1) translate(0, -2px) rotate(0deg); }
+              100% { opacity: 0; transform: scaleY(-1) translate(0, -2px) rotate(-2deg); }
+            }
+            @keyframes dogBiteImpact {
+              0%   { opacity: 0; transform: scale(0.4); }
+              35%  { opacity: 1; transform: scale(1.2); }
+              100% { opacity: 0; transform: scale(1.6); }
+            }
+            @keyframes dogBiteShock {
+              0%   { opacity: 0; transform: rotate(var(--rot, 0deg)) scaleX(0.2); }
+              40%  { opacity: 0.95; transform: rotate(var(--rot, 0deg)) scaleX(1); }
+              100% { opacity: 0; transform: rotate(var(--rot, 0deg)) scaleX(1.3); }
+            }
+            @keyframes dogBiteDroplet {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              25%  { opacity: 1; transform: translate(calc(var(--dbDx) * 0.3), calc(var(--dbDy) * 0.3)) scale(1); }
+              100% { opacity: 0; transform: translate(var(--dbDx), var(--dbDy)) scale(0.6); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
 };
 
 function IceEncaseEffect({ x, y }) {
@@ -6424,6 +7636,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const actionLogRef = useRef(null);
   const [transferAnims, setTransferAnims] = useState([]); // Card transfer animations (Dark Gear, etc.)
   const [projectileAnims, setProjectileAnims] = useState([]); // Projectile animations (phoenix cannon, etc.)
+  const [tempesteRainInsts, setTempesteRainInsts] = useState([]); // Active Prophecy of Tempeste instance ids — one rain overlay per
   const [discardAnims, setDiscardAnims] = useState([]);
   const [myDiscardHidden, setMyDiscardHidden] = useState(0);
   const [oppDiscardHidden, setOppDiscardHidden] = useState(0);
@@ -6992,6 +8205,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Gray out Artifacts if not enough gold or item-locked
       if (card.cardType === 'Artifact') {
         if (me.itemLocked && (me.hand || []).length < 2) return true;
+        // Boomerang's "no Artifacts for the rest of this turn" lockout —
+        // every Artifact in hand greys out for the duration. Server
+        // enforces the same gate; this is purely visual.
+        if (me.artifactLocked) return true;
         if ((me.gold || 0) < (card.cost || 0)) return true;
         // Once-per-game artifacts (Smug Coin, etc.)
         if ((me.oncePerGameUsed || []).includes(cardName)) return true;
@@ -7206,6 +8423,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (heroData?.cardType !== 'Ascended Hero') return false;
     }
 
+    // Restricted-attachment abilities (Divinity, etc.) are never
+    // playable from hand — only specific cards that name them can
+    // attach. The card stays grayed-out in hand exactly like any
+    // other ability with no valid hero target. The `allowRestricted`
+    // opt-in lets server-driven attach prompts (e.g. "Sacrifice to
+    // Divinity"'s `abilityAttachTarget`) bypass the gate, since the
+    // server has already vetted the eligibleHeroIdxs list.
+    if (!opts.allowRestricted && (gameState.restrictedAttachmentAbilities || []).includes(abilityName)) return false;
+
     const abZones = playerData.abilityZones[heroIdx] || [[], [], []];
     const isCustom = (gameState.customPlacementCards || []).includes(abilityName);
 
@@ -7247,7 +8473,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (!card || card.cardType !== 'Creature') return false;
     const hero = playerData.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
-    if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
+    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.bound) return false;
     // Apply board-wide level reductions from `reduceCardLevel` hooks (Elven
     // Forager, …) so the highlight agrees with `heroMeetsLevelReq`. Only
     // meaningful for the own player — the charmed-summon path calls this
@@ -7920,33 +9146,40 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           } else if (card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment') {
             socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx });
           } else if ((card.cardType === 'Spell' || card.cardType === 'Attack') && isPlayable) {
-            // Find all heroes that can play this card (own + charmed opponent)
-            const eligible = [];
-            for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-              if (canHeroPlayCard(me, hi, card)) {
-                eligible.push({ idx: hi, name: me.heroes[hi].name });
+            // Hero-locked path: a heroAction prompt names a single Hero
+            // who's getting the additional Action (Body Swap, Coffee,
+            // Trample Sounds, any future immediate-additional card).
+            // Clicking an eligible card auto-routes to that Hero — no
+            // hero picker, no fallthrough to "any Hero who can cast".
+            // The prompt's `eligibleCards` list is already narrowed
+            // server-side to only what THIS hero can legally cast, so
+            // the click is always safe to dispatch directly.
+            if (isHeroAction) {
+              socket.emit('effect_prompt_response', {
+                roomId: gameState.roomId,
+                response: { cardName, handIndex: idx, heroIdx: heroActionPrompt.heroIdx },
+              });
+            } else {
+              // Normal flow: find every Hero that could cast this card,
+              // own + charmed opponent. Single eligible auto-plays;
+              // multiple eligible opens the hero-selection popup.
+              const eligible = [];
+              for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+                if (canHeroPlayCard(me, hi, card)) {
+                  eligible.push({ idx: hi, name: me.heroes[hi].name });
+                }
               }
-            }
-            // Also check charmed opponent heroes
-            for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
-              const oppHero = opp.heroes[hi];
-              if (oppHero?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card)) {
-                eligible.push({ idx: hi, name: oppHero.name, charmedOwner: oppIdx });
+              for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
+                const oppHero = opp.heroes[hi];
+                if (oppHero?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card)) {
+                  eligible.push({ idx: hi, name: oppHero.name, charmedOwner: oppIdx });
+                }
               }
-            }
-            if (eligible.length === 1) {
-              // Only one eligible hero — auto-play
-              if (isHeroAction) {
-                socket.emit('effect_prompt_response', {
-                  roomId: gameState.roomId,
-                  response: { cardName, handIndex: idx, heroIdx: eligible[0].idx },
-                });
-              } else {
+              if (eligible.length === 1) {
                 socket.emit('play_spell', { roomId: gameState.roomId, cardName, handIndex: idx, heroIdx: eligible[0].idx, charmedOwner: eligible[0].charmedOwner });
+              } else if (eligible.length > 1) {
+                setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isHeroAction });
               }
-            } else if (eligible.length > 1) {
-              // Multiple eligible — show hero selection popup
-              setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isHeroAction });
             }
           } else if (card.cardType === 'Ability' && isAbilityPlayable && !isAbilityAttachEligible) {
             // Click-to-attach. Instead of a popup, enter "pick-a-zone" mode:
@@ -7957,6 +9190,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               setAbilityAttachPick({ cardName, handIndex: idx, card });
             }
           } else if (card.cardType === 'Creature' && isPlayable) {
+            // Hero-locked path: heroAction prompt is up and this
+            // Creature is in its eligibleCards. Auto-summon onto the
+            // prompt's named Hero — no hero picker. The first free
+            // Support Zone on that hero is used; performImmediate
+            // Action's server validation checks the slot.
+            if (isHeroAction) {
+              const lockedHi = heroActionPrompt.heroIdx;
+              const lockedSlot = findFreeSupportSlot(me, lockedHi);
+              if (lockedSlot >= 0) {
+                socket.emit('effect_prompt_response', {
+                  roomId: gameState.roomId,
+                  response: { cardName, handIndex: idx, heroIdx: lockedHi, zoneSlot: lockedSlot },
+                });
+              }
+              setHandDrag(null); setPlayDrag(null); setAbilityDrag(null); return;
+            }
             // Click-to-summon. Two routing paths:
             //
             // (A) Bounce-place is available (Deepsea archetype / any
@@ -10012,6 +11261,246 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => glow.remove(), 900);
     };
     socket.on('fireshield_corona', onFireshieldCorona);
+    // ── Flashbang: full-viewport white flash ──
+    // The Potion broadcasts `flashbang_screen` from its resolve() and again
+    // when the trigger fires on the opponent's first action. Both events
+    // produce the same overlay — a brief opaque-white flash that fades out.
+    const onFlashbangScreen = () => {
+      // 'match_found' has the bright, sharp tone that fits the
+      // disorienting flashbang — see SFX_NAMES in app-shared.jsx.
+      if (window.playSFX) window.playSFX('match_found', { dedupe: 200, category: 'effect' });
+      if (!document.getElementById('flashbang-screen-kf')) {
+        const style = document.createElement('style');
+        style.id = 'flashbang-screen-kf';
+        style.textContent = `
+          @keyframes flashbangScreen {
+            0%   { opacity: 0; }
+            10%  { opacity: 1; }
+            45%  { opacity: 1; }
+            100% { opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+      const overlay = document.createElement('div');
+      overlay.style.cssText = [
+        'position:fixed', 'left:0', 'top:0',
+        'width:100vw', 'height:100vh',
+        'background:#fff',
+        'pointer-events:none', 'z-index:99999',
+        'opacity:0',
+        'animation:flashbangScreen 850ms ease-out forwards',
+      ].join(';');
+      document.body.appendChild(overlay);
+      setTimeout(() => overlay.remove(), 900);
+    };
+    socket.on('flashbang_screen', onFlashbangScreen);
+    // ── Gathering Storm: per-target lightning strike SFX ──
+    // Server fires this alongside the electric_strike zone animation
+    // for each target hit by the storm's start-of-turn damage. Plays
+    // the lightning SFX at full volume (the ambient bolt rumbles use
+    // a much lower volume; THIS one is the "strike landed" punch).
+    const onGatheringStormStrike = () => {
+      if (window.playSFX) window.playSFX('elem_lightning', { dedupe: 80, category: 'effect' });
+    };
+    socket.on('gathering_storm_strike', onGatheringStormStrike);
+    // ── Compulsory Body Swap: two ghost copies cross paths between heroes ──
+    // Server broadcasts `body_swap_souls` with the two hero coords + a
+    // duration; we paint a semi-transparent ghost portrait of each hero
+    // anchored at its origin and animate it across to the other slot.
+    // The two ghosts cross at the midpoint, symbolising the souls
+    // changing places.
+    const onBodySwapSouls = ({ a, b, durationMs }) => {
+      const dur = durationMs || 1000;
+      const labelA = a.owner === myIdx ? 'me' : 'opp';
+      const labelB = b.owner === myIdx ? 'me' : 'opp';
+      const aEl = document.querySelector(`[data-hero-zone][data-hero-owner="${labelA}"][data-hero-idx="${a.heroIdx}"]`);
+      const bEl = document.querySelector(`[data-hero-zone][data-hero-owner="${labelB}"][data-hero-idx="${b.heroIdx}"]`);
+      if (!aEl || !bEl) return;
+      const ar = aEl.getBoundingClientRect();
+      const br = bEl.getBoundingClientRect();
+      const ax = ar.left + ar.width / 2, ay = ar.top + ar.height / 2;
+      const bx = br.left + br.width / 2, by = br.top + br.height / 2;
+
+      // Inject keyframes once per session.
+      if (!document.getElementById('body-swap-souls-kf')) {
+        const style = document.createElement('style');
+        style.id = 'body-swap-souls-kf';
+        style.textContent = `
+          @keyframes bodySwapGhostFly {
+            0%   { opacity: 0; transform: translate(0, 0) scale(0.9); }
+            15%  { opacity: 0.85; transform: translate(calc(var(--bsDx) * 0.15), calc(var(--bsDy) * 0.15)) scale(1.05); }
+            85%  { opacity: 0.85; transform: translate(calc(var(--bsDx) * 0.85), calc(var(--bsDy) * 0.85)) scale(1.05); }
+            100% { opacity: 0; transform: translate(var(--bsDx), var(--bsDy)) scale(0.9); }
+          }
+          @keyframes bodySwapGhostHalo {
+            0%, 100% { box-shadow: 0 0 18px rgba(180, 220, 255, 0.55), 0 0 38px rgba(120, 180, 255, 0.35); }
+            50%      { box-shadow: 0 0 30px rgba(220, 240, 255, 0.85), 0 0 60px rgba(160, 200, 255, 0.5);  }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      // Each ghost is the hero's actual card image at reduced opacity,
+      // wrapped in a frosty halo so it reads as a soul rather than a
+      // duplicate portrait. Image URL routes through window.cardImageUrl
+      // (defined in app-shared.jsx) — same lookup BoardCard uses, so
+      // skin overrides aren't relevant here (skins are server-managed
+      // per-card and we want the canonical hero portrait for the swap).
+      const imgFor = (heroName) => (window.cardImageUrl ? window.cardImageUrl(heroName) : null);
+      const makeGhost = (sx, sy, dx, dy, heroName) => {
+        const ghost = document.createElement('div');
+        ghost.style.cssText = [
+          'position:fixed',
+          `left:${sx - 40}px`, `top:${sy - 56}px`,
+          'width:80px', 'height:112px',
+          'border-radius:10px',
+          'overflow:hidden',
+          // Soft cyan-white halo around the soul portrait.
+          'box-shadow:0 0 18px rgba(180,220,255,0.65), 0 0 38px rgba(120,180,255,0.4)',
+          'border:1.5px solid rgba(220,240,255,0.7)',
+          'pointer-events:none', 'z-index:10080',
+          'opacity:0',
+          `--bsDx:${dx}px`, `--bsDy:${dy}px`,
+          `animation:bodySwapGhostFly ${dur}ms ease-in-out forwards, bodySwapGhostHalo ${Math.round(dur / 2)}ms ease-in-out infinite`,
+        ].join(';');
+        const url = imgFor(heroName);
+        if (url) {
+          // Layer 1: the actual portrait.
+          const img = document.createElement('img');
+          img.src = url;
+          img.style.cssText = [
+            'position:absolute', 'inset:0',
+            'width:100%', 'height:100%',
+            'object-fit:cover',
+            'opacity:0.7',
+            'filter:saturate(0.85) brightness(1.1)',
+          ].join(';');
+          img.draggable = false;
+          ghost.appendChild(img);
+          // Layer 2: cool blue tint over the portrait so it reads as a
+          // ghost rather than a duplicate live hero.
+          const tint = document.createElement('div');
+          tint.style.cssText = [
+            'position:absolute', 'inset:0',
+            'background:linear-gradient(180deg, rgba(180,220,255,0.45) 0%, rgba(140,190,240,0.35) 60%, rgba(110,170,230,0.40) 100%)',
+            'mix-blend-mode:screen',
+          ].join(';');
+          ghost.appendChild(tint);
+        } else {
+          // Fallback for cards without a registered image — labelled
+          // soul ribbon so the swap still reads correctly.
+          ghost.style.cssText += ';background:linear-gradient(180deg, rgba(220,240,255,0.55) 0%, rgba(150,200,255,0.45) 100%);display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;font-size:11px;font-weight:700;color:#fff;text-shadow:0 0 4px rgba(60,100,160,0.9)';
+          ghost.textContent = (heroName || '').split(',')[0].slice(0, 14);
+        }
+        document.body.appendChild(ghost);
+        setTimeout(() => ghost.remove(), dur + 60);
+      };
+
+      makeGhost(ax, ay, bx - ax, by - ay, a.name);
+      makeGhost(bx, by, ax - bx, ay - by, b.name);
+
+      if (window.playSFX) window.playSFX('ability_activate', { dedupe: 200, category: 'effect' });
+    };
+    socket.on('body_swap_souls', onBodySwapSouls);
+    // ── Forbidden Zone: battlefield-wide eerie red light ──
+    // Brief overlay that bathes the entire viewport in a pulsing red
+    // glow while the spell resolves. Fades in fast, holds at full,
+    // fades out over the back half. Pure visual — the per-target
+    // damage flashes inside still play normally underneath.
+    const onForbiddenZoneOverlay = ({ durationMs } = {}) => {
+      const dur = durationMs || 2200;
+      if (window.playSFX) window.playSFX('elem_dark', { dedupe: 200, category: 'effect' });
+      if (!document.getElementById('forbidden-zone-overlay-kf')) {
+        const style = document.createElement('style');
+        style.id = 'forbidden-zone-overlay-kf';
+        style.textContent = `
+          @keyframes forbiddenZoneFade {
+            0%   { opacity: 0; }
+            12%  { opacity: 1; }
+            70%  { opacity: 0.85; }
+            100% { opacity: 0; }
+          }
+          @keyframes forbiddenZonePulse {
+            0%, 100% { filter: hue-rotate(-6deg) saturate(1.15) brightness(0.95); }
+            50%      { filter: hue-rotate(8deg)  saturate(1.4)  brightness(1.05); }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+      const overlay = document.createElement('div');
+      overlay.style.cssText = [
+        'position:fixed', 'left:0', 'top:0',
+        'width:100vw', 'height:100vh',
+        'background:radial-gradient(ellipse at 50% 50%, rgba(140,0,0,0.55) 0%, rgba(80,0,0,0.45) 55%, rgba(30,0,0,0.55) 100%)',
+        'mix-blend-mode:multiply',
+        'pointer-events:none', 'z-index:9998',
+        'opacity:0',
+        `animation:forbiddenZoneFade ${dur}ms ease-out forwards, forbiddenZonePulse 900ms ease-in-out infinite`,
+      ].join(';');
+      document.body.appendChild(overlay);
+      // Concentric ring pulse to sell the "forbidden seal" vibe.
+      const ring = document.createElement('div');
+      ring.style.cssText = [
+        'position:fixed',
+        'left:50%', 'top:50%',
+        'width:60px', 'height:60px',
+        'transform:translate(-50%, -50%)',
+        'border:6px solid rgba(255,40,40,0.9)',
+        'border-radius:50%',
+        'box-shadow:0 0 60px rgba(255,40,40,0.7), inset 0 0 30px rgba(255,40,40,0.5)',
+        'pointer-events:none', 'z-index:9999',
+        'opacity:0',
+        `animation:forbiddenZoneFade ${dur}ms ease-out forwards`,
+      ].join(';');
+      document.body.appendChild(ring);
+      setTimeout(() => { overlay.remove(); ring.remove(); }, dur + 60);
+    };
+    socket.on('forbidden_zone_overlay', onForbiddenZoneOverlay);
+    // ── Prophecy of Tempeste: permanent rain while attached ──
+    // Lifecycle is owned by the server: `tempeste_rain_start` adds an
+    // entry keyed by instance id, `tempeste_rain_stop` removes it. The
+    // <TempesteRainOverlay/> component renders one per active entry.
+    const onTempesteRainStart = ({ instId }) => {
+      if (instId == null) return;
+      setTempesteRainInsts(prev => prev.includes(instId) ? prev : [...prev, instId]);
+    };
+    const onTempesteRainStop = ({ instId }) => {
+      if (instId == null) {
+        setTempesteRainInsts([]);
+        return;
+      }
+      setTempesteRainInsts(prev => prev.filter(id => id !== instId));
+    };
+    socket.on('tempeste_rain_start', onTempesteRainStart);
+    socket.on('tempeste_rain_stop', onTempesteRainStop);
+    // Tempeste single-strike redirect line — same SFX as Gathering
+    // Storm's distant rumble so the redirect reads as a thunderclap.
+    const onTempesteRedirectStrike = () => {
+      if (window.playSFX) window.playSFX('elem_lightning', { dedupe: 120, category: 'effect' });
+    };
+    socket.on('tempeste_redirect_strike', onTempesteRedirectStrike);
+    // ── Creature damage absorbed-to-zero floater ──
+    // The HP-diff-based floater pass downstream only fires when HP
+    // actually changed. Damage absorbed all the way to 0 (Loyal
+    // Labradoodle, Flame Avalanche damageLocked, future "reduce to
+    // 0" effects) leaves HP unchanged, so the engine emits this
+    // explicit event with `amount: 0` and we surface a "0" floater
+    // on the absorbing creature's slot.
+    const onCreatureDamageFloater = ({ owner, heroIdx, zoneSlot, amount }) => {
+      if (owner == null || heroIdx == null || zoneSlot == null) return;
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const entry = {
+        id: Date.now() + Math.random(),
+        amount: amount || 0,
+        ownerLabel, heroIdx, zoneSlot,
+      };
+      setCreatureDamageNumbers(prev => [...prev, entry]);
+      setTimeout(() => {
+        setCreatureDamageNumbers(prev => prev.filter(d => d.id !== entry.id));
+      }, 1800);
+    };
+    socket.on('creature_damage_floater', onCreatureDamageFloater);
     const onSurpriseFlip = ({ owner, heroIdx, cardName, isBakhmSlot, bakhmZoneSlot }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       let el;
@@ -11390,6 +12879,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('jumpscare_box', onJumpscareBox);
       socket.off('anti_magic_bubble', onAntiMagicBubble);
       socket.off('fireshield_corona', onFireshieldCorona);
+      socket.off('flashbang_screen', onFlashbangScreen);
+      socket.off('gathering_storm_strike', onGatheringStormStrike);
+      socket.off('body_swap_souls', onBodySwapSouls);
+      socket.off('forbidden_zone_overlay', onForbiddenZoneOverlay);
+      socket.off('tempeste_rain_start', onTempesteRainStart);
+      socket.off('tempeste_rain_stop', onTempesteRainStop);
+      socket.off('tempeste_redirect_strike', onTempesteRedirectStrike);
+      socket.off('creature_damage_floater', onCreatureDamageFloater);
       socket.off('play_permanent_animation', onPermanentAnim);
       socket.off('surprise_flip', onSurpriseFlip);
       socket.off('surprise_reset', onSurpriseReset);
@@ -12850,6 +14347,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 && !abilityAttachPick.eligibleHeroIdxs.includes(i)) return false;
             return canHeroReceiveAbility(p, i, abilityAttachPick.cardName, {
               skipAbilityGiven: !!abilityAttachPick.skipAbilityGiven,
+              // Server-driven attach prompts have already vetted the
+              // restrictedAttachment gate when building eligibleHeroIdxs.
+              // Re-applying it client-side would reject heroes the
+              // server explicitly approved (e.g. Sacrifice to Divinity
+              // attaching Divinity).
+              allowRestricted: abilityAttachPick.source === 'effectPrompt',
             });
           })();
           const attachPickHeroDim = !isOpp && abilityAttachPick && !attachPickEligibleHero;
@@ -12870,6 +14373,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const isHealReversed = hero?.statuses?.healReversed;
           const isUntargetable = hero?.statuses?.untargetable;
           const isSirenLinked = !!hero?.statuses?.sirenLinked;
+          const isBound = !!hero?.statuses?.bound;
           // Check if this hero has an active hero effect
           const heroEffectEntry = (gameState.activeHeroEffects || []).find(e => e.heroIdx === i && ((!isOpp && !e.charmedOwner) || (isOpp && e.charmedOwner === pi)));
           const isHeroEffectActive = !!heroEffectEntry;
@@ -12962,7 +14466,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
                 {hero?.name && isHealReversed && <HealReversedOverlay />}
-                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isSirenLinked) && <StatusBadges statuses={hero.statuses} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
+                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isSirenLinked || isBound) && <StatusBadges statuses={hero.statuses} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
                 {hero?.name && (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Mummy Token')) && (
@@ -13136,6 +14640,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       && !abilityAttachPick.eligibleHeroIdxs.includes(i)) return false;
                   if (!canHeroReceiveAbility(p, i, abilityAttachPick.cardName, {
                     skipAbilityGiven: !!abilityAttachPick.skipAbilityGiven,
+                    // Same server-authority bypass as the hero-pick
+                    // highlight above.
+                    allowRestricted: abilityAttachPick.source === 'effectPrompt',
                   })) return false;
                   const abList = (p.abilityZones || [])[i] || [[],[],[]];
                   const isCustom = (gameState.customPlacementCards || []).includes(abilityAttachPick.cardName);
@@ -13700,10 +15207,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (opp.supportSpellLocked) debuffs.push({ key: 'support-opp', icon: '💚', text: `Your opponent cannot use another Support Spell this turn.`, color: '#ff8844' });
             if (me.itemLocked) debuffs.push({ key: 'item-me', icon: '🔨', text: 'You must delete 1 card from your hand to use an Artifact!', color: '#ff6633' });
             if (opp.itemLocked) debuffs.push({ key: 'item-opp', icon: '🔨', text: `${opp.username} must delete 1 card from their hand to use an Artifact!`, color: '#cc5522' });
+            // Boomerang's "no Artifacts for the rest of this turn"
+            // lockout. Distinct icon (🪃) from the 🔨 itemLocked
+            // badge — different mechanic, different message.
+            if (me.artifactLocked) debuffs.push({ key: 'artifact-me', icon: '🪃', text: 'You cannot use any more Artifacts this turn!', color: '#ff8855' });
+            if (opp.artifactLocked) debuffs.push({ key: 'artifact-opp', icon: '🪃', text: `${opp.username} cannot use any more Artifacts this turn!`, color: '#cc6644' });
             if (me.forsaken) debuffs.push({ key: 'forsaken-me', icon: '🏴‍☠️', text: 'All cards that would go to your discard pile are deleted for the rest of the turn.', color: '#8888aa' });
             if (opp.forsaken) debuffs.push({ key: 'forsaken-opp', icon: '🏴‍☠️', text: `All cards that would go to ${opp.username}'s discard pile are deleted for the rest of the turn.`, color: '#6666aa' });
             if (me.handLocked) debuffs.push({ key: 'hand-me', icon: '🔒', text: 'You cannot draw or search any more cards this turn!', color: '#ff6644' });
             if (opp.handLocked) debuffs.push({ key: 'hand-opp', icon: '🔒', text: `${opp.username} cannot draw or search any more cards this turn!`, color: '#cc8800' });
+            if (me.flashbanged) debuffs.push({ key: 'flashbanged-me', icon: '⚪', text: 'Flashbanged — your turn will end after your first Action!', color: '#ffffff' });
+            if (opp.flashbanged) debuffs.push({ key: 'flashbanged-opp', icon: '⚪', text: `Flashbanged — ${opp.username}'s turn will end after their first Action!`, color: '#dddddd' });
             if (debuffs.length === 0) return null;
             return (
               <div className="phase-debuffs">
@@ -13801,6 +15315,42 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {(((gameState.areaZones?.[0] || []).includes('Acid Rain')) || ((gameState.areaZones?.[1] || []).includes('Acid Rain'))) && <AcidRainOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Deepsea Castle')) || ((gameState.areaZones?.[1] || []).includes('Deepsea Castle'))) && <DeepseaCastleOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Slippery Ice')) || ((gameState.areaZones?.[1] || []).includes('Slippery Ice'))) && <SlipperyIceOverlay />}
+            {(((gameState.areaZones?.[0] || []).includes('The Cosmic Depths')) || ((gameState.areaZones?.[1] || []).includes('The Cosmic Depths'))) && <CosmicDepthsOverlay />}
+            {(((gameState.areaZones?.[0] || []).includes("Tarleinn's Floating Island")) || ((gameState.areaZones?.[1] || []).includes("Tarleinn's Floating Island"))) && <FloatingIslandOverlay />}
+            {(() => {
+              // Gathering Storm is an Attachment Spell — it lives in a
+              // hero's Support Zone rather than an Area Zone, so walk
+              // every support slot across both players to find any copy.
+              const hasGatheringStorm = [0, 1].some(pi => {
+                const sz = gameState.players?.[pi]?.supportZones || [];
+                for (const heroZone of sz) {
+                  for (const slot of (heroZone || [])) {
+                    if ((slot || []).includes('Gathering Storm')) return true;
+                  }
+                }
+                return false;
+              });
+              return hasGatheringStorm ? <GatheringStormOverlay /> : null;
+            })()}
+            {(() => {
+              // Prophecy of Tempeste — same shape as Gathering Storm.
+              // The actual rain overlay's lifetime is gated on the spell's
+              // physical presence in a support zone (so it survives
+              // reconnects + works for spectators), not just the
+              // tempesteRainInsts socket flag. The flag is an additional
+              // safety hook for the start/stop events in case there's a
+              // brief race during the attach animation.
+              const hasTempeste = (tempesteRainInsts.length > 0) || [0, 1].some(pi => {
+                const sz = gameState.players?.[pi]?.supportZones || [];
+                for (const heroZone of sz) {
+                  for (const slot of (heroZone || [])) {
+                    if ((slot || []).includes('Prophecy of Tempeste')) return true;
+                  }
+                }
+                return false;
+              });
+              return hasTempeste ? <TempesteRainOverlay /> : null;
+            })()}
             {(((gameState.areaZones?.[0] || []).includes('Stinky Stables')) || ((gameState.areaZones?.[1] || []).includes('Stinky Stables'))) && <StinkyStablesOverlay />}
             {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>

@@ -87,6 +87,61 @@ function _collectTributeCandidates(engine, playerIdx, selfId) {
   return cs;
 }
 
+/**
+ * DDG's on-summon effect: AoE `DAMAGE` to every opp Hero + Creature.
+ * HOPT-gated (`ddg_aoe` per controller) so a second DDG this turn
+ * still fires its manifest animation but does not double-dip. Used by
+ * both the normal-summon path and Deepsea Monstrosity's copy path.
+ * `sourceInst` is the damage source (DDG itself on normal summons,
+ * Monstrosity on copies).
+ */
+async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  if (!engine.claimHOPT('ddg_aoe', pi)) {
+    engine.log('dark_deepsea_god_repeat', {
+      player: ps?.username,
+      reason: 'ddg_aoe_already_fired_this_turn',
+      viaCopy: !!isCopy,
+    });
+    return;
+  }
+  const oi = pi === 0 ? 1 : 0;
+  const ops = gs.players[oi];
+  if (!ops) return;
+  const cardDB = engine._getCardDB();
+
+  for (const h of (ops.heroes || [])) {
+    if (!h?.name || h.hp <= 0) continue;
+    await engine.actionDealDamage(sourceInst, h, DAMAGE, 'creature', {
+      sourceOwner: pi, canBeNegated: true,
+    });
+  }
+
+  const creatureEntries = [];
+  for (const inst of engine.cardInstances) {
+    if ((inst.controller ?? inst.owner) !== oi) continue;
+    if (inst.zone !== 'support') continue;
+    if (inst.faceDown) continue;
+    const cd = cardDB[inst.name];
+    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    creatureEntries.push({
+      inst, amount: DAMAGE, type: 'creature',
+      source: sourceInst, sourceOwner: pi, canBeNegated: true,
+    });
+  }
+  if (creatureEntries.length > 0) {
+    await engine.processCreatureDamageBatch(creatureEntries);
+  }
+
+  engine.log('dark_deepsea_god_awakened', {
+    player: ps?.username, damage: DAMAGE,
+    heroHits: (ops.heroes || []).filter(h => h?.name && h.hp >= 0).length,
+    creatureHits: creatureEntries.length,
+    viaCopy: !!isCopy,
+  });
+}
+
 module.exports = {
   canBypassLevelReq: () => true,
 
@@ -112,6 +167,32 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
+    // ═════════════════════════════════════════════════════════════════
+    //  Two distinct entry paths.
+    //
+    //  NORMAL SUMMON:
+    //    • Summoning condition → tribute 2+ own Creatures (sum-level ≥4).
+    //    • On-summon effect    → AoE 90 to every opp target.
+    //    Both live together in `beforeSummon` historically because DDG's
+    //    placement-inside-a-tribute-slot animation couples them.
+    //
+    //  DEEPSEA MONSTROSITY COPY (`ctx._monstrosityCopy`):
+    //    • The COST (tribute of 2 creatures) is DDG's SUMMONING
+    //      CONDITION, not its on-summon effect, so it does NOT copy.
+    //    • Only the AoE is the on-summon effect — that's what Monstrosity
+    //      should fire.
+    //    • HOPT still gates it (one detonation per turn per controller).
+    // ═════════════════════════════════════════════════════════════════
+    const isCopy = !!ctx._monstrosityCopy;
+
+    if (isCopy) {
+      await _fireAoEAsSource(engine, pi, ctx.card, /*isCopy*/ true);
+      // Return value is ignored on the copy path — we're not in an
+      // actual summon flow. Return false so no unintended side effects.
+      return false;
+    }
+
+    // ── Normal summon from here ──────────────────────────────────────
     const candidates = _collectTributeCandidates(engine, pi, ctx.card?.id);
     if (!engine.hasValidSacrificeSet(candidates, SACRIFICE_SPEC.minCount, 0, SACRIFICE_SPEC.minSumLevel)) {
       engine.log('ddg_fizzle', { reason: 'no_valid_tribute' });
@@ -183,9 +264,6 @@ module.exports = {
     await engine._delay(MANIFEST_HALF_MS);
 
     // ── Step 5: place DDG into the vacated landing slot ─────────────
-    // `fireHooks: true` fires DDG's onPlay (intentionally empty below)
-    // + onCardEnterZone (so other listeners like buff-grant cards see
-    // the placement normally).
     const result = await engine.actionPlaceCreature(CARD_NAME, pi, zonePick.heroIdx, zonePick.slotIdx, {
       source: 'external',
       sourceName: CARD_NAME,
@@ -197,51 +275,8 @@ module.exports = {
     // ── Step 6: wait the remaining half of the animation ────────────
     await engine._delay(MANIFEST_HALF_MS);
 
-    // ── Step 7 + 8: HOPT-gated AoE damage ───────────────────────────
-    // One DDG detonation per turn per controller. Subsequent DDGs in
-    // the same turn still get the manifest animation but skip damage.
-    if (engine.claimHOPT('ddg_aoe', pi)) {
-      const oi = pi === 0 ? 1 : 0;
-      const ops = gs.players[oi];
-      if (ops) {
-        const cardDB = engine._getCardDB();
-        const ddgInst = result.inst;
-
-        for (const h of (ops.heroes || [])) {
-          if (!h?.name || h.hp <= 0) continue;
-          await engine.actionDealDamage(ddgInst, h, DAMAGE, 'creature', {
-            sourceOwner: pi, canBeNegated: true,
-          });
-        }
-
-        const creatureEntries = [];
-        for (const inst of engine.cardInstances) {
-          if ((inst.controller ?? inst.owner) !== oi) continue;
-          if (inst.zone !== 'support') continue;
-          if (inst.faceDown) continue;
-          const cd = cardDB[inst.name];
-          if (!cd || !hasCardType(cd, 'Creature')) continue;
-          creatureEntries.push({
-            inst, amount: DAMAGE, type: 'creature',
-            source: ddgInst, sourceOwner: pi, canBeNegated: true,
-          });
-        }
-        if (creatureEntries.length > 0) {
-          await engine.processCreatureDamageBatch(creatureEntries);
-        }
-
-        engine.log('dark_deepsea_god_awakened', {
-          player: ps.username, damage: DAMAGE,
-          heroHits: (ops.heroes || []).filter(h => h?.name && h.hp >= 0).length,
-          creatureHits: creatureEntries.length,
-        });
-      }
-    } else {
-      engine.log('dark_deepsea_god_repeat', {
-        player: ps.username,
-        reason: 'ddg_aoe_already_fired_this_turn',
-      });
-    }
+    // ── Step 7 + 8: on-summon AoE, HOPT-gated ───────────────────────
+    await _fireAoEAsSource(engine, pi, result.inst, /*isCopy*/ false);
 
     // ── Step 9: server skips summonCreature ─────────────────────────
     ps._placementConsumedByCard = CARD_NAME;

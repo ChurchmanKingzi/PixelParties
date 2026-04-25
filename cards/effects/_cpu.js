@@ -11,8 +11,11 @@
 const { loadCardEffect } = require('./_loader');
 const { PHASES } = require('./_hooks');
 
-const PAUSE_BETWEEN_ACTIONS = 400;
-const PAUSE_BETWEEN_PHASES = 300;
+// Small pauses between CPU actions / phase advances so a human spectator
+// can actually follow the sequence. Kept deliberately modest — longer
+// values make the CPU feel sluggish on complex decks.
+const PAUSE_BETWEEN_ACTIONS = 600;
+const PAUSE_BETWEEN_PHASES = 450;
 // Delay for each CPU prompt decision during card resolution (targeting, picks,
 // confirms). Puzzle mode keeps the original 50ms via the original prompt path.
 const CPU_PROMPT_DELAY = 350;
@@ -63,6 +66,24 @@ function shuffle(arr) {
 
 function stillCpuTurn(engine, cpuIdx) {
   return !engine.gs.result && engine.gs.activePlayer === cpuIdx;
+}
+
+/**
+ * True when the CPU's current turn is gated by Flashbang — the first
+ * Action they perform will end the turn immediately.
+ *
+ * The brain uses this to disincentivise inherent / additional / hero-
+ * effect plays in Main Phase 1, saving the one available Action for
+ * Action Phase (widest card pool, highest impact, "as late as
+ * possible"). The flag is set on the affected player's state by
+ * Flashbang's resolve(), persists through onTurnStart, and clears
+ * either when an Action consumes the trigger or when the turn ends
+ * unused.
+ */
+function isCpuFlashbanged(engine) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  if (cpuIdx < 0) return false;
+  return !!engine.gs.players[cpuIdx]?._flashbangedDebuff;
 }
 
 function broadcast(helpers) {
@@ -550,6 +571,16 @@ async function activateHeroEffects(engine, helpers) {
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
   if (!ps) return;
+
+  // Flashbang gate — Hero Effect activations now fire onAnyActionResolved
+  // (so they trigger Flashbang's turn-end). Skip in Main Phase 1 to
+  // preserve the one allowed Action for the Action Phase's wider
+  // card pool; allow in Main Phase 2 as a fallback. Same rationale
+  // as the gate in fireAdditionalActions above.
+  if (isCpuFlashbanged(engine) && gs.currentPhase === 2) {
+    cpuLog('  activateHeroEffects: skipping in MP1 (Flashbanged)');
+    return;
+  }
   const tried = new Set();
   for (let safety = 0; safety < 6; safety++) {
     if (!stillCpuTurn(engine, cpuIdx)) return;
@@ -1405,6 +1436,18 @@ async function fireAdditionalActions(engine, helpers) {
   const ps = gs.players[cpuIdx];
   const cardDB = engine._getCardDB();
 
+  // ── Flashbang gate ──
+  // Each inherent / additional Spell / Attack / Creature play counts
+  // as an Action and would burn Flashbang's one-shot trigger here in
+  // Main Phase 1 — leaving Action Phase impotent. Skip in MP1 so the
+  // brain saves its action for Action Phase's full card pool. Allow
+  // in Main Phase 2 as a fallback if Action Phase had no legal play
+  // (otherwise the turn ends with the trigger wasted on nothing).
+  if (isCpuFlashbanged(engine) && gs.currentPhase === 2) {
+    cpuLog('  fireAdditionalActions: skipping in MP1 (Flashbanged — saving sole Action for Action Phase)');
+    return;
+  }
+
   // Remember which (card, hero) pairs we've already TRIED so we don't retry
   // the same pick if the play silently fails and leaves the card in hand.
   // This prevents a 20-iteration stall when a card passes eligibility but
@@ -1425,9 +1468,13 @@ async function fireAdditionalActions(engine, helpers) {
       if ((cd.subtype || '').toLowerCase() === 'surprise') continue;
 
       // Per-card opt-out: card can declare itself "never proactively played"
-      // (e.g. Golden Wings — Reaction-only).
+      // (e.g. Golden Wings — Reaction-only). Also: a per-game runtime
+      // skip list (`gs._cpuSkipProactiveNames`) lets self-play tests
+      // and puzzle/scripted scenarios block specific cards from being
+      // proactively played without modifying their scripts.
       const script = loadCardEffect(cardName);
       if (script?.cpuSkipProactive) continue;
+      if (engine.gs?._cpuSkipProactiveNames?.has?.(cardName)) continue;
       // Hero-removal / sacrifice-style cards (Divine Gift of Sacrifice, etc.)
       // should fire in Main Phase 2 — AFTER the Action Phase has already
       // used the heroes they'd remove. Playing them in Main Phase 1 can
@@ -1746,14 +1793,62 @@ async function attachAbilities(engine, helpers) {
   for (let safety = 0; safety < 6; safety++) {
     if (!stillCpuTurn(engine, cpuIdx)) return;
 
+    // ── Per-pass placement biases (recomputed each pass since the
+    // ability board state changes between attaches). These are
+    // archetype-aware overrides on top of the generic tier/score
+    // logic — when a bias matches, candidates not satisfying it are
+    // dropped from this pass entirely, even if they'd otherwise score
+    // higher. Add new biases here as new archetypes need them.
+    const heroes = ps.heroes || [];
+
+    // Divinity → middle Hero (heroIdx 1) preference. If hero 1 can
+    // legally receive a Divinity copy this pass, skip non-middle
+    // heroes for any Divinity in hand. Falls through to all-hero
+    // candidates if hero 1 is dead / max-leveled / locked out.
+    const divinityMiddleEligible = (() => {
+      const hi = 1;
+      const hero = heroes[hi];
+      if (!hero?.name || hero.hp <= 0) return false;
+      if (ps.abilityGivenThisTurn[hi]) return false;
+      if (heroHasAbilityAtMaxLevel(ps, hi, 'Divinity')) return false;
+      const divCd = cardDB['Divinity'];
+      if (!divCd) return false;
+      if (heroRejectsAbility(engine, cpuIdx, hi, 'Divinity', divCd)) return false;
+      return resolveAbilitySlot(engine, cpuIdx, hi, 'Divinity') !== null;
+    })();
+
+    // Performance → boost an existing Divinity stack if any. Maps
+    // heroIdx → the zoneSlot of that hero's Divinity stack (1 or 2
+    // cards deep, since Performance can't go on full Lv3 zones).
+    // When the map is non-empty, Performance is filtered to those
+    // (hero, slot) pairs only; resolveAbilitySlot's normal random
+    // pick is overridden to land on the Divinity zone specifically.
+    const performanceDivinitySlots = (() => {
+      const map = new Map();
+      for (let hi = 0; hi < heroes.length; hi++) {
+        const hero = heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (ps.abilityGivenThisTurn[hi]) continue;
+        const abZones = ps.abilityZones?.[hi] || [];
+        for (let z = 0; z < 3; z++) {
+          const zoneArr = abZones[z] || [];
+          if (zoneArr.length === 0 || zoneArr.length >= 3) continue;
+          if (zoneArr[0] !== 'Divinity') continue;
+          map.set(hi, z);
+          break;
+        }
+      }
+      return map;
+    })();
+
     const tier1 = [], tier2 = [], tier3 = [];
     for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
       const cardName = ps.hand[handIdx];
       const cd = cardDB[cardName];
       if (!cd || cd.cardType !== 'Ability') continue;
 
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
+      for (let hi = 0; hi < heroes.length; hi++) {
+        const hero = heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
         if (ps.abilityGivenThisTurn[hi]) continue;
 
@@ -1767,8 +1862,19 @@ async function attachAbilities(engine, helpers) {
         // school, so the copy is always better placed elsewhere).
         if (heroRejectsAbility(engine, cpuIdx, hi, cardName, cd)) continue;
 
-        const slot = resolveAbilitySlot(engine, cpuIdx, hi, cardName);
+        // ── Per-card placement biases ──
+        if (cardName === 'Divinity' && divinityMiddleEligible && hi !== 1) continue;
+        if (cardName === 'Performance' && performanceDivinitySlots.size > 0
+            && !performanceDivinitySlots.has(hi)) continue;
+
+        let slot = resolveAbilitySlot(engine, cpuIdx, hi, cardName);
         if (slot === null) continue;
+
+        // Performance bias: override the random custom-placement slot
+        // pick to land specifically on the hero's Divinity zone.
+        if (cardName === 'Performance' && performanceDivinitySlots.has(hi)) {
+          slot = performanceDivinitySlots.get(hi);
+        }
 
         const entry = { handIdx, cardName, heroIdx: hi, zoneSlot: slot };
         const thisHeroHasIt = heroHasAbility(ps, hi, cardName);
@@ -2146,6 +2252,36 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
   const ownTargets = validTargets.filter(t => t.owner === cpuIdx);
   const enemyTargets = validTargets.filter(t => t.owner != null && t.owner !== cpuIdx);
 
+  // Attack cards that reach this picker weren't classified as a buff/heal
+  // above — they deal damage. Targeting own units just self-damages for
+  // no gain. Filter own-side targets out when ANY enemy target is
+  // available. The notable trap this closes is Ghuanjun: his afterDamage
+  // grants own targets an 'immortal' buff that expires at the END of
+  // his own turn, so attacking own units to "buff" them is almost
+  // useless — without this drop, the CPU would keep picking own targets
+  // because the picker otherwise falls through to the enemy branch only
+  // when ownTargets is empty. `config.isBuff === true` still gets
+  // respected (looksLikeBuff catches those above). `allowOwnSide`
+  // lets a rare attack-shaped card opt out of this guard.
+  if (cd?.cardType === 'Attack' && ownTargets.length > 0 && enemyTargets.length > 0
+      && !config.allowOwnSide) {
+    ownTargets.length = 0;
+  }
+
+  // Self-damage prompts (Fire Bolts recoil, any future "pay HP" cost):
+  // the prompt asks the caster to pick an OWN target that will take
+  // real damage. The generic ally-fallback below would shuffle and
+  // pick a random hero — a coin flip that has been observed killing
+  // the CPU's last living hero and ending the game on its own turn.
+  // Route to the harm-minimizing picker instead.
+  const isSelfDamage = config.selfDamage === true
+    || /recoil/i.test(config.title || '')
+    || /recoil/i.test(config.description || '');
+  if (isSelfDamage && ownTargets.length > 0) {
+    const picked = pickSelfDamageTarget(engine, ownTargets, config);
+    if (picked) return [picked.id];
+  }
+
   // Self-status cards (Sickly Cheese self-poison, Zsos'Ssar Decay-cost
   // self-poison, …). The card's `targetingConfig.appliesStatus` names the
   // status it lands, and the picker routes to status-beneficiary scoring
@@ -2321,6 +2457,26 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // Reactions: prompt type='confirm' with a showCard and an 'Activate' button.
   if (type === 'confirm' && promptData.confirmLabel && /activate/i.test(promptData.confirmLabel)) {
     return cpuReactionDecision(engine, promptData);
+  }
+
+  // ── Ability-attach prompts (Sacrifice to Divinity, Megu, Alex, …) ──
+  // The card hands us an eligibleHeroIdxs allowlist + an ability cardName
+  // and asks "which hero gets it?". Mirror the same per-card placement
+  // biases the in-hand attachAbilities loop applies — Divinity always
+  // prefers the middle hero (heroIdx 1) when it's in the allowlist.
+  if (type === 'abilityAttachTarget') {
+    const eligible = Array.isArray(promptData.eligibleHeroIdxs)
+      ? promptData.eligibleHeroIdxs
+      : null;
+    const attachName = promptData.cardName;
+    const pickHero = (hi) => ({ heroIdx: hi });
+    if (attachName === 'Divinity' && eligible && eligible.includes(1)) {
+      return pickHero(1);
+    }
+    if (eligible && eligible.length > 0) {
+      return pickHero(eligible[0]);
+    }
+    return null;
   }
 
   // Confirm prompts fall into two shapes:
@@ -2912,6 +3068,83 @@ function pickSelfStatusTarget(engine, ownTargets, statusName) {
   return randomOf(top);
 }
 
+// ─── Self-damage target picker (Fire Bolts recoil etc.) ─────────────────
+// Rule-based harm minimization. Lower cost = better pick.
+//
+//   • Lethal on the caster's ONLY remaining live hero  → Infinity (never
+//     pick; doing so loses the game on our own turn).
+//   • Lethal on a doomed-anyway hero (Golden Ankh's `_forceKillAtTurnEnd`)
+//     → near-free: the hero would die at End Phase anyway, so taking a
+//     hit there costs nothing real.
+//   • Lethal on a regular hero (not the only living) → expensive, but
+//     fine if the alternative is the only-hero lethal trap.
+//   • Non-lethal on a hero → priced by HP lost; doomed heroes again
+//     nearly free; live heroes take a hit to their post-damage HP.
+//   • Creatures → cheap compared to hero loss; creatures that die from
+//     the damage cost a bit more than survivors, but far less than a
+//     live hero kill.
+function pickSelfDamageTarget(engine, ownTargets, config) {
+  if (!ownTargets || ownTargets.length === 0) return null;
+  const gs = engine.gs;
+  const damage = Number(config.damage ?? config.baseDamage ?? 0) || 0;
+  const cardDB = engine._getCardDB();
+
+  // Helper: living own heroes count (for game-loss detection on hero kills).
+  const livingHeroCount = (pi) => {
+    const ps = gs.players[pi];
+    return (ps?.heroes || []).filter(h => h?.name && h.hp > 0).length;
+  };
+
+  const score = (t) => {
+    if (t.type === 'hero') {
+      const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
+      if (!hero) return Infinity;
+      const doomed = hero._forceKillAtTurnEnd === gs.turn;
+      const lethal = damage > 0 && hero.hp > 0 && hero.hp <= damage;
+      if (lethal) {
+        // Would this kill leave 0 living own heroes? That's a loss
+        // condition on our own turn — never pick.
+        if (livingHeroCount(t.owner) <= 1) return Infinity;
+        // Doomed heroes die at End Phase anyway — cheap to sacrifice now.
+        if (doomed) return 10;
+        // Regular hero kill: very expensive, but not game-ending.
+        return 600;
+      }
+      // Non-lethal hit.
+      if (doomed) {
+        // Partial damage to a hero that's already on a death timer.
+        // Almost free — the only downside is losing their End-Phase
+        // Adventurousness / onTurnEnd utility. Give it a small cost.
+        return 20;
+      }
+      // Live hero takes non-lethal damage. Prefer higher-HP heroes so
+      // we keep the low-HP ones safer. Cost scales with post-hit
+      // vulnerability.
+      const postHp = hero.hp - damage;
+      // 200 base + "how close to death are we now" bonus up to +150.
+      return 200 + Math.max(0, 150 - Math.floor(postHp / 2));
+    }
+    // Creatures + equipment-creatures
+    const inst = t.cardInstance;
+    if (!inst) return 1000;
+    const cd = cardDB[inst.name];
+    const maxHp = inst.counters?.maxHp ?? cd?.hp ?? 0;
+    const currentHp = inst.counters?.currentHp ?? maxHp;
+    const lethal = damage > 0 && currentHp <= damage;
+    // Creatures are far cheaper than hero kills — worst case ~120.
+    return lethal ? 120 : 50;
+  };
+
+  const scored = ownTargets.map(t => ({ t, s: score(t) }));
+  scored.sort((a, b) => a.s - b.s);
+  // If every candidate is Infinity (every pick ends the game), there's
+  // nothing we can do cleanly — fall back to `null` and let the caller
+  // (or the default ally-fallback) pick something. A forced pick is a
+  // forced pick; at least this path doesn't pretend the trap is safe.
+  if (!scored.length || scored[0].s === Infinity) return null;
+  return scored[0].t;
+}
+
 function pickBuffTarget(engine, ownTargets, cardName) {
   if (!ownTargets.length) return null;
   // Prefer Hero targets; de-prioritize targets already carrying the buff
@@ -3426,15 +3659,107 @@ function evaluateState(engine, cpuIdx) {
   for (const h of (ps.heroes || [])) if (h?.name && h.hp <= 0) score -= 500;
   for (const h of (opp.heroes || [])) if (h?.name && h.hp <= 0) score += 500;
 
-  // Support zone occupancy (creatures + equips). Own side good, enemy bad.
-  let ownSup = 0, oppSup = 0;
+  // ── Support zone occupancy (creatures + equips) ──────────────────
+  // Per-zone base value is +30. Each card's own death may have
+  // value to its owner (Hell Fox-style on-death tutors / damage /
+  // gold), and other own creatures may be "chain sources" that fire
+  // beneficial effects when an ally dies (Loyal Terrier window,
+  // Loyal Shepherd revive, future cards with the same shape). Both
+  // are read GENERICALLY off the per-card `cpuMeta` declaration:
+  //
+  //    cpuMeta: {
+  //      onDeathBenefit: <number>,           // value to owner when this dies
+  //      chainSource: {                       // declares: I react to ally deaths
+  //        isArmed(engine, inst) → bool,      //   ready to fire?
+  //        triggersOn(engine, tributeInst, sourceInst) → bool,
+  //        valuePerTrigger: <number>,         //   chain payoff magnitude
+  //      },
+  //    }
+  //
+  // The eval combines these to compute "effective on-death value to
+  // owner" per creature: own intrinsic benefit + sum of chain
+  // bonuses from armed same-side sources whose `triggersOn` matches
+  // this creature. The slot's "alive value" is then `30 - effective`
+  // (clamped to a small floor so creatures keep some board-presence
+  // value). On the OWN side this discounts sacrifice-fodder
+  // creatures so MCTS prefers to feed them to chains. On the OPP
+  // side it disincentivises killing opp's death-engines (we don't
+  // want to fuel their plan).
+  //
+  // Chain sources themselves are NEVER discounted by chain bonuses —
+  // killing your own Terrier ends the window, killing your own
+  // Shepherd ends the revive HOPT for the rest of the turn. The
+  // eval skips applying chain bonuses to any creature whose own
+  // script declares `cpuMeta.chainSource`.
+  const SLOT_BASE         = 30;
+  const SLOT_FLOOR        = 5;
+  // Pre-collect armed chain sources per side so each per-slot calc
+  // doesn't re-walk cardInstances.
+  const collectArmedChainSources = (ownerIdx) => {
+    const sources = [];
+    for (const inst of engine.cardInstances) {
+      if (inst.owner !== ownerIdx) continue;
+      if (inst.zone !== 'support') continue;
+      if (inst.faceDown) continue;
+      const script = loadCardEffect(inst.name);
+      const chain = script?.cpuMeta?.chainSource;
+      if (!chain) continue;
+      try {
+        if (chain.isArmed && !chain.isArmed(engine, inst)) continue;
+      } catch { continue; }
+      sources.push({ inst, chain, script });
+    }
+    return sources;
+  };
+  const ownChainSources = collectArmedChainSources(cpuIdx);
+  const oppChainSources = collectArmedChainSources(oppIdx);
+  /**
+   * Effective "value to owner of this Creature dying" — sum of the
+   * Creature's own `onDeathBenefit` plus every armed same-side
+   * chain source that would fire on this death. Chain sources
+   * themselves don't get chain bonuses applied (we don't want the
+   * CPU killing its own engine).
+   */
+  const effectiveOnDeathValue = (inst, ownerIdx) => {
+    if (!inst) return 0;
+    const script = loadCardEffect(inst.name);
+    const meta = script?.cpuMeta;
+    let value = meta?.onDeathBenefit || 0;
+    if (meta?.chainSource) return value; // chain sources skip chain bonuses
+    const sources = ownerIdx === cpuIdx ? ownChainSources : oppChainSources;
+    for (const { inst: srcInst, chain } of sources) {
+      if (srcInst.id === inst.id) continue; // can't trigger off self
+      try {
+        if (chain.triggersOn && !chain.triggersOn(engine, inst, srcInst)) continue;
+      } catch { continue; }
+      value += chain.valuePerTrigger || 0;
+    }
+    return value;
+  };
+  let ownSupVal = 0, oppSupVal = 0;
   for (let hi = 0; hi < 3; hi++) {
     for (let z = 0; z < 3; z++) {
-      if ((ps.supportZones?.[hi]?.[z] || []).length > 0) ownSup++;
-      if ((opp.supportZones?.[hi]?.[z] || []).length > 0) oppSup++;
+      const ownSlot = ps.supportZones?.[hi]?.[z] || [];
+      const oppSlot = opp.supportZones?.[hi]?.[z] || [];
+      if (ownSlot.length > 0) {
+        const inst = engine.cardInstances.find(c =>
+          c.owner === cpuIdx && c.zone === 'support'
+          && c.heroIdx === hi && c.zoneSlot === z
+        );
+        const onDeath = effectiveOnDeathValue(inst, cpuIdx);
+        ownSupVal += Math.max(SLOT_FLOOR, SLOT_BASE - onDeath);
+      }
+      if (oppSlot.length > 0) {
+        const inst = engine.cardInstances.find(c =>
+          c.owner === oppIdx && c.zone === 'support'
+          && c.heroIdx === hi && c.zoneSlot === z
+        );
+        const onDeath = effectiveOnDeathValue(inst, oppIdx);
+        oppSupVal += Math.max(SLOT_FLOOR, SLOT_BASE - onDeath);
+      }
     }
   }
-  score += 30 * (ownSup - oppSup);
+  score += ownSupVal - oppSupVal;
 
   // Ability totals — cumulative stacked abilities matter more than fresh ones.
   let ownAb = 0, oppAb = 0;
@@ -3445,6 +3770,40 @@ function evaluateState(engine, cpuIdx) {
     }
   }
   score += 15 * (ownAb - oppAb);
+
+  // ── Engine-tier ability bonus ────────────────────────────────────
+  // Some abilities are deck-defining "engines" — Divinity's free
+  // level coverage, future engine abilities of similar weight. Each
+  // such ability declares its magnitude on its script:
+  //
+  //    cpuMeta: { engineValue: 120 }
+  //
+  // The eval reads it generically. For each ability slot on each
+  // hero we look up the BASE ability's script (zone[0]) — that
+  // determines the engine identity, since Performance copies on top
+  // inherit the base's school. Stack size multiplies the bonus, so
+  // a Lv2 Divinity (or Divinity + Performance) is twice as valuable
+  // as a Lv1.
+  //
+  // Symmetric: opp engine stacks count negatively, so MCTS values
+  // stripping/disrupting an opp's engine ability proportionally.
+  const sumEngineValue = (pl) => {
+    let total = 0;
+    for (let hi = 0; hi < (pl.heroes || []).length; hi++) {
+      const zones = pl.abilityZones?.[hi] || [];
+      for (const slot of zones) {
+        if (!slot || slot.length === 0) continue;
+        // zone[0] is the BASE ability — that's what governs the
+        // engine identity. Performance copies stacked on top
+        // inherit the base's role.
+        const baseScript = loadCardEffect(slot[0]);
+        const engineValue = baseScript?.cpuMeta?.engineValue || 0;
+        if (engineValue > 0) total += engineValue * slot.length;
+      }
+    }
+    return total;
+  };
+  score += sumEngineValue(ps) - sumEngineValue(opp);
 
   // Hand-value differential — weighted by card PLAYABILITY rather than
   // flat size. A card that can plausibly be played within the next ~2
@@ -3512,6 +3871,38 @@ function evaluateState(engine, cpuIdx) {
   }
   const oppHandValue = 20 * (opp.hand?.length || 0);
   score += ownHandValue - oppHandValue;
+
+  // ── Deck-out awareness ─────────────────────────────────────────────
+  // When the CPU's deck is shrinking OR the opponent has shown ANY
+  // mill capability this game, deck cards become a precious resource.
+  // Penalty grows as the deck approaches 0, pulling MCTS away from
+  // Trade / self-mill / aggressive draw plays that would hasten deck-
+  // out. Symmetric bonus when the opponent's deck is thin (our own
+  // mill pressure pays off).
+  //
+  // Tiers (stack):
+  //   milled this game (sticky) → −2 per missing card below 30
+  //                               (kicks in at any deck size once the
+  //                                opponent has shown mill threat)
+  //   deck ≤ 20                 → additional −5 per missing card below 20
+  //   deck ≤ 10                 → additional −30 per missing card below 10
+  //                               (drawing itself becomes net-negative:
+  //                                each card pulled erodes this tier more
+  //                                than the +15 average card is worth)
+  //
+  // At deck=0 with the mill flag the combined crisis term is ~−420, enough
+  // to dominate local eval noise.
+  const ownDeckSize = ps.mainDeck?.length || 0;
+  const oppDeckSize = opp.mainDeck?.length || 0;
+  const applyDeckOut = (deckSize, milled) => {
+    let penalty = 0;
+    if (milled && deckSize < 30) penalty += (30 - deckSize) * 2;
+    if (deckSize <= 20) penalty += (20 - deckSize) * 5;
+    if (deckSize <= 10) penalty += (10 - deckSize) * 30;
+    return penalty;
+  };
+  score -= applyDeckOut(ownDeckSize, !!ps._oppHasMilledMe);
+  score += applyDeckOut(oppDeckSize, !!opp._oppHasMilledMe);
   // Gold value depends on demand vs supply, not absolute amount. Demand =
   // gold the CPU could productively spend right now (artifacts in hand it
   // could actually play, on-board effects that charge gold to activate).

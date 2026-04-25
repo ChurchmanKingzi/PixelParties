@@ -1,0 +1,3165 @@
+{
+  "gamesDone": 300,
+  "total": 300,
+  "elapsedMs": 819,
+  "pickerMode": "pinned",
+  "stats": {
+    "p0wins": 0,
+    "p1wins": 0,
+    "draws": 300,
+    "totalTurns": 300,
+    "totalMs": 113
+  },
+  "aggregateWinReasons": {},
+  "decks": [
+    {
+      "id": "sample-Structure Deck Slimy Infestation",
+      "name": "Slimy Infestation",
+      "games": 26,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Mans Best Friends",
+      "name": "Man's Best Friends",
+      "games": 156,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Heal Burn",
+      "name": "Heal Burn",
+      "games": 19,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck One-Two-Punch",
+      "name": "One-Two-Punch!",
+      "games": 27,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Shifting Sandlands",
+      "name": "Shifting Sandlands",
+      "games": 19,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Venom Swamp",
+      "name": "Venom Swamp",
+      "games": 23,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck To Attain Divinity",
+      "name": "To Attain Divinity",
+      "games": 144,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Poison Torture",
+      "name": "Poison Torture",
+      "games": 20,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Spell Industrialization",
+      "name": "Spell Industrialization",
+      "games": 22,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Great Weapon Master",
+      "name": "Great Weapon Master",
+      "games": 29,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Dance of the Butterflies",
+      "name": "Dance of the Butterflies",
+      "games": 20,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Steam Dwarf Mines",
+      "name": "Steam Dwarf Mines",
+      "games": 23,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Deepsea Terror",
+      "name": "Deepsea Terror",
+      "games": 20,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Gather That Storm",
+      "name": "Gather That Storm!",
+      "games": 19,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Lightning Caller",
+      "name": "Lightning Caller",
+      "games": 16,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Suicide Bombers",
+      "name": "Suicide Bombers",
+      "games": 17,
+      "wins": 0,
+      "losses": 0,
+      "winReasons": {},
+      "winRate": 0
+    }
+  ],
+  "matchups": [],
+  "onesidedMatchups": [],
+  "tieDetails": [
+    {
+      "gameIdx": 1,
+      "deckP0": "Slimy Infestation",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 2,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Heal Burn",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 3,
+      "deckP0": "One-Two-Punch!",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 4,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Shifting Sandlands",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 5,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Venom Swamp",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 6,
+      "deckP0": "Venom Swamp",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 7,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Poison Torture",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 8,
+      "deckP0": "Spell Industrialization",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 9,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Great Weapon Master",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 10,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 11,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 12,
+      "deckP0": "Venom Swamp",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 13,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Dance of the Butterflies",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 14,
+      "deckP0": "Steam Dwarf Mines",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 15,
+      "deckP0": "Deepsea Terror",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 16,
+      "deckP0": "Gather That Storm!",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 17,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 18,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 19,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Great Weapon Master",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 20,
+      "deckP0": "Poison Torture",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 21,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Spell Industrialization",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 22,
+      "deckP0": "Poison Torture",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 23,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 24,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Steam Dwarf Mines",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 25,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Venom Swamp",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 26,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Venom Swamp",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 27,
+      "deckP0": "Dance of the Butterflies",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 28,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Steam Dwarf Mines",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 29,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Steam Dwarf Mines",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 30,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Steam Dwarf Mines",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 31,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 32,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 33,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Lightning Caller",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 34,
+      "deckP0": "Spell Industrialization",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 35,
+      "deckP0": "Deepsea Terror",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 36,
+      "deckP0": "Lightning Caller",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 37,
+      "deckP0": "Poison Torture",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 38,
+      "deckP0": "Shifting Sandlands",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 39,
+      "deckP0": "Venom Swamp",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 40,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 41,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 42,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Venom Swamp",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 43,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Spell Industrialization",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 44,
+      "deckP0": "Gather That Storm!",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 45,
+      "deckP0": "Spell Industrialization",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 46,
+      "deckP0": "Heal Burn",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 47,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Lightning Caller",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 48,
+      "deckP0": "Slimy Infestation",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 49,
+      "deckP0": "Venom Swamp",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 50,
+      "deckP0": "Deepsea Terror",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 51,
+      "deckP0": "Suicide Bombers",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 52,
+      "deckP0": "Lightning Caller",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 53,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Shifting Sandlands",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 54,
+      "deckP0": "Slimy Infestation",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 55,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Gather That Storm!",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 56,
+      "deckP0": "One-Two-Punch!",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 57,
+      "deckP0": "Gather That Storm!",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 58,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Steam Dwarf Mines",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 59,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 60,
+      "deckP0": "Venom Swamp",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 61,
+      "deckP0": "Spell Industrialization",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 62,
+      "deckP0": "Gather That Storm!",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 63,
+      "deckP0": "Shifting Sandlands",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 64,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Steam Dwarf Mines",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 65,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 66,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Shifting Sandlands",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 67,
+      "deckP0": "Steam Dwarf Mines",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 68,
+      "deckP0": "Suicide Bombers",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 69,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Great Weapon Master",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 70,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Venom Swamp",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 71,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Deepsea Terror",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 72,
+      "deckP0": "Slimy Infestation",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 73,
+      "deckP0": "Venom Swamp",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 74,
+      "deckP0": "Heal Burn",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 75,
+      "deckP0": "Gather That Storm!",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 76,
+      "deckP0": "Slimy Infestation",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 77,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 78,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Steam Dwarf Mines",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 79,
+      "deckP0": "Deepsea Terror",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 80,
+      "deckP0": "One-Two-Punch!",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 81,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Great Weapon Master",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 82,
+      "deckP0": "Slimy Infestation",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 83,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 84,
+      "deckP0": "Dance of the Butterflies",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 85,
+      "deckP0": "Deepsea Terror",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 86,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Spell Industrialization",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 87,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 88,
+      "deckP0": "Lightning Caller",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 89,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Great Weapon Master",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 90,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Heal Burn",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 91,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Steam Dwarf Mines",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 92,
+      "deckP0": "Shifting Sandlands",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 93,
+      "deckP0": "One-Two-Punch!",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 94,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 95,
+      "deckP0": "Gather That Storm!",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 96,
+      "deckP0": "Dance of the Butterflies",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 97,
+      "deckP0": "Lightning Caller",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 98,
+      "deckP0": "Heal Burn",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 99,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Venom Swamp",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 100,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Gather That Storm!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 101,
+      "deckP0": "Heal Burn",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 102,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Shifting Sandlands",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 103,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Suicide Bombers",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 3,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 104,
+      "deckP0": "Heal Burn",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 105,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Heal Burn",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 106,
+      "deckP0": "Gather That Storm!",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 107,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Steam Dwarf Mines",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 108,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 109,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 110,
+      "deckP0": "Steam Dwarf Mines",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 111,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Gather That Storm!",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 112,
+      "deckP0": "One-Two-Punch!",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 113,
+      "deckP0": "Spell Industrialization",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 114,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 115,
+      "deckP0": "Lightning Caller",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 116,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Shifting Sandlands",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 117,
+      "deckP0": "Gather That Storm!",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 118,
+      "deckP0": "Steam Dwarf Mines",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 119,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Deepsea Terror",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 120,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Poison Torture",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 121,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 122,
+      "deckP0": "Heal Burn",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 123,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 124,
+      "deckP0": "Heal Burn",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 125,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Steam Dwarf Mines",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 126,
+      "deckP0": "One-Two-Punch!",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 127,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Lightning Caller",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 128,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Gather That Storm!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 129,
+      "deckP0": "Venom Swamp",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 130,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 131,
+      "deckP0": "Steam Dwarf Mines",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 132,
+      "deckP0": "Venom Swamp",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 133,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Deepsea Terror",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 134,
+      "deckP0": "Poison Torture",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 135,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Spell Industrialization",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 136,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 137,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Lightning Caller",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 138,
+      "deckP0": "Poison Torture",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 139,
+      "deckP0": "Heal Burn",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 3,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 140,
+      "deckP0": "One-Two-Punch!",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 141,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 142,
+      "deckP0": "Deepsea Terror",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 143,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Spell Industrialization",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 144,
+      "deckP0": "Slimy Infestation",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 145,
+      "deckP0": "Spell Industrialization",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 146,
+      "deckP0": "Poison Torture",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 147,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Poison Torture",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 148,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 149,
+      "deckP0": "Dance of the Butterflies",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 150,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Venom Swamp",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 151,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 152,
+      "deckP0": "Deepsea Terror",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 153,
+      "deckP0": "Poison Torture",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 154,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 155,
+      "deckP0": "Slimy Infestation",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 156,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Great Weapon Master",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 157,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Dance of the Butterflies",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 158,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Great Weapon Master",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 159,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Dance of the Butterflies",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 160,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Heal Burn",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 161,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Suicide Bombers",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 162,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Spell Industrialization",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 163,
+      "deckP0": "One-Two-Punch!",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 164,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Poison Torture",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 165,
+      "deckP0": "Poison Torture",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 166,
+      "deckP0": "Venom Swamp",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 167,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Lightning Caller",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 168,
+      "deckP0": "Heal Burn",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 169,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Lightning Caller",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 170,
+      "deckP0": "Steam Dwarf Mines",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 171,
+      "deckP0": "Slimy Infestation",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 172,
+      "deckP0": "Suicide Bombers",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 173,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 174,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Dance of the Butterflies",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 175,
+      "deckP0": "One-Two-Punch!",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 176,
+      "deckP0": "Shifting Sandlands",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 177,
+      "deckP0": "Shifting Sandlands",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 178,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Deepsea Terror",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 179,
+      "deckP0": "Spell Industrialization",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 180,
+      "deckP0": "Deepsea Terror",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 181,
+      "deckP0": "Venom Swamp",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 182,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 183,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Steam Dwarf Mines",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 184,
+      "deckP0": "Shifting Sandlands",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 185,
+      "deckP0": "Poison Torture",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 186,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Deepsea Terror",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 187,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Venom Swamp",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 188,
+      "deckP0": "Spell Industrialization",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 189,
+      "deckP0": "Dance of the Butterflies",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 190,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Great Weapon Master",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 191,
+      "deckP0": "Suicide Bombers",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 192,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Great Weapon Master",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 193,
+      "deckP0": "Dance of the Butterflies",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 194,
+      "deckP0": "Steam Dwarf Mines",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 195,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Gather That Storm!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 196,
+      "deckP0": "One-Two-Punch!",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 197,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 198,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Poison Torture",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 2,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 199,
+      "deckP0": "Suicide Bombers",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 200,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Great Weapon Master",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 201,
+      "deckP0": "Slimy Infestation",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 202,
+      "deckP0": "Poison Torture",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 203,
+      "deckP0": "One-Two-Punch!",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 204,
+      "deckP0": "Dance of the Butterflies",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 205,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Deepsea Terror",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 206,
+      "deckP0": "Poison Torture",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 207,
+      "deckP0": "Suicide Bombers",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 208,
+      "deckP0": "Suicide Bombers",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 209,
+      "deckP0": "Heal Burn",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 210,
+      "deckP0": "Suicide Bombers",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 211,
+      "deckP0": "Poison Torture",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 212,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Steam Dwarf Mines",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 213,
+      "deckP0": "Slimy Infestation",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 214,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Venom Swamp",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 215,
+      "deckP0": "Gather That Storm!",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 216,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Suicide Bombers",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 217,
+      "deckP0": "Spell Industrialization",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 218,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Poison Torture",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 219,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Suicide Bombers",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 220,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Lightning Caller",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 221,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 222,
+      "deckP0": "Deepsea Terror",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 223,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Deepsea Terror",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 224,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 225,
+      "deckP0": "Venom Swamp",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 226,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Suicide Bombers",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 227,
+      "deckP0": "Deepsea Terror",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 228,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 229,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 230,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Shifting Sandlands",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 231,
+      "deckP0": "Spell Industrialization",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 232,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Shifting Sandlands",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 233,
+      "deckP0": "Dance of the Butterflies",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 234,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 235,
+      "deckP0": "Suicide Bombers",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 236,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Suicide Bombers",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 237,
+      "deckP0": "Dance of the Butterflies",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 238,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Great Weapon Master",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 239,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Gather That Storm!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 240,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Spell Industrialization",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 241,
+      "deckP0": "Steam Dwarf Mines",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 242,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Lightning Caller",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 243,
+      "deckP0": "Heal Burn",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 244,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Spell Industrialization",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 245,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 246,
+      "deckP0": "Lightning Caller",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 247,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Suicide Bombers",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 248,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Gather That Storm!",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 249,
+      "deckP0": "Dance of the Butterflies",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 250,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 251,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Deepsea Terror",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 252,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 253,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 254,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 255,
+      "deckP0": "Great Weapon Master",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 256,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Shifting Sandlands",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 257,
+      "deckP0": "Deepsea Terror",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 258,
+      "deckP0": "Steam Dwarf Mines",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 259,
+      "deckP0": "Heal Burn",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 260,
+      "deckP0": "Shifting Sandlands",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 261,
+      "deckP0": "Steam Dwarf Mines",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 262,
+      "deckP0": "Dance of the Butterflies",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 263,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 264,
+      "deckP0": "Venom Swamp",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 265,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Dance of the Butterflies",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 266,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Venom Swamp",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 267,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 268,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Great Weapon Master",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 269,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Shifting Sandlands",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 270,
+      "deckP0": "Heal Burn",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 271,
+      "deckP0": "Shifting Sandlands",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 272,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Gather That Storm!",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 273,
+      "deckP0": "Lightning Caller",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 274,
+      "deckP0": "Lightning Caller",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 275,
+      "deckP0": "Heal Burn",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 276,
+      "deckP0": "One-Two-Punch!",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 277,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Shifting Sandlands",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 278,
+      "deckP0": "Steam Dwarf Mines",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 279,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Dance of the Butterflies",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 280,
+      "deckP0": "Dance of the Butterflies",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 281,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 282,
+      "deckP0": "Spell Industrialization",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 283,
+      "deckP0": "Poison Torture",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 284,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 285,
+      "deckP0": "Gather That Storm!",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 286,
+      "deckP0": "Deepsea Terror",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 287,
+      "deckP0": "Heal Burn",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 288,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "One-Two-Punch!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 289,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Dance of the Butterflies",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 290,
+      "deckP0": "Venom Swamp",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 291,
+      "deckP0": "Poison Torture",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 292,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Suicide Bombers",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1100hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 293,
+      "deckP0": "Spell Industrialization",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 294,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Spell Industrialization",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1150hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 295,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Shifting Sandlands",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 296,
+      "deckP0": "Dance of the Butterflies",
+      "deckP1": "Man's Best Friends",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1100hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 297,
+      "deckP0": "Spell Industrialization",
+      "deckP1": "To Attain Divinity",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1150hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 298,
+      "deckP0": "To Attain Divinity",
+      "deckP1": "Great Weapon Master",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 1,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1200hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    },
+    {
+      "gameIdx": 299,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Slimy Infestation",
+      "firstPlayer": 0,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1250hp, deck 60, hand 0) | turn 1 phase 0 active p0"
+    },
+    {
+      "gameIdx": 300,
+      "deckP0": "Man's Best Friends",
+      "deckP1": "Gather That Storm!",
+      "firstPlayer": 1,
+      "turns": 1,
+      "ms": 0,
+      "reason": "setup-error: cpuSkipCardNames is not defined",
+      "diagnosis": "p0(heroes 3/3 alive, 1250hp, deck 60, hand 0) | p1(heroes 3/3 alive, 1200hp, deck 60, hand 0) | turn 1 phase 0 active p1"
+    }
+  ],
+  "savedAt": "2026-04-25T19:39:56.251Z"
+}

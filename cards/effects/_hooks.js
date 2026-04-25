@@ -27,6 +27,7 @@ const HOOKS = {
   BEFORE_DRAW:      'beforeDraw',
   ON_DRAW:          'onDraw',
   ON_CARD_ADDED_TO_HAND: 'onCardAddedToHand', // Fires when a card is added to a hand from the deck (tutor effects — Mass Multiplication, etc.). Complements ON_DRAW, which only fires for top-of-deck draws.
+  ON_CARD_ADDED_FROM_DISCARD_TO_HAND: 'onCardAddedFromDiscardToHand', // Fires when a card is moved from a discard pile (either player's) into a hand. Distinct from ON_CARD_ADDED_TO_HAND so listeners (Bamboo Staff, Bamboo Shield reveal, …) can react specifically to "recovered from graveyard" without firing on deck-tutors.
   BEFORE_PLAY:      'beforePlay',
   ON_PLAY:          'onPlay',
   ON_DISCARD:       'onDiscard',
@@ -42,6 +43,13 @@ const HOOKS = {
   ON_HERO_KO:        'onHeroKO',
   ON_HERO_REVIVE:    'onHeroRevive',
   ON_CREATURE_DEATH: 'onCreatureDeath',
+  // Fires specifically when a Creature is SACRIFICED — i.e. removed
+  // from the board as a deliberate cost (resolveSacrificeCost), not
+  // killed by damage. Sacrifices ALSO fire ON_CREATURE_DEATH normally
+  // (destroyCard → onCreatureDeath); this hook layers ON TOP for cards
+  // that need to distinguish "you chose to lose this Creature" from
+  // any other death.
+  ON_CREATURE_SACRIFICED: 'onCreatureSacrificed',
 
   // ── Resources ──
   ON_RESOURCE_GAIN:  'onResourceGain',
@@ -142,6 +150,12 @@ const STATUS_EFFECTS = {
   // `nulled` is used by permanent silence effects (Null Zone, Shadow etc).
   // Same rationale as `negated` — shouldn't be cleanseable.
   nulled:  { negative: true, cleansable: false, label: 'Nulled',  icon: '🔇', immuneKey: 'null_immune' },
+  // `bound` (Forbidden Zone, future restraint cards) prevents the hero
+  // from performing Actions but does NOT silence their hero / ability /
+  // creature effects — passive auras, ability triggers, and reactions
+  // all keep firing. Distinct from Stunned which silences everything.
+  // Cleansable like Stunned.
+  bound:   { negative: true, cleansable: true,  label: 'Bound',   icon: '⛓️', immuneKey: 'bound_immune' },
   immune:  { negative: false, label: 'Immune',  icon: '🛡️' },
   shielded:{ negative: false, label: 'Shielded', icon: '✨' },
 };

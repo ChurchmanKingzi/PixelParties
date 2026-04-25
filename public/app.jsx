@@ -5664,9 +5664,10 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const canHeroPlayCard = (playerData, heroIdx, card) => {
     const hero = playerData.heroes[heroIdx];
     if (!hero || !hero.name || hero.hp <= 0) return false;
-    // Frozen/stunned/negated heroes can't use abilities for spells, creatures, attacks
+    // Frozen/stunned/negated/bound heroes can't perform Actions —
+    // playing a card from hand IS an Action.
     if (card.cardType !== 'Ability') {
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated || hero.statuses?.bound) return false;
     }
     // Combo lock: only the locked hero can act
     if (playerData.comboLockHeroIdx != null && playerData.comboLockHeroIdx !== heroIdx) return false;

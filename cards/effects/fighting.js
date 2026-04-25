@@ -66,6 +66,11 @@ module.exports = {
     onCardLeaveZone: async (ctx) => {
       // Only react when an ability card leaves (not creatures dying in support zones)
       if (ctx.fromZone !== 'ability') return;
+      // Self-only: ctx.card is the LISTENING Fighting, so the
+      // `atkGranted > 0` check used to wrongly revoke this hero's ATK
+      // every time some OTHER ability left the board. Compare instance
+      // ids so only the actually-departing Fighting decrements ATK.
+      if (ctx.leavingCard && ctx.leavingCard.id !== ctx.card?.id) return;
       const engine = ctx._engine;
       const atkGranted = ctx.card.counters.atkGranted || 0;
       if (atkGranted <= 0) return;

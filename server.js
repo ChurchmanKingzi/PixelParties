@@ -149,8 +149,9 @@ async function initDatabase() {
   await db.execute('CREATE INDEX IF NOT EXISTS idx_game_history_user ON game_history(user_id)');
 
   // Per-opponent win/loss for singleplayer CPU battles. Keyed by the
-  // deckId the player faced — sample decks (`sample-N`) and structure
-  // decks share this key space since both come from loadSampleDecks().
+  // deckId the player faced — sample decks (`sample-<filename>`) and
+  // structure decks share this key space since both come from
+  // loadSampleDecks().
   await db.execute(`CREATE TABLE IF NOT EXISTS npc_stats (
     user_id TEXT NOT NULL,
     opponent_deck_id TEXT NOT NULL,
@@ -160,6 +161,21 @@ async function initDatabase() {
     FOREIGN KEY (user_id) REFERENCES users(id)
   )`);
   await db.execute('CREATE INDEX IF NOT EXISTS idx_npc_stats_user ON npc_stats(user_id)');
+
+  // One-time migration: sample-deck IDs used to be array-index-based
+  // (`sample-0`, `sample-1`, ...) which made every win/loss record shift
+  // to a DIFFERENT deck whenever a new sample deck was added or the
+  // alphabetical order of files changed. IDs are now filename-based
+  // (`sample-Heal Burn`, ...). Drop the legacy numeric rows so users
+  // don't carry forward mis-attributed stats — starting fresh is
+  // better than seeing wins against decks you never played.
+  try {
+    await db.execute(`DELETE FROM npc_stats
+      WHERE opponent_deck_id LIKE 'sample-%'
+        AND opponent_deck_id GLOB 'sample-[0-9]*'`);
+  } catch (err) {
+    console.error('[npc_stats migration] failed:', err.message);
+  }
 
   // Cardback storage table (replaces filesystem storage)
   await db.execute(`CREATE TABLE IF NOT EXISTS user_cardbacks (
@@ -825,7 +841,11 @@ function loadSampleDecks() {
       const displayName = stripped || deckName;
 
       decks.push({
-        id: 'sample-' + fi,
+        // Stable ID derived from the source filename so adding / removing
+        // / reordering sample decks never causes stats (npc_stats) to
+        // drift onto the wrong opponent. Previously this was 'sample-' +
+        // array-index, which shifted every key on any roster change.
+        id: 'sample-' + fileBase,
         name: displayName,
         heroes,
         mainDeck: mainCards,
@@ -1580,14 +1600,21 @@ function sendGameState(room, playerIdx, extra) {
           return ps.hand.map((name, index) => ({ index, name }));
         }
         const result = [];
-        // Per-index reveals (Luna Kiai): exact copy was revealed.
+        const seenIdx = new Set();
+        const pushReveal = (idx) => {
+          if (seenIdx.has(idx)) return;
+          if (idx < 0 || idx >= ps.hand.length) return;
+          seenIdx.add(idx);
+          result.push({ index: idx, name: ps.hand[idx] });
+        };
+        // Per-index reveals (Luna Kiai): exact copy was revealed for
+        // the rest of THIS turn.
         const indexMap = ps._revealedHandIndices || {};
-        for (const kStr of Object.keys(indexMap)) {
-          const idx = +kStr;
-          if (idx >= 0 && idx < ps.hand.length) {
-            result.push({ index: idx, name: ps.hand[idx] });
-          }
-        }
+        for (const kStr of Object.keys(indexMap)) pushReveal(+kStr);
+        // Permanent per-index reveals (Bamboo Shield): survives turn
+        // boundaries until the revealed copy is spliced out of hand.
+        const permaMap = ps._permanentlyRevealedHandIndices || {};
+        for (const kStr of Object.keys(permaMap)) pushReveal(+kStr);
         // Legacy count-based reveals (Madaga's temporary reveal): pick
         // the last-N matching copies. Skip indices already exposed by
         // the per-index map to avoid double-listing.
@@ -1617,10 +1644,16 @@ function sendGameState(room, playerIdx, extra) {
       damageLocked: ps.damageLocked || false,
       oppHandLocked: ps.oppHandLocked || false,
       itemLocked: ps.itemLocked || false,
+      // Boomerang's "no Artifacts for the rest of this turn" lockout —
+      // surfaced as a clean boolean so the client can grey out hand
+      // Artifacts and show a debuff badge. Self-expires when the turn
+      // number rolls over (the underlying flag holds the lock-turn).
+      artifactLocked: (ps._artifactLockTurn === gs.turn) || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
       handLocked: ps.handLocked || false,
+      flashbanged: ps._flashbangedDebuff || false,
       forsaken: ps._discardToDeleteActive || false,
       creationLockedNames: (pi === playerIdx && ps._creationLockedNames) ? [...ps._creationLockedNames] : [],
       handLockBlockedCards: (ps.handLocked && pi === playerIdx) ? (() => {
@@ -1673,6 +1706,20 @@ function sendGameState(room, playerIdx, extra) {
       for (const cn of (ps2?.hand || [])) {
         const s = loadCardEffect(cn);
         if (s?.ascendedHeroOnly) names.add(cn);
+      }
+      return [...names];
+    })(),
+    // Abilities flagged with `restrictedAttachment: true` can never be
+    // attached to a Hero by normal play / generic tutors — Divinity is
+    // the inaugural example. Surface them so the client gray-out logic
+    // can refuse the attach immediately rather than letting the player
+    // drag the card onto a hero only to be silently denied server-side.
+    restrictedAttachmentAbilities: (() => {
+      const ps2 = gs.players[playerIdx];
+      const names = new Set();
+      for (const cn of (ps2?.hand || [])) {
+        const s = loadCardEffect(cn);
+        if (s?.restrictedAttachment) names.add(cn);
       }
       return [...names];
     })(),
@@ -1811,15 +1858,22 @@ function sendGameState(room, playerIdx, extra) {
     // turn start along with other reveal state.
     revealedOwnHandIndices: (() => {
       const myPs = gs.players[playerIdx];
-      const map = myPs?._revealedHandIndices;
-      if (!map) return [];
-      const out = [];
+      if (!myPs) return [];
       const handLen = myPs.hand?.length || 0;
-      for (const kStr of Object.keys(map)) {
-        const k = +kStr;
-        if (k >= 0 && k < handLen) out.push(k);
-      }
-      return out;
+      const out = new Set();
+      const collect = (map) => {
+        if (!map) return;
+        for (const kStr of Object.keys(map)) {
+          const k = +kStr;
+          if (k >= 0 && k < handLen) out.add(k);
+        }
+      };
+      // Per-turn reveals (Luna Kiai) AND permanent reveals (Bamboo
+      // Shield) are both surfaced here so the owner sees both with
+      // the same revealed-card styling.
+      collect(myPs._revealedHandIndices);
+      collect(myPs._permanentlyRevealedHandIndices);
+      return [...out];
     })(),
     // True only while Deepsea Spores' per-turn override is live — the
     // client tints every board Creature dark-red and prefixes "Deepsea"
@@ -1837,7 +1891,7 @@ function sendGameState(room, playerIdx, extra) {
       for (let hi = 0; hi < (ps2?.heroes || []).length; hi++) {
         const hero = ps2.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
-        if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+        if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated || hero.statuses?.bound) continue;
         const heroScript = loadCardEffect(hero.name);
         if (!heroScript?.isBakhmHero) continue;
         const freeSlots = [];
@@ -1859,7 +1913,7 @@ function sendGameState(room, playerIdx, extra) {
         const hi = inst.heroIdx;
         const hero = ps2?.heroes?.[hi];
         if (!hero?.name || hero.hp <= 0) continue;
-        if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+        if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated || hero.statuses?.bound) continue;
         // Check abilities
         const cardData = getCardDB()[inst.name];
         if (!cardData) continue;
@@ -1958,10 +2012,14 @@ function sendSpectatorGameState(room) {
       damageLocked: ps.damageLocked || false,
       oppHandLocked: ps.oppHandLocked || false,
       itemLocked: ps.itemLocked || false,
+      // Boomerang lockout — see the matching block in sendGameState
+      // for the rationale.
+      artifactLocked: (ps._artifactLockTurn === gs.turn) || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
       potionLocked: ps.potionLocked || false,
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(spi) : 30,
       handLocked: ps.handLocked || false,
+      flashbanged: ps._flashbangedDebuff || false,
       forsaken: ps._discardToDeleteActive || false,
       supportSpellLocked: ps.supportSpellLocked || false,
       permanents: ps.permanents || [],
@@ -2593,6 +2651,10 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   const ps = gs.players[pi];
   if (!ps) return false;
   if (ps.itemLocked && (ps.hand || []).length < 2) return false;
+  // Boomerang's "no Artifacts for the rest of this turn" lockout —
+  // self-expiring (the stored turn number invalidates on the next
+  // turn-rollover). Blocks all proactive Artifact plays via this path.
+  if (ps._artifactLockTurn === gs.turn) return false;
   if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return false;
 
   const cardData = getCardDB()[cardName];
@@ -2849,6 +2911,15 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       if (hi >= 0) { ps.hand.splice(hi, 1); if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++; }
       ps.discardPile.push(cardName);
       room.engine._untrackCard(inst.id);
+      // Wisdom cost is paid IMMEDIATELY after the spell leaves hand,
+      // BEFORE any phase-advance / turn-end mechanics can interrupt.
+      // Otherwise a Flashbanged / Terror turn-end fired by the
+      // action-used hooks would walk past this discard prompt.
+      if (wisdomDiscardCost > 0) {
+        await room.engine.actionPromptForceDiscard(pi, wisdomDiscardCost, {
+          title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+        });
+      }
       if (additionalConsumed && consumedInst) {
         consumedInst.counters.additionalActionAvail = 1;
       }
@@ -2867,11 +2938,6 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
       if (isActionPhase && !additionalConsumed && !isInherentAction) {
         await room.engine.advanceToPhase(pi, 4);
-      }
-      if (wisdomDiscardCost > 0) {
-        await room.engine.actionPromptForceDiscard(pi, wisdomDiscardCost, {
-          title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
-        });
       }
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
@@ -2980,6 +3046,23 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       room.engine._untrackCard(inst.id);
     }
 
+    // Wisdom cost is paid IMMEDIATELY after the spell leaves the
+    // caster's hand, BEFORE any onActionUsed / onAnyActionResolved
+    // hooks (Flashbang's turn-end, Reiza's bonus action, etc.) and
+    // BEFORE any phase-advance. If we leave it at the end of the
+    // function the way it used to be, a Flashbanged caster's turn
+    // ends mid-flow on the action-used hook, the CPU runs an entire
+    // counter-turn while we're still mid-await here, and by the time
+    // we resume the player has long since moved on — the prompt
+    // either fires too late or gets eaten by stale state. Paying
+    // costs upfront matches Wisdom's "always paid even if the spell
+    // is negated, interrupted, or fizzles" contract.
+    if (wisdomDiscardCost > 0) {
+      await room.engine.actionPromptForceDiscard(pi, wisdomDiscardCost, {
+        title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+      });
+    }
+
     if (cardData.cardType === 'Spell' && cardData.spellSchool1 === 'Support Magic') {
       ps.supportSpellUsedThisTurn = true;
       if (additionalConsumed && consumedInst?.counters?.additionalActionType?.startsWith('friendship_support')) {
@@ -3023,6 +3106,20 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         _skipReactionCheck: true,
       });
     }
+    // ── Universal "any action resolved" hook ──
+    // Unlike onActionUsed (which skips inherent + free plays so things
+    // like Reiza's bonus-action-on-poison don't fire on Quick Attack),
+    // this hook fires for EVERY action play — Spell/Attack/Creature/
+    // Ability/HeroEffect, regardless of whether it consumed the main
+    // action slot. Flashbang listens here so it correctly ends the
+    // turn on the first inherent / additional / free action too.
+    await room.engine.runHooks('onAnyActionResolved', {
+      actionType: cardData.cardType.toLowerCase(), playerIdx: pi, cardName, heroIdx,
+      isAdditional: !!additionalConsumed,
+      isInherent: !!isInherentAction,
+      isFree: !!becameFreeAction,
+      _skipReactionCheck: true,
+    });
 
     if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction && !gs._preventPhaseAdvance) {
       await room.engine.advanceToPhase(pi, 4);
@@ -3043,11 +3140,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       ps._oncePerGameUsed.add(opgKey);
     }
 
-    if (wisdomDiscardCost > 0) {
-      await room.engine.actionPromptForceDiscard(pi, wisdomDiscardCost, {
-        title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
-      });
-    }
+    // (Wisdom discard is paid earlier — right after the spell leaves
+    // the caster's hand. See the comment above that earlier site.)
   } catch (err) {
     console.error('[Engine] doPlaySpell error:', err.message, err.stack);
   } finally {
@@ -3159,6 +3253,10 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner 
   const ps = gs.players[heroOwner];
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
+  // Bound blocks "Actions" (Spell/Attack/Creature plays from hand)
+  // — NOT Ability activations like Alchemy, Adventurousness, etc.
+  // Frozen/Stunned still gate ability activations because those
+  // statuses silence the hero outright.
   if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
 
@@ -3407,8 +3505,15 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
 
     if (!placementConsumed) {
-      await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualZoneSlot });
-      await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
+      // `_isNormalSummon: true` flags this as a player-driven summon
+      // gated against THIS hero's spell-school + level requirements.
+      // Distinguishes from card-effect placements (Loyal Rottweiler,
+      // Loyal Shepherd's revive, Monster in a Bottle, bounce-place,
+      // …) where no hero-level gating happens. Listeners like
+      // Orthos's "if THIS Hero summons a Loyal" use the flag to
+      // skip non-summon placements.
+      await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualZoneSlot, _isNormalSummon: true });
+      await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _isNormalSummon: true });
     }
     await room.engine.runHooks('onActionUsed', {
       actionType: 'creature', playerIdx: pi, cardName, heroIdx,
@@ -3420,6 +3525,14 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         _skipReactionCheck: true,
       });
     }
+    // Universal action-resolved hook (see doPlaySpell for rationale).
+    await room.engine.runHooks('onAnyActionResolved', {
+      actionType: 'creature', playerIdx: pi, cardName, heroIdx,
+      isAdditional: !!usingAdditional,
+      isInherent: !!isInherentAction,
+      isFree: false,
+      _skipReactionCheck: true,
+    });
     if (isActionPhase && !usingAdditional && !isInherentAction) {
       await room.engine.advanceToPhase(pi, 4);
     }
@@ -3450,6 +3563,8 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner }) {
   if (!hero?.name || hero.hp <= 0) return false;
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
   if (charmedOwner == null && gs.players[pi].comboLockHeroIdx != null && gs.players[pi].comboLockHeroIdx !== heroIdx) return false;
+  // One-turn action lock (Treasure Hunter's Backpack, etc.)
+  if (hero._actionLockedTurn === gs.turn) return false;
 
   const abilitySlot = ps.abilityZones?.[heroIdx]?.[zoneIdx];
   if (!abilitySlot || abilitySlot.length === 0) return false;
@@ -3553,6 +3668,12 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner }) {
         actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx, _skipReactionCheck: true,
       });
     }
+    // Universal action-resolved hook (see doPlaySpell for rationale).
+    await room.engine.runHooks('onAnyActionResolved', {
+      actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx,
+      isAdditional: !!usingAdditional, isInherent: false, isFree: false,
+      _skipReactionCheck: true,
+    });
 
     if (isActionPhase) {
       await room.engine.advanceToPhase(pi, 4);
@@ -3585,8 +3706,14 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
   const ps = gs.players[heroOwner];
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
+  // Bound blocks "Actions" (Spell/Attack/Creature plays from hand) only.
+  // Hero-effect activations are an "effect", not an Action — Bound's
+  // text-spec ("ONLY Actions, but not their Abilities or effects")
+  // covers hero effects too. Frozen/stunned/negated still silence them.
   if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
+  // One-turn action lock (Treasure Hunter's Backpack, etc.)
+  if (hero._actionLockedTurn === gs.turn) return false;
 
   const availableEffects = [];
   const hasMummyToken = (ps.supportZones[heroIdx] || []).some(slot => (slot || []).includes('Mummy Token'));
@@ -3709,6 +3836,14 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       if (!gs.hoptUsed) gs.hoptUsed = {};
       gs.hoptUsed[chosen.hoptKey] = gs.turn;
       delete gs._preventPhaseAdvance;
+      // Universal action-resolved hook — Hero Effect activations count
+      // as Actions for Flashbang's purposes even though they don't
+      // consume the action-phase slot.
+      await room.engine.runHooks('onAnyActionResolved', {
+        actionType: 'hero_effect', playerIdx: pi, cardName: chosen.name, heroIdx,
+        isAdditional: false, isInherent: true, isFree: false,
+        _skipReactionCheck: true,
+      });
     } else {
       delete gs._pendingCardReveal;
       delete gs._pendingPlayLog;
@@ -3777,6 +3912,8 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
   const ps = gs.players[pi];
   const hero = ps.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
+  // Bound blocks "Actions" only — equip-effect activations are an
+  // "effect" per the spec and stay alive under Bound.
   if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
 
   const slot = (ps.supportZones[heroIdx] || [])[zoneSlot] || [];
@@ -3962,7 +4099,7 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
   // Bakhm Support-Zone placement: Surprise Creatures can go into Bakhm's own
   // Support Zones instead of the Surprise Zone.
   if (bakhmSlot != null && bakhmSlot >= 0) {
-    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
+    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated || hero.statuses?.bound) return false;
     const heroScript = loadCardEffect(hero.name);
     if (!heroScript?.isBakhmHero) return false;
     if (cardData.cardType !== 'Creature') return false;
@@ -4120,6 +4257,10 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
   const ps = gs.players[pi];
   if (!ps) return false;
   if (ps.itemLocked && (ps.hand || []).length < 2) return false;
+  // Boomerang's "no Artifacts for the rest of this turn" lockout —
+  // covers Normal / Reaction-with-proactivePlay Artifacts that route
+  // through this handler.
+  if (ps._artifactLockTurn === gs.turn) return false;
   if (ps._creationLockedNames?.has(cardName)) return false;
   if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return false;
   if (ps._resolvingCard && handIndex === getResolvingHandIndex(ps)) return false;
@@ -4691,17 +4832,21 @@ io.on('connection', (socket) => {
       }
       if (ok) validMap = indexMap;
     }
-    // Per-copy reveal state (Luna Kiai) is keyed by hand index. With a
-    // valid indexMap we can remap old→new positions so reveals follow
-    // their physical copy. Without one, we fall back to clearing.
-    const oldReveals = ps._revealedHandIndices;
-    const newReveals = {};
-    if (oldReveals && validMap) {
-      for (let newIdx = 0; newIdx < hand.length; newIdx++) {
-        if (oldReveals[validMap[newIdx]]) newReveals[newIdx] = true;
+    // Per-copy reveal state (Luna Kiai per-turn, Bamboo Shield
+    // permanent) is keyed by hand index. With a valid indexMap we can
+    // remap old→new positions so reveals follow their physical copy.
+    // Without one, we fall back to clearing.
+    const remap = (oldMap) => {
+      const out = {};
+      if (oldMap && validMap) {
+        for (let newIdx = 0; newIdx < hand.length; newIdx++) {
+          if (oldMap[validMap[newIdx]]) out[newIdx] = true;
+        }
       }
-    }
-    ps._revealedHandIndices = newReveals;
+      return out;
+    };
+    ps._revealedHandIndices = remap(ps._revealedHandIndices);
+    ps._permanentlyRevealedHandIndices = remap(ps._permanentlyRevealedHandIndices);
     ps.hand = hand;
     // Array reassignment wiped the splice interceptor — re-install.
     if (room.engine) room.engine._installHandRevealInterceptor(pi);
@@ -4771,7 +4916,7 @@ io.on('connection', (socket) => {
 
     const hero = ps.heroes[heroIdx];
     if (!hero?.name || hero.hp <= 0) return;
-    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
+    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated || hero.statuses?.bound) return;
 
     // Check abilities
     const cardData = getCardDB()[cardName];
@@ -5600,6 +5745,47 @@ io.on('connection', (socket) => {
       if (inst.zone === 'support') inst.turnPlayed = 0;
     }
 
+    // ── Apply player-state starting debuffs ──
+    // The Puzzle Creator stores `playerDebuffs` as `[meDebuffs, oppDebuffs]`,
+    // each an array of registry keys. Most simply set a player flag the
+    // engine and UI already read; `flashbanged` additionally tracks a
+    // Flashbang sentinel instance in the deleted pile so its onActionUsed
+    // hook fires correctly when the affected player takes their first
+    // action of the puzzle.
+    if (Array.isArray(puzzleData.playerDebuffs)) {
+      const flagByKey = {
+        flashbanged:        '_flashbangedDebuff',
+        summonLocked:       'summonLocked',
+        damageLocked:       'damageLocked',
+        oppHandLocked:      'oppHandLocked',
+        itemLocked:         'itemLocked',
+        potionLocked:       'potionLocked',
+        supportSpellLocked: 'supportSpellLocked',
+        forsaken:           '_discardToDeleteActive',
+        handLocked:         'handLocked',
+      };
+      for (let pi = 0; pi < 2; pi++) {
+        const debuffs = puzzleData.playerDebuffs[pi] || [];
+        const ps = gs.players[pi];
+        if (!ps) continue;
+        for (const key of debuffs) {
+          const flag = flagByKey[key];
+          if (flag) ps[flag] = true;
+          if (key === 'flashbanged') {
+            // Sentinel Flashbang in the deleted pile, owned by the
+            // OPPONENT (whoever would have used the potion), targeting
+            // the affected player and pre-armed for the puzzle's first
+            // turn so the trigger fires on their first action.
+            const opp = pi === 0 ? 1 : 0;
+            const inst = room.engine._trackCard('Flashbang', opp, 'deleted', -1, -1);
+            if (!inst.counters) inst.counters = {};
+            inst.counters.flashbangTargetIdx = pi;
+            inst.counters.flashbangArmedTurn = gs.turn;
+          }
+        }
+      }
+    }
+
     // Apply creature custom HP and statuses
     for (let pi = 0; pi < 2; pi++) {
       const pz = puzzleData.players[pi];
@@ -6015,6 +6201,42 @@ io.on('connection', (socket) => {
   //  Both deckIds are optional — defaults to your first deck for both sides.
   //  Runs N games sequentially (CPU vs CPU, both running the MCTS brain),
   //  reports per-game winner / turn-count / duration plus a final summary.
+  //
+  //  Three pairing modes:
+  //    • Default (no `random`, no `pinDeckName(s)`) — fixed deck A vs deck B.
+  //    • `random: true`                              — both decks picked randomly
+  //                                                    per game from the pool.
+  //    • `pinDeckName: 'Gather That Storm'`          — one slot fixed to the
+  //                                                    named deck (substring
+  //                                                    match), other slot drawn
+  //                                                    randomly from the
+  //                                                    remaining pool. Side
+  //                                                    assignment (p0 vs p1)
+  //                                                    flips 50/50 each game.
+  //    • `pinDeckNames: ['A', 'B']` (multi-pin)     — one slot drawn each game
+  //                                                    from the named set; other
+  //                                                    slot from the rest.
+  //
+  //  Extra options:
+  //    • `samplesOnly: true` — opponent pool is restricted to canonical
+  //      Starter / Structure decks; user-saved decks are excluded. Pinned
+  //      names also only resolve against samples in this mode.
+  //    • `cpuSkipCardNames: ['Lifeforce Howitzer']` — runtime block-list:
+  //      the CPU brain refuses to proactively play any of these cards
+  //      during the run. Useful for isolating suspected problem cards
+  //      without modifying their scripts. Cleared when the game ends.
+  //
+  //  Examples:
+  //    // Single-pin vs the field
+  //    socket.emit('debug_self_play_run', { count: 100, pinDeckName: 'Gather That Storm' })
+  //    // Multi-pin (rotate the pinned slot between two decks) vs sample
+  //    // decks only, blocking Howitzer from CPU's proactive play list
+  //    socket.emit('debug_self_play_run', {
+  //      count: 300,
+  //      pinDeckNames: ["Structure Deck: Man's Best Friends", 'Structure Deck: To Attain Divinity'],
+  //      samplesOnly: true,
+  //      cpuSkipCardNames: ['Lifeforce Howitzer'],
+  //    })
   // ═══════════════════════════════════════════
 
   // Heal Burn per-game instrumentation removed — every self-play OOM during
@@ -6190,6 +6412,16 @@ io.on('connection', (socket) => {
       startGameEngine(room, roomId, firstPlayer, (engine) => {
         engine._isSelfPlay = true;
         engine._cpuPlayerIdx = firstPlayer;
+        // Per-game runtime CPU skip list: blocks the CPU brain's
+        // proactive-play scanner from picking specific cards. Read by
+        // _cpu.js next to the per-card `cpuSkipProactive` flag. Used
+        // by self-play tests to isolate suspected problem cards
+        // (e.g. Lifeforce Howitzer during Loyal/Divinity rebalance
+        // testing) without modifying their scripts.
+        if (Array.isArray(cpuSkipCardNames) && cpuSkipCardNames.length > 0
+            && engine.gs && !engine.gs._cpuSkipProactiveNames) {
+          engine.gs._cpuSkipProactiveNames = new Set(cpuSkipCardNames);
+        }
         installCpuBrain(engine);
         engine.onGameOver = (_room, winnerIdx, reason) => {
           // The engine's deck-out / all-heroes-dead paths call onGameOver
@@ -6359,7 +6591,12 @@ io.on('connection', (socket) => {
     socket.emit('debug_self_play_config_result', { ok: true, ...cfg });
   });
 
-  socket.on('debug_self_play_run', ({ count = 5, deckIdA, deckIdB, random, silent = true, minMatchupGames = 5, excludeDeckNames = [] } = {}) => {
+  socket.on('debug_self_play_run', ({
+    count = 5, deckIdA, deckIdB, random, silent = true,
+    minMatchupGames = 5, excludeDeckNames = [],
+    pinDeckName, pinDeckNames, samplesOnly = false,
+    cpuSkipCardNames = [],
+  } = {}) => {
     if (!currentUser) {
       socket.emit('debug_self_play_result', { ok: false, msg: 'not authenticated' });
       return;
@@ -6382,7 +6619,89 @@ io.on('connection', (socket) => {
       };
       let allDecks = [];
       let pickerMode = 'fixed';
-      if (random) {
+      let pinnedDeck = null; // Set when pinDeckName resolves to a real deck.
+      let _pinnedDecks = null; // Multi-pin variant — array of pinned decks.
+      let _pinnedOpponents = null; // Closure-scope opponent pool.
+      // Resolve pin spec: accept either a single name (`pinDeckName`) or
+      // an array of names (`pinDeckNames`). The multi-pin variant lets
+      // tests rotate the pinned side between two or more decks across
+      // the run (e.g. "pin {Loyals, Divinity} vs the field").
+      const pinNames = Array.isArray(pinDeckNames) && pinDeckNames.length > 0
+        ? pinDeckNames
+        : (pinDeckName ? [pinDeckName] : null);
+      // Pinned mode supersedes the random / fixed branches below — it
+      // builds the same broad pool but reserves one slot for the
+      // pinned-deck rotation and draws the other slot from the
+      // remaining pool each game.
+      if (pinNames) {
+        const rows = await db.all('SELECT * FROM decks WHERE user_id = ?', [currentUser.userId]);
+        const userDecks = rows.map(parseDeck).filter(d =>
+          d && Array.isArray(d.heroes) && d.heroes.length > 0
+          && Array.isArray(d.mainDeck) && d.mainDeck.length > 0);
+        const sampleDecks = loadSampleDecks().filter(d =>
+          d && Array.isArray(d.heroes) && d.heroes.length > 0
+          && Array.isArray(d.mainDeck) && d.mainDeck.length > 0);
+        // `samplesOnly: true` excludes user-saved decks from BOTH the
+        // pinned-resolution pool AND the opponent pool. The pinned
+        // names still resolve via sample decks (Starter / Structure
+        // collections). Useful for "test only against the canonical
+        // sample decks" runs that don't want noisy user creations.
+        const pool = samplesOnly ? sampleDecks : [...userDecks, ...sampleDecks];
+        const resolved = [];
+        // Punctuation-insensitive bidirectional matcher: strip
+        // apostrophes / colons / spaces / etc., then accept either
+        // direction of substring containment. Handles three traps in
+        // one:
+        //   1. Straight-vs-curly apostrophe (Man's vs Man’s)
+        //   2. Missing-colon variants ("Mans Best Friends" matches
+        //      the canonical "Structure Deck: Man's Best Friends")
+        //   3. Search query is MORE specific than the deck's stored
+        //      name (e.g. user types "Structure Deck: To Attain
+        //      Divinity" but the file's `Name:` line is just "To
+        //      Attain Divinity"). Without bidirectional matching, a
+        //      longer query can never resolve a shorter name.
+        const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+        const matchesEitherWay = (a, b) => a.includes(b) || b.includes(a);
+        for (const name of pinNames) {
+          const target = norm(name);
+          if (!target) {
+            socket.emit('debug_self_play_result', { ok: false, msg: `pinDeckName empty: ${name}` });
+            return;
+          }
+          const found = pool.find(d => matchesEitherWay(norm(d.name), target));
+          if (!found) {
+            const available = pool.map(d => d.name).filter(Boolean).join(', ');
+            socket.emit('debug_self_play_result', {
+              ok: false,
+              msg: `pinDeckName not found: ${name} — available: ${available}`,
+            });
+            return;
+          }
+          if (!resolved.includes(found)) resolved.push(found);
+        }
+        _pinnedDecks = resolved;
+        pinnedDeck = resolved[0]; // legacy reference for stats labels
+        // Opponent pool — every legal deck OTHER than any pinned one.
+        let opponents = pool.filter(d => !resolved.includes(d));
+        if (excludeDeckNames.length > 0) {
+          const excludeLc = excludeDeckNames.map(n => n.toLowerCase());
+          opponents = opponents.filter(d => {
+            const nameLc = (d.name || '').toLowerCase();
+            return !excludeLc.some(ex => nameLc.includes(ex) || ex.includes(nameLc));
+          });
+        }
+        if (opponents.length === 0) {
+          socket.emit('debug_self_play_result', { ok: false, msg: 'no legal opponents found for pinned deck(s)' });
+          return;
+        }
+        // The full deck list reported in the summary still includes
+        // every pinned deck so each deck's W-L line shows up.
+        allDecks = [...resolved, ...opponents];
+        pickerMode = 'pinned';
+        const pinLabel = resolved.map(d => `"${d.name}"`).join(' / ');
+        console.log(`[self-play] pinned mode: ${pinLabel} vs ${opponents.length} opponent${opponents.length !== 1 ? 's' : ''}${samplesOnly ? ' (samples only)' : ''}`);
+        _pinnedOpponents = opponents;
+      } else if (random) {
         // Pool = user's saved decks + ALL sample decks (Starter + Structure).
         // Self-play is a test tool, so we want broad archetype coverage even
         // when the user has only a few decks of their own saved.
@@ -6427,6 +6746,19 @@ io.on('connection', (socket) => {
       }
       const pickPair = () => {
         if (pickerMode === 'fixed') return [allDecks[0], allDecks[1] || allDecks[0]];
+        if (pickerMode === 'pinned') {
+          // 50/50 side assignment so the pinned deck(s) play p0 and p1
+          // an equal number of times across the run — keeps first-
+          // player skew from biasing the measured win-rate.
+          // For multi-pin: pick a random pinned deck per game so the
+          // rotation is even across the pinned set.
+          const opponents = _pinnedOpponents;
+          const pinned = (_pinnedDecks && _pinnedDecks.length > 0)
+            ? _pinnedDecks[Math.floor(Math.random() * _pinnedDecks.length)]
+            : pinnedDeck;
+          const opp = opponents[Math.floor(Math.random() * opponents.length)];
+          return Math.random() < 0.5 ? [pinned, opp] : [opp, pinned];
+        }
         if (allDecks.length < 2) return [allDecks[0], allDecks[0]];
         const i = Math.floor(Math.random() * allDecks.length);
         let j = Math.floor(Math.random() * (allDecks.length - 1));
@@ -6501,6 +6833,18 @@ io.on('connection', (socket) => {
       // this file is the user's recovery point.
       const partialSavePath = path.join(__dirname, 'data', `selfplay-partial-${Date.now()}.json`);
       console.log(`[self-play] incremental save → ${partialSavePath}`);
+      // Emit a "started" event to the BROWSER side so the user sees
+      // immediate confirmation in their dev console rather than
+      // staring at silence until the first game completes ~30s later.
+      // Includes the picker mode, deck count, and partial-save path
+      // so the user can tail the JSON live if they want.
+      socket.emit('debug_self_play_started', {
+        count, pickerMode, deckCount: allDecks.length,
+        pinnedDeckNames: _pinnedDecks ? _pinnedDecks.map(d => d.name) : null,
+        partialSavePath,
+        cpuSkipCardNames: Array.isArray(cpuSkipCardNames) ? cpuSkipCardNames : [],
+        startedAt: new Date().toISOString(),
+      });
 
       // Pick ~10 random game indices for detailed transcription. Selected
       // up front so every batch has a consistent sample size regardless
@@ -6526,6 +6870,17 @@ io.on('connection', (socket) => {
         // Announce decks BEFORE the game runs — if the game hangs, this
         // is the last line in the log and pinpoints the offending matchup.
         console.log(`[self-play] Game ${i + 1}/${count} starting: ${nameP0} vs ${nameP1}`);
+        // Browser-side start signal so the dev console gets immediate
+        // feedback that the next game has begun. Without this the user
+        // only sees output once a game COMPLETES (the
+        // `debug_self_play_progress` event fires post-game), which can
+        // look like nothing's happening for the first ~10-30s of the
+        // run.
+        socket.emit('debug_self_play_game_start', {
+          i: i + 1, total: count,
+          deckP0: nameP0, deckP1: nameP1,
+          startedAt: new Date().toISOString(),
+        });
         // Set up transcription for this game if selected. Buffer caps at
         // ~500 lines to keep the report readable; older lines drop.
         const isTranscribeGame = transcriptIndices.has(i);
@@ -6604,12 +6959,22 @@ io.on('connection', (socket) => {
           const mu = process.memoryUsage();
           const mb = (n) => Math.round(n / 1024 / 1024);
           console.log(`[self-play] heap after game ${i + 1}: rss=${mb(mu.rss)}MB heapUsed=${mb(mu.heapUsed)}MB heapTotal=${mb(mu.heapTotal)}MB external=${mb(mu.external)}MB turns=${r.turns}`);
-          // Per-game result line — name the winner, loser, how it ended.
+          // Per-game result line — name the winner, loser, how it ended,
+          // and a running win/loss tally for the participating decks so
+          // the user can watch trends as the batch runs.
           const winnerName = r.winnerIdx === 0 ? nameP0 : r.winnerIdx === 1 ? nameP1 : 'DRAW';
           const loserName = r.winnerIdx === 0 ? nameP1 : r.winnerIdx === 1 ? nameP0 : 'DRAW';
           const method = labelReason(r.reason);
           const diagSuffix = (r.winnerIdx === -1 && r.diagnosis) ? `\n    → ${r.diagnosis}` : '';
+          // Running w/l line for both participants — sample-size aware.
+          const fmtRunning = (deck) => {
+            const s = byDeck.get(String(deck.id || deck.name));
+            if (!s || s.games === 0) return `${deck.name} 0-0`;
+            const wr = ((s.wins / s.games) * 100).toFixed(1);
+            return `${deck.name} ${s.wins}-${s.losses} (${wr}%)`;
+          };
           console.log(`[self-play] Game ${i + 1}/${count} complete (${nameP0} vs ${nameP1})! Winner: ${winnerName}, Loser: ${loserName}, method of victory: ${method}, game lasted ${r.turns} turns, took ${r.ms} ms.${diagSuffix}`);
+          console.log(`[self-play]   running: ${fmtRunning(deckP0)} | ${fmtRunning(deckP1)}`);
           socket.emit('debug_self_play_progress', {
             i: i + 1, total: count,
             deckP0: deckP0.name, deckP1: deckP1.name,
@@ -6618,14 +6983,48 @@ io.on('connection', (socket) => {
           // Incremental save — fire-and-forget; a failed write here
           // shouldn't stop the batch. Synchronous to guarantee flush
           // to disk before a potential OOM a few seconds later.
+          //
+          // Snapshot includes:
+          //   • stats: aggregate p0/p1 wins, draws, totals.
+          //   • decks: per-deck record (games, wins, losses, winRate,
+          //     winReasons {Heroes dead, Deck-out, Cardinal Beasts, ...}).
+          //     Sorted by winRate so the leaderboard is at the top.
+          //   • matchups: every distinct pairing seen so far, with
+          //     game count, side splits, and a `dominance` measure
+          //     (|aWins-bWins|/games — 0 = even, 1 = whitewash).
+          //   • onesidedMatchups: top 10 most-lopsided eligible
+          //     pairings (≥ minMatchupGames games), so the user can
+          //     watch the "particularly good/bad matchups" narrow
+          //     in as more games run.
+          //   • aggregateWinReasons: how all wins broke down across
+          //     the entire run (Heroes dead vs Deck-out vs Cardinal
+          //     Beasts vs Puzzle failed vs Timeout).
+          //   • tieDetails: per-tie diagnostics for inspection.
           try {
+            const decksSnapshot = [...byDeck.values()].map(d => ({
+              ...d,
+              winRate: d.games > 0 ? +(d.wins / d.games).toFixed(3) : 0,
+            })).sort((a, b) => b.winRate - a.winRate);
+            const matchupSnapshot = [...byMatchup.values()].map(m => {
+              const dominance = m.games > 0 ? Math.abs(m.aWins - m.bWins) / m.games : 0;
+              return {
+                ...m,
+                dominance: +dominance.toFixed(3),
+                dominantSide: m.aWins > m.bWins ? m.nameA : m.nameB,
+              };
+            });
+            const onesidedSnapshot = matchupSnapshot
+              .filter(m => m.games >= minMatchupGames)
+              .sort((a, b) => b.dominance - a.dominance)
+              .slice(0, 10);
             const partial = {
               gamesDone: i + 1, total: count, elapsedMs: Date.now() - t0,
+              pickerMode,
               stats: { ...stats },
-              decks: [...byDeck.values()].map(d => ({
-                ...d,
-                winRate: d.games > 0 ? +(d.wins / d.games).toFixed(3) : 0,
-              })).sort((a, b) => b.winRate - a.winRate),
+              aggregateWinReasons: { ...totalWinReasons },
+              decks: decksSnapshot,
+              matchups: matchupSnapshot,
+              onesidedMatchups: onesidedSnapshot,
               tieDetails: [...tieDetails],
               savedAt: new Date().toISOString(),
             };
