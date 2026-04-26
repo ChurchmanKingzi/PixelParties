@@ -264,7 +264,10 @@ module.exports = {
           c.owner === secondTarget.owner && c.zone === 'support' &&
           c.heroIdx === secondTarget.heroIdx && c.zoneSlot === secondTarget.slotIdx
         );
-        if (inst) {
+        // Cardinal Beasts (and anything else with `_cardinalImmune`)
+        // refuse every status, including the ones Tea is "redirecting"
+        // here — canApplyCreatureStatus is the single point of truth.
+        if (inst && engine.canApplyCreatureStatus(inst, key)) {
           if (key === 'poisoned') {
             inst.counters.poisoned = 1;
             inst.counters.poisonStacks = poisonStacks;

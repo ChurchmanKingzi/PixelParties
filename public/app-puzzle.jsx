@@ -17,6 +17,25 @@ const emptyPlayer = () => ({
   mainDeck: [], potionDeck: [], discardPile: [], deletedPile: [],
 });
 
+// Dream-Landers attach pairs. Each Creature listed here can hold the
+// associated Hero attached underneath via `inst.counters.attachedHero`
+// (the generic attach plumbing in `engine.actionAttachHeroToCreature`).
+// The puzzle creator surfaces a "hero attached" toggle inside the stat
+// editor for these — clicking it sets `_creatureStatuses[hi-slot]
+// .attachedHero` to the hero name (or unsets it). The server's puzzle
+// loader picks the toggle up and re-runs each creature script's
+// `onAttachHero` so HP / counter bumps land identically to the
+// in-game attach action.
+const ATTACHABLE_HERO_PAIRS = {
+  'Goff, the Burnbringer':            'Gon, the Frostbringer',
+  'Smug Mastermind Antonia':          'Cool Rescuer Monia',
+  'Stellin, the Calm Dictator':       'Stellan, the Calm Cat',
+  'Smugbeth, the Rebel of no Rules':  'Lizbeth, the Reaper of the Light',
+  'Clausss, the No-Nonsense Cultist': 'Klaus, the Cult Leader',
+  'Wolflesia, the Canine Flower':     'Rafflesia, the Poison Princess',
+  'Unsettling Opportunist Vullary':   'Cute Princess Mary',
+};
+
 // ── Player-level debuff registry ──
 //
 // Each entry maps a stable key (used in saved puzzle data) to a label
@@ -907,6 +926,9 @@ function PuzzleCreator() {
   const [editStatuses, setEditStatuses] = useState({});
   const [editBuffs, setEditBuffs] = useState({});
   const [editBiomancyLevel, setEditBiomancyLevel] = useState(null);
+  // For Dream-Landers Creatures: tracks which Hero (if any) is attached
+  // to the Creature being edited. Null = no Hero attached.
+  const [editAttachedHero, setEditAttachedHero] = useState(null);
   const openStatEditor = useCallback((si, zt, hi, slot) => {
     const p = players[si];
     if (zt === 'hero') {
@@ -933,6 +955,8 @@ function PuzzleCreator() {
       // in creatureStatuses. Hydrate the level picker so the dedicated
       // editor branch shows and the generic stat/status inputs are hidden.
       setEditBiomancyLevel(c?.cardType === 'Potion' ? (cs.biomancyLevel || 1) : null);
+      // Dream-Landers attach: hydrate the toggle from the saved state.
+      setEditAttachedHero(cs.attachedHero || null);
     }
   }, [players, getCard]);
 
@@ -990,11 +1014,15 @@ function PuzzleCreator() {
         delete merged.buffs;
         if (Object.keys(editBuffs).length > 0) merged.buffs = { ...editBuffs };
       }
+      // Dream-Landers attach: persist `attachedHero` only if set so the
+      // puzzle JSON stays clean for Creatures without an attachment.
+      delete merged.attachedHero;
+      if (editAttachedHero) merged.attachedHero = editAttachedHero;
       p._creatureStatuses[hi + '-' + slot] = merged;
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, updatePlayer, getCard]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, updatePlayer, getCard]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -1749,6 +1777,25 @@ function PuzzleCreator() {
                   style={{ width: '100%', padding: '6px 0', fontSize: 11, marginBottom: 12 }}
                   onClick={toggleHeroDead}>
                   {isDead ? '❤️ REVIVE (set HP to Max)' : '💀 DEFEAT (set HP to 0)'}
+                </button>
+              );
+            })()}
+            {/* Dream-Landers Hero attach toggle — visible only for the
+                attach-eligible Creatures listed in ATTACHABLE_HERO_PAIRS.
+                Toggling sets the `attachedHero` flag in
+                `_creatureStatuses[hi-slot]`, which the server's puzzle
+                loader picks up to invoke the Creature's `onAttachHero`
+                so HP / counter bumps land identically to a live attach. */}
+            {!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard && ATTACHABLE_HERO_PAIRS[_editCard.name] && (() => {
+              const heroName = ATTACHABLE_HERO_PAIRS[_editCard.name];
+              const attached = !!editAttachedHero;
+              return (
+                <button className={'btn ' + (attached ? 'btn-success' : '')}
+                  style={{ width: '100%', padding: '8px 0', fontSize: 11, marginBottom: 12, borderColor: attached ? '#44dd66' : 'var(--bg4)' }}
+                  onClick={() => setEditAttachedHero(attached ? null : heroName)}>
+                  {attached
+                    ? `✅ ${heroName} attached — click to detach`
+                    : `🔗 Attach ${heroName}`}
                 </button>
               );
             })()}

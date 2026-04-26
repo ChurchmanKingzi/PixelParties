@@ -57,7 +57,10 @@ module.exports = {
         if (!cd || !hasCardType(cd, 'Creature')) continue;
         if (inst.counters?._damagedOnTurn === currentTurn) continue;
         if (inst.counters?.stunned) continue;
-        if (!engine.canApplyCreatureStatus(inst, 'stunned')) continue;
+        // NOTE: cardinal-immune / shielded creatures are intentionally
+        // INCLUDED here so they get the petrify animation. The stun-
+        // application loop below re-checks `canApplyCreatureStatus`
+        // and skips the actual counter set on those targets.
         creatureTargets.push(inst);
       }
 
@@ -114,6 +117,11 @@ module.exports = {
       }
 
       for (const inst of creatureTargets) {
+        // Re-gate at apply time: cardinal-immune / shielded creatures
+        // got the visual petrify above but the actual stun + buff are
+        // refused here. Without this gate, the inline counter write
+        // would bypass every immunity check.
+        if (!engine.canApplyCreatureStatus(inst, 'stunned')) continue;
         inst.counters.stunned = 1;
         inst.counters.stunnedAppliedBy = pi;
         // Route through actionAddCreatureBuff so damageMultiplier is pulled

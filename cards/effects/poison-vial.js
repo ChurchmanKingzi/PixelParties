@@ -79,12 +79,21 @@ module.exports = {
         c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
       );
       if (inst) {
-        if (inst.counters.poison_immune) return; // Immune to poison
-        if (inst.counters.poisoned) {
-          inst.counters.poisonStacks = (inst.counters.poisonStacks || 1) + 2;
-        } else {
-          inst.counters.poisoned = 1;
-          inst.counters.poisonStacks = 2;
+        // canApplyCreatureStatus enforces every absolute-immunity gate
+        // (Cardinal Beast / Golden Wings / face-down / Defending the Gate
+        // shield / Monia shield) along with the per-status `*_immune`
+        // counter — no need to inline-check `poison_immune` separately.
+        // Note: the parent potion-resolution framework plays the
+        // `potion_resolved` animation regardless of whether the status
+        // actually applies, so a fizzle still gives the player visual
+        // feedback that the throw landed.
+        if (engine.canApplyCreatureStatus(inst, 'poisoned')) {
+          if (inst.counters.poisoned) {
+            inst.counters.poisonStacks = (inst.counters.poisonStacks || 1) + 2;
+          } else {
+            inst.counters.poisoned = 1;
+            inst.counters.poisonStacks = 2;
+          }
         }
       }
     }

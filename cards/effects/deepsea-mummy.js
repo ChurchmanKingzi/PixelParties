@@ -51,14 +51,18 @@ module.exports = {
         await engine.addHeroStatus(target.owner, target.heroIdx, 'stunned', {
           duration: 1, appliedBy: ctx.cardOwner, animationType: 'electric_strike',
         });
-      } else if (target.cardInstance && engine.canApplyCreatureStatus(target.cardInstance, 'stunned')) {
-        target.cardInstance.counters.stunned = 1;
-        target.cardInstance.counters.stunnedAppliedBy = ctx.cardOwner;
+      } else if (target.cardInstance) {
+        // Animation plays unconditionally — fizzles silently on
+        // Cardinal-immune / shielded targets but the strike is visible.
         engine._broadcastEvent('play_zone_animation', {
           type: 'electric_strike', owner: target.owner,
           heroIdx: target.heroIdx, zoneSlot: target.slotIdx,
         });
-        engine.log('stun', { target: target.cardInstance.name, by: CARD_NAME, type: 'creature' });
+        if (engine.canApplyCreatureStatus(target.cardInstance, 'stunned')) {
+          target.cardInstance.counters.stunned = 1;
+          target.cardInstance.counters.stunnedAppliedBy = ctx.cardOwner;
+          engine.log('stun', { target: target.cardInstance.name, by: CARD_NAME, type: 'creature' });
+        }
       }
       engine.sync();
     },

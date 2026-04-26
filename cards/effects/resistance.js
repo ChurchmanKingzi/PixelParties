@@ -23,6 +23,10 @@ const CARD_NAME = 'Resistance';
 module.exports = {
   activeIn: ['ability'],
   bypassStatusFilter: true, // Must fire even after the status is set on the hero
+  // Lizbeth/Smugbeth: same `ps.abilityZones[heroIdx]` re-walk pattern
+  // as Smugness — auto-mirror finds no Resistance on the borrower's
+  // own slot and aborts. Phase 3 punch list.
+  disableLizbethMirror: true,
 
   hooks: {
     onTurnStart: (ctx) => {

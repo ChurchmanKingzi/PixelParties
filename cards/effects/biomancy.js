@@ -22,6 +22,12 @@ const LEVEL_STATS = { 1: 40, 2: 60, 3: 80 };
 
 module.exports = {
   activeIn: ['ability'],
+  // Lizbeth/Smugbeth: auto-mirror disabled. The hook walks the
+  // borrower's own heroes for free Support Zones + Biomancy level,
+  // and Lizbeth without her own Biomancy slot resolves no eligible
+  // host. Phase 3 punch list — bespoke handler should read level from
+  // the SOURCE Biomancy and place the token on Lizbeth's side.
+  disableLizbethMirror: true,
 
   hooks: {
     afterPotionUsed: async (ctx) => {

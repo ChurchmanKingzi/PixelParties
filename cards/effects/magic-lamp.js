@@ -51,11 +51,36 @@ module.exports = {
       cancellable: true,
     });
 
-    if (!result || result.cancelled || !result.selectedCards || result.selectedCards.length !== 3) {
+    if (!result || result.cancelled || !Array.isArray(result.selectedCards) || result.selectedCards.length !== 3) {
       return { cancelled: true };
     }
 
-    const chosenNames = result.selectedCards;
+    // Defensive: ensure every selectedCard is actually a name from the
+    // gallery, dedupe, and bail if the player's response somehow ended
+    // up with fewer than 3 distinct names. The gallery is always
+    // dedup'd up front, so duplicates / stranger names here would
+    // indicate a desync between the client's pick and the server's
+    // gallery — drop the activation rather than splice nonsense out
+    // of mainDeck or offer the opponent a card the player didn't
+    // actually pick.
+    const galleryNames = new Set(galleryCards.map(c => c.name));
+    const chosenNames = [];
+    const chosenSet = new Set();
+    for (const name of result.selectedCards) {
+      if (typeof name !== 'string') continue;
+      if (!galleryNames.has(name)) continue;
+      if (chosenSet.has(name)) continue;
+      chosenSet.add(name);
+      chosenNames.push(name);
+    }
+    if (chosenNames.length !== 3) {
+      engine.log('magic_lamp_invalid_pick', {
+        player: ps.username,
+        sent: result.selectedCards,
+        accepted: chosenNames,
+      });
+      return { cancelled: true };
+    }
 
     // Broadcast card to opponent NOW (after player decisions finalized)
     const oppSid = oppPs.socketId;
@@ -81,16 +106,45 @@ module.exports = {
     });
 
     let oppChoice;
-    if (oppResult && oppResult.cardName && chosenNames.includes(oppResult.cardName)) {
+    if (oppResult && typeof oppResult.cardName === 'string'
+        && chosenNames.includes(oppResult.cardName)) {
       oppChoice = oppResult.cardName;
     } else {
-      // Safety fallback: opponent gets the first card
+      // Safety fallback: opponent gets the first card. Log so a
+      // recurring "CPU picked off-list" report has a paper trail —
+      // the user's recent Magic Lamp report (CPU choosing a card
+      // outside the offered 3) shouldn't be reachable from the
+      // server side, but a logged hit here proves it.
+      if (oppResult && oppResult.cardName) {
+        engine.log('magic_lamp_off_list_pick', {
+          player: oppPs.username,
+          picked: oppResult.cardName,
+          offered: chosenNames,
+        });
+      }
       oppChoice = chosenNames[0];
     }
 
-    const playerCards = chosenNames.filter(n => n !== oppChoice);
+    // Splice ONE matching name out of chosenNames so duplicates (which
+    // shouldn't exist after the dedupe above, but defensive in case
+    // future code paths skip it) don't drop multiple copies. The
+    // remaining 2 are always exactly the cards the player picked
+    // minus what the opponent kept.
+    const playerCards = (() => {
+      const out = chosenNames.slice();
+      const idx = out.indexOf(oppChoice);
+      if (idx >= 0) out.splice(idx, 1);
+      return out;
+    })();
 
-    // Add opponent's choice to their hand (face-up to both players)
+    // Add opponent's choice to their hand. Broadcast a defensive
+    // `card_reveal` to BOTH sides as well as the standard
+    // `deck_search_add` flight animation. The reveal popup is
+    // independent of the deck-search-add queue, so even if a stale
+    // animation entry from an earlier effect somehow corrupts the
+    // flight visual, the reveal popup will always show the correct
+    // card the opponent ended up with.
+    engine._broadcastEvent('card_reveal', { cardName: oppChoice });
     engine._broadcastEvent('deck_search_add', { cardName: oppChoice, playerIdx: oppIdx });
     oppPs.hand.push(oppChoice);
     engine.log('card_added_to_hand', { card: oppChoice, player: oppPs.username, by: 'Magic Lamp' });

@@ -195,6 +195,7 @@ module.exports = {
             confirmClass: 'btn-success',
             cancellable: false,
             maxPerType: { hero: 1, equip: 1 },
+            previewCardName: selectedNames[0],
           });
           if (!picked || picked.length === 0) { gs.heroEffectPending = null; engine.sync(); return; }
           const parsed = parseTarget(picked[0], targets);
@@ -210,6 +211,7 @@ module.exports = {
           confirmClass: 'btn-success',
           cancellable: false,
           maxPerType: { hero: 1, equip: 1 },
+          previewCardName: selectedNames[0],
         });
         if (!picked || picked.length === 0) { gs.heroEffectPending = null; engine.sync(); return; }
         const firstParsed = parseTarget(picked[0], targets);

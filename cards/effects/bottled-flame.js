@@ -9,6 +9,10 @@ const { runDiscardChain } = require('./_bottled-shared');
 
 module.exports = {
   isPotion: true,
+  // Either side ends up the "taker" — if it's the opponent on turn 1, all the
+  // Burn applications on their targets fizzle through the shield; if it's the
+  // CPU, we just self-Burn for nothing. Either way the card is wasted.
+  firstTurnSafe: false,
 
   async resolve(engine, pi) {
     const gs = engine.gs;

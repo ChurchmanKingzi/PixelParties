@@ -10,6 +10,10 @@ const { runDiscardChain } = require('./_bottled-shared');
 
 module.exports = {
   isPotion: true,
+  // Same reasoning as Bottled Flame — the discard chain forces ONE side to
+  // take damage on its own targets. Turn 1 either fizzles on the shielded
+  // opponent or wastes 300 damage on our own heroes.
+  firstTurnSafe: false,
 
   async resolve(engine, pi) {
     const gs = engine.gs;

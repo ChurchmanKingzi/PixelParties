@@ -1611,10 +1611,38 @@ function sendGameState(room, playerIdx, extra) {
         // the rest of THIS turn.
         const indexMap = ps._revealedHandIndices || {};
         for (const kStr of Object.keys(indexMap)) pushReveal(+kStr);
-        // Permanent per-index reveals (Bamboo Shield): survives turn
-        // boundaries until the revealed copy is spliced out of hand.
+        // Permanent per-index reveals (legacy hook — currently unused
+        // by any card; Bamboo Shield switched to instance-flagged
+        // reveals, see below).
         const permaMap = ps._permanentlyRevealedHandIndices || {};
         for (const kStr of Object.keys(permaMap)) pushReveal(+kStr);
+        // Per-instance permanent reveals (Bamboo Shield, …): the flag
+        // lives on the CardInstance itself, so reorder/splice can't
+        // transfer the reveal onto another card. Translate to hand
+        // positions by counting flagged instances per name and marking
+        // the first matching positions in hand order. All physical
+        // copies of a card are interchangeable for reveal purposes —
+        // what matters is "N copies are revealed", not "this exact
+        // slot index" — and FIFO assignment keeps the visible slot
+        // stable across reorders.
+        const revealedByName = {};
+        for (const inst of (room.engine?.cardInstances || [])) {
+          if (inst.owner !== pi) continue;
+          if (inst.zone !== 'hand') continue;
+          if (!inst.counters?._permanentlyRevealed) continue;
+          revealedByName[inst.name] = (revealedByName[inst.name] || 0) + 1;
+        }
+        if (Object.keys(revealedByName).length > 0) {
+          const remaining = { ...revealedByName };
+          for (let i = 0; i < ps.hand.length; i++) {
+            if (seenIdx.has(i)) continue;
+            const name = ps.hand[i];
+            if ((remaining[name] || 0) > 0) {
+              pushReveal(i);
+              remaining[name]--;
+            }
+          }
+        }
         // Legacy count-based reveals (Madaga's temporary reveal): pick
         // the last-N matching copies. Skip indices already exposed by
         // the per-index map to avoid double-listing.
@@ -1846,6 +1874,18 @@ function sendGameState(room, playerIdx, extra) {
     freeActivatableAbilities: room.engine ? room.engine.getFreeActivatableAbilities(playerIdx) : [],
     activeHeroEffects: room.engine ? room.engine.getActiveHeroEffects(playerIdx) : [],
     activatableCreatures: room.engine ? room.engine.getActivatableCreatures(playerIdx) : [],
+    // Creatures that can act as Spell casters via Wolflesia-style
+    // `bypassesCasterRequirement` additional actions. Each entry has
+    // `{ creatureInstId, cardName, heroIdx, zoneSlot, eligibleHandCards }`.
+    // Used by the client to highlight the Creature as the visible
+    // caster (instead of the host Hero) for matching Spells.
+    creatureSpellCasters: room.engine ? room.engine.getCreatureSpellCasters(playerIdx) : [],
+    // Hero-side level-req bypass per (heroIdx → list of hand-card names).
+    // Populated by Cute Princess Mary's "Cute" bypass and any future
+    // `canBypassLevelReqForCard`-exporting hero. Used by the client's
+    // `canHeroNormalSummon` empty-slot drop check so Mary's free
+    // Support Zones light up under a Cute Phoenix drag.
+    heroBypassSummonCards: room.engine ? room.engine.getHeroBypassSummonCards(playerIdx) : {},
     // Hand slots with a clickable "activate in hand without playing"
     // effect (Luna Kiai's "reveal to Burn a Hero" — any future card
     // with the same shape). Each entry is `{ cardName, handIndex,
@@ -1868,11 +1908,33 @@ function sendGameState(room, playerIdx, extra) {
           if (k >= 0 && k < handLen) out.add(k);
         }
       };
-      // Per-turn reveals (Luna Kiai) AND permanent reveals (Bamboo
-      // Shield) are both surfaced here so the owner sees both with
-      // the same revealed-card styling.
+      // Per-turn reveals (Luna Kiai) AND legacy permanent index
+      // reveals are both surfaced here with the same styling.
       collect(myPs._revealedHandIndices);
       collect(myPs._permanentlyRevealedHandIndices);
+      // Per-instance permanent reveals (Bamboo Shield, …): walk
+      // tracked instances, count flagged copies per name, mark the
+      // first hand positions of each name. See `revealedHandCards`
+      // above for the rationale — instance-bound reveal flags are
+      // robust to reorder/splice.
+      const revealedByName = {};
+      for (const inst of (room.engine?.cardInstances || [])) {
+        if (inst.owner !== playerIdx) continue;
+        if (inst.zone !== 'hand') continue;
+        if (!inst.counters?._permanentlyRevealed) continue;
+        revealedByName[inst.name] = (revealedByName[inst.name] || 0) + 1;
+      }
+      if (Object.keys(revealedByName).length > 0) {
+        const remaining = { ...revealedByName };
+        for (let i = 0; i < handLen; i++) {
+          if (out.has(i)) continue;
+          const name = myPs.hand[i];
+          if ((remaining[name] || 0) > 0) {
+            out.add(i);
+            remaining[name]--;
+          }
+        }
+      }
       return [...out];
     })(),
     // True only while Deepsea Spores' per-turn override is live — the
@@ -2817,13 +2879,39 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   return false;
 }
 
-async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwner, attachmentZoneSlot }) {
+async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwner, attachmentZoneSlot, viaCreatureInstId }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
 
   const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Spell', 'Attack'], { charmedOwner });
   if (!v) return false;
   const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
+
+  // Wolflesia-style Creature spell-cast routing: the client sends
+  // `viaCreatureInstId` when the player picked a Creature as the
+  // visible caster (or dropped on her support slot). We:
+  //   • set `gs._spellCasterOverride` so the engine's `_broadcastEvent`
+  //     anchors caster-side animations on the Creature's slot instead
+  //     of the host hero's zone (Heal beam etc. originate from her);
+  //   • force-consume the matching `bypassesCasterRequirement`
+  //     additional action so the play counts as Wolflesia's free
+  //     additional, not the host hero's main action — even when the
+  //     host hero could have cast it normally.
+  // Cleared in the finally block below so it never leaks into a
+  // subsequent spell cast.
+  let _viaCreature = null;
+  if (viaCreatureInstId != null) {
+    const creature = room.engine.cardInstances.find(c => c.id === viaCreatureInstId);
+    if (creature && creature.zone === 'support'
+        && (creature.controller ?? creature.owner) === pi) {
+      _viaCreature = creature;
+      gs._spellCasterOverride = {
+        owner: creature.owner,
+        heroIdx: creature.heroIdx,
+        zoneSlot: creature.zoneSlot,
+      };
+    }
+  }
 
   // Consume Silence's one-use bypass token as soon as validation succeeds.
   // After this point the Spell lock fully applies — any further Spell attempts
@@ -2843,12 +2931,21 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     || ((ps._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
   );
   const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
-  const needsAdditional = (isMainPhase && !isInherentAction) || actionAlreadyUsed;
+  // Wolflesia-style Creature spell-cast: force-consume the bypass
+  // additional action regardless of phase, so the play never counts
+  // as the host hero's main action even when they had a free slot.
+  const forceAdditional = _viaCreature != null;
+  const needsAdditional = forceAdditional || (isMainPhase && !isInherentAction) || actionAlreadyUsed;
   let additionalConsumed = false;
   let consumedInst = null;
   if (needsAdditional) {
     const typeId = room.engine.findAdditionalActionForCard(pi, cardName, heroIdx);
-    if (!typeId) return false;
+    if (!typeId) {
+      // Clean up the spell-caster override we set above before bailing,
+      // otherwise the next spell cast in this turn could pick it up.
+      if (_viaCreature) delete gs._spellCasterOverride;
+      return false;
+    }
     consumedInst = room.engine.consumeAdditionalAction(pi, typeId);
     additionalConsumed = true;
   }
@@ -3149,6 +3246,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // this is a no-op if resolution already released normally above. Only
     // fires on error / early returns that skipped the explicit release.
     _releaseSpellDepth();
+    // Always clear the spell-caster animation override so it never
+    // leaks into a subsequent cast.
+    if (gs._spellCasterOverride) delete gs._spellCasterOverride;
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -3240,7 +3340,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   return true;
 }
 
-async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner }) {
+async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, borrowedFromOwner }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
@@ -3249,7 +3349,20 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner 
   const isActionPhase = gs.currentPhase === 3;
   if (!isMainPhase && !isActionPhase) return false;
 
-  const heroOwner = charmedOwner != null ? charmedOwner : pi;
+  // Lizbeth/Smugbeth borrow: the slot lives on opponent's hero but the
+  // activation runs on the borrower's side. Validate via the engine
+  // helper; reject if no borrower covers this slot.
+  let borrowerHeroIdx = null;
+  if (borrowedFromOwner != null) {
+    if (charmedOwner != null) return false;
+    const borrow = room.engine._getAbilityBorrowerForOppSlot(pi, borrowedFromOwner, heroIdx, zoneIdx);
+    if (!borrow) return false;
+    borrowerHeroIdx = borrow.borrowerHeroIdx;
+  }
+
+  const heroOwner = borrowedFromOwner != null
+    ? borrowedFromOwner
+    : (charmedOwner != null ? charmedOwner : pi);
   const ps = gs.players[heroOwner];
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
@@ -3279,6 +3392,15 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner 
 
   if (script.canFreeActivate) {
     const checkCtx = room.engine._createContext(inst, { event: 'canFreeActivateCheck' });
+    if (borrowedFromOwner != null) {
+      // Borrow check uses borrower-side ctx so per-hero checks (gold,
+      // hand cards, etc.) hit the activator instead of the source side.
+      checkCtx.cardOwner = pi;
+      checkCtx.cardController = pi;
+      checkCtx.cardHeroOwner = pi;
+      checkCtx.cardHeroIdx = borrowerHeroIdx;
+      checkCtx.attachedHero = gs.players[pi]?.heroes?.[borrowerHeroIdx];
+    }
     if (!script.canFreeActivate(checkCtx, level)) return false;
   }
 
@@ -3311,10 +3433,19 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner 
 
     const origController = inst.controller;
     const origOwner = inst.owner;
+    const origHeroIdx = inst.heroIdx;
     if (charmedOwner != null) {
       inst.controller = pi;
       inst.owner = pi;
       inst.heroOwner = charmedOwner;
+    } else if (borrowedFromOwner != null) {
+      // Borrow: temporarily reroute the inst as if attached to the
+      // borrower hero on the activator's side. Restored after the
+      // free-activate finishes (success OR cancel).
+      inst.controller = pi;
+      inst.owner = pi;
+      inst.heroIdx = borrowerHeroIdx;
+      inst.heroOwner = pi;
     }
 
     gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi };
@@ -3327,6 +3458,11 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner 
     if (charmedOwner != null) {
       inst.controller = origController;
       inst.owner = origOwner;
+      delete inst.heroOwner;
+    } else if (borrowedFromOwner != null) {
+      inst.controller = origController;
+      inst.owner = origOwner;
+      inst.heroIdx = origHeroIdx;
       delete inst.heroOwner;
     }
 
@@ -3551,18 +3687,32 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   return true;
 }
 
-async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner }) {
+async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, borrowedFromOwner }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
   if (gs.potionTargeting) return false;
 
-  const heroOwner = charmedOwner != null ? charmedOwner : pi;
+  // Borrowed activation (Lizbeth / Smugbeth): the slot is on opponent's
+  // hero but the activation runs on the borrower's side. Validate via
+  // the engine's borrow check; reject if no borrower covers this slot.
+  // The borrower's heroIdx is what becomes the activation context.
+  let borrowerHeroIdx = null;
+  if (borrowedFromOwner != null) {
+    if (charmedOwner != null) return false; // charm + borrow combo not supported
+    const borrow = room.engine._getAbilityBorrowerForOppSlot(pi, borrowedFromOwner, heroIdx, zoneIdx);
+    if (!borrow) return false;
+    borrowerHeroIdx = borrow.borrowerHeroIdx;
+  }
+
+  const heroOwner = borrowedFromOwner != null
+    ? borrowedFromOwner
+    : (charmedOwner != null ? charmedOwner : pi);
   const ps = gs.players[heroOwner];
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
-  if (charmedOwner == null && gs.players[pi].comboLockHeroIdx != null && gs.players[pi].comboLockHeroIdx !== heroIdx) return false;
+  if (charmedOwner == null && borrowedFromOwner == null && gs.players[pi].comboLockHeroIdx != null && gs.players[pi].comboLockHeroIdx !== heroIdx) return false;
   // One-turn action lock (Treasure Hunter's Backpack, etc.)
   if (hero._actionLockedTurn === gs.turn) return false;
 
@@ -3626,6 +3776,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner }) {
 
     const origController = inst.controller;
     const origOwner = inst.owner;
+    const origHeroIdx = inst.heroIdx;
     for (let i = 0; i < 2; i++) {
       const sid = gs.players[i]?.socketId;
       if (sid) io.to(sid).emit('ability_activated', { owner: heroOwner, heroIdx, zoneIdx, abilityName });
@@ -3635,6 +3786,14 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner }) {
     gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi };
     if (charmedOwner != null) {
       inst.controller = pi; inst.owner = pi; inst.heroOwner = charmedOwner;
+    } else if (borrowedFromOwner != null) {
+      // Borrowed activation: temporarily pretend the ability instance is
+      // attached to the borrower's hero on the activator's side. The
+      // script's `ctx.cardOwner / cardHeroIdx / attachedHero` then route
+      // benefits to the activator. Restored after onActivate returns.
+      inst.controller = pi; inst.owner = pi;
+      inst.heroIdx = borrowerHeroIdx;
+      inst.heroOwner = pi;
     }
 
     const ctx = room.engine._createContext(inst, {});
@@ -3651,6 +3810,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner }) {
 
     if (charmedOwner != null) {
       inst.controller = origController; inst.owner = origOwner; delete inst.heroOwner;
+    } else if (borrowedFromOwner != null) {
+      inst.controller = origController; inst.owner = origOwner;
+      inst.heroIdx = origHeroIdx; delete inst.heroOwner;
     }
     if (result === false) {
       delete gs.hoptUsed[hoptKey];
@@ -3765,6 +3927,24 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
 
   if (availableEffects.length === 0) return false;
 
+  // ── Re-entry guard ─────────────────────────────────────────────────
+  // The HOPT for a hero effect is only stamped AFTER `onHeroEffect`
+  // resolves below — the choice prompt, the chain-reaction window, and
+  // the effect itself all `await`, yielding the event loop in between.
+  // A second socket message ("clicked her again") arriving during any
+  // of those awaits would otherwise pass the HOPT check above and run
+  // a parallel activation. A per-(player, heroIdx) in-progress lock
+  // closes that race; cleared in the finally so a crash mid-flight
+  // doesn't permanently brick the hero. Mirrors the pre-await
+  // reservation pattern doActivateFreeAbility uses, but stamping the
+  // chosen HOPT ahead of time is awkward here because the choice isn't
+  // known until after the option prompt — so the lock covers the
+  // whole activation instead.
+  const inProgressKey = `${pi}:${heroIdx}`;
+  if (!gs._heroEffectInProgress) gs._heroEffectInProgress = {};
+  if (gs._heroEffectInProgress[inProgressKey]) return false;
+  gs._heroEffectInProgress[inProgressKey] = true;
+
   try {
     let chosen;
     if (availableEffects.length === 1) chosen = availableEffects[0];
@@ -3850,6 +4030,8 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     }
   } catch (err) {
     console.error('[doActivateHeroEffect]', err.message);
+  } finally {
+    delete gs._heroEffectInProgress[inProgressKey];
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -3936,6 +4118,18 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
     if (!script.canActivateEquipEffect(checkCtx)) return false;
   }
 
+  // Reserve the HOPT BEFORE any await. `onEquipEffect` may issue prompts
+  // that yield the event loop; without the pre-stamp, a second socket
+  // call (double-click) passes the check above and runs the effect a
+  // second time. Released on cancel (resolved === false) so a backed-out
+  // activation doesn't burn the slot.
+  if (!gs.hoptUsed) gs.hoptUsed = {};
+  gs.hoptUsed[hoptKey] = gs.turn;
+  let hoptReserved = true;
+  const releaseHopt = () => {
+    if (hoptReserved) { delete gs.hoptUsed[hoptKey]; hoptReserved = false; }
+  };
+
   room.engine._setPendingPlayLog('equip_effect_activated', { player: gs.players[pi].username, card: cardName, hero: hero.name });
 
   try {
@@ -3943,11 +4137,11 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
     const ctx = room.engine._createContext(inst, {});
     const resolved = await script.onEquipEffect(ctx);
     if (resolved !== false) {
+      hoptReserved = false; // reservation becomes the final consumption
       if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
       else room.engine._firePendingPlayLog();
-      if (!gs.hoptUsed) gs.hoptUsed = {};
-      gs.hoptUsed[hoptKey] = gs.turn;
     } else {
+      releaseHopt();
       delete gs._pendingCardReveal;
       delete gs._pendingPlayLog;
     }
@@ -3955,6 +4149,9 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
     await room.engine._executeDeferredSurprises();
   } catch (err) {
     console.error('[doActivateEquipEffect]', err.message);
+    // Crash mid-activation — release the reservation so a real error
+    // doesn't silently brick the player's once-per-turn slot.
+    releaseHopt();
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -5805,13 +6002,34 @@ io.on('connection', (socket) => {
           // customHp below only affects CURRENT HP.
           const cd = cardsByName[inst.name];
           if (cd?.hp) inst.counters.maxHp = cd.hp;
+
+          const cs = pz._creatureStatuses?.[hi + '-' + slot];
+
+          // Dream-Landers attach: apply BEFORE customHp so any HP bump
+          // from `onAttachHero` lands on the base, then customHp can
+          // override `currentHp` to the user's authored value. Stamps
+          // `inst.counters.attachedHero` and re-runs the creature
+          // script's `onAttachHero` so future attach Creatures inherit
+          // the same bookkeeping with no engine edits.
+          if (cs?.attachedHero) {
+            inst.counters.attachedHero = cs.attachedHero;
+            const creatureScript = loadCardEffect(inst.name);
+            if (typeof creatureScript?.onAttachHero === 'function') {
+              try {
+                const ctx = room.engine._createContext(inst, {});
+                creatureScript.onAttachHero(room.engine, ctx);
+              } catch (err) {
+                console.error(`[puzzle attachHero] ${inst.name} onAttachHero threw:`, err.message);
+              }
+            }
+          }
+
           const customHp = pz._customSupportHp?.[hi]?.[slot];
           if (customHp != null) {
             // customHp is CURRENT HP only — may be above or below the
             // card's max. Effects that check max HP still see cards.json.
             inst.counters.currentHp = customHp;
           }
-          const cs = pz._creatureStatuses?.[hi + '-' + slot];
           if (cs) {
             if (cs.frozen) inst.counters.frozen = 1;
             if (cs.stunned) inst.counters.stunned = 1;

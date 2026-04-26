@@ -124,7 +124,21 @@ function loadCardEffect(cardName) {
       // exports too. `reduceCardLevel` is the board-wide sibling of
       // `reduceSpellLevel` (used by Elven Forager) and belongs in the
       // same bucket.
-      if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !mod.reduceSpellLevel && !mod.reduceCardLevel && !mod.coverLevelGap && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
+      // Validate minimum structure. Passive Hero scripts that only export
+      // gate-style functions (canPlayCard, canBypassLevelReqForCard, etc.)
+      // are valid — they plug into the engine's gate-checks without
+      // needing hooks or type flags. Cute Princess Mary is the first such
+      // hero; this list grows as future passive-gate hero scripts ship.
+      const PASSIVE_GATE_FNS = [
+        'canPlayCard',
+        'canBypassLevelReqForCard',
+        'canBypassFreeZoneRequirement',
+        'canBypassLevelReq',
+        'canSummon',
+        'canActivate',
+      ];
+      const hasPassiveGate = PASSIVE_GATE_FNS.some(k => typeof mod[k] === 'function');
+      if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !mod.reduceSpellLevel && !mod.reduceCardLevel && !mod.coverLevelGap && !hasPassiveGate && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
         console.warn(`[Loader] Card "${cardName}" (${normalized}.js) has no hooks, effects, or card type flags — ignored.`);
         mod = null;
       }

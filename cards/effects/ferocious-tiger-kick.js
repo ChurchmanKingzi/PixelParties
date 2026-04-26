@@ -116,13 +116,18 @@ module.exports = {
           c.owner === tgtOwner && c.zone === 'support' &&
           c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
         );
-        if (inst && engine.canApplyCreatureStatus(inst, 'stunned')) {
-          inst.counters.stunned = 1;
+        if (inst) {
+          // Animation plays unconditionally so the kick visibly lands
+          // on Cardinal-immune / shielded creatures even when the stun
+          // counter doesn't actually apply.
           engine._broadcastEvent('play_zone_animation', {
             type: 'electric_strike', owner: tgtOwner,
             heroIdx: tgtHeroIdx, zoneSlot: target.slotIdx,
           });
-          engine.log('stun', { target: inst.name, by: 'Ferocious Tiger Kick', type: 'creature' });
+          if (engine.canApplyCreatureStatus(inst, 'stunned')) {
+            inst.counters.stunned = 1;
+            engine.log('stun', { target: inst.name, by: 'Ferocious Tiger Kick', type: 'creature' });
+          }
         }
       }
 

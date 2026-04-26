@@ -64,7 +64,11 @@
       "Bash(grep -l \"countPoisoned\\\\|poisoned.*count\\\\|count.*Poison\\\\|poisoned.*damage\\\\|statuses.*poison\" \"C:\\\\\\\\Pixel Parties WEB\\\\\\\\PixelPartiesWeb/cards/effects/\"*.js)",
       "Bash(grep -v \"ps\\\\.hand\\\\s*=\\\\s*\\\\[\\\\]\\\\s*$\\\\|ps\\\\.hand\\\\s*=\\\\s*\\\\\\(ps\\\\|ps\\\\.hand\\\\.splice\\\\|ps\\\\.hand\\\\.push\\\\|_hasRevealInterceptor\")",
       "Bash(grep -n \"^const ANIM_REGISTRY\\\\|^};.*$\\\\|playAnimation =\\\\|function playAnimation\" \"C:/Pixel Parties WEB/PixelPartiesWeb/public/app-board.jsx\")",
-      "Bash(grep -E \"\\\\\"spellSchool1\\\\\":\\\\\\\\s*\\\\\"[^\\\\\"]+\\\\\"\" \"C:/Pixel Parties WEB/PixelPartiesWeb/data/cards.json\")"
+      "Bash(grep -E \"\\\\\"spellSchool1\\\\\":\\\\\\\\s*\\\\\"[^\\\\\"]+\\\\\"\" \"C:/Pixel Parties WEB/PixelPartiesWeb/data/cards.json\")",
+      "Bash(grep -v -E \"charme\\\\.js|//|cute-nerd-magenta\")",
+      "Bash(grep -n \"\\\\\"Gon\\\\\\\\b\\\\|\\\\\"Goff\\\\\\\\b\\\\|name.*Gon\\\\\\\\b\\\\|name.*Goff\\\\\\\\b\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\data\\\\cards.json\")",
+      "Bash(grep -lE '\"cardType\":\\\\s*\"Ability\"' \"C:/Pixel Parties WEB/PixelPartiesWeb/data/cards.json\" echo \"---\" grep -B 1 -A 1 '\"cardType\": \"Ability\"' \"C:/Pixel Parties WEB/PixelPartiesWeb/data/cards.json\")",
+      "Bash(grep -nE \"play_spell.*emit\\\\b|play_spell\\\\\\\\\\\\\".*emit\" \"C:/Pixel Parties WEB/PixelPartiesWeb/public/app-board.jsx\")"
     ]
   }
 }

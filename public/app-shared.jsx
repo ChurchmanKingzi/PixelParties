@@ -1016,7 +1016,12 @@ function getCardMax(deck, cardName) {
   if (!card) return 0;
   if (card.maxCopies != null) return card.maxCopies;
   const ct = card.cardType;
-  if (ct === 'Hero') return 1;
+  // Heroes: 1 copy in the team slot + up to 4 copies in main / side
+  // deck (for Goff-style attach mechanics where a Creature pulls a
+  // Hero from main deck or hand). Per-section caps are enforced
+  // separately in canAddCard so the team slot stays at 1 even
+  // though the global cap is 5.
+  if (ct === 'Hero') return 5;
   if (ct === 'Potion') return 2;
   if (ct === 'Ability') return Infinity;
   if (ct === 'Artifact' && hasSacredJewelArtifactBonus(deck)) return 5;
@@ -1031,7 +1036,18 @@ function canAddCard(deck, cardName, section) {
   if (ct === 'Token') return false;
   const effMax = getCardMax(deck, cardName);
   if (section === 'main') {
-    if (ct === 'Hero') return false;
+    // Heroes are now legal in main deck up to 4 copies (Goff-style
+    // attach mechanic — main-deck Heroes are drawable and can be
+    // pulled by Creatures that declare attachableHeroes). The team
+    // slot still caps at 1 of each Hero (handled in the 'hero'
+    // branch below), so global cap stays at 5 (1 team + 4 main).
+    if (ct === 'Hero') {
+      if ((deck.mainDeck || []).length >= 60) return false;
+      const inMain = (deck.mainDeck || []).filter(n => n === cardName).length;
+      if (inMain >= 4) return false;
+      if (countInDeck(deck, cardName) >= effMax) return false;
+      return true;
+    }
     // Potions allowed in main deck ONLY if Nicolas is a hero
     if (ct === 'Potion') {
       if (!hasNicolasHero(deck)) return false;
@@ -1057,12 +1073,20 @@ function canAddCard(deck, cardName, section) {
   if (section === 'hero') {
     if (ct !== 'Hero') return false;
     if (!(deck.heroes || []).some(h => !h || !h.hero)) return false;
+    // Team slot: only ONE copy of each Hero may be in the team,
+    // regardless of how many copies sit in main/side deck.
+    const inTeam = (deck.heroes || []).filter(h => h?.hero === cardName).length;
+    if (inTeam >= 1) return false;
     if (countInDeck(deck, cardName) >= effMax) return false;
     return true;
   }
   if (section === 'side') {
     if ((deck.sideDeck || []).length >= 15) return false;
     if (ct === 'Ability' && effMax === Infinity) return true;
+    if (ct === 'Hero') {
+      const inSide = (deck.sideDeck || []).filter(n => n === cardName).length;
+      if (inSide >= 4) return false;
+    }
     if (countInDeck(deck, cardName) >= effMax) return false;
     return true;
   }

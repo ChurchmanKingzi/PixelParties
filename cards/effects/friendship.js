@@ -99,6 +99,12 @@ function setupAdditionalAction(engine, pi, heroIdx) {
 
 module.exports = {
   activeIn: ['ability'],
+  // Lizbeth/Smugbeth: auto-mirror disabled. Friendship's setup uses
+  // `getFriendshipLevel(ps, heroIdx)` and `setupAdditionalAction(...)`
+  // keyed on the borrower's own (Lizbeth's) heroIdx where Friendship
+  // doesn't actually live, so the level/draw resolves to 0. Phase 3
+  // punch list.
+  disableLizbethMirror: true,
 
   hooks: {
     /**

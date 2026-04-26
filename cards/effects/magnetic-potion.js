@@ -10,6 +10,13 @@ module.exports = {
   blockedByHandLock: true,
   isPotion: true,
 
+  // CPU evaluation hint — same reasoning as Magnetic Glove: simulating
+  // rest-of-turn lets the gate's variations see which tutored card
+  // actually pays off this turn (a playable Spell vs a filler card),
+  // instead of picking the gallery's first random alt by hand-value
+  // bump alone.
+  cpuMeta: { evaluateThroughTurnEnd: true },
+
   canActivate(gs, pi) {
     // HOPT check
     const hoptKey = `magnetic-potion:${pi}`;

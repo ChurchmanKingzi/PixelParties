@@ -17,6 +17,13 @@
 module.exports = {
   activeIn: ['ability'],
   ascendedHeroOnly: true,
+  // Lizbeth/Smugbeth: auto-mirror disabled because the hook re-walks
+  // `ps.abilityZones[heroIdx]` for level lookup using the redirected
+  // (Lizbeth's) heroIdx — Lizbeth has no Smugness slot of her own so
+  // the level resolves to 0 and the retaliation aborts. A bespoke
+  // Lizbeth-side handler that reads the SOURCE Smugness's level is
+  // tracked under Phase 3 (per-ability mirroring punch list).
+  disableLizbethMirror: true,
 
   /**
    * Restrict placement to Ascended Heroes only.

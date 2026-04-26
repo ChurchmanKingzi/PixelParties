@@ -247,15 +247,18 @@ module.exports = {
         const inst = e.inst;
         if (!inst || inst.zone !== 'support') continue;
         if (inst.counters.burned) continue;
-        if (!engine.canApplyCreatureStatus(inst, 'burned')) continue;
 
-        inst.counters.burned = 1;
-        inst.counters.burnAppliedBy = pi;
+        // Animation plays unconditionally — visual feedback for the
+        // hit even when the burn fizzles on a Cardinal-immune target.
         engine._broadcastEvent('play_zone_animation', {
           type: 'flame_strike', owner: inst.owner,
           heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
         });
-        engine.log('burn_applied', { target: inst.name, by: 'The Sun Sword' });
+        if (engine.canApplyCreatureStatus(inst, 'burned')) {
+          inst.counters.burned = 1;
+          inst.counters.burnAppliedBy = pi;
+          engine.log('burn_applied', { target: inst.name, by: 'The Sun Sword' });
+        }
       }
     },
   },

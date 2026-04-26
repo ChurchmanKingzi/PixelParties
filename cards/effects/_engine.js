@@ -1055,7 +1055,16 @@ class GameEngine {
       if ((c.zone === 'hero' || c.zone === 'ability' || c.zone === 'support') && c.heroIdx >= 0) {
         const hero = this.gs.players[c.controller ?? c.owner]?.heroes?.[c.heroIdx];
         if (!hero || !hero.name) return false; // Empty hero slot
-        if (hero.hp <= 0 && !hookCtx._bypassDeadHeroFilter) return false;
+        // Dead-hero filter — script-level `bypassDeadHeroFilter` is an
+        // opt-in for source-attributed effects ("I attacked and killed
+        // even though I died in the retaliation"). Xiong's on-kill
+        // tutor uses this so a hero who died to a Firewall recoil but
+        // whose attack still finished off the target gets to claim the
+        // tutor. Hookctx-level `_bypassDeadHeroFilter` (set by the
+        // engine for ON_HERO_KO etc.) still wins for backward compat.
+        if (hero.hp <= 0
+            && !hookCtx._bypassDeadHeroFilter
+            && !loadCardEffect(c.name)?.bypassDeadHeroFilter) return false;
         if ((hero.statuses?.frozen || hero.statuses?.stunned) && (c.zone === 'hero' || c.zone === 'ability') && !loadCardEffect(c.name)?.bypassStatusFilter) return false;
         if (hero.statuses?.negated && (c.zone === 'hero' || c.zone === 'ability') && !loadCardEffect(c.name)?.bypassStatusFilter) return false;
         // Mummy Token in the hero's support zone silences ALL of that
@@ -1118,6 +1127,20 @@ class GameEngine {
 
       // Propagate cancellation back to shared hookCtx
       if (ctx.cancelled) hookCtx.cancelled = true;
+
+      // ── Lizbeth/Smugbeth ability auto-mirror dispatch ──
+      // If this listener is an opponent's ability AND the active player
+      // has a Lizbeth-style passive borrower drawing from this ability's
+      // host hero, fire the hook a SECOND time with cardOwner /
+      // cardHeroIdx redirected to the borrower. The ability's natural
+      // `ctx.cardOwner / cardHeroIdx / attachedHero` references then
+      // route benefits to the borrower's controller. Skipped if the
+      // script opts out (`disableLizbethMirror: true`) or the card is
+      // Toughness (excluded by spec). The mirror flag prevents
+      // recursion via _isLizbethMirror.
+      if (!hookCtx._isLizbethMirror && card.zone === 'ability' && card.heroIdx >= 0) {
+        await this._fireLizbethMirrorIfApplicable(card, hookFn, hookName, hookCtx);
+      }
 
       // If this hook created pending triggers, collect them
       if (ctx._triggers?.length) {
@@ -2755,11 +2778,20 @@ class GameEngine {
               this.log('smug_coin_save', { target: this._heroLabel(target), player: this.gs.players[targetOwner]?.username });
               // Broadcast coin rain animation
               this._broadcastEvent('smug_coin_save', { owner: targetOwner, heroIdx });
-              // Delete the Smug Coin (remove from zone + untrack)
+              // Delete the Smug Coin: clear its support slot, push to
+              // the original-owner's deleted pile (so a steal-then-trigger
+              // case correctly returns the card to whoever owned it
+              // before being equipped), then untrack the instance.
+              // Previous version skipped the deletedPile push entirely,
+              // so the Coin just vanished — the user couldn't see it
+              // in the deleted pile and any future "this card is in
+              // your deleted pile" interaction missed it.
               const ps = this.gs.players[targetOwner];
               if (ps.supportZones[heroIdx]?.[smugCoinInst.zoneSlot]) {
                 ps.supportZones[heroIdx][smugCoinInst.zoneSlot] = [];
               }
+              const ownerPs = this.gs.players[smugCoinInst.originalOwner ?? targetOwner];
+              if (ownerPs) ownerPs.deletedPile.push('Smug Coin');
               this._untrackCard(smugCoinInst.id);
               this.log('card_deleted', { card: 'Smug Coin', player: ps.username });
             }
@@ -3224,6 +3256,175 @@ class GameEngine {
   }
 
   /**
+   * Generic Hero-attached-to-Creature mechanic. The host Creature
+   * declares the Heroes it accepts via `script.attachableHeroes` (an
+   * array of card names). When this helper fires, the named Hero is
+   * pulled from the controller's hand (priority) or main deck and
+   * marked as attached on the host Creature. Per design:
+   *
+   *   • While attached, the Hero is INERT — its abilities, hero
+   *     effect, and passive hooks do NOT fire (the Hero literally
+   *     isn't anywhere active; it's tucked underneath the Creature).
+   *     Implementation: we don't move the Hero into any tracked
+   *     zone — we just stash the name on `inst.counters.attachedHero`
+   *     and let the host Creature's own hooks read that flag to gate
+   *     its bonus effect.
+   *   • The host Creature's `onAttachHero(engine, ctx)` hook (if
+   *     declared) fires immediately — used to apply stat bumps like
+   *     Goff's +200 HP grant. The bonus EFFECT (e.g. doubling Burn
+   *     damage) is implemented as the Creature's normal hooks
+   *     gating on `inst.counters.attachedHero`.
+   *   • Targeting: attached Heroes are NOT independently targetable
+   *     (no addressable zone, no card instance for the attached
+   *     copy). Effects that destroy / steal the host Creature take
+   *     the attachment with them; on creature death, the attached
+   *     Hero is sent to the original owner's discard pile (handled
+   *     in the creature-damage cleanup batch).
+   *
+   * Returns true when the attach succeeds, false otherwise. Failure
+   * cases:
+   *   • Hero not present in hand or main deck.
+   *   • Creature already has an attached Hero.
+   *   • Creature script doesn't list the Hero in `attachableHeroes`.
+   */
+  async actionAttachHeroToCreature(playerIdx, heroName, creatureInst, opts = {}) {
+    if (!creatureInst || creatureInst.zone !== 'support') return false;
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return false;
+    if (creatureInst.counters?.attachedHero) return false;
+
+    const script = loadCardEffect(creatureInst.name);
+    const accepted = script?.attachableHeroes;
+    if (!Array.isArray(accepted) || !accepted.includes(heroName)) return false;
+
+    const handIdx = (ps.hand || []).indexOf(heroName);
+    const deckIdx = (ps.mainDeck || []).indexOf(heroName);
+    const inHand = handIdx >= 0;
+    const inDeck = deckIdx >= 0;
+    if (!inHand && !inDeck) return false;
+
+    // When the Hero exists in BOTH hand and deck, let the player pick
+    // which copy to consume — the card text reads "from your hand or
+    // deck" and pulling from one vs the other has different
+    // information cost (deck pull also shuffles, hand pull leaves the
+    // deck untouched). Single-source attaches skip the prompt.
+    let sourceLabel;
+    if (inHand && inDeck) {
+      const choice = await this.promptGeneric(playerIdx, {
+        type: 'optionPicker',
+        title: creatureInst.name,
+        description: `Place ${heroName} from where?`,
+        options: [
+          { id: 'hand',
+            label: '🃏 From Hand',
+            description: `Use the copy in your hand.`,
+            color: '#44aaff' },
+          { id: 'deck',
+            label: '📚 From Deck',
+            description: `Search your deck for a copy (deck reshuffled).`,
+            color: '#ffd700' },
+        ],
+        cancellable: false,
+      });
+      sourceLabel = choice?.optionId === 'deck' ? 'deck' : 'hand';
+    } else {
+      sourceLabel = inHand ? 'hand' : 'deck';
+    }
+
+    // Snapshot the source location BEFORE we mutate hand / deck — the
+    // client's attach-fly animation needs the original handIndex so it
+    // can find the right hand-card DOM source. After the splice, the
+    // card is gone and indices shift.
+    const sourceHandIndex = sourceLabel === 'hand' ? handIdx : -1;
+
+    if (sourceLabel === 'hand') {
+      ps.hand.splice(handIdx, 1);
+    } else {
+      // Re-resolve the deck index in case it shifted (defensive — the
+      // prompt above can't actually mutate the deck, but cheap to
+      // re-lookup).
+      const di = ps.mainDeck.indexOf(heroName);
+      if (di < 0) return false;
+      ps.mainDeck.splice(di, 1);
+      this.shuffleDeck(playerIdx, 'main');
+    }
+
+    if (!creatureInst.counters) creatureInst.counters = {};
+    creatureInst.counters.attachedHero = heroName;
+
+    // ── Visual flight: source → host Creature ──────────────────────
+    // A custom `attach_hero_fly` event renders for BOTH the owner and
+    // opp (unlike `hand_to_board_fly` which suppresses the owner's
+    // own animation, since drag-drops don't need re-rendering). The
+    // attach is triggered by activating a creature effect, not by
+    // dragging — so the owner needs to see the card move from their
+    // hand or deck onto the Creature.
+    //
+    // Broadcast-then-sync ordering matters here. Socket events arrive
+    // and process in order, so:
+    //   1. Client receives `attach_hero_fly` → handler runs
+    //      synchronously, captures source DOM rect (the source card
+    //      is still rendered at this moment because React hasn't
+    //      processed the next state update yet), spawns a `position:
+    //      fixed` flying div in document.body.
+    //   2. Client receives the gameState sync that follows → React
+    //      re-renders hand/deck WITHOUT the source card. Hand visibly
+    //      drops the slot or deck-count visibly decrements at the
+    //      start of the flight, not at the end. The flying div lives
+    //      outside React's tree so it keeps animating to its
+    //      destination unaffected.
+    this._broadcastEvent('attach_hero_fly', {
+      ownerIdx: playerIdx,
+      source: sourceLabel,
+      handIndex: sourceHandIndex,
+      cardName: heroName,
+      destOwner: creatureInst.owner,
+      destHeroIdx: creatureInst.heroIdx,
+      destZoneSlot: creatureInst.zoneSlot,
+    });
+    // Also broadcast the standard reveal popup so both players see
+    // the Hero name prominently — a redundant cue on top of the
+    // flight animation, useful when a chain of attaches happens too
+    // fast for the eye to follow each flight individually.
+    this._broadcastEvent('card_reveal', { cardName: heroName });
+    // Sync NOW, before the await. The order on the wire is:
+    //   attach_hero_fly → card_reveal → state-update.
+    // The client processes each in turn synchronously, so the
+    // animation handler captures source coords from the still-stale
+    // hand/deck DOM, and the immediately-following state update
+    // removes the source visually mid-flight.
+    this.sync();
+    // Wait for the flight to play before the host gets its sparkle.
+    await this._delay(650);
+    this._broadcastEvent('play_zone_animation', {
+      type: 'gold_sparkle',
+      owner: creatureInst.owner,
+      heroIdx: creatureInst.heroIdx,
+      zoneSlot: creatureInst.zoneSlot,
+    });
+
+    // Let the host Creature apply its bonus stats / state changes.
+    if (typeof script?.onAttachHero === 'function') {
+      try {
+        const ctx = this._createContext(creatureInst, { heroName, source: opts.source });
+        await script.onAttachHero(this, ctx);
+      } catch (err) {
+        console.error(`[attachHero] ${creatureInst.name}.onAttachHero threw:`, err.message);
+      }
+    }
+
+    this.log('hero_attached_to_creature', {
+      hero: heroName,
+      creature: creatureInst.name,
+      from: sourceLabel,
+      player: ps.username,
+      by: opts.source || creatureInst.name,
+    });
+    this.sync();
+    return true;
+  }
+
+  /**
    * Increase a hero's max HP (and optionally current HP) by the given amount.
    * Respects hero.maxHpCapped — if set, max HP cannot exceed that value.
    * @param {object} hero - The hero object
@@ -3640,6 +3841,16 @@ class GameEngine {
     if (!targetCard) return;
     if (targetCard.counters?.immovable) return; // Cannot be destroyed or removed
     if (targetCard.counters?._cardinalImmune) return; // Cardinal Beast immunity
+    // Name-list fallback for Cardinal Beasts whose `_cardinalImmune`
+    // counter never got stamped (puzzle preset / revive without hooks).
+    // Mirrors the same belt-and-suspenders check in canApplyCreatureStatus.
+    {
+      const { CARDINAL_NAMES } = require('./_cardinal-shared');
+      if (CARDINAL_NAMES.includes(targetCard.name)) {
+        this.log('destroy_blocked', { card: targetCard.name, reason: 'cardinal-beast' });
+        return;
+      }
+    }
     // Temporarily stolen creatures with damage-immune flag (Deepsea Succubus)
     // cannot be destroyed while controlled by the thief.
     if (targetCard.counters?._stealImmortal) {
@@ -5444,7 +5655,12 @@ class GameEngine {
         // for the rest of the turn.
         if ((cd.subtype || '').toLowerCase() === 'area'
             && ps._cantPlayAreaThisTurn === gs.turn) continue;
-        // Level/school requirements (handles levelOverrideCards, bypassLevelReq, negation, Performance, Wisdom)
+        // Level/school requirements (handles levelOverrideCards, bypassLevelReq, negation, Performance, Wisdom).
+        // Note: Wolflesia-style Creature spell-cast bypass is NOT
+        // honoured here — the host Hero must NOT appear as an eligible
+        // caster for those Spells. Those Spells are surfaced via
+        // `getCreatureSpellCasters` so the client highlights the
+        // Creature herself as the caster, never the host.
         if (!this.heroMeetsLevelReq(playerIdx, hi, cd)) continue;
         // Wisdom hand-size check: player must have enough cards to pay the discard cost
         if (cd.cardType === 'Spell') {
@@ -5721,8 +5937,12 @@ class GameEngine {
     // One-turn action lock (Treasure Hunter's Backpack, etc.)
     if (hero._actionLockedTurn === this.gs.turn) return null;
 
-    // Spell school / level requirements — centralized check (handles levelOverrideCards, bypassLevelReq, negation)
-    if (!this.heroMeetsLevelReq(heroOwner, heroIdx, cardData)) return null;
+    // Spell school / level requirements — centralized check (handles levelOverrideCards, bypassLevelReq, negation).
+    // Wolflesia-style Creature spell-cast: bypasses the host hero's
+    // school/level requirement when the matching additional-action
+    // type is flagged `bypassesCasterRequirement: true`.
+    const _bypassesCasterReq = this.canBypassCasterRequirementForSpell(heroOwner, heroIdx, cardData, cardName);
+    if (!_bypassesCasterReq && !this.heroMeetsLevelReq(heroOwner, heroIdx, cardData)) return null;
 
     // Load card script
     const script = loadCardEffect(cardName);
@@ -7400,7 +7620,12 @@ class GameEngine {
         confirmLabel: spec.confirmLabel || '🗡️ Sacrifice!',
         confirmClass: spec.confirmClass || 'btn-danger',
         cancellable,
-        maxTotal: targets.length,
+        // `maxCount` caps how many Creatures the player may pick. When
+        // unset, defaults to "all candidates" — matching the legacy
+        // sacrifice-as-many-as-you-want behaviour for cards like
+        // Sacrifice to Divinity. Cards that demand an exact count
+        // (Clausss → exactly one) pass `maxCount: 1`.
+        maxTotal: spec.maxCount != null ? spec.maxCount : targets.length,
         minRequired: spec.minCount,
         minSumMaxHp: spec.minMaxHp || undefined,
         minSumLevel: spec.minSumLevel || undefined,
@@ -7739,6 +7964,12 @@ class GameEngine {
           // Parallel rule for combined-level thresholds (Dark Deepsea
           // God's tribute: 2+ creatures with combined levels ≥ 4).
           minSumLevel: config.minSumLevel,
+          // Optional small card preview image rendered inside the
+          // targeting panel — set this to the name of the card the
+          // prompt is "about" (the equip Bill is offering, the creature
+          // a placement is fronting, etc.) so the player has visual
+          // confirmation of what their click will do.
+          previewCardName: config.previewCardName,
         },
       };
       this.sync();
@@ -8591,10 +8822,37 @@ class GameEngine {
       });
       if (!confirmed) continue;
 
-      // Activate: remove from hand, deduct gold, mark once-per-game
+      // Activate: remove from hand, deduct gold, mark once-per-game.
+      //
+      // Per-instance discount alignment: when `dynamicCost` charged a
+      // reduced cost (cost < baseCost), the discount comes from a
+      // SPECIFIC copy's flag (Bamboo Shield's `_permanentlyRevealed`
+      // counter). Card text reads "make ITS cost become 8" — so the
+      // copy consumed should be the discounted one, not whichever
+      // matching name happens to sit at hand index 0. Without this,
+      // the player gets the cost-8 charge AND keeps their revealed
+      // copy in hand, which both contradicts the card and lets the
+      // discount apply forever to un-revealed siblings drawn later.
+      // When no discount is applied (or the script doesn't expose
+      // a per-instance flag), fall back to the legacy first-position
+      // consume.
+      let consumedInst = null;
+      if (cost < baseCost) {
+        consumedInst = this.cardInstances.find(c =>
+          c.owner === targetOwner && c.zone === 'hand'
+          && c.name === cardName
+          && c.counters?._permanentlyRevealed
+        ) || null;
+      }
+      if (!consumedInst) {
+        consumedInst = this.cardInstances.find(c =>
+          c.owner === targetOwner && c.zone === 'hand' && c.name === cardName
+        ) || null;
+      }
       const actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
+      if (consumedInst) this._untrackCard(consumedInst.id);
       if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
       if (this.gs._scTracking && targetOwner >= 0 && targetOwner < 2) this.gs._scTracking[targetOwner].cardsPlayedFromHand++;
 
@@ -10394,6 +10652,130 @@ class GameEngine {
    * Check if a hand card can be played via any additional action.
    * Returns the matching typeId or null.
    */
+  /**
+   * Returns a per-hero list of hand-card names that the hero's own
+   * script bypasses the level/school requirement for via
+   * `canBypassLevelReqForCard` (Cute Princess Mary's "Cute" bypass,
+   * any future hero-side bypass). Used by the client's
+   * `canHeroNormalSummon` empty-slot drop check, which is otherwise a
+   * strict client-side reproduction of `heroMeetsLevelReq` and would
+   * miss the bypass. Card-side `canBypassLevelReq` (Deepsea) is
+   * deliberately NOT included — those bypasses are conditional /
+   * placement-mode-specific and should not light up empty-slot drops.
+   *
+   * Generic for ANY future hero with a `canBypassLevelReqForCard`
+   * export — no per-hero engine edit needed.
+   *
+   * @param {number} playerIdx
+   * @returns {Object} { 0: [cardName, ...], 1: [...], 2: [...] }
+   */
+  getHeroBypassSummonCards(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return {};
+    const cardDB = this._getCardDB();
+    const result = {};
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name) continue;
+      const heroScript = loadCardEffect(hero.name);
+      if (typeof heroScript?.canBypassLevelReqForCard !== 'function') continue;
+      const bypassed = [];
+      const seen = new Set();
+      for (const cn of (ps.hand || [])) {
+        if (seen.has(cn)) continue;
+        seen.add(cn);
+        const cd = cardDB[cn];
+        if (!cd) continue;
+        try {
+          if (heroScript.canBypassLevelReqForCard(this.gs, playerIdx, hi, cd, this)) {
+            bypassed.push(cn);
+          }
+        } catch (err) {
+          console.error(`[getHeroBypassSummonCards] ${hero.name} threw on ${cn}:`, err.message);
+        }
+      }
+      if (bypassed.length > 0) result[hi] = bypassed;
+    }
+    return result;
+  }
+
+  /**
+   * Generic creature-spell-cast bypass: returns true if there's an
+   * additional-action provider for `(playerIdx, cardName, heroIdx)`
+   * whose type is flagged `bypassesCasterRequirement: true`. Used by
+   * Wolflesia (and any future Creature able to use Spells) — the
+   * Creature registers an additional action with this flag, which lets
+   * the Spell skip `heroMeetsLevelReq` so the host hero doesn't need
+   * the spell-school / level abilities itself.
+   *
+   * Generic for ANY future Creature able-to-use-Spells: register the
+   * additional action with `bypassesCasterRequirement: true` and an
+   * appropriate filter — no engine edit per Creature.
+   */
+  canBypassCasterRequirementForSpell(playerIdx, heroIdx, cardData, cardName) {
+    if (!cardData) return false;
+    if (cardData.cardType !== 'Spell' && cardData.cardType !== 'Attack') return false;
+    const typeId = this.findAdditionalActionForCard(playerIdx, cardName, heroIdx);
+    if (!typeId) return false;
+    const config = this._additionalActionTypes[typeId];
+    return !!config?.bypassesCasterRequirement;
+  }
+
+  /**
+   * Returns the list of Creatures that can currently act as Spell
+   * casters via a `bypassesCasterRequirement` additional action — i.e.
+   * Wolflesia-class providers. Each entry includes the eligible spell
+   * names from the player's hand so the client can:
+   *   • highlight the matching hand cards (even though no Hero is a
+   *     "normal" eligible caster);
+   *   • surface the Creature as the visible caster in the click-to-
+   *     choose dialog and as a support-zone drop target;
+   *   • route the actual play through `doPlaySpell` with `heroIdx` =
+   *     the Creature's `heroIdx` (its host Hero's slot — the engine
+   *     uses that for action / phase bookkeeping).
+   *
+   * Generic for ANY future Creature: every Creature that registers an
+   * additional action with `bypassesCasterRequirement: true` gets
+   * surfaced automatically. No engine edit per Creature.
+   */
+  getCreatureSpellCasters(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+    const cardDB = this._getCardDB();
+    const result = [];
+    for (const inst of this.cardInstances) {
+      if (inst.owner !== playerIdx) continue;
+      if (inst.zone !== 'support') continue;
+      if (inst.faceDown) continue;
+      if (!inst.counters?.additionalActionType) continue;
+      if (!inst.counters?.additionalActionAvail) continue;
+      const config = this._additionalActionTypes[inst.counters.additionalActionType];
+      if (!config?.bypassesCasterRequirement) continue;
+      if (!config.allowedCategories?.includes('spell')) continue;
+
+      // Compute eligible hand cards by walking hand × the type's filter.
+      // Mirrors the per-type computation in `getAdditionalActions`.
+      const eligibleNames = [];
+      const seen = new Set();
+      for (const cn of (ps.hand || [])) {
+        if (seen.has(cn)) continue;
+        const cd = cardDB[cn];
+        if (cd && (!config.filter || config.filter(cd))) {
+          seen.add(cn);
+          eligibleNames.push(cn);
+        }
+      }
+      result.push({
+        creatureInstId: inst.id,
+        cardName: inst.name,
+        heroIdx: inst.heroIdx,
+        zoneSlot: inst.zoneSlot,
+        eligibleHandCards: eligibleNames,
+      });
+    }
+    return result;
+  }
+
   findAdditionalActionForCard(playerIdx, cardName, heroIdx) {
     const allCards = this._getCardDB();
     const cardData = allCards[cardName];
@@ -10737,7 +11119,123 @@ class GameEngine {
       }
     }
 
+    // ── Borrowed opponent abilities (Lizbeth / Smugbeth) ──
+    // Any of `playerIdx`'s heroes that qualifies as a borrower (Lizbeth
+    // herself, or a hero with Smugbeth+Lizbeth attached) makes opponent
+    // ability slots activatable. Skip slots already covered by the
+    // charm/control branches above so the client doesn't get duplicate
+    // entries for the same physical slot. HOPT is keyed on (ability,
+    // playerIdx) — same as own-side activation — so the borrowed slot
+    // and the player's own copy of the same ability share the lock.
+    if (ops && this._anyBorrowerActive(playerIdx)) {
+      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
+        const hero = ops.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+        if (hero.charmedBy === playerIdx) continue; // already charmed
+        if (hero.controlledBy === playerIdx && hero.charmedBy == null) continue; // already controlled
+
+        // Only borrow if at least one of `playerIdx`'s heroes is currently
+        // borrowing from THIS specific opponent hero. The helper does the
+        // full per-borrower / per-source eligibility walk.
+        let borrowed = false;
+        const ps2 = this.gs.players[playerIdx];
+        for (let bhi = 0; bhi < (ps2?.heroes || []).length; bhi++) {
+          const sources = this._getAbilityBorrowSources(playerIdx, bhi, 'active');
+          if (sources.some(s => s.playerIdx === oi && s.heroIdx === hi)) {
+            borrowed = true; break;
+          }
+        }
+        if (!borrowed) continue;
+
+        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
+          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+          if (slot.length === 0) continue;
+          const abilityName = slot[0];
+          const script = loadCardEffect(abilityName);
+          if (!script?.actionCost) continue;
+
+          const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
+          if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
+
+          if (script.canActivateAction && !script.canActivateAction(this.gs, playerIdx, hi, slot.length, this)) continue;
+
+          result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, borrowedFromOwner: oi });
+        }
+      }
+    }
+
     return result;
+  }
+
+  /** Cheap pre-check used by `getActivatableAbilities`: does `playerIdx`
+   *  have ANY borrower-hero active right now? Avoids the per-slot
+   *  per-borrower walk when no Lizbeth / Smugbeth is in play. */
+  _anyBorrowerActive(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return false;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      if (this._getAbilityBorrowSources(playerIdx, hi, 'active').length > 0) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Fire an ability's hook a second time as the borrower's mirror. Called
+   * from `runHooks` after the original dispatch when the firing card is
+   * an opponent ability that a Lizbeth-style borrower has access to.
+   *
+   * The mirror ctx is the same as the original except `cardOwner`,
+   * `cardController`, `cardHeroOwner`, `cardHeroIdx`, `attachedHero`,
+   * and `isMyTurn` are redirected to the borrower side — so the
+   * ability's natural "give benefit to ctx.cardOwner" logic routes the
+   * effect to Lizbeth's controller. The card instance itself is NOT
+   * mutated (only the ctx fields are), so any counter writes the
+   * ability does still go to the original opponent's instance.
+   *
+   * Per-ability opt-out: `module.exports.disableLizbethMirror = true`
+   * for abilities whose state model isn't compatible with vanilla
+   * cardOwner-redirect (Smugness, Resistance, Creativity, etc. — they
+   * compute level by re-walking ps.abilityZones and fail when the
+   * borrower has no matching slot). Toughness is hard-coded out by
+   * spec.
+   */
+  async _fireLizbethMirrorIfApplicable(card, hookFn, hookName, hookCtx) {
+    if (card.name === 'Toughness') return;
+    const script = loadCardEffect(card.name);
+    if (script?.disableLizbethMirror) return;
+
+    const cardSide = card.controller ?? card.owner;
+    const activePi = this.gs.activePlayer ?? -1;
+    if (activePi < 0 || activePi === cardSide) return;
+
+    const ps = this.gs.players[activePi];
+    if (!ps) return;
+
+    for (let bhi = 0; bhi < (ps.heroes || []).length; bhi++) {
+      const sources = this._getAbilityBorrowSources(activePi, bhi, 'passive');
+      const hosted = sources.some(s => s.playerIdx === cardSide && s.heroIdx === card.heroIdx);
+      if (!hosted) continue;
+
+      const mirrorCtx = this._createContext(card, { ...hookCtx, _isLizbethMirror: true });
+      mirrorCtx.cardOwner = activePi;
+      mirrorCtx.cardController = activePi;
+      mirrorCtx.cardHeroOwner = activePi;
+      mirrorCtx.cardHeroIdx = bhi;
+      mirrorCtx.attachedHero = ps.heroes[bhi];
+      mirrorCtx.isMyTurn = true; // mirror only fires on borrower's turn
+
+      try {
+        await Promise.resolve(hookFn(mirrorCtx));
+      } catch (err) {
+        console.error(`[Engine] Lizbeth-mirror hook "${hookName}" on "${card.name}" failed:`, err.message);
+      }
+      // Triggers raised during a mirror dispatch follow the standard
+      // pendingTriggers path so reactions still chain correctly.
+      if (mirrorCtx._triggers?.length) {
+        this.pendingTriggers.push(...mirrorCtx._triggers);
+      }
+    }
   }
 
   // ─── ACTIVE HERO EFFECTS ─────────────────
@@ -11351,6 +11849,75 @@ class GameEngine {
       }
     }
 
+    // ── Borrowed opponent free-activation abilities (Lizbeth / Smugbeth) ──
+    // Same shape as the action-cost borrow section in
+    // `getActivatableAbilities`, applied to the freeActivation set so
+    // Alchemy / Leadership / Necromancy / Inventing / etc. on opponent's
+    // heroes light up for the borrower's controller. HOPT is keyed on
+    // (ability, playerIdx) — same as own-side activation — so a single
+    // use spends both Lizbeth's borrowed slot and the player's own copy.
+    if (ops && this._anyBorrowerActive(playerIdx)) {
+      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
+        const hero = ops.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+        if (hero.charmedBy === playerIdx) continue;
+        if (hero.controlledBy === playerIdx && hero.charmedBy == null) continue;
+
+        let borrowed = false;
+        const ps2 = this.gs.players[playerIdx];
+        for (let bhi = 0; bhi < (ps2?.heroes || []).length; bhi++) {
+          const sources = this._getAbilityBorrowSources(playerIdx, bhi, 'active');
+          if (sources.some(s => s.playerIdx === oi && s.heroIdx === hi)) {
+            borrowed = true; break;
+          }
+        }
+        if (!borrowed) continue;
+
+        for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
+          const slot = (ops.abilityZones[hi] || [])[zi] || [];
+          if (slot.length === 0) continue;
+          const abilityName = slot[0];
+          const script = loadCardEffect(abilityName);
+          if (!script?.freeActivation) continue;
+
+          const hoptKey = `free-ability:${abilityName}:${playerIdx}`;
+          const exhausted = this.gs.hoptUsed?.[hoptKey] === this.gs.turn;
+          let canActivate = !exhausted && isMainPhase;
+          if (!canActivate && !exhausted && isActionPhase && script.actionPhaseEligible) canActivate = true;
+
+          let handLockBlocked = false;
+          if (canActivate && script.blockedByHandLock && ps.handLocked) {
+            canActivate = false;
+            handLockBlocked = true;
+          }
+
+          if (canActivate && script.canFreeActivate) {
+            try {
+              const inst = this.cardInstances.find(c =>
+                c.owner === oi && c.zone === 'ability' && c.heroIdx === hi && c.zoneSlot === zi
+              );
+              if (inst) {
+                // Build ctx with borrower-side cardOwner so per-hero
+                // checks like "do I have enough gold" hit the activator.
+                const ctx = this._createContext(inst, { event: 'canFreeActivateCheck' });
+                ctx.cardOwner = playerIdx;
+                ctx.cardController = playerIdx;
+                ctx.cardHeroOwner = playerIdx;
+                canActivate = !!script.canFreeActivate(ctx, slot.length);
+              } else canActivate = false;
+            } catch { canActivate = false; }
+          }
+
+          result.push({
+            heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length,
+            canActivate, exhausted, handLockBlocked,
+            borrowedFromOwner: oi,
+          });
+        }
+      }
+    }
+
     return result;
   }
 
@@ -11445,6 +12012,157 @@ class GameEngine {
     return { success: true, zoneSlot: targetZone, inst };
   }
 
+  // ──────────────────────────────────────────────────────────────────
+  //  ABILITY BORROWING (Lizbeth / Smugbeth — Dream Landers archetype)
+  // ──────────────────────────────────────────────────────────────────
+  // The Lizbeth / Smugbeth pair "absorbs" opponent abilities so the
+  // borrower's controller can use them as if they were attached to the
+  // borrower hero. Phase 1 covers two channels:
+  //   • PASSIVE: opponent ability zones contribute toward the borrower's
+  //     spell-school / level-requirement counts (`heroMeetsLevelReq`),
+  //     so Lizbeth can summon high-level Creatures, cast high-level
+  //     Spells, etc. Lizbeth ONLY — Smugbeth's host doesn't get this.
+  //   • ACTIVE: opponent ability slots become activatable by the
+  //     borrower's controller, sharing HOPT with their own copies.
+  //     Both Lizbeth AND Smugbeth's host get this.
+  // Toughness is excluded from the passive count by spec.
+  //
+  // The borrower must be alive, on its owner's active turn, and not
+  // Frozen / Stunned / Negated / Bound (matches the standard "hero is
+  // capable of acting" filter used elsewhere in the engine).
+
+  /** Internal: is this hero currently capable of "acting" (the standard
+   *  alive-and-uninhibited gate that dead/frozen/stunned/negated/bound
+   *  heroes fail)? Used by both passive and active borrow checks. */
+  _heroCanAct(playerIdx, heroIdx) {
+    const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    const s = hero.statuses || {};
+    if (s.frozen || s.stunned || s.negated || s.bound) return false;
+    return true;
+  }
+
+  /** Internal: does `(playerIdx, heroIdx)` have a `Smugbeth, the Rebel
+   *  of no Rules` Creature in its Support zones with Lizbeth attached?
+   *  Smugbeth must itself be active (not negated/frozen/stunned, not
+   *  face-down). The Lizbeth attach is stored on
+   *  `inst.counters.attachedHero` per the generic attach mechanic. */
+  _heroHasSmugbethBoost(playerIdx, heroIdx) {
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== 'support') continue;
+      if ((inst.controller ?? inst.owner) !== playerIdx) continue;
+      if (inst.heroIdx !== heroIdx) continue;
+      if (inst.name !== 'Smugbeth, the Rebel of no Rules') continue;
+      if (inst.counters?.attachedHero !== 'Lizbeth, the Reaper of the Light') continue;
+      if (inst.counters?.negated || inst.counters?.nulled
+          || inst.counters?.frozen || inst.counters?.stunned) continue;
+      if (inst.faceDown) continue;
+      if ((inst.counters?.currentHp ?? 1) <= 0) continue;
+      return true;
+    }
+    return false;
+  }
+
+  /** Internal: does this borrower hero qualify as a Lizbeth-style hero?
+   *  Lizbeth qualifies if she IS Lizbeth. Smugbeth's host qualifies for
+   *  active-only borrowing — passive borrowing is Lizbeth-exclusive. */
+  _heroBorrowsAbilities(playerIdx, heroIdx, mode) {
+    const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    if (hero.name === 'Lizbeth, the Reaper of the Light') return true;
+    if (mode === 'active' && this._heroHasSmugbethBoost(playerIdx, heroIdx)) return true;
+    return false;
+  }
+
+  /**
+   * Returns the list of opponent ability sources `(playerIdx, heroIdx)`
+   * whose ability zones the borrower hero can read. Empty list if no
+   * borrowing applies. The borrower itself must be acting, on its owner's
+   * turn, and a registered borrower kind. Only OPPONENT heroes that are
+   * themselves currently capable of "acting" contribute — borrowing from
+   * a dead / frozen opponent makes no thematic sense and matches what
+   * the opponent could do themselves.
+   *
+   * @param {number} playerIdx - Borrower's owner
+   * @param {number} heroIdx   - Borrower's hero index
+   * @param {'active'|'passive'} mode
+   * @returns {Array<{playerIdx:number, heroIdx:number}>}
+   */
+  _getAbilityBorrowSources(playerIdx, heroIdx, mode) {
+    if ((this.gs.activePlayer ?? -1) !== playerIdx) return [];
+    if (!this._heroCanAct(playerIdx, heroIdx)) return [];
+    if (!this._heroBorrowsAbilities(playerIdx, heroIdx, mode)) return [];
+    const oppIdx = playerIdx === 0 ? 1 : 0;
+    const ops = this.gs.players[oppIdx];
+    if (!ops) return [];
+    const out = [];
+    for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
+      if (this._heroCanAct(oppIdx, hi)) out.push({ playerIdx: oppIdx, heroIdx: hi });
+    }
+    return out;
+  }
+
+  /**
+   * Returns the list of candidate ability-zone sets to test for a hero's
+   * level / school requirements. For non-borrowers this is just `[ownZones]`.
+   * For Lizbeth-style passive borrowers it's `[ownZones, ownZones+opp1,
+   * ownZones+opp2, …]` — each opponent hero is a SEPARATE potential
+   * "as if attached" bundle, never summed across opponents. Toughness
+   * slots are filtered from borrowed bundles per the Lizbeth spec.
+   *
+   * Why per-opponent instead of summed: "as if the abilities were
+   * attached to her" reads as "Lizbeth picks one opponent hero's
+   * abilities at a time as the borrowed bundle". Summing would mean
+   * 2 opponents each with Lv1 Summoning Magic let her summon Lv2
+   * Creatures, which is wrong.
+   */
+  _getCandidateAbilityZoneSets(playerIdx, heroIdx) {
+    const ps = this.gs.players[playerIdx];
+    const own = ps?.abilityZones?.[heroIdx] || [[], [], []];
+    const sets = [own];
+    const sources = this._getAbilityBorrowSources(playerIdx, heroIdx, 'passive');
+    for (const src of sources) {
+      const oppZones = this.gs.players[src.playerIdx]?.abilityZones?.[src.heroIdx] || [];
+      const filteredOpp = oppZones.filter(slot => slot && slot.length > 0 && slot[0] !== 'Toughness');
+      if (filteredOpp.length === 0) continue;
+      sets.push([...own, ...filteredOpp]);
+    }
+    return sets;
+  }
+
+  /**
+   * Whether `activatingPi` can activate the ability slot at `sourcePi`'s
+   * `sourceHeroIdx`/`sourceZoneIdx` because one of `activatingPi`'s heroes
+   * borrows from that opponent hero. Used by the activation path to
+   * accept clicks on opponent ability slots that have become "lit up"
+   * by Lizbeth or Smugbeth.
+   *
+   * Returns `null` if not borrowable, otherwise `{ borrowerHeroIdx }`
+   * — the hero on the activator's side whose presence is granting
+   * access. Caller uses the borrower's heroIdx for the activation
+   * context (cardOwner, charm checks, etc.). The HOPT key naturally
+   * shares with the activator's own copies of the ability because it's
+   * keyed on `(abilityName, activatingPi)`, not on the source slot.
+   */
+  _getAbilityBorrowerForOppSlot(activatingPi, sourcePi, sourceHeroIdx, sourceZoneIdx) {
+    if (sourcePi === activatingPi) return null; // not a borrow
+    const ps = this.gs.players[activatingPi];
+    if (!ps) return null;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const sources = this._getAbilityBorrowSources(activatingPi, hi, 'active');
+      for (const src of sources) {
+        if (src.playerIdx === sourcePi && src.heroIdx === sourceHeroIdx) {
+          // Confirm the slot itself exists and is non-empty — the
+          // activation path will fail anyway, but bailing here gives
+          // a cleaner false return to the click handler.
+          const opSlot = this.gs.players[sourcePi]?.abilityZones?.[sourceHeroIdx]?.[sourceZoneIdx];
+          if (opSlot && opSlot.length > 0) return { borrowerHeroIdx: hi };
+        }
+      }
+    }
+    return null;
+  }
+
   /**
    * Count how many ability cards in a hero's ability zones match a given spell school.
    * Wildcard abilities (e.g. Performance with isWildcardAbility: true) count as the
@@ -11508,69 +12226,78 @@ class GameEngine {
       rawLevel = hero.levelOverrideCards[cardData.name];
     }
     if (rawLevel <= 0 && !cardData.spellSchool1) return true;
-    const abZones = hero.statuses?.negated ? [] : (ps.abilityZones[heroIdx] || []);
 
+    // Test the level requirement against each candidate ability-zone
+    // set. For non-borrowers this is just the hero's own zones (the
+    // legacy single-pass behaviour). For Lizbeth-style borrowers, each
+    // opponent hero is its own candidate (own + that opponent's zones);
+    // we return true as soon as ANY candidate passes — never summed
+    // across opponents. Negated heroes get blanked: only Lv0 cards
+    // without a school requirement remain playable.
+    const candidates = hero.statuses?.negated
+      ? [[]]
+      : this._getCandidateAbilityZoneSets(playerIdx, heroIdx);
+    for (const abZones of candidates) {
+      if (this._testLevelReqForZones(playerIdx, heroIdx, cardData, hero, rawLevel, abZones)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Per-zone-set level-req test — extracted from `heroMeetsLevelReq` so
+   * the borrower flow can re-run it for each candidate bundle. Tests
+   * whether `abZones` alone is enough to play `cardData` from `hero`.
+   * Side-effect-free.
+   */
+  _testLevelReqForZones(playerIdx, heroIdx, cardData, hero, rawLevel, abZones) {
     // Apply generic pre-reductions (Mana Mining and any future ability
     // that silently lowers spell levels). Abilities opt in by exporting
     // `reduceSpellLevel(cardData, abilityLevel, engine) → number`.
     const levelAfterAbility = this._applySpellLevelReductions(cardData, rawLevel, abZones);
     // Additional board-wide reductions — any tracked instance the player
     // owns may contribute via `reduceCardLevel(cardData, engine, ownerIdx)`.
-    // Sibling hook to reduceSpellLevel, but walks the entire board (any
-    // zone), not a single hero's abilities, and applies to any card type
-    // (not just Spells). Used e.g. by Elven Forager.
     const level = this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx);
 
-    // Multi-school spells: a hero needs the COMBINED count across all
-    // listed schools to be ≥ effective level. Single-school spells
-    // (spellSchool2 empty) collapse to the original "school1 ≥ level"
-    // check naturally. Same school listed twice (rare/defensive) is
-    // counted once via the dedupe.
     const schools = [];
     if (cardData.spellSchool1) schools.push(cardData.spellSchool1);
     if (cardData.spellSchool2 && cardData.spellSchool2 !== cardData.spellSchool1) schools.push(cardData.spellSchool2);
     let combined = 0;
     for (const s of schools) combined += this.countAbilitiesForSchool(s, abZones);
-    let levelFail = false;
-    if (schools.length > 0 && combined < level) levelFail = true;
-    if (levelFail) {
-      const blr = hero.bypassLevelReq;
-      if (blr && level <= blr.maxLevel && blr.types.includes(cardData.cardType)) return true;
+    if (schools.length === 0 || combined >= level) return true;
 
-      // Generic level-gap coverage — abilities opt in via
-      // `coverLevelGap(cardData, abilityLevel, engine, gap) → { coverable: bool, discardCost: number }`.
-      // Wisdom (Spells, paid in discards) and Divinity (Spells +
-      // Attacks, free) are the current users. Each ability decides
-      // which card types it covers — Wisdom returns coverable=false
-      // for Attacks; Divinity returns coverable for both. The engine
-      // just walks the slots and accepts the first coverer that says
-      // yes for this card type.
-      if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack') {
-        const gap = this._spellLevelGap(cardData, level, abZones);
-        if (gap > 0) {
-          const cov = this._findLevelGapCoverage(cardData, gap, abZones);
-          if (cov?.coverable) return true;
-        }
+    // Failed primary count — try bypass paths against this same zone set.
+    const blr = hero.bypassLevelReq;
+    if (blr && level <= blr.maxLevel && blr.types.includes(cardData.cardType)) return true;
+
+    if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack') {
+      const gap = this._spellLevelGap(cardData, level, abZones);
+      if (gap > 0) {
+        const cov = this._findLevelGapCoverage(cardData, gap, abZones);
+        if (cov?.coverable) return true;
       }
-
-      // Per-card level-req bypass — the card script opts in by exporting
-      // `canBypassLevelReq(gs, playerIdx, heroIdx, cardData, engine) → bool`.
-      // Lets an alternate play path (e.g. Deepsea bounce-place) let the
-      // card through without spell-school requirements. Any future card
-      // with a similar "play via alternate cost" mechanic uses the same
-      // hook — no engine edit per card.
-      const cardScript = loadCardEffect(cardData.name);
-      if (typeof cardScript?.canBypassLevelReq === 'function') {
-        try {
-          if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this)) return true;
-        } catch (err) {
-          console.error(`[canBypassLevelReq] ${cardData.name} threw:`, err.message);
-        }
-      }
-
-      return false;
     }
-    return true;
+
+    const cardScript = loadCardEffect(cardData.name);
+    if (typeof cardScript?.canBypassLevelReq === 'function') {
+      try {
+        if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this)) return true;
+      } catch (err) {
+        console.error(`[canBypassLevelReq] ${cardData.name} threw:`, err.message);
+      }
+    }
+    // Hero-script side: a Hero may opt to bypass the level / school
+    // requirement for specific kinds of card data (Cute Princess Mary
+    // bypasses level reqs for Cute Creatures, etc.). Mirror to the
+    // card-script branch above — same arg shape, hero-script keyed.
+    const heroScript = loadCardEffect(hero.name);
+    if (typeof heroScript?.canBypassLevelReqForCard === 'function') {
+      try {
+        if (heroScript.canBypassLevelReqForCard(this.gs, playerIdx, heroIdx, cardData, this)) return true;
+      } catch (err) {
+        console.error(`[canBypassLevelReqForCard] ${hero.name} threw:`, err.message);
+      }
+    }
+    return false;
   }
 
   /**
@@ -11767,24 +12494,37 @@ class GameEngine {
     }
     if (rawLevel <= 0 && !cardData.spellSchool1) return 0;
 
-    const abZones = hero.statuses?.negated ? [] : (ps.abilityZones[heroIdx] || []);
+    // For Lizbeth-style borrowers, walk each candidate ability-zone set
+    // (own, then own+opp1, own+opp2, …) and return the MINIMUM cost
+    // — the player wants the cheapest playable path. Mirrors the
+    // per-opponent semantics in `heroMeetsLevelReq`.
+    const candidates = hero.statuses?.negated
+      ? [[]]
+      : this._getCandidateAbilityZoneSets(playerIdx, heroIdx);
+    let bestCost = -1; // -1 = not playable
+    for (const abZones of candidates) {
+      const cost = this._wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx);
+      if (cost === 0) return 0;
+      if (cost > 0 && (bestCost === -1 || cost < bestCost)) bestCost = cost;
+    }
+    return bestCost;
+  }
+
+  /** Per-zone-set Wisdom cost — extracted for the per-opponent walk. */
+  _wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx) {
     const levelAfterAbility = this._applySpellLevelReductions(cardData, rawLevel, abZones);
-    // Mirror the board-wide reduction applied in heroMeetsLevelReq — same
-    // generic `reduceCardLevel` walker — so Wisdom's discard cost is
-    // computed against the true effective level the card will face.
     const level = this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx);
 
     const gap = this._spellLevelGap(cardData, level, abZones);
-    if (gap === 0) return 0; // Playable at effective level
+    if (gap === 0) return 0;
 
-    // bypassLevelReq grants free coverage — no paid cost needed
     const blr = hero.bypassLevelReq;
     if (blr && level <= blr.maxLevel && blr.types.includes(cardData.cardType)) return 0;
 
     const cov = this._findLevelGapCoverage(cardData, gap, abZones);
     if (cov?.coverable) return cov.discardCost || 0;
 
-    return -1; // Not playable even with paid coverage
+    return -1;
   }
 
   /**
@@ -12597,6 +13337,19 @@ class GameEngine {
             creatureDiscardPs.discardPile.push(e.inst.name);
           }
         }
+        // Attached Hero (Goff/Gon-style) follows the host Creature into
+        // the same original-owner's discard pile when the host dies.
+        // The Hero was never tracked as an instance — only stored as a
+        // name on `inst.counters.attachedHero` — so we just push the
+        // name into the discard.
+        const attachedHero = e.inst.counters?.attachedHero;
+        if (attachedHero && creatureDiscardPs) {
+          creatureDiscardPs.discardPile.push(attachedHero);
+          this.log('attached_hero_discarded', {
+            hero: attachedHero, creature: e.inst.name,
+            player: creatureDiscardPs.username,
+          });
+        }
         // `_onlyCard: e.inst` — onCardLeaveZone fires ONLY the leaving
         // card's own cleanup hook, not every tracked card's. Without this
         // filter, every creature death made cards like Flying Island
@@ -13259,13 +14012,32 @@ class GameEngine {
 
   _broadcastEvent(event, data) {
     if (this._fastMode) return; // Silent during MCTS simulations.
+    // Wolflesia-style Creature spell-cast: when an active spell is being
+    // cast through a Creature (gs._spellCasterOverride is set by the
+    // server's doPlaySpell), redirect the SOURCE of caster-anchored
+    // animations (`sourceOwner` + `sourceHeroIdx` matching the host
+    // hero) onto the Creature's support slot by injecting
+    // `sourceZoneSlot`. The client's animation positioner reads
+    // `[data-support-zone][...slot=...]` when sourceZoneSlot is set,
+    // which puts the beam / projectile origin on the Creature instead
+    // of the host hero. Target animations (`owner`/`heroIdx`/`zoneSlot`)
+    // are NOT rewritten — those refer to the spell's effect target,
+    // unrelated to the caster.
+    let outData = data;
+    const override = this.gs._spellCasterOverride;
+    if (override && outData
+        && outData.sourceOwner === override.owner
+        && outData.sourceHeroIdx === override.heroIdx
+        && (outData.sourceZoneSlot == null || outData.sourceZoneSlot < 0)) {
+      outData = { ...outData, sourceZoneSlot: override.zoneSlot };
+    }
     for (let i = 0; i < 2; i++) {
       const sid = this.gs.players[i]?.socketId;
-      if (sid) this.io.to(sid).emit(event, data);
+      if (sid) this.io.to(sid).emit(event, outData);
     }
     if (this.room.spectators) {
       for (const spec of this.room.spectators) {
-        if (spec.socketId) this.io.to(spec.socketId).emit(event, data);
+        if (spec.socketId) this.io.to(spec.socketId).emit(event, outData);
       }
     }
   }

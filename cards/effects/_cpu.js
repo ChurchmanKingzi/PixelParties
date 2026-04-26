@@ -239,6 +239,17 @@ async function runActionPhase(engine, helpers) {
     if (cd.cardType === 'Creature') {
       const lowHi = pickHeroForActionCard(engine, cpuIdx, cd, cardName);
       heroPool = (lowHi >= 0) ? eligible.filter(e => e.hi === lowHi) : eligible;
+    } else if (cd.cardType === 'Attack') {
+      // Sort by current atk stat DESC. Most Attack cards scale damage
+      // with the caster's atk; with the rollout count this brain runs
+      // on (3 per candidate), two same-card / different-caster
+      // candidates routinely fall inside statistical noise of each
+      // other and the input order decides via stable sort. Putting the
+      // bigger stick first means a noisy tie correctly resolves toward
+      // the higher-atk hero. MCTS still gets to override when a
+      // lower-atk hero has a synergy that actually beats raw damage.
+      heroPool = [...eligible].sort((a, b) =>
+        (ps.heroes[b.hi]?.atk || 0) - (ps.heroes[a.hi]?.atk || 0));
     } else {
       heroPool = eligible;
     }
@@ -248,6 +259,20 @@ async function runActionPhase(engine, helpers) {
       const v = engine.validateActionPlay(cpuIdx, cardName, handIdx, heroIdx, [cd.cardType]);
       if (!v) continue;
       if (!v.isActionPhase) continue;
+      // Inherent additional Action cards (Divine Gift of Sacrifice, etc.)
+      // are designed to be played in MAIN PHASE on top of the regular
+      // Action Phase action — they're "additional" by intent. The engine
+      // currently still consumes the Action-Phase action slot when one
+      // is played at phase 3, so enumerating them here makes the CPU
+      // burn its real action on a card that should have been free. Defer
+      // them entirely to fireAdditionalActions in Main Phase.
+      if (v.isInherentAction) continue;
+      // `casterAtk` is the casting hero's CURRENT atk stat — used by the
+      // candidate-ranking tiebreak so Attack candidates that score
+      // similarly under MCTS deterministically resolve to the higher-
+      // atk caster. Stamped on every candidate (cheap, ignored for
+      // non-Attack types in the tiebreak path).
+      const casterAtk = ps.heroes[heroIdx]?.atk || 0;
       // For Creatures, enumerate one candidate per free support-zone slot so
       // MCTS evaluates zone placement (adjacency effects, Slippery-Skates /
       // Cool-Fridge positioning, etc.) as a first-class decision. For Spells/
@@ -262,6 +287,7 @@ async function runActionPhase(engine, helpers) {
             cardType: cd.cardType,
             level: cd.level || 0,
             typeScore: typePriority[cd.cardType],
+            casterAtk,
           });
         }
       } else {
@@ -270,6 +296,7 @@ async function runActionPhase(engine, helpers) {
           cardType: cd.cardType,
           level: cd.level || 0,
           typeScore: typePriority[cd.cardType],
+          casterAtk,
         });
       }
     }
@@ -333,7 +360,10 @@ async function runActionPhase(engine, helpers) {
   if (MCTS_ENABLED && candidates.length > 0 && !inBonusAction) {
     candidates = await mctsRankCandidates(engine, helpers, candidates);
   } else {
-    candidates.sort((a, b) => (b.level - a.level) || (b.typeScore - a.typeScore));
+    candidates.sort((a, b) =>
+      (b.level - a.level)
+      || (b.typeScore - a.typeScore)
+      || ((b.casterAtk || 0) - (a.casterAtk || 0)));
   }
 
   // Ascension hard-priority: if the CPU has an unfulfilled Ascended Hero
@@ -830,8 +860,12 @@ async function activateCreatureEffects(engine, helpers) {
     const hoptKey = `creature-effect:${pick.instId}`;
     const wasClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
     cpuLog(`      → activate creature effect "${pick.cardName}" hero=${pick.heroIdx} zone=${pick.zoneSlot}`);
+    const pickScript = loadCardEffect(pick.cardName);
+    const pickAlwaysCommit = !!pickScript?.cpuMeta?.alwaysCommit;
+    const pickEvalThroughTurnEnd = !!pickScript?.cpuMeta?.evaluateThroughTurnEnd;
     const committed = await mctsGatedActivation(engine, helpers, `creature-effect ${pick.cardName}`,
-      () => helpers.doActivateCreatureEffect(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneSlot: pick.zoneSlot }));
+      () => helpers.doActivateCreatureEffect(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneSlot: pick.zoneSlot }),
+      { alwaysCommit: pickAlwaysCommit, evaluateThroughTurnEnd: pickEvalThroughTurnEnd });
     const nowClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
     cpuLog(`      ← creature effect "${pick.cardName}" ${committed && nowClaimed ? 'OK' : 'SKIPPED/FAILED'}`);
     if (!committed || (!wasClaimed && !nowClaimed)) tried.add(pick.key);
@@ -898,8 +932,23 @@ async function playArtifacts(engine, helpers) {
     };
     const pickScript = loadCardEffect(pick.cardName);
     const pickIsDrawOnly = !!pickScript?.blockedByHandLock;
+    const pickEvalThroughTurnEnd = !!pickScript?.cpuMeta?.evaluateThroughTurnEnd;
+    const pickAlwaysCommit = !!pickScript?.cpuMeta?.alwaysCommit;
+    // Equipment / Artifact-Creature plays are long-term investments: the
+    // body lands on the board and pays off over many turns. The
+    // immediate-state gate sees only "−gold −1 hand card +30 slot",
+    // which often nets negative — so the CPU has been refusing to
+    // equip even when it has the gold and an eligible hero. Match
+    // the user's intuition by always committing equipment plays once
+    // planArtifactPlay has filtered for an eligible hero+zone.
+    // Use-effect Artifacts (Fire Bomb, Magnetic Glove, …) still go
+    // through the regular score gate.
+    const pickIsEquipment = pick.kind === 'equipment' || pick.kind === 'artifactCreature';
     const committed = await mctsGatedActivation(engine, helpers, `artifact ${pick.cardName}`, actionFn,
-      { alwaysCommit: pickIsDrawOnly });
+      {
+        alwaysCommit: pickIsDrawOnly || pickIsEquipment || pickAlwaysCommit,
+        evaluateThroughTurnEnd: pickEvalThroughTurnEnd,
+      });
     const shrank = ps.hand.length < handLenBefore;
     cpuLog(`      ← artifact "${pick.cardName}" ${committed && shrank ? 'OK' : 'SKIPPED/FAILED'} (hand ${handLenBefore}→${ps.hand.length})`);
     if (!committed || !shrank) tried.add(pick.cardName);
@@ -1080,8 +1129,17 @@ async function playPotions(engine, helpers) {
     };
     const pickScript = loadCardEffect(pick.cardName);
     const pickIsDrawOnly = !!pickScript?.blockedByHandLock;
+    const pickEvalThroughTurnEnd = !!pickScript?.cpuMeta?.evaluateThroughTurnEnd;
+    // Future-trigger / permanent-placing potions (Elixir of Immortality,
+    // any "place this card openly in front of you" effect) opt into
+    // alwaysCommit so the gate doesn't refuse them just because the
+    // immediate post-play eval doesn't see the multi-turn payoff.
+    const pickAlwaysCommit = !!pickScript?.cpuMeta?.alwaysCommit;
     const committed = await mctsGatedActivation(engine, helpers, `potion ${pick.cardName}`, actionFn,
-      { alwaysCommit: pickIsDrawOnly });
+      {
+        alwaysCommit: pickIsDrawOnly || pickAlwaysCommit,
+        evaluateThroughTurnEnd: pickEvalThroughTurnEnd,
+      });
     const shrank = ps.hand.length < handLenBefore;
     cpuLog(`      ← potion "${pick.cardName}" ${committed && shrank ? 'OK' : 'SKIPPED/FAILED'}`);
     if (!committed || !shrank) tried.add(pick.cardName);
@@ -1102,6 +1160,11 @@ function isPotionPlayable(engine, pi, cardName) {
   // Targeted Potions play via doUsePotion → gs.potionTargeting → resolveTargetingPrompt.
   const isTargeted = !!(script.getValidTargets && script.targetingConfig);
   if (!isTargeted && !script.resolve) return false;
+  // First-turn shield: damage / debuff / forced-discard Potions (Bottled
+  // Flame, Bottled Lightning, …) waste their effect under the opponent's
+  // turn-1 immunity. The same gate that filters Spells/Attacks applies.
+  const cd = engine._getCardDB()[cardName];
+  if (cd && !isFirstTurnSafe(engine, pi, cardName, cd)) return false;
   return true;
 }
 
@@ -1382,7 +1445,9 @@ function isFirstTurnSafe(engine, cpuIdx, cardName, cardData) {
   if (gs.firstTurnProtectedPlayer !== oppIdx) return true;
   // Creatures always play — only their effects might fizzle, not their presence.
   if (cardData.cardType === 'Creature') return true;
-  if (cardData.cardType !== 'Attack' && cardData.cardType !== 'Spell') return true;
+  // Abilities, Heroes, Areas, Permanents play freely; only attack-shaped
+  // cards (Spells/Attacks/Potions) can waste damage/debuffs on the shield.
+  if (cardData.cardType !== 'Attack' && cardData.cardType !== 'Spell' && cardData.cardType !== 'Potion') return true;
 
   const script = loadCardEffect(cardName);
   if (script?.firstTurnSafe === true) return true;
@@ -1393,7 +1458,7 @@ function isFirstTurnSafe(engine, cpuIdx, cardName, cardData) {
 
   // Spells with a declared `getValidTargets`: play only if at least one
   // non-enemy target is available (own-side, areas, or no-owner targets).
-  if (script?.getValidTargets) {
+  if (cardData.cardType === 'Spell' && script?.getValidTargets) {
     try {
       const targets = script.getValidTargets(gs, cpuIdx, engine) || [];
       if (targets.length === 0) return true; // Nothing to hit either way; don't block on this.
@@ -1413,9 +1478,25 @@ function isFirstTurnSafe(engine, cpuIdx, cardName, cardData) {
   // verbs and stay safe. Card authors can still force either side via the
   // `firstTurnSafe` flag above — that wins over this heuristic.
   const effect = (cardData.effect || '').toLowerCase();
+  // "deal X damage" / "deals damage" — direct damage Spells.
   if (/\bdeal(s|ing)?\b[^.]*\bdamage\b/.test(effect)) return false;
+  // "takes X damage" / "take damage" — indirect-target damage where the
+  // opponent picks (Chain Lightning, Bottled Lightning), or where status
+  // ticks land on a target. Either way the damage routes through someone
+  // who is shielded turn 1.
+  if (/\btake(s|n)?\b[^.]*\bdamage\b/.test(effect)) return false;
+  // "X damage" without an explicit verb — covers "150 damage to each enemy"
+  // and similar patterns where the verb is implicit.
+  if (/\b\d+\s*damage\b/.test(effect)) return false;
   if (/\bdestroy(s|ed|ing)?\b/.test(effect)) return false;
+  // Status / debuff / disruption verbs. "are Burned", "is Frozen" etc.
+  // need the bare adjectives to match because the card text uses the
+  // status as a state ("All targets that player controls are Burned").
   if (/\b(freeze|frozen|stun|stunned|burn|burned|poison|poisoned|negate|negated|silence|silenced|steal|stole|stolen|discard|mill)\b/.test(effect)) return false;
+  // Cards that explicitly route effects through the opponent's choice
+  // ("your opponent has to choose", "opponent chooses") almost certainly
+  // resolve on opponent-controlled targets — wasted under the shield.
+  if (/your opponent[^.]*\b(choose|choos|pick|select|discard|lose|take)/.test(effect)) return false;
   return true;
 }
 
@@ -2044,14 +2125,27 @@ function mctsEnumerateGenericAlternatives(promptData) {
     }));
   }
   if (type === 'cardGallery') {
-    return (promptData.cards || []).map(c => ({
+    // Sort by `_galleryScore` (stamped by `pickBestGalleryCard` during
+    // the heuristic recon) descending so the first MCTS_MAX_ALTS_PER_BRANCH
+    // variations actually explore the highest-impact cards. Without this,
+    // a 30-card-deck gallery only tested the alphabetically-first 6 and
+    // routinely missed the right pick (the user-reported "Magnetic Glove
+    // tutored another Magnetic Glove" case is exactly this — ascension
+    // pieces and high-impact spells got dropped because they sit later
+    // alphabetically). Cards without a stamped score fall to the back.
+    const cards = (promptData.cards || []).slice();
+    cards.sort((a, b) => (b._galleryScore || -Infinity) - (a._galleryScore || -Infinity));
+    return cards.map(c => ({
       value: { cardName: c.name, source: c.source },
       label: `card=${c.name}`,
     }));
   }
   if (type === 'cardGalleryMulti') {
     // Single-pick variations only (combinatorial explosion otherwise).
-    return (promptData.cards || []).map(c => ({
+    // Same gallery-score ordering as the single-select path above.
+    const cards = (promptData.cards || []).slice();
+    cards.sort((a, b) => (b._galleryScore || -Infinity) - (a._galleryScore || -Infinity));
+    return cards.map(c => ({
       value: { selectedCards: [c.name] },
       label: `pickOne=${c.name}`,
     }));
@@ -2085,6 +2179,100 @@ function installCpuBrain(engine) {
 
   const origTarget = engine._getCpuTargetResponse.bind(engine);
   const origGeneric = engine._getCpuGenericResponse.bind(engine);
+
+  // ── Dynamic-tracking wrappers ────────────────────────────────────────
+  // Captures per-hero / per-creature contribution data on the live game
+  // state so the dynamic valuation has real history to reason about.
+  // Wraps the engine's `runHooks` so we can observe `afterDamage`,
+  // `afterCreatureDamageBatch`, `afterSpellResolved`, `onCardEnterZone`,
+  // and `onTurnEnd` without each card having to opt in. The hooks fire
+  // both during live play AND inside MCTS rollouts; rollout state lives
+  // on the cloned snapshot, so the live hero objects never see rollout
+  // mutations.
+  const origRunHooks = engine.runHooks.bind(engine);
+  engine.runHooks = async function (hookName, hookCtx = {}) {
+    const result = await origRunHooks(hookName, hookCtx);
+    try {
+      if (hookName === 'afterDamage') {
+        // Damage to a single hero target. `hookCtx.amount` is the actual
+        // dealt amount as recorded by the engine before firing the hook.
+        const target = hookCtx.target;
+        const targetSide = target ? engine._findHeroOwner?.(target) : -1;
+        recordDamageDealt(engine, hookCtx.source, hookCtx.amount, targetSide);
+        // Kill attribution — afterDamage fires post-HP-application, so
+        // target.hp <= 0 here means this damage event killed the hero.
+        // Credit the source so later target valuation knows who's been
+        // dropping enemy heroes.
+        if (target && target.hp !== undefined && target.hp <= 0
+            && targetSide != null && targetSide >= 0) {
+          recordKill(engine, hookCtx.source, 'hero', targetSide);
+        }
+      } else if (hookName === 'afterCreatureDamageBatch') {
+        // Each entry already carries the actual amount (`actualAmount`)
+        // after all clamps & shields. Fall back to `amount` if the
+        // batch handler didn't expose it explicitly — keeps tracking
+        // alive even if the engine's internal field name evolves.
+        const entries = hookCtx.entries || [];
+        for (const e of entries) {
+          const dealt = e.actualAmount != null ? e.actualAmount : (e.amount || 0);
+          if (!(dealt > 0)) continue;
+          recordDamageDealt(engine, e.source, dealt, e.inst?.owner);
+          // Creature kill attribution. `currentHp` already reflects
+          // the post-damage value at this hook fire.
+          if (e.inst && (e.inst.counters?.currentHp ?? 1) <= 0) {
+            recordKill(engine, e.source, 'creature', e.inst.owner);
+          }
+        }
+      } else if (hookName === 'afterSpellResolved') {
+        recordSpellCast(engine, hookCtx.casterIdx, hookCtx.heroIdx, hookCtx.spellCardData);
+      } else if (hookName === 'onCardEnterZone') {
+        const enteringCard = hookCtx.enteringCard;
+        const toZone = hookCtx.toZone;
+        if (enteringCard && toZone === 'support') {
+          const cd = engine._getCardDB()[enteringCard.name];
+          if (cd && cd.cardType === 'Creature') {
+            const owner = enteringCard.controller ?? enteringCard.owner;
+            const hi = enteringCard.heroIdx;
+            const hero = (owner != null && hi != null && hi >= 0)
+              ? engine.gs?.players?.[owner]?.heroes?.[hi]
+              : null;
+            if (hero?.name) {
+              const stats = ensureHeroCpuStats(hero);
+              stats.lastSummonTurn = engine.gs.turn;
+              stats.summonsThisGame++;
+            }
+            const cstats = ensureCreatureCpuStats(enteringCard);
+            if (cstats) cstats.summonedOnTurn = engine.gs.turn;
+          }
+        }
+      } else if (hookName === 'onTurnEnd') {
+        rolloverPerTurnStats(engine);
+        // Snapshot the active player's end-of-turn gold for the
+        // hoarder/spender history used by mctsOpponentGoldEconomy.
+        recordEndOfTurnGold(engine);
+      } else if (hookName === 'onDraw') {
+        // Active player got a card. We don't have per-hero attribution
+        // for most draws, so credit the active player's heroes weighted
+        // by their declared `supportYield.drawsPerTurn` if any. When no
+        // hero declares a draw yield, skip — the draw came from a
+        // generic source (Resource Phase, Trade, …) we can't attribute.
+        const ap = engine.gs?.activePlayer;
+        const ps = ap != null ? engine.gs.players[ap] : null;
+        if (ps) attributeAggregateValue(engine, ap, 'draw', 1);
+      } else if (hookName === 'onResourceGain') {
+        // Gold gained — attribute proportionally to gold-yielding heroes.
+        const ap = hookCtx.playerIdx;
+        const amount = hookCtx.amount;
+        if (ap != null && amount > 0) {
+          attributeAggregateValue(engine, ap, 'gold', amount);
+        }
+      }
+    } catch (err) {
+      // Tracking must never break the hook chain — it's a side observer.
+      cpuLog(`  [tracking] ${hookName} hook observer threw:`, err.message);
+    }
+    return result;
+  };
 
   // Slow down CPU prompt responses so the human can see each decision. We
   // override promptGeneric / promptEffectTarget to replace the engine's
@@ -2525,39 +2713,54 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     return { optionId: options[options.length - 1].id };
   }
 
-  // Card-gallery prompts (deck searches, tutors, ascension bonuses). MCTS
-  // handles the picks via `mctsBuildVariationsFromRecord` — the recon
-  // uses a random initial choice, then variations re-run with alternatives
-  // and the highest-scoring pick wins. This heuristic was removed in
-  // favor of letting the evaluator's synergy terms (OHS / Howitzer value)
-  // drive the decision through actual rollouts.
+  // Blind-hand-pick prompts — Thieving Strike, Loot the Leftovers, any
+  // "steal N face-down cards from your opponent's hand" effect. The
+  // engine's default declines cancellable prompts (Thieving Strike's
+  // post-hit prompt is cancellable, so the steal silently fizzled),
+  // and falls through to a generic `return true` for non-cancellable
+  // ones (Loot the Leftovers — `prompt = true` has no
+  // `selectedIndices`, so the steal validates to an empty list and
+  // returns `{ stolen: [] }`). Both paths drop the entire steal.
+  // Always pick: random distinct indices, capped at maxSelect /
+  // oppHandCount. The pick is genuinely blind by card spec — we
+  // deliberately don't peek at opponent's hand.
+  if (type === 'blindHandPick') {
+    const oppHandCount = promptData.oppHandCount || 0;
+    const maxSelect = Math.max(1, promptData.maxSelect || 1);
+    if (oppHandCount === 0) return { selectedIndices: [] };
+    const pool = Array.from({ length: oppHandCount }, (_, i) => i);
+    const picked = [];
+    const n = Math.min(maxSelect, oppHandCount);
+    for (let i = 0; i < n; i++) {
+      const r = Math.floor(Math.random() * pool.length);
+      picked.push(pool[r]);
+      pool.splice(r, 1);
+    }
+    return { selectedIndices: picked };
+  }
+
+  // Card-gallery prompts (deck searches, tutors, ascension bonuses).
+  // The user-reported case: Magnetic Glove tutored another Magnetic
+  // Glove because the heuristic picked the gallery's first random
+  // card and the variation cap (6 alts) only explored alphabetically-
+  // first alternatives. Score every gallery card by
+  // `estimateHandCardValueFor` (same valuation `evaluateState` uses
+  // for hand-value scoring) and pick the highest-scoring — duplicates
+  // of cards already in hand drop to half value, ascension-critical
+  // cards floor at 80, unaffordable cards drop to 5, etc. MCTS still
+  // overrides via `mctsBuildVariationsFromRecord` (which now also
+  // sorts alts by this score), so the heuristic only seeds the recon
+  // with a sensible pick — variations still test alternatives.
   if (type === 'cardGallery') {
     const cards = promptData.cards || [];
     if (!cards.length) return null;
-    // Ascension priority: if any gallery card progresses an unfulfilled
-    // Ascension (Magnetic Glove searching for Arthor's Sword, Brilliant
-    // Idea tutoring a Spell of Beato's missing school, Layn's Hammer,
-    // etc.), seed the heuristic with that pick. MCTS variations still
-    // test other options; if the Ascension pick scores worse in a
-    // rollout, MCTS will override this default.
-    if (playerHasUnfulfilledAscension(engine, cpuIdx)) {
-      const cardDB = engine._getCardDB();
-      const ascCards = cards.filter(c => {
-        const cd = cardDB[c.name];
-        return !!cd && cardIsAscensionCriticalForAnyHero(engine, cpuIdx, c.name, cd);
-      });
-      if (ascCards.length > 0) {
-        const c = ascCards[Math.floor(Math.random() * ascCards.length)];
-        return { cardName: c.name, source: c.source };
-      }
-    }
-    const c = cards[Math.floor(Math.random() * cards.length)];
+    const c = pickBestGalleryCard(engine, cpuIdx, cards);
     return { cardName: c.name, source: c.source };
   }
   if (type === 'cardGalleryMulti') {
     const cards = promptData.cards || [];
     if (!cards.length) return { selectedCards: [] };
-    const c = cards[Math.floor(Math.random() * cards.length)];
+    const c = pickBestGalleryCard(engine, cpuIdx, cards);
     return { selectedCards: [c.name] };
   }
   // Card-name picker — the prompt Luck raises on activation. Engine default
@@ -2695,7 +2898,30 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   if (type === 'forceDiscard' || type === 'forceDiscardCancellable') {
     const ps = engine.gs.players[cpuIdx];
     if (!ps?.hand?.length) return null;
-    const eligible = promptData.eligibleIndices || ps.hand.map((_, i) => i);
+    let eligible = promptData.eligibleIndices || ps.hand.map((_, i) => i);
+    // Defensive resolving-card exclusion. When a script prompts for a
+    // forced discard / delete during its own resolve and forgets to
+    // pass eligibleIndices, the prompt accepts ANY hand card —
+    // including the still-in-hand resolving card itself. The CPU's
+    // discard scorer would then happily nominate Wheels itself as
+    // a "delete 2" target. Strip the resolving card here so the
+    // brain never picks the in-flight card even if the script
+    // didn't filter it. Scripts should still pass eligibleIndices
+    // explicitly for correctness against the human player too.
+    if (ps._resolvingCard) {
+      const { name: rname, nth } = ps._resolvingCard;
+      let count = 0;
+      let resolvingIdx = -1;
+      for (let i = 0; i < ps.hand.length; i++) {
+        if (ps.hand[i] !== rname) continue;
+        count++;
+        if (count === (nth || 1)) { resolvingIdx = i; break; }
+      }
+      if (resolvingIdx >= 0) {
+        const filtered = eligible.filter(i => i !== resolvingIdx);
+        if (filtered.length > 0) eligible = filtered;
+      }
+    }
     if (!eligible.length) return null;
     const cardDB = engine._getCardDB();
     const baseScore = (() => {
@@ -2860,90 +3086,78 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect) {
   // prompts, which cancels the spell and leaves the card in hand.
   const viable = enemyTargets.filter(t => !isTargetImmune(engine, t));
   if (viable.length === 0) return [];
-  // Partition enemy targets. Immortal doesn't prevent damage — it only caps
-  // the target at 1 HP (prevents death). So:
-  //   • HP > damage (non-lethal chip): normal priority regardless of Immortal.
-  //   • HP ≤ damage (would-be lethal): Immortal demotes lethal → bigHero
-  //     (still deals hp-1 of chip, which is usually decent).
-  //   • HP == 1 and Immortal: the Immortal cap zeroes effective damage —
-  //     skip entirely when damage > 0 (the attack is wasted).
-  const lethalHero = [];
-  const bigHero = [];
-  const otherHero = [];
-  const killableCreature = [];
-  const unkillableCreature = [];
 
-  for (const t of viable) {
+  // Score each viable target by *expected value of the hit*, combining:
+  //   • the unit's dynamic value (hero: spell history, recent damage,
+  //     redundancy, summoner state, atk; creature: level, recent
+  //     contribution, on-death-fuel discount)
+  //   • the actual damage that will land (capped by HP — we don't reward
+  //     overkill on a 40 HP creature)
+  //   • a kill-shot bonus that scales with the unit's value (lethal on a
+  //     deadweight creature is still much less valuable than lethal on
+  //     the team's main carry)
+  // This replaces the old fixed-tier weighted random — the "300 damage
+  // wasted on a 40 HP creature" symptom comes directly from that tier
+  // system not knowing how much the creature was actually worth.
+  const teamMaxSchoolLvls = {};
+  const teamMax = (oppIdx) => {
+    if (teamMaxSchoolLvls[oppIdx] == null) teamMaxSchoolLvls[oppIdx] = mctsTeamMaxSchoolLvl(gs, oppIdx);
+    return teamMaxSchoolLvls[oppIdx];
+  };
+  const scoreTarget = (t) => {
     if (t.type === 'hero') {
       const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
-      if (!h || h.hp <= 0) continue;
+      if (!h || h.hp <= 0) return -Infinity;
       const immortal = !!h.buffs?.immortal;
-      if (immortal && h.hp <= 1 && damage > 0) continue; // damage → 0, wasted
-      if (damage >= h.hp) {
-        if (immortal) bigHero.push(t); // cap-to-1: still meaningful chip
-        else lethalHero.push(t);
-      } else if (damage >= h.hp * 0.5) {
-        bigHero.push(t);
-      } else {
-        otherHero.push(t);
-      }
-    } else if (t.type === 'creature' || t.type === 'equip') {
+      if (immortal && h.hp <= 1 && damage > 0) return -Infinity; // wasted
+      const value = mctsEnemyHeroDynamicValue(engine, t.owner, t.heroIdx, teamMax(t.owner));
+      const effDamage = Math.min(damage, immortal ? Math.max(0, h.hp - 1) : h.hp);
+      const lethal = !immortal && damage > 0 && damage >= h.hp;
+      // Kill-shot reward scales with hero value — lethal on a 1.0× hero
+      // is OK, lethal on a 3.0× carry is nearly always the right pick.
+      const killBonus = lethal ? 250 * value : 0;
+      // Low-HP focus tiebreaker: small bonus for hitting a hero already
+      // close to dying (consistent focus-fire across turns).
+      const focusBonus = Math.max(0, 40 - h.hp * 0.3);
+      return effDamage * value + killBonus + focusBonus;
+    }
+    if (t.type === 'creature' || t.type === 'equip') {
       const inst = t.cardInstance || findSupportInstance(engine, t);
       const hp = creatureCurrentHp(engine, inst, t);
-      if (hp == null) { otherHero.push(t); continue; } // unknown — treat as fallback
+      if (hp == null) return 0;
       const immortal = !!inst?.counters?.buffs?.immortal;
-      if (immortal && hp <= 1 && damage > 0) continue;
-      if (damage >= hp) {
-        if (immortal) unkillableCreature.push(t); // can't kill; demote
-        else killableCreature.push(t);
-      } else {
-        unkillableCreature.push(t);
-      }
-    } else {
-      otherHero.push(t);
+      if (immortal && hp <= 1 && damage > 0) return -Infinity;
+      const value = mctsEnemyCreatureValue(engine, inst);
+      const effDamage = Math.min(damage, immortal ? Math.max(0, hp - 1) : hp);
+      const killable = !immortal && damage > 0 && damage >= hp;
+      const killBonus = killable ? 80 * value : 0;
+      // Creatures generally rank below heroes — same effective damage on
+      // an equally-valued creature should not beat an equally-valued
+      // hero. The kill-shot multiplier is also smaller (80 vs 250).
+      return effDamage * value + killBonus - 30;
     }
-  }
+    return 0;
+  };
+
+  const scored = viable.map(t => ({ t, s: scoreTarget(t) }))
+    .filter(x => x.s > -Infinity)
+    .sort((a, b) => b.s - a.s);
+  if (scored.length === 0) return [];
 
   // ── Multi-target path (maxSelect > 1) ──
-  // Pyroblast-style "hit up to N targets" prompts: greedy-fill from best
-  // tier to worst, capped at maxSelect. No random tier-mixing — damage
-  // spells always want their best targets first when choosing multiple.
+  // Pyroblast-style "hit up to N targets" prompts: greedy-fill from
+  // best to worst by score.
   if (maxSelect > 1) {
-    const picks = [];
-    const takeFrom = (list) => {
-      if (!list.length) return;
-      const shuffled = shuffle(list);
-      for (const t of shuffled) {
-        if (picks.length >= maxSelect) return;
-        picks.push(t);
-      }
-    };
-    takeFrom(lethalHero);
-    takeFrom(bigHero);
-    takeFrom(killableCreature);
-    takeFrom(otherHero);
-    takeFrom(unkillableCreature);
-    return picks;
+    return scored.slice(0, maxSelect).map(x => x.t);
   }
 
-  if (lethalHero.length) {
-    return [randomOf(lethalHero)];
-  }
-  const roll = Math.random();
-  const tiers = [];
-  if (bigHero.length) tiers.push({ weight: 0.60, list: bigHero });
-  if (killableCreature.length) tiers.push({ weight: 0.30, list: killableCreature });
-  if (unkillableCreature.length) tiers.push({ weight: 0.10, list: unkillableCreature });
-  if (otherHero.length) tiers.push({ weight: 0.60, list: otherHero }); // small-damage hero as hero-tier
-
-  if (tiers.length === 0) return [];
-  const totalW = tiers.reduce((s, t) => s + t.weight, 0);
-  let acc = 0;
-  for (const tier of tiers) {
-    acc += tier.weight / totalW;
-    if (roll <= acc) return [randomOf(tier.list)].filter(Boolean).map(x => x);
-  }
-  return [randomOf(tiers[tiers.length - 1].list)];
+  // Single-target: pick the best score. Random tiebreak among targets
+  // within ~3% of the top score so the CPU isn't perfectly predictable
+  // and so that ties (e.g. equally valued heroes) are spread fairly.
+  const top = scored[0].s;
+  const epsilon = Math.max(1, Math.abs(top) * 0.03);
+  const tied = scored.filter(x => x.s >= top - epsilon).map(x => x.t);
+  return [randomOf(tied)];
 }
 
 // ─── Ally targeting ───────────────────────────────────────────────────
@@ -3309,12 +3523,644 @@ const MCTS_UCB1_TOTAL_PULLS = 80;
 // UCB1 exploration constant. √2 is the textbook default. Higher = more
 // exploration (visit undervisited arms), lower = more exploitation.
 const MCTS_UCB1_EXPLORE_C = 1.414;
+// ─── Adaptive extension phase ──────────────────────────────────────────
+// When the regular UCB1 phase ends with the top arms still clustered
+// inside the noise band, spend up to MCTS_EXT_PULLS_MAX extra rollouts
+// re-pulling ONLY those clustered arms (round-robin by lowest visits)
+// so the cluster either resolves to a clear winner or gets averaged
+// flat. Prevents the "noise picks the loser" failure mode where a
+// genuinely-better arm is within 1-2 points of the runner-up after
+// the standard pulls and stable-sort decides via input order. Capped
+// so a perpetually-tied cluster doesn't bleed wall-clock on
+// diminishing-returns resampling — once the cap is hit, the
+// deterministic tiebreaker (e.g. casterAtk for Attack candidates)
+// takes over.
+const MCTS_EXT_PULLS_MAX = 60;
+// Noise band for cluster detection. Same shape as the final-sort
+// epsilon — max(absolute, percentage) of the top arm's avg. Arms
+// within this band of the leader are considered "clustered" and
+// eligible for extension pulls.
+const MCTS_EXT_EPSILON_ABS = 3;
+const MCTS_EXT_EPSILON_PCT = 0.01;
 // Late-game bypass: past this turn count, skip MCTS and fall through to the
 // heuristic sort / direct activation. Normal games end well under turn 50;
 // matches that pass turn 80 are almost always attritional stalls (Heal Burn
 // vs Lightning Caller, etc.) where MCTS's snapshot storm outruns GC before
 // its marginal decision quality gets to matter.
 const MCTS_LATE_GAME_TURN_THRESHOLD = 80;
+
+// ═══════════════════════════════════════════════════════════════════════
+//  DYNAMIC HERO / CREATURE TRACKING
+//  Captures HOW each unit has been used so far this game (spells cast,
+//  damage dealt, summon cadence, value generated last turn). Wired in
+//  via `installCpuBrain` which wraps `engine.runHooks` to capture the
+//  relevant signals as the engine fires its existing hook events. Lives
+//  on `hero._cpuStats` and `inst.counters._cpuStats` so engine.snapshot/
+//  restore preserves it across MCTS rollouts (rollouts can mutate the
+//  cloned copies; the live values resume after restore).
+// ═══════════════════════════════════════════════════════════════════════
+
+function ensureHeroCpuStats(hero) {
+  if (!hero) return null;
+  if (!hero._cpuStats) {
+    hero._cpuStats = {
+      spellsCast: 0,
+      spellLevelsTotal: 0,
+      attackDamageThisTurn: 0,
+      attackDamageLastTurn: 0,
+      attackDamageTotal: 0,
+      // Kill counters — incremented when this hero's damage drops a
+      // target to 0. `heroKills` is the strongest carry signal we
+      // track; `creatureKills` is the secondary cleaner signal. These
+      // are cumulative for the whole game so a hero who killed the
+      // opponent's main carry on turn 5 is still flagged as high-value
+      // on turn 12 even after several quiet turns.
+      heroKills: 0,
+      creatureKills: 0,
+      // Aggregated "value generated" per turn — damage / draws caused / gold
+      // earned attributed to this hero. Used by the dynamic valuation to
+      // tell apart a deadweight hero from one that produced real swing
+      // on the previous turn.
+      valueThisTurn: 0,
+      valueLastTurn: 0,
+      lastSummonTurn: -1,
+      summonsThisGame: 0,
+    };
+  }
+  return hero._cpuStats;
+}
+
+function ensureCreatureCpuStats(inst) {
+  if (!inst) return null;
+  if (!inst.counters) inst.counters = {};
+  if (!inst.counters._cpuStats) {
+    inst.counters._cpuStats = {
+      damageThisTurn: 0,
+      damageLastTurn: 0,
+      valueThisTurn: 0,
+      valueLastTurn: 0,
+      summonedOnTurn: null,
+    };
+  }
+  return inst.counters._cpuStats;
+}
+
+/**
+ * Roll over current-turn deltas into "last turn" fields. Called when the
+ * engine fires `onTurnEnd` so the next eval pass sees deltas for the
+ * turn that just finished, not for an arbitrary mid-turn slice.
+ */
+function rolloverPerTurnStats(engine) {
+  const gs = engine.gs;
+  if (!gs?.players) return;
+  for (const ps of gs.players) {
+    for (const h of (ps.heroes || [])) {
+      const s = h?._cpuStats;
+      if (!s) continue;
+      s.attackDamageLastTurn = s.attackDamageThisTurn;
+      s.attackDamageThisTurn = 0;
+      s.valueLastTurn = s.valueThisTurn;
+      s.valueThisTurn = 0;
+    }
+  }
+  for (const inst of (engine.cardInstances || [])) {
+    const s = inst.counters?._cpuStats;
+    if (!s) continue;
+    s.damageLastTurn = s.damageThisTurn;
+    s.damageThisTurn = 0;
+    s.valueLastTurn = s.valueThisTurn;
+    s.valueThisTurn = 0;
+  }
+}
+
+/**
+ * Attribute `dealt` damage to source's hero/creature. Source object comes
+ * from actionDealDamage / actionDealCreatureDamage — fields used:
+ *   • source.owner / source.controller — player index of the source
+ *   • source.heroIdx — hero index when the source is hero/ability/equip
+ *   • source.id + source.zone === 'support' — when source is a creature
+ *     instance, attribute to the creature too
+ * `targetSide` is the player index whose unit took the hit, so we can
+ * skip self-damage (Fire Bolts recoil) which we don't want counted.
+ */
+function recordDamageDealt(engine, source, dealt, targetSide) {
+  if (!dealt || dealt <= 0) return;
+  if (!source) return;
+  const srcOwner = source.owner ?? source.controller ?? -1;
+  if (srcOwner < 0) return;
+  if (targetSide === srcOwner) return; // own-side damage doesn't count as offense
+
+  // Source is a creature instance on the support zone — credit goes to the
+  // creature itself (the host hero shouldn't double-collect for what its
+  // creature did). Tracked instances always carry an `id` plus a zone of
+  // 'support', so this check is a clean "is this a tracked CardInstance?".
+  const isCreatureSource = source.id != null && source.zone === 'support';
+  if (isCreatureSource) {
+    const stats = ensureCreatureCpuStats(source);
+    if (stats) {
+      stats.damageThisTurn += dealt;
+      stats.valueThisTurn += dealt * 0.5;
+    }
+    return;
+  }
+
+  // Hero-initiated damage (own Spell/Attack/Hero-Effect/Equip-Effect with
+  // hero attribution). `srcHi` is the casting hero; credit damage there.
+  const srcHi = source.heroIdx;
+  const hero = (srcHi != null && srcHi >= 0)
+    ? engine.gs.players[srcOwner]?.heroes?.[srcHi]
+    : null;
+  if (hero?.name) {
+    const stats = ensureHeroCpuStats(hero);
+    stats.attackDamageThisTurn += dealt;
+    stats.attackDamageTotal += dealt;
+    stats.valueThisTurn += dealt * 0.5;
+  }
+}
+
+/**
+ * Attribute a spell cast to its caster hero. Called from the wrapper
+ * around `runHooks('afterSpellResolved', ctx)` — `ctx.casterIdx` and
+ * `ctx.heroIdx` identify the caster, and `ctx.spellCardData.level`
+ * gives the spell's level. We skip Attack-card "spells" (those use the
+ * same hook path but aren't really Spells the user reasons about).
+ */
+/**
+ * Attribute a kill to its source hero. Called from the runHooks
+ * observer right after `afterDamage` / `afterCreatureDamageBatch`
+ * detects that the damaged target is now at 0 HP. Mirrors the
+ * `recordDamageDealt` attribution logic — credit goes to the
+ * casting hero, NOT the attacking creature's host. `kind` is
+ * 'hero' or 'creature'; the dynamic value formula weights hero
+ * kills more heavily because they're a larger swing event.
+ */
+function recordKill(engine, source, kind, targetSide) {
+  if (!source) return;
+  const srcOwner = source.owner ?? source.controller ?? -1;
+  if (srcOwner < 0) return;
+  if (targetSide === srcOwner) return; // own-side kill (shouldn't happen normally)
+  // Creature-instance source — kills attributed to the creature, not
+  // the hero hosting it. Currently no-op (creature stats don't track
+  // kills); kept here so the structure mirrors recordDamageDealt and
+  // can be extended later if "creature that wiped out a hero" turns
+  // out to be a useful signal.
+  const isCreatureSource = source.id != null && source.zone === 'support';
+  if (isCreatureSource) return;
+  const srcHi = source.heroIdx;
+  if (srcHi == null || srcHi < 0) return;
+  const hero = engine.gs.players[srcOwner]?.heroes?.[srcHi];
+  if (!hero?.name) return;
+  const stats = ensureHeroCpuStats(hero);
+  if (kind === 'hero') stats.heroKills++;
+  else if (kind === 'creature') stats.creatureKills++;
+}
+
+function recordSpellCast(engine, casterIdx, heroIdx, spellCardData) {
+  if (casterIdx == null || casterIdx < 0) return;
+  if (heroIdx == null || heroIdx < 0) return;
+  if (!spellCardData) return;
+  if (spellCardData.cardType !== 'Spell') return;
+  const hero = engine.gs.players[casterIdx]?.heroes?.[heroIdx];
+  if (!hero?.name) return;
+  const stats = ensureHeroCpuStats(hero);
+  stats.spellsCast++;
+  stats.spellLevelsTotal += (spellCardData.level || 0);
+  // Casting spells generates "value" — fold the level into the per-turn
+  // accumulator so a hero that just cast a Lv5 spell registers as more
+  // valuable than one that just cast a Lv1.
+  stats.valueThisTurn += (spellCardData.level || 0) * 8;
+}
+
+/**
+ * Fold a draws/gold gain at the player level into per-hero "value
+ * generated" buckets. We don't have per-hero attribution for these
+ * generic sources, so the accumulator is split across the player's
+ * draw/gold-yielding heroes weighted by their declared supportYield.
+ * When no hero declares a yield, the value is dropped (we can't tell
+ * who deserves it). `kind` is 'draw' (1 unit each) or 'gold' (per gold).
+ */
+function attributeAggregateValue(engine, pi, kind, amount) {
+  if (!amount || amount <= 0) return;
+  const ps = engine.gs.players[pi];
+  if (!ps) return;
+  // Weights: draw worth 15 value-units, gold worth 2 value-units each.
+  // Roughly comparable to how the existing evaluator weights each
+  // resource (avg card ~15 score, gold-on-demand ~2× gold).
+  const valuePerUnit = kind === 'gold' ? 2 : kind === 'draw' ? 15 : 0;
+  if (valuePerUnit <= 0) return;
+  const totalValue = amount * valuePerUnit;
+
+  const yields = [];
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    const ctx = { engine, pi, hi, cpuIdx: engine._cpuPlayerIdx };
+    let drawWeight = 0, goldWeight = 0;
+    const apply = (y) => {
+      if (!y) return;
+      drawWeight += (y.drawsPerTurn || 0) + (y.potionDrawsPerTurn || 0) * 3;
+      goldWeight += y.goldPerTurn || 0;
+    };
+    const heroScript = loadCardEffect(hero.name);
+    if (typeof heroScript?.supportYield === 'function') {
+      try { apply(heroScript.supportYield(ctx)); } catch {}
+    }
+    const abZones = ps.abilityZones?.[hi] || [];
+    for (const slot of abZones) {
+      if (!slot || slot.length === 0) continue;
+      const abScript = loadCardEffect(slot[0]);
+      if (typeof abScript?.supportYield !== 'function') continue;
+      try { apply(abScript.supportYield(slot.length, ctx)); } catch {}
+    }
+    const w = kind === 'gold' ? goldWeight : drawWeight;
+    if (w > 0) yields.push({ hi, w });
+  }
+  if (yields.length === 0) return;
+  const totalW = yields.reduce((s, y) => s + y.w, 0);
+  if (!(totalW > 0)) return;
+  for (const y of yields) {
+    const share = (y.w / totalW) * totalValue;
+    const hero = ps.heroes[y.hi];
+    if (!hero) continue;
+    const stats = ensureHeroCpuStats(hero);
+    stats.valueThisTurn += share;
+  }
+}
+
+// ─── Dynamic valuation ────────────────────────────────────────────────
+// Builds on the existing static threat (atk, school level, supportYield)
+// by layering in the live game history captured above. Used to weight
+// enemy HP in the evaluator and to score targets when the CPU picks
+// who to damage with an offensive Spell/Attack/Potion.
+
+const SPELL_SCHOOL_ROLE_TAG_PREFIX = 'caster:';
+
+/**
+ * Tag the role(s) this hero fills for redundancy detection. A hero
+ * tagged "caster:Destruction Magic" duplicates another caster of the
+ * same school; "supporter" duplicates any draw/gold engine; etc.
+ */
+function mctsHeroRoleTags(engine, oppIdx, hi) {
+  const tags = new Set();
+  const gs = engine.gs;
+  const ps = gs.players[oppIdx];
+  const hero = ps?.heroes?.[hi];
+  if (!hero?.name) return tags;
+
+  // Schools the hero can cast at level ≥ 1 — anything castable counts as
+  // "caster-of-school" because the user explicitly mentioned that another
+  // hero "capable of casting Spells of the same or even higher levels"
+  // makes the original caster redundant.
+  const abZones = ps.abilityZones?.[hi] || [];
+  const schoolLevels = {};
+  for (const slot of abZones) {
+    if (!slot || slot.length === 0) continue;
+    if (SPELL_SCHOOL_ABILITIES.has(slot[0])) {
+      schoolLevels[slot[0]] = Math.max(schoolLevels[slot[0]] || 0, slot.length);
+    }
+  }
+  for (const sc of Object.keys(schoolLevels)) {
+    tags.add(SPELL_SCHOOL_ROLE_TAG_PREFIX + sc);
+  }
+  if (schoolLevels['Summoning Magic']) tags.add('summoner');
+
+  const { supportUnits, damagePerTurn } = mctsHeroSupportDetails(engine, oppIdx, hi);
+  if (supportUnits >= 1) tags.add('supporter');
+  if (damagePerTurn > 0) tags.add('damage_supporter');
+  if ((hero.atk || 0) >= 130) tags.add('attacker');
+
+  // Game-history-derived tags.
+  const stats = hero._cpuStats;
+  if (stats && stats.spellsCast >= 2) tags.add('active_caster');
+  if (stats && (stats.attackDamageLastTurn || 0) >= 60) tags.add('active_attacker');
+
+  return tags;
+}
+
+/**
+ * Schools where another LIVING hero can match or exceed this hero's
+ * spell-school level. When the user's spec says "their other hero can
+ * cast the same or higher Spells", picking off this hero is a softer
+ * blow than killing the team's only carry of that school.
+ */
+function mctsCasterIsCovered(engine, oppIdx, hi) {
+  const ps = engine.gs.players[oppIdx];
+  const hero = ps?.heroes?.[hi];
+  if (!hero?.name) return false;
+  const myAbZones = ps.abilityZones?.[hi] || [];
+  const mySchoolLevels = {};
+  for (const slot of myAbZones) {
+    if (!slot || slot.length === 0) continue;
+    if (SPELL_SCHOOL_ABILITIES.has(slot[0])) {
+      mySchoolLevels[slot[0]] = Math.max(mySchoolLevels[slot[0]] || 0, slot.length);
+    }
+  }
+  if (Object.keys(mySchoolLevels).length === 0) return false;
+
+  for (let other = 0; other < (ps.heroes || []).length; other++) {
+    if (other === hi) continue;
+    const oh = ps.heroes[other];
+    if (!oh?.name || oh.hp <= 0) continue;
+    const oZones = ps.abilityZones?.[other] || [];
+    for (const slot of oZones) {
+      if (!slot || slot.length === 0) continue;
+      if (!SPELL_SCHOOL_ABILITIES.has(slot[0])) continue;
+      // Same school + matching/higher level = full coverage of that school.
+      if (mySchoolLevels[slot[0]] != null && slot.length >= mySchoolLevels[slot[0]]) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Discount (in threat units) for redundancy with same-side teammates.
+ * Each living teammate that shares a role tag adds up to ~0.5 of
+ * discount, capped at 1.0 total. Using a per-tag overlap check rather
+ * than counting tag intersections directly keeps the discount sensible
+ * even when one teammate fills multiple of the same roles.
+ */
+function mctsRoleRedundancyDiscount(engine, oppIdx, hi) {
+  const ps = engine.gs.players[oppIdx];
+  if (!ps) return 0;
+  const myTags = mctsHeroRoleTags(engine, oppIdx, hi);
+  if (myTags.size === 0) return 0;
+  let overlapCount = 0;
+  for (let other = 0; other < (ps.heroes || []).length; other++) {
+    if (other === hi) continue;
+    const oh = ps.heroes[other];
+    if (!oh?.name || oh.hp <= 0) continue;
+    const otherTags = mctsHeroRoleTags(engine, oppIdx, other);
+    for (const tag of myTags) {
+      if (otherTags.has(tag)) {
+        overlapCount++;
+        break;
+      }
+    }
+  }
+  return Math.min(1.0, overlapCount * 0.5);
+}
+
+/**
+ * Combined dynamic threat multiplier for enemy hero `hi`. Replaces the
+ * raw mctsEnemyHeroThreat call inside the evaluator so target-selection
+ * follows the same scoring as state evaluation. Returns a multiplier on
+ * the hero's HP — higher means hitting them hurts the opponent more.
+ *
+ * The static base (school presence, supportYield, atk) lives in the
+ * existing mctsEnemyHeroThreat. This function layers on:
+ *   + 0.4 × avg spell level cast (heavy spellcaster signal)
+ *   + 0.05 × spells cast  (frequency)
+ *   + ≤ 2.0 from attackDamageLastTurn (recent damage output)
+ *   + ≤ 2.0 from cumulative attackDamageTotal (sustained-attacker
+ *     signal — captures a carry who's quiet THIS turn but has been
+ *     hammering the CPU all game)
+ *   + ≤ 2.5 from heroKills, ≤ 1.0 from creatureKills (impact —
+ *     a hero who has actually KO'd one of our pieces is the priority
+ *     remove regardless of last-turn activity)
+ *   + ≤ 1.0 from non-creature support cards equipped on this hero
+ *     (Swords, equipment artifacts, etc. — a kitted-up hero is more
+ *     dangerous than a vanilla body)
+ *   + ≤ 1.5 from valueLastTurn (recent broad-sense value)
+ *   - up to 0.6 if a summoner has all support zones full AND didn't
+ *     summon last turn (their effect is parked for now)
+ *   - up to 1.0 from same-role redundancy with living teammates
+ *   - up to 0.6 if another teammate already covers their highest school
+ */
+function mctsEnemyHeroDynamicValue(engine, oppIdx, hi, teamMaxSchoolLvl) {
+  const gs = engine.gs;
+  const ps = gs.players[oppIdx];
+  const hero = ps?.heroes?.[hi];
+  if (!hero?.name || hero.hp <= 0) return 1.0;
+
+  let value = mctsEnemyHeroThreat(engine, oppIdx, hi, teamMaxSchoolLvl);
+  const stats = hero._cpuStats || null;
+
+  if (stats) {
+    if (stats.spellsCast > 0) {
+      const avgLvl = stats.spellLevelsTotal / stats.spellsCast;
+      value += 0.4 * avgLvl + 0.05 * Math.min(stats.spellsCast, 6);
+    }
+    const recentDmg = stats.attackDamageLastTurn || 0;
+    if (recentDmg > 0) value += Math.min(2.0, recentDmg / 100);
+    // Cumulative damage — sustained carry signal. A hero who's dealt
+    // 700+ damage over the game stays a high-priority target even on
+    // a quiet turn where they happened not to attack. Using a square-
+    // root-ish ramp so the first 200 damage matters proportionally
+    // more than the next 500 (diminishing returns).
+    const totalDmg = stats.attackDamageTotal || 0;
+    if (totalDmg > 0) value += Math.min(2.0, Math.sqrt(totalDmg) / 14);
+    // Kill history. Hero kills swing the game far harder than
+    // creature kills, so weighted asymmetrically.
+    if ((stats.heroKills || 0) > 0) value += Math.min(2.5, stats.heroKills * 1.0);
+    if ((stats.creatureKills || 0) > 0) value += Math.min(1.0, stats.creatureKills * 0.25);
+    const recentValue = stats.valueLastTurn || 0;
+    if (recentValue > 0) value += Math.min(1.5, recentValue * 0.005);
+  }
+
+  // Equipment / kit bonus. Counts non-Creature cards in the hero's
+  // own support zones — Swords, weapon artifacts, attachments. An
+  // equipped hero with even one weapon is a notably bigger threat
+  // than the same hero with nothing on them. Equipment-Creatures
+  // (Pollution Spewer-style hybrids) and pure Creatures don't count
+  // here — they're tracked separately as board presence.
+  const supportZones = ps.supportZones?.[hi] || [];
+  let equipCount = 0;
+  if (supportZones.length > 0) {
+    const cardDB = engine._getCardDB();
+    for (const slot of supportZones) {
+      for (const cardName of (slot || [])) {
+        const cd = cardDB[cardName];
+        if (!cd) continue;
+        // Skip Creatures (including Artifact-Creature hybrids) — they
+        // contribute via creature valuation, not equipment.
+        if (cd.cardType === 'Creature') continue;
+        if (cd.cardType === 'Artifact' && (cd.subtype || '').toLowerCase() === 'creature') continue;
+        equipCount++;
+      }
+    }
+  }
+  if (equipCount > 0) value += Math.min(1.0, equipCount * 0.4);
+
+  // ── Demand-weighted gold engine ──────────────────────────────────────
+  // The static threat above already added a flat
+  //   0.25 × SUPPORT_UNIT_WEIGHTS.gold × goldYield
+  // contribution from this hero's gold supportYield (Trade, Wealth,
+  // Adventurousness, Semi, Fiona, …). That assumes every gold/turn
+  // is equally valuable, which is wrong: gold engines on a hoarder
+  // (already saving 15+ each turn, nothing in hand to spend on) are
+  // near-worthless to remove, while the same engine on an opponent
+  // who spends every coin and has unplayed artifacts in hand is
+  // critical. We rescale the gold portion by the demand-aware
+  // multiplier — only for POSITIVE goldYield (gold makers). Gold
+  // SINKS (Alchemy's −cost) leave the static math alone; their value
+  // is already dominated by their potion-draw side and the user
+  // spec's "gold gain valuation" is about the maker side.
+  const { goldYield } = mctsHeroSupportDetails(engine, oppIdx, hi);
+  if (goldYield > 0) {
+    const flatStaticGold = 0.25 * SUPPORT_UNIT_WEIGHTS.gold * goldYield;
+    const econMult = mctsOpponentGoldEconomy(engine, oppIdx);
+    // Adjust toward the demand-aware weighting. econMult=1 → no change;
+    // econMult<1 → subtract from the flat baseline (saturated opp);
+    // econMult>1 → add to it (starved opp). Bounded by mctsOpponent-
+    // GoldEconomy's own [0.3, 1.8] range, so the swing on this hero
+    // is at most ±80% of the original gold contribution.
+    value += flatStaticGold * (econMult - 1);
+  }
+
+  // Summoner-with-no-room discount. Only matters when the hero has
+  // Summoning Magic AND every support zone is occupied AND the hero
+  // didn't just summon last turn (a fresh chain of summons projects
+  // continued threat — full zones immediately after summoning means
+  // the threat is still LIVE).
+  const myTags = mctsHeroRoleTags(engine, oppIdx, hi);
+  if (myTags.has('summoner')) {
+    const supportZones = ps.supportZones?.[hi] || [[], [], []];
+    const allFull = supportZones.length > 0 && supportZones.every(z => (z || []).length > 0);
+    const summonedRecently = stats && stats.lastSummonTurn === gs.turn - 1;
+    if (allFull && !summonedRecently) value -= 0.6;
+  }
+
+  // Redundancy: same-role teammates dilute the loss.
+  value -= mctsRoleRedundancyDiscount(engine, oppIdx, hi);
+
+  // Caster-coverage: if another teammate can already cast same-or-higher
+  // spells of this hero's main school, this hero is partially fungible.
+  if (mctsCasterIsCovered(engine, oppIdx, hi)) value -= 0.6;
+
+  // ── Spent one-shot effect ─────────────────────────────────────────────
+  // Some heroes carry a single very strong turn-1 effect (Willy's Draw 5
+  // / Gain 30, Barker's free Lv ≤ 1 summon, …) and once that's fired
+  // they're effectively a generic body — the abilities they host still
+  // matter (and feed the school/support tracks above) but the hero's own
+  // contribution is mostly gone. Heavy flat discount so the CPU doesn't
+  // burn 200-damage spells on a spent Willy when a live carry is also
+  // available. Hero scripts opt in via `cpuMeta.oneShotEffectSpent`.
+  const heroScript = loadCardEffect(hero.name);
+  const oneShotSpent = heroScript?.cpuMeta?.oneShotEffectSpent;
+  if (typeof oneShotSpent === 'function') {
+    const heroInst = engine.cardInstances.find(c =>
+      c.owner === oppIdx && c.zone === 'hero' && c.heroIdx === hi
+    );
+    try {
+      if (oneShotSpent(engine, oppIdx, hi, hero, heroInst)) value -= 1.5;
+    } catch { /* swallow — observer must not break eval */ }
+  }
+
+  return Math.max(0.5, value);
+}
+
+/**
+ * Threat multiplier on an opponent's Creature/Equipment-creature target.
+ * Built around level + recent damage + last-turn value, minus an
+ * on-death-fuel discount so we don't gleefully kill creatures that
+ * fuel the opponent's chains (Hell Fox, Loyal Bone Dog, …).
+ */
+function mctsEnemyCreatureValue(engine, inst) {
+  if (!inst) return 1.0;
+  const cd = engine._getCardDB()[inst.name];
+  if (!cd) return 1.0;
+  let value = 1.0;
+  const lvl = cd.level || 0;
+  if (lvl > 0) value += lvl * 0.4;
+  const stats = inst.counters?._cpuStats;
+  if (stats) {
+    if ((stats.damageLastTurn || 0) > 0) value += Math.min(1.8, stats.damageLastTurn / 100);
+    if ((stats.valueLastTurn || 0) > 0) value += Math.min(1.0, stats.valueLastTurn * 0.005);
+  }
+  // On-death fuel — discount.
+  const script = loadCardEffect(inst.name);
+  const onDeath = script?.cpuMeta?.onDeathBenefit || 0;
+  if (onDeath > 0) value -= Math.min(0.7, onDeath / 30);
+  // Chain sources should be killed eagerly when armed (denying their
+  // window) — slight bump.
+  if (script?.cpuMeta?.chainSource) value += 0.4;
+  return Math.max(0.3, value);
+}
+
+/**
+ * Score for "how valuable would `cardName` be sitting in pi's hand right
+ * now". Mirrors the in-eval logic in evaluateState's hand-value pass —
+ * promoted to a top-level helper so deck-search prompts (Magnetic Glove,
+ * Magnetic Potion, future tutors) can rank gallery options without
+ * paying for a full state snapshot per candidate. Combines:
+ *   • Affordability (cost vs current gold + 1–2 turn lookahead)
+ *   • Type lock (Potion/Artifact/Creature locks zero out playability)
+ *   • Tutor cap (`blockedByHandLock + resolve` — drawing a card to draw
+ *     another card double-counts the second card otherwise)
+ *   • Ascension-critical floor (Beato's missing-school spells, Layn's
+ *     Hammer, Arthor's Sword — these are the carry pieces a tutor
+ *     should always grab if available)
+ *   • Duplicate penalty — drawing a second copy of a HOPT-locked /
+ *     once-per-turn-relevant card is worth half.
+ */
+/**
+ * Pick the highest-value gallery card for `pi` to tutor / select. Used
+ * by both the cpuGenericChoice heuristic seed and by
+ * mctsEnumerateGenericAlternatives' sort, so the variation cap of 6
+ * alternatives lands on the most promising 6 cards instead of the
+ * alphabetically-first 6. Scores via `estimateHandCardValueFor` with
+ * a duplicate count derived from the player's CURRENT hand — drawing
+ * a second copy of a card already in hand correctly drops to
+ * half-value. Ties resolved randomly so the CPU isn't perfectly
+ * predictable on equal-value gallery picks.
+ */
+function pickBestGalleryCard(engine, pi, cards) {
+  if (!Array.isArray(cards) || cards.length === 0) return null;
+  const ps = engine.gs.players[pi];
+  const handCounts = {};
+  if (ps?.hand) {
+    for (const name of ps.hand) handCounts[name] = (handCounts[name] || 0) + 1;
+  }
+  let best = -Infinity;
+  for (const c of cards) {
+    const seen = handCounts[c.name] || 0;
+    const score = estimateHandCardValueFor(engine, pi, c.name, seen);
+    c._galleryScore = score;
+    if (score > best) best = score;
+  }
+  const top = cards.filter(c => c._galleryScore >= best - 0.01);
+  const pick = top[Math.floor(Math.random() * top.length)] || cards[0];
+  // Hard invariant: the returned pick MUST be one of the input cards
+  // (checked by reference identity since the caller passes a fresh
+  // object array per prompt). If somehow not — e.g., a future bug
+  // mutates the cards array mid-pick — fall back to the first input
+  // card so callers like Magic Lamp's `chosenNames.includes(picked)`
+  // gate never sees a phantom card.
+  if (!cards.includes(pick)) return cards[0];
+  return pick;
+}
+
+function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
+  const cardDB = engine._getCardDB();
+  const cd = cardDB[cardName];
+  if (!cd) return 15;
+  const ps = engine.gs.players[pi];
+  const gold = ps?.gold || 0;
+  const cost = cd.cost || 0;
+  const typeLocked =
+    (cd.cardType === 'Potion' && ps?.potionLocked) ||
+    (cd.cardType === 'Artifact' && ps?.itemLocked) ||
+    (cd.cardType === 'Creature' && ps?.creatureLocked);
+  let base;
+  if (typeLocked) base = 10;
+  else if (cost <= gold) base = 25;
+  else if (cost <= gold + 6) base = 20;
+  else if (cost <= gold + 12) base = 15;
+  else base = 5;
+  if (!typeLocked) {
+    const script = loadCardEffect(cardName);
+    if (script?.blockedByHandLock && typeof script.resolve === 'function') {
+      base = Math.min(base, 12);
+    }
+  }
+  if (cardIsAscensionCriticalForAnyHero(engine, pi, cardName, cd)) {
+    base = Math.max(base, 80);
+  }
+  if (seenCount >= 1) base *= 0.5;
+  return base;
+}
 
 // Scalar evaluation of a game state from the CPU's perspective. Higher is
 // better for the CPU. Feature weights are educated guesses — tune after
@@ -3352,7 +4198,9 @@ const SUPPORT_UNIT_WEIGHTS = { draws: 1.0, potionDraws: 3.0, gold: 0.25 };
 function mctsHeroSupportDetails(engine, pi, hi) {
   const ps = engine.gs.players[pi];
   const hero = ps?.heroes?.[hi];
-  if (!hero?.name || hero.hp <= 0) return { supportUnits: 0, damagePerTurn: 0 };
+  if (!hero?.name || hero.hp <= 0) {
+    return { supportUnits: 0, damagePerTurn: 0, goldYield: 0 };
+  }
   let draws = 0, potionDraws = 0, gold = 0, damage = 0;
   const ctx = { engine, pi, hi, cpuIdx: engine._cpuPlayerIdx };
   const apply = (y) => {
@@ -3377,7 +4225,12 @@ function mctsHeroSupportDetails(engine, pi, hi) {
     SUPPORT_UNIT_WEIGHTS.draws * draws +
     SUPPORT_UNIT_WEIGHTS.potionDraws * potionDraws +
     SUPPORT_UNIT_WEIGHTS.gold * gold;
-  return { supportUnits, damagePerTurn: damage };
+  // `goldYield` is the raw per-turn gold contribution surfaced
+  // separately so the dynamic-value layer can re-weight it by the
+  // opponent's actual gold demand instead of using the flat
+  // 0.25-per-gold weight baked into supportUnits. Positive = gold
+  // generator, negative = gold sink (Alchemy).
+  return { supportUnits, damagePerTurn: damage, goldYield: gold };
 }
 
 // ─── Gold vs Card-Draw decision helper ────────────────────────────────
@@ -3617,6 +4470,75 @@ function computeGoldDemand(engine, pi) {
   return demand;
 }
 
+/**
+ * Demand-aware multiplier for an opponent's gold-yielding hero. Returned
+ * value scales the static gold contribution to the hero's threat:
+ *   ≈ 0.3  → opponent has plenty of gold and nothing to spend it on;
+ *            their gold engine is redundant, killing it doesn't sting
+ *   ≈ 0.6  → mild over-supply
+ *   = 1.0  → balanced
+ *   ≈ 1.4  → starved, every gold counts
+ *   ≈ 1.8  → severely starved, gold engine is critical to remove
+ *
+ * Combines two signals:
+ *   • Snapshot — current gold vs computeGoldDemand. Demand is what
+ *     they could productively spend RIGHT NOW (artifacts in hand,
+ *     gold-cost activations on board).
+ *   • Historical — average end-of-turn gold across the game so far.
+ *     A hoarder ending most turns with 15+ gold doesn't actually
+ *     need more; a spender at 0–2 each turn is genuinely starved.
+ *     Blends in once we have ≥3 turns of data so early-game noise
+ *     doesn't swing the multiplier.
+ */
+function mctsOpponentGoldEconomy(engine, oppIdx) {
+  const opp = engine.gs.players[oppIdx];
+  if (!opp) return 1.0;
+  const gold = opp.gold || 0;
+  const demand = computeGoldDemand(engine, oppIdx);
+
+  let snapshotMult;
+  if (demand <= 0) {
+    // No measurable demand — gold engines have nothing to feed. Heavy
+    // discount when there's already a stockpile; mild discount when
+    // gold is low (opp may be priming for next turn).
+    snapshotMult = gold > 10 ? 0.3 : 0.6;
+  } else {
+    const ratio = gold / demand;
+    if (ratio >= 2) snapshotMult = 0.3;          // ≥2× supply: saturated
+    else if (ratio >= 1) snapshotMult = 0.6 - 0.3 * Math.min(1, ratio - 1);
+    else snapshotMult = 1.0 + 0.8 * Math.min(1, 1 - ratio);
+  }
+
+  const hist = opp._cpuGoldHistory;
+  if (hist && hist.turnsTracked >= 3) {
+    const avgEnd = hist.totalGold / hist.turnsTracked;
+    let histMult;
+    if (avgEnd > 15)      histMult = 0.4; // hoarder
+    else if (avgEnd > 10) histMult = 0.6;
+    else if (avgEnd > 5)  histMult = 1.0;
+    else if (avgEnd > 2)  histMult = 1.4;
+    else                  histMult = 1.7; // spends everything
+    return (snapshotMult + histMult) / 2;
+  }
+  return snapshotMult;
+}
+
+/**
+ * Snapshot the active player's gold pool when their turn ends. Builds
+ * up a per-player rolling average that `mctsOpponentGoldEconomy`
+ * consults to tell hoarders apart from spenders.
+ */
+function recordEndOfTurnGold(engine) {
+  const gs = engine.gs;
+  const ap = gs?.activePlayer;
+  if (ap == null || ap < 0) return;
+  const ps = gs.players?.[ap];
+  if (!ps) return;
+  if (!ps._cpuGoldHistory) ps._cpuGoldHistory = { totalGold: 0, turnsTracked: 0 };
+  ps._cpuGoldHistory.totalGold += (ps.gold || 0);
+  ps._cpuGoldHistory.turnsTracked++;
+}
+
 function evaluateState(engine, cpuIdx) {
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
@@ -3632,18 +4554,35 @@ function evaluateState(engine, cpuIdx) {
 
   let score = 0;
 
+  // ── Doomed-hero projection ──────────────────────────────────────────
+  // Heroes flagged with `_forceKillAtTurnEnd === gs.turn` (Golden Ankh,
+  // any future "revive for one turn only" effect) are alive RIGHT NOW
+  // but un-negatably die at this turn's End Phase. The evaluator
+  // measures end-of-turn outcomes for activations gated mid-turn, so
+  // treat doomed heroes as already dead in the structural HP / dead-
+  // bonus terms — they shouldn't credit the +HP / -dead-penalty that
+  // a real revive would. Spell/Attack/Hero-Effect contributions made
+  // during their forced-life DO persist (cards drawn, gold gained,
+  // damage dealt) and show up via the other eval terms.
+  const isDoomed = (h) => !!h && h._forceKillAtTurnEnd === gs.turn;
+  const isAliveForEval = (h) => !!h?.name && h.hp > 0 && !isDoomed(h);
+  const isDeadForEval = (h) => !!h?.name && (h.hp <= 0 || isDoomed(h));
+
   // Hero HP deltas. Own HP counts raw; opp HP is threat-weighted so damage
   // to a carry/supporter breaks ties over damage to a plain bruiser.
   let ownHp = 0;
-  for (const h of (ps.heroes || [])) if (h?.name && h.hp > 0) ownHp += h.hp;
+  for (const h of (ps.heroes || [])) if (isAliveForEval(h)) ownHp += h.hp;
 
   const oppTeamMaxSchoolLvl = mctsTeamMaxSchoolLvl(gs, oppIdx);
   let oppWeightedHp = 0;
   let minOppHp = Infinity;
   for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
     const h = opp.heroes[hi];
-    if (!h?.name || h.hp <= 0) continue;
-    const threat = mctsEnemyHeroThreat(engine, oppIdx, hi, oppTeamMaxSchoolLvl);
+    if (!isAliveForEval(h)) continue;
+    // Dynamic threat: layers spell-cast history, recent damage output,
+    // role-redundancy with teammates, and summoner-no-room discount on
+    // top of the static threat function. See mctsEnemyHeroDynamicValue.
+    const threat = mctsEnemyHeroDynamicValue(engine, oppIdx, hi, oppTeamMaxSchoolLvl);
     oppWeightedHp += h.hp * threat;
     if (h.hp < minOppHp) minOppHp = h.hp;
   }
@@ -3656,8 +4595,10 @@ function evaluateState(engine, cpuIdx) {
   if (minOppHp !== Infinity) score -= 0.3 * minOppHp;
 
   // Killed-hero swing — huge, because losing a hero is close to losing.
-  for (const h of (ps.heroes || [])) if (h?.name && h.hp <= 0) score -= 500;
-  for (const h of (opp.heroes || [])) if (h?.name && h.hp <= 0) score += 500;
+  // Doomed-but-alive heroes count as dead here too (they will be by End
+  // Phase, and that's what eval is projecting toward).
+  for (const h of (ps.heroes || [])) if (isDeadForEval(h)) score -= 500;
+  for (const h of (opp.heroes || [])) if (isDeadForEval(h)) score += 500;
 
   // ── Support zone occupancy (creatures + equips) ──────────────────
   // Per-zone base value is +30. Each card's own death may have
@@ -3818,54 +4759,17 @@ function evaluateState(engine, cpuIdx) {
   // Duplicate copies beyond the first are half-value (HOPT / once-per-
   // turn cards don't benefit from multiple copies in hand).
   // Opponent hand is opaque — value it flat at 20/card (status quo).
-  const cardDBForEval = engine._getCardDB();
-  const estimateHandCardValue = (pi, cardName, seenCount) => {
-    const cd = cardDBForEval[cardName];
-    if (!cd) return 15;
-    const p = gs.players[pi];
-    const gold = p?.gold || 0;
-    const cost = cd.cost || 0;
-    const typeLocked =
-      (cd.cardType === 'Potion' && p?.potionLocked) ||
-      (cd.cardType === 'Artifact' && p?.itemLocked) ||
-      (cd.cardType === 'Creature' && p?.creatureLocked);
-    let base;
-    if (typeLocked) base = 10;
-    else if (cost <= gold) base = 25;       // affordable now
-    else if (cost <= gold + 6) base = 20;   // affordable next turn
-    else if (cost <= gold + 12) base = 15;  // affordable in 2 turns
-    else base = 5;                           // dead for the lookahead horizon
-    // Draw / tutor cards trade themselves for another card — their in-hand
-    // value is the unrealized output, not the trivially-playable cost. Without
-    // this cap, a free Magnetic Potion (cost 0 → base 25) swapped for a
-    // searched card (also ≤25) nets delta 0, and the MCTS activation gate
-    // skips forever. `blockedByHandLock + resolve` is the signal: the loader
-    // auto-tags draw-only cards that way (see _loader.js DRAW_PATTERNS), and
-    // Magnetic Potion / Magnetic Glove set it manually.
-    if (!typeLocked) {
-      const script = loadCardEffect(cardName);
-      if (script?.blockedByHandLock && typeof script.resolve === 'function') {
-        base = Math.min(base, 12);
-      }
-    }
-    // Ascension-critical cards (Arthor's Sword / Summoning Circle, Layn's
-    // Hammer, Spells/Creatures of Beato's uncollected schools) override
-    // every other valuation: they're the CPU's top plan piece. Floors the
-    // base high enough that force-discard heuristics protect them, tutor
-    // search prefers them, and losing one registers as a big delta in
-    // MCTS rollouts.
-    if (cardIsAscensionCriticalForAnyHero(engine, pi, cardName, cd)) {
-      base = Math.max(base, 80);
-    }
-    if (seenCount >= 1) base *= 0.5;         // duplicate penalty
-    return base;
-  };
+  // Hand-value scoring — uses the shared `estimateHandCardValueFor`
+  // helper so the same valuation drives both `evaluateState`'s hand
+  // term and the deck-search heuristic in cpuGenericChoice (Magnetic
+  // Glove / Potion picking the highest-impact card from deck instead
+  // of random).
   let ownHandValue = 0;
   {
     const counts = {};
     for (const name of (ps.hand || [])) {
       const seen = counts[name] || 0;
-      ownHandValue += estimateHandCardValue(cpuIdx, name, seen);
+      ownHandValue += estimateHandCardValueFor(engine, cpuIdx, name, seen);
       counts[name] = seen + 1;
     }
   }
@@ -3956,7 +4860,7 @@ function evaluateState(engine, cpuIdx) {
     const dmg = STATUS_DMG_PER_STACK * stacks;
     if (dmg >= h.hp) score += 400; // anticipated kill
     else {
-      const threat = mctsEnemyHeroThreat(engine, oppIdx, hi, oppTeamMaxSchoolLvl);
+      const threat = mctsEnemyHeroDynamicValue(engine, oppIdx, hi, oppTeamMaxSchoolLvl);
       score += 0.5 * dmg * threat;
     }
   }
@@ -4328,6 +5232,17 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   // variation loop so that, e.g., Magnetic Glove picks the best card from
   // the gallery instead of a random one.
   const alwaysCommit = !!options.alwaysCommit;
+  // `evaluateThroughTurnEnd` — after the activation's actionFn, also
+  // play out the REST of the CPU's turn (rolloutRestOfTurn) before
+  // scoring. Required for "alive only this turn" effects like Golden
+  // Ankh: without rest-of-turn projection, the immediate eval shows
+  // a free +500 dead-bonus revert; with it, the End-Phase forceKill
+  // fires and the eval correctly sees the hero is dead again — the
+  // gate then commits IFF the revived hero actually generated value
+  // during the simulated action phase (cards drawn, damage dealt,
+  // …). Pricier than the default gate (full rest-of-turn rollout per
+  // recon + per variation), so opt-in only.
+  const evaluateThroughTurnEnd = !!options.evaluateThroughTurnEnd;
 
   // ── Nested-rollout / late-game short-circuit ──
   // Skip the gate when we're already inside an MCTS simulation — running
@@ -4343,7 +5258,41 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   }
 
   const cpuIdx = engine._cpuPlayerIdx;
-  const skipScore = evaluateState(engine, cpuIdx);
+  // ── Skip baseline ──
+  // Default: immediate-state score with the activation NOT played.
+  // When `evaluateThroughTurnEnd` is on, the recon below ALSO plays
+  // out the rest of the turn before scoring — comparing that to an
+  // immediate-state skip is unfair: the rest-of-turn's natural play
+  // value (Action Phase plays, MP2 activations, end-of-turn ticks)
+  // would inflate the post-play score regardless of whether the
+  // activation itself contributed anything. To isolate the
+  // activation's incremental value, also play the rest-of-turn for
+  // the skip baseline. This is the fix for "Golden Ankh revives a
+  // hero who's never used in the action phase but the rollout's
+  // natural value still made the gate commit" — under the new
+  // baseline, both rollouts produce the same natural value and the
+  // delta correctly drops to ~0 (or negative once you subtract the
+  // gold + hand-card cost).
+  let skipScore;
+  if (evaluateThroughTurnEnd) {
+    const snapSkip = engine.snapshot();
+    const prevInSimSkip = engine._inMctsSim;
+    engine._inMctsSim = true;
+    engine.enterFastMode();
+    const prevSilentSkip = _cpuLogSilent;
+    _cpuLogSilent = true;
+    try {
+      try { await rolloutRestOfTurn(engine, helpers); } catch {}
+      skipScore = evaluateState(engine, cpuIdx);
+    } finally {
+      _cpuLogSilent = prevSilentSkip;
+      engine.exitFastMode();
+      engine.restore(snapSkip);
+      engine._inMctsSim = prevInSimSkip;
+    }
+  } else {
+    skipScore = evaluateState(engine, cpuIdx);
+  }
 
   // ── Recon rollout ──
   const snap = engine.snapshot();
@@ -4360,6 +5309,9 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   let reconCompleted = false;
   try {
     await actionFn();
+    if (evaluateThroughTurnEnd) {
+      try { await rolloutRestOfTurn(engine, helpers); } catch {}
+    }
     reconScore = evaluateState(engine, cpuIdx);
     reconCompleted = true;
   } catch (err) {
@@ -4393,6 +5345,9 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
       _cpuLogSilent = true;
       try {
         await actionFn();
+        if (evaluateThroughTurnEnd) {
+          try { await rolloutRestOfTurn(engine, helpers); } catch {}
+        }
         variation.score = evaluateState(engine, cpuIdx);
       } catch {}
       delete engine._mctsTargetPlan;
@@ -4445,7 +5400,21 @@ async function rankCandidatesEvalGreedy(engine, helpers, candidates) {
     }
     scored.push({ cand, score });
   }
-  scored.sort((a, b) => b.score - a.score);
+  // Noise-tolerant Attack tiebreak — same rationale as the main MCTS
+  // ranking sort. Single-rollout evals in nested simulations are even
+  // noisier than the ~3-rollout outer loop, so the epsilon band is a
+  // touch wider here. Within it, prefer the higher-atk caster.
+  scored.sort((a, b) => {
+    const diff = b.score - a.score;
+    const epsilon = Math.max(5, Math.abs(b.score) * 0.015);
+    if (Math.abs(diff) <= epsilon
+        && a.cand.cardType === 'Attack'
+        && b.cand.cardType === 'Attack') {
+      const atkDiff = (b.cand.casterAtk || 0) - (a.cand.casterAtk || 0);
+      if (atkDiff !== 0) return atkDiff;
+    }
+    return diff;
+  });
   return scored.map(s => s.cand);
 }
 
@@ -4473,7 +5442,9 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
       return await rankCandidatesEvalGreedy(engine, helpers, candidates);
     }
     const sorted = [...candidates].sort((a, b) =>
-      (b.level - a.level) || (b.typeScore - a.typeScore));
+      (b.level - a.level)
+      || (b.typeScore - a.typeScore)
+      || ((b.casterAtk || 0) - (a.casterAtk || 0)));
     return sorted;
   }
 
@@ -4563,6 +5534,52 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
     }
   }
 
+  // ── Adaptive extension phase ─────────────────────────────────────────
+  // When the regular UCB1 budget ended with the top arms clustered
+  // inside the noise band (avg gap small enough that variance is
+  // deciding the winner instead of real differences), spend remaining
+  // wall-clock on ONLY those clustered arms. Each extra pull goes to
+  // the cluster arm with the fewest visits — balances precision
+  // across the cluster, drives standard error down fastest where it
+  // matters, and re-checks the cluster after every pull (arms that
+  // drift outside the band are dropped). Stops as soon as one arm
+  // wins outright OR the cluster genuinely settles. The deterministic
+  // tiebreaker downstream (casterAtk for Attacks, etc.) handles the
+  // truly-equal case without spending more pulls on it.
+  let extensionPulls = 0;
+  while (!budgetExceeded && extensionPulls < MCTS_EXT_PULLS_MAX) {
+    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS) {
+      budgetExceeded = true;
+      break;
+    }
+    const visited = arms.filter(a => a.visits > 0);
+    if (visited.length < 2) break;
+    let topAvg = -Infinity;
+    for (const a of visited) {
+      const avg = a.scoreSum / a.visits;
+      if (avg > topAvg) topAvg = avg;
+    }
+    const epsilon = Math.max(MCTS_EXT_EPSILON_ABS, Math.abs(topAvg) * MCTS_EXT_EPSILON_PCT);
+    const cluster = visited.filter(a => (a.scoreSum / a.visits) >= topAvg - epsilon);
+    if (cluster.length < 2) break; // only one arm in the cluster — done
+    // Pick the cluster member with the fewest visits to drive its SE
+    // down fastest. Ties on visits → first one (deterministic).
+    cluster.sort((a, b) => a.visits - b.visits);
+    const target = cluster[0];
+    const r = await mctsRunOneRollout(engine, helpers, target.candidate, { plan: target.variation.plan });
+    totalRollouts++;
+    extensionPulls++;
+    if (r.completed) {
+      target.scoreSum += r.score;
+      target.visits++;
+    } else {
+      break; // rollout failed — bail before the loop tightens
+    }
+  }
+  if (extensionPulls > 0) {
+    cpuLog(`  [MCTS/EXT] +${extensionPulls} cluster-resolution pulls`);
+  }
+
   // ── Build ranked results from arm stats ──
   const results = arms.map(arm => ({
     candidate: arm.candidate,
@@ -4576,15 +5593,34 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // doesn't crash.
   if (results.every(r => !r.scored)) {
     const sorted = [...candidates].sort((a, b) =>
-      (b.level - a.level) || (b.typeScore - a.typeScore));
+      (b.level - a.level)
+      || (b.typeScore - a.typeScore)
+      || ((b.casterAtk || 0) - (a.casterAtk || 0)));
     cpuLog(`  [MCTS] budget exhausted with 0 scored arms → heuristic fallback`);
     return sorted;
   }
 
   // Scored arms first, by avg desc. Unscored drop to the tail.
+  // Within an epsilon band — accounting for the inherent noise of running
+  // ~3 rollouts per candidate — Attack candidates tiebreak by the
+  // caster's atk stat. Without this, a same-card-different-caster pair
+  // whose avgs land within noise of each other would resolve via stable
+  // sort to the lower-atk hero whenever they happened to be emitted
+  // first. The emission-side sort (heroPool sorted by atk DESC) plus
+  // this ranking-side tiebreak together ensure raw-atk ties go to the
+  // bigger stick. MCTS still wins outright when the avg gap exceeds
+  // noise — a real synergy on a low-atk hero still beats raw damage.
   results.sort((a, b) => {
     if (a.scored !== b.scored) return a.scored ? -1 : 1;
-    return b.avg - a.avg;
+    const avgDiff = b.avg - a.avg;
+    const epsilon = Math.max(3, Math.abs(b.avg) * 0.01);
+    if (Math.abs(avgDiff) <= epsilon
+        && a.candidate.cardType === 'Attack'
+        && b.candidate.cardType === 'Attack') {
+      const atkDiff = (b.candidate.casterAtk || 0) - (a.candidate.casterAtk || 0);
+      if (atkDiff !== 0) return atkDiff;
+    }
+    return avgDiff;
   });
 
   const elapsed = Date.now() - t0;
@@ -4606,7 +5642,10 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // Any candidate not touched at all (budget cut off recon loop) → append
   // in heuristic order so the turn still has fallback plays.
   const unseen = candidates.filter(c => !seen.has(c));
-  unseen.sort((a, b) => (b.level - a.level) || (b.typeScore - a.typeScore));
+  unseen.sort((a, b) =>
+    (b.level - a.level)
+    || (b.typeScore - a.typeScore)
+    || ((b.casterAtk || 0) - (a.casterAtk || 0)));
   for (const c of unseen) out.push({ ...c, scriptedTargetPlan: null });
   return out;
 }

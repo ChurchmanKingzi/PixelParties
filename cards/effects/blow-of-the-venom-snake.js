@@ -101,14 +101,17 @@ module.exports = {
           c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst && !inst.counters.poisoned) {
+          // Animation plays unconditionally — visible splash on
+          // Cardinal-immune / shielded targets even when the status
+          // application fizzles in the gate below.
+          engine._broadcastEvent('play_zone_animation', {
+            type: 'poison_splash', owner: tgtOwner,
+            heroIdx: tgtHeroIdx, zoneSlot: target.slotIdx,
+          });
           if (engine.canApplyCreatureStatus(inst, 'poisoned')) {
             inst.counters.poisoned = 1;
             inst.counters.poisonStacks = poisonStacks;
             inst.counters.poisonAppliedBy = pi;
-            engine._broadcastEvent('play_zone_animation', {
-              type: 'poison_splash', owner: tgtOwner,
-              heroIdx: tgtHeroIdx, zoneSlot: target.slotIdx,
-            });
             engine.log('poison_applied', { target: inst.name, by: 'Blow of the Venom Snake', stacks: poisonStacks });
           }
         }

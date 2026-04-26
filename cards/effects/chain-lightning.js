@@ -6,6 +6,11 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // Turn-1 shielded opponent makes every bolt fizzle (opponent picks the
+  // targets and they're all immune). The CPU has no `getValidTargets` to
+  // reason about, so flag it explicitly here.
+  firstTurnSafe: false,
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;

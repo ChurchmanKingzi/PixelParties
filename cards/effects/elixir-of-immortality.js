@@ -25,6 +25,16 @@ module.exports = {
   deferBroadcast: true,
   activeIn: ['permanent'],
 
+  // CPU evaluation hint — Elixir's value is a multi-turn safety net
+  // (waits for a future death to revive). The immediate post-play
+  // state shows only "−1 hand card" (hand value drops by ~25) and
+  // "+1 permanent" (which evaluateState doesn't weight directly), so
+  // the gate sees a net negative delta and correctly-but-uselessly
+  // refuses to play it. Cards with future-trigger value that the
+  // turn-bounded evaluator can't see opt into alwaysCommit so the
+  // CPU plays them as soon as they're available.
+  cpuMeta: { alwaysCommit: true },
+
   canActivate(gs, pi) {
     const ps = gs.players[pi];
     if (ps?._oncePerGameUsed?.has('elixirOfImmortality')) return false;

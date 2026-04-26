@@ -31,6 +31,9 @@ module.exports = {
             return hero && !hero.statuses?.immune && !hero.statuses?.negated;
           }
           if (t.type === 'equip' && t.cardInstance) {
+            // Already-negated / nulled creatures don't qualify. Cardinal-
+            // immune and other absolute-immunity targets are deliberately
+            // NOT filtered — animation plays, status fizzles silently.
             return !(t.cardInstance.counters?.negated || t.cardInstance.counters?.nulled);
           }
           return true;
@@ -48,8 +51,12 @@ module.exports = {
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c => c.owner === target.owner && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx);
         if (inst) {
-          inst.counters.negated = 1;
+          // Animation plays unconditionally so the player sees the
+          // strike land even when the status fizzles on an immune target.
           engine._broadcastEvent('play_zone_animation', { type: 'electric_strike', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx });
+          if (engine.canApplyCreatureStatus(inst, 'negated')) {
+            inst.counters.negated = 1;
+          }
         }
       }
       engine.log('negate', { target: target.cardName, by: 'Sparky Slime', type: target.type });

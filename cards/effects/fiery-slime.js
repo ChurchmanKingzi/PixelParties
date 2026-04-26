@@ -31,6 +31,11 @@ module.exports = {
             return hero && !hero.statuses?.burned;
           }
           if (t.type === 'equip' && t.cardInstance) {
+            // Already-burned creatures don't qualify (no stacking on
+            // creature burns). Cardinal-immune / face-down / shielded
+            // targets are deliberately NOT filtered — the player picks,
+            // the animation plays, the status fizzles. Visual feedback
+            // beats silent target absence.
             return !t.cardInstance.counters?.burned;
           }
           return true;
@@ -48,9 +53,14 @@ module.exports = {
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c => c.owner === target.owner && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx);
         if (inst) {
-          inst.counters.burned = 1;
-          inst.counters.burnAppliedBy = ctx.cardOwner;
+          // Animation plays unconditionally — the player needs to see
+          // their effect "land" on the target even when the status
+          // itself fizzles against an immune creature.
           engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx });
+          if (engine.canApplyCreatureStatus(inst, 'burned')) {
+            inst.counters.burned = 1;
+            inst.counters.burnAppliedBy = ctx.cardOwner;
+          }
         }
       }
       engine.log('burn', { target: target.cardName, by: 'Fiery Slime', type: target.type });

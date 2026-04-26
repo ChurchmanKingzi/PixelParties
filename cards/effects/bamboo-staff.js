@@ -5,8 +5,8 @@
 //  Once per turn, when a card is added from your
 //  discard pile to your hand, you may choose a
 //  target and deal damage equal to the equipped
-//  Hero's Attack stat to it. That is treated as
-//  that Hero hitting the target with an Attack.
+//  Hero's Base Attack stat to it. That is treated
+//  as that Hero hitting the target with an Attack.
 //
 //  Wiring:
 //    • Listens to the engine's
@@ -102,7 +102,12 @@ module.exports = {
       // Per-instance soft-HOPT.
       if (ctx.card.counters._bambooFiredOnTurn === gs.turn) return;
 
-      const atk = hero.atk || 0;
+      // Damage scales off the Hero's BASE Attack — printed-stat value,
+      // unaffected by Vampiric Sword / Fighting / any buff or debuff.
+      // Card text: "damage equal to the equipped Hero's Base Attack
+      // stat". The same convention Blow of the Venom Snake / Ferocious
+      // Tiger Kick use.
+      const atk = hero.baseAtk || 0;
       if (atk <= 0) return;
 
       // No targets on the board — silently skip the prompt (matches
@@ -140,8 +145,14 @@ module.exports = {
         return;
       }
 
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'punch_impact',
+      // Punch-impact animation matches Aggressive Town Guard's pattern —
+      // emitted as its own socket event so the client's onPunchImpact
+      // handler renders the fist + impact ring + radiating lines. Routing
+      // through play_zone_animation doesn't work here: punch_impact
+      // isn't registered in the client's ANIM_REGISTRY (it's only
+      // handled by the dedicated socket listener), so the animation
+      // silently dropped.
+      engine._broadcastEvent('punch_impact', {
         owner: target.owner,
         heroIdx: target.heroIdx,
         zoneSlot: target.type === 'hero' ? -1 : target.slotIdx,

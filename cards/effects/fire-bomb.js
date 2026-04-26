@@ -39,10 +39,16 @@ module.exports = {
       // See Engine.isAbilityRemovalProtected() — use in any card that removes abilities
       const isOpponentProtected = pi !== playerIdx && gs.firstTurnProtectedPlayer === pi;
 
-      // Abilities (any non-empty ability zone)
+      // Abilities — any non-empty ability zone, INCLUDING dead heroes'
+      // zones. Per card text, Fire Bomb can target any Hero's Ability,
+      // alive or not. The dead-hero exclusion was a bug; abilities
+      // remain on a hero's sheet after death and stay legal Fire Bomb
+      // targets (their slot still fills the board, future revives
+      // restore them with the abilities, etc.). Empty hero slots
+      // (no name) are still skipped — there's nothing to target.
       if (!isOpponentProtected) {
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-          if (!ps.heroes[hi]?.name || ps.heroes[hi]?.hp <= 0) continue;
+          if (!ps.heroes[hi]?.name) continue;
           for (let zi = 0; zi < (ps.abilityZones[hi] || []).length; zi++) {
             const cards = (ps.abilityZones[hi] || [])[zi] || [];
             if (cards.length > 0) {

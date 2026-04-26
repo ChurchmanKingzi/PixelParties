@@ -9,6 +9,14 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // CPU valuation hook. Once Willy's first-turn Draw 5 / Gain 30 has
+  // fired, Willy is essentially a vanilla body — his only real
+  // contribution to the team was that one-time payout. Marks him as
+  // a low-priority target so the CPU doesn't waste big spells on him.
+  cpuMeta: {
+    oneShotEffectSpent: (_engine, _pi, _hi, hero) => !!hero?._willyEffectUsed,
+  },
+
   hooks: {
     /**
      * On game start: record the owner's first turn number

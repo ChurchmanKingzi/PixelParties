@@ -25,6 +25,13 @@ function applyBonus(engine, card, hero, ownerIdx, heroIdx, copyIndex) {
 
 module.exports = {
   activeIn: ['ability'],
+  // Lizbeth/Smugbeth: Fighting is opted OUT of the engine's auto-mirror
+  // because the spec wants override semantics (highest opponent
+  // Fighting bonus replaces Lizbeth's own if greater, only one
+  // contributing at a time), not the additive "+10 per copy" the
+  // mirror would produce. Lizbeth's hero script computes the override
+  // delta in its own hooks instead.
+  disableLizbethMirror: true,
 
   hooks: {
     /**

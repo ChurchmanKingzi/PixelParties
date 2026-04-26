@@ -12,6 +12,19 @@ module.exports = {
   blockedByHandLock: true,
   isTargetingArtifact: true,
 
+  // CPU evaluation hint. Without this, the gate's recon scores each
+  // variation purely by post-add-to-hand state — every tutored card
+  // contributes a similar small bump to hand-value, so the highest-
+  // impact pick (a Spell the CPU could actually CAST this turn) and
+  // a useless filler tutor score within noise. Simulating rest-of-
+  // turn lets the variation that tutors a playable carry-piece
+  // execute the play and reflect its real value (damage dealt, spell
+  // school progressed, etc.) in the eval. Combined with the
+  // `pickBestGalleryCard` heuristic + variation-alts sort, the CPU
+  // now tutors the right card instead of randomly grabbing whatever
+  // sits in the deck.
+  cpuMeta: { evaluateThroughTurnEnd: true },
+
   canActivate(gs, pi) {
     // HOPT check
     const hoptKey = `magnetic-glove:${pi}`;

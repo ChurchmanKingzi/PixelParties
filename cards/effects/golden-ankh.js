@@ -15,6 +15,17 @@
 module.exports = {
   isTargetingArtifact: true,
 
+  // CPU evaluation hint. Reviving a hero only for the current turn
+  // (forceKillAtTurnEnd) looks free at the immediate post-play state
+  // because the hero is alive again, but the End-Phase forceKill
+  // wipes that out before the opponent's turn. Telling the gate to
+  // simulate the rest of the turn makes the eval correctly see the
+  // hero dead again — so the gate only commits if the revived hero
+  // actually generated value during their forced-life (cards drawn,
+  // damage dealt, abilities/effects used). Matches the user spec
+  // "only revive if there's a use this turn".
+  cpuMeta: { evaluateThroughTurnEnd: true },
+
   canActivate(gs, pi) {
     const ps = gs.players[pi];
     // Must have at least one dead hero

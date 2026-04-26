@@ -92,15 +92,19 @@ module.exports = {
           );
         if (!inst || inst.zone !== 'support') return;
         if (inst.counters.frozen) return;
-        if (!engine.canApplyCreatureStatus(inst, 'frozen')) return;
 
+        // Animation plays unconditionally — Cardinal-immune / shielded
+        // targets visibly receive the freeze even when the status itself
+        // fizzles in the apply gate below.
         engine._broadcastEvent('play_zone_animation', {
           type: 'freeze', owner: tgt.owner, heroIdx: tgt.heroIdx, zoneSlot: tgt.slotIdx,
         });
         await engine._delay(300);
 
-        inst.counters.frozen = 1;
-        engine.log('frostbringer_freeze', { target: inst.name, by: CARD_NAME });
+        if (engine.canApplyCreatureStatus(inst, 'frozen')) {
+          inst.counters.frozen = 1;
+          engine.log('frostbringer_freeze', { target: inst.name, by: CARD_NAME });
+        }
       }
 
       engine.sync();

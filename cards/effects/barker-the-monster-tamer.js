@@ -12,6 +12,16 @@ const { hasCardType } = require('./_hooks');
 module.exports = {
   activeIn: ['hero'],
 
+  // CPU valuation hook. Once Barker's free turn-1 Lv ≤ 1 summon has
+  // fired, his on-the-board contribution is done — the abilities he
+  // hosts still count, but Barker himself drops to a low-priority
+  // target. The `barkerUsed` counter is set on Barker's hero-zone
+  // card instance the moment the summon fires (or fizzles).
+  cpuMeta: {
+    oneShotEffectSpent: (_engine, _pi, _hi, _hero, heroInst) =>
+      !!heroInst?.counters?.barkerUsed,
+  },
+
   // CPU prompt override. Barker's on-play card-gallery lists every Lv ≤ 1
   // Creature in hand + deck. The CPU should prefer Lv 1 over Lv 0; ties
   // broken at random. We also accept the initial confirm and the

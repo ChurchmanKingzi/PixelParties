@@ -44,6 +44,13 @@ const CARD_NAME = 'Xiong, the Bamboo Guardian';
 /**
  * Did `source` come from THIS Xiong's slot? Heroes are identified by
  * (originalOwner, heroIdx) — charm doesn't migrate the physical slot.
+ * This is the only gate the listener relies on: as long as the kill is
+ * attributable to Xiong (his attack landed and dropped the target to 0),
+ * the tutor fires — even if Xiong himself died from a Firewall-style
+ * recoil during the same exchange. The `bypassDeadHeroFilter` script
+ * flag tells the engine to keep firing Xiong's listener while his hp
+ * is 0; this filter ensures the listener still no-ops on every OTHER
+ * damage event in the game.
  */
 function isFromThisXiong(ctx, source) {
   if (!source) return false;
@@ -51,13 +58,6 @@ function isFromThisXiong(ctx, source) {
   if (owner !== ctx.cardOriginalOwner) return false;
   if (source.heroIdx !== ctx.card.heroIdx) return false;
   return true;
-}
-
-/** Xiong himself must still be alive to use his trigger. */
-function xiongAlive(ctx) {
-  const hero = ctx._engine.gs.players[ctx.cardOriginalOwner]
-    ?.heroes?.[ctx.card.heroIdx];
-  return !!(hero?.name && hero.hp > 0);
 }
 
 /**
@@ -122,12 +122,21 @@ async function tryTutor(ctx) {
 
 module.exports = {
   activeIn: ['hero'],
+  // Source-attributed on-kill effect — the tutor needs to fire even
+  // when Xiong himself died in the same damage exchange (e.g. a
+  // Firewall surprise's recoil killed him, but his attack still
+  // dropped the target to 0). Without this flag the engine would
+  // drop Xiong's listener at hero.hp <= 0 before isFromThisXiong
+  // gets a chance to gate by source attribution.
+  bypassDeadHeroFilter: true,
 
   hooks: {
     /**
      * Hero target killed by Xiong's Attack. Fires once per damaged
      * Hero target, post-HP-application — `target.hp <= 0` is the kill
-     * signal.
+     * signal. `isFromThisXiong` is the only attribution gate; the
+     * listener fires regardless of Xiong's own current hp (see the
+     * `bypassDeadHeroFilter` flag above).
      */
     afterDamage: async (ctx) => {
       if (ctx.type !== 'attack') return;
@@ -135,7 +144,6 @@ module.exports = {
       if (!target || target.hp === undefined) return;
       if (target.hp > 0) return;
       if (!isFromThisXiong(ctx, ctx.source)) return;
-      if (!xiongAlive(ctx)) return;
       await tryTutor(ctx);
     },
 
@@ -150,7 +158,6 @@ module.exports = {
     onCreatureDeath: async (ctx) => {
       if (ctx.type !== 'attack') return;
       if (!isFromThisXiong(ctx, ctx.source)) return;
-      if (!xiongAlive(ctx)) return;
       await tryTutor(ctx);
     },
   },

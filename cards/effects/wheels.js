@@ -39,6 +39,32 @@ module.exports = {
     // Claim HOPT only after confirming a mode (cancel doesn't consume it)
     if (!engine.claimHOPT('wheels', pi)) return;
 
+    // Compute the hand index of THIS Wheels copy so we can exclude it
+    // from the prompts below — Wheels is mid-resolution and shouldn't
+    // be a valid target of its own forced-discard / forced-delete cost.
+    // The natural cleanup at the end of doUseArtifactEffect moves it
+    // to discard; allowing the CPU (or a confused human) to pick it
+    // here just sends Wheels to the deletedPile by mistake.
+    const resolvingHandIdx = () => {
+      const r = ps._resolvingCard;
+      if (!r || r.name !== 'Wheels') return -1;
+      const target = r.nth || 1;
+      let count = 0;
+      for (let i = 0; i < ps.hand.length; i++) {
+        if (ps.hand[i] !== 'Wheels') continue;
+        count++;
+        if (count === target) return i;
+      }
+      return -1;
+    };
+    const buildEligibleIndices = () => {
+      const exclude = resolvingHandIdx();
+      if (exclude < 0) return undefined;
+      const out = [];
+      for (let i = 0; i < ps.hand.length; i++) if (i !== exclude) out.push(i);
+      return out.length > 0 ? out : undefined;
+    };
+
     if (choice.optionId === 'draw3') {
       // ── Mode A: Draw 3, Discard 1 ──
       await engine.actionDrawCards(pi, 3);
@@ -51,6 +77,7 @@ module.exports = {
         title: 'Wheels — Draw 3',
         description: 'You must discard 1 card from your hand.',
         cancellable: false,
+        eligibleIndices: buildEligibleIndices(),
       });
 
       if (!result || !result.cardName) return;
@@ -75,6 +102,7 @@ module.exports = {
           description: `You must delete ${2 - d} more card${2 - d > 1 ? 's' : ''} from your hand.`,
           instruction: 'Click a card in your hand to delete it.',
           cancellable: false,
+          eligibleIndices: buildEligibleIndices(),
         });
 
         if (!result || !result.cardName) {

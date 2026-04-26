@@ -127,8 +127,17 @@ function canAddCard(deck, cardName, section) {
   if (ct === 'Token') return false;
   // Per-card copy limit (e.g. Performance has maxCopies: 4 despite being an Ability)
   const cardMax = card.maxCopies;
+  // Heroes: 1 team-slot copy + up to 4 in main / side deck → 5 global cap.
+  const heroGlobalMax = cardMax || 5;
   if (section === 'main') {
-    if (ct === 'Hero') return false;
+    // Heroes legal in main deck (Goff-style attach mechanic).
+    if (ct === 'Hero') {
+      if ((deck.mainDeck || []).length >= 60) return false;
+      const inMain = (deck.mainDeck || []).filter(n => n === cardName).length;
+      if (inMain >= 4) return false;
+      if (countInDeck(deck, cardName) >= heroGlobalMax) return false;
+      return true;
+    }
     // Potions allowed in main deck ONLY if Nicolas is a hero
     if (ct === 'Potion') {
       if (!hasNicolasHero(deck)) return false;
@@ -154,13 +163,23 @@ function canAddCard(deck, cardName, section) {
   if (section === 'hero') {
     if (ct !== 'Hero') return false;
     if (!(deck.heroes || []).some(h => !h || !h.hero)) return false;
-    if (countInDeck(deck, cardName) >= (cardMax || 1)) return false;
+    // Team slot caps at 1 of each Hero regardless of how many copies
+    // sit in main/side deck.
+    const inTeam = (deck.heroes || []).filter(h => h?.hero === cardName).length;
+    if (inTeam >= 1) return false;
+    if (countInDeck(deck, cardName) >= heroGlobalMax) return false;
     return true;
   }
   if (section === 'side') {
     if ((deck.sideDeck || []).length >= 15) return false;
     if (ct === 'Ability' && !cardMax) return true; // Unlimited unless maxCopies set
-    const maxC = cardMax || (ct === 'Hero' ? 1 : ct === 'Potion' ? 2 : 4);
+    if (ct === 'Hero') {
+      const inSide = (deck.sideDeck || []).filter(n => n === cardName).length;
+      if (inSide >= 4) return false;
+      if (countInDeck(deck, cardName) >= heroGlobalMax) return false;
+      return true;
+    }
+    const maxC = cardMax || (ct === 'Potion' ? 2 : 4);
     if (countInDeck(deck, cardName) >= maxC) return false;
     return true;
   }

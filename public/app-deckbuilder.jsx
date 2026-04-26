@@ -658,6 +658,10 @@ function DeckBuilder() {
     const items = [];
     if (card.cardType === 'Hero') {
       items.push({ label: 'Add to Heroes', icon: '👑', color: '#ffd700', disabled: !canAddCard(currentDeck, cardName, 'hero'), action: () => addCardTo(cardName, 'hero') });
+      // Heroes are also legal in the Main Deck (Goff-style attach
+      // mechanic) up to 4 copies. Always offer the option; canAddCard
+      // disables it when the cap or 60-card limit is hit.
+      items.push({ label: 'Add to Main Deck', icon: '📋', color: '#44aaff', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
     } else if (card.cardType === 'Potion') {
       items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#44ffaa', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
       if (hasNicolasHero(currentDeck)) {

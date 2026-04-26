@@ -44,13 +44,17 @@ module.exports = {
           c.owner === result.target.owner && c.zone === 'support' &&
           c.heroIdx === result.target.heroIdx && c.zoneSlot === result.target.slotIdx
         );
-        if (inst && engine.canApplyCreatureStatus(inst, 'stunned')) {
-          inst.counters.stunned = 1;
+        if (inst) {
+          // Animation always plays — visual feedback for the hit even
+          // if the stun fizzles against a Cardinal-immune target.
           engine._broadcastEvent('play_zone_animation', {
             type: 'electric_strike', owner: result.target.owner,
             heroIdx: result.target.heroIdx, zoneSlot: result.target.slotIdx,
           });
-          engine.log('stun', { target: inst.name, by: 'Heavy Hit', type: 'creature' });
+          if (engine.canApplyCreatureStatus(inst, 'stunned')) {
+            inst.counters.stunned = 1;
+            engine.log('stun', { target: inst.name, by: 'Heavy Hit', type: 'creature' });
+          }
         }
       }
 

@@ -25,6 +25,11 @@ function applyBonus(engine, card, hero, ownerIdx, heroIdx, copyIndex) {
 
 module.exports = {
   activeIn: ['ability'],
+  // Lizbeth/Smugbeth: Toughness is explicitly excluded from ability
+  // borrowing per spec — Lizbeth does NOT gain HP from opponent's
+  // Toughness. This flag is honoured by the engine's auto-mirror
+  // dispatch in `_fireLizbethMirrorIfApplicable`.
+  disableLizbethMirror: true,
 
   hooks: {
     /**

@@ -12,6 +12,12 @@
 
 module.exports = {
   activeIn: ['ability'],
+  // Lizbeth/Smugbeth: auto-mirror disabled. The hook gates on
+  // `entering.owner !== ctx.cardOwner` (would only fire when an
+  // ability enters Lizbeth's slot) AND re-walks `ps.abilityZones[hi]`
+  // for the Creativity level on the borrower's side — both fail when
+  // Lizbeth has no Creativity of her own. Phase 3 punch list.
+  disableLizbethMirror: true,
 
   hooks: {
     onCardEnterZone: async (ctx) => {

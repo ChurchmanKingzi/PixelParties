@@ -6857,6 +6857,37 @@ function GameAnimationRenderer({ type, x, y, w, h }) {
   return <Component x={x} y={y} w={w} h={h} />;
 }
 
+// Renders a Creature card with an attached Hero "underneath".
+// While the player hovers, the Creature visually swaps to the
+// attached Hero card (mirrors the Performance hover-flip pattern
+// in AbilityStack below). When not hovered, shows the Creature's
+// own art with a small "📎 Hero attached" badge so the user can
+// tell at a glance that an attachment is present.
+function AttachableCreatureCard({ creatureName, attachedHero, ...boardCardProps }) {
+  const [hovered, setHovered] = useState(false);
+  const showName = hovered ? attachedHero : creatureName;
+  return (
+    <div className="attachable-creature-wrap"
+      style={{ position: 'relative', width: '100%', height: '100%' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}>
+      <BoardCard {...boardCardProps} cardName={showName} />
+      {!hovered && (
+        <div className="attached-hero-badge"
+          title={`Attached: ${attachedHero}`}
+          style={{
+            position: 'absolute', top: 2, left: 2,
+            background: 'rgba(0,0,0,.65)', color: '#ffd700',
+            fontSize: 10, padding: '1px 4px', borderRadius: 3,
+            pointerEvents: 'none', zIndex: 5,
+          }}>
+          📎 {attachedHero?.split(',')[0] || 'Hero'}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Renders an ability zone stack — handles Performance visual transformation
 function AbilityStack({ cards }) {
   const [hovered, setHovered] = useState(false);
@@ -8103,6 +8134,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
       if (opp.heroes[hi]?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card)) return true;
     }
+    // Wolflesia-style Creature spell-casters: any matching Creature is
+    // a valid cast path even when no Hero qualifies normally.
+    if (card.cardType === 'Spell') {
+      const casters = gameState.creatureSpellCasters || [];
+      for (const c of casters) {
+        if ((c.eligibleHandCards || []).includes(card.name)) return true;
+      }
+    }
     return false;
   };
 
@@ -8469,6 +8508,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // heroes that can only host them via bounce-place / tribute. Replicates the
   // engine's countAbilitiesForSchool + bypassLevelReq logic — close enough for
   // the drop/highlight UI; the server still re-validates on play.
+  //
+  // HERO-SIDE bypasses (Cute Princess Mary's `canBypassLevelReqForCard`) ARE
+  // honoured here via `gameState.heroBypassSummonCards` — those reflect the
+  // hero's own identity rather than a conditional placement mode, so Mary's
+  // free slots light up under a Cute Phoenix drag. Card-side bypasses still
+  // don't.
   const canHeroNormalSummon = (playerData, heroIdx, card) => {
     if (!card || card.cardType !== 'Creature') return false;
     const hero = playerData.heroes?.[heroIdx];
@@ -8499,6 +8544,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // are deliberately NOT consulted here; see function docstring above.
     const blr = hero.bypassLevelReq;
     if (blr && level <= blr.maxLevel && (blr.types || []).includes(card.cardType)) return true;
+    // Hero-side `canBypassLevelReqForCard` (Cute Princess Mary's "Cute"
+    // bypass, etc.). Server pre-computes this per-hero per-card so the
+    // client doesn't need access to the hero scripts directly.
+    if (playerData === me) {
+      const list = (gameState.heroBypassSummonCards || {})[heroIdx];
+      if (list && list.includes(card.name)) return true;
+    }
     return false;
   };
 
@@ -8885,6 +8937,33 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               }
             }
           }
+          // Hero-zone fallback for Creatures: dropping on a Hero (rather
+          // than on a specific Support Zone) auto-places into that Hero's
+          // LEFT-MOST free Support Zone. Skipped in bounce mode — bounce
+          // targets are slot-specific and the user must explicitly aim
+          // at the bounceable's slot.
+          if (targetHero < 0 && card.cardType === 'Creature' && !hasBounceTargets) {
+            const heroEls3 = document.querySelectorAll('[data-hero-zone]');
+            for (const el of heroEls3) {
+              const r = el.getBoundingClientRect();
+              if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+                if (el.dataset.heroOwner !== 'me') continue;
+                const hi = parseInt(el.dataset.heroIdx);
+                if (heroActionHeroIdx !== undefined && hi !== heroActionHeroIdx) continue;
+                const canPlayHere = isHeroAction || canHeroNormalSummon(me, hi, card);
+                if (!canPlayHere) continue;
+                const supZones = me.supportZones[hi] || [];
+                let leftmost = -1;
+                for (let z = 0; z < 3; z++) {
+                  if ((supZones[z] || []).length === 0) { leftmost = z; break; }
+                }
+                if (leftmost >= 0) {
+                  targetHero = hi;
+                  targetSlot = leftmost;
+                }
+              }
+            }
+          }
         }
         setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot, targetBakhmSlot, isSurprise: surpriseTarget });
       } else if (isEquipPlayable) {
@@ -9054,6 +9133,43 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
 
+        // Wolflesia-style Creature spell-cast: support zones holding a
+        // matching creature-spell-caster are valid drop targets for the
+        // Spell. Drop emits `play_spell` with `heroIdx` set to the
+        // Creature's host heroIdx — the engine's bypass additional-
+        // action picks up the cast. We tag `creatureCasterSlot` so the
+        // support-zone renderer can light up just THIS slot (not the
+        // host hero zone).
+        let creatureCasterSlot = -1;
+        let creatureCasterInstId = null;
+        if (!surpriseTarget && card.cardType === 'Spell') {
+          const casters = (gameState.creatureSpellCasters || [])
+            .filter(c => (c.eligibleHandCards || []).includes(card.name));
+          if (casters.length > 0) {
+            const supEls2 = document.querySelectorAll('[data-support-zone]');
+            for (const el of supEls2) {
+              const r = el.getBoundingClientRect();
+              if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+                if (el.dataset.supportOwner !== 'me') continue;
+                const hi = parseInt(el.dataset.supportHero);
+                const si = parseInt(el.dataset.supportSlot);
+                const match = casters.find(c => c.heroIdx === hi && c.zoneSlot === si);
+                if (match) {
+                  targetHero = hi;
+                  // Don't repurpose targetSlot — that field drives the
+                  // attachment-spell flow (sets `attachmentZoneSlot` on
+                  // the play_spell emit). Wolflesia's spell isn't an
+                  // attachment. Use a separate `creatureCasterSlot`
+                  // for the visual highlight, and `creatureCasterInstId`
+                  // so the server anchors animations on the Creature.
+                  creatureCasterSlot = si;
+                  creatureCasterInstId = match.creatureInstId;
+                }
+              }
+            }
+          }
+        }
+
         // Check hero zones (all spells/attacks, including attachments for auto-place)
         if (targetHero < 0) {
         const heroEls2 = document.querySelectorAll('[data-hero-zone]');
@@ -9087,7 +9203,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot: targetSlot, isSpell: !surpriseTarget, isSurprise: surpriseTarget, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot: targetSlot, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner });
       } else if (isAscensionPlayable) {
         // Ascended Hero drag — target hero zones with eligible base heroes
         let targetHero = -1;
@@ -9161,8 +9277,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               });
             } else {
               // Normal flow: find every Hero that could cast this card,
-              // own + charmed opponent. Single eligible auto-plays;
-              // multiple eligible opens the hero-selection popup.
+              // own + charmed opponent. Wolflesia-style Creature
+              // spell-casters appear in the eligible list as
+              // `creatureInstId`-tagged entries — clicking one routes
+              // through `play_spell` with `heroIdx` set to the
+              // Creature's host slot, where the engine's bypass
+              // additional-action picks it up. Single eligible
+              // auto-plays; multiple eligible opens the picker popup.
               const eligible = [];
               for (let hi = 0; hi < (me.heroes || []).length; hi++) {
                 if (canHeroPlayCard(me, hi, card)) {
@@ -9175,8 +9296,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   eligible.push({ idx: hi, name: oppHero.name, charmedOwner: oppIdx });
                 }
               }
+              if (card.cardType === 'Spell') {
+                for (const c of (gameState.creatureSpellCasters || [])) {
+                  if (!(c.eligibleHandCards || []).includes(card.name)) continue;
+                  eligible.push({
+                    idx: c.heroIdx,
+                    name: `${c.cardName} (Creature)`,
+                    creatureInstId: c.creatureInstId,
+                  });
+                }
+              }
               if (eligible.length === 1) {
-                socket.emit('play_spell', { roomId: gameState.roomId, cardName, handIndex: idx, heroIdx: eligible[0].idx, charmedOwner: eligible[0].charmedOwner });
+                socket.emit('play_spell', { roomId: gameState.roomId, cardName, handIndex: idx, heroIdx: eligible[0].idx, charmedOwner: eligible[0].charmedOwner, viaCreatureInstId: eligible[0].creatureInstId });
               } else if (eligible.length > 1) {
                 setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isHeroAction });
               }
@@ -9465,6 +9596,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             heroIdx: prev.targetHero,
             charmedOwner: prev.charmedOwner,
             attachmentZoneSlot: prev.targetSlot >= 0 ? prev.targetSlot : undefined,
+            viaCreatureInstId: prev.creatureCasterInstId || undefined,
           });
           return null;
         });
@@ -9867,6 +9999,53 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => { fly.remove(); }, 700);
     };
     socket.on('hand_to_board_fly', onHandToBoard);
+
+    // Generic "attach Hero to Creature" flight — used by Goff/Gon and
+    // any future attach-style mechanic. Unlike hand_to_board_fly, this
+    // ALWAYS renders for both sides (the owner doesn't trigger this via
+    // drag-drop, so they haven't already seen a local animation). The
+    // source is either a specific hand index or the player's deck pile;
+    // the destination is the host Creature's support zone slot.
+    const onAttachHeroFly = ({ ownerIdx, source, handIndex, cardName, destOwner, destHeroIdx, destZoneSlot }) => {
+      const ownerLabel = ownerIdx === myIdx ? 'me' : 'opp';
+      const destLabel = destOwner === myIdx ? 'me' : 'opp';
+      let sourceEl;
+      if (source === 'hand') {
+        sourceEl = ownerIdx === myIdx
+          ? document.querySelector(`.game-hand [data-hand-idx="${handIndex}"]`)
+          : document.querySelector(`.game-hand-opp [data-hand-idx="${handIndex}"]`);
+      } else {
+        // Deck pile element. The owner's deck and opp's deck have
+        // different selectors.
+        sourceEl = ownerIdx === myIdx
+          ? document.querySelector('[data-my-deck]')
+          : document.querySelector('[data-opp-deck]');
+      }
+      const destEl = document.querySelector(
+        `[data-support-zone][data-support-owner="${destLabel}"][data-support-hero="${destHeroIdx}"][data-support-slot="${destZoneSlot}"]`
+      );
+      if (!sourceEl || !destEl) return;
+      const sr = sourceEl.getBoundingClientRect();
+      const dr = destEl.getBoundingClientRect();
+      const fly = document.createElement('div');
+      fly.className = 'board-card hand-to-board-fly';
+      const imgUrl = cardName ? cardImageUrl(cardName) : null;
+      fly.innerHTML = imgUrl
+        ? `<img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" draggable="false" />`
+        : `<img src="/cardback.png" style="width:100%;height:100%;object-fit:cover" draggable="false" />`;
+      const dx = (dr.left + dr.width / 2) - (sr.left + sr.width / 2);
+      const dy = (dr.top + dr.height / 2) - (sr.top + sr.height / 2);
+      // Slightly tighter shadow + faster transition than the regular
+      // hand-to-board fly so chained attaches don't feel sluggish.
+      fly.style.cssText = `position:fixed;left:${sr.left}px;top:${sr.top}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 24px rgba(255,180,80,.7);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
+      document.body.appendChild(fly);
+      requestAnimationFrame(() => {
+        fly.style.transform = `translate(${dx}px, ${dy}px) scale(${dr.width / sr.width})`;
+        fly.style.opacity = '0.3';
+      });
+      setTimeout(() => { fly.remove(); }, 700);
+    };
+    socket.on('attach_hero_fly', onAttachHeroFly);
 
     socket.on('card_reveal', onReveal);
     socket.on('deck_search_add', onDeckSearchAdd);
@@ -12728,10 +12907,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => skull.remove(), 1200);
     };
     socket.on('play_skull_burst', onSkullBurst);
-    const onHealBeam = ({ phase, sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot }) => {
+    const onHealBeam = ({ phase, sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot }) => {
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
-      const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
+      // Source: support slot if `sourceZoneSlot` is set (Wolflesia-style
+      // Creature spell-cast — beam originates from her support slot),
+      // otherwise the hero zone.
+      const srcEl = (sourceZoneSlot != null && sourceZoneSlot >= 0)
+        ? document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`)
+        : document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
       let tgtEl;
       if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
         tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
@@ -12849,6 +13033,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return () => {
       socket.off('card_reveal', onReveal); socket.off('deck_search_add', onDeckSearchAdd);
       socket.off('hand_to_board_fly', onHandToBoard);
+      socket.off('attach_hero_fly', onAttachHeroFly);
       socket.off('reaction_chain_update', onChainUpdate); socket.off('reaction_chain_resolving_start', onChainResolvingStart);
       socket.off('reaction_chain_link_resolving', onChainLinkResolving); socket.off('reaction_chain_link_resolved', onChainLinkResolved);
       socket.off('reaction_chain_link_negated', onChainLinkNegated); socket.off('reaction_chain_done', onChainDone);
@@ -14357,7 +14542,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           })();
           const attachPickHeroDim = !isOpp && abilityAttachPick && !attachPickEligibleHero;
           const equipTarget = !isOpp && playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1;
-          const spellTarget = playDrag && playDrag.isSpell && playDrag.targetHero === i && (playDrag.charmedOwner != null ? isOpp : !isOpp);
+          const spellTarget = playDrag && playDrag.isSpell && playDrag.targetHero === i && (playDrag.charmedOwner != null ? isOpp : !isOpp) && !(playDrag.creatureCasterSlot >= 0);
           const pi = isOpp ? oppIdx : myIdx;
           const heroTargetId = `hero-${pi}-${i}`;
           const isValidHeroTarget = isTargeting && validTargetIds.has(heroTargetId);
@@ -14659,16 +14844,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isValidPotionTarget = isTargeting && validTargetIds.has(abTargetId);
                 const isSelectedPotionTarget = selectedSet.has(abTargetId);
                 const isExploding = explosions.includes(abTargetId);
-                // Check if this ability is activatable (action-costing)
+                // Check if this ability is activatable (action-costing).
+                // Three matchers for opponent-side slots: charm/control
+                // (`charmedOwner === pi`) and Lizbeth/Smugbeth borrow
+                // (`borrowedFromOwner === pi`). Both highlight the slot
+                // and enable the click handler.
                 const activatableEntry = cards.length > 0 && (
-                  (!isOpp && (gameState.activatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z && !a.charmedOwner)) ||
-                  (isOpp && (gameState.activatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z && a.charmedOwner === pi))
+                  (!isOpp && (gameState.activatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z && !a.charmedOwner && !a.borrowedFromOwner)) ||
+                  (isOpp && (gameState.activatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z && (a.charmedOwner === pi || a.borrowedFromOwner === pi)))
                 );
                 const isActivatable = !!activatableEntry;
-                // Check if this ability is free-activatable (no action cost, Main Phase)
+                // Check if this ability is free-activatable (no action cost, Main Phase).
+                // Three matchers for opponent-side slots: own (no charmedOwner /
+                // borrowedFromOwner), charm/control (`charmedOwner === pi`),
+                // and Lizbeth/Smugbeth borrow (`borrowedFromOwner === pi`).
                 const freeAbilityEntry = cards.length > 0 && (
-                  (!isOpp && (gameState.freeActivatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z && !a.charmedOwner)) ||
-                  (isOpp && (gameState.freeActivatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z && a.charmedOwner === pi))
+                  (!isOpp && (gameState.freeActivatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z && !a.charmedOwner && !a.borrowedFromOwner)) ||
+                  (isOpp && (gameState.freeActivatableAbilities || []).find(a => a.heroIdx === i && a.zoneIdx === z && (a.charmedOwner === pi || a.borrowedFromOwner === pi)))
                 );
                 const isFreeActivatable = freeAbilityEntry?.canActivate === true;
                 const isFreeExhausted = freeAbilityEntry && !freeAbilityEntry.canActivate;
@@ -14702,9 +14894,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   : (canActivate && !isEffectLocked) ? () => {
                       if (isFreeActivatable) {
                         // Free activation — no confirmation needed, activate directly
-                        socket.emit('activate_free_ability', { roomId: gameState.roomId, heroIdx: i, zoneIdx: z, charmedOwner: freeAbilityEntry?.charmedOwner });
+                        socket.emit('activate_free_ability', { roomId: gameState.roomId, heroIdx: i, zoneIdx: z, charmedOwner: freeAbilityEntry?.charmedOwner, borrowedFromOwner: freeAbilityEntry?.borrowedFromOwner });
                       } else {
-                        setPendingAbilityActivation({ heroIdx: i, zoneIdx: z, abilityName: cards[0], level: cards.length, isHeroAction: isHeroActionActivatable, charmedOwner: activatableEntry?.charmedOwner });
+                        setPendingAbilityActivation({ heroIdx: i, zoneIdx: z, abilityName: cards[0], level: cards.length, isHeroAction: isHeroActionActivatable, charmedOwner: activatableEntry?.charmedOwner, borrowedFromOwner: activatableEntry?.borrowedFromOwner });
                       }
                     } : (isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined);
                 return (
@@ -14810,7 +15002,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const z = slot.z;
               const isIsland = slot.isIsland;
               const cards = (supZones[i]||[])[z]||[];
-              const isPlayTarget = !isOpp && playDrag && playDrag.targetHero === i && playDrag.targetSlot === z;
+              const isPlayTarget = !isOpp && playDrag && playDrag.targetHero === i && (playDrag.targetSlot === z || playDrag.creatureCasterSlot === z);
               const isAutoTarget = !isOpp && playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1 && z === autoSlot;
               const pi = isOpp ? oppIdx : myIdx;
               // Check all possible equip target IDs for this zone
@@ -15062,6 +15254,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                               archetype: 'Deepsea',
                             };
                           }
+                        }
+                        // Goff/Gon-style attached Hero: swap to the
+                        // Hero's card on hover (Performance-pattern).
+                        // The badge in the corner tells the player an
+                        // attachment is present even before they hover.
+                        if (cc?.attachedHero) {
+                          return <AttachableCreatureCard
+                            creatureName={cards[0]}
+                            attachedHero={cc.attachedHero}
+                            hp={curHp} maxHp={mHp} hpPosition="creature"
+                            skins={gameSkins} style={creatureStyle}
+                            tooltipCardOverride={tooltipOverride}
+                          />;
                         }
                         return <BoardCard cardName={cards[0]} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={creatureStyle} tooltipCardOverride={tooltipOverride} />;
                       })()
@@ -16463,6 +16668,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Select a Zone'}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+          {/* Optional small card preview — server passes `previewCardName`
+              to give the player a visual of what they're about to place.
+              CardMini gives the full hover tooltip + foil treatment for free. */}
+          {ep.previewCardName && CARDS_BY_NAME[ep.previewCardName] && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+              <div style={{ width: 90 }}>
+                <CardMini card={CARDS_BY_NAME[ep.previewCardName]} inGallery />
+              </div>
+            </div>
+          )}
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7 }}>Click a highlighted zone on the board.</div>
           {ep.cancellable !== false && (
             <button className="btn" style={{ marginTop: 10, padding: '6px 16px', fontSize: 11 }}
@@ -16605,7 +16820,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 if (pa.isHeroAction) {
                   socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx } });
                 } else {
-                  socket.emit('activate_ability', { roomId: gameState.roomId, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, charmedOwner: pa.charmedOwner });
+                  socket.emit('activate_ability', { roomId: gameState.roomId, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, charmedOwner: pa.charmedOwner, borrowedFromOwner: pa.borrowedFromOwner });
                 }
               }}>Yes!</button>
             <button className="btn" style={{ padding: '8px 20px', fontSize: 12, borderColor: 'var(--danger)', color: 'var(--danger)' }}
@@ -16622,8 +16837,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
           <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>{spellHeroPick.isSurprise ? 'Choose a Hero to set this Surprise face-down:' : spellHeroPick.isAscension ? 'Choose a Hero to Ascend:' : spellHeroPick.isCreature ? 'Choose a Hero to summon this Creature:' : 'Choose a Hero to play this card:'}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {spellHeroPick.eligible.map(h => (
-              <button key={(h.charmedOwner != null ? 'c' : '') + h.idx} className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: h.charmedOwner != null ? '#ff69b4' : 'var(--accent)', color: h.charmedOwner != null ? '#ff69b4' : 'var(--accent)', textAlign: 'left' }}
+            {spellHeroPick.eligible.map(h => {
+              const isCreatureCaster = h.creatureInstId != null;
+              const keyStr = isCreatureCaster
+                ? `cr:${h.creatureInstId}`
+                : (h.charmedOwner != null ? 'c' : '') + h.idx;
+              const borderColor = isCreatureCaster ? '#7fffaa'
+                : (h.charmedOwner != null ? '#ff69b4' : 'var(--accent)');
+              const label = isCreatureCaster
+                ? `🐾 ${h.name}`
+                : (h.charmedOwner != null ? `💕 ${h.name} (charmed)` : (me.heroes[h.idx]?.name || 'Hero ' + (h.idx + 1)));
+              return (
+              <button key={keyStr} className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor, color: borderColor, textAlign: 'left' }}
                 onClick={() => {
                   const pick = spellHeroPick;
                   setSpellHeroPick(null);
@@ -16650,16 +16875,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       zoneSlot: h.zoneSlot,
                     });
                   } else {
+                    // Spell. For creature casters, heroIdx routes to the
+                    // host slot — engine's bypass additional-action picks
+                    // it up automatically. `viaCreatureInstId` tells the
+                    // server to anchor animations on the Creature's
+                    // support slot, not the host hero's zone.
                     socket.emit('play_spell', {
                       roomId: gameState.roomId, cardName: pick.cardName,
                       handIndex: pick.handIndex, heroIdx: h.idx,
                       charmedOwner: h.charmedOwner,
+                      viaCreatureInstId: h.creatureInstId,
                     });
                   }
                 }}>
-                {h.charmedOwner != null ? `💕 ${h.name} (charmed)` : (me.heroes[h.idx]?.name || 'Hero ' + (h.idx + 1))}
+                {label}
               </button>
-            ))}
+            );
+            })}
             <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
               onClick={() => setSpellHeroPick(null)}>Cancel</button>
           </div>
@@ -16899,6 +17131,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out' }}>
           <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
+          {/* Optional small card preview — passed in via config.previewCardName.
+              Bill uses this to show the equip the player is placing; any
+              future card can do the same with no further panel changes. */}
+          {pt.config?.previewCardName && CARDS_BY_NAME[pt.config.previewCardName] && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+              <div style={{ width: 90 }}>
+                <CardMini card={CARDS_BY_NAME[pt.config.previewCardName]} inGallery />
+              </div>
+            </div>
+          )}
           {pt.config?.maxTotal > 0 && pt.validTargets?.length > 0 && (() => {
             // For Pollution-capped prompts (Sun Beam etc.), the effective cap
             // grows with each own-support target selected — since destroying
