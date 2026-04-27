@@ -103,10 +103,16 @@ module.exports = {
   },
 
   async onCreatureEffect(ctx) {
-    return await ctx._engine.actionAttachHeroToCreature(
+    const ok = await ctx._engine.actionAttachHeroToCreature(
       ctx.cardOwner, ATTACHABLE, ctx.card,
       { source: CARD_NAME },
     );
+    // Don't burn the once-per-turn creatureEffect slot — the post-
+    // attach Spell-cast (granted by `onAttachHero`) is a SEPARATE
+    // once-per-turn gate, and the player should be able to use it
+    // the same turn Rafflesia is attached.
+    if (ok) ctx._skipCreatureEffectHopt = true;
+    return ok;
   },
 
   onAttachHero(engine, ctx) {

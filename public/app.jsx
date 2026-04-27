@@ -3807,6 +3807,302 @@ const ANIM_REGISTRY = {
   ice_encase: IceEncaseEffect,
   electric_strike: ElectricStrikeEffect,
   flame_strike: FlameStrikeEffect,
+  // ── Boiling Oil ───────────────────────────────────────────────────
+  // Mirrors the registry entry in app-board.jsx — see that file for
+  // full design notes. Red oil rains down with sizzle/splat marks.
+  boiling_oil: (() => {
+    return function BoilingOilEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      const drops = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+        startX: -cw * 0.5 + Math.random() * cw,
+        delay: i * 18 + Math.random() * 60,
+        dur: 320 + Math.random() * 180,
+        size: 4 + Math.random() * 6,
+        color: ['#cc1100', '#ff2200', '#dd3300', '#aa0000', '#ee4400', '#b81022'][Math.floor(Math.random() * 6)],
+      })), [cw]);
+      const splats = useMemo(() => Array.from({ length: 9 }, () => ({
+        x: -cw * 0.4 + Math.random() * cw * 0.8,
+        y: ch * 0.15 + Math.random() * ch * 0.25,
+        rx: 6 + Math.random() * 9,
+        ry: 3 + Math.random() * 4,
+        delay: 150 + Math.random() * 220,
+        dur: 500 + Math.random() * 350,
+      })), [cw, ch]);
+      const steams = useMemo(() => Array.from({ length: 7 }, () => ({
+        x: -cw * 0.35 + Math.random() * cw * 0.7,
+        y: ch * 0.18 + Math.random() * ch * 0.15,
+        size: 6 + Math.random() * 5,
+        delay: 280 + Math.random() * 250,
+        dur: 600 + Math.random() * 280,
+      })), [cw, ch]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {drops.map((d, i) => (
+            <div key={'bod' + i} style={{
+              position: 'absolute',
+              left: d.startX + 'px',
+              top: -ch * 0.65 + 'px',
+              width: d.size + 'px',
+              height: (d.size * 1.7) + 'px',
+              borderRadius: '50% 50% 50% 50% / 60% 60% 40% 40%',
+              background: d.color,
+              boxShadow: `0 0 5px ${d.color}, 0 1px 2px rgba(0,0,0,0.4)`,
+              opacity: 0,
+              animation: `boiling-oil-fall ${d.dur}ms cubic-bezier(0.5, 0, 1, 1) ${d.delay}ms forwards`,
+              '--bofdy': (ch * 1.05) + 'px',
+            }} />
+          ))}
+          {splats.map((s, i) => (
+            <div key={'bos' + i} style={{
+              position: 'absolute',
+              left: s.x + 'px', top: s.y + 'px',
+              width: (s.rx * 2) + 'px', height: (s.ry * 2) + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(ellipse, #ee2200 0%, #aa0500 50%, #440000 90%)',
+              boxShadow: '0 0 7px rgba(220, 30, 0, 0.85), inset 0 -2px 3px rgba(0,0,0,0.5)',
+              opacity: 0,
+              animation: `boiling-oil-splat ${s.dur}ms ease-out ${s.delay}ms forwards`,
+            }} />
+          ))}
+          {steams.map((st, i) => (
+            <div key={'bost' + i} style={{
+              position: 'absolute',
+              left: st.x + 'px', top: st.y + 'px',
+              width: st.size + 'px', height: (st.size * 1.4) + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,210,190,0.7) 0%, rgba(255,160,110,0.35) 65%, transparent 100%)',
+              opacity: 0,
+              animation: `boiling-oil-steam ${st.dur}ms ease-out ${st.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes boiling-oil-fall {
+              0%   { opacity: 0;    transform: translateY(0)              scaleY(0.65); }
+              12%  { opacity: 1;    transform: translateY(calc(var(--bofdy) * 0.12)) scaleY(0.9); }
+              100% { opacity: 0.85; transform: translateY(var(--bofdy))   scaleY(1.15); }
+            }
+            @keyframes boiling-oil-splat {
+              0%   { opacity: 0;    transform: scale(0.25) translateY(-4px); }
+              35%  { opacity: 0.95; transform: scale(1.25) translateY(0); }
+              100% { opacity: 0;    transform: scale(1.4)  translateY(2px); }
+            }
+            @keyframes boiling-oil-steam {
+              0%   { opacity: 0;   transform: translate(0, 0)       scale(0.5); }
+              30%  { opacity: 0.7; transform: translate(0, -8px)    scale(1); }
+              100% { opacity: 0;   transform: translate(0, -28px)   scale(1.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Flame Pillars (Dance of the Flame Pillars) ────────────────────
+  // Mirrors app-board.jsx — geyser of fire erupting from the bottom
+  // with embers spraying at the top. Full design notes in that file.
+  flame_pillars: (() => {
+    return function FlamePillarsEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      const jet = useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+        startX: -cw * 0.18 + Math.random() * cw * 0.36,
+        delay: i * 18 + Math.random() * 60,
+        dur: 420 + Math.random() * 240,
+        size: 12 + Math.random() * 14,
+        char: ['🔥', '🔥', '🔥', '🔥', '✦', '⭐'][Math.floor(Math.random() * 6)],
+        sway: -10 + Math.random() * 20,
+        rise: ch * 1.0 + Math.random() * ch * 0.6,
+      })), [cw, ch]);
+      const embers = useMemo(() => Array.from({ length: 14 }, () => {
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.4;
+        const speed = 38 + Math.random() * 60;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed,
+          size: 3 + Math.random() * 4,
+          color: ['#ff2200', '#ff8800', '#ffaa00', '#ffcc33', '#ffe066'][Math.floor(Math.random() * 5)],
+          delay: 230 + Math.random() * 220,
+          dur: 500 + Math.random() * 320,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute',
+            left: -cw * 0.42 + 'px',
+            top: ch * 0.22 + 'px',
+            width: cw * 0.84 + 'px',
+            height: ch * 0.32 + 'px',
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse, #fff8aa 0%, #ffaa22 30%, #ff4400aa 60%, transparent 85%)',
+            opacity: 0,
+            animation: 'flame-pillar-base 380ms ease-out forwards',
+            filter: 'blur(2px)',
+          }} />
+          {jet.map((p, i) => (
+            <div key={'fpj' + i} style={{
+              position: 'absolute',
+              left: p.startX + 'px',
+              top: ch * 0.45 + 'px',
+              fontSize: p.size + 'px',
+              filter: 'drop-shadow(0 0 4px #ff6600)',
+              opacity: 0,
+              animation: `flame-pillar-rise ${p.dur}ms cubic-bezier(0.3, 0.7, 0.3, 1) ${p.delay}ms forwards`,
+              '--fpdy': (-p.rise) + 'px',
+              '--fpsway': p.sway + 'px',
+            }}>{p.char}</div>
+          ))}
+          {embers.map((e, i) => (
+            <div key={'fpe' + i} style={{
+              position: 'absolute',
+              left: 0, top: -ch * 0.35 + 'px',
+              width: e.size + 'px', height: e.size + 'px',
+              borderRadius: '50%',
+              background: e.color,
+              boxShadow: `0 0 6px ${e.color}`,
+              opacity: 0,
+              animation: `flame-pillar-ember ${e.dur}ms ease-out ${e.delay}ms forwards`,
+              '--fpedx': e.dx + 'px',
+              '--fpedy': e.dy + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes flame-pillar-base {
+              0%   { opacity: 0;    transform: scale(0.35, 0.5); }
+              30%  { opacity: 0.95; transform: scale(1.1, 1.15); }
+              100% { opacity: 0;    transform: scale(1.45, 0.8); }
+            }
+            @keyframes flame-pillar-rise {
+              0%   { opacity: 0;   transform: translate(0, 0) scale(0.4); }
+              15%  { opacity: 1;   transform: translate(0, calc(var(--fpdy) * 0.15)) scale(1.25); }
+              70%  { opacity: 1;   transform: translate(var(--fpsway), calc(var(--fpdy) * 0.7)) scale(1); }
+              100% { opacity: 0;   transform: translate(var(--fpsway), var(--fpdy)) scale(0.5); }
+            }
+            @keyframes flame-pillar-ember {
+              0%   { opacity: 0; transform: translate(0, 0) scale(1); }
+              22%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--fpedx), var(--fpedy)) scale(0.35); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Cute Hydra ────────────────────────────────────────────────────
+  // Purple-goo splat. Mirrors the registry entry in app-board.jsx —
+  // duplicated here because the lobby/menu app embeds its own copy
+  // of the registry. See that file for the full design notes.
+  hydra_goo: (() => {
+    return function HydraGooEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      const drops = useMemo(() => Array.from({ length: 18 }, (_, i) => {
+        const angle = (-Math.PI / 6) + Math.random() * (Math.PI * 7 / 6);
+        const speed = 35 + Math.random() * 55;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed + 18,
+          size: 6 + Math.random() * 8,
+          delay: i * 12 + Math.random() * 60,
+          dur: 380 + Math.random() * 220,
+          color: ['#5a189a', '#7b2cbf', '#9d4edd', '#c77dff',
+                  '#b338ff', '#e0aaff', '#ff5cd6', '#a855f7'][Math.floor(Math.random() * 8)],
+        };
+      }), []);
+      const splats = useMemo(() => Array.from({ length: 7 }, () => ({
+        x: -cw * 0.32 + Math.random() * cw * 0.64,
+        y: -ch * 0.28 + Math.random() * ch * 0.56,
+        rx: 8 + Math.random() * 10,
+        ry: 5 + Math.random() * 6,
+        rot: -25 + Math.random() * 50,
+        delay: 80 + Math.random() * 220,
+        dur: 600 + Math.random() * 500,
+      })), [cw, ch]);
+      const bubbles = useMemo(() => Array.from({ length: 10 }, () => ({
+        x: -cw * 0.3 + Math.random() * cw * 0.6,
+        y: -ch * 0.3 + Math.random() * ch * 0.6,
+        size: 4 + Math.random() * 4,
+        delay: 200 + Math.random() * 300,
+        dur: 280 + Math.random() * 220,
+      })), [cw, ch]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute',
+            left: -cw * 0.45 + 'px', top: -ch * 0.35 + 'px',
+            width: cw * 0.9 + 'px', height: ch * 0.7 + 'px',
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse, #f0c4ff 0%, #c77dff 25%, #7b2cbf99 55%, transparent 80%)',
+            opacity: 0,
+            animation: 'hydra-goo-flash 360ms ease-out forwards',
+            filter: 'blur(2px)',
+          }} />
+          {splats.map((s, i) => (
+            <div key={'gs' + i} style={{
+              position: 'absolute',
+              left: s.x + 'px', top: s.y + 'px',
+              width: (s.rx * 2) + 'px', height: (s.ry * 2) + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(ellipse, #b338ff 0%, #7b2cbf 50%, #4a0e75 90%)',
+              boxShadow: '0 0 8px rgba(155, 60, 230, 0.85), inset 0 -2px 4px rgba(0,0,0,0.4)',
+              transform: `rotate(${s.rot}deg)`,
+              opacity: 0,
+              animation: `hydra-goo-splat ${s.dur}ms ease-out ${s.delay}ms forwards`,
+            }} />
+          ))}
+          {drops.map((d, i) => (
+            <div key={'gd' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: d.size + 'px', height: d.size + 'px',
+              borderRadius: '50%',
+              background: d.color,
+              boxShadow: `0 0 6px ${d.color}, inset -1px -1px 2px rgba(0,0,0,0.4)`,
+              opacity: 0,
+              animation: `hydra-goo-fling ${d.dur}ms cubic-bezier(0.2, 0.6, 0.4, 1) ${d.delay}ms forwards`,
+              '--ggdx': d.dx + 'px',
+              '--ggdy': d.dy + 'px',
+            }} />
+          ))}
+          {bubbles.map((b, i) => (
+            <div key={'gb' + i} style={{
+              position: 'absolute',
+              left: b.x + 'px', top: b.y + 'px',
+              width: b.size + 'px', height: b.size + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, #ffffff 0%, #e0aaff 60%, #c77dff 100%)',
+              boxShadow: '0 0 4px rgba(255, 200, 255, 0.9)',
+              opacity: 0,
+              animation: `hydra-goo-bubble ${b.dur}ms ease-out ${b.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes hydra-goo-flash {
+              0%   { opacity: 0;    transform: scale(0.4); }
+              25%  { opacity: 0.95; transform: scale(1.05); }
+              100% { opacity: 0;    transform: scale(1.35); }
+            }
+            @keyframes hydra-goo-fling {
+              0%   { opacity: 0;   transform: translate(0, 0) scale(0.4); }
+              15%  { opacity: 1;   transform: translate(calc(var(--ggdx) * 0.18), calc(var(--ggdy) * 0.18)) scale(1.1); }
+              80%  { opacity: 1;   transform: translate(calc(var(--ggdx) * 0.92), calc(var(--ggdy) * 0.92)) scale(0.95); }
+              100% { opacity: 0;   transform: translate(var(--ggdx), var(--ggdy)) scale(0.55); }
+            }
+            @keyframes hydra-goo-splat {
+              0%   { opacity: 0;    transform: scale(0.2) rotate(var(--rot, 0deg)); }
+              30%  { opacity: 1;    transform: scale(1.2)   rotate(var(--rot, 0deg)); }
+              60%  { opacity: 0.95; transform: scale(1)     rotate(var(--rot, 0deg)); }
+              100% { opacity: 0;    transform: scale(1.05)  translateY(8px) rotate(var(--rot, 0deg)); }
+            }
+            @keyframes hydra-goo-bubble {
+              0%   { opacity: 0;   transform: scale(0.3) translateY(0); }
+              35%  { opacity: 1;   transform: scale(1)   translateY(-2px); }
+              100% { opacity: 0;   transform: scale(0.4) translateY(-10px); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   stranglehold_squeeze: (() => {
     return function StrangleholdSqueezeEffect({ x, y }) {
       useEffect(() => {

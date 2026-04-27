@@ -2,9 +2,13 @@
 //  CARD EFFECT: "Clausss, the No-Nonsense Cultist"
 //  Creature (Summoning Magic Lv 0, 50 HP)
 //
-//  Two-mode active effect (single creatureEffect
-//  HOPT slot per instance per turn — sharing the
-//  engine's `creature-effect:${inst.id}` key):
+//  Two-mode active effect — INDEPENDENT once-
+//  per-turn gates. Mode A (attach) does NOT
+//  consume the engine's `creature-effect:${inst.id}`
+//  HOPT (the script stamps `_skipCreatureEffectHopt`
+//  on the ctx during the attach), so Mode B can
+//  fire the same turn the attach lands. Mode B
+//  consumes HOPT normally.
 //
 //    A) NOT YET ATTACHED:
 //       Place a "Klaus, the Cult Leader" from
@@ -94,10 +98,16 @@ module.exports = {
 
     // Mode A: attach Klaus.
     if (!ctx.card.counters?.attachedHero) {
-      return await engine.actionAttachHeroToCreature(
+      const ok = await engine.actionAttachHeroToCreature(
         ctx.cardOwner, ATTACHABLE, ctx.card,
         { source: CARD_NAME },
       );
+      // Don't burn the once-per-turn creatureEffect slot — Mode B
+      // (sacrifice for second action) is a SEPARATE once-per-turn
+      // gate, and the player should be able to use it the same turn
+      // Klaus is attached.
+      if (ok) ctx._skipCreatureEffectHopt = true;
+      return ok;
     }
 
     // Mode B: sacrifice → second action.

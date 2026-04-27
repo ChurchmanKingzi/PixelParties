@@ -115,24 +115,60 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops) {
     : allAbilities.filter(a => a.isFree);
   if (abilities.length === 0) return false;
 
-  const options = abilities.map((ab, i) => ({
-    id: `ab-${i}`,
-    label: `${ab.abName} Lv${ab.abLevel} (${ab.heroName})`,
+  // ── Direct click: highlight eligible opponent Ability slots, click
+  // one to commit. `promptEffectTarget` with `autoConfirm: true`
+  // skips the Confirm-button step — the first click that fills the
+  // single-target slot dispatches the response automatically.
+  //
+  // The pending card-reveal + play-log slots are STASHED across the
+  // click-pick so its auto-confirm doesn't burn them on the way in.
+  // (`_firePendingCardReveal` runs from `resolveGenericPrompt` /
+  // `resolveEffectPrompt` on every confirmed response — without the
+  // stash, the player picking an ability would already reveal Charme
+  // to the opponent before the borrowed ability gets a chance to
+  // cancel.) After the pick, we put them back so the borrowed
+  // ability's first confirmed prompt OR the server's end-of-resolve
+  // path can fire them — both of which only run when the borrow
+  // actually resolves. On full cancellation the server sees
+  // `resolved === false` and clears them as part of its standard
+  // free-activate rollback (HOPT released, no animation, no opponent
+  // reveal).
+  const targets = abilities.map(ab => ({
+    id: `ability-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`,
+    type: 'ability',
+    owner: oi,
+    heroIdx: ab.ownerHeroIdx,
+    slotIdx: ab.zoneIdx,
+    cardName: ab.abName,
   }));
 
-  const result = await engine.promptGeneric(pi, {
-    type: 'optionPicker',
-    title: `${hero.name} — Charme Lv1`,
-    description: "Choose an opponent's Ability to use as your own!",
-    options,
-    cancellable: true,
-  });
+  const stashedReveal = gs._pendingCardReveal;
+  const stashedLog    = gs._pendingPlayLog;
+  gs._pendingCardReveal = null;
+  gs._pendingPlayLog    = null;
 
-  if (!result || result.cancelled || !result.optionId) return false;
+  let selectedIds;
+  try {
+    selectedIds = await engine.promptEffectTarget(pi, targets, {
+      title: `${hero.name} — Charme Lv1`,
+      description: "Click an opponent's Ability to use it as your own.",
+      confirmLabel: 'Confirm',
+      cancellable: true,
+      maxPerType: { ability: 1 },
+      maxTotal: 1,
+      minRequired: 1,
+      autoConfirm: true,
+    });
+  } finally {
+    gs._pendingCardReveal = stashedReveal;
+    gs._pendingPlayLog    = stashedLog;
+  }
 
-  const match = result.optionId.match(/^ab-(\d+)$/);
-  if (!match) return false;
-  const selectedAb = abilities[parseInt(match[1])];
+  if (!selectedIds || selectedIds.length === 0) return false;
+  const targetId = selectedIds[0];
+  const selectedAb = abilities.find(ab =>
+    `ability-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}` === targetId
+  );
   if (!selectedAb) return false;
 
   const script = selectedAb.script;
@@ -162,9 +198,17 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops) {
     from: selectedAb.heroName,
   });
 
-  await activateFn(fakeCtx, selectedAb.abLevel);
+  // Propagate the borrowed ability's cancel return: when an ability
+  // returns `false` from its onFreeActivate/onActivate (player backed
+  // out of an internal prompt), Charme's outer wrapper must also
+  // return `false` so the server's free-activate handler rolls back —
+  // HOPT released, pending card-reveal cleared (opponent doesn't see
+  // Charme), no `ability_activated` flash on Charme's slot. Anything
+  // truthy / undefined / void counts as "Charme committed" — matches
+  // the server's `resolved !== false` convention.
+  const result = await activateFn(fakeCtx, selectedAb.abLevel);
   engine.sync();
-  return true;
+  return result !== false;
 }
 
 // ═══════════════════════════════════════════

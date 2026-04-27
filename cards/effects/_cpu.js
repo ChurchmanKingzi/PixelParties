@@ -2938,13 +2938,21 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       else if (copiesLeft === 2) value += 25;
       // Ascended Hero cards are critical win-condition pieces
       if (cd?.cardType === 'Ascended Hero') value += 200;
-      // Evaluator delta — tentatively remove and re-score. Cards the
-      // evaluator rewards for being accessible (Cardinal Beasts, etc.)
-      // naturally score higher here. Restore hand afterwards.
+      // Evaluator delta — tentatively MOVE the card from hand to
+      // discard pile and re-score. Pushing to discardPile (not just
+      // splicing out of hand) lets the evaluator see post-discard
+      // synergies — e.g. Cute Phoenix's HOPT damage scaling with the
+      // count of Creatures in the controller's discard pile flips a
+      // Creature discard from "neutral" into "actively beneficial",
+      // so the brain prefers to feed Phoenix when armed instead of
+      // burning Spells. Mirror the move via splice + push, then
+      // restore both halves afterwards.
       const removed = ps.hand[idx];
       ps.hand.splice(idx, 1);
+      ps.discardPile.push(removed);
       let scoreWithout = baseScore;
       try { scoreWithout = evaluateState(engine, cpuIdx); } catch {}
+      ps.discardPile.pop();
       ps.hand.splice(idx, 0, removed);
       value += Math.max(0, baseScore - scoreWithout);
       return { idx, name, value };
@@ -4701,6 +4709,150 @@ function evaluateState(engine, cpuIdx) {
     }
   }
   score += ownSupVal - oppSupVal;
+
+  // ── Generic "pile-fuel" scaling ────────────────────────────────────
+  // Cards that benefit from cards in their controller's discard pile
+  // (and optionally still in the deck as latent fuel) opt in via:
+  //
+  //   cpuMeta: {
+  //     pileFuel: {
+  //       // Where this card's scaling counts FROM, with weights.
+  //       // Default: support 1.0 + hand 0.5. A Phoenix-class card
+  //       // that's still in hand contributes at half value because
+  //       // the bonus only realises after it's summoned.
+  //       presenceWeights: { support: 1.0, hand: 0.5 },
+  //
+  //       // True (default) → multiple copies sum their weights.
+  //       // False           → uniqueness-locked cards take MAX weight
+  //       //                   across copies (extras are redundant).
+  //       stackable: true,
+  //
+  //       // What counts as fuel in the controller's discard pile.
+  //       // Predicate against cards.json data.
+  //       discardFilter: (cardData) => boolean,
+  //       discardValue: <number per match>,
+  //
+  //       // Optional latent fuel — cards still in the deck that
+  //       // COULD become discard fuel via mill / draw + discard.
+  //       // Disabled unless all three deck* fields are set. The
+  //       // deckMinSize floor makes self-mill cards (Cute Cat etc.)
+  //       // look positive while decking out isn't a risk; below the
+  //       // floor the deck-out penalty (further down) takes over.
+  //       deckFilter: (cardData) => boolean,
+  //       deckValue: <number per match>,
+  //       deckMinSize: <int — deck.length must be >= this>,
+  //     },
+  //   }
+  //
+  // The brain reads this generically:
+  //   • Walk active cardInstances on the controller's side; group
+  //     by name; collect each instance's presenceWeight.
+  //   • For unique scripts (stackable: false) take MAX weight,
+  //     for stackable take SUM. (Caps at 1.0 effective for unique
+  //     cards no matter how many in-hand copies sit there.)
+  //   • For each name, multiply effective weight by:
+  //       discardValue × (matching cards in controller's discard)
+  //     plus, if deckMinSize gate passes:
+  //       deckValue    × (matching cards still in deck)
+  //   • Subtract the symmetric value computed for the opponent.
+  //
+  // Combined with the forceDiscard simulator above pushing candidates
+  // into discardPile before re-scoring, every prompted discard sees
+  // pileFuel-relevant cards becoming "actively beneficial to drop"
+  // when the controller has a matching pile-fuel card anywhere. No
+  // per-card hardcoding inside the eval — just a cpuMeta declaration
+  // on the relying card.
+  const computePileFuelContribution = (player, ownerIdx) => {
+    // Group active sources by card name.
+    const byName = new Map();
+    for (const inst of engine.cardInstances) {
+      if ((inst.controller ?? inst.owner) !== ownerIdx) continue;
+      if (inst.faceDown) continue;
+      if (inst.counters?.negated || inst.counters?.nulled) continue;
+      const meta = loadCardEffect(inst.name)?.cpuMeta?.pileFuel;
+      if (!meta) continue;
+      const weights = meta.presenceWeights || { support: 1.0, hand: 0.5 };
+      const w = weights[inst.zone];
+      if (!w) continue;
+      let entry = byName.get(inst.name);
+      if (!entry) { entry = { meta, weights: [] }; byName.set(inst.name, entry); }
+      entry.weights.push(w);
+    }
+    if (byName.size === 0) return 0;
+
+    const cardDB = engine._getCardDB();
+    let total = 0;
+    for (const { meta, weights } of byName.values()) {
+      const effective = (meta.stackable === false)
+        ? Math.max(...weights)
+        : weights.reduce((a, b) => a + b, 0);
+      if (effective <= 0) continue;
+
+      // Discard fuel
+      if (meta.discardFilter && meta.discardValue) {
+        let matches = 0;
+        for (const cn of (player.discardPile || [])) {
+          const cd = cardDB[cn];
+          if (cd && meta.discardFilter(cd)) matches++;
+        }
+        total += meta.discardValue * matches * effective;
+      }
+
+      // Latent deck fuel — gated on a min deck size so the brain
+      // doesn't chase mill into deck-out.
+      if (meta.deckFilter && meta.deckValue && meta.deckMinSize != null) {
+        if ((player.mainDeck || []).length >= meta.deckMinSize) {
+          let matches = 0;
+          for (const cn of (player.mainDeck || [])) {
+            const cd = cardDB[cn];
+            if (cd && meta.deckFilter(cd)) matches++;
+          }
+          total += meta.deckValue * matches * effective;
+        }
+      }
+    }
+    return total;
+  };
+  score += computePileFuelContribution(ps, cpuIdx);
+  score -= computePileFuelContribution(opp, oppIdx);
+
+  // ── Cute Hydra damage potential ────────────────────────────────────
+  // Each Head Counter caps the number of distinct targets her HOPT
+  // can hit for 100 each. Useful damage tops out at the count of
+  // viable enemy targets (heroes + creatures), so we credit
+  // 100 × min(heads, viableTargets) as the per-turn damage threat.
+  // Symmetric across sides — opp's loaded Hydra is our future pain.
+  const countViableTargetsAgainst = (player) => {
+    let n = 0;
+    for (const h of (player.heroes || [])) {
+      if (h?.name && h.hp > 0) n++;
+    }
+    for (let hi = 0; hi < (player.heroes || []).length; hi++) {
+      for (let z = 0; z < 3; z++) {
+        const slot = player.supportZones?.[hi]?.[z] || [];
+        if (slot.length > 0) n++;
+      }
+    }
+    return n;
+  };
+  const hydraDamagePotential = (ownerIdx, opposingPlayer) => {
+    const targets = countViableTargetsAgainst(opposingPlayer);
+    if (targets === 0) return 0;
+    let total = 0;
+    for (const inst of engine.cardInstances) {
+      if (inst.name !== 'Cute Hydra') continue;
+      if (inst.owner !== ownerIdx) continue;
+      if (inst.zone !== 'support') continue;
+      if (inst.faceDown) continue;
+      if (inst.counters?.negated || inst.counters?.nulled) continue;
+      const heads = inst.counters?.headCounter || 0;
+      if (heads <= 0) continue;
+      total += 100 * Math.min(heads, targets);
+    }
+    return total;
+  };
+  score += hydraDamagePotential(cpuIdx, opp);
+  score -= hydraDamagePotential(oppIdx, ps);
 
   // Ability totals — cumulative stacked abilities matter more than fresh ones.
   let ownAb = 0, oppAb = 0;

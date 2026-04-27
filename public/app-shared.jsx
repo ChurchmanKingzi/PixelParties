@@ -565,6 +565,15 @@ const ZONE_ANIM_SFX = {
   poison_ooze:             { name: 'poison' },
   poison_pollen_rain:      { name: 'poison' },
   mushroom_spore:          { name: 'poison' },
+  // Cute Hydra's purple-goo splat — toxic-themed, so it shares the
+  // poison sound family. The visuals are showy enough that a
+  // distinctive layer wasn't worth a new SFX file.
+  hydra_goo:               { name: 'poison' },
+  // Boiling Oil — sizzling hot liquid, routes through the acid
+  // family because the audio is a viscous splash either way.
+  boiling_oil:             { name: 'elem_acid' },
+  // Dance of the Flame Pillars — fire geyser, fire family.
+  flame_pillars:           { name: 'elem_fire' },
   // Biomancy
   biomancy_bloom:          { name: 'elem_biomancy' },
   biomancy_vines:          { name: 'elem_biomancy' },

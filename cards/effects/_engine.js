@@ -1245,12 +1245,32 @@ class GameEngine {
 
       // ── Event modification (for "before" hooks) ──
       cancel() { hookCtx.cancelled = true; },
+      // `cannotBeReduced` (set via `ctx.lockReduction()` or directly on
+      // `hookCtx`) signals that the current damage amount is the floor —
+      // subsequent reduction attempts (this hook chain's later listeners,
+      // engine-level buff multipliers like Cloudy / petrify) must skip.
+      // setAmount / modifyAmount enforce it locally so a listener that
+      // tries to reduce after the lock simply no-ops; engine sites that
+      // apply multipliers check the flag explicitly. INCREASES are still
+      // allowed (the rule is "cannot be reduced", not "frozen").
       modifyAmount(delta) {
-        if (hookCtx.amount !== undefined) hookCtx.amount += delta;
+        if (hookCtx.amount === undefined) return;
+        if (hookCtx.cannotBeReduced && delta < 0) return;
+        hookCtx.amount += delta;
       },
       setAmount(val) {
-        if (hookCtx.amount !== undefined) hookCtx.amount = val;
+        if (hookCtx.amount === undefined) return;
+        if (hookCtx.cannotBeReduced && val < hookCtx.amount) return;
+        hookCtx.amount = val;
       },
+      /**
+       * Lock the current damage amount as a floor — no further effect
+       * may bring it below this value. Generic flag any card can set
+       * during a beforeDamage / beforeCreatureDamageBatch hook to
+       * mean "my reduction (or lack thereof) is the final word."
+       * Idempotent.
+       */
+      lockReduction() { hookCtx.cannotBeReduced = true; },
       negate() { hookCtx.negated = true; },
       /** Set a flag on the hookCtx (survives through all hooks → read by engine after) */
       setFlag(key, value) { hookCtx[key] = value; },
@@ -2679,10 +2699,16 @@ class GameEngine {
     const { applyArrowsBeforeDamage } = require('./_arrows-shared');
     applyArrowsBeforeDamage(this, source, target, hookCtx);
 
-    // Apply buff damage modifiers (Cloudy, etc.) — skipped for un-reducible damage (Ida)
+    // Apply buff damage modifiers (Cloudy, etc.) — skipped for un-reducible damage (Ida).
+    // Also skipped for reduce-only multipliers when `cannotBeReduced` is
+    // set: a card declared "this damage cannot be further reduced" so
+    // multipliers below 1 (Cloudy, medusa_petrified, …) must not trim
+    // the amount. Multipliers ≥ 1 (any future damage-amplifier buff)
+    // still apply because the lock is only a floor, not a freeze.
     if (!hookCtx.cannotBeNegated && target?.buffs) {
       for (const [, buffData] of Object.entries(target.buffs)) {
         if (buffData.damageMultiplier != null) {
+          if (hookCtx.cannotBeReduced && buffData.damageMultiplier < 1) continue;
           hookCtx.amount = Math.ceil(hookCtx.amount * buffData.damageMultiplier);
         }
       }
@@ -3977,6 +4003,31 @@ class GameEngine {
     // Remove from old zone in game state
     this._removeCardFromState(cardInstance);
 
+    // ── Delete-rescue gate ──
+    // If this move is heading to the deleted pile, give the card's
+    // beforeDelete callback (Cute Hydra) a chance to rescue itself.
+    // The callback is responsible for placing the card if it claims
+    // the rescue (typically: summon back to support, untrack the
+    // original instance). On rescue we abort the rest of the move
+    // entirely — no death hook, no zone update, no _addCardToState
+    // push, no enter-zone hook.
+    if (toZone === ZONES.DELETED) {
+      const rescued = await this._tryBeforeDelete(cardInstance.name, cardInstance.originalOwner ?? cardInstance.owner, {
+        fromZone, fromInstance: cardInstance, source: opts.deathSource?.name || opts.source || 'move-to-deleted',
+      });
+      if (rescued) {
+        this.log('delete_rescued', {
+          card: cardInstance.name, from: fromZone,
+          source: opts.deathSource?.name || opts.source || 'move-to-deleted',
+        });
+        // The rescue callback was responsible for tracking a fresh
+        // instance (typically via summonCreatureWithHooks) and
+        // untracking `cardInstance`. Nothing left for actionMoveCard
+        // to do.
+        return;
+      }
+    }
+
     // Fire ON_CREATURE_DEATH BETWEEN the splice and the inst-zone
     // update. Two invariants the damage-batch death path also relies
     // on: (1) the support zone slot is already empty so on-death
@@ -4076,13 +4127,31 @@ class GameEngine {
     const milledCards = [];
     const pileKey    = opts.deleteMode ? 'deletedPile' : 'discardPile';
 
+    // Helper that wraps the actual pile push with the delete-rescue
+    // gate when destination is the deletedPile. For normal mills the
+    // gate is a cheap script-lookup miss and we fall through to the
+    // ordinary push.
+    const pushOrRescue = async (cardName) => {
+      if (opts.deleteMode) {
+        const rescued = await this._tryBeforeDelete(cardName, playerIdx, {
+          fromZone: ZONES.DECK,
+          fromInstance: null,
+          source: opts.source || 'mill',
+        });
+        if (rescued) return false; // rescue claimed it — no push
+      }
+      ps[pileKey].push(cardName);
+      return true;
+    };
+
     if (opts.targetCardName) {
       // Targeted mill: remove a specific named card from anywhere in the deck
       const idx = ps.mainDeck.indexOf(opts.targetCardName);
       if (idx >= 0) {
         ps.mainDeck.splice(idx, 1);
-        ps[pileKey].push(opts.targetCardName);
-        milledCards.push(opts.targetCardName);
+        if (await pushOrRescue(opts.targetCardName)) {
+          milledCards.push(opts.targetCardName);
+        }
       }
     } else if (Array.isArray(opts.targetCardNames) && opts.targetCardNames.length > 0) {
       // Batch targeted mill: remove each named card from the deck in order
@@ -4093,16 +4162,18 @@ class GameEngine {
         const idx = ps.mainDeck.indexOf(targetName);
         if (idx < 0) continue;
         ps.mainDeck.splice(idx, 1);
-        ps[pileKey].push(targetName);
-        milledCards.push(targetName);
+        if (await pushOrRescue(targetName)) {
+          milledCards.push(targetName);
+        }
       }
     } else {
       // Normal mill: take from the top of the deck
       for (let i = 0; i < toMill; i++) {
         const cardName = ps.mainDeck.shift();
         if (!cardName) break;
-        ps[pileKey].push(cardName);
-        milledCards.push(cardName);
+        if (await pushOrRescue(cardName)) {
+          milledCards.push(cardName);
+        }
       }
     }
 
@@ -4378,6 +4449,54 @@ class GameEngine {
       console.error(`[beforeSummon] ${cardName} threw:`, err.message);
       return false;
     }
+  }
+
+  /**
+   * Universal "would be deleted" rescue gate. Called by every engine
+   * path that pushes a card to a player's `deletedPile`, between the
+   * source-zone removal and the pile push. If the card's effect script
+   * exports a `beforeDelete(ctx)` callback, it fires with:
+   *   ctx.cardName        — the card about to be deleted
+   *   ctx.cardOwner       — original owner whose deletedPile receives it
+   *   ctx.fromZone        — last zone before the delete (e.g. 'hand',
+   *                         'support', 'deck', null for raw pushes)
+   *   ctx.fromInstance    — the CardInstance being deleted (or null
+   *                         if the card had no tracked instance, e.g.
+   *                         a deck-mill where deck cards aren't tracked)
+   *   ctx.source          — the effect/card that caused the delete
+   *                         (free-form string used for logging)
+   *   ctx.rescued = false — the callback sets this to `true` to abort
+   *                         the deletion entirely. Caller skips the
+   *                         pile push and any onDelete cleanup.
+   *
+   * The callback is responsible for placing the card SOMEWHERE if it
+   * rescues (typically: `summonCreatureWithHooks` to support, then
+   * `_untrackCard(ctx.fromInstance.id)` to clean up the orphaned
+   * source instance).
+   *
+   * This is the SINGLE choke point for "deleted from anywhere"
+   * rescue effects (Cute Hydra). New delete sites MUST call this
+   * helper between source removal and pile push, or the rescue
+   * won't see them.
+   */
+  async _tryBeforeDelete(cardName, originalOwner, opts = {}) {
+    const script = loadCardEffect(cardName);
+    if (!script?.beforeDelete) return false;
+    const rescueCtx = {
+      _engine: this,
+      cardName,
+      cardOwner: originalOwner,
+      fromZone: opts.fromZone || null,
+      fromInstance: opts.fromInstance || null,
+      source: opts.source || null,
+      rescued: false,
+    };
+    try {
+      await script.beforeDelete(rescueCtx);
+    } catch (err) {
+      console.error(`[beforeDelete] ${cardName} threw:`, err.message);
+    }
+    return !!rescueCtx.rescued;
   }
 
   /**
@@ -4699,6 +4818,13 @@ class GameEngine {
     // batch is paid — otherwise a wisdom-cost discard whose first
     // card is a Normal Spell prompts to cast it before the second
     // card is even chosen.
+    // Also track per-batch discard count and per-player count, so
+    // listeners that key off "N or more cards left my hand at once"
+    // (Cute Bunny) can read it from the batch-end ctx.
+    if ((this.gs._batchDiscardDepth || 0) === 0) {
+      this.gs._batchDiscardCount = 0;
+      this.gs._batchDiscardCountByPlayer = {};
+    }
     this.gs._batchDiscardDepth = (this.gs._batchDiscardDepth || 0) + 1;
 
     try {
@@ -4715,12 +4841,30 @@ class GameEngine {
           cancellable: false,
         });
 
+        let actuallyDiscarded = false;
+        let rescuedFromDelete = false;
+        let resolvedCardName = null;
+        let resolvedInst = null;
+
         if (!result || result.cardName == null) {
           // Safety fallback: auto-pop
           const cardName = ps.hand.pop();
           if (cardName) {
-            ps[pileKey].push(cardName);
-            this.log(logEvent, { player: ps.username, card: cardName, source: opts.source });
+            resolvedCardName = cardName;
+            // Snapshot the instance BEFORE delete-rescue runs (rescue
+            // may untrack it as part of summoning a fresh copy).
+            resolvedInst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0] || null;
+            if (deleteMode) {
+              rescuedFromDelete = await this._tryBeforeDelete(cardName, playerIdx, {
+                fromZone: ZONES.HAND, fromInstance: resolvedInst,
+                source: opts.source || 'forced-delete',
+              });
+            }
+            if (!rescuedFromDelete) {
+              ps[pileKey].push(cardName);
+              this.log(logEvent, { player: ps.username, card: cardName, source: opts.source });
+              actuallyDiscarded = true;
+            }
           }
         } else {
           const handIdx = result.handIndex;
@@ -4731,14 +4875,37 @@ class GameEngine {
             if (fallbackIdx >= 0) ps.hand.splice(fallbackIdx, 1);
             else continue;
           }
-          ps[pileKey].push(result.cardName);
-          this.log(logEvent, { player: ps.username, card: result.cardName, source: opts.source });
+          resolvedCardName = result.cardName;
+          resolvedInst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: result.cardName })[0] || null;
+          if (deleteMode) {
+            rescuedFromDelete = await this._tryBeforeDelete(result.cardName, playerIdx, {
+              fromZone: ZONES.HAND, fromInstance: resolvedInst,
+              source: opts.source || 'forced-delete',
+            });
+          }
+          if (!rescuedFromDelete) {
+            ps[pileKey].push(result.cardName);
+            this.log(logEvent, { player: ps.username, card: result.cardName, source: opts.source });
+            actuallyDiscarded = true;
+          } else {
+            this.log('delete_rescued', { player: ps.username, card: result.cardName, source: opts.source });
+          }
         }
 
-        const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: result?.cardName })[0];
-        if (inst) {
-          inst.zone = destZone;
-          await this.runHooks(hookName, { playerIdx, card: inst, cardName: result.cardName, discardedCardName: result.cardName, _fromHand: true, _skipReactionCheck: true });
+        if (actuallyDiscarded) {
+          this.gs._batchDiscardCount = (this.gs._batchDiscardCount || 0) + 1;
+          if (!this.gs._batchDiscardCountByPlayer) this.gs._batchDiscardCountByPlayer = {};
+          this.gs._batchDiscardCountByPlayer[playerIdx] =
+            (this.gs._batchDiscardCountByPlayer[playerIdx] || 0) + 1;
+        }
+
+        // Only fire onDiscard / onDelete for cards that ACTUALLY hit
+        // the destination pile. A delete-rescued card (Cute Hydra)
+        // never landed in deletedPile, so its on-delete listeners
+        // (and any chained reactions) should not fire.
+        if (!rescuedFromDelete && resolvedInst) {
+          resolvedInst.zone = destZone;
+          await this.runHooks(hookName, { playerIdx, card: resolvedInst, cardName: resolvedCardName, discardedCardName: resolvedCardName, _fromHand: true, _skipReactionCheck: true });
         }
         this.sync();
       }
@@ -4749,8 +4916,14 @@ class GameEngine {
       // Archibald walks all discarded Normal Spells and prompts ONCE
       // with a gallery, instead of per-card mid-batch).
       if (this.gs._batchDiscardDepth === 0) {
+        const totalCount = this.gs._batchDiscardCount || 0;
+        const countByPlayer = this.gs._batchDiscardCountByPlayer || {};
+        delete this.gs._batchDiscardCount;
+        delete this.gs._batchDiscardCountByPlayer;
         await this.runHooks('onForcedDiscardBatchEnd', {
           playerIdx, source: opts.source, deleteMode,
+          count: totalCount,
+          countByPlayer,
           _skipReactionCheck: true,
         });
       }
@@ -4816,15 +4989,34 @@ class GameEngine {
         cancellable: false,
       });
 
-      if (!result || result.cardName == null) {
-        // Safety: if prompt fails, auto-remove from end of hand
-        const cardName = ps.hand.pop();
+      // Helper: push to the destination pile, but in deleteMode give
+      // the card's beforeDelete a chance to rescue. Returns true if
+      // the card actually landed in the pile (caller should fire the
+      // on-delete / on-discard hook); false if rescued.
+      const finishMove = async (cardName) => {
+        const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0] || null;
+        if (deleteMode) {
+          const rescued = await this._tryBeforeDelete(cardName, playerIdx, {
+            fromZone: ZONES.HAND, fromInstance: inst, source: 'hand-limit',
+          });
+          if (rescued) {
+            this.log('delete_rescued', { player: ps.username, card: cardName, source: 'hand-limit' });
+            this.sync();
+            return false;
+          }
+        }
         ps[pileArr].push(cardName);
-        const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0];
         if (inst) inst.zone = destZone;
         this.log('hand_limit_' + pile, { player: ps.username, card: cardName });
         await this.runHooks(hookName, { playerIdx, cardName, discardedCardName: cardName, _fromHand: true, _skipReactionCheck: true });
         this.sync();
+        return true;
+      };
+
+      if (!result || result.cardName == null) {
+        // Safety: if prompt fails, auto-remove from end of hand
+        const cardName = ps.hand.pop();
+        if (cardName != null) await finishMove(cardName);
         continue;
       }
 
@@ -4837,28 +5029,15 @@ class GameEngine {
           // the last card so we still make progress; without this, `continue`
           // loops forever when the hand mutated between response and check.
           const cardName = ps.hand.pop();
-          if (cardName != null) {
-            ps[pileArr].push(cardName);
-            const inst0 = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0];
-            if (inst0) inst0.zone = destZone;
-            this.log('hand_limit_' + pile, { player: ps.username, card: cardName });
-            await this.runHooks(hookName, { playerIdx, cardName, discardedCardName: cardName, _fromHand: true, _skipReactionCheck: true });
-            this.sync();
-          }
+          if (cardName != null) await finishMove(cardName);
           continue;
         }
         ps.hand.splice(fallbackIdx, 1);
       } else {
         ps.hand.splice(handIdx, 1);
       }
-      ps[pileArr].push(result.cardName);
 
-      const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: result.cardName })[0];
-      if (inst) inst.zone = destZone;
-
-      this.log('hand_limit_' + pile, { player: ps.username, card: result.cardName });
-      await this.runHooks(hookName, { playerIdx, cardName: result.cardName, discardedCardName: result.cardName, _fromHand: true, _skipReactionCheck: true });
-      this.sync();
+      await finishMove(result.cardName);
     }
   }
 
@@ -5376,18 +5555,60 @@ class GameEngine {
     if (!inst) return false;
     if (inst.faceDown) return false; // Face-down surprises cannot receive statuses
     if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner)) return false; // Defending the Gate
-    // Generic absolute-immunity gate: _cardinalImmune blocks every status
-    // application, matching how it already blocks damage / destroy / move /
-    // buff-add. Used by Cardinal Beasts and Golden Wings. The name-list
-    // fallback is belt-and-suspenders for pre-placed beasts (puzzle
-    // setup / game-start support zones) whose onPlay never fired and
-    // therefore never stamped the counter.
-    if (inst.counters?._cardinalImmune) return false;
-    const { CARDINAL_NAMES } = require('./_cardinal-shared');
-    if (CARDINAL_NAMES.includes(inst.name)) return false;
+    // Generic absolute-immunity gate: omni-immune creatures (Cardinal
+    // Beasts, Golden Wings, future creatures opting in via
+    // `_omniImmune`) block every status application AT APPLY TIME.
+    // They remain TARGETABLE — animations still play; the effect just
+    // fizzles silently. Card scripts building target lists should use
+    // `canTargetForStatus` (which omits this check) so omni-immune
+    // creatures appear in the picker; this helper stays as the
+    // authoritative "would the status actually stick" gate.
+    if (this.isOmniImmune(inst)) return false;
     const immuneKey = statusName + '_immune';
     if (inst.counters[immuneKey]) return false;
     // Monia-style creature protection (synchronous check via _moniaShieldActive)
+    if (this.gs._moniaShieldActive != null && inst.owner === this.gs._moniaShieldActive) return false;
+    return true;
+  }
+
+  /**
+   * Generic absolute-immunity flag — true for any creature instance
+   * that opts into "all effects fizzle on me" semantics. Currently:
+   *   • `_cardinalImmune` counter (set by Cardinal Beasts / Golden Wings)
+   *   • `_omniImmune` counter (generic flag for future creatures)
+   *   • Cardinal-name fallback for pre-placed beasts whose onPlay
+   *     never fired and therefore never stamped the counter (puzzle
+   *     setup, game-start support zones)
+   *
+   * Used as the application-time gate inside the engine's status /
+   * damage / destroy / move helpers, and by card scripts that
+   * conditionally apply effects to creatures (Arcane Lamp, etc.) so
+   * the effect fizzles cleanly without breaking the targeting flow.
+   */
+  isOmniImmune(inst) {
+    if (!inst) return false;
+    if (inst.counters?._cardinalImmune) return true;
+    if (inst.counters?._omniImmune) return true;
+    const { CARDINAL_NAMES } = require('./_cardinal-shared');
+    if (CARDINAL_NAMES.includes(inst.name)) return true;
+    return false;
+  }
+
+  /**
+   * TARGETING-side gate for status-applying effects. Mirrors
+   * `canApplyCreatureStatus` but DELIBERATELY OMITS the omni-immune
+   * check so omni-immune creatures (Cardinal Beasts, etc.) stay in
+   * the target pool — the user clicks one, the animation plays, the
+   * application step fizzles silently. Cards building target lists
+   * for single-target Burn / Freeze / Poison / etc. should use this
+   * helper instead of `canApplyCreatureStatus`.
+   */
+  canTargetForStatus(inst, statusName, opts = {}) {
+    if (!inst) return false;
+    if (inst.faceDown) return false;
+    if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner)) return false;
+    const immuneKey = statusName + '_immune';
+    if (inst.counters[immuneKey]) return false;
     if (this.gs._moniaShieldActive != null && inst.owner === this.gs._moniaShieldActive) return false;
     return true;
   }
@@ -5469,6 +5690,15 @@ class GameEngine {
       if (seen.has(cardName)) continue;
       const cd = cardDB[cardName];
       if (!cd || !ACTION_TYPES.includes(cd.cardType)) continue;
+      // Reaction subtype: never proactively playable. Fireshield, Bamboo
+      // Shield, etc. should NOT appear in additional-action prompts
+      // (Coffee, Fortify, performImmediateAction, …) — they're reactive
+      // ONLY. A script may opt in via `proactivePlay: true` (matches
+      // the gate in `getHeroPlayableCards`).
+      if ((cd.subtype || '').toLowerCase() === 'reaction') {
+        const reactScript = loadCardEffect(cardName);
+        if (!reactScript?.proactivePlay) continue;
+      }
       // Check spell school / level requirements (centralized)
       if (!this.heroMeetsLevelReq(playerIdx, heroIdx, cd)) continue;
       // Wisdom hand-size affordability check — spells that ONLY meet
@@ -5626,9 +5856,17 @@ class GameEngine {
         // have no such hook and are filtered out here.
         if (heroParalyzed) {
           const s = loadCardEffect(cd.name);
-          if (typeof s?.canBypassFreeZoneRequirement !== 'function') continue;
           let ok = false;
-          try { ok = !!s.canBypassFreeZoneRequirement(gs, playerIdx, hi, cd, this); } catch {}
+          if (typeof s?.canBypassFreeZoneRequirement === 'function') {
+            try { ok = !!s.canBypassFreeZoneRequirement(gs, playerIdx, hi, cd, this); } catch {}
+          }
+          // Generic "play despite negative statuses" hook — mirrors the
+          // gate in validatePlayActionCardCommon. Hero must still be
+          // alive for this hook to apply (no resurrecting corpses to
+          // cast Outbreak from the grave).
+          if (!ok && hero.hp > 0 && typeof s?.canPlayDespiteStatuses === 'function') {
+            try { ok = !!s.canPlayDespiteStatuses(gs, playerIdx, hi, cd, this); } catch {}
+          }
           if (!ok) continue;
         }
         // Reaction subtype: not proactively playable unless script opts in
@@ -5638,8 +5876,16 @@ class GameEngine {
         }
         // Nulled heroes cannot cast Spells (Null Zone). Mirrors the play-time
         // gate in validatePlayActionCardCommon so the client grays the spell
-        // out when no non-nulled hero can cast it.
-        if (cd.cardType === 'Spell' && hero.statuses?.nulled) continue;
+        // out when no non-nulled hero can cast it. Status-bypass spells
+        // (Outbreak) opt out via `canPlayDespiteStatuses`.
+        if (cd.cardType === 'Spell' && hero.statuses?.nulled) {
+          const s = loadCardEffect(cd.name);
+          let ok = false;
+          if (typeof s?.canPlayDespiteStatuses === 'function') {
+            try { ok = !!s.canPlayDespiteStatuses(gs, playerIdx, hi, cd, this); } catch {}
+          }
+          if (!ok) continue;
+        }
         // Generic per-player Spell lock (Eraser Beam / any future "only Spell
         // this turn" card). Blocks further Spell plays once the lock is set;
         // cleared in the turn-start reset path alongside other per-turn flags.
@@ -5892,6 +6138,22 @@ class GameEngine {
           console.error('[canBypassFreeZoneRequirement]', cardData.name, err.message);
         }
       }
+      // ── Generic "play despite negative statuses" hook ──
+      // Distinct from `canBypassFreeZoneRequirement` (placement-style
+      // creatures using a paralysed Hero only as a slot address). This
+      // hook is for cards whose printed text says "can be used in spite
+      // of negative status effects" — Outbreak today, future similar
+      // status-bypass spells. Bypasses frozen / stunned / bound, but
+      // NEVER dead heroes (hp <= 0 still hard-fails — a corpse can't
+      // act regardless of card text). The Nulled gate further down
+      // honours the same hook for parity.
+      if (!bypass && hero.hp > 0 && typeof cardScript?.canPlayDespiteStatuses === 'function') {
+        try {
+          bypass = !!cardScript.canPlayDespiteStatuses(gs, pi, heroIdx, cardData, this);
+        } catch (err) {
+          console.error('[canPlayDespiteStatuses]', cardData.name, err.message);
+        }
+      }
       if (!bypass) return null;
     }
 
@@ -5899,7 +6161,22 @@ class GameEngine {
     // Spells. This is a generic gate — any future card applying the
     // 'nulled' hero status benefits for free. "Nulled" is a cleansable
     // negative status (Juice/Tea/Coffee all strip it).
-    if (hero.statuses?.nulled && cardData.cardType === 'Spell') return null;
+    //
+    // Status-bypass spells (Outbreak) opt out via `canPlayDespiteStatuses`,
+    // mirroring the paralysis gate above so a single hook covers all
+    // negative-status blocks.
+    if (hero.statuses?.nulled && cardData.cardType === 'Spell') {
+      const cardScript = loadCardEffect(cardData.name);
+      let bypass = false;
+      if (typeof cardScript?.canPlayDespiteStatuses === 'function') {
+        try {
+          bypass = !!cardScript.canPlayDespiteStatuses(gs, pi, heroIdx, cardData, this);
+        } catch (err) {
+          console.error('[canPlayDespiteStatuses]', cardData.name, err.message);
+        }
+      }
+      if (!bypass) return null;
+    }
 
     // Generic per-player Spell lock — set by cards that declare themselves
     // "the only Spell you play this turn" (Eraser Beam). Cleared at turn
@@ -7970,6 +8247,11 @@ class GameEngine {
           // a placement is fronting, etc.) so the player has visual
           // confirmation of what their click will do.
           previewCardName: config.previewCardName,
+          // Auto-confirm: when set, the first click that fills the
+          // selection up to `maxTotal` commits immediately, skipping
+          // the Confirm-button step. Used by direct-click pickers
+          // (Singing's Creature borrow, Charme Lv1's Ability borrow).
+          autoConfirm: config.autoConfirm === true,
         },
       };
       this.sync();
@@ -13145,10 +13427,16 @@ class GameEngine {
     // ALL damage to opponent's creatures becomes 0 (ABSOLUTE — overrides everything)
     for (const e of entries) {
       if (e.cancelled) continue;
-      // Apply buff damage modifiers (Cloudy, etc.) — skipped for un-reducible damage
+      // Apply buff damage modifiers (Cloudy, etc.) — skipped for un-reducible
+      // damage. Also skipped for reduce-only multipliers when the entry
+      // carries `cannotBeReduced`: a beforeCreatureDamageBatch listener
+      // (e.g. Dichotomy of Luna and Tempeste) declared "this entry's
+      // damage cannot be reduced further", so any multiplier below 1
+      // is a no-op. Multipliers ≥ 1 still apply.
       if (e.canBeNegated !== false && e.inst.counters?.buffs) {
         for (const [, bd] of Object.entries(e.inst.counters.buffs)) {
           if (bd.damageMultiplier != null) {
+            if (e.cannotBeReduced && bd.damageMultiplier < 1) continue;
             e.amount = Math.ceil(e.amount * bd.damageMultiplier);
           }
         }

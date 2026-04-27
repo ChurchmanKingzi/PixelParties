@@ -2,8 +2,13 @@
 //  CARD EFFECT: "Unsettling Opportunist Vullary"
 //  Creature (Summoning Magic Lv 0, 50 HP)
 //
-//  Two-mode active effect (single creatureEffect
-//  HOPT slot per instance per turn):
+//  Two-mode active effect — INDEPENDENT once-
+//  per-turn gates. Mode A (attach) does NOT
+//  consume the engine's per-instance creatureEffect
+//  HOPT (the script stamps `_skipCreatureEffectHopt`
+//  on the ctx during the attach), so Mode B can
+//  fire the same turn the attach lands. Mode B
+//  consumes HOPT normally.
 //
 //    A) NOT YET ATTACHED:
 //       Place a "Cute Princess Mary" from hand
@@ -20,8 +25,7 @@
 //  While Mary is attached:
 //    • +170 HP (current and max).
 //    • The bonus mode (B) becomes the active
-//      effect. Both modes share the engine's
-//      per-instance creatureEffect HOPT.
+//      effect.
 //
 //  The summon bypasses school/level requirements
 //  via `actionPlaceCreature` (`countAsSummon:
@@ -94,10 +98,16 @@ module.exports = {
 
     // Mode A: attach Mary.
     if (!ctx.card.counters?.attachedHero) {
-      return await engine.actionAttachHeroToCreature(
+      const ok = await engine.actionAttachHeroToCreature(
         ctx.cardOwner, ATTACHABLE, ctx.card,
         { source: CARD_NAME },
       );
+      // Don't burn the once-per-turn creatureEffect slot — Mode B
+      // (Lv≤3 bypass-summon) is a SEPARATE once-per-turn gate, and
+      // the player should be able to use it the same turn Mary is
+      // attached.
+      if (ok) ctx._skipCreatureEffectHopt = true;
+      return ok;
     }
 
     // Mode B: bypass-summon a Lv≤3 Creature with negate-until-next-turn.

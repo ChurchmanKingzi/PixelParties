@@ -162,15 +162,50 @@ module.exports = {
       if (ctx.source?.name !== 'Burn') return;
       const target = ctx.target;
       if (!target || target.hp === undefined) return;
+      // The bump fires AFTER the burn damage applies, so a Hero that
+      // dies from this exact tick MUST stay dead — Luna can't pull a
+      // corpse back over the line. The 60-HP grant only lands on Heroes
+      // who survived the tick.
+      if (target.hp <= 0) return;
       // Only Heroes controlled by Luna's controller get the bump.
       const engine = ctx._engine;
       const gs = engine.gs;
       const ownerPs = gs.players[ctx.cardOwner];
       if (!ownerPs) return;
-      if (!(ownerPs.heroes || []).includes(target)) return;
-      // Bump ONLY max HP, do NOT heal current HP — the burn tick
-      // damage stays on the Hero's sheet.
-      engine.increaseMaxHp(target, HP_PER_BURN_TICK, { alsoHealCurrent: false });
+      const heroIdx = (ownerPs.heroes || []).indexOf(target);
+      if (heroIdx < 0) return;
+
+      // ── Explicit damage + heal popups ──────────────────────────
+      // The auto HP-delta detector on the client compares the
+      // pre-sync and post-sync hp values. Burn -X cancelled by
+      // Kiai +60 nets to 0 (or +60*(N-1) with multiple Kiais), which
+      // would render either NO popup or the wrong "+heal" popup —
+      // hiding the burn from the player. Instead, emit explicit
+      // popups: ONE red "burn" popup for the tick (the first Kiai to
+      // react this damage event claims it via a ctx flag), plus a
+      // green "+60" popup per Kiai. The client suppresses auto
+      // detection for this hero on this sync so the explicit popups
+      // are the sole source of truth.
+      const burnAmount = ctx.amount || 0;
+      if (!ctx._kiaiHpPopupEmitted && burnAmount > 0) {
+        engine._broadcastEvent('kiai_hp_split', {
+          owner: ctx.cardOwner, heroIdx,
+          damage: burnAmount, heal: HP_PER_BURN_TICK,
+        });
+        ctx._kiaiHpPopupEmitted = true;
+      } else {
+        engine._broadcastEvent('kiai_hp_split', {
+          owner: ctx.cardOwner, heroIdx,
+          heal: HP_PER_BURN_TICK,
+        });
+      }
+
+      // Bump max HP AND heal current HP by the same amount — the
+      // 60-HP "buffer" is a real cushion against the next tick, not
+      // just a paper number. Default alsoHealCurrent on the engine
+      // helper is true, but make it explicit for self-documenting
+      // intent.
+      engine.increaseMaxHp(target, HP_PER_BURN_TICK, { alsoHealCurrent: true });
       engine.log('luna_kiai_burn_bump', {
         player: ownerPs.username,
         target: target.name,

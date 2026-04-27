@@ -2804,6 +2804,40 @@ body {
   50% { filter: drop-shadow(0 0 6px rgba(255,200,0,1)); transform: scale(1.15); }
 }
 
+/* Head Counter badge for Cute Hydra (and any future "Head Counter"
+   creature). Sits bottom-left on the support card so it doesn't clash
+   with summoning-sickness (top-left), additional-action (top-right),
+   creature-level (right-middle), or mummified (bottom-right). */
+.head-counter-badge {
+  position: absolute;
+  left: 1px;
+  bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px 3px;
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  font-size: calc(9px * var(--board-scale));
+  color: #ffd5b3;
+  background: rgba(50, 10, 5, 0.78);
+  border: 1px solid #c44a2a;
+  border-radius: 3px;
+  text-shadow: 0 0 3px #000, 1px 1px 0 #000;
+  box-shadow: 0 0 4px rgba(220, 80, 30, 0.5);
+  z-index: 5;
+  pointer-events: auto;
+  cursor: default;
+  line-height: 1;
+}
+.head-counter-badge .head-counter-icon {
+  font-size: calc(11px * var(--board-scale));
+  filter: drop-shadow(0 0 2px rgba(255, 100, 30, 0.7));
+}
+.head-counter-badge .head-counter-num {
+  font-weight: bold;
+  color: #ffe2b3;
+}
+
 .summoning-sickness-icon {
   position: absolute;
   left: 1px;
@@ -3576,6 +3610,41 @@ body {
 @keyframes targetValidPulse {
   0%, 100% { box-shadow: 0 0 16px rgba(255,180,50,.8), 0 0 30px rgba(255,140,0,.4), inset 0 0 8px rgba(255,180,50,.3); }
   50% { box-shadow: 0 0 24px rgba(255,180,50,1), 0 0 45px rgba(255,140,0,.6), inset 0 0 14px rgba(255,180,50,.5); }
+}
+/* Direct-click borrow picker highlight (Charme Lv1, Singing). Layered
+   ON TOP of `.potion-target-valid` for prompts that auto-commit on
+   first click — distinctly flashier so players immediately notice the
+   "click here" affordance. Bright magenta-cyan double glow, faster
+   pulse than the standard targeting yellow. */
+.borrow-pick-target {
+  box-shadow:
+    0 0 22px rgba(255,80,255,1),
+    0 0 44px rgba(80,220,255,.85),
+    0 0 70px rgba(255,80,255,.6),
+    inset 0 0 16px rgba(255,140,255,.7) !important;
+  border-color: #ff66ff !important;
+  border-width: 3px !important;
+  animation: borrowPickPulse .55s ease-in-out infinite !important;
+  z-index: 4;
+  position: relative;
+}
+@keyframes borrowPickPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 22px rgba(255,80,255,1),
+      0 0 44px rgba(80,220,255,.85),
+      0 0 70px rgba(255,80,255,.6),
+      inset 0 0 16px rgba(255,140,255,.7);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow:
+      0 0 36px rgba(255,140,255,1),
+      0 0 70px rgba(120,240,255,1),
+      0 0 110px rgba(255,80,255,.8),
+      inset 0 0 26px rgba(255,180,255,.9);
+    transform: scale(1.06);
+  }
 }
 .potion-target-selected {
   box-shadow: 0 0 20px rgba(255,50,50,.9), 0 0 40px rgba(255,30,30,.5), inset 0 0 12px rgba(255,50,50,.4) !important;

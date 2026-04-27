@@ -47,6 +47,76 @@ function countCreaturesInDiscard(engine, ps) {
 module.exports = {
   activeIn: ['support'],
 
+  // ── CPU evaluation hints ──────────────────────────────────────────
+  // Two complementary signals tell the brain how to value Phoenix:
+  //
+  //   chainSource — own Creature deaths discount the slot value of
+  //     dying Creatures while Phoenix is armed, so MCTS sees them
+  //     as cheap fodder to feed her. Phoenix herself skips the
+  //     chain bonus (chain sources don't discount themselves).
+  //
+  //   pileFuel — generic eval contribution: Phoenix on board (1.0)
+  //     or in hand (0.5) makes EACH Creature in her controller's
+  //     discard pile worth +50 to that side's score, and EACH
+  //     Creature still in the deck worth +10 (latent fuel — see
+  //     `_cpu.js` for the full machinery). Combined with the
+  //     forceDiscard simulator pushing candidates into discardPile
+  //     before re-scoring, the brain sees "discarding a Creature
+  //     feeds my Phoenix" as actively beneficial — across every
+  //     prompted discard generically (Cute Dog tutor cost, Cute
+  //     Hydra head counters, Wisdom cost, hand-limit cleanup, etc.).
+  //     The deck term is gated at deck.length ≥ 21 so the bonus
+  //     auto-stops once the existing deck-out penalty starts
+  //     charging the brain per missing card.
+  //
+  //     `stackable: false` — Phoenix is uniqueness-locked at 1
+  //     active per side. Multiple copies (e.g. 1 on board + 1 in
+  //     hand) take the MAX weight (1.0), not summed.
+  cpuMeta: {
+    chainSource: {
+      isArmed(engine, inst) {
+        if (!inst) return false;
+        if (inst.counters?.negated || inst.counters?.nulled) return false;
+        return true;
+      },
+      triggersOn(engine, tributeInst, sourceInst) {
+        if (!tributeInst || !sourceInst) return false;
+        if (tributeInst.id === sourceInst.id) return false;
+        if (tributeInst.name === CARD_NAME) return false;
+        const cd = engine._getCardDB()[tributeInst.name];
+        return !!(cd && hasCardType(cd, 'Creature'));
+      },
+      valuePerTrigger: 50,
+    },
+    pileFuel: {
+      presenceWeights: { support: 1.0, hand: 0.5 },
+      stackable: false,
+      discardFilter: (cd) => hasCardType(cd, 'Creature'),
+      discardValue: 50,
+      deckFilter: (cd) => hasCardType(cd, 'Creature'),
+      deckValue: 10,
+      deckMinSize: 21,
+    },
+  },
+
+  /**
+   * CPU prompt response — the engine's default `cpuGenericChoice`
+   * declines cancellable confirms (returns null), which would make
+   * the CPU refuse Phoenix's revive every time. Override to confirm
+   * — the 2-card discard cost is paid via the standard forceDiscard
+   * handler immediately afterwards, which picks the least-valuable
+   * cards (and protects Ascended Heroes / scarce singletons via the
+   * value scorer).
+   */
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm'
+        && /Revive/i.test(promptData.confirmLabel || '')) {
+      return { confirmed: true };
+    }
+    return undefined;
+  },
+
   /**
    * Uniqueness gate: deny summon if a Cute Phoenix instance is already
    * on this player's side. The `ctx.card.id` self-exclusion prevents

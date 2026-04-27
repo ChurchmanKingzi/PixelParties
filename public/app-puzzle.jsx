@@ -929,6 +929,9 @@ function PuzzleCreator() {
   // For Dream-Landers Creatures: tracks which Hero (if any) is attached
   // to the Creature being edited. Null = no Hero attached.
   const [editAttachedHero, setEditAttachedHero] = useState(null);
+  // For Cute Hydra: number of Head Counters on the creature being edited.
+  // Null when the open editor target isn't a Cute Hydra.
+  const [editHeadCounter, setEditHeadCounter] = useState(null);
   const openStatEditor = useCallback((si, zt, hi, slot) => {
     const p = players[si];
     if (zt === 'hero') {
@@ -957,6 +960,9 @@ function PuzzleCreator() {
       setEditBiomancyLevel(c?.cardType === 'Potion' ? (cs.biomancyLevel || 1) : null);
       // Dream-Landers attach: hydrate the toggle from the saved state.
       setEditAttachedHero(cs.attachedHero || null);
+      // Cute Hydra: hydrate Head Counter from the saved state. Null
+      // for non-Hydra creatures so the editor section stays hidden.
+      setEditHeadCounter(c?.name === 'Cute Hydra' ? (cs.headCounter || 0) : null);
     }
   }, [players, getCard]);
 
@@ -1018,11 +1024,19 @@ function PuzzleCreator() {
       // puzzle JSON stays clean for Creatures without an attachment.
       delete merged.attachedHero;
       if (editAttachedHero) merged.attachedHero = editAttachedHero;
+      // Cute Hydra: persist `headCounter` only when the editor was open
+      // on a Hydra (editHeadCounter !== null) AND the value is positive.
+      // 0 / null leave the key absent so the puzzle JSON stays clean
+      // for non-Hydra creatures.
+      delete merged.headCounter;
+      if (editHeadCounter != null && editHeadCounter > 0) {
+        merged.headCounter = editHeadCounter;
+      }
       p._creatureStatuses[hi + '-' + slot] = merged;
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, updatePlayer, getCard]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, updatePlayer, getCard]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -1799,6 +1813,42 @@ function PuzzleCreator() {
                 </button>
               );
             })()}
+            {/* Cute Hydra Head Counter editor — visible only when the
+                edit target is a Cute Hydra. Stamps `headCounter` into
+                `_creatureStatuses[hi-slot]`, which the server's puzzle
+                loader applies as `inst.counters.headCounter` so the
+                board badge + HOPT multi-target damage cap match. */}
+            {!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard?.name === 'Cute Hydra' && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  🐲 Head Counters
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    disabled={(editHeadCounter || 0) <= 0}
+                    onClick={() => setEditHeadCounter(Math.max(0, (editHeadCounter || 0) - 1))}>
+                    −
+                  </button>
+                  <input className="input" type="number" min={0}
+                    value={editHeadCounter ?? 0}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10);
+                      setEditHeadCounter(Number.isFinite(n) && n >= 0 ? n : 0);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
+                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#ffd5b3' }} />
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    onClick={() => setEditHeadCounter((editHeadCounter || 0) + 1)}>
+                    +
+                  </button>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                  Caps the number of different targets Hydra's once-per-turn strike can hit.
+                </div>
+              </div>
+            )}
             {!isBiomancyTokenEdit && (
             <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
               <label style={{ flex: 1 }}>

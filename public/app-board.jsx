@@ -2109,6 +2109,336 @@ const ANIM_REGISTRY = {
   flame_strike: FlameStrikeEffect,
   venom_fog: VenomFogEffect,
   poisoned_well: PoisonedWellEffect,
+  // ── Boiling Oil ───────────────────────────────────────────────────
+  // Red oil raining down from above the target onto a sizzling pool
+  // of splat marks at the bottom. Tear-drop droplets fall fast,
+  // brighten on impact, and leave glowing splats behind. A few wisps
+  // of steam rise from the splats to suggest the "boiling" half.
+  // Distinct from `acid_splash` (which is greener/wetter) — this is
+  // hot and viscous.
+  boiling_oil: (() => {
+    return function BoilingOilEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      // Falling oil drops — distributed across the width, falling from
+      // above the card down to its lower third where they "land".
+      const drops = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+        startX: -cw * 0.5 + Math.random() * cw,
+        delay: i * 18 + Math.random() * 60,
+        dur: 320 + Math.random() * 180,
+        size: 4 + Math.random() * 6,
+        color: ['#cc1100', '#ff2200', '#dd3300', '#aa0000', '#ee4400', '#b81022'][Math.floor(Math.random() * 6)],
+      })), [cw]);
+      // Splat marks — viscous oil pooling at impact points.
+      const splats = useMemo(() => Array.from({ length: 9 }, () => ({
+        x: -cw * 0.4 + Math.random() * cw * 0.8,
+        y: ch * 0.15 + Math.random() * ch * 0.25,
+        rx: 6 + Math.random() * 9,
+        ry: 3 + Math.random() * 4,
+        delay: 150 + Math.random() * 220,
+        dur: 500 + Math.random() * 350,
+      })), [cw, ch]);
+      // Steam wisps rising off the hot splats.
+      const steams = useMemo(() => Array.from({ length: 7 }, () => ({
+        x: -cw * 0.35 + Math.random() * cw * 0.7,
+        y: ch * 0.18 + Math.random() * ch * 0.15,
+        size: 6 + Math.random() * 5,
+        delay: 280 + Math.random() * 250,
+        dur: 600 + Math.random() * 280,
+      })), [cw, ch]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {drops.map((d, i) => (
+            <div key={'bod' + i} style={{
+              position: 'absolute',
+              left: d.startX + 'px',
+              top: -ch * 0.65 + 'px',
+              width: d.size + 'px',
+              height: (d.size * 1.7) + 'px',
+              borderRadius: '50% 50% 50% 50% / 60% 60% 40% 40%',
+              background: d.color,
+              boxShadow: `0 0 5px ${d.color}, 0 1px 2px rgba(0,0,0,0.4)`,
+              opacity: 0,
+              animation: `boiling-oil-fall ${d.dur}ms cubic-bezier(0.5, 0, 1, 1) ${d.delay}ms forwards`,
+              '--bofdy': (ch * 1.05) + 'px',
+            }} />
+          ))}
+          {splats.map((s, i) => (
+            <div key={'bos' + i} style={{
+              position: 'absolute',
+              left: s.x + 'px', top: s.y + 'px',
+              width: (s.rx * 2) + 'px', height: (s.ry * 2) + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(ellipse, #ee2200 0%, #aa0500 50%, #440000 90%)',
+              boxShadow: '0 0 7px rgba(220, 30, 0, 0.85), inset 0 -2px 3px rgba(0,0,0,0.5)',
+              opacity: 0,
+              animation: `boiling-oil-splat ${s.dur}ms ease-out ${s.delay}ms forwards`,
+            }} />
+          ))}
+          {steams.map((st, i) => (
+            <div key={'bost' + i} style={{
+              position: 'absolute',
+              left: st.x + 'px', top: st.y + 'px',
+              width: st.size + 'px', height: (st.size * 1.4) + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,210,190,0.7) 0%, rgba(255,160,110,0.35) 65%, transparent 100%)',
+              opacity: 0,
+              animation: `boiling-oil-steam ${st.dur}ms ease-out ${st.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes boiling-oil-fall {
+              0%   { opacity: 0;    transform: translateY(0)              scaleY(0.65); }
+              12%  { opacity: 1;    transform: translateY(calc(var(--bofdy) * 0.12)) scaleY(0.9); }
+              100% { opacity: 0.85; transform: translateY(var(--bofdy))   scaleY(1.15); }
+            }
+            @keyframes boiling-oil-splat {
+              0%   { opacity: 0;    transform: scale(0.25) translateY(-4px); }
+              35%  { opacity: 0.95; transform: scale(1.25) translateY(0); }
+              100% { opacity: 0;    transform: scale(1.4)  translateY(2px); }
+            }
+            @keyframes boiling-oil-steam {
+              0%   { opacity: 0;   transform: translate(0, 0)       scale(0.5); }
+              30%  { opacity: 0.7; transform: translate(0, -8px)    scale(1); }
+              100% { opacity: 0;   transform: translate(0, -28px)   scale(1.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Flame Pillars (Dance of the Flame Pillars) ────────────────────
+  // A geyser of fire erupting from the bottom of the card, columns of
+  // flame and embers shooting upward and spreading at the top. Bright
+  // basal flash where the pillar erupts. Distinct from `flame_strike`
+  // (radial burst on the target) — directional, vertical, theatrical.
+  flame_pillars: (() => {
+    return function FlamePillarsEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      // Vertical flame jet — particles erupting upward from the bottom.
+      // Slight horizontal sway suggests heat-shimmer column movement.
+      const jet = useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+        startX: -cw * 0.18 + Math.random() * cw * 0.36,
+        delay: i * 18 + Math.random() * 60,
+        dur: 420 + Math.random() * 240,
+        size: 12 + Math.random() * 14,
+        char: ['🔥', '🔥', '🔥', '🔥', '✦', '⭐'][Math.floor(Math.random() * 6)],
+        sway: -10 + Math.random() * 20,
+        rise: ch * 1.0 + Math.random() * ch * 0.6,
+      })), [cw, ch]);
+      // Embers spraying outward at the top of the pillar.
+      const embers = useMemo(() => Array.from({ length: 14 }, () => {
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.4;
+        const speed = 38 + Math.random() * 60;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed,
+          size: 3 + Math.random() * 4,
+          color: ['#ff2200', '#ff8800', '#ffaa00', '#ffcc33', '#ffe066'][Math.floor(Math.random() * 5)],
+          delay: 230 + Math.random() * 220,
+          dur: 500 + Math.random() * 320,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Bright basal flash where the pillar erupts */}
+          <div style={{
+            position: 'absolute',
+            left: -cw * 0.42 + 'px',
+            top: ch * 0.22 + 'px',
+            width: cw * 0.84 + 'px',
+            height: ch * 0.32 + 'px',
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse, #fff8aa 0%, #ffaa22 30%, #ff4400aa 60%, transparent 85%)',
+            opacity: 0,
+            animation: 'flame-pillar-base 380ms ease-out forwards',
+            filter: 'blur(2px)',
+          }} />
+          {/* Vertical jet — flame characters rising from the bottom */}
+          {jet.map((p, i) => (
+            <div key={'fpj' + i} style={{
+              position: 'absolute',
+              left: p.startX + 'px',
+              top: ch * 0.45 + 'px',
+              fontSize: p.size + 'px',
+              filter: 'drop-shadow(0 0 4px #ff6600)',
+              opacity: 0,
+              animation: `flame-pillar-rise ${p.dur}ms cubic-bezier(0.3, 0.7, 0.3, 1) ${p.delay}ms forwards`,
+              '--fpdy': (-p.rise) + 'px',
+              '--fpsway': p.sway + 'px',
+            }}>{p.char}</div>
+          ))}
+          {/* Embers spraying outward at top */}
+          {embers.map((e, i) => (
+            <div key={'fpe' + i} style={{
+              position: 'absolute',
+              left: 0, top: -ch * 0.35 + 'px',
+              width: e.size + 'px', height: e.size + 'px',
+              borderRadius: '50%',
+              background: e.color,
+              boxShadow: `0 0 6px ${e.color}`,
+              opacity: 0,
+              animation: `flame-pillar-ember ${e.dur}ms ease-out ${e.delay}ms forwards`,
+              '--fpedx': e.dx + 'px',
+              '--fpedy': e.dy + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes flame-pillar-base {
+              0%   { opacity: 0;    transform: scale(0.35, 0.5); }
+              30%  { opacity: 0.95; transform: scale(1.1, 1.15); }
+              100% { opacity: 0;    transform: scale(1.45, 0.8); }
+            }
+            @keyframes flame-pillar-rise {
+              0%   { opacity: 0;   transform: translate(0, 0) scale(0.4); }
+              15%  { opacity: 1;   transform: translate(0, calc(var(--fpdy) * 0.15)) scale(1.25); }
+              70%  { opacity: 1;   transform: translate(var(--fpsway), calc(var(--fpdy) * 0.7)) scale(1); }
+              100% { opacity: 0;   transform: translate(var(--fpsway), var(--fpdy)) scale(0.5); }
+            }
+            @keyframes flame-pillar-ember {
+              0%   { opacity: 0; transform: translate(0, 0) scale(1); }
+              22%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--fpedx), var(--fpedy)) scale(0.35); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Cute Hydra ────────────────────────────────────────────────────
+  // A fat splat of purple goo lands on the target, flings droplets
+  // outward in a downward-biased arc, and leaves a few oozing patches
+  // dripping on the slot. Distinct from flame_strike (fiery radial
+  // burst) and from venom_fog (a passive lingering cloud) — this one
+  // is an aggressive "spit" with strong impact + viscous drips.
+  hydra_goo: (() => {
+    return function HydraGooEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      // Initial splat — a wide, luminous radial flash that fades fast.
+      // ── Droplets: fly outward from impact in a 360° spray with a
+      //    slight downward bias (gravity), in a range of purple tints.
+      const drops = useMemo(() => Array.from({ length: 18 }, (_, i) => {
+        // Bias the spray downward so the goo "falls". Angle range:
+        // -30° to 210° (mostly the lower hemisphere), measured from
+        // the right horizontal in standard math convention.
+        const angle = (-Math.PI / 6) + Math.random() * (Math.PI * 7 / 6);
+        const speed = 35 + Math.random() * 55;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed + 18, // extra +18 fall for gravity feel
+          size: 6 + Math.random() * 8,
+          delay: i * 12 + Math.random() * 60,
+          dur: 380 + Math.random() * 220,
+          // Range of purple tints — deep violet, mid amethyst,
+          // bright neon, with a couple of sickly pink-magenta to
+          // avoid the spray feeling monochromatic.
+          color: ['#5a189a', '#7b2cbf', '#9d4edd', '#c77dff',
+                  '#b338ff', '#e0aaff', '#ff5cd6', '#a855f7'][Math.floor(Math.random() * 8)],
+        };
+      }), []);
+      // ── Splats: oozing patches that LAND on the target and stick.
+      //    Lower count, larger, persist longer than droplets.
+      const splats = useMemo(() => Array.from({ length: 7 }, () => ({
+        x: -cw * 0.32 + Math.random() * cw * 0.64,
+        y: -ch * 0.28 + Math.random() * ch * 0.56,
+        rx: 8 + Math.random() * 10, // ellipse radii
+        ry: 5 + Math.random() * 6,
+        rot: -25 + Math.random() * 50,
+        delay: 80 + Math.random() * 220,
+        dur: 600 + Math.random() * 500,
+      })), [cw, ch]);
+      // ── Bubbles: small fizzy pops, paler, suggest toxicity.
+      const bubbles = useMemo(() => Array.from({ length: 10 }, () => ({
+        x: -cw * 0.3 + Math.random() * cw * 0.6,
+        y: -ch * 0.3 + Math.random() * ch * 0.6,
+        size: 4 + Math.random() * 4,
+        delay: 200 + Math.random() * 300,
+        dur: 280 + Math.random() * 220,
+      })), [cw, ch]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Bright impact flash — viscous purple glow. */}
+          <div style={{
+            position: 'absolute',
+            left: -cw * 0.45 + 'px', top: -ch * 0.35 + 'px',
+            width: cw * 0.9 + 'px', height: ch * 0.7 + 'px',
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse, #f0c4ff 0%, #c77dff 25%, #7b2cbf99 55%, transparent 80%)',
+            opacity: 0,
+            animation: 'hydra-goo-flash 360ms ease-out forwards',
+            filter: 'blur(2px)',
+          }} />
+          {/* Lingering splats — the goo that "stuck" to the slot. */}
+          {splats.map((s, i) => (
+            <div key={'gs' + i} style={{
+              position: 'absolute',
+              left: s.x + 'px', top: s.y + 'px',
+              width: (s.rx * 2) + 'px', height: (s.ry * 2) + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(ellipse, #b338ff 0%, #7b2cbf 50%, #4a0e75 90%)',
+              boxShadow: '0 0 8px rgba(155, 60, 230, 0.85), inset 0 -2px 4px rgba(0,0,0,0.4)',
+              transform: `rotate(${s.rot}deg)`,
+              opacity: 0,
+              animation: `hydra-goo-splat ${s.dur}ms ease-out ${s.delay}ms forwards`,
+            }} />
+          ))}
+          {/* Droplet spray — flies outward and falls. */}
+          {drops.map((d, i) => (
+            <div key={'gd' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: d.size + 'px', height: d.size + 'px',
+              borderRadius: '50%',
+              background: d.color,
+              boxShadow: `0 0 6px ${d.color}, inset -1px -1px 2px rgba(0,0,0,0.4)`,
+              opacity: 0,
+              animation: `hydra-goo-fling ${d.dur}ms cubic-bezier(0.2, 0.6, 0.4, 1) ${d.delay}ms forwards`,
+              '--ggdx': d.dx + 'px',
+              '--ggdy': d.dy + 'px',
+            }} />
+          ))}
+          {/* Fizzy bubbles — small popping highlights on the splat. */}
+          {bubbles.map((b, i) => (
+            <div key={'gb' + i} style={{
+              position: 'absolute',
+              left: b.x + 'px', top: b.y + 'px',
+              width: b.size + 'px', height: b.size + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, #ffffff 0%, #e0aaff 60%, #c77dff 100%)',
+              boxShadow: '0 0 4px rgba(255, 200, 255, 0.9)',
+              opacity: 0,
+              animation: `hydra-goo-bubble ${b.dur}ms ease-out ${b.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes hydra-goo-flash {
+              0%   { opacity: 0;    transform: scale(0.4); }
+              25%  { opacity: 0.95; transform: scale(1.05); }
+              100% { opacity: 0;    transform: scale(1.35); }
+            }
+            @keyframes hydra-goo-fling {
+              0%   { opacity: 0;   transform: translate(0, 0) scale(0.4); }
+              15%  { opacity: 1;   transform: translate(calc(var(--ggdx) * 0.18), calc(var(--ggdy) * 0.18)) scale(1.1); }
+              80%  { opacity: 1;   transform: translate(calc(var(--ggdx) * 0.92), calc(var(--ggdy) * 0.92)) scale(0.95); }
+              100% { opacity: 0;   transform: translate(var(--ggdx), var(--ggdy)) scale(0.55); }
+            }
+            @keyframes hydra-goo-splat {
+              0%   { opacity: 0;    transform: scale(0.2) rotate(var(--rot, 0deg)); }
+              30%  { opacity: 1;    transform: scale(1.2)   rotate(var(--rot, 0deg)); }
+              60%  { opacity: 0.95; transform: scale(1)     rotate(var(--rot, 0deg)); }
+              100% { opacity: 0;    transform: scale(1.05)  translateY(8px) rotate(var(--rot, 0deg)); }
+            }
+            @keyframes hydra-goo-bubble {
+              0%   { opacity: 0;   transform: scale(0.3) translateY(0); }
+              35%  { opacity: 1;   transform: scale(1)   translateY(-2px); }
+              100% { opacity: 0;   transform: scale(0.4) translateY(-10px); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   // ── Steam Dwarfs archetype ───────────────────────────────────────
   // A puff of white/grey steam clouds rising upward. Used as a
   // generic "steam engine fired" feedback — +HP on discard, brewing,
@@ -8788,14 +9118,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (attachHeroOnly >= 0 && hi !== attachHeroOnly) return false;
           return canHeroReceiveAbility(me, hi, cn, { skipAbilityGiven });
         };
-        // Check hero zones
-        const heroEls = document.querySelectorAll('[data-hero-zone]');
-        for (const el of heroEls) {
-          const r = el.getBoundingClientRect();
-          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
-            if (el.dataset.heroOwner === 'me') {
-              const hi = parseInt(el.dataset.heroIdx);
-              if (canReceive(hi, cardName)) { targetHero = hi; targetZone = -1; }
+        // Custom-placement abilities (Performance — stacks onto an existing
+        // Lv1/2 Ability) cannot land on the Hero zone itself: the player
+        // MUST drop on a specific Ability slot to pick which one to stack
+        // on. Skip the Hero-zone hover match entirely so the Hero card
+        // doesn't light up as a drop target.
+        const isCustomDrag = (gameState.customPlacementCards || []).includes(cardName);
+        // Check hero zones (skipped for custom-placement)
+        if (!isCustomDrag) {
+          const heroEls = document.querySelectorAll('[data-hero-zone]');
+          for (const el of heroEls) {
+            const r = el.getBoundingClientRect();
+            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+              if (el.dataset.heroOwner === 'me') {
+                const hi = parseInt(el.dataset.heroIdx);
+                if (canReceive(hi, cardName)) { targetHero = hi; targetZone = -1; }
+              }
             }
           }
         }
@@ -9387,6 +9725,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 if (slot < 0) continue;
                 eligible.push({ idx: hi, name: me.heroes[hi].name, zoneSlot: slot });
               }
+              // Cards that opt into a custom host picker (Waitress) skip
+              // the generic spellHeroPick panel — their `beforeSummon`
+              // runs a richer prompt. Auto-emit with the FIRST eligible
+              // hero as a placeholder; the script's prompt makes the
+              // actual pick and redirects placement if needed.
+              const usesCustomHostPick = (gameState.customHostPickCards || []).includes(cardName);
               if (eligible.length === 1) {
                 socket.emit('play_creature', {
                   roomId: gameState.roomId, cardName,
@@ -9394,7 +9738,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   zoneSlot: eligible[0].zoneSlot,
                 });
               } else if (eligible.length > 1) {
-                setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isCreature: true });
+                if (usesCustomHostPick) {
+                  socket.emit('play_creature', {
+                    roomId: gameState.roomId, cardName,
+                    handIndex: idx, heroIdx: eligible[0].idx,
+                    zoneSlot: eligible[0].zoneSlot,
+                  });
+                } else {
+                  setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isCreature: true });
+                }
               }
             }
           } else if (isAscensionPlayable) {
@@ -9536,6 +9888,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             socket.emit('play_creature', {
               roomId: gameState.roomId, cardName: prev.cardName,
               handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetSlot,
+              // Drag-drop signal — Creature scripts whose `beforeSummon`
+              // would normally prompt for the host hero (Waitress) trust
+              // the explicit drag target and skip the picker.
+              viaDragDrop: true,
             });
           }
           return null;
@@ -9792,6 +10148,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [cameraFlash, setCameraFlash] = useState(false);
   const [toughnessHpChanges, setToughnessHpChanges] = useState([]); // [{id, amount, owner, heroIdx}]
   const toughnessHpSuppressRef = useRef({}); // { 'owner-heroIdx': true } — suppress damage numbers for Toughness HP removal
+  const manualHpSuppressRef = useRef({}); // { 'owner-heroIdx': true } — suppress BOTH damage + heal numbers for one tick when explicit popups handle them (Luna Kiai split, future split-popup cards)
   const creatureMoveSuppressRef = useRef({}); // { 'owner-heroIdx-slot': true } — suppress damage numbers when creature moves zones
   const [fightingAtkChanges, setFightingAtkChanges] = useState([]); // [{id, amount, owner, heroIdx}]
 
@@ -9861,6 +10218,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (amount < 0) {
         toughnessHpSuppressRef.current[`${owner}-${heroIdx}`] = true;
       }
+    };
+    // Luna Kiai's split popup: a Burn tick lands on a Hero, then Kiai's
+    // afterDamage hook bumps max+current HP by 60. The auto HP-delta
+    // detector would see the net delta (0 for one Kiai, +60 per extra
+    // Kiai) and either skip or fire the wrong popup, hiding the burn
+    // from the player. The engine emits one of these events per Kiai
+    // — the FIRST event for the damage tick carries `damage` (red
+    // popup); every event carries `heal` (green popup). The auto
+    // detector is suppressed for this hero on the upcoming sync so
+    // these explicit popups are the sole source of truth.
+    const onKiaiHpSplit = ({ owner, heroIdx, damage, heal }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      if (damage && damage > 0) {
+        const dmgEntry = { id: Date.now() + Math.random(), amount: damage, ownerLabel, heroIdx };
+        setDamageNumbers(prev => [...prev, dmgEntry]);
+        setTimeout(() => setDamageNumbers(prev => prev.filter(e => e.id !== dmgEntry.id)), 1800);
+      }
+      if (heal && heal > 0) {
+        const healEntry = { id: Date.now() + Math.random(), amount: heal, ownerLabel, heroIdx };
+        setHealNumbers(prev => [...prev, healEntry]);
+        setTimeout(() => setHealNumbers(prev => prev.filter(e => e.id !== healEntry.id)), 1800);
+      }
+      manualHpSuppressRef.current[`${owner}-${heroIdx}`] = true;
     };
     const onCreatureZoneMove = ({ owner, heroIdx, zoneSlot }) => {
       creatureMoveSuppressRef.current[`${owner}-${heroIdx}-${zoneSlot}`] = true;
@@ -10057,6 +10437,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('reaction_chain_done', onChainDone);
     socket.on('camera_flash', onCameraFlash);
     socket.on('toughness_hp_change', onToughnessHp);
+    socket.on('kiai_hp_split', onKiaiHpSplit);
     socket.on('creature_zone_move', onCreatureZoneMove);
     socket.on('fighting_atk_change', onFightingAtk);
     socket.on('summon_effect', onSummon);
@@ -13037,7 +13418,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('reaction_chain_update', onChainUpdate); socket.off('reaction_chain_resolving_start', onChainResolvingStart);
       socket.off('reaction_chain_link_resolving', onChainLinkResolving); socket.off('reaction_chain_link_resolved', onChainLinkResolved);
       socket.off('reaction_chain_link_negated', onChainLinkNegated); socket.off('reaction_chain_done', onChainDone);
-      socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('creature_zone_move', onCreatureZoneMove); socket.off('fighting_atk_change', onFightingAtk);
+      socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('kiai_hp_split', onKiaiHpSplit); socket.off('creature_zone_move', onCreatureZoneMove); socket.off('fighting_atk_change', onFightingAtk);
       socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick);
       socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange);
       socket.off('deepsea_spores_activated', onDeepseaSporesActivated);
@@ -13606,6 +13987,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             delete toughnessHpSuppressRef.current[key];
             continue;
           }
+          // Skip if explicit popup events already covered this tick
+          // (e.g. Luna Kiai's split-popup). The flag is consumed at
+          // the bottom of this useEffect so it suppresses BOTH the
+          // damage and heal branch this tick, then is cleared.
+          if (manualHpSuppressRef.current[key]) continue;
           const dmg = prev.hp - cur.hp;
           const [, hiStr] = key.split('-');
           newDmgNums.push({ id: Date.now() + Math.random(), amount: dmg, ownerLabel: cur.owner, heroIdx: parseInt(hiStr) });
@@ -13622,6 +14008,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       for (const [key, cur] of Object.entries(currentHp)) {
         const prev = prevHpRef.current[key];
         if (prev && cur.hp > prev.hp && prev.hp > 0) {
+          // Same suppression as the damage branch — see comment above.
+          if (manualHpSuppressRef.current[key]) continue;
           const healed = cur.hp - prev.hp;
           const [piStr, hiStr] = key.split('-');
           newHealNums.push({ id: Date.now() + Math.random(), amount: healed, ownerLabel: cur.owner, heroIdx: parseInt(hiStr) });
@@ -13633,6 +14021,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           setHealNumbers(prev => prev.filter(d => !newHealNums.some(n => n.id === d.id)));
         }, 1800);
       }
+      // Clear the manual-suppress refs once the tick has been
+      // processed. Any kiai_hp_split (or future split-popup) events
+      // that arrive AFTER this useEffect runs but before the next
+      // sync set a fresh flag that the next render consumes.
+      manualHpSuppressRef.current = {};
     }
     prevHpRef.current = currentHp;
 
@@ -13826,22 +14219,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const target = pt.validTargets.find(t => t.id === targetId);
     if (!target || target.ineligible) return;
     if (window.playSFX) window.playSFX('ui_click');
-    setPotionSelection(prev => {
-      if (prev.includes(targetId)) {
-        // Deselect
-        return prev.filter(id => id !== targetId);
-      }
-      // Check exclusive types
-      const config = pt.config || {};
+    // Compute the next selection synchronously so we can auto-confirm
+    // outside the React state updater. (Inside the updater is unsafe —
+    // React may double-invoke updaters and we'd emit confirm_potion
+    // twice.)
+    const config = pt.config || {};
+    const computeNext = (prev) => {
+      if (prev.includes(targetId)) return prev.filter(id => id !== targetId);
       if (config.exclusiveTypes) {
         const prevTargets = prev.map(id => pt.validTargets.find(t => t.id === id)).filter(Boolean);
         const prevTypes = new Set(prevTargets.map(t => t.type));
-        if (prevTypes.size > 0 && !prevTypes.has(target.type)) {
-          // Switching type — clear previous
-          return [targetId];
-        }
+        if (prevTypes.size > 0 && !prevTypes.has(target.type)) return [targetId];
       }
-      // Check max per type
       const maxPerType = config.maxPerType || {};
       const max = maxPerType[target.type] ?? Infinity;
       const sameType = prev.filter(id => {
@@ -13849,15 +14238,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         return t2 && t2.type === target.type;
       });
       if (sameType.length >= max) {
-        // At limit — swap: remove oldest same-type selection, add new one
         const without = prev.filter(id => !sameType.includes(id));
         return [...without, targetId];
       }
-      // Pollution-cap rule (Sun Beam & future Pollution-creating effects):
-      // non-own-support selections are capped at `maxNonOwnSupport`.
-      // Own-support targets (ownSupport:true) are exempt, because destroying
-      // them immediately frees a slot for the Pollution Token placed in return.
-      // At limit, the click is ignored — existing selections stay put.
       const maxNonOwnSupport = config.maxNonOwnSupport;
       if (maxNonOwnSupport !== undefined && !target.ownSupport) {
         const currentNonOwn = prev.filter(id => {
@@ -13866,17 +14249,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         });
         if (currentNonOwn.length >= maxNonOwnSupport) return prev;
       }
-      // Check global max total. For single-target spells (maxTotal === 1),
-      // preserve the click-to-swap convention — that's the familiar "change
-      // my mind" UX. For multi-target selections, ignore over-limit clicks
-      // so the user doesn't accidentally wipe their carefully-built picks.
       const maxTotal = config.maxTotal ?? Infinity;
       if (prev.length >= maxTotal) {
         if (maxTotal === 1) return [targetId];
         return prev;
       }
       return [...prev, targetId];
-    });
+    };
+    const next = computeNext(potionSelection);
+    setPotionSelection(next);
+
+    // Auto-confirm: when `config.autoConfirm` is set, commit immediately
+    // once the selection has reached `maxTotal`. Used by single-target
+    // direct-click pickers (Singing's Creature borrow, Charme Lv1's
+    // Ability borrow) to skip the Confirm-button step entirely. The
+    // server's confirm_potion handler is the same path the Confirm
+    // button uses, so all the standard validation / chain handling
+    // still applies.
+    if (config.autoConfirm) {
+      const maxTotal = config.maxTotal ?? 1;
+      if (next.length === maxTotal) {
+        socket.emit('confirm_potion', { roomId: gameState.roomId, selectedIds: next });
+      }
+    }
   };
 
   const canConfirmPotion = (() => {
@@ -13914,9 +14309,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const isOppEffectPrompt = !isSpectator && !result && ep && ep.ownerIdx !== myIdx && ep.ownerIdx !== (gameState.activePlayer ?? -1);
   const isActivePlayerPromptForOpp = !isSpectator && !result && ep && ep.ownerIdx !== myIdx && ep.ownerIdx === (gameState.activePlayer ?? -1) && ep.showOpponentWaiting;
   const zonePickSet = new Set();
+  // Map heroIdx → first slotIdx eligible in this zonePick prompt.
+  // Used so clicking the Hero card itself (when zonePick is active and
+  // that hero has at least one eligible Support Zone) auto-routes the
+  // click to that hero's first eligible slot, mirroring the normal-
+  // summoning UX where the Hero zone is also clickable.
+  const zonePickHeroFirstSlot = new Map();
   if (isMyEffectPrompt && ep.type === 'zonePick') {
     for (const z of (ep.zones || [])) {
       zonePickSet.add(`${myIdx}-${z.heroIdx}-${z.slotIdx}`);
+      if (!zonePickHeroFirstSlot.has(z.heroIdx)) {
+        zonePickHeroFirstSlot.set(z.heroIdx, z.slotIdx);
+      }
     }
   }
   // ── Slippery Skates two-step move ──
@@ -14530,6 +14934,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const attachPickEligibleHero = !isOpp && abilityAttachPick && (() => {
             if (Array.isArray(abilityAttachPick.eligibleHeroIdxs)
                 && !abilityAttachPick.eligibleHeroIdxs.includes(i)) return false;
+            // Custom-placement abilities (Performance) MUST be clicked on
+            // a specific Ability zone — the player picks which Lv1/2
+            // Ability to stack on. Make the Hero card itself non-clickable
+            // so it can't auto-route to the first eligible slot. The
+            // matching Ability zones still light up via attachPickZoneValid
+            // below, so the player still sees the valid drop targets.
+            const isCustomPick = (gameState.customPlacementCards || []).includes(abilityAttachPick.cardName);
+            if (isCustomPick) return false;
             return canHeroReceiveAbility(p, i, abilityAttachPick.cardName, {
               skipAbilityGiven: !!abilityAttachPick.skipAbilityGiven,
               // Server-driven attach prompts have already vetted the
@@ -14575,6 +14987,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const isChainPickValid = chainPickValidIds.has(heroTargetId);
           const isChainPickSelected = chainPickSelectedIds.has(heroTargetId);
           const chainPickStep = chainPickSelected.findIndex(t => t.id === heroTargetId);
+          // zonePick prompts (Waitress host pick, …) treat the Hero
+          // card itself as a clickable shortcut to that Hero's first
+          // eligible Support Zone. Only fires for the local player.
+          const isZonePickHero = !isOpp && zonePickHeroFirstSlot.has(i);
           const onHeroClick = attachPickEligibleHero
             ? () => {
                 // Click the Hero → auto-attach to the first eligible slot.
@@ -14621,6 +15037,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const tgt = (chainPickData?.targets || []).find(t => t.id === heroTargetId);
                 if (tgt) setChainPickSelected(prev => [...prev, tgt]);
               }
+            : isZonePickHero
+            ? () => respondToPrompt({ heroIdx: i, slotIdx: zonePickHeroFirstSlot.get(i) })
             : (isHeroEffectActive && !isEffectLocked && !isValidHeroTarget)
             ? () => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: i, charmedOwner: heroEffectEntry?.charmedOwner })
             : (isValidHeroTarget ? () => togglePotionTarget(heroTargetId) : undefined);
@@ -14630,10 +15048,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || attachPickEligibleHero) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || attachPickEligibleHero) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
-                style={zsMerge('hero', { ...((isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
+                style={zsMerge('hero', { ...((isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
                 {isChainPickSelected && <div className="chain-pick-number">{chainPickStep + 1}</div>}
                 {hero?.name && !isRamming ? (
                   <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={gameSkins}
@@ -14901,7 +15319,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     } : (isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined);
                 return (
                   <div key={z}
-                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (attachPickZoneValid ? ' attach-pick-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '')}
+                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (attachPickZoneValid ? ' attach-pick-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isValidPotionTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '')}
                     data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel} data-card-name={cards[0] || ''}
                     onClick={onAbilityClick}
                     onMouseEnter={() => {
@@ -15113,7 +15531,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const isStolen = stolenBy != null;
               const stolenColor = isStolen ? (stolenBy === myIdx ? me.color : opp.color) : null;
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   onClick={isPendingBounceTarget ? () => {
                     // Click-to-swap: dispatches play_creature as if the
@@ -15276,6 +15694,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       </div>
                     )}
                     {(() => { const lvl = cc?.level; return lvl ? <div className="creature-level">Lv{lvl}</div> : null; })()}
+                    {cc?.headCounter > 0 ? (
+                      <div className="head-counter-badge"
+                        onMouseEnter={e => showGameTooltip(e, `Head Counters: ${cc.headCounter}. This Creature can hit up to ${cc.headCounter} different targets with its Hydra strike.`)}
+                        onMouseLeave={hideGameTooltip}
+                      >
+                        <span className="head-counter-icon">🐲</span>
+                        <span className="head-counter-num">×{cc.headCounter}</span>
+                      </div>
+                    ) : null}
                     {(() => { return cc?.additionalActionAvail ? <div className="additional-action-icon"
                       onMouseEnter={() => { window._aaTooltipKey = cKey; window.dispatchEvent(new Event('aaHover')); }}
                       onMouseLeave={() => { window._aaTooltipKey = null; window.dispatchEvent(new Event('aaHover')); }}

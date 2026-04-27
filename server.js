@@ -1728,6 +1728,25 @@ function sendGameState(room, playerIdx, extra) {
       }
       return [...names];
     })(),
+    // Cards whose script declares `usesCustomHostPick: true` — the
+    // card's own `beforeSummon` runs a richer host picker (zones +
+    // heroes clickable) than the generic spellHeroPick panel can
+    // offer, so the client SKIPS that panel for these cards on a
+    // click play and emits `play_creature` with the first eligible
+    // hero as a placeholder. The card's `beforeSummon` then prompts
+    // for the real host. Drag-drop bypasses both flows because the
+    // explicit drop slot is the player's host pick (signalled via
+    // `viaDragDrop` on the play_creature payload).
+    customHostPickCards: (() => {
+      const ps2 = gs.players[playerIdx];
+      const names = new Set();
+      for (const cn of (ps2?.hand || [])) {
+        if (names.has(cn)) continue;
+        const s = loadCardEffect(cn);
+        if (s?.usesCustomHostPick) names.add(cn);
+      }
+      return [...names];
+    })(),
     ascendedOnlyAbilities: (() => {
       const ps2 = gs.players[playerIdx];
       const names = new Set();
@@ -2110,6 +2129,7 @@ function sendSpectatorGameState(room) {
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     customPlacementCards: [],
+    customHostPickCards: [],
     ascendedOnlyAbilities: [],
     awaitingFirstChoice: gs.awaitingFirstChoice || false,
     choosingPlayerName,
@@ -3325,8 +3345,17 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     if (resolved !== false) {
       if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
       else room.engine._firePendingPlayLog();
-      if (!gs.hoptUsed) gs.hoptUsed = {};
-      gs.hoptUsed[hoptKey] = gs.turn;
+      // Allow the script to opt out of the standard once-per-turn lock
+      // by stamping `ctx._skipCreatureEffectHopt = true` during
+      // `onCreatureEffect`. Used by Dream Lander Creatures
+      // (Wolflesia / Clausss / Vullary) whose "attach a Hero" mode is
+      // a separate, independent gate from the post-attach effect —
+      // attaching shouldn't burn the once-per-turn slot the bonus
+      // mode also wants to use this turn.
+      if (!ctx._skipCreatureEffectHopt) {
+        if (!gs.hoptUsed) gs.hoptUsed = {};
+        gs.hoptUsed[hoptKey] = gs.turn;
+      }
     } else {
       delete gs._pendingCardReveal;
       delete gs._pendingPlayLog;
@@ -3499,7 +3528,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
   return true;
 }
 
-async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot, additionalActionProvider }) {
+async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot, additionalActionProvider, viaDragDrop }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
 
@@ -3601,7 +3630,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       return true;
     }
 
-    const beforeSummonOk = await room.engine._runBeforeSummon(cardName, pi, heroIdx, { isInherentAction });
+    const beforeSummonOk = await room.engine._runBeforeSummon(cardName, pi, heroIdx, { isInherentAction, viaDragDrop: !!viaDragDrop });
     const placementConsumed = ps._placementConsumedByCard === cardName;
     if (placementConsumed) delete ps._placementConsumedByCard;
     if (!beforeSummonOk && !placementConsumed) {
@@ -6072,6 +6101,16 @@ io.on('connection', (socket) => {
               inst.counters.maxHp = stats;
               inst.counters.biomancyDamage = stats;
               inst.counters.biomancyLevel = level;
+            }
+            // Cute Hydra Head Counter — authored in the puzzle editor,
+            // mirrors what the live `onPlay` handler stamps after the
+            // discard prompt. The board renderer keys off
+            // `inst.counters.headCounter` for the badge AND the HOPT
+            // creature-effect uses it as the cap on different targets,
+            // so a puzzle Hydra with N counters can immediately strike
+            // up to N targets on its first activation.
+            if (typeof cs.headCounter === 'number' && cs.headCounter > 0) {
+              inst.counters.headCounter = cs.headCounter;
             }
           }
         }
