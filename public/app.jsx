@@ -3607,6 +3607,15 @@ function StatusBadges({ statuses, counters, isHero }) {
     badges.push({ key: 'poisoned', icon: '☠️', tooltip: `Poisoned: Takes ${30 * stacks} damage at the start of each of its owner's turns.` });
   }
   if (s.negated || c.negated) badges.push({ key: 'negated', icon: '🚫', tooltip: isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.' });
+  // Extra Life — visual-only marker (Trial of Coolness, etc.). Stored
+  // outside `statuses` on the source side so engine status checks never
+  // trip on it; the call sites spread `_extraLife` into the statuses
+  // prop just for this badge.
+  if (s._extraLife || c._extraLife) {
+    const mark = s._extraLife || c._extraLife;
+    const by = (mark && typeof mark === 'object' && mark.by) || 'an effect';
+    badges.push({ key: 'extraLife', icon: '💖', tooltip: `Extra Life: The next time this is defeated, it is fully revived. (Granted by ${by}.)` });
+  }
   if (badges.length === 0) return null;
   return (
     <div className="status-badges-row">
@@ -7346,7 +7355,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                 {hero?.name && isNegated && <NegatedOverlay />}
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
-                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated) && <StatusBadges statuses={hero.statuses} isHero={true} />}
+                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || hero._extraLife) && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} isHero={true} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
                 {hero?.name && hero.buffs && <BuffColumn buffs={hero.buffs} />}
@@ -7547,7 +7556,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                     {cc?.frozen ? <FrozenOverlay /> : null}
                     {cc?.negated ? <NegatedOverlay /> : null}
                     {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
-                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated) ? <StatusBadges counters={cc} isHero={false} /> : null}
+                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated || cc?._extraLife) ? <StatusBadges counters={cc} isHero={false} /> : null}
                     {cc?.buffs ? <BuffColumn buffs={cc.buffs} /> : null}
                     </>
                     ); })()

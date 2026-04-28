@@ -1616,30 +1616,36 @@ function sendGameState(room, playerIdx, extra) {
         // reveals, see below).
         const permaMap = ps._permanentlyRevealedHandIndices || {};
         for (const kStr of Object.keys(permaMap)) pushReveal(+kStr);
-        // Per-instance permanent reveals (Bamboo Shield, …): the flag
-        // lives on the CardInstance itself, so reorder/splice can't
-        // transfer the reveal onto another card. Translate to hand
-        // positions by counting flagged instances per name and marking
-        // the first matching positions in hand order. All physical
-        // copies of a card are interchangeable for reveal purposes —
-        // what matters is "N copies are revealed", not "this exact
-        // slot index" — and FIFO assignment keeps the visible slot
-        // stable across reorders.
-        const revealedByName = {};
+        // Per-instance reveals (Luna Kiai per-turn via `_revealedThisTurn`,
+        // Bamboo Shield permanent via `_permanentlyRevealed`): map each
+        // revealed inst to its specific hand position via rank-by-name
+        // correspondence (K-th tracked inst of name X ↔ K-th hand
+        // position of name X). Inverse of `_findHandInstanceAt`. The
+        // earlier "count + mark first N" version always exposed the
+        // leftmost matching slot regardless of which copy was actually
+        // revealed — visible bug with multiple copies of the same card.
+        const revealedRanks = {};
+        const trackingRank  = {};
         for (const inst of (room.engine?.cardInstances || [])) {
           if (inst.owner !== pi) continue;
           if (inst.zone !== 'hand') continue;
-          if (!inst.counters?._permanentlyRevealed) continue;
-          revealedByName[inst.name] = (revealedByName[inst.name] || 0) + 1;
+          const name = inst.name;
+          const rank = trackingRank[name] || 0;
+          trackingRank[name] = rank + 1;
+          if (inst.counters?._permanentlyRevealed || inst.counters?._revealedThisTurn) {
+            if (!revealedRanks[name]) revealedRanks[name] = new Set();
+            revealedRanks[name].add(rank);
+          }
         }
-        if (Object.keys(revealedByName).length > 0) {
-          const remaining = { ...revealedByName };
+        if (Object.keys(revealedRanks).length > 0) {
+          const handRank = {};
           for (let i = 0; i < ps.hand.length; i++) {
-            if (seenIdx.has(i)) continue;
+            if (seenIdx.has(i)) { /* still need to bump rank */ }
             const name = ps.hand[i];
-            if ((remaining[name] || 0) > 0) {
+            const k = handRank[name] || 0;
+            handRank[name] = k + 1;
+            if (revealedRanks[name]?.has(k) && !seenIdx.has(i)) {
               pushReveal(i);
-              remaining[name]--;
             }
           }
         }
@@ -1931,27 +1937,43 @@ function sendGameState(room, playerIdx, extra) {
       // reveals are both surfaced here with the same styling.
       collect(myPs._revealedHandIndices);
       collect(myPs._permanentlyRevealedHandIndices);
-      // Per-instance permanent reveals (Bamboo Shield, …): walk
-      // tracked instances, count flagged copies per name, mark the
-      // first hand positions of each name. See `revealedHandCards`
-      // above for the rationale — instance-bound reveal flags are
-      // robust to reorder/splice.
-      const revealedByName = {};
+      // Per-instance reveals (Luna Kiai per-turn via `_revealedThisTurn`,
+      // Bamboo Shield permanent via `_permanentlyRevealed`): walk
+      // tracked instances and map EACH revealed inst back to its
+      // specific hand position via rank-by-name correspondence.
+      //   • Tracked instances are appended in entry order; cards in hand
+      //     are appended in the same order. So the K-th tracked inst
+      //     of name X corresponds to the K-th hand position of name X.
+      //   • For each revealed inst, compute its rank-by-name in tracking
+      //     order, then mark the K-th hand position with that name.
+      // This is the EXACT inverse of `_findHandInstanceAt(handIndex)`,
+      // which is what stamps the reveal flag in the first place — so
+      // the round-trip lands on the same physical copy the player clicked.
+      // The earlier "count per name → mark first N" version always
+      // marked the leftmost copy regardless of which one was actually
+      // clicked (visible bug with 3 Luna Kiais — clicking the rightmost
+      // revealed the leftmost).
+      const revealedRanks = {}; // name -> Set<rankAmongName>
+      const trackingRank = {};  // name -> running counter
       for (const inst of (room.engine?.cardInstances || [])) {
         if (inst.owner !== playerIdx) continue;
         if (inst.zone !== 'hand') continue;
-        if (!inst.counters?._permanentlyRevealed) continue;
-        revealedByName[inst.name] = (revealedByName[inst.name] || 0) + 1;
+        const name = inst.name;
+        const rank = trackingRank[name] || 0;
+        trackingRank[name] = rank + 1;
+        if (inst.counters?._permanentlyRevealed || inst.counters?._revealedThisTurn) {
+          if (!revealedRanks[name]) revealedRanks[name] = new Set();
+          revealedRanks[name].add(rank);
+        }
       }
-      if (Object.keys(revealedByName).length > 0) {
-        const remaining = { ...revealedByName };
+      if (Object.keys(revealedRanks).length > 0) {
+        const handRank = {};
         for (let i = 0; i < handLen; i++) {
           if (out.has(i)) continue;
           const name = myPs.hand[i];
-          if ((remaining[name] || 0) > 0) {
-            out.add(i);
-            remaining[name]--;
-          }
+          const k = handRank[name] || 0;
+          handRank[name] = k + 1;
+          if (revealedRanks[name]?.has(k)) out.add(i);
         }
       }
       return [...out];
@@ -3049,6 +3071,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // follow-up attack this turn would inherit them.
         const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
         clearArmedArrows(room.engine, pi);
+      } else if (cardData.cardType === 'Spell') {
+        ps.spellsPlayedThisTurn = (ps.spellsPlayedThisTurn || 0) + 1;
       }
       if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
       if (!isInherentAction && !additionalConsumed && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
@@ -3206,6 +3230,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
       if (!ps.heroesAttackedThisTurn) ps.heroesAttackedThisTurn = [];
       if (!ps.heroesAttackedThisTurn.includes(heroIdx)) ps.heroesAttackedThisTurn.push(heroIdx);
+    } else if (cardData.cardType === 'Spell') {
+      ps.spellsPlayedThisTurn = (ps.spellsPlayedThisTurn || 0) + 1;
     }
 
     if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction) {
@@ -3278,7 +3304,6 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
-  if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return false;
   if (gs.potionTargeting) return false;
 
   const heroOwner = charmedOwner != null ? charmedOwner : pi;
@@ -3302,6 +3327,28 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   const effectName = inst.counters?._effectOverride || creatureName;
   const script = loadCardEffect(effectName);
   if (!script?.creatureEffect || !script?.onCreatureEffect) return false;
+
+  // Phase + action-economy gate. The default creature-effect path is
+  // Main-Phase-only and free. Creatures that opt into `creatureActionCost`
+  // (Adventurousness-style: "spend an Action") follow the ability
+  // action-cost rules — Action Phase OR Main Phase with an additional-
+  // action provider that covers the 'ability_activation' category.
+  const isActionPhase = gs.currentPhase === 3;
+  const isMainPhase   = gs.currentPhase === 2 || gs.currentPhase === 4;
+  const isActionCost  = !!script.creatureActionCost;
+  let hasAdditionalForActionCost = false;
+  if (isActionCost) {
+    if (isActionPhase) {
+      // Allowed.
+    } else if (isMainPhase) {
+      hasAdditionalForActionCost = room.engine.hasAdditionalActionForCategory(pi, 'ability_activation');
+      if (!hasAdditionalForActionCost) return false;
+    } else {
+      return false;
+    }
+  } else {
+    if (!isMainPhase) return false;
+  }
 
   if (inst.turnPlayed === (gs.turn || 0)) return false;
 
@@ -3355,6 +3402,24 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       if (!ctx._skipCreatureEffectHopt) {
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[hoptKey] = gs.turn;
+      }
+      // Action-cost creatures consume the Action on success — phase
+      // advance in Action Phase, additional-action consumption in Main
+      // Phase. Mirrors the doActivateActionCost path for abilities.
+      if (isActionCost) {
+        if (isActionPhase) {
+          await room.engine.advanceToPhase(pi, 4);
+        } else if (hasAdditionalForActionCost) {
+          for (const inst2 of room.engine.cardInstances) {
+            if (inst2.owner !== pi) continue;
+            if (!inst2.counters?.additionalActionType || !inst2.counters?.additionalActionAvail) continue;
+            const config = room.engine._additionalActionTypes[inst2.counters.additionalActionType];
+            if (config?.allowedCategories?.includes('ability_activation')) {
+              room.engine.consumeAdditionalAction(pi, inst2.counters.additionalActionType, inst2.id);
+              break;
+            }
+          }
+        }
       }
     } else {
       delete gs._pendingCardReveal;
@@ -3903,8 +3968,11 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
   // covers hero effects too. Frozen/stunned/negated still silence them.
   if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
-  // One-turn action lock (Treasure Hunter's Backpack, etc.)
-  if (hero._actionLockedTurn === gs.turn) return false;
+  // _actionLockedTurn (Treasure Hunter's Backpack, etc.) blocks "Actions"
+  // only — Spell/Attack/Creature plays and `actionCost` Ability activations.
+  // Hero-effect activations are an "effect", not an Action, so the lock
+  // does NOT gate this path. Same rationale as the frozen/stunned/negated
+  // comment above (Bound vs. Frozen distinction).
 
   const availableEffects = [];
   const hasMummyToken = (ps.supportZones[heroIdx] || []).some(slot => (slot || []).includes('Mummy Token'));
@@ -6112,6 +6180,17 @@ io.on('connection', (socket) => {
             if (typeof cs.headCounter === 'number' && cs.headCounter > 0) {
               inst.counters.headCounter = cs.headCounter;
             }
+            // Sleeping Beauty's linked-hero slot — authored in the puzzle
+            // editor. The link is per-SLOT (matches in-game behavior:
+            // a Hero swapped into the slot inherits the tether). Owner
+            // is implicit (= Beauty's controller, `pi`). The script
+            // reads these counters in `canActivateCreatureEffect` /
+            // `onCreatureEffect` / `onCreatureDeath`.
+            if (typeof cs._linkedHeroIdx === 'number'
+                && cs._linkedHeroIdx >= 0 && cs._linkedHeroIdx <= 2) {
+              inst.counters._linkedHeroOwner = pi;
+              inst.counters._linkedHeroIdx   = cs._linkedHeroIdx;
+            }
           }
         }
       }
@@ -6136,7 +6215,7 @@ io.on('connection', (socket) => {
           ps.dealtDamageToOpponent = false; ps.potionLocked = false;
           ps.oppHandLocked = false;
           ps.supportSpellLocked = false; ps.supportSpellUsedThisTurn = false;
-          ps.potionsUsedThisTurn = 0; ps.attacksPlayedThisTurn = 0;
+          ps.potionsUsedThisTurn = 0; ps.attacksPlayedThisTurn = 0; ps.spellsPlayedThisTurn = 0;
           ps.comboLockHeroIdx = null; ps.heroesActedThisTurn = []; ps.heroesAttackedThisTurn = [];
           ps._creaturesSummonedThisTurn = 0; ps.bonusActions = null; ps._bonusMainActions = 0;
           ps._actionsPlayedThisPhase = 0;

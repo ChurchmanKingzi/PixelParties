@@ -183,22 +183,14 @@ module.exports = {
       if (result?.cancelled) break;
       if (!result || result.cardName == null) break;
 
-      let actualIdx = result.handIndex;
-      if (actualIdx == null || actualIdx < 0 || actualIdx >= ps.hand.length || ps.hand[actualIdx] !== result.cardName) {
-        actualIdx = ps.hand.indexOf(result.cardName);
-        if (actualIdx < 0) break;
-      }
-
-      ps.hand.splice(actualIdx, 1);
-      ps.discardPile.push(result.cardName);
-      engine.log('discard', { player: ps.username, card: result.cardName, source: CARD_NAME });
-      await engine.runHooks('onDiscard', {
-        playerIdx: pi,
-        cardName: result.cardName,
-        discardedCardName: result.cardName,
-        _fromHand: true,
-        _skipReactionCheck: true,
-      });
+      // Commit via the engine helper — see actionDiscardHandCard for
+      // the load-bearing inst.zone update that lets discard-summon
+      // listeners (Cute Familiar etc.) actually fire.
+      const ok = await engine.actionDiscardHandCard(
+        pi, result.cardName, result.handIndex,
+        { source: CARD_NAME }
+      );
+      if (!ok) break;
       discarded++;
       engine.sync();
     }

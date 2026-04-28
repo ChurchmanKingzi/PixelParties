@@ -23,25 +23,96 @@ module.exports = {
   },
 
   // CPU prompt override. Barker's on-play card-gallery lists every Lv ≤ 1
-  // Creature in hand + deck. The CPU should prefer Lv 1 over Lv 0; ties
-  // broken at random. We also accept the initial confirm and the
-  // zone-picker as their defaults (confirm → yes, zonePick → random).
+  // Creature in hand + deck. Picks the best one via MCTS-style rollout
+  // scoring rather than a fixed level-based heuristic — a Lv0 Creature
+  // (Goff, etc.) whose downstream value (auto-upgrade, Burn doubling,
+  // archetype synergy) actually wins more games scores higher than a
+  // Lv1 vanilla.
+  //
+  // **Sync function, async return ONLY for the MCTS branch.** Declaring
+  // the function as `async` would coerce every "I don't handle this
+  // prompt" return into a `Promise<undefined>`, and the engine's
+  // cpuResponse wrapper checks `override !== undefined` synchronously —
+  // it would then pass the Promise through, the awaiting caller would
+  // resolve it to `undefined`, and `promptConfirmEffect` would read
+  // that as "declined". Net effect: Barker's initial confirm dialog
+  // would be silently auto-declined and Barker would never fire.
+  // Returning undefined synchronously for non-cardGallery prompts lets
+  // the default brain auto-confirm them.
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic') return undefined;
     if (promptData.type !== 'cardGallery') return undefined;
     const cards = promptData.cards || [];
     if (!cards.length) return undefined;
+
     const cardDB = engine._getCardDB();
-    // Partition by card level.
-    let bestLevel = -Infinity;
-    for (const c of cards) {
-      const cd = cardDB[c.name];
-      const lvl = cd?.level || 0;
-      if (lvl > bestLevel) bestLevel = lvl;
+    const cpuIdx = engine._cpuPlayerIdx;
+    if (cpuIdx < 0) return undefined;
+
+    // Heuristic fallback (sync). Used when MCTS isn't available OR
+    // we're already inside an outer rollout (no nested rollouts).
+    const heuristicPick = () => {
+      let bestLevel = -Infinity;
+      for (const c of cards) {
+        const cd = cardDB[c.name];
+        const lvl = cd?.level || 0;
+        if (lvl > bestLevel) bestLevel = lvl;
+      }
+      const top = cards.filter(c => (cardDB[c.name]?.level || 0) === bestLevel);
+      const pick = top[Math.floor(Math.random() * top.length)];
+      return { cardName: pick.name, source: pick.source };
+    };
+
+    // Lazy-required so card-script load doesn't depend on _cpu init.
+    let mctsPick;
+    try { ({ mctsPickFromOptions: mctsPick } = require('./_cpu')); }
+    catch { mctsPick = null; }
+    if (typeof mctsPick !== 'function' || engine._inMctsSim) {
+      return heuristicPick();
     }
-    const top = cards.filter(c => (cardDB[c.name]?.level || 0) === bestLevel);
-    const pick = top[Math.floor(Math.random() * top.length)];
-    return { cardName: pick.name, source: pick.source };
+
+    const ps = engine.gs.players[cpuIdx];
+    let heroIdx = -1;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      if (ps.heroes[hi]?.name === 'Barker, the Monster Tamer') { heroIdx = hi; break; }
+    }
+    if (heroIdx < 0) return heuristicPick();
+
+    // ── MCTS branch — returns a Promise. ────────────────────────────
+    // We're committed to a Promise return only past this point. The
+    // engine wrapper sees a Promise (`!== undefined`), passes it
+    // through, and the awaiting caller resolves to the picked option.
+    return (async () => {
+      const findFreeSlot = () => {
+        const sup = ps.supportZones?.[heroIdx] || [];
+        for (let s = 0; s < 3; s++) if ((sup[s] || []).length === 0) return s;
+        return -1;
+      };
+      const apply = async (eng, opt) => {
+        const slot = findFreeSlot();
+        if (slot < 0) return false;
+        const psp = eng.gs.players[cpuIdx];
+        if (opt.source === 'hand') {
+          const idx = psp.hand.indexOf(opt.name);
+          if (idx >= 0) psp.hand.splice(idx, 1);
+        } else {
+          const idx = psp.mainDeck.indexOf(opt.name);
+          if (idx >= 0) psp.mainDeck.splice(idx, 1);
+        }
+        if (!psp.supportZones[heroIdx]) psp.supportZones[heroIdx] = [[], [], []];
+        psp.supportZones[heroIdx][slot] = [opt.name];
+        const inst = eng._trackCard(opt.name, cpuIdx, 'support', heroIdx, slot);
+        inst.counters.isPlacement = 1;
+        await eng.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName: opt.name, zone: 'support', heroIdx, zoneSlot: slot, _skipReactionCheck: true });
+        await eng.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _skipReactionCheck: true });
+        return true;
+      };
+      try {
+        const best = await mctsPick(engine, cards, apply);
+        if (best) return { cardName: best.name, source: best.source };
+      } catch { /* fall through */ }
+      return heuristicPick();
+    })();
   },
 
   hooks: {

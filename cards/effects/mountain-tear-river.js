@@ -87,10 +87,22 @@ module.exports = {
    * Attack / Spell / Creature effect with a valid owner + hero idx.
    * Mirrors Booby Trap's gate: passive sources without an actor
    * (e.g. board-state effects) don't qualify.
+   *
+   * AoE gate: card text says "in response to targeting effects" —
+   * effects that auto-fan-out across every matching target on the
+   * board (Divine Gift of Fire, Cataclysm, etc.) do NOT count as
+   * "targeting" the host. The engine stamps `_isAoeCheck = true` on
+   * the source CardInstance for the duration of its AoE surprise
+   * window (see `_engine.js` AoE block: `cardInst._isAoeCheck = true`
+   * before `_checkSurpriseWindow`, deleted right after) — we read
+   * that flag here and bail out so AoEs don't trigger the river.
+   * Single-target picks AND multi-target prompts both go through the
+   * non-AoE surprise paths and keep firing the river normally.
    */
   surpriseTrigger(gs, ownerIdx, heroIdx, sourceInfo, engine) {
     if (!sourceInfo) return false;
     if (sourceInfo.owner < 0 || sourceInfo.heroIdx < 0) return false;
+    if (sourceInfo.cardInstance?._isAoeCheck) return false;
 
     // Source must be alive — burning a corpse is meaningless.
     const srcInst = sourceInfo.cardInstance;

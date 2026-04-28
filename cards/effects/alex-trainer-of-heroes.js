@@ -64,6 +64,133 @@ function findTargetZone(abZones, cardName) {
 module.exports = {
   activeIn: ['hero'],
 
+  // ── CPU prompt overrides ─────────────────────────────────────────────
+  // Alex fires TWO prompts in sequence: a cardGallery (pick which Ability
+  // to fetch from deck) followed by an abilityAttachTarget (pick which
+  // other Hero to attach it to). The default brain picks the FIRST eligible
+  // option for both — random Ability, first hero — which is exactly the
+  // "Summoning Magic on a Hero that wanted Destruction" symptom the user
+  // reported.
+  //
+  // The fix enumerates every (Ability × eligibleHero) pair as an MCTS
+  // candidate, scores each via snapshot → attach → rollout-rest-of-turn
+  // → evaluator, and picks the pair with the highest projected end-of-
+  // turn value. The MCTS rollout naturally surfaces "this Hero now casts
+  // a Lv3 Spell because they reached Destruction Magic 3" — no hardcoded
+  // priority list, all dynamic via the score function.
+  //
+  // Two-prompt coordination: the cardGallery handler stashes the chosen
+  // hero on `engine._alexCpuPick` so the follow-up abilityAttachTarget
+  // can return it without re-running MCTS. Stash is cleared on read.
+  //
+  // Sync function returning a Promise from the IIFE branch only — same
+  // pattern Barker uses to avoid the "Promise<undefined> != undefined"
+  // wrapper bug that would kill prompts where this script doesn't apply.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    const cpuIdx = engine._cpuPlayerIdx;
+    if (cpuIdx < 0) return undefined;
+    if (engine._inMctsSim) return undefined; // Default brain inside rollouts.
+
+    // ── 2nd prompt — return the stashed hero from the 1st prompt's MCTS pick.
+    if (promptData.type === 'abilityAttachTarget') {
+      const cache = engine._alexCpuPick;
+      if (cache && Array.isArray(promptData.eligibleHeroIdxs)
+          && promptData.eligibleHeroIdxs.includes(cache.heroIdx)
+          && cache.cardName === promptData.cardName) {
+        delete engine._alexCpuPick;
+        return { heroIdx: cache.heroIdx, zoneSlot: cache.zoneSlot };
+      }
+      // Fall through if no cached pick — default brain picks for us.
+      return undefined;
+    }
+
+    // ── 1st prompt — score every (ability, hero) pair via MCTS rollout.
+    if (promptData.type !== 'cardGallery') return undefined;
+    const cards = promptData.cards || [];
+    if (cards.length === 0) return undefined;
+
+    let mctsPick;
+    try { ({ mctsPickFromOptions: mctsPick } = require('./_cpu')); }
+    catch { mctsPick = null; }
+    if (typeof mctsPick !== 'function') return undefined;
+
+    const ps = engine.gs.players[cpuIdx];
+    if (!ps) return undefined;
+
+    // Find Alex's hero index — needed to exclude him from the eligible-
+    // hero list (his text says "your OTHER Heroes").
+    let alexIdx = -1;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      if (ps.heroes[hi]?.name === CARD_NAME) { alexIdx = hi; break; }
+    }
+    if (alexIdx < 0) return undefined;
+
+    // Build (ability, hero) options. Skip pairs that fail the engine's
+    // canAttachAbilityToHero gate so the picker doesn't waste rollouts
+    // on impossible plans.
+    const options = [];
+    for (const c of cards) {
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        if (hi === alexIdx) continue;
+        const h = ps.heroes[hi];
+        if (!h?.name || h.hp <= 0) continue;
+        if (!engine.canAttachAbilityToHero(cpuIdx, c.name, hi)) continue;
+        options.push({ cardName: c.name, source: c.source || 'deck', heroIdx: hi });
+      }
+    }
+    if (options.length === 0) return undefined;
+
+    return (async () => {
+      const apply = async (eng, opt) => {
+        const psp = eng.gs.players[cpuIdx];
+        // Splice the ability out of the deck (mirrors Alex's real placement).
+        const dIdx = (psp.mainDeck || []).indexOf(opt.cardName);
+        if (dIdx < 0) return false;
+        psp.mainDeck.splice(dIdx, 1);
+        // Resolve the destination zone (stack onto existing, then first free).
+        const abZones = psp.abilityZones[opt.heroIdx] || [[], [], []];
+        psp.abilityZones[opt.heroIdx] = abZones;
+        const zone = findTargetZone(abZones, opt.cardName);
+        if (zone < 0) return false;
+        if (!abZones[zone]) abZones[zone] = [];
+        abZones[zone].push(opt.cardName);
+        const inst = eng._trackCard(opt.cardName, cpuIdx, 'ability', opt.heroIdx, zone);
+        // Fire the standard placement hooks so any onPlay / onCardEnterZone
+        // listeners (Performance's Divinity-stack snap, etc.) can affect
+        // the rollout score the same way they would in real play.
+        await eng.runHooks('onPlay', {
+          _onlyCard: inst, playedCard: inst, cardName: opt.cardName,
+          zone: 'ability', heroIdx: opt.heroIdx, _skipReactionCheck: true,
+        });
+        await eng.runHooks('onCardEnterZone', {
+          enteringCard: inst, toZone: 'ability', toHeroIdx: opt.heroIdx,
+          _skipReactionCheck: true,
+        });
+        return true;
+      };
+      let best = null;
+      try { best = await mctsPick(engine, options, apply); }
+      catch { best = null; }
+      if (!best) {
+        // Fall back to the default brain if MCTS produced nothing
+        // (e.g. evaluator threw on every candidate). Return undefined
+        // sync; the wrapper picks the gallery's first option.
+        return undefined;
+      }
+      // Stash the chosen hero (and the deterministic zone) for the
+      // follow-up abilityAttachTarget prompt.
+      const abZones = ps.abilityZones[best.heroIdx] || [[], [], []];
+      const zone = findTargetZone(abZones, best.cardName);
+      engine._alexCpuPick = {
+        cardName: best.cardName,
+        heroIdx: best.heroIdx,
+        zoneSlot: zone >= 0 ? zone : -1,
+      };
+      return { cardName: best.cardName, source: best.source };
+    })();
+  },
+
   hooks: {
     onCardEnterZone: async (ctx) => {
       if (ctx.toZone !== 'ability') return;

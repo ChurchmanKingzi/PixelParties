@@ -97,9 +97,18 @@ function _getOpponentActivatableAbilities(gs, pi, engine) {
       if (!script?.onActivate && !script?.onFreeActivate) continue;
       // Cannot copy another Charme
       if (abName === 'Charme') continue;
-      // Check standard HOPT for the original ability
-      const abHoptKey = isFree ? `free-ability:${abName}:${oi}` : `ability-action:${abName}:${oi}`;
-      if (gs.hoptUsed?.[abHoptKey] === gs.turn) continue;
+      // HOPT gate — applies to BOTH the original owner AND the borrower.
+      // The engine's per-(name, player) keys are normally one-shot per
+      // turn. Charme's borrow has to honour the lock from BOTH sides:
+      //   • Owner already used theirs → can't copy a spent slot.
+      //   • Borrower already used their OWN copy of the same ability →
+      //     can't double-dip via Charme. Charme's commit further down
+      //     stamps the borrower's key so a subsequent self-activation
+      //     of the same ability is also blocked.
+      const ownerKey    = isFree ? `free-ability:${abName}:${oi}` : `ability-action:${abName}:${oi}`;
+      const borrowerKey = isFree ? `free-ability:${abName}:${pi}` : `ability-action:${abName}:${pi}`;
+      if (gs.hoptUsed?.[ownerKey] === gs.turn) continue;
+      if (gs.hoptUsed?.[borrowerKey] === gs.turn) continue;
       results.push({ abName, abLevel: slot.length, ownerHeroIdx: hi, zoneIdx: zi, heroName: h.name, script, isFree });
     }
   }
@@ -207,6 +216,21 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops) {
   // truthy / undefined / void counts as "Charme committed" — matches
   // the server's `resolved !== false` convention.
   const result = await activateFn(fakeCtx, selectedAb.abLevel);
+
+  // On commit, stamp the BORROWER's HOPT key for this ability name.
+  // Charme's borrow runs the script function directly — it never goes
+  // through doActivateFreeAbility / doActivateActionCost, which is
+  // where the engine normally stamps the per-(name, player) lock. So
+  // without this manual stamp, the borrower could go on to play their
+  // OWN copy of the same ability the same turn (Adventurousness etc.).
+  // Skipped on cancel (the borrow didn't actually commit).
+  if (result !== false) {
+    const stampKey = selectedAb.isFree
+      ? `free-ability:${selectedAb.abName}:${pi}`
+      : `ability-action:${selectedAb.abName}:${pi}`;
+    if (!gs.hoptUsed) gs.hoptUsed = {};
+    gs.hoptUsed[stampKey] = gs.turn;
+  }
   engine.sync();
   return result !== false;
 }

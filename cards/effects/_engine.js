@@ -1969,6 +1969,44 @@ class GameEngine {
           if (targets.length === 0) return null;
         }
 
+        // ── Creature SOFT-untargetable-by-opponent filter (Perfect Disguise) ──
+        // Soft variant of the strict filter above: per-side, drop tagged
+        // creatures only when at LEAST ONE non-tagged creature remains on
+        // that side as a legal target. If ALL creatures on the side are
+        // tagged, keep them — the card text "except if it is your only
+        // legal target" prevents the spell from fizzling on a fully-
+        // shielded board. Mirrors the per-side scope the hero
+        // `untargetable` filter uses.
+        if (!config.ignoreUntargetable) {
+          const softByOwner = new Map(); // owner -> { all: [], soft: [] }
+          for (const t of targets) {
+            if (t.type !== 'equip' || !t.cardInstance) continue;
+            if (t.owner === pi) continue; // own creatures — soft doesn't block self-targeting
+            if (!softByOwner.has(t.owner)) softByOwner.set(t.owner, { all: [], soft: [] });
+            const entry = softByOwner.get(t.owner);
+            entry.all.push(t);
+            const c = t.cardInstance.counters;
+            if (c?.softUntargetable_by_opponent && c?.softUntargetable_by_opponent_pi === pi) {
+              entry.soft.push(t);
+            }
+          }
+          const removeIds = new Set();
+          for (const { all, soft } of softByOwner.values()) {
+            if (soft.length === 0) continue;
+            // At least one non-soft creature on this side → soft creatures filtered.
+            // All-soft on this side → keep them all (only legal target rule).
+            if (all.length - soft.length > 0) {
+              for (const t of soft) removeIds.add(t.id);
+            }
+          }
+          if (removeIds.size > 0) {
+            for (let i = targets.length - 1; i >= 0; i--) {
+              if (removeIds.has(targets[i].id)) targets.splice(i, 1);
+            }
+            if (targets.length === 0) return null;
+          }
+        }
+
         // ── Forced-target filter (Deepsea Horror Clown, taunt mechanic) ──
         // Generic: if any creature currently on the board has counters.
         // forcesTargeting === true, forcesTargeting_pi === caster, and
@@ -1997,6 +2035,20 @@ class GameEngine {
           cancellable: config.cancellable !== false,
           exclusiveTypes: true,
           maxPerType: { hero: 1, equip: 1 },
+          // Forward intent fields so the CPU's `cpuPickTargets` brain can
+          // score targets by expected damage / heal value. Without these,
+          // `inferDamage(config)` returned 0 and the picker fell back to
+          // a low-HP focus tiebreaker — which is why hero-effect damage
+          // (Ascended Arthor, Alice, Bakhm, …) and any future card that
+          // routes through `promptDamageTarget` was hitting the lowest-
+          // value hero instead of the highest-threat one.
+          baseDamage: config.baseDamage,
+          damageType: config.damageType,
+          isBuff: config.isBuff,
+          isHeal: config.isHeal,
+          appliesStatus: config.appliesStatus,
+          allowOwnSide: config.allowOwnSide,
+          selfDamage: config.selfDamage,
         });
 
         if (!selectedIds || selectedIds.length === 0) {
@@ -2205,6 +2257,38 @@ class GameEngine {
           if (targets.length === 0) return [];
         }
 
+        // ── Creature SOFT-untargetable-by-opponent filter (Perfect Disguise) ──
+        // Mirror of the soft filter in promptDamageTarget. Per-side scope
+        // with the "all-soft → keep" exception so Perfect Disguise doesn't
+        // break a multi-target spell that has nowhere else to land.
+        if (!config.ignoreUntargetable) {
+          const softByOwner = new Map();
+          for (const t of targets) {
+            if (t.type !== 'equip' || !t.cardInstance) continue;
+            if (t.owner === pi) continue;
+            if (!softByOwner.has(t.owner)) softByOwner.set(t.owner, { all: [], soft: [] });
+            const entry = softByOwner.get(t.owner);
+            entry.all.push(t);
+            const c = t.cardInstance.counters;
+            if (c?.softUntargetable_by_opponent && c?.softUntargetable_by_opponent_pi === pi) {
+              entry.soft.push(t);
+            }
+          }
+          const removeIds = new Set();
+          for (const { all, soft } of softByOwner.values()) {
+            if (soft.length === 0) continue;
+            if (all.length - soft.length > 0) {
+              for (const t of soft) removeIds.add(t.id);
+            }
+          }
+          if (removeIds.size > 0) {
+            for (let i = targets.length - 1; i >= 0; i--) {
+              if (removeIds.has(targets[i].id)) targets.splice(i, 1);
+            }
+            if (targets.length === 0) return [];
+          }
+        }
+
         // ── Forced-target filter (Deepsea Horror Clown) ──
         // Mirror of the filter in promptDamageTarget. See that site for
         // full documentation.
@@ -2230,6 +2314,14 @@ class GameEngine {
           cancellable: config.cancellable !== false,
           maxTotal: max,
           minRequired: min,
+          // Forward intent fields — see promptDamageTarget for rationale.
+          baseDamage: config.baseDamage,
+          damageType: config.damageType,
+          isBuff: config.isBuff,
+          isHeal: config.isHeal,
+          appliesStatus: config.appliesStatus,
+          allowOwnSide: config.allowOwnSide,
+          selfDamage: config.selfDamage,
         });
 
         if (!selectedIds || selectedIds.length === 0) {
@@ -2869,7 +2961,7 @@ class GameEngine {
     const realDealt = Math.min(actualAmount, hpBefore);
 
     this.log('damage', { source: source?.name, target: this._heroLabel(target), amount: actualAmount, damageType: type });
-    await this.runHooks(HOOKS.AFTER_DAMAGE, { source, target, amount: actualAmount, type, sourceHeroIdx: source?.heroIdx ?? -1 });
+    await this.runHooks(HOOKS.AFTER_DAMAGE, { source, target, amount: actualAmount, realDealt, type, sourceHeroIdx: source?.heroIdx ?? -1 });
 
     // Armed-arrow post-hit riders (Burn, Poison, gold-per-damage, …).
     // Runs once per target hit; armed arrows are NOT popped here so they
@@ -2937,6 +3029,29 @@ class GameEngine {
       this.gs._heroKOContext = { hero: target, source, heroOwner: targetOwner, killerOwner: source?.owner ?? -1 };
       await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, _bypassDeadHeroFilter: true });
       delete this.gs._heroKOContext;
+
+      // Generic "extra life" mark consumer (Trial of Coolness, etc.).
+      // Runs AFTER onHeroKO so cards like Guardian Angel still get
+      // priority — `_extraLife` is the last automatic safety net.
+      // Persists across turns until consumed; stamped by the granting
+      // card with `{ by: 'CardName' }` for log attribution.
+      if (target.hp <= 0 && target._extraLife) {
+        const lifeMark = target._extraLife;
+        delete target._extraLife;
+        target.hp = target.maxHp || 400;
+        const ownerIdx = targetOwner >= 0
+          ? targetOwner
+          : this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
+        const heroIdx = ownerIdx >= 0
+          ? this.gs.players[ownerIdx].heroes.indexOf(target)
+          : -1;
+        if (ownerIdx >= 0 && heroIdx >= 0) {
+          this._broadcastEvent('play_zone_animation', {
+            type: 'holy_revival', owner: ownerIdx, heroIdx, zoneSlot: -1,
+          });
+        }
+        this.log('extra_life_hero', { hero: target.name, by: lifeMark?.by || 'Extra Life' });
+      }
 
       // If a hook (Guardian Angel) restored HP, skip death processing
       if (target.hp > 0) {
@@ -3016,7 +3131,7 @@ class GameEngine {
 
       // Fire afterDamage so Shield of Life/Death, Fireshield, etc. still react.
       await this.runHooks(HOOKS.AFTER_DAMAGE, {
-        source, target, amount: dealt, type,
+        source, target, amount: dealt, realDealt: dealt, type,
         sourceHeroIdx: source?.heroIdx ?? -1,
         _skipReactionCheck: opts._skipReactionCheck,
       });
@@ -3040,6 +3155,29 @@ class GameEngine {
         };
         await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, _bypassDeadHeroFilter: true });
         delete this.gs._heroKOContext;
+
+        // Generic "extra life" mark consumer — see actionDealDamage for
+        // rationale. True-damage path mirrors the normal-damage path so
+        // a Trial-of-Coolness-protected hero survives Acid Vial / Rockfall
+        // / etc. just as it survives an attack.
+        if (target.hp <= 0 && target._extraLife) {
+          const lifeMark = target._extraLife;
+          delete target._extraLife;
+          target.hp = target.maxHp || 400;
+          const ownerIdx = targetOwner >= 0
+            ? targetOwner
+            : this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
+          const heroIdx = ownerIdx >= 0
+            ? this.gs.players[ownerIdx].heroes.indexOf(target)
+            : -1;
+          if (ownerIdx >= 0 && heroIdx >= 0) {
+            this._broadcastEvent('play_zone_animation', {
+              type: 'holy_revival', owner: ownerIdx, heroIdx, zoneSlot: -1,
+            });
+          }
+          this.log('extra_life_hero', { hero: target.name, by: lifeMark?.by || 'Extra Life' });
+        }
+
         if (target.hp > 0) {
           delete target.diedOnTurn;
         } else if (!target._koProcessed) {
@@ -4000,6 +4138,26 @@ class GameEngine {
       });
     }
 
+    // Suppress the client's HP-diff damage floater for Creatures that
+    // leave the support zone via NON-death moves (bounce-to-hand,
+    // shuffle-back-to-deck, support→support relocate). The client
+    // detects "creature disappeared from slot" as lethal damage by
+    // default; this `creature_zone_move` event flags the slot so the
+    // floater is skipped on the next state diff. Death moves
+    // (support → discard / deleted) intentionally still show the
+    // floater for proper visual feedback.
+    if (fromZone === ZONES.SUPPORT
+        && toZone !== ZONES.DISCARD && toZone !== ZONES.DELETED) {
+      const cd = this._getCardDB()[cardInstance.name];
+      if (cd && hasCardType(cd, 'Creature')) {
+        this._broadcastEvent('creature_zone_move', {
+          owner: cardInstance.owner,
+          heroIdx: cardInstance.heroIdx,
+          zoneSlot: cardInstance.zoneSlot,
+        });
+      }
+    }
+
     // Remove from old zone in game state
     this._removeCardFromState(cardInstance);
 
@@ -4038,7 +4196,23 @@ class GameEngine {
     // matching instId. Sacrifice + insta-kill destroys go through
     // here; pure damage deaths fire ON_CREATURE_DEATH separately in
     // actionApplyDamageBatch.
-    if (opts.fireCreatureDeath) {
+    //
+    // Auto-promote: a Creature transitioning from 'support' to
+    // 'discard' or 'deleted' is leaving the board AS A DEATH event,
+    // even if the caller forgot `fireCreatureDeath: true`. Without
+    // this, on-death listeners (Sleeping Beauty's 300-damage rider,
+    // Loyal Terrier death-watch, Hell Fox self-detect) would silently
+    // miss any future "delete this Creature to the deleted pile"
+    // path. `actionDestroyCard` already passes the flag, so this is
+    // additive: a defense for paths that don't.
+    let shouldFireDeath = !!opts.fireCreatureDeath;
+    if (!shouldFireDeath
+        && fromZone === ZONES.SUPPORT
+        && (toZone === ZONES.DISCARD || toZone === ZONES.DELETED)) {
+      const cd = this._getCardDB()[cardInstance.name];
+      if (cd && hasCardType(cd, 'Creature')) shouldFireDeath = true;
+    }
+    if (shouldFireDeath) {
       const deathInfo = {
         name: cardInstance.name,
         owner: cardInstance.owner,
@@ -4097,6 +4271,52 @@ class GameEngine {
         await this.runHooks(HOOKS.ON_DISCARD, { playerIdx, card: inst, cardName, discardedCardName: cardName, _fromHand: true });
       }
     }
+  }
+
+  /**
+   * Commit a single hand→discard transition correctly: splice the hand
+   * array, push to discard pile, MOVE the tracked CardInstance's zone
+   * marker to 'discard', then fire onDiscard with the inst attached to
+   * the hook context.
+   *
+   * The inst.zone update is load-bearing: the hook listener filter at
+   * runHooks gates on `c.isActiveIn(c.zone)`, so a discard-summon card
+   * (Cute Familiar, Cute Dog) whose `activeIn` is `['support','discard']`
+   * silently drops out of the listener pool if the inst is still parked
+   * at zone='hand' when the hook fires. Hand-side effects that fire
+   * onDiscard manually MUST go through this helper (or at minimum
+   * reproduce its inst.zone update + inst-in-hookCtx pattern).
+   *
+   * Returns true on success, false if the (cardName, handIdx) pair did
+   * not resolve to a real hand entry — caller should bail / re-prompt.
+   *
+   * @param {number} playerIdx
+   * @param {string} cardName
+   * @param {number} handIdx Optional preferred hand index. If it doesn't
+   *   match `cardName`, falls back to first occurrence by name.
+   * @param {object} [opts]
+   * @param {string} [opts.source] Effect name driving the discard (logged).
+   * @param {boolean} [opts.skipReactionCheck=true]
+   */
+  async actionDiscardHandCard(playerIdx, cardName, handIdx, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !cardName) return false;
+    let idx = handIdx;
+    if (idx == null || idx < 0 || idx >= ps.hand.length || ps.hand[idx] !== cardName) {
+      idx = ps.hand.indexOf(cardName);
+      if (idx < 0) return false;
+    }
+    ps.hand.splice(idx, 1);
+    ps.discardPile.push(cardName);
+    const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0];
+    if (inst) inst.zone = ZONES.DISCARD;
+    this.log('discard', { player: ps.username, card: cardName, source: opts.source || null });
+    await this.runHooks(HOOKS.ON_DISCARD, {
+      playerIdx, card: inst, cardName, discardedCardName: cardName,
+      _fromHand: true,
+      _skipReactionCheck: opts.skipReactionCheck !== false,
+    });
+    return true;
   }
 
   // ─── SAFE SUPPORT ZONE PLACEMENT ─────────
@@ -6236,6 +6456,18 @@ class GameEngine {
     // Support Spell lock (Friendship Lv1 debuff)
     if (ps.supportSpellLocked && cardData.cardType === 'Spell' && cardData.spellSchool1 === 'Support Magic') return null;
 
+    // Generic Attack/Spell lockout for the rest of the turn (Trial of
+    // Coolness sets this on resolve). The locking card is exempt while
+    // it's still resolving — once it stamps the flag, every subsequent
+    // Attack/Spell play from hand is refused for the remainder of the
+    // turn. Reset implicitly: ps._attackSpellLockedTurn !== gs.turn after
+    // turn rollover (the per-turn cleanup zeroes counters; this flag is
+    // self-expiring via the equality check).
+    if (ps._attackSpellLockedTurn === gs.turn
+        && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')) {
+      return null;
+    }
+
     // Custom play conditions (spells/attacks)
     if (script?.spellPlayCondition && !script.spellPlayCondition(gs, pi, this)) return null;
 
@@ -6427,8 +6659,14 @@ class GameEngine {
 
       this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: actualSlot, cardName });
 
-      await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualSlot, _skipReactionCheck: true });
-      await this.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _skipReactionCheck: true });
+      // `_isNormalSummon: true` mirrors the doPlayCreature hand-summon
+      // path so on-summon effects gated on it (Spawn Mother's AOE,
+      // Orthos's Loyal trigger, etc.) fire — Trample Sounds in the
+      // Forest and other "free additional Action" pathways route through
+      // here, and players reasonably expect those to count as a hand
+      // summon for the purpose of triggered abilities.
+      await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualSlot, _isNormalSummon: true, _skipReactionCheck: true });
+      await this.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _isNormalSummon: true, _skipReactionCheck: true });
 
       this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title });
 
@@ -6623,8 +6861,11 @@ class GameEngine {
       // Propagate guardian immunity to newly placed creatures
       this._syncGuardianImmunity(inst, playerIdx);
       this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx: responseHeroIdx, zoneSlot: actualSlot, cardName });
-      await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx: responseHeroIdx, zoneSlot: actualSlot, _skipReactionCheck: true });
-      await this.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: responseHeroIdx, _skipReactionCheck: true });
+      // `_isNormalSummon: true` — same rationale as performImmediateAction:
+      // free-additional-action paths (Trample Sounds, etc.) should fire
+      // on-summon triggers gated on this flag.
+      await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx: responseHeroIdx, zoneSlot: actualSlot, _isNormalSummon: true, _skipReactionCheck: true });
+      await this.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: responseHeroIdx, _isNormalSummon: true, _skipReactionCheck: true });
       this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title });
     } else {
       // Spell or Attack
@@ -6805,6 +7046,7 @@ class GameEngine {
         ps.supportSpellUsedThisTurn = false;
         ps.potionsUsedThisTurn = 0;
         ps.attacksPlayedThisTurn = 0;
+        ps.spellsPlayedThisTurn = 0;
         ps.comboLockHeroIdx = null;
         ps.heroesActedThisTurn = [];
         ps.heroesAttackedThisTurn = [];
@@ -6812,6 +7054,13 @@ class GameEngine {
         delete ps._creationLockedNames;
         delete ps._revealedCardCounts;
         delete ps._revealedHandIndices;
+        // Per-instance per-turn reveal flag (Luna Kiai). Walk the
+        // player's hand instances and clear the flag — the inst itself
+        // persists across turns, but the reveal is per-turn-only.
+        for (const inst of this.cardInstances) {
+          if (inst.zone !== 'hand') continue;
+          if (inst.counters?._revealedThisTurn) delete inst.counters._revealedThisTurn;
+        }
         // Clear discard-to-delete redirect (Madaga's Forsaken, etc.)
         if (ps._discardToDeleteActive) this.disableDiscardToDelete(this.gs.players.indexOf(ps));
         ps.bonusActions = null;
@@ -7095,6 +7344,15 @@ class GameEngine {
     // If game already ended (e.g. all heroes dead during End Phase), don't continue
     if (this.gs.result) return;
 
+    // Fire end-of-turn hooks for the ENDING player FIRST — even in puzzle
+    // mode where the puzzle-failure check below would otherwise short-
+    // circuit. End-of-turn effects (Cute Familiar's revive, status
+    // duration tickers, etc.) are a legitimate part of the human's turn
+    // and may even produce a winning board state, so they must resolve
+    // before we evaluate puzzle success/failure.
+    await this.runHooks(HOOKS.ON_TURN_END, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
+    if (this.gs.result) return; // ON_TURN_END resolution itself produced a result
+
     // Puzzle mode: the human player's turn just ended without winning.
     // Before declaring failure, simulate the opponent's start-of-turn status damage
     // (burn/poison) — it should be possible to win via lingering status effects.
@@ -7130,7 +7388,8 @@ class GameEngine {
       }
     }
 
-    await this.runHooks(HOOKS.ON_TURN_END, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
+    // ON_TURN_END already fired above (top of switchTurn). Non-puzzle
+    // path continues here with itemLocked clear + active-player flip.
     // Clear itemLocked for the player whose turn is ending
     // (it lasts from when it's applied until after the afflicted player's own turn)
     const endingPs = this.gs.players[this.gs.activePlayer];
@@ -7240,6 +7499,14 @@ class GameEngine {
       if (ps.supportSpellLocked) {
         const cd = allCards[cardName];
         if (cd && cd.cardType === 'Spell' && cd.spellSchool1 === 'Support Magic') {
+          blocked.push(cardName);
+          continue;
+        }
+      }
+      // Generic Attack/Spell lock (Trial of Coolness, etc.)
+      if (ps._attackSpellLockedTurn === this.gs.turn) {
+        const cd = allCards[cardName];
+        if (cd && (cd.cardType === 'Spell' || cd.cardType === 'Attack')) {
           blocked.push(cardName);
           continue;
         }
@@ -8107,91 +8374,95 @@ class GameEngine {
     if (!ps) return;
 
     const abZones = ps.abilityZones?.[heroIdx] || [[], [], []];
+    while (abZones.length < 3) abZones.push([]);
 
-    const calcPlacement = (name) => {
-      const deckCount = ps.mainDeck.filter(cn => cn === name).length;
-      if (deckCount === 0) return null;
-      const existingIdx = abZones.findIndex(slot => slot.length > 0 && slot[0] === name);
-      if (existingIdx >= 0) {
-        const room = 3 - abZones[existingIdx].length;
-        if (room <= 0) return null;
-        return { slotIdx: existingIdx, canAdd: Math.min(deckCount, room) };
+    // Auto-attach as many copies of every offered ability as physically
+    // possible. No prompt: each ability claims a slot (existing same-name
+    // stack first, otherwise the leftmost free zone), then fills from
+    // DECK first, then HAND, until either source is exhausted or the
+    // slot caps at level 3. The first ability's placement may consume
+    // a free zone, which is why each subsequent ability re-resolves
+    // its slot against the freshly-mutated abZones.
+    const placedInsts = [];
+    const placeOne = (name, slotIdx, source) => {
+      if (source === 'deck') {
+        const deckIdx = ps.mainDeck.indexOf(name);
+        if (deckIdx < 0) return false;
+        ps.mainDeck.splice(deckIdx, 1);
+      } else {
+        const handIdx = ps.hand.indexOf(name);
+        if (handIdx < 0) return false;
+        // Untrack the matching hand inst BEFORE splicing the name so
+        // _findHandInstanceAt's rank-by-name math still maps correctly.
+        const handInst = this._findHandInstanceAt(pi, handIdx);
+        if (handInst) this._untrackCard(handInst.id);
+        ps.hand.splice(handIdx, 1);
       }
-      const freeIdx = abZones.findIndex(slot => slot.length === 0);
-      if (freeIdx < 0) return null;
-      return { slotIdx: freeIdx, canAdd: Math.min(deckCount, 3) };
+      if (!abZones[slotIdx]) abZones[slotIdx] = [];
+      abZones[slotIdx].push(name);
+      const inst = this._trackCard(name, pi, 'ability', heroIdx, slotIdx);
+      placedInsts.push({ inst, name, slotIdx, source });
+      return true;
     };
 
-    const available = abilityChoices
-      .map(name => ({ name, ...calcPlacement(name) }))
-      .filter(entry => entry.slotIdx !== undefined);
-    if (available.length === 0) return;
-
-    let chosen;
-    if (available.length === 1) {
-      const entry = available[0];
-      const result = await this.promptGeneric(pi, {
-        type: 'optionPicker',
-        title: 'Ascension Bonus',
-        description: `Add up to ${entry.canAdd} ${entry.name} from your deck?`,
-        options: [
-          { id: 'yes',  label: `✅ Add ${entry.name}`, color: '#44bb44' },
-          { id: 'skip', label: '✗ Skip',               color: '#888' },
-        ],
-        cancellable: false,
-      });
-      if (!result || result.optionId !== 'yes') return;
-      chosen = entry;
-    } else {
-      const options = available.map(e => ({
-        id: e.name, label: e.name,
-        description: `Up to ${e.canAdd} cop${e.canAdd > 1 ? 'ies' : 'y'}`,
-        color: '#44aaff',
-      }));
-      options.push({ id: 'skip', label: '✗ Skip', color: '#888' });
-      const result = await this.promptGeneric(pi, {
-        type: 'optionPicker',
-        title: 'Ascension Bonus',
-        description: 'Choose your activation bonus!',
-        options, cancellable: false,
-      });
-      if (!result || result.optionId === 'skip') return;
-      chosen = available.find(e => e.name === result.optionId);
-      if (!chosen) return;
+    for (const name of abilityChoices) {
+      let slotIdx = abZones.findIndex(s => s.length > 0 && s[0] === name);
+      if (slotIdx < 0) slotIdx = abZones.findIndex(s => s.length === 0);
+      if (slotIdx < 0) continue;
+      while (abZones[slotIdx].length < 3) {
+        if (!placeOne(name, slotIdx, 'deck')) break;
+      }
+      while (abZones[slotIdx].length < 3) {
+        if (!placeOne(name, slotIdx, 'hand')) break;
+      }
     }
 
-    const { name: abilityName, slotIdx, canAdd } = chosen;
-
-    const placedInsts = [];
-    for (let i = 0; i < canAdd; i++) {
-      const deckIdx = ps.mainDeck.indexOf(abilityName);
-      if (deckIdx < 0) break;
-      ps.mainDeck.splice(deckIdx, 1);
-      abZones[slotIdx].push(abilityName);
-      const inst = this._trackCard(abilityName, pi, 'ability', heroIdx, slotIdx);
-      placedInsts.push(inst);
-    }
+    if (placedInsts.length === 0) return;
 
     ps.abilityZones[heroIdx] = abZones;
     this.shuffleDeck(pi);
 
-    for (const inst of placedInsts) {
+    for (const { inst, name, slotIdx } of placedInsts) {
       await this.runHooks('onPlay', {
         _onlyCard: inst, playedCard: inst,
-        cardName: abilityName, zone: 'ability',
+        cardName: name, zone: 'ability',
         heroIdx, zoneSlot: slotIdx,
         _skipReactionCheck: true,
       });
     }
 
-    this._broadcastEvent('deck_to_ability_animation', {
-      owner: pi, heroIdx, slotIdx, cardName: abilityName, count: canAdd,
-    });
+    // Animate per (slot, name, source) group so deck-sourced and hand-
+    // sourced copies fly from the right origin element on the client.
+    const animGroups = new Map();
+    for (const { name, slotIdx, source } of placedInsts) {
+      const key = `${slotIdx}-${name}-${source}`;
+      if (!animGroups.has(key)) animGroups.set(key, { slotIdx, name, source, count: 0 });
+      animGroups.get(key).count++;
+    }
+    let totalCount = 0;
+    for (const g of animGroups.values()) {
+      this._broadcastEvent('deck_to_ability_animation', {
+        owner: pi, heroIdx, slotIdx: g.slotIdx, cardName: g.name,
+        count: g.count, source: g.source,
+      });
+      totalCount += g.count;
+    }
 
-    await this._delay(canAdd * 300 + 400);
-    this.log('ascension_bonus', {
-      player: ps.username, ability: abilityName, count: canAdd,
-    });
+    await this._delay(totalCount * 300 + 400);
+
+    // Log per (slot, name) — players care about the total per ability,
+    // not the deck-vs-hand split.
+    const logGroups = new Map();
+    for (const { name, slotIdx } of placedInsts) {
+      const key = `${slotIdx}-${name}`;
+      if (!logGroups.has(key)) logGroups.set(key, { name, count: 0 });
+      logGroups.get(key).count++;
+    }
+    for (const g of logGroups.values()) {
+      this.log('ascension_bonus', {
+        player: ps.username, ability: g.name, count: g.count,
+      });
+    }
     this.sync();
   }
 
@@ -11221,14 +11492,17 @@ class GameEngine {
     if (this.gs.potionTargeting) return [];
     if (this.gs.effectPrompt) return [];
     const result = [];
-    const revealed = ps._revealedHandIndices || {};
     // Cache per-name script lookups + canHandActivate results — many
     // copies of the same name share the same answer.
     const scriptCache = new Map();
     const canCache = new Map();
     for (let handIndex = 0; handIndex < (ps.hand || []).length; handIndex++) {
-      if (revealed[handIndex]) continue;
       const cardName = ps.hand[handIndex];
+      // Per-instance reveal flag: the inst at this hand slot may have
+      // been revealed earlier this turn (Luna Kiai). Robust to hand
+      // mutations because the flag travels with the inst, not the slot.
+      const inst = this._findHandInstanceAt(playerIdx, handIndex);
+      if (inst?.counters?._revealedThisTurn) continue;
       let script;
       if (scriptCache.has(cardName)) script = scriptCache.get(cardName);
       else { script = loadCardEffect(cardName); scriptCache.set(cardName, script); }
@@ -11272,8 +11546,17 @@ class GameEngine {
     if (typeof handIndex !== 'number' || handIndex < 0) return false;
     if (handIndex >= (ps.hand || []).length) return false;
     if (ps.hand[handIndex] !== cardName) return false;
+    // Map hand-position handIndex → real CardInstance using the same
+    // FIFO match the server's reveal-snapshot uses (Bamboo Shield et al.):
+    // walk the hand, match each name to the next available un-flagged
+    // tracked instance with that name. The instance at the clicked slot
+    // is the one whose reveal flag will be stamped on success — keying
+    // by inst (not by hand index) makes the reveal robust to any later
+    // hand mutation.
+    const realInst = this._findHandInstanceAt(playerIdx, handIndex);
+    if (!realInst) return false;
     // This specific copy already revealed — ignore.
-    if (ps._revealedHandIndices?.[handIndex]) return false;
+    if (realInst.counters?._revealedThisTurn) return false;
     const script = loadCardEffect(cardName);
     if (!script?.handActivatedEffect || typeof script.onHandActivate !== 'function') return false;
     if (typeof script.canHandActivate === 'function') {
@@ -11281,19 +11564,50 @@ class GameEngine {
       catch { return false; }
     }
     try {
-      const fakeInst = {
-        name: cardName, owner: playerIdx, originalOwner: playerIdx,
-        controller: playerIdx, zone: 'hand', heroIdx: -1, zoneSlot: -1,
-        counters: {}, statuses: {}, faceDown: false, turnPlayed: this.gs.turn,
-        id: `hand-activate-${playerIdx}-${cardName}-${Date.now()}`,
-      };
-      const ctx = this._createContext(fakeInst, { event: 'handActivate', handIndex });
+      const ctx = this._createContext(realInst, { event: 'handActivate', handIndex });
       const result = await script.onHandActivate(ctx);
+      // Engine stamps the per-turn reveal on success — script doesn't
+      // need to manage it. Cancellable prompts that returned false leave
+      // the instance available for re-activation.
+      if (result !== false && realInst.counters) {
+        realInst.counters._revealedThisTurn = true;
+      }
       return result !== false;
     } catch (err) {
       console.error(`[Engine] doHandActivate(${cardName}) threw:`, err.message);
       return false;
     }
+  }
+
+  /**
+   * Find the tracked CardInstance at a player's hand position via
+   * FIFO-by-name matching. Mirrors the algorithm used by the server's
+   * revealedOwnHandIndices snapshot — for each hand slot, the i-th
+   * occurrence of that name in `cardInstances` (in tracking order) is
+   * the inst at slot N-of-name (N = number of earlier slots holding the
+   * same name). Returns null if no matching instance exists (e.g. the
+   * hand was hand-rebuilt without re-tracking — shouldn't happen in
+   * normal play).
+   */
+  _findHandInstanceAt(playerIdx, handIndex) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps?.hand || handIndex < 0 || handIndex >= ps.hand.length) return null;
+    const targetName = ps.hand[handIndex];
+    // Count how many times this name appears in the hand BEFORE the
+    // clicked slot — that's the inst rank we want.
+    let rankAmongName = 0;
+    for (let i = 0; i < handIndex; i++) {
+      if (ps.hand[i] === targetName) rankAmongName++;
+    }
+    let seen = 0;
+    for (const inst of this.cardInstances) {
+      if (inst.owner !== playerIdx) continue;
+      if (inst.zone !== 'hand') continue;
+      if (inst.name !== targetName) continue;
+      if (seen === rankAmongName) return inst;
+      seen++;
+    }
+    return null;
   }
 
   /**
@@ -11678,7 +11992,14 @@ class GameEngine {
     if (this.gs.activePlayer !== playerIdx) return [];
     const currentPhase = this.gs.currentPhase;
     const isMainPhase = currentPhase === 2 || currentPhase === 4;
-    if (!isMainPhase) return [];
+    const isActionPhase = currentPhase === 3;
+    if (!isMainPhase && !isActionPhase) return [];
+
+    // Action-cost creatures (Spawn Mother, …) follow the ability-action
+    // economy: Action Phase OR Main Phase with an additional-action
+    // provider that covers 'ability_activation'. Cached once per call.
+    const hasAdditionalForActionCost = isMainPhase
+      && this.hasAdditionalActionForCategory(playerIdx, 'ability_activation');
 
     const result = [];
     const cardDB = this._getCardDB();
@@ -11710,6 +12031,16 @@ class GameEngine {
           const script = loadCardEffect(effectName);
           if (!script?.creatureEffect) continue;
 
+          // Phase gate: free creature effects are Main-Phase-only;
+          // action-cost creatures are Action Phase or Main Phase with
+          // an additional-action provider for 'ability_activation'.
+          const isActionCost = !!script.creatureActionCost;
+          if (isActionCost) {
+            if (!isActionPhase && !hasAdditionalForActionCost) continue;
+          } else {
+            if (!isMainPhase) continue;
+          }
+
           // Summoning sickness: creatures cannot activate on the turn they were summoned
           const hasSummoningSickness = inst.turnPlayed === (this.gs.turn || 0);
 
@@ -11730,6 +12061,7 @@ class GameEngine {
             owner: pi, heroIdx: hi, zoneSlot: zi,
             cardName: creatureName, canActivate, exhausted,
             instId: inst.id,
+            actionCost: isActionCost,
             charmedOwner: charmedOwner != null ? pi : undefined,
           });
         }
@@ -13065,6 +13397,20 @@ class GameEngine {
           this.log('status_removed', { target: hero.name, status: 'untargetable' });
         }
       }
+      // Creature soft-untargetable (Perfect Disguise) — mirror of the
+      // hero `untargetable` cleanup. The flag was stamped on the
+      // CASTER's turn to protect through the OPPONENT's next turn; it
+      // expires at the START of the caster's next turn (i.e. when
+      // `ap` rolls back around to the protector's side). Walk every
+      // tracked creature on this player's side and drop the flag.
+      for (const inst of this.cardInstances) {
+        if (inst.owner !== ap) continue;
+        if (inst.zone !== 'support') continue;
+        if (!inst.counters?.softUntargetable_by_opponent) continue;
+        delete inst.counters.softUntargetable_by_opponent;
+        delete inst.counters.softUntargetable_by_opponent_pi;
+        this.log('counter_removed', { target: inst.name, counter: 'softUntargetable_by_opponent' });
+      }
       // Butterfly Cloud cooldown: rotate flags each turn
       // _butterflyCloudUsedThisTurn (set during play) → _butterflyCooldown (blocks next turn) → cleared
       if (ps._butterflyCooldown) delete ps._butterflyCooldown;
@@ -13556,17 +13902,46 @@ class GameEngine {
       // continues unaffected, just like `negated: true` does in the
       // hero pre-damage path.
       if (e.inst.counters.currentHp > 0 && actualAmount >= e.inst.counters.currentHp) {
-        const saved = await this._checkCreaturePreDefeatHandReactions(e.inst, e.source, actualAmount, e.type);
-        if (saved) {
-          // Saved by Bone Dog (or similar) — creature is back to full
-          // HP and will not die this batch. Clear the dying flag so
-          // any later Loyal-death listener (Shepherd, Terrier window)
-          // sees this creature as alive when it reads the flag.
-          delete e.inst.counters._dyingThisBatch;
-          this.log('creature_pre_defeat_save', { creature: e.inst.name, by: e.source?.name || e.type });
-          this.sync();
-          await this._delay(150);
-          continue; // skip HP subtraction + death branch
+        // Generic "extra life" mark consumer (Trial of Coolness, etc.).
+        // Distinct from Bone Dog: this is a true die-and-revive — we
+        // stamp `_reviveAfterDeath.fireHooks` and let the death branch
+        // run normally. onCardLeaveZone / onCreatureDeath / killer-side
+        // on-kill triggers all fire on the actual death; the engine
+        // then re-summons WITH on-summon hooks so the revived creature
+        // re-runs onPlay + onCardEnterZone (Beagle gold-on-summon DOES
+        // retrigger here — the creature genuinely re-entered play).
+        // Skips the Bone-Dog-style hand-reaction prompt (no point asking
+        // the player to spend a card when Extra Life is already saving
+        // this creature). Marker is consumed at this point.
+        if (e.inst.counters._extraLife && !e.inst._reviveAfterDeath) {
+          const lifeMark = e.inst.counters._extraLife;
+          delete e.inst.counters._extraLife;
+          e.inst._reviveAfterDeath = {
+            name: e.inst.name,
+            owner: e.inst.owner,
+            originalOwner: e.inst.originalOwner,
+            heroIdx: e.inst.heroIdx,
+            zoneSlot: e.inst.zoneSlot,
+            by: lifeMark?.by || 'Extra Life',
+            fireHooks: true,
+            bypassSummoningSickness: true,
+          };
+          this.log('extra_life_creature_revive', { creature: e.inst.name, by: lifeMark?.by || 'Extra Life' });
+          // Fall through to death branch — death proceeds, then revive
+          // handler downstream re-summons with on-summon hooks.
+        } else {
+          const saved = await this._checkCreaturePreDefeatHandReactions(e.inst, e.source, actualAmount, e.type);
+          if (saved) {
+            // Saved by Bone Dog (or similar) — creature is back to full
+            // HP and will not die this batch. Clear the dying flag so
+            // any later Loyal-death listener (Shepherd, Terrier window)
+            // sees this creature as alive when it reads the flag.
+            delete e.inst.counters._dyingThisBatch;
+            this.log('creature_pre_defeat_save', { creature: e.inst.name, by: e.source?.name || e.type });
+            this.sync();
+            await this._delay(150);
+            continue; // skip HP subtraction + death branch
+          }
         }
       }
 
@@ -13576,6 +13951,13 @@ class GameEngine {
       e.inst.counters._damagedOnTurn = this.gs.turn;
       this.log('creature_damage', { source: e.source?.name || e.source, target: e.inst.name, amount: actualAmount, damageType: e.type, owner: e.inst.owner });
 
+      // Stamp the actual HP delta onto the entry — capped at pre-hit HP
+      // so overkill doesn't inflate the value. Read by lifesteal-style
+      // afterCreatureDamageBatch listeners (Vinepire, …) that need
+      // "actual damage dealt" rather than the originally requested
+      // amount or the post-immortal `actualAmount`.
+      e.realDealt = Math.min(actualAmount, Math.max(0, creatureHpBefore));
+
       // Armed-arrow post-hit riders (Burn, Poison, gold-per-damage, …)
       // for creature targets. Mirror of the hero-damage path. Fires even
       // if the hit was lethal — the status counter on a dying creature
@@ -13583,8 +13965,7 @@ class GameEngine {
       // is capped at pre-hit HP so gold-per-damage doesn't reward overkill.
       {
         const { applyArrowsAfterDamage } = require('./_arrows-shared');
-        const realDealt = Math.min(actualAmount, Math.max(0, creatureHpBefore));
-        await applyArrowsAfterDamage(this, e.source, e.inst, realDealt, e.amount, e.type);
+        await applyArrowsAfterDamage(this, e.source, e.inst, e.realDealt, e.amount, e.type);
       }
 
       // ── SC tracking: creature overkill ──
@@ -13678,15 +14059,31 @@ class GameEngine {
             const dIdx = origPs.discardPile.lastIndexOf(reviveAfterDeath.name);
             if (dIdx >= 0) origPs.discardPile.splice(dIdx, 1);
           }
-          // Re-summon raw — no on-summon hooks fire. This is a revive,
-          // not a fresh play (Beagle's gold-on-summon must NOT retrigger).
-          await this.summonCreatureWithHooks(
+          // Re-summon. Default (Bone Dog etc.) is hooks-suppressed: the
+          // revived creature is the same one that just died, so on-summon
+          // riders (Beagle gold, Layn drops, …) MUST NOT retrigger — that
+          // would be value laundering on every protected death. Trial of
+          // Coolness opts in to `fireHooks: true`, which re-runs onPlay +
+          // onCardEnterZone — its text reads as a true "summon back onto
+          // the board" and the user wants on-summon effects to fire on
+          // the revived copy.
+          const fireHooks = !!reviveAfterDeath.fireHooks;
+          const reviveResult = await this.summonCreatureWithHooks(
             reviveAfterDeath.name,
             reviveAfterDeath.owner,
             reviveAfterDeath.heroIdx,
             reviveAfterDeath.zoneSlot,
-            { skipHooks: true, skipBeforeSummon: true, source: reviveAfterDeath.by },
+            { skipHooks: !fireHooks, skipBeforeSummon: true, source: reviveAfterDeath.by },
           );
+          // Optional summoning-sickness bypass on the revived copy.
+          // Trial of Coolness sets this so the revived Creature can act
+          // immediately — the death + re-summon happens mid-turn and
+          // the user explicitly carved out an exception to the standard
+          // turnPlayed === currentTurn HOPT gate. Other revivers leave
+          // this flag unset, preserving the standard sickness behavior.
+          if (reviveResult?.inst && reviveAfterDeath.bypassSummoningSickness) {
+            reviveResult.inst.turnPlayed = (this.gs.turn || 0) - 1;
+          }
           this.log('creature_revived_after_death', {
             target: reviveAfterDeath.name,
             by: reviveAfterDeath.by,
@@ -14461,9 +14858,16 @@ class GameEngine {
     delete hero.ascensionTarget;
 
     // ── Update card instance for the hero ──
+    // CardInstance.loadScript() caches the resolved script on `inst.script`
+    // keyed against the original `inst.name`. After Ascension we point the
+    // inst at the new card name, so the cache MUST be invalidated — otherwise
+    // the base hero's hooks (e.g. base Arthor's afterSpellResolved discard)
+    // keep firing on the ascended hero. Setting `inst.script = null` forces
+    // the next loadScript() to re-resolve against the new name.
     for (const inst of this.cardInstances) {
       if (inst.owner === pi && inst.heroIdx === heroIdx && inst.zone === 'hero') {
         inst.name = cardName;
+        inst.script = null;
         break;
       }
     }

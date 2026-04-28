@@ -104,6 +104,10 @@ async function runCpuTurn(engine, helpers) {
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
   if (!stillCpuTurn(engine, cpuIdx)) return;
+  // Stash helpers on the engine so card-script-level MCTS picks
+  // (mctsPickFromOptions, …) can reuse them for rollouts without
+  // re-plumbing helper construction.
+  engine._cpuHelpers = helpers;
 
   const turnStartT = Date.now();
   cpuLog(`===== TURN START turn=${gs.turn} phase=${gs.currentPhase} hand=${ps.hand.length} gold=${ps.gold} fast=${!!engine._fastMode} =====`);
@@ -514,14 +518,18 @@ async function tryAscend(engine, helpers) {
   const pick = candidates[Math.floor(Math.random() * candidates.length)];
   cpuLog(`  → ascend "${pick.cardName}" onto hero ${pick.heroIdx}`);
   await pauseAction(engine);
-  // Route through the MCTS activation gate so ascension bonuses with
-  // card-gallery prompts (e.g. Beato's Eternal Butterfly pick-from-deck)
-  // get full variation exploration — otherwise the first heuristic pick
-  // is committed and MCTS has no say.
+  // Ascension is an enormous, near-always-positive boon: HP/ATK upgrade,
+  // free Ascension Bonus, and unlocks the Ascended hero's effect/passive.
+  // The MCTS evaluator can't always see that through the noisy short-
+  // horizon rollout (esp. when the bonus prompt is interactive), so we
+  // route the activation through the gate with `alwaysCommit: true` —
+  // MCTS still gets to explore bonus-prompt variations to pick the best
+  // one, but the gate will not refuse the ascension itself.
   const actionFn = async () => {
     await engine.performAscension(cpuIdx, pick.heroIdx, pick.cardName, pick.handIdx, {});
   };
-  const committed = await mctsGatedActivation(engine, helpers, `ascend ${pick.cardName}`, actionFn);
+  const committed = await mctsGatedActivation(engine, helpers, `ascend ${pick.cardName}`, actionFn,
+    { alwaysCommit: true });
   if (!committed) {
     cpuLog(`  ← ascension skipped by MCTS gate`);
     return false;
@@ -1832,10 +1840,24 @@ function scoreAbilityPlacement(engine, pi, heroIdx, cardName) {
   }
   const newLevel = currentLevel + 1;
 
-  // Level-weighted unlock count: cards that were NOT castable pre-stack
-  // (`lvl > currentLevel`) but ARE post-stack (`lvl <= newLevel`) AND
-  // require this specific school (`spellSchool1/2 === cardName`).
+  // Walk hand+deck ONCE to gather everything we need:
+  //   • `unlock` — level-weighted count of cards that were NOT castable
+  //     pre-stack (`lvl > currentLevel`) but ARE post-stack
+  //     (`lvl <= newLevel`) AND require this specific school.
+  //   • `maxNeededLevel` — highest level requirement across ALL cards in
+  //     hand+deck that need this school. Drives the saturation gate
+  //     below: stacking past this ceiling unlocks nothing the deck
+  //     can't already cast.
+  //   • `scalingValue` — generic bonus from cards that declare
+  //     `cpuMeta.scalesWithSchool === cardName` in their script. These
+  //     are spells/attacks whose effect strength keeps scaling with the
+  //     school's level beyond the cast threshold (Heal: 150/200/300 by
+  //     Support Magic count; Phoenix Tackle: 100/200/300 by Destruction
+  //     Magic count). Optional numeric `cpuMeta.schoolScalingValue`
+  //     overrides the default per-card weight (60).
   let unlock = 0;
+  let maxNeededLevel = 0;
+  let scalingValue = 0;
   const scan = (arr, weight) => {
     for (const cn of (arr || [])) {
       const cd = cardDB[cn];
@@ -1843,16 +1865,123 @@ function scoreAbilityPlacement(engine, pi, heroIdx, cardName) {
       const t = cd.cardType;
       if (t !== 'Spell' && t !== 'Attack' && t !== 'Creature') continue;
       const lvl = cd.level || 0;
-      if (lvl <= currentLevel) continue;
-      if (lvl > newLevel) continue;
-      if (cd.spellSchool1 !== cardName && cd.spellSchool2 !== cardName) continue;
-      unlock += lvl * weight;
+      const needsThisSchool = (cd.spellSchool1 === cardName || cd.spellSchool2 === cardName);
+      if (needsThisSchool && lvl > maxNeededLevel) maxNeededLevel = lvl;
+      if (needsThisSchool && lvl > currentLevel && lvl <= newLevel) {
+        unlock += lvl * weight;
+      }
+      // School-scaling spells (declared via cpuMeta — generic, no
+      // per-card hardcoding here). Each scaling card in hand/deck
+      // contributes `scalingValue * weight` per level reached: stacking
+      // higher = stronger Heal / bigger Phoenix Tackle / etc., even
+      // when the spell was already castable at the current school
+      // level. Picked up dynamically from the script — any future
+      // scaling card just sets the meta field.
+      const script = (() => {
+        try { return require('./_loader').loadCardEffect(cn); }
+        catch { return null; }
+      })();
+      const meta = script?.cpuMeta;
+      const scalesWith = meta?.scalesWithSchool;
+      if (typeof scalesWith === 'string' && scalesWith === cardName) {
+        const v = typeof meta.schoolScalingValue === 'number' ? meta.schoolScalingValue : 60;
+        scalingValue += v * weight;
+      }
     }
   };
   scan(ps.hand, 2);      // hand cards will be played sooner — worth more
   scan(ps.mainDeck, 1);  // deck cards count too, at half weight
 
-  return unlock * 100 + currentLevel * 10;
+  // Saturation gate: if stacking past `currentLevel` unlocks nothing
+  // (no card in hand/deck requires this school at level > currentLevel)
+  // AND no scaling spell benefits from a higher school count, the stack
+  // is dead weight. Return a tiny score so the CPU prefers ANY other
+  // ability placement (or doesn't bother placing this copy at all).
+  // Saturation only applies when the ability IS a school the deck
+  // actually uses — non-school abilities (Leadership, Toughness,
+  // Wisdom, Performance) skip the gate because `maxNeededLevel === 0`
+  // would otherwise misclassify them.
+  const isSchoolAbility = maxNeededLevel > 0
+    || scalingValue > 0
+    || (cd_anyDeckCardNeedsSchool(cardDB, ps, cardName));
+  if (isSchoolAbility && newLevel > maxNeededLevel && scalingValue === 0) {
+    return 0;
+  }
+
+  // Scaling cards add value proportional to the new level (each level
+  // reached cranks Heal/Phoenix Tackle/etc. higher). Heuristically the
+  // bonus is `scalingValue * newLevel`; combined with the unlock term
+  // it lets a 3-Heal deck still want Support Magic Lv3 even when the
+  // deck has nothing requiring Support Magic Lv2/Lv3 to cast.
+  return unlock * 100 + scalingValue * newLevel + currentLevel * 10;
+}
+
+// Cheap helper: does ANY card in hand+deck require this school for its
+// cast (independent of level)? Used by the saturation gate to decide
+// "is this even a school-typed ability for our deck" — non-school
+// abilities (Leadership, Toughness, …) shouldn't be saturation-gated.
+function cd_anyDeckCardNeedsSchool(cardDB, ps, schoolName) {
+  const sources = [ps?.hand, ps?.mainDeck];
+  for (const arr of sources) {
+    for (const cn of (arr || [])) {
+      const cd = cardDB[cn];
+      if (!cd) continue;
+      if (cd.spellSchool1 === schoolName || cd.spellSchool2 === schoolName) return true;
+    }
+  }
+  return false;
+}
+
+// Predicate: would placing this ability copy be a useless saturated
+// stack of a Spell-School ability? Used by the candidate-builder loop
+// to drop these placements ENTIRELY (as opposed to scoring 0 and
+// tying with other genuinely-zero placements like Toughness on a
+// fresh hero). Saturation triggers when:
+//   • The ability is one this deck actually uses as a school (some
+//     hand/deck card lists it as spellSchool1/2 OR a scaling card
+//     declares it via cpuMeta.scalesWithSchool).
+//   • The would-be new level exceeds the highest level any hand/deck
+//     card needs for that school.
+//   • No hand/deck card declares scaling for this school (those
+//     keep wanting more levels even past the cast threshold).
+function isAbilityStackSaturated(engine, pi, heroIdx, cardName) {
+  const ps = engine.gs.players[pi];
+  const abZones = ps?.abilityZones?.[heroIdx];
+  if (!abZones) return false;
+  const cardDB = engine._getCardDB();
+  let currentLevel = 0;
+  for (const slot of abZones) {
+    if (!slot) continue;
+    if (slot[0] === cardName) currentLevel = Math.max(currentLevel, slot.length);
+  }
+  const newLevel = currentLevel + 1;
+  // Walk hand+deck once. Same logic as scoreAbilityPlacement but only
+  // computes the gate-relevant numbers (no scoring math).
+  let maxNeededLevel = 0;
+  let hasScaler = false;
+  let isSchoolAbility = false;
+  const { loadCardEffect } = require('./_loader');
+  const scan = (arr) => {
+    for (const cn of (arr || [])) {
+      const cd = cardDB[cn];
+      if (!cd) continue;
+      if (cd.spellSchool1 === cardName || cd.spellSchool2 === cardName) {
+        isSchoolAbility = true;
+        const lvl = cd.level || 0;
+        if (lvl > maxNeededLevel) maxNeededLevel = lvl;
+      }
+      const meta = loadCardEffect(cn)?.cpuMeta;
+      if (meta?.scalesWithSchool === cardName) {
+        isSchoolAbility = true;
+        hasScaler = true;
+      }
+    }
+  };
+  scan(ps.hand);
+  scan(ps.mainDeck);
+  if (!isSchoolAbility) return false; // Non-school ability — never gated.
+  if (hasScaler) return false;        // Scaling spells want more levels.
+  return newLevel > maxNeededLevel;
 }
 
 async function attachAbilities(engine, helpers) {
@@ -1950,6 +2079,17 @@ async function attachAbilities(engine, helpers) {
 
         let slot = resolveAbilitySlot(engine, cpuIdx, hi, cardName);
         if (slot === null) continue;
+
+        // Spell-School saturation gate: if stacking this Ability would
+        // exceed the deck's highest needed level for that school AND
+        // no scaling Spell in hand/deck wants more, drop the candidate
+        // entirely. Without this filter, a saturated stack with score
+        // 0 still ties with genuinely-zero non-school placements
+        // (Toughness etc.) and gets randomly chosen — re-introducing
+        // the dead-stack behaviour the user reported. Dropping the
+        // candidate keeps the copy in hand for a turn where it can
+        // land somewhere useful (e.g. on a freshly-summoned hero).
+        if (isAbilityStackSaturated(engine, cpuIdx, hi, cardName)) continue;
 
         // Performance bias: override the random custom-placement slot
         // pick to land specifically on the hero's Divinity zone.
@@ -5512,9 +5652,39 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
 
   variations.sort((a, b) => b.score - a.score);
   const best = variations[0];
-  const beats = best.score > skipScore + MCTS_ACTIVATION_GATE_THRESHOLD;
+  // Threshold for COMMIT: usually MCTS_ACTIVATION_GATE_THRESHOLD = 3.
+  // For `evaluateThroughTurnEnd` activations the bar is HIGHER —
+  // these activations cost real resources (gold + hand card) for a
+  // state mutation that only persists for the current turn (Golden
+  // Ankh's revival re-dies at the End Phase forceKill). The eval's
+  // gold/hand penalty for the cost is small (~20-50 score points)
+  // and easily drowned out by rollout noise from the rest-of-turn
+  // simulation, so the gate would otherwise green-light any tiny
+  // positive delta and waste the card. The higher threshold demands
+  // the temporary mutation produce SUBSTANTIAL value above the
+  // natural rest-of-turn noise floor — i.e. the revived hero must
+  // actually do something meaningful (Action, ability activation,
+  // hero effect that gains gold / draws cards / deals damage), not
+  // just exist briefly while the CPU passes.
+  // Per-card override: `cpuMeta.activationGateThreshold` lets a card
+  // tune this for itself (high value = strict gate, 0 = use default).
+  // Card name is parsed from the gate `desc` — covers every caller in
+  // _cpu.js (artifact, potion, free-ability, creature-effect, hero-
+  // effect, equip-effect, area, permanent, ascend, additional X).
+  // `additional` and `hero-effect h<idx>` are non-name patterns and
+  // resolve to null (falling through to the default threshold).
+  const cardScript = (() => {
+    let m = /^(?:artifact|potion|spell|attack|free-ability|creature-effect|equip-effect|area|permanent|ascend) (.+)$/.exec(desc);
+    if (!m) m = /^additional (?:Spell|Attack|Creature) (.+)$/.exec(desc);
+    return m ? loadCardEffect(m[1]) : null;
+  })();
+  const overrideThreshold = cardScript?.cpuMeta?.activationGateThreshold;
+  const threshold = (typeof overrideThreshold === 'number')
+    ? overrideThreshold
+    : (evaluateThroughTurnEnd ? 30 : MCTS_ACTIVATION_GATE_THRESHOLD);
+  const beats = best.score > skipScore + threshold;
   const commit = beats || alwaysCommit;
-  cpuLog(`      [gate] ${desc}: skip=${skipScore.toFixed(1)} best=${best.score.toFixed(1)} via ${best.label} → ${commit ? (beats ? 'COMMIT' : 'FORCE-COMMIT') : 'SKIP'}`);
+  cpuLog(`      [gate] ${desc}: skip=${skipScore.toFixed(1)} best=${best.score.toFixed(1)} threshold=${threshold} via ${best.label} → ${commit ? (beats ? 'COMMIT' : 'FORCE-COMMIT') : 'SKIP'}`);
 
   if (!commit) return false;
 
@@ -5878,4 +6048,71 @@ function shouldMulliganStartingHand(engine, pi) {
   return mull;
 }
 
-module.exports = { runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw };
+/**
+ * MCTS-style scoring for a card-gallery / option picker that the engine
+ * exposes as a `cpuResponse` prompt. Caller passes:
+ *   • `engine`    — the live engine (snapshot/restore + simulation host)
+ *   • `options`   — array of { id?, ...payload }; the chosen entry is
+ *                   returned verbatim. Must be a non-empty list.
+ *   • `applyFn`   — async (engine, option) => boolean. The caller mutates
+ *                   the engine to reflect choosing this option (e.g.
+ *                   placing a creature, attaching an ability). Throw or
+ *                   return false to score this option as -Infinity.
+ *
+ * For each option: snapshot → applyFn → rolloutRestOfTurn → evaluateState
+ * → restore. The option with the highest evaluator score wins. Behaviour
+ * matches the existing `rankCandidatesEvalGreedy` flow but is exposed for
+ * card-script use. Recursive calls (engine already inside `_inMctsSim`)
+ * fall back to the option list as-is so nested rollouts don't explode
+ * exponentially — the caller should treat the first entry as the cheap
+ * default in that case.
+ *
+ * The picker is generic: works for any cardGallery / optionPicker that
+ * a card script intercepts in its `cpuResponse`. Barker, future picker
+ * cards, and any "choose one" prompt with non-trivial downstream value
+ * differences should route through here rather than keying off card
+ * level / name heuristics.
+ */
+async function mctsPickFromOptions(engine, options, applyFn) {
+  if (!Array.isArray(options) || options.length === 0) return null;
+  if (options.length === 1) return options[0];
+  // Inside an outer rollout — don't recurse. Return the first option;
+  // the caller's heuristic ordering (if any) acts as the cheap default.
+  if (engine._inMctsSim) return options[0];
+
+  const cpuIdx = engine._cpuPlayerIdx;
+  const prevSilent = _cpuLogSilent;
+  let best = options[0];
+  let bestScore = -Infinity;
+  engine._inMctsSim = true;
+  engine.enterFastMode();
+  _cpuLogSilent = true;
+  try {
+    for (const opt of options) {
+      const snap = engine.snapshot();
+      let score = -Infinity;
+      try {
+        const ok = await applyFn(engine, opt);
+        if (ok !== false) {
+          // Run the rest of the turn so timed buffs / cleanups score
+          // realistically. Helpers come from the engine's CPU brain
+          // installation (runMainPhase / advancePhase).
+          try {
+            const helpers = engine._cpuHelpers || null;
+            if (helpers) await rolloutRestOfTurn(engine, helpers);
+          } catch { /* swallow — partial state still scores */ }
+          score = evaluateState(engine, cpuIdx);
+        }
+      } catch { /* score stays -Infinity */ }
+      finally { engine.restore(snap); }
+      if (score > bestScore) { bestScore = score; best = opt; }
+    }
+  } finally {
+    engine._inMctsSim = false;
+    engine.exitFastMode();
+    _cpuLogSilent = prevSilent;
+  }
+  return best;
+}
+
+module.exports = { runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions };

@@ -1,8 +1,9 @@
 === PIXEL PARTIES DECK ===
 Name: Structure Deck: Burning Inferno
+Cover: Luna Kiai
 
 == HEROES ==
-Cute Starlet Megu
+Alex, Trainer of Heroes
 Luna Pele, the Flame Dancer
 Barker, the Monster Tamer
 

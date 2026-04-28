@@ -7,6 +7,10 @@
 
 module.exports = {
   inherentAction: true,
+  // Engine + client gate: a hand-locked controller cannot search any
+  // more cards into their hand this turn. Causes the spell to fizzle
+  // pre-play and grays the card out in the eligible-cards UI.
+  blockedByHandLock: true,
 
   // Gray out when no Ascended Heroes in deck
   spellPlayCondition(gs, pi, engine) {

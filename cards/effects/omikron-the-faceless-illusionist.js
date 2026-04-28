@@ -15,6 +15,16 @@
 //      are suppressed (skipHooks: true) because
 //      negation is applied BEFORE placement
 //
+//  Per-name once-per-game gate: each Omikron
+//  Hero tracks the names it has already summoned
+//  in `hero._omikronSummoned` (a string list).
+//  Names already in the list are filtered out of
+//  the gallery on subsequent activations and the
+//  chosen name is appended on a successful
+//  resolution. Tracking is per-Hero (two Omikrons
+//  on the same player keep independent lists),
+//  matching the "this Hero" wording.
+//
 //  HOPT enforced by engine (heroEffect: true).
 // ═══════════════════════════════════════════
 
@@ -41,14 +51,20 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps      = gs.players[pi];
     if (!ps) return false;
+    const hero    = ps.heroes?.[heroIdx];
+    if (!hero?.name) return false;
 
     const cardDB = engine._getCardDB();
     const { loadCardEffect } = require('./_loader');
 
-    // ── Step 1: gallery of implemented creatures only ─────────────────────
+    // ── Per-Hero exclusion set: names this Omikron has already summoned ──
+    const usedNames = new Set(hero._omikronSummoned || []);
+
+    // ── Step 1: gallery of implemented creatures (excluding already-used names) ──
 
     const galleryCards = Object.values(cardDB)
       .filter(cd => hasCardType(cd, 'Creature') && !hasCardType(cd, 'Token') && cd.subtype !== 'Token' && !!loadCardEffect(cd.name))
+      .filter(cd => !usedNames.has(cd.name))
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(cd => ({ name: cd.name, source: 'omikron' }));
 
@@ -58,7 +74,7 @@ module.exports = {
       type:         'cardGallery',
       cards:        galleryCards,
       title:        CARD_NAME,
-      description:  'Choose any Creature to summon as an illusion (negated, 1 HP, until your next turn).',
+      description:  'Choose any Creature to summon as an illusion (negated, 1 HP, until your next turn). Each name only once per game.',
       confirmLabel: '✨ Summon Illusion',
       confirmClass: 'btn-info',
       cancellable:  true,
@@ -67,6 +83,9 @@ module.exports = {
     if (!picked || picked.cancelled || !picked.cardName) return false;
 
     const chosenName = picked.cardName;
+    // Defensive guard against a stale gallery: if something snuck the
+    // chosen name into the used-set during the prompt, bail out.
+    if (usedNames.has(chosenName)) return false;
 
     // ── Step 2: find a free slot on this hero ────────────────────────────
 
@@ -97,6 +116,11 @@ module.exports = {
 
     // Track summon count
     ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
+
+    // Per-Hero once-per-game: stamp the chosen name onto Omikron's
+    // history so subsequent activations of THIS Omikron filter it out.
+    if (!Array.isArray(hero._omikronSummoned)) hero._omikronSummoned = [];
+    hero._omikronSummoned.push(chosenName);
 
     engine._broadcastEvent('summon_effect', {
       owner: pi, heroIdx, zoneSlot: destSlot, cardName: chosenName,

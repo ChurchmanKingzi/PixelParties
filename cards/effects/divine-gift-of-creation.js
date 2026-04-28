@@ -11,6 +11,8 @@ module.exports = {
   inherentAction: true,
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
+  // Whole effect is search-to-hand — fizzles entirely while hand-locked.
+  blockedByHandLock: true,
 
   hooks: {
     onPlay: async (ctx) => {

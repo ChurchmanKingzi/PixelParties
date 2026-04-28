@@ -15,6 +15,8 @@ const { hasCardType } = require('./_hooks');
 
 module.exports = {
   isTargetingArtifact: true,
+  // Tutors a Decay Magic Spell into hand — blocked while hand-locked.
+  blockedByHandLock: true,
 
   canActivate(gs, pi) {
     // Must have at least 1 living hero under control

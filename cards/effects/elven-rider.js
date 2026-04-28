@@ -111,6 +111,13 @@ async function runRiderTutor(engine, pi) {
   const ps     = gs.players[pi];
   const cardDB = engine._getCardDB();
 
+  // Hand-lock fizzles only the search step — the summon itself already
+  // resolved. No prompt, no shuffle, silent skip.
+  if (ps?.handLocked) {
+    engine.log('elven_rider_tutor_handlocked', { player: ps.username });
+    return;
+  }
+
   const counts = {};
   for (const name of (ps.mainDeck || [])) {
     if (name === EXCLUDE_NAME) continue;

@@ -301,24 +301,17 @@ module.exports = {
 
         // Defensive: malformed response or stale hand index — bail out.
         if (!result || result.cardName == null) break;
-        const handIdx = result.handIndex;
-        let actualIdx = handIdx;
-        if (actualIdx == null || actualIdx < 0 || actualIdx >= ps.hand.length || ps.hand[actualIdx] !== result.cardName) {
-          actualIdx = ps.hand.indexOf(result.cardName);
-          if (actualIdx < 0) break;
-        }
 
-        // Commit the discard.
-        ps.hand.splice(actualIdx, 1);
-        ps.discardPile.push(result.cardName);
-        engine.log('discard', { player: ps.username, card: result.cardName, source: CARD_NAME });
-        await engine.runHooks('onDiscard', {
-          playerIdx: pi,
-          cardName: result.cardName,
-          discardedCardName: result.cardName,
-          _fromHand: true,
-          _skipReactionCheck: true,
-        });
+        // Commit via the engine helper — splices, pushes, MOVES the
+        // tracked inst's zone marker to 'discard' (load-bearing for
+        // discard-summon listeners like Cute Familiar that gate on
+        // `c.isActiveIn('discard')`), then fires onDiscard with the
+        // inst attached to the hook context.
+        const ok = await engine.actionDiscardHandCard(
+          pi, result.cardName, result.handIndex,
+          { source: CARD_NAME }
+        );
+        if (!ok) break;
         discarded++;
         engine.sync();
       }

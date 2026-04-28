@@ -41,17 +41,10 @@ module.exports = {
       if (entering.heroIdx !== ctx.cardHeroIdx) return;
       // Loyal-only.
       if (!isLoyalCreature(entering.name, ctx._engine)) return;
-      // CRITICAL: only fire when Orthos himself summoned the Loyal —
-      // i.e. the placement went through a hero-gated summon path
-      // (doPlayCreature, Pinpom's chain, any future "summon from
-      // hand as additional Action" effect). Card-effect placements
-      // (Loyal Rottweiler's deck-tutor, Loyal Shepherd's revive,
-      // Monster in a Bottle, bounce-place from the Deepsea
-      // archetype, …) skip the hero-level gate and therefore don't
-      // count as Orthos summoning. The `_isNormalSummon` flag is
-      // stamped by doPlayCreature + Pinpom's chain — anything
-      // missing it is an external place, no chain.
-      if (!ctx._isNormalSummon) return;
+      // Fires for ANY Loyal entering Orthos's support zones — hand
+      // summon, free additional Action, revive, illusion, bounce-place,
+      // etc. The per-Orthos-instance HOPT below caps the chain to once
+      // per turn, which is the only intended gate.
 
       const engine = ctx._engine;
       const gs     = engine.gs;

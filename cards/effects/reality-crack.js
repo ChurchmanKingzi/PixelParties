@@ -19,6 +19,7 @@ const { hasCardType } = require('./_hooks');
 module.exports = {
   placesPollutionTokens: true,
   inherentAction: true,
+  cpuMeta: { scalesWithSchool: 'Magic Arts' },
 
   spellPlayCondition(gs, pi) {
     const ps = gs.players[pi];

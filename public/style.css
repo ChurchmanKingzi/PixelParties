@@ -4314,6 +4314,35 @@ body:has(.reaction-chain-overlay) .board-tooltip {
   100% { transform: scale(2.5); opacity: 0; }
 }
 
+/* Dark wave engulf — Spawn Mother's AOE damage. The wave body rises
+   from below the target, peaks at full coverage, then recedes off the
+   top. CSS variable `--engulf-h` is the target's height in px so the
+   wave scales to fit creatures (small) and heroes (taller). */
+@keyframes darkWaveRise {
+  0%   { transform: translateY(calc(var(--engulf-h, 140px) * 0.6)); opacity: 0; }
+  18%  { opacity: 0.95; }
+  55%  { transform: translateY(calc(var(--engulf-h, 140px) * -0.05)); opacity: 0.95; }
+  85%  { transform: translateY(calc(var(--engulf-h, 140px) * -0.15)); opacity: 0.85; }
+  100% { transform: translateY(calc(var(--engulf-h, 140px) * -0.95)); opacity: 0; }
+}
+
+/* Foam crest riding the wave's leading edge. Same vertical motion +
+   a subtle scale-out so the crest "spreads" as it climbs. */
+@keyframes darkWaveCrest {
+  0%   { transform: translateY(calc(var(--engulf-h, 140px) * 0.55)) scaleX(0.9); opacity: 0; }
+  20%  { opacity: 0.9; }
+  55%  { transform: translateY(calc(var(--engulf-h, 140px) * -0.10)) scaleX(1.05); opacity: 0.9; }
+  100% { transform: translateY(calc(var(--engulf-h, 140px) * -0.95)) scaleX(1.15); opacity: 0; }
+}
+
+/* Spray droplet — flung from the wave crest at impact, decays via
+   gravity-style downward arc + fade. dx/dy are negative-up vectors. */
+@keyframes darkSprayDrop {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translate(var(--dx, 0), var(--dy, -40px)) scale(0.4); opacity: 0; }
+}
+
 /* Sunglasses drop — Divine Gift of Coolness */
 @keyframes sunglassesDrop {
   0%   { transform: translateY(-80px) scale(0.6); opacity: 0; }

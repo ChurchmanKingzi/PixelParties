@@ -36,7 +36,10 @@ module.exports = attachSteamEngine({
 
     // Must have at least one card in main deck to search
     const ps = engine.gs.players[ctx.cardOwner];
-    return (ps?.mainDeck || []).length > 0;
+    if ((ps?.mainDeck || []).length === 0) return false;
+    // Hand-locked controllers can't add cards from deck to hand.
+    if (ps?.handLocked) return false;
+    return true;
   },
 
   async onCreatureEffect(ctx) {

@@ -926,6 +926,11 @@ function PuzzleCreator() {
   const [editStatuses, setEditStatuses] = useState({});
   const [editBuffs, setEditBuffs] = useState({});
   const [editBiomancyLevel, setEditBiomancyLevel] = useState(null);
+  // Sleeping Beauty link target: slot index (0/1/2) of the linked
+  // hero, or null when no link is set. The link is per-SLOT, not per-
+  // hero name, so a hero swapped into the slot mid-puzzle inherits the
+  // tether automatically (matches the in-game behavior).
+  const [editLinkedHeroSlot, setEditLinkedHeroSlot] = useState(null);
   // For Dream-Landers Creatures: tracks which Hero (if any) is attached
   // to the Creature being edited. Null = no Hero attached.
   const [editAttachedHero, setEditAttachedHero] = useState(null);
@@ -963,6 +968,13 @@ function PuzzleCreator() {
       // Cute Hydra: hydrate Head Counter from the saved state. Null
       // for non-Hydra creatures so the editor section stays hidden.
       setEditHeadCounter(c?.name === 'Cute Hydra' ? (cs.headCounter || 0) : null);
+      // Sleeping Beauty: hydrate the linked-hero slot. `_linkedHeroIdx`
+      // is a slot index (0/1/2) into the controller's heroes array.
+      // Default to null so the picker reads as "no link" until the
+      // author commits to a slot.
+      setEditLinkedHeroSlot(c?.name === 'Sleeping Beauty'
+        ? (typeof cs._linkedHeroIdx === 'number' ? cs._linkedHeroIdx : null)
+        : null);
     }
   }, [players, getCard]);
 
@@ -1032,11 +1044,19 @@ function PuzzleCreator() {
       if (editHeadCounter != null && editHeadCounter > 0) {
         merged.headCounter = editHeadCounter;
       }
+      // Sleeping Beauty: persist the linked-hero slot when the author
+      // committed to one. `_linkedHeroOwner` is implicit (= si, Beauty's
+      // controller) and stamped server-side. Slot null = no link.
+      delete merged._linkedHeroIdx;
+      delete merged._linkedHeroOwner;
+      if (c?.name === 'Sleeping Beauty' && editLinkedHeroSlot != null) {
+        merged._linkedHeroIdx = editLinkedHeroSlot;
+      }
       p._creatureStatuses[hi + '-' + slot] = merged;
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, updatePlayer, getCard]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, updatePlayer, getCard]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -1285,8 +1305,8 @@ function PuzzleCreator() {
                   {hero.statuses?.healReversed && <HealReversedOverlay />}
                   {hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                   {hero.statuses?.immune && !hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
-                  {(hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.burned || hero.statuses?.poisoned || hero.statuses?.negated || hero.statuses?.nulled || hero.statuses?.healReversed || hero.statuses?.untargetable || hero.statuses?.charmed || hero.statuses?.bound) &&
-                    <StatusBadges statuses={hero.statuses} isHero={true} />}
+                  {(hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.burned || hero.statuses?.poisoned || hero.statuses?.negated || hero.statuses?.nulled || hero.statuses?.healReversed || hero.statuses?.untargetable || hero.statuses?.charmed || hero.statuses?.bound || hero._extraLife) &&
+                    <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} isHero={true} />}
                   {hero.buffs && <BuffColumn buffs={hero.buffs} />}
                 </> : <div className="board-zone-empty">Hero</div>}
               </div>
@@ -1440,7 +1460,7 @@ function PuzzleCreator() {
                         {cs.burned && <BurnedOverlay />}
                         {cs.negated && <NegatedOverlay />}
                         {cs.poisoned && <PoisonedOverlay stacks={cs.poisoned.stacks || 1} />}
-                        {(cs.frozen || cs.stunned || cs.burned || cs.poisoned || cs.negated) &&
+                        {(cs.frozen || cs.stunned || cs.burned || cs.poisoned || cs.negated || cs._extraLife) &&
                           <StatusBadges statuses={cs} isHero={false} />}
                         {cs.buffs && <BuffColumn buffs={cs.buffs} />}
                       </>;
@@ -1849,6 +1869,42 @@ function PuzzleCreator() {
                 </div>
               </div>
             )}
+            {/* Sleeping Beauty linked-hero picker — visible only when the
+                edit target is a Sleeping Beauty in a support zone. The
+                link is per-SLOT (left/middle/right), so a hero swapped
+                into the slot mid-puzzle inherits the tether. Each slot
+                button shows the current occupant (or "(Empty)"); clicking
+                an active slot clears the link. */}
+            {!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard?.name === 'Sleeping Beauty' && (() => {
+              const heroes = players[editTarget.si]?.heroes || [];
+              const SLOT_LABELS = ['Left', 'Middle', 'Right'];
+              return (
+                <div style={{ marginBottom: 14 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                    🌹 Linked Hero Slot
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                    {[0, 1, 2].map(slotIdx => {
+                      const heroName = heroes[slotIdx]?.name || null;
+                      const active = editLinkedHeroSlot === slotIdx;
+                      return (
+                        <button key={slotIdx}
+                          className={'btn ' + (active ? 'btn-success' : '')}
+                          style={{ width: '100%', padding: '8px 12px', fontSize: 12, textAlign: 'left',
+                            borderColor: active ? '#44dd66' : 'var(--bg4)' }}
+                          onClick={() => setEditLinkedHeroSlot(active ? null : slotIdx)}>
+                          {active ? '✅ ' : '○ '}
+                          {`Slot ${slotIdx + 1} (${SLOT_LABELS[slotIdx]}) — ${heroName || '(Empty)'}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                    Beauty borrows the linked Hero's effect (once they've used it this turn) and deals 300 damage to whoever occupies that slot when she dies. The link follows the SLOT, not the Hero — swaps inherit it. Click an active slot to clear.
+                  </div>
+                </div>
+              );
+            })()}
             {!isBiomancyTokenEdit && (
             <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
               <label style={{ flex: 1 }}>

@@ -9,6 +9,10 @@
 module.exports = {
   isTargetingArtifact: true,
   deferBroadcast: true,
+  // Both modes (draw + search) move a Potion from deck to hand —
+  // hand-locked controllers can't do either. Blocks the artifact
+  // entirely while the lock is active.
+  blockedByHandLock: true,
 
   canActivate(gs, pi) {
     if (gs.hoptUsed?.[`alchemic-journal:${pi}`] === gs.turn) return false;

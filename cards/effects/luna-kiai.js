@@ -105,17 +105,14 @@ module.exports = {
     const chosen = burnable.find(t => t.id === picked[0]);
     if (!chosen) return false;
 
-    // Commit the reveal on Luna's end BEFORE running the burn:
-    //   • Stamp `_revealedHandIndices[handIndex]` so the clicked copy
-    //     can't be activated again and renders semi-transparent. The
-    //     reveal lasts for the rest of the turn — cleared at turn
-    //     start along with other reveal state.
+    // Reveal commit:
+    //   • The engine stamps `inst.counters._revealedThisTurn = true` on
+    //     SUCCESS (after this function returns truthy), so we don't
+    //     manage the reveal state here. Cancellable prompts that bail
+    //     out keep the inst available for re-activation.
     //   • Broadcast `card_reveal` so BOTH players (and spectators) see
     //     the card image pop up, matching the artifact-activation feel.
-    if (typeof myHandIndex === 'number' && myHandIndex >= 0) {
-      if (!ps._revealedHandIndices) ps._revealedHandIndices = {};
-      ps._revealedHandIndices[myHandIndex] = true;
-    }
+    void myHandIndex; // retained for log/debug if ever needed
     engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
 
     engine.sync();

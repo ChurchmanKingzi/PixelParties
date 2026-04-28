@@ -60,6 +60,13 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return;
 
+    // Hand-locked controllers can't search any cards into their hand
+    // this turn — the bonus fizzles silently rather than half-resolving.
+    if (ps.handLocked) {
+      engine.log('beato_ascension_handlocked', { player: ps.username });
+      return;
+    }
+
     const cardDB = engine._getCardDB();
 
     // Build deduplicated gallery of Spells/Creatures in deck

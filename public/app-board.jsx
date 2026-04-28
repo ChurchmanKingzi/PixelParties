@@ -4243,6 +4243,89 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // Dark wave engulf — Spawn Mother's AOE. A dark teal-black wave rises
+  // from below the target, peaks at full coverage, then recedes off the
+  // top, leaving a foam crest and dark spray droplets. The wave body is
+  // sized to the target via the engine-provided `w` / `h` so creature
+  // slots and hero slots both get the right coverage.
+  dark_wave_engulf: (() => {
+    return function DarkWaveEngulfEffect({ x, y, w, h }) {
+      const cw = w || 110;
+      const ch = h || 140;
+      const drops = useMemo(() => Array.from({ length: 14 }, () => {
+        const angle = -Math.PI * 0.15 + Math.random() * Math.PI * 1.3;
+        const speed = 30 + Math.random() * 50;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: -Math.abs(Math.sin(angle) * speed) - 8,
+          size: 4 + Math.random() * 7,
+          delay: 200 + Math.random() * 280,
+          dur: 600 + Math.random() * 350,
+          color: ['#0a2a3a','#143a55','#1c4a66','#0e2030','#22526e','#0c1c2a'][Math.floor(Math.random() * 6)],
+        };
+      }), []);
+      const ripples = useMemo(() => Array.from({ length: 3 }, (_, i) => ({
+        delay: i * 180,
+        dur: 750 + i * 200,
+        size: cw * 0.8 + i * 24,
+      })), [cw]);
+      // Engulf-style wave body — fills the target's bounding box. Dark
+      // teal radial gradient with a black core suggests deep water.
+      const waveStyle = {
+        position: 'absolute',
+        left: -cw / 2,
+        top: -ch / 2,
+        width: cw,
+        height: ch,
+        borderRadius: '46% 54% 38% 62% / 60% 50% 50% 40%',
+        background: 'radial-gradient(ellipse at 50% 70%, rgba(8,18,28,0.96) 0%, rgba(14,40,60,0.92) 35%, rgba(20,60,80,0.7) 65%, rgba(30,90,120,0.25) 90%, transparent 100%)',
+        boxShadow: 'inset 0 -16px 32px rgba(0,0,0,0.6), 0 0 24px rgba(20,60,90,0.5)',
+        '--engulf-h': ch + 'px',
+        animation: 'darkWaveRise 950ms ease-out forwards',
+      };
+      // Foam crest — lighter highlight at the wave's leading edge.
+      const crestStyle = {
+        position: 'absolute',
+        left: -cw / 2,
+        top: -ch / 2 - 6,
+        width: cw,
+        height: 14,
+        borderRadius: '50%',
+        background: 'linear-gradient(to bottom, rgba(180,220,235,0.0) 0%, rgba(160,200,220,0.85) 45%, rgba(80,140,170,0.7) 70%, transparent 100%)',
+        filter: 'blur(1px)',
+        '--engulf-h': ch + 'px',
+        animation: 'darkWaveCrest 950ms ease-out forwards',
+      };
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Bottom ripples — water gathers and pulses outward at the base */}
+          {ripples.map((r, i) => (
+            <div key={'dwr'+i} style={{
+              position: 'absolute', left: -r.size / 2, top: ch / 2 - 10,
+              width: r.size, height: r.size * 0.32, borderRadius: '50%',
+              border: '2px solid rgba(40,90,120,.65)',
+              animation: `waterRipple ${r.dur}ms ease-out ${r.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+          <div style={waveStyle} />
+          <div style={crestStyle} />
+          {/* Spray droplets flung from the crest at impact */}
+          {drops.map((d, i) => (
+            <div key={'dwd'+i} style={{
+              position: 'absolute', left: -d.size / 2, top: -ch / 2,
+              width: d.size, height: d.size, borderRadius: '50%',
+              background: d.color,
+              boxShadow: `0 0 ${d.size}px rgba(20,60,90,0.6)`,
+              '--dx': d.dx + 'px', '--dy': d.dy + 'px',
+              animation: `darkSprayDrop ${d.dur}ms ease-out ${d.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
   water_splash: (() => {
     // Water splash — hero dives into water (Jump in the River)
     return function WaterSplashEffect({ x, y }) {
@@ -8528,6 +8611,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const card = CARDS_BY_NAME[cardName];
     if (!card) return false;
 
+    // Base Hero cards in hand can never be proactively played — they're
+    // board pieces, not action cards. Ascended Heroes are handled by
+    // their own dedicated case in the Main-Phase block below (they CAN
+    // play, via ascension on an eligible base hero). Always grey out.
+    if (card.cardType === 'Hero') return true;
+
     // Hand-lock: dim non-Ability cards that are blocked by handLock
     if (me.handLocked && card.cardType !== 'Ability' && (me.handLockBlockedCards || []).includes(cardName)) return true;
 
@@ -8573,6 +8662,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       // Gray out Artifacts if not enough gold or item-locked
       if (card.cardType === 'Artifact') {
+        // Reaction-subtype Artifacts (Invisibility Cloak, Bomb Arrow,
+        // Anti-Magnet, …) only fire from the engine's reaction windows
+        // — never proactively from hand. Server's `doUseArtifactEffect`
+        // enforces the same rule (see line ~4573); mirror it here so the
+        // card visibly greys out instead of silently rejecting clicks.
+        if ((card.subtype || '').toLowerCase() === 'reaction') return true;
         if (me.itemLocked && (me.hand || []).length < 2) return true;
         // Boomerang's "no Artifacts for the rest of this turn" lockout —
         // every Artifact in hand greys out for the duration. Server
@@ -9066,10 +9161,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       && (me.gold || 0) >= (card.cost || 0);
     // "Artifact-activatable" is click-to-use (potions / Wheels-style). It
     // excludes Equipment AND Artifact-Creatures — both of those are drag-
-    // to-hero plays instead.
+    // to-hero plays instead. Reaction-subtype Artifacts (Invisibility
+    // Cloak, Bomb Arrow, …) are also excluded — they only fire from the
+    // engine's reaction windows, never as a proactive own-turn play.
+    // (Server's `doUseArtifactEffect` enforces the same gate at line
+    // ~4573; mirroring it here keeps the UI honest.)
     const isArtifactActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
       && card.cardType === 'Artifact'
       && (card.subtype || '').toLowerCase() !== 'equipment'
+      && (card.subtype || '').toLowerCase() !== 'reaction'
       && !(card.subtype || '').toLowerCase().split('/').some(t => t.trim() === 'creature');
     const isPotionActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Potion';
     const isSurprisePlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
@@ -12905,11 +13005,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('deck_to_discard_animation', onDeckToDiscard);
-    const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count }) => {
+    const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count, source }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
-      const deckSel = ownerLabel === 'me' ? '[data-my-deck]' : '[data-opp-deck]';
+      // 'hand' source flies cards out of the player's hand instead of
+      // their deck pile (used by Ascension bonus when deck supply is
+      // exhausted but hand still has copies).
+      let srcSel;
+      if (source === 'hand') {
+        srcSel = ownerLabel === 'me' ? '.game-hand-me' : '.game-hand-opp';
+      } else {
+        srcSel = ownerLabel === 'me' ? '[data-my-deck]' : '[data-opp-deck]';
+      }
       const abSel   = `[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`;
-      const srcEl   = document.querySelector(deckSel);
+      const srcEl   = document.querySelector(srcSel);
       const tgtEl   = document.querySelector(abSel);
       if (!srcEl || !tgtEl || !count) return;
 
@@ -15069,7 +15177,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
                 {hero?.name && isHealReversed && <HealReversedOverlay />}
-                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isSirenLinked || isBound) && <StatusBadges statuses={hero.statuses} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
+                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isSirenLinked || isBound || hero._extraLife) && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
                 {hero?.name && (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Mummy Token')) && (
@@ -15715,7 +15823,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     {cc?.frozen ? <FrozenOverlay /> : null}
                     {(cc?.negated || cc?.nulled) ? <NegatedOverlay /> : null}
                     {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
-                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated || cc?.nulled || cc?._baihuStunned || cc?.sirenLinked) ? <StatusBadges counters={cc} isHero={false} player={p} cardName={cards[cards.length-1]} /> : null}
+                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated || cc?.nulled || cc?._baihuStunned || cc?.sirenLinked || cc?._extraLife) ? <StatusBadges counters={cc} isHero={false} player={p} cardName={cards[cards.length-1]} /> : null}
                     {cc?.buffs ? <BuffColumn buffs={cc.buffs} cardName={cards[cards.length-1]} /> : null}
                     {cc?._guardianImmune ? <div className="board-card-guardian-shield" /> : null}
                     </>

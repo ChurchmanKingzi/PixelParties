@@ -188,6 +188,20 @@ module.exports = {
       // Burned", meaning prior to this cast.)
       const preBurned = targets.map(t => targetIsBurned(engine, t));
 
+      // Mark Heat Wave's spell instance as AoE for the duration of the
+      // damage loop. Surprises that opt out of AoE triggers (Mountain
+      // Tear River — "in response to TARGETING effects" — explicitly
+      // skips when this flag is set on the source) read this through
+      // `sourceInfo.cardInstance._isAoeCheck`. The engine's own AoE
+      // batch path (`actionApplyDamageBatch`) already does the same
+      // bracketing; Heat Wave doesn't go through that path because it
+      // resolves per-target manually (each target either gets Burned
+      // or takes damage based on prior state), so we set the flag
+      // here to keep the AoE semantics consistent.
+      const sourceInst = ctx.card;
+      const hadFlag = sourceInst?._isAoeCheck;
+      if (sourceInst) sourceInst._isAoeCheck = true;
+      try {
       for (let i = 0; i < targets.length; i++) {
         const t = targets[i];
         const wasBurned = preBurned[i];
@@ -229,6 +243,12 @@ module.exports = {
         }
         // Else: burn-immune + not yet burned → nothing (animation
         // already played, which matches the user's spec).
+      }
+      } finally {
+        // Restore the AoE flag. Defensive: only delete if WE set it —
+        // a parent path that already had it set keeps it (currently
+        // no such caller, but cheap idempotent cleanup).
+        if (sourceInst && !hadFlag) delete sourceInst._isAoeCheck;
       }
 
       engine.log('heat_wave', {

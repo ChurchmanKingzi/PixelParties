@@ -26,6 +26,7 @@ const CARD_NAME = 'Create Illusion';
 
 module.exports = {
   inherentAction: true,
+  cpuMeta: { scalesWithSchool: 'Magic Arts' },
 
   /** Cannot play without an eligible deck creature and a free support zone. */
   spellPlayCondition(gs, playerIdx) {

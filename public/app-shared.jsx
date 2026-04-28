@@ -584,6 +584,7 @@ const ZONE_ANIM_SFX = {
   deep_sea_bubbles:        { name: 'elem_water' },
   water_splash:            { name: 'elem_water' },
   whirlpool:               { name: 'elem_water' },
+  dark_wave_engulf:        { name: 'elem_water' },
   // Wind
   whirlwind_spin:          { name: 'elem_wind' },
   sand_twister:            { name: 'elem_wind' },
@@ -1642,6 +1643,18 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
   if (s.shielded) badges.push({ key: 'shielded', icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + durStart(s.shielded) });
   if (s.untargetable) badges.push({ key: 'untargetable', icon: '🦋', tooltip: 'Untargetable: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen.' });
   if (s.healReversed) badges.push({ key: 'healReversed', icon: '💀', tooltip: 'Overheal Shock: Takes any healing as damage.' });
+  // Extra Life — visual-only marker (Trial of Coolness, etc.). The mark
+  // is stored OUTSIDE statuses (`hero._extraLife` / `inst.counters._extraLife`)
+  // so engine status checks never trip on it; the badge simply mirrors
+  // whichever side the props deliver.
+  if (s._extraLife || c._extraLife) {
+    const mark = s._extraLife || c._extraLife;
+    const by   = (mark && typeof mark === 'object' && mark.by) || 'an effect';
+    badges.push({
+      key: 'extraLife', icon: '💖',
+      tooltip: `Extra Life: The next time this is defeated, it is fully revived. (Granted by ${by}.)`,
+    });
+  }
   if (s.charmed) badges.push({ key: 'charmed', icon: '💘', tooltip: 'Charmed: Under opponent control and immune to all effects.' });
   if (s.sirenLinked || c.sirenLinked) {
     const linkData = s.sirenLinked || c.sirenLinked;

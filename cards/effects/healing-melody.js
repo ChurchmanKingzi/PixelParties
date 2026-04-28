@@ -15,6 +15,7 @@
 
 module.exports = {
   includesHealing: true,
+  cpuMeta: { scalesWithSchool: 'Support Magic' },
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;

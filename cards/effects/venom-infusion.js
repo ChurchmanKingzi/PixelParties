@@ -14,6 +14,7 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  cpuMeta: { scalesWithSchool: 'Decay Magic' },
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;

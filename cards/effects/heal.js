@@ -18,6 +18,11 @@
 
 module.exports = {
   includesHealing: true,
+  // Heal scales with the caster's Support Magic level (150/200/300).
+  // The CPU's ability-stacking scoring reads `cpuMeta.scalesWithSchool`
+  // to keep Support Magic worth stacking even when no card in the deck
+  // strictly requires it at the higher level.
+  cpuMeta: { scalesWithSchool: 'Support Magic' },
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
