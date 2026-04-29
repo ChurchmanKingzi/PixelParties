@@ -234,6 +234,15 @@ class GameEngine {
     // Card instance tracking
     this.cardInstances = []; // All tracked CardInstance objects
 
+    // Reaction summons that opted to wait until the triggering effect /
+    // AoE has fully resolved. Stellan / Stellin push closures here from
+    // `afterDamage` / `afterCreatureDamageBatch` so the Creatures they
+    // place aren't included in the same AoE source's still-in-flight
+    // damage targets. Drained by `_flushDeferredReactionSummons` at
+    // every effect-resolution boundary (called from
+    // `_flushSurpriseDrawChecks`).
+    this._deferredReactionSummons = [];
+
     // Chain state
     this.chain = [];           // Current chain links
     this.chainDepth = 0;       // Nested chain counter
@@ -1630,8 +1639,19 @@ class GameEngine {
        * @param {object} config - { title, message }
        */
       async promptConfirmEffect(config) {
+        // The helper is the canonical "you may do X?" gate — ALL its
+        // callers use it for optional effects, so it's always
+        // cancellable AND eligible for Gerrymander redirect by
+        // default. Card scripts can override either flag through
+        // `config.cancellable` / `config.gerrymanderEligible` if they
+        // want a non-cancellable confirm or want to opt out of
+        // Gerrymander control specifically.
         const result = await engine.promptGeneric(cardInstance.controller, {
-          type: 'confirm', title: config.title || cardInstance.name, message: config.message,
+          type: 'confirm',
+          title: config.title || cardInstance.name,
+          message: config.message,
+          cancellable: config.cancellable !== false,
+          gerrymanderEligible: config.gerrymanderEligible !== false,
         });
         return result?.confirmed === true;
       },
@@ -3935,8 +3955,19 @@ class GameEngine {
       if ((ps.potionDeck || []).length === 0) break;
       const cardName = ps.potionDeck.shift();
       ps.hand.push(cardName);
+      const inst = this._trackCard(cardName, playerIdx, ZONES.HAND);
       drawn.push(cardName);
       this.log('potion_draw', { player: ps.username, card: cardName });
+      // Fire ON_DRAW so cards that react to "your opponent draws or
+      // adds cards to their hand via an effect" (Analyzer / Gatherer
+      // from the Cosmic Depths) trigger off Potion Deck draws too.
+      // Potion draws are always effect-induced (no resource-phase
+      // auto-draw), so `_isResourceDraw` stays false.
+      await this.runHooks(HOOKS.ON_DRAW, {
+        playerIdx, card: inst, cardName,
+        _isResourceDraw: false,
+        _isPotionDraw: true,
+      });
     }
     // Accumulate for surprise draw checks (same as regular draws)
     if (drawn.length > 0 && this.gs.currentPhase !== PHASES.RESOURCE && !this._inSurpriseResolution) {
@@ -4778,12 +4809,12 @@ class GameEngine {
    * check, but usable from any summoning effect (Living Illusion,
    * Reincarnation, etc.) that wants to filter its gallery.
    */
-  isCreatureSummonable(cardName, playerIdx, heroIdx = -1) {
+  isCreatureSummonable(cardName, playerIdx, heroIdx = -1, ctxExtras = {}) {
     const script = loadCardEffect(cardName);
     if (!script?.canSummon) return true;
     try {
       const dummy = new CardInstance(cardName, playerIdx, 'hand', heroIdx);
-      const ctx = this._createContext(dummy, { event: 'canSummonCheck' });
+      const ctx = this._createContext(dummy, { event: 'canSummonCheck', ...ctxExtras });
       return !!script.canSummon(ctx);
     } catch (err) {
       console.error(`[canSummon] ${cardName} threw:`, err.message);
@@ -5017,6 +5048,34 @@ class GameEngine {
     if (inst) this._untrackCard(inst.id);
 
     return { returnedToOwner: originalOwner, isPotion };
+  }
+
+  /**
+   * Resolve the discard owner for a hand card a player is about to play
+   * out of their hand. If a tracked instance in `pi`'s hand was tagged
+   * with a foreign `originalOwner` (Magic Lamp gifted card etc.), the
+   * card belongs to that player's pile when discarded — consume the
+   * tagged instance and return the foreign owner. Otherwise returns
+   * `pi` unchanged. Untracking the consumed instance keeps subsequent
+   * plays of the same card name (when more than one foreign copy was
+   * granted) routed correctly in FIFO order.
+   *
+   * @param {number} pi - Player playing the card from hand.
+   * @param {string} cardName - The card being played.
+   * @returns {number} The player index whose discard / deleted pile
+   *                  receives the card.
+   */
+  _consumeHandCardOrigin(pi, cardName) {
+    const foreign = this.cardInstances.find(c =>
+      c.zone === 'hand' && c.owner === pi && c.name === cardName
+      && c.originalOwner != null && c.originalOwner !== pi
+    );
+    if (foreign) {
+      const origOwner = foreign.originalOwner;
+      this._untrackCard(foreign.id);
+      return origOwner;
+    }
+    return pi;
   }
 
   /**
@@ -6546,11 +6605,17 @@ class GameEngine {
     // Inherent action detection. A Spell played via Silence's bonus
     // (bypassing the lock) doesn't consume the Main/Action-Phase Action —
     // that's the "additional Action" clause in Silence's text.
+    //
+    // `opts.zoneSlot` is forwarded to function-form `inherentAction` so
+    // contextual gates (Deepsea bounce-place, Candlestick Squire) can
+    // distinguish "drop on an occupied bounceable slot" from "drop on
+    // an empty slot" — only the bounce-place path is inherent; a normal
+    // summon to an empty slot still costs an Action.
     const usingSilenceBonus = cardData.cardType === 'Spell'
       && ps._spellLockTurn === gs.turn
       && ps._silenceBonusSpell === gs.turn;
     const isInherentAction = usingSilenceBonus || (typeof script?.inherentAction === 'function'
-      ? script.inherentAction(gs, pi, heroIdx, this)
+      ? script.inherentAction(gs, pi, heroIdx, this, { zoneSlot: opts.zoneSlot })
       : script?.inherentAction === true);
 
     return { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction };
@@ -8899,6 +8964,7 @@ class GameEngine {
         confirmLabel: `⚔️ ${cardName}!`,
         cancelLabel: 'No',
         cancellable: true,
+        gerrymanderEligible: true, // True "you may" — opt-in target redirect.
       });
 
       if (!confirmed) continue; // Declined — check next redirect card
@@ -9047,12 +9113,30 @@ class GameEngine {
     if (!promptData || !promptData.type) return null;
 
     // Eligibility by prompt shape.
+    //   • optionPicker: distinct effect paths (Move vs Spawn, Hand vs
+    //     Deck, Discard vs Damage). Parameter pickers (count, source,
+    //     amount) intentionally omit the flag. Requires explicit
+    //     `gerrymanderEligible: true` opt-in.
+    //   • confirm: "you may" effects. Either an explicit
+    //     `gerrymanderEligible: true` opt-in, OR `showCard: <name>`
+    //     (the engine's standard reaction-confirm marker — every
+    //     "Activate <reaction card> in response to <event>?" prompt
+    //     sets it, so all hand-reaction windows / target-redirect /
+    //     surprise / anti-magic / pre-defeat etc. confirms qualify
+    //     automatically). Plain "are you sure you want to cast this
+    //     spell?" gates (Brilliant Idea, Haste, Healing Melody,
+    //     Supply Chain) have neither flag — they're not a player
+    //     choice between effect paths, just an undo button on the
+    //     cast itself.
     let mode = null;
     if (promptData.type === 'optionPicker'
         && Array.isArray(promptData.options) && promptData.options.length >= 2
         && promptData.gerrymanderEligible === true) {
       mode = 'option';
-    } else if (promptData.type === 'confirm' && promptData.cancellable === true) {
+    } else if (promptData.type === 'confirm'
+        && promptData.cancellable === true
+        && (promptData.gerrymanderEligible === true
+            || (typeof promptData.showCard === 'string' && promptData.showCard.length > 0))) {
       mode = 'may';
     }
     if (!mode) return null;
@@ -9473,13 +9557,45 @@ class GameEngine {
   async _flushSurpriseDrawChecks() {
     // Clear Defending the Gate shield at end of effect resolution
     delete this.gs._gateShieldActive;
-    
-    if (!this._pendingSurpriseDraws) return;
-    if (this._inSurpriseResolution) return;
-    const pending = this._pendingSurpriseDraws;
-    this._pendingSurpriseDraws = null;
-    for (const [piStr, count] of Object.entries(pending)) {
-      await this._checkSurpriseOnDraw(parseInt(piStr), count);
+
+    if (this._pendingSurpriseDraws && !this._inSurpriseResolution) {
+      const pending = this._pendingSurpriseDraws;
+      this._pendingSurpriseDraws = null;
+      for (const [piStr, count] of Object.entries(pending)) {
+        await this._checkSurpriseOnDraw(parseInt(piStr), count);
+      }
+    }
+    // Drain reaction summons that asked to wait for the triggering
+    // effect / AoE to fully resolve (Stellan / Stellin) — by the time
+    // we reach this barrier the AoE source has finished all of its
+    // damage steps, so the placed Creatures are safe from being hit
+    // by the same AoE.
+    await this._flushDeferredReactionSummons();
+  }
+
+  /**
+   * Drain `_deferredReactionSummons` — Stellan / Stellin push closures
+   * here so their placement Creatures aren't included in the AoE that
+   * triggered them. Called from `_flushSurpriseDrawChecks` (i.e. at
+   * every effect-resolution boundary). Re-entrancy-guarded so a
+   * deferred summon that itself queues another deferral (chained
+   * Stellans) is processed in FIFO order without overlap.
+   */
+  async _flushDeferredReactionSummons() {
+    if (this._draining_deferredReactionSummons) return;
+    if (!this._deferredReactionSummons?.length) return;
+    this._draining_deferredReactionSummons = true;
+    try {
+      while (this._deferredReactionSummons.length > 0) {
+        const fn = this._deferredReactionSummons.shift();
+        try {
+          await fn();
+        } catch (err) {
+          console.error('[Engine] deferred reaction summon error:', err.message);
+        }
+      }
+    } finally {
+      this._draining_deferredReactionSummons = false;
     }
   }
 
@@ -15405,6 +15521,14 @@ class GameEngine {
 
   _broadcastEvent(event, data) {
     if (this._fastMode) return; // Silent during MCTS simulations.
+    // Animation broadcasts count as progress for the runHooks timeout
+    // watcher — a hook that's spacing itself with delay+broadcast (Chain
+    // Lightning's per-bolt animation, Wheels' staggered draw, Cosmic
+    // Depths' portal flourish) is genuinely doing work. Without this
+    // tick, a long animation chain with no `sync()` between events
+    // could trip the 5s "no progress" timeout even though the hook is
+    // healthy and just waiting on visual pacing.
+    this._hookProgressTick = (this._hookProgressTick || 0) + 1;
     // Self-play teardown nulls `this.room` to break the room↔engine ref
     // cycle, but tail-async work (a switchTurn → cpuTurn chain that was
     // already queued) can still reach this method. Bail silently rather

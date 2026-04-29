@@ -999,6 +999,12 @@ function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
   if (subLower === 'reaction' && !script.proactivePlay) return null;
   if (script.canActivate && !script.canActivate(gs, pi)) return null;
   if (script.blockedByHandLock && ps.handLocked) return null;
+  // Juice: server-side `canActivate` returns true if EITHER side has a
+  // cleansable status, so without this CPU-side guard the CPU happily
+  // plays it when only the opponent has statuses (and the targeting
+  // brain then either picks []-confirms a no-op or actively cleanses
+  // an opponent's debuff, both bad). Gate on own cleansable targets.
+  if (cardName === 'Juice' && !hasCleansableOwnTarget(engine)) return null;
   // Targeted artifacts (getValidTargets + targetingConfig) also go through
   // doUseArtifactEffect — the CPU brain's post-play step picks targets and
   // calls doConfirmPotion to finish resolution.
@@ -3175,9 +3181,12 @@ function cpuReactionDecision(engine, promptData) {
   const chainInit = engine.chain?.[0];
   const chainOwnerIsCpu = chainInit && chainInit.owner === cpuIdx;
 
-  // Juice: CPU only plays it when one of their own targets can actually be healed.
+  // Juice: CPU only plays it when one of their own targets actually
+  // has a cleansable negative status. The card removes statuses, NOT
+  // HP — gating on HP missing (the previous behaviour) made the CPU
+  // burn Juice on a full-HP own hero with no statuses for 0 effect.
   if (reactionName === 'Juice') {
-    if (!hasHealableOwnTarget(engine)) return null; // decline
+    if (!hasCleansableOwnTarget(engine)) return null; // decline
     return true;
   }
 
@@ -3665,6 +3674,31 @@ function hasHealableOwnTarget(engine) {
       const cd = engine.getEffectiveCardData(inst);
       if (cd?.hp && (inst.counters?.damageTaken || 0) > 0) return true;
     }
+  }
+  return false;
+}
+
+/**
+ * True when the CPU controls at least one Hero or Creature with a
+ * cleansable negative status (Frozen / Stunned / Burned / Poisoned /
+ * Bound). Distinct from `hasHealableOwnTarget` which gates HP-healing
+ * cards — Juice and friends remove STATUSES, not HP, so the HP-based
+ * gate would let the CPU play Juice on a target with full HP and no
+ * status (the user-reported "0 effect" misplay).
+ */
+function hasCleansableOwnTarget(engine) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const ps = engine.gs.players[cpuIdx];
+  const { getCleansableStatuses } = require('./_hooks');
+  const negKeys = getCleansableStatuses();
+  for (const h of (ps?.heroes || [])) {
+    if (!h?.name || h.hp <= 0) continue;
+    if (h.statuses && negKeys.some(k => h.statuses[k])) return true;
+  }
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support') continue;
+    if ((inst.controller ?? inst.owner) !== cpuIdx) continue;
+    if (negKeys.some(k => inst.counters?.[k])) return true;
   }
   return false;
 }

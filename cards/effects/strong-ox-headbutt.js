@@ -128,6 +128,7 @@ module.exports = {
               confirmLabel: '⚒️ Yes, remove!',
               cancelLabel: 'No',
               cancellable: true,
+              gerrymanderEligible: true, // True "you may" — opt-in ability removal.
             });
 
             if (wantsRemove) {

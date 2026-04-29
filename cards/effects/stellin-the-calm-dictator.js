@@ -394,8 +394,15 @@ module.exports = {
      * survived. Stellin dying is naturally suppressed because runHooks
      * filters listeners from `cardInstances` and the death loop has
      * already untracked dead instances by the time this fires.
+     *
+     * The placement itself is DEFERRED to the engine's
+     * `_deferredReactionSummons` queue (drained at the next effect-
+     * resolution barrier). Without the deferral, an AoE source that
+     * runs additional damage steps after its creature batch would hit
+     * the Creatures Stellin just placed — the user-facing rule is
+     * "the full AoE resolves first before Stellin summons."
      */
-    afterCreatureDamageBatch: async (ctx) => {
+    afterCreatureDamageBatch: (ctx) => {
       if (!ctx.card.counters?.attachedHero) return;
       if (alreadyTriggered(ctx.card)) return;
       if ((ctx.card.counters?.currentHp || 0) <= 0) return;
@@ -411,15 +418,23 @@ module.exports = {
       if (!wasHit) return;
 
       // Reserve up front so a re-entrant batch can't slip a second
-      // trigger through this one's prompt window. Refund on cancel.
+      // trigger through this one's prompt window. Refund on cancel
+      // or if Stellin died before the deferred summon ran.
       markTriggered(ctx.card);
-      let placed = false;
-      try {
-        placed = await runStellinEffect(ctx);
-      } catch (err) {
-        console.error('[Stellin] effect threw:', err.message);
-      }
-      if (!placed) refundTrigger(ctx.card);
+      const card = ctx.card;
+      ctx._engine._deferredReactionSummons.push(async () => {
+        if ((card.counters?.currentHp || 0) <= 0) {
+          refundTrigger(card);
+          return;
+        }
+        let placed = false;
+        try {
+          placed = await runStellinEffect(ctx);
+        } catch (err) {
+          console.error('[Stellin] effect threw:', err.message);
+        }
+        if (!placed) refundTrigger(card);
+      });
     },
   },
 };

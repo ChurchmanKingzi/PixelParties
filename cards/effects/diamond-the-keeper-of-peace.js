@@ -81,6 +81,7 @@ module.exports = {
         confirmLabel: `🛡️ Protect! (${selfDamage} dmg to Diamond)`,
         cancelLabel: 'No',
         cancellable: true,
+        gerrymanderEligible: true, // True "you may" — opt-in self-damage protect.
       });
 
       if (!confirmed || confirmed.cancelled) return;

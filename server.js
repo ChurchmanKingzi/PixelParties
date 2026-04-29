@@ -1536,11 +1536,26 @@ function sendGameState(room, playerIdx, extra) {
   const gs = room.gameState;
   if (!gs) return;
 
-  // Terror: force end turn if threshold reached
+  // Terror: force end turn if threshold reached.
+  //
+  // Defer firing while ANY effect, prompt, or chain is still in flight.
+  // Without this gate, a sync() emitted from inside a hero/creature/ability
+  // effect (e.g. Siphem mid-onHeroEffect, before its prompts resolve) would
+  // run runPhase(5) here while the effect is still awaiting a player
+  // response — the effect then resumes during the *next* turn. The flag
+  // stays set, so the next `sendGameState` after the effect / chain fully
+  // resolves picks it up.
   if (gs._terrorForceEndTurn != null && !gs._terrorProcessing && room.engine) {
     const phase = gs.currentPhase;
+    const engine = room.engine;
+    const heroEffectActive = gs._heroEffectInProgress
+      && Object.values(gs._heroEffectInProgress).some(v => v);
+    const cardResolving = (gs.players || []).some(p => p?._resolvingCard);
+    const promptOpen = !!(engine._pendingPrompt || engine._pendingGenericPrompt);
+    const chainOpen = !!engine._inReactionCheck;
+    const midEffect = heroEffectActive || cardResolving || promptOpen || chainOpen;
     // Only force during playable phases (Main1, Action, Main2)
-    if (phase >= 2 && phase <= 4) {
+    if (phase >= 2 && phase <= 4 && !midEffect) {
       gs._terrorProcessing = true;
       const terrorPi = gs._terrorForceEndTurn;
       delete gs._terrorForceEndTurn;
@@ -2730,7 +2745,10 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot 
         const idx = abZones2[z].lastIndexOf(cardName);
         if (idx >= 0) { abZones2[z].splice(idx, 1); break; }
       }
-      ps.discardPile.push(cardName);
+      // Foreign-origin abilities (Magic Lamp gifts etc.) discard to
+      // the ORIGINAL owner's pile when negated.
+      const negatedAbilityOwner = room.engine._consumeHandCardOrigin(pi, cardName);
+      gs.players[negatedAbilityOwner].discardPile.push(cardName);
       ps.abilityGivenThisTurn[heroIdx] = false;
       room.engine.log('ability_negated', { card: cardName, player: ps.username });
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
@@ -3048,7 +3066,11 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       const hi = getResolvingHandIndex(ps);
       ps._resolvingCard = null;
       if (hi >= 0) { ps.hand.splice(hi, 1); if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++; }
-      ps.discardPile.push(cardName);
+      // Foreign-origin cards (Magic Lamp gifts etc.) route to the
+      // ORIGINAL owner's discard pile, not the caster's. Falls back
+      // to `pi` when the card has no foreign-origin tag.
+      const discardOwner = room.engine._consumeHandCardOrigin(pi, cardName);
+      gs.players[discardOwner].discardPile.push(cardName);
       room.engine._untrackCard(inst.id);
       // Wisdom cost is paid IMMEDIATELY after the spell leaves hand,
       // BEFORE any phase-advance / turn-end mechanics can interrupt.
@@ -3183,7 +3205,13 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     if (gs._spellPlacedOnBoard) {
       delete gs._spellPlacedOnBoard;
     } else {
-      if (resolveHi >= 0) ps.discardPile.push(cardName);
+      if (resolveHi >= 0) {
+        // Foreign-origin cards (Magic Lamp etc.) discard to their
+        // ORIGINAL owner's pile. `_consumeHandCardOrigin` returns `pi`
+        // for normally-owned cards, so the local case is unchanged.
+        const discardOwner = room.engine._consumeHandCardOrigin(pi, cardName);
+        gs.players[discardOwner].discardPile.push(cardName);
+      }
       room.engine._untrackCard(inst.id);
     }
 
@@ -3603,7 +3631,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
 
-  const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Creature']);
+  const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Creature'], { zoneSlot });
   if (!v) return false;
   const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
 
@@ -3686,7 +3714,13 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
 
     if (chainResult.negated) {
       commitHandRemoval();
-      ps.discardPile.push(cardName);
+      // Foreign-origin Creatures (Magic Lamp gifts etc.) discard to
+      // the ORIGINAL owner's pile when negated before placement.
+      // Once the Creature is on the board, the death path already
+      // routes via `inst.originalOwner` (see processCreatureDamageBatch),
+      // so we only need the override here on the negate-from-hand path.
+      const negatedDiscardOwner = room.engine._consumeHandCardOrigin(pi, cardName);
+      gs.players[negatedDiscardOwner].discardPile.push(cardName);
       room.engine.log('creature_negated', { card: cardName, player: ps.username });
       if (isActionPhase && !usingAdditional) {
         await room.engine.advanceToPhase(pi, 4);
@@ -3722,13 +3756,24 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       commitHandRemoval();
       const placeResult = room.engine.summonCreature(cardName, pi, heroIdx, zoneSlot);
       if (!placeResult) {
-        ps.discardPile.push(cardName);
+        // Fizzle on a full zone — foreign-origin Creatures still route
+        // their fizzle discard back to the original owner's pile.
+        const fizzleDiscardOwner = room.engine._consumeHandCardOrigin(pi, cardName);
+        gs.players[fizzleDiscardOwner].discardPile.push(cardName);
         room.engine.log('creature_fizzle', { card: cardName, reason: 'zone_occupied' });
         for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
         return true;
       }
       actualZoneSlot = placeResult.actualSlot;
       inst = placeResult.inst;
+      // Propagate foreign-origin tag from the hand-tracked instance
+      // onto the placed-on-board instance, so when the Creature dies
+      // the engine's death-path (which already routes via
+      // `inst.originalOwner`) returns the card to its true owner.
+      const placedOriginOwner = room.engine._consumeHandCardOrigin(pi, cardName);
+      if (placedOriginOwner !== pi) {
+        inst.originalOwner = placedOriginOwner;
+      }
 
       broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'support', heroIdx, slotIdx: actualZoneSlot });
       for (let i = 0; i < 2; i++) {
@@ -4357,15 +4402,20 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   if (hi >= 0) {
     ps.hand.splice(hi, 1);
     if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+    // Foreign-origin cards (Magic Lamp gifts etc.) discard / delete
+    // to the ORIGINAL owner's pile. `_consumeHandCardOrigin` returns
+    // `pi` for normally-owned cards.
+    const pileOwner = room.engine._consumeHandCardOrigin(pi, potionName);
+    const pilePs = gs.players[pileOwner];
     if (chainResult.negated) {
-      ps.discardPile.push(potionName);
+      pilePs.discardPile.push(potionName);
     } else if (cardType === 'Potion') {
       const potionHookCtx = { potionName, potionOwner: pi, placed: false, _skipReactionCheck: true };
       await room.engine.runHooks('afterPotionUsed', potionHookCtx);
-      if (!potionHookCtx.placed) ps.deletedPile.push(potionName);
+      if (!potionHookCtx.placed) pilePs.deletedPile.push(potionName);
       checkPotionLock(ps, gs, pi);
     } else {
-      ps.discardPile.push(potionName);
+      pilePs.discardPile.push(potionName);
     }
   } else {
     if (!chainResult.negated && cardType === 'Potion') checkPotionLock(ps, gs, pi);
@@ -4528,8 +4578,13 @@ async function doUsePotion(room, pi, { cardName, handIndex }) {
     if (currentIdx >= 0) {
       ps.hand.splice(currentIdx, 1);
       if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+      // Foreign-origin Potions (Magic Lamp gifts etc.) route to the
+      // ORIGINAL owner's pile. Resolves to `pi` for normally-owned
+      // Potions, so the local-pile case is unchanged.
+      const pileOwner = room.engine._consumeHandCardOrigin(pi, cardName);
+      const pilePs = gs.players[pileOwner];
       if (chainResult.negated) {
-        ps.discardPile.push(cardName);
+        pilePs.discardPile.push(cardName);
       } else if (chainResult.resolveResult?.placed) {
         checkPotionLock(ps, gs, pi);
       } else {
@@ -4538,7 +4593,7 @@ async function doUsePotion(room, pi, { cardName, handIndex }) {
         if (potionHookCtx.placed) {
           checkPotionLock(ps, gs, pi);
         } else {
-          ps.deletedPile.push(cardName);
+          pilePs.deletedPile.push(cardName);
           checkPotionLock(ps, gs, pi);
         }
       }

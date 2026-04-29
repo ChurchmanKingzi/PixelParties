@@ -74,6 +74,7 @@ module.exports = {
         confirmLabel: '🔥 Tutor!',
         cancelLabel: 'No',
         cancellable: true,
+        gerrymanderEligible: true, // True "you may" — opt-in tutor.
       });
       if (!confirmed) return;
 

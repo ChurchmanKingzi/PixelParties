@@ -52,6 +52,7 @@ module.exports = {
         confirmLabel: '📸 Close it! (3G)',
         cancelLabel: 'No',
         cancellable: true,
+        gerrymanderEligible: true, // True "you may" — opt-in 3G chain close.
       });
 
       if (confirmed) {

@@ -229,6 +229,7 @@ module.exports = {
         confirmLabel: '🔥 Revive!',
         cancelLabel: 'No',
         cancellable: true,
+        gerrymanderEligible: true, // True "you may" — opt-in revive.
       });
       if (!confirmed) return;
 

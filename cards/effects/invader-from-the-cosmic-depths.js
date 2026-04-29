@@ -95,12 +95,22 @@ module.exports = {
   },
 
   // Surface the restriction in client UX (greyed-out hand card etc.).
-  canSummon(gs, pi, _heroIdx, _opts, engine) {
-    if (!engine) return false;
+  // Engine signature is `(ctx)`, NOT `(gs, pi, ...)` — passing the wrong
+  // shape used to make `engine` undefined and the function returned
+  // `false` unconditionally. With the fixed signature this gates both
+  // hand plays (no cosmic flag → grey out) AND the per-source filters
+  // used by other summoners (Cosmic Depths, Necromancy, Reincarnation,
+  // …) that route through `engine.isCreatureSummonable`. Effect-summons
+  // by a Cosmic source pass `_summonedByCosmic` (or `_summonedBy` with a
+  // Cosmic name) in `ctxExtras` and are allowed.
+  canSummon(ctx) {
+    const engine = ctx?._engine;
+    const pi = ctx?.cardOwner;
+    if (!engine || pi == null) return false;
     if (countOwnInvaders(engine, pi) >= 1) return false;
-    // Hand plays never have the cosmic flag — Invader can't be hand-
-    // summoned. Greyed always.
-    return false;
+    const byCosmic = ctx._summonedByCosmic
+      || (typeof ctx._summonedBy === 'string' && isCosmicCard(ctx._summonedBy));
+    return !!byCosmic;
   },
 
   // ── ON-PLAY: place up to 2 Invader Tokens (optional) ───────────
@@ -226,14 +236,14 @@ module.exports = {
       title: CARD_NAME,
       description: `Discard a Lv1-4 Attack or Spell to deal ${DAMAGE_PER_LEVEL}×lvl damage to a target.`,
       eligibleIndices,
-      maxSelect: 1,
-      minSelect: 1,
       confirmLabel: '🌌 Discard',
       cancellable: true,
     });
-    if (!handPick || handPick.cancelled || !handPick.selectedCards?.length) return false;
-    const sel = handPick.selectedCards[0];
-    const discardName = sel.cardName;
+    // pickHandCard returns `{ cardName, handIndex }` on confirm, or
+    // `{ cancelled: true }` on cancel — NOT a `selectedCards` array
+    // (that's the cardGalleryMulti shape). Read both fields directly.
+    if (!handPick || handPick.cancelled || !handPick.cardName) return false;
+    const discardName = handPick.cardName;
     const discardCd = cardDB[discardName];
     if (!discardCd) return false;
     const lvl = discardCd.level || 0;
@@ -275,10 +285,14 @@ module.exports = {
     const tgt = targets.find(t => t.id === tgtPicked[0]);
     if (!tgt) return false;
 
-    // Pay the discard cost.
-    const idx = ps.hand.indexOf(discardName);
-    if (idx >= 0) {
-      ps.hand.splice(idx, 1);
+    // Pay the discard cost — splice the EXACT copy the player clicked
+    // (handIndex), not the first matching name. Multiple copies of the
+    // same name in hand would otherwise route the wrong physical copy.
+    const handIdx = handPick.handIndex != null
+      ? handPick.handIndex
+      : ps.hand.indexOf(discardName);
+    if (handIdx >= 0 && ps.hand[handIdx] === discardName) {
+      ps.hand.splice(handIdx, 1);
       ps.discardPile.push(discardName);
       engine.log('invader_discard', { player: ps.username, discarded: discardName, lvl });
     }

@@ -226,6 +226,7 @@ module.exports = attachSteamEngine({
         confirmLabel: '🔥 Fireball!',
         cancelLabel: 'No',
         cancellable: true,
+        gerrymanderEligible: true, // True "you may" — opt-in fireball discharge.
       });
       if (!confirm || confirm.cancelled) return;
 

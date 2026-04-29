@@ -88,6 +88,9 @@ module.exports = {
           confirmLabel: '🌿 Create Token!',
           confirmClass: 'btn-success',
           cancellable: true,
+          // True "you may" effect — Biomancy asks per Hero whether to
+          // convert the spent Potion. Gerrymander redirects this.
+          gerrymanderEligible: true,
         });
 
         if (!result || result.cancelled) continue;

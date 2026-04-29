@@ -242,6 +242,7 @@ module.exports = {
         confirmLabel: '✨ Summon!',
         cancelLabel: 'No',
         cancellable: true,
+        gerrymanderEligible: true, // True "you may" — opt-in summon.
       });
       if (!confirmed) return;
 

@@ -242,25 +242,40 @@ async function runStellanEffect(ctx) {
 }
 
 /**
- * Shared gate for both trigger hooks: reserve the HOPT slot up front so a
- * second trigger fired during this one's prompt chain can't slip through,
- * then refund if the player cancels (or no placement lands). Returns
- * true iff the effect actually placed something.
+ * Shared gate for both trigger hooks. Reserves the HOPT slot SYNCHRONOUSLY
+ * (so a second trigger fired during the same AoE can't queue a parallel
+ * placement) but DEFERS the actual placement to the engine's
+ * `_deferredReactionSummons` queue — flushed at the next effect-resolution
+ * barrier. Without the deferral, an AoE that damages Stellan and then
+ * sweeps the rest of the opponent's board would hit the very Creatures
+ * Stellan just placed: the AoE source builds its target list AFTER the
+ * hero-damage afterDamage hook returns, so any new live instances on
+ * Stellan's side get picked up.
  */
-async function tryFire(ctx) {
-  if (alreadyTriggered(ctx.card)) return false;
+function tryFire(ctx) {
+  if (alreadyTriggered(ctx.card)) return;
   const hero = ctx.attachedHero;
-  if (!hero?.name || hero.hp <= 0) return false;
+  if (!hero?.name || hero.hp <= 0) return;
 
   markTriggered(ctx.card);
-  let placed = false;
-  try {
-    placed = await runStellanEffect(ctx);
-  } catch (err) {
-    console.error('[Stellan] effect threw:', err.message);
-  }
-  if (!placed) refundTrigger(ctx.card);
-  return placed;
+  const card = ctx.card;
+  ctx._engine._deferredReactionSummons.push(async () => {
+    // Re-validate: Stellan may have died between the trigger and the
+    // flush boundary. A dead Stellan refunds the slot — the once-per-
+    // turn shouldn't burn against a hero who never got to react.
+    const heroNow = ctx.attachedHero;
+    if (!heroNow?.name || heroNow.hp <= 0) {
+      refundTrigger(card);
+      return;
+    }
+    let placed = false;
+    try {
+      placed = await runStellanEffect(ctx);
+    } catch (err) {
+      console.error('[Stellan] effect threw:', err.message);
+    }
+    if (!placed) refundTrigger(card);
+  });
 }
 
 module.exports = {
@@ -298,8 +313,9 @@ module.exports = {
       const heroIdx = ctx.card.heroIdx;
       const expectedHero = gs.players[owner]?.heroes?.[heroIdx];
       if (expectedHero !== target) return;
-      // Damage of any source / any type counts — no filter.
-      await tryFire(ctx);
+      // Damage of any source / any type counts — no filter. The
+      // placement itself is deferred (see `tryFire`).
+      tryFire(ctx);
     },
 
     onStatusApplied: async (ctx) => {
@@ -325,7 +341,7 @@ module.exports = {
       // or `immune` shouldn't spend the trigger. (Matches Fiona.)
       const statusDef = STATUS_EFFECTS[ctx.statusName];
       if (!statusDef?.negative) return;
-      await tryFire(ctx);
+      tryFire(ctx);
     },
   },
 };

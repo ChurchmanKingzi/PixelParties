@@ -52,6 +52,7 @@ module.exports = {
         confirmLabel: '🛡️ Protect!',
         cancelLabel: 'No',
         cancellable: true,
+        gerrymanderEligible: true, // True "you may" — opt-in damage negation.
       });
 
       if (!confirmed || confirmed.cancelled) return;

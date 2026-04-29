@@ -115,6 +115,21 @@ function getEligibleDeckCreatures(engine, pi, ownedLevels, excludeName) {
     // could pull a Creature no Hero can host, then the placement
     // would fizzle silently after the shuffle cost was paid.
     if (getEligibleHeroesForCreature(engine, pi, cd).length === 0) continue;
+    // Per-card summoning condition (canSummon) — covers sacrifice
+    // tributes (Dragon Pilot, DDG), uniqueness (Cute Phoenix, etc.),
+    // per-turn summon caps, and any future "extra summoning condition"
+    // a card might define. Without this gate Cosmic Depths could pull
+    // a tribute Creature even when the player has no valid sacrifice
+    // set, then silently fizzle after the shuffle was paid.
+    //
+    // The Cosmic Depths IS a Cosmic source, so cards that gate on
+    // "summoned by a Cosmic card" (Invader from the Cosmic Depths)
+    // need to see the cosmic flag at canSummon time too — otherwise
+    // they're filtered out wholesale.
+    if (!engine.isCreatureSummonable(cn, pi, -1, {
+      _summonedByCosmic: true,
+      _summonedBy: CARD_NAME,
+    })) continue;
     eligible.push(cn);
   }
   return eligible;
@@ -254,33 +269,80 @@ module.exports = {
     });
     if (!heroPick) return true;
 
+    // ── Step 4.5: pay any beforeSummon cost (sacrifice tributes etc.)
+    //              BEFORE the deck splice, so a cancelled / unpayable
+    //              cost doesn't lose us a deck card. The canSummon gate
+    //              at activation + gallery time already filters out
+    //              creatures whose cost can't be paid; this only fizzles
+    //              if state shifted mid-prompt or the player declines a
+    //              cancellable sacrifice prompt.
+    //
+    // Pass cosmic-source flags so cards whose `beforeSummon` gates on
+    // "summoned by a Cosmic card" (Invader) accept the placement.
+    // Without these the canSummon gallery filter would let Invader in
+    // but `beforeSummon` would then reject and the summon would fizzle.
+    const beforeOk = await engine._runBeforeSummon(chosenName, activator, heroPick.heroIdx, {
+      _summonedByCosmic: true,
+      _summonedBy: CARD_NAME,
+      _summonedFromDeck: true,
+    });
+    let inst = null;
+    if (!beforeOk) {
+      // Some cards (DDG, 500 Piranhas, etc.) place themselves inside
+      // beforeSummon and signal it via `_placementConsumedByCard`. Pick
+      // up the placed instance so we can still negate it and run the
+      // shared "OTHER cards react" hook pass below. Without this branch
+      // the negation never lands and reactions never fire.
+      if (ps._placementConsumedByCard === chosenName) {
+        delete ps._placementConsumedByCard;
+        const matches = engine.cardInstances.filter(i =>
+          i.name === chosenName && i.zone === 'support'
+          && (i.controller ?? i.owner) === activator
+        );
+        inst = matches[matches.length - 1] || null;
+      } else {
+        // Cost cancelled / unpayable — fizzle cleanly. Shuffle stays
+        // paid (HOPT remains consumed); same policy as `no_target`.
+        engine.log('cosmic_depths_cost_unpaid', {
+          player: ps.username, summoned: chosenName,
+        });
+        return true;
+      }
+    }
+
     // ── Step 5: remove from deck, run cosmic summon animation, place,
     //            negate ────────────────────────────────────────────────
-    ps.mainDeck.splice(deckIdx, 1);
-    engine._broadcastEvent('deck_search_add', { cardName: chosenName, playerIdx: activator });
-    engine.sync();
-    await engine._delay(250);
+    if (!inst) {
+      // Standard path (no self-place inside beforeSummon).
+      const stillIdx = ps.mainDeck.indexOf(chosenName);
+      if (stillIdx < 0) return true; // shifted out from under us
+      ps.mainDeck.splice(stillIdx, 1);
+      engine._broadcastEvent('deck_search_add', { cardName: chosenName, playerIdx: activator });
+      engine.sync();
+      await engine._delay(250);
 
-    // Black/purple portal flourish on the target zone BEFORE the
-    // creature appears. Matches the Area's cosmos backdrop palette.
-    engine._broadcastEvent('play_zone_animation', {
-      type: 'cosmic_summon',
-      owner: activator,
-      heroIdx: heroPick.heroIdx,
-      zoneSlot: heroPick.slotIdx,
-    });
-    await engine._delay(600);
+      // Black/purple portal flourish on the target zone BEFORE the
+      // creature appears. Matches the Area's cosmos backdrop palette.
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'cosmic_summon',
+        owner: activator,
+        heroIdx: heroPick.heroIdx,
+        zoneSlot: heroPick.slotIdx,
+      });
+      await engine._delay(600);
 
-    // `summonCreature` places without firing hooks. We then negate the
-    // instance BEFORE any hook pass, so the runHooks filter (line 996
-    // of _engine.js) short-circuits the summoned creature's own onPlay
-    // / onCardEnterZone while still letting OTHER board cards react to
-    // the summon.
-    const summonRes = engine.summonCreature(chosenName, activator, heroPick.heroIdx, heroPick.slotIdx, {
-      source: CARD_NAME,
-    });
-    if (!summonRes) return true;
-    const { inst } = summonRes;
+      // `summonCreature` places without firing hooks. We then negate the
+      // instance BEFORE any hook pass, so the runHooks filter (line 996
+      // of _engine.js) short-circuits the summoned creature's own onPlay
+      // / onCardEnterZone while still letting OTHER board cards react to
+      // the summon.
+      const summonRes = engine.summonCreature(chosenName, activator, heroPick.heroIdx, heroPick.slotIdx, {
+        source: CARD_NAME,
+      });
+      if (!summonRes) return true;
+      inst = summonRes.inst;
+    }
+    if (!inst) return true;
 
     engine.actionNegateCreature(inst, CARD_NAME, {
       expiresAtTurn: gs.turn + 1,

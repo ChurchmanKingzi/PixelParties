@@ -57,13 +57,19 @@ function getReviveTargets(gs, pi) {
   return out;
 }
 
-/** Level-4-or-lower Creatures in caster's own discard pile, deduplicated. */
-function getRestoreCandidates(ps, cardDB) {
+/** Level-4-or-lower Creatures in caster's own discard pile, deduplicated.
+ *  When `engine` + `pi` are provided, also filters by the per-card
+ *  `canSummon` gate so per-turn summon limits (Deepsea Primordium and
+ *  friends), uniqueness, and sacrifice-cost gates are respected — without
+ *  this filter, Reincarnation could revive a Creature whose summoning
+ *  condition can't be paid right now. */
+function getRestoreCandidates(ps, cardDB, engine, pi) {
   const counts = {};
   for (const name of (ps?.discardPile || [])) {
     const cd = cardDB[name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if ((cd.level || 0) > MAX_CREATURE_LEVEL) continue;
+    if (engine && pi != null && !engine.isCreatureSummonable(name, pi)) continue;
     counts[name] = (counts[name] || 0) + 1;
   }
   return counts;
@@ -97,7 +103,7 @@ module.exports = {
       const cardDB = engine._getCardDB();
       canRestore =
         freeZones >= FREE_ZONES_FOR_RESTORE &&
-        Object.keys(getRestoreCandidates(ps, cardDB)).length > 0;
+        Object.keys(getRestoreCandidates(ps, cardDB, engine, pi)).length > 0;
     } else {
       canRestore =
         freeZones >= FREE_ZONES_FOR_RESTORE &&
@@ -117,7 +123,7 @@ module.exports = {
       const freeZones = countFreeZones(gs, pi);
 
       const reviveTargets  = getReviveTargets(gs, pi);
-      const restoreCounts  = getRestoreCandidates(ps, cardDB);
+      const restoreCounts  = getRestoreCandidates(ps, cardDB, engine, pi);
       const restoreNames   = Object.keys(restoreCounts);
 
       const canRevive  = freeZones >= FREE_ZONES_FOR_REVIVE  && reviveTargets.length > 0;

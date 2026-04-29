@@ -196,6 +196,7 @@ module.exports = {
       confirmLabel: '🐉 Summon!',
       cancelLabel: 'No',
       cancellable: true,
+      gerrymanderEligible: true, // True "you may" — opt-in rescue summon.
     });
     if (!confirmed) return; // ctx.rescued stays false → deletion proceeds
 

@@ -613,7 +613,17 @@ function clearDeepseaCounters(hero) {
 // use them as its `inherentAction` and `canBypassLevelReq` values without
 // having to duplicate the "is there a bounceable?" check.
 
-function inherentActionIfBounceable(gs, pi, heroIdx, engine) {
+function inherentActionIfBounceable(gs, pi, heroIdx, engine, opts) {
+  // Deepsea's "free Action" clause is the BOUNCE-PLACE path: replace one
+  // of your own bounceable Deepsea Creatures. Plain summons to an empty
+  // Support Zone still cost an Action even when the player happens to
+  // also have a bounceable Creature on the board. `opts.zoneSlot` is the
+  // drop target; an empty slot here means the player is doing a normal
+  // summon, not a bounce-place — so this is NOT inherent.
+  if (opts && opts.zoneSlot != null) {
+    const slot = (gs.players?.[pi]?.supportZones?.[heroIdx] || [])[opts.zoneSlot] || [];
+    if (slot.length === 0) return false;
+  }
   return getBounceableDeepseaCreatures(engine, pi).length > 0;
 }
 

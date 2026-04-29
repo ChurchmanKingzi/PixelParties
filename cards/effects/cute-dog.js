@@ -282,6 +282,7 @@ module.exports = {
         confirmLabel: '🐶 Summon!',
         cancelLabel: 'No',
         cancellable: true,
+        gerrymanderEligible: true, // True "you may" — opt-in summon.
       });
       // Stamp regardless of accept/decline — the offer counts as the
       // turn's use of this effect.

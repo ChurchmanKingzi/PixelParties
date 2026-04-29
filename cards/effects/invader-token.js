@@ -33,6 +33,14 @@ const DAMAGE = 50;
 module.exports = {
   activeIn: ['support'],
 
+  // Invader Tokens fire their end-of-turn punishment regardless of
+  // whether their host Hero is alive — they're a board fixture that
+  // squats on a Support Zone whether or not the Hero standing there
+  // got KO'd. The engine's runHooks filter normally drops support
+  // cards whose host Hero has hp <= 0; this opt-in keeps Invader
+  // Token's listener firing in that case.
+  bypassDeadHeroFilter: true,
+
   // Gerrymander redirect — pick `damage` for the 50-dmg punishment
   // over the 1-card discard. Damage is generally more impactful, and
   // Effect 1 also redirects the subsequent target picker (no — that's

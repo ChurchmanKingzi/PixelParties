@@ -228,10 +228,15 @@ module.exports = {
   },
 
   // ── PASSIVE TRIGGER ──────────────────────────────────────────────
+  //
+  // 1 Change Counter per draw / hand-add EFFECT — NOT per card. See
+  // Analyzer's matching block for the full rationale. Listening to
+  // `beforeDrawBatch` fires once per draw call regardless of card
+  // count, so Elixir of Quickness (3 draws) yields 1 counter.
   hooks: {
-    onDraw: (ctx) => {
-      if (ctx._isResourceDraw) return;
+    beforeDrawBatch: (ctx) => {
       if (ctx.playerIdx === ctx.cardOwner) return;
+      if ((ctx.amount || 0) <= 0) return;
       addChangeCounters(ctx._engine, ctx.card, 1);
     },
     onCardAddedToHand: (ctx) => {

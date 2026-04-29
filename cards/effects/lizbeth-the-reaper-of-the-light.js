@@ -431,6 +431,7 @@ async function handleBiomancyMirror(ctx) {
     confirmLabel: '🌿 Create Token!',
     confirmClass: 'btn-success',
     cancellable: true,
+    gerrymanderEligible: true, // True "you may" — opt-in Biomancy Token creation.
   });
   if (!result || result.cancelled) return;
 

@@ -123,6 +123,7 @@ module.exports = {
         confirmLabel: '⚔️ Combo!',
         cancelLabel: 'No',
         cancellable: true,
+        gerrymanderEligible: true, // True "you may" — opt-in combo with downside.
       });
       if (!wantsCombo) return;
 

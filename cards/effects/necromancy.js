@@ -73,6 +73,12 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel) {
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if ((cd.level || 0) > necromancyLevel) continue;
     if (!heroCanSummon(ps, heroIdx, cd)) continue;
+    // Per-card summoning condition (canSummon). Without this, per-turn
+    // summon limits ("you can only summon 1 Deepsea Primordium per
+    // turn"), uniqueness gates (Cute Phoenix), and sacrifice tributes
+    // are all bypassed by Necromancy — the player could revive a
+    // Primordium they already summoned this turn.
+    if (!engine.isCreatureSummonable(cardName, pi, heroIdx)) continue;
     seen.add(cardName);
     result.push({ name: cardName, source: 'discard' });
   }

@@ -128,6 +128,10 @@ module.exports = {
             confirmLabel: '🔥 200 Recoil — Free Action!',
             cancelLabel: 'No (50 Recoil)',
             cancellable: true,
+            // Two distinct effect paths: 200 recoil + free action vs
+            // 50 recoil + standard action. Gerrymander redirects which
+            // one opp takes.
+            gerrymanderEligible: true,
           });
 
           if (confirmed && !confirmed.cancelled) {

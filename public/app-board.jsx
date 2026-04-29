@@ -15995,7 +15995,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onMouseEnter={e => showGameTooltip(e, `Change Counters: ${hero._changeCounters}. Cosmic Depths counters used by Argos and the Cosmic Depths archetype.`)}
                     onMouseLeave={hideGameTooltip}
                     style={{
-                      position: 'absolute', left: 4, bottom: 4,
+                      position: 'absolute', left: '6%', top: '6%',
                       display: 'flex', alignItems: 'center', gap: 2,
                       padding: '2px 5px',
                       fontFamily: "'Pixel Intv', 'Press Start 2P', monospace",

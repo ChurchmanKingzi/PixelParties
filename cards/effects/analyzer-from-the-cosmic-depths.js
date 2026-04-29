@@ -287,14 +287,21 @@ module.exports = {
   },
 
   // ── PASSIVE TRIGGER ─────────────────────────────────────────────
+  //
+  // 1 Change Counter per draw / hand-add EFFECT — NOT per card. Listening
+  // to `beforeDrawBatch` fires once per `actionDrawCards` /
+  // `actionDrawFromPotionDeck` invocation regardless of how many cards
+  // come out, so Elixir of Quickness (3 draws) yields 1 counter, matching
+  // the user-facing rule. Resource-phase auto-draws don't fire this hook
+  // (the engine gates the runHooks call on phase), so no extra filter is
+  // needed. `onCardAddedToHand` / `onCardAddedFromDiscardToHand` fire
+  // once per card-add call — almost every search / recovery effect adds
+  // exactly one card per call (Magnetic Potion, Hell Fox, Bamboo Staff,
+  // etc.), so per-call ≈ per-effect for those paths.
   hooks: {
-    onDraw: (ctx) => {
-      // Skip resource-phase auto-draws (flagged via _isResourceDraw in
-      // engine.js's runPhase).
-      if (ctx._isResourceDraw) return;
-      // ctx.playerIdx is the drawing player; ctx.cardOwner is Analyzer's
-      // controller. Only opp draws give us a counter.
+    beforeDrawBatch: (ctx) => {
       if (ctx.playerIdx === ctx.cardOwner) return;
+      if ((ctx.amount || 0) <= 0) return;
       addChangeCounters(ctx._engine, ctx.card, 1);
     },
     onCardAddedToHand: (ctx) => {

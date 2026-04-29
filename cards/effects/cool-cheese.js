@@ -111,6 +111,7 @@ module.exports = {
         confirmLabel: `💰 Pay ${EXTRA_COST}`,
         cancelLabel: 'Accept the lock',
         cancellable: true,
+        gerrymanderEligible: true, // True "you may" — pay extra to skip lock.
       });
       if (confirmed && !confirmed.cancelled) {
         ps.gold = Math.max(0, (ps.gold || 0) - EXTRA_COST);
