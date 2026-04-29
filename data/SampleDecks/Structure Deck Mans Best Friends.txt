@@ -5,7 +5,7 @@ Cover: Loyal Pinpom
 == HEROES ==
 Ingo, Investor of Evil
 Orthos, the Loyal Guard Dog
-Barker, the Monster Tamer
+Alice, the Puppeteer Girl
 
 == MAIN DECK ==
 6x Alchemy

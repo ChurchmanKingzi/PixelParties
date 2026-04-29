@@ -61,6 +61,17 @@ module.exports = {
       checkArthorAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
     },
 
+    // Turn-start safety net. The flag is normally maintained by the equip
+    // scripts' onPlay/onCardLeaveZone hooks, but any non-standard placement
+    // path (charm flips, snapshot/restore, future tutors that drop equips
+    // onto the board without firing onPlay) could leave the flag stale.
+    // Re-running the check at every turn start guarantees the flag tracks
+    // reality at least once per turn — cheap, idempotent, and covers paths
+    // we haven't enumerated.
+    onTurnStart: (ctx) => {
+      checkArthorAscension(ctx._engine, ctx.cardOriginalOwner, ctx.cardHeroIdx, null);
+    },
+
     // ── Spell discard effect ─────────────────────────────────────────────
 
     afterSpellResolved: async (ctx) => {

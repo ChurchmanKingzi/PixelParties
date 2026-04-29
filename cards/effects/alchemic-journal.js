@@ -14,6 +14,12 @@ module.exports = {
   // entirely while the lock is active.
   blockedByHandLock: true,
 
+  // Gerrymander redirect — pick `draw` (random) instead of `choose`
+  // (search, +5G), denying opp the targeted Potion they wanted.
+  cpuGerrymanderResponse(/* engine, gerryOwnerPi, promptData */) {
+    return { optionId: 'draw' };
+  },
+
   canActivate(gs, pi) {
     if (gs.hoptUsed?.[`alchemic-journal:${pi}`] === gs.turn) return false;
     const ps = gs.players[pi];
@@ -44,6 +50,7 @@ module.exports = {
           { id: 'choose', label: '🔍 Choose 1 Potion (+5G)', description: 'Search your Potion Deck for a specific card. It cannot be used this turn.', color: '#ddaa22' },
         ],
         cancellable: true,
+        gerrymanderEligible: true, // Random draw vs targeted search are distinct effects.
       });
       if (!choice || choice.cancelled) return { cancelled: true };
       mode = choice.optionId || 'draw';

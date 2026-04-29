@@ -101,6 +101,13 @@ function _allBoardHeroes(gs) {
 module.exports = {
   activeIn: ['support'],
 
+  // Gerrymander redirect — pick `all` so opp's own creatures eat
+  // 100 damage from the AOE alongside our heroes. Friendly fire is
+  // always worse for opp than the targeted-only mode.
+  cpuGerrymanderResponse(/* engine, gerryOwnerPi, promptData */) {
+    return { optionId: 'all' };
+  },
+
   // ── 1. AOE-ON-SUMMON ───────────────────────────────────────────
   hooks: {
     onPlay: async (ctx) => {
@@ -152,6 +159,7 @@ module.exports = {
           },
         ],
         cancellable: false,
+        gerrymanderEligible: true, // Targeted opp damage vs friendly-fire AOE.
       });
       const mode = choice?.optionId === 'all' ? 'all' : 'opp';
 

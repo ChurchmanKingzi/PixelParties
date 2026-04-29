@@ -72,6 +72,14 @@ function getRestoreCandidates(ps, cardDB) {
 module.exports = {
   placesPollutionTokens: true,
 
+  // Gerrymander redirect — pick `restore` (Creature) instead of
+  // `revive` (Hero). Reviving a Hero is generally far higher-impact
+  // than restoring a Creature, so Gerrymander forces the smaller
+  // payoff.
+  cpuGerrymanderResponse(/* engine, gerryOwnerPi, promptData */) {
+    return { optionId: 'restore' };
+  },
+
   spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
@@ -133,6 +141,7 @@ module.exports = {
             { id: 'restore', label: '🔮 Revive Creature', description: 'Return a Lv≤4 Creature from your discard pile.' },
           ],
           cancellable: true,
+          gerrymanderEligible: true, // Hero revive vs Creature restore are distinct effects.
         });
         if (!pick || pick.cancelled) { gs._spellCancelled = true; return; }
         mode = pick.optionId;

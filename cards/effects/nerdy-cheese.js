@@ -111,9 +111,15 @@ module.exports = {
 
     ps.mainDeck.splice(tutorIdx, 1);
     ps.hand.push(result.cardName);
+    const tutorInst = engine._trackCard(result.cardName, pi, 'hand');
     engine._broadcastEvent('deck_search_add', { cardName: result.cardName, playerIdx: pi });
     engine.log('deck_search', {
       player: ps.username, card: result.cardName, by: 'Nerdy Cheese',
+    });
+    // Universal tutor signal — see actionAddCardFromDeckToHand for the
+    // canonical firing.
+    await engine.runHooks('onCardAddedToHand', {
+      playerIdx: pi, card: tutorInst, cardName: result.cardName,
     });
     engine.sync();
 

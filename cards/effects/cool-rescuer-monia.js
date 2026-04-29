@@ -16,6 +16,14 @@ module.exports = {
   heroEffect: true,
   activeIn: ['hero'],
 
+  // Gerrymander redirect — when opp's Monia opens the multi-side
+  // "save 0's vs save 1's" picker, our Gerrymander forces opp to
+  // save OUR creatures with their discard cost. The option ids are
+  // `save-${ownerIdx}` — we want save-${gerryOwnerPi}.
+  cpuGerrymanderResponse(_engine, gerryOwnerPi /*, promptData */) {
+    return { optionId: `save-${gerryOwnerPi}` };
+  },
+
   hooks: {
     onGameStart: async (ctx) => {
       const engine = ctx._engine;
@@ -108,6 +116,11 @@ module.exports = {
         description: 'Creatures are in danger! Discard 1 card to protect them.',
         options,
         cancellable: true,
+        // Gerrymander only redirects when 2+ options (the multi-side
+        // AOE branch where the player picks WHICH side to save).
+        // Single-option branches are auto-skipped by the engine's
+        // gerry gate (options.length >= 2 required).
+        gerrymanderEligible: true,
       });
 
       if (!result || !result.optionId || result.cancelled) return;

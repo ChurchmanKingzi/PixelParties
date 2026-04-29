@@ -54,15 +54,51 @@ function getOwnedCreatureLevels(engine, pi) {
 }
 
 /**
- * Deck Creatures whose level is NOT in `ownedLevels`, optionally
- * excluding a specific card name (`excludeName`) — the card just
- * shuffled back into the deck as the activation cost cannot itself
- * be searched up, per the card's wording ("the card it shuffled back").
- * The exclusion is NAME-based (not instance-based) because the engine
- * stores deck cards as plain strings and cannot distinguish which
- * physical copy was shuffled. Practically: if the activator shuffles
- * a copy of X, no X can be summoned this activation, even if additional
- * copies of X were already in the deck.
+ * Can this hero NORMALLY summon this Creature into a free Support
+ * Zone? "Normally" here means: alive, not frozen / stunned / bound,
+ * and meets the level + spell-school requirement (heroMeetsLevelReq
+ * already accounts for negation, ascension bypasses, Wisdom, etc.).
+ * The Cosmic Depths is NOT a placement — it summons through the host
+ * Hero's normal-summon gate, then negates the resulting Creature.
+ */
+function canHeroSummon(engine, pi, heroIdx, cd) {
+  const ps = engine.gs.players[pi];
+  const hero = ps?.heroes?.[heroIdx];
+  if (!hero?.name) return false;
+  if (hero.hp <= 0) return false;
+  if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.bound) return false;
+  return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+}
+
+/**
+ * Heroes (with a free Support slot) that could host a normal summon
+ * of `cd`. Returns one {heroIdx, slotIdx} per eligible hero — the
+ * leftmost free zone, matching the prompt's "Slot N" labelling.
+ */
+function getEligibleHeroesForCreature(engine, pi, cd) {
+  const ps = engine.gs.players[pi];
+  if (!ps) return [];
+  const out = [];
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    if (!canHeroSummon(engine, pi, hi, cd)) continue;
+    const zones = ps.supportZones?.[hi] || [[], [], []];
+    let freeSlot = -1;
+    for (let zi = 0; zi < 3; zi++) {
+      if ((zones[zi] || []).length === 0) { freeSlot = zi; break; }
+    }
+    if (freeSlot < 0) continue;
+    out.push({ heroIdx: hi, slotIdx: freeSlot });
+  }
+  return out;
+}
+
+/**
+ * Deck Creatures whose level is NOT in `ownedLevels` AND that at
+ * least one of `pi`'s Heroes can normally summon. Optional
+ * `excludeName` excludes the card just shuffled back ("the card
+ * it shuffled back" cannot be the search payoff). Name-based
+ * exclusion: with multiple copies, none of them are searchable
+ * this activation.
  */
 function getEligibleDeckCreatures(engine, pi, ownedLevels, excludeName) {
   const cardDB = engine._getCardDB();
@@ -73,27 +109,15 @@ function getEligibleDeckCreatures(engine, pi, ownedLevels, excludeName) {
     const cd = cardDB[cn];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (ownedLevels.has(cd.level ?? 0)) continue;
+    // Must be summonable by at least one of the activator's living,
+    // unfrozen / unstunned / unbound Heroes with the level + spell
+    // school requirement satisfied. Without this gate the search
+    // could pull a Creature no Hero can host, then the placement
+    // would fizzle silently after the shuffle cost was paid.
+    if (getEligibleHeroesForCreature(engine, pi, cd).length === 0) continue;
     eligible.push(cn);
   }
   return eligible;
-}
-
-/**
- * First free {heroIdx, slotIdx} pairing per living hero. Returns one slot
- * per hero — the cosmos summon drops into the leftmost free zone of the
- * picked hero.
- */
-function getHeroesWithFreeSlot(ps) {
-  const out = [];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
-    const zones = ps.supportZones?.[hi] || [[], [], []];
-    for (let zi = 0; zi < 3; zi++) {
-      if ((zones[zi] || []).length === 0) { out.push({ heroIdx: hi, slotIdx: zi }); break; }
-    }
-  }
-  return out;
 }
 
 module.exports = {
@@ -118,7 +142,9 @@ module.exports = {
     const ps = engine.gs.players[activator];
     if (!ps) return false;
     if (!(ps.hand || []).length) return false;
-    if (getHeroesWithFreeSlot(ps).length === 0) return false;
+    // No need to pre-check "any free slot" separately — the eligible-
+    // creatures helper now requires at least one capable hero with a
+    // free slot, which subsumes the bare slot check.
     const ownedLevels = getOwnedCreatureLevels(engine, activator);
     const eligible = getEligibleDeckCreatures(engine, activator, ownedLevels);
     return eligible.length > 0;
@@ -190,8 +216,19 @@ module.exports = {
     if (deckIdx < 0) return true;
 
     // ── Step 4: pick which Hero receives the summon ──────────────────
-    const slots = getHeroesWithFreeSlot(ps);
-    if (slots.length === 0) return true;
+    // Filtered to Heroes that meet the chosen Creature's level / school
+    // requirement AND aren't dead / frozen / stunned / bound. The
+    // creature gallery already prunes unsummonable creatures; this is
+    // the matched per-hero filter — only show eligible host slots.
+    const cardDB = engine._getCardDB();
+    const chosenCd = cardDB[chosenName];
+    const slots = chosenCd ? getEligibleHeroesForCreature(engine, activator, chosenCd) : [];
+    if (slots.length === 0) {
+      // State drift between gallery pick and zone-pick (host hero died
+      // / got frozen) — fizzle without summoning. Cost stays paid.
+      engine.log('cosmic_depths_no_host', { player: ps.username, summoned: chosenName });
+      return true;
+    }
 
     // Synthetic instance drives the zone-pick prompt through the
     // activating player (Area can be activated from either side, so we
@@ -253,9 +290,20 @@ module.exports = {
     // Fire onCardEnterZone (without `_onlyCard`) so OTHER cards can
     // react — the negated creature's own hooks are filtered out
     // automatically by the engine's negation guard.
+    //
+    // `_summonedFromDeck: true` lets Cosmic Manipulation's post-summon
+    // reaction trigger fire (it gates on direct-from-deck summons).
+    // `_summonedByCosmic: true` + `_summonedBy` keep the summoning-
+    // source identity available for Life-Searcher / Invader gates,
+    // even though those creatures' on-summon triggers are silenced
+    // here by the negation. Defensive — future cards may listen on
+    // this flag without needing the summoned creature's hooks to fire.
     await engine.runHooks('onCardEnterZone', {
       enteringCard: inst, toZone: 'support', toHeroIdx: heroPick.heroIdx,
       _skipReactionCheck: true,
+      _summonedFromDeck: true,
+      _summonedByCosmic: true,
+      _summonedBy: CARD_NAME,
     });
 
     engine.log('cosmic_depths_summon', {

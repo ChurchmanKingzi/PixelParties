@@ -224,10 +224,27 @@ module.exports = {
 
     // ── Step 5: Execute the move ──
 
-    // 5a: Fire onCardLeaveZone for ONLY the moved card (prevents other equips revoking ATK)
+    // 5a: Fire onCardLeaveZone for ONLY the moved card (prevents other equips revoking ATK).
+    //
+    // Equipment scripts (Legendary Sword, Vampiric Sword, Sun Sword, both
+    // Hammers, both Blades, etc.) gate their leave-zone hook on
+    //   ctx.fromOwner === ctx.cardOwner
+    //   ctx.fromHeroIdx === ctx.card.heroIdx
+    //   ctx.fromZoneSlot === ctx.card.zoneSlot
+    // — the "did THIS card actually leave?" check. Omitting `fromOwner`
+    // or `fromZoneSlot` here makes those checks evaluate
+    // `undefined !== ctx.cardOwner` and bail silently, which used to
+    // skip revokeAtk (old hero kept the +X ATK), expireAdditionalAction
+    // (Sword's summon token persisted on the old hero), and equipment-
+    // specific ascension re-checks (checkArthorAscension on the source
+    // hero). Pass the full canonical payload — same shape as
+    // _engine.js's death/move paths and the runHooks call at line 14045.
     await engine.runHooks('onCardLeaveZone', {
       _onlyCard: inst, card: inst,
-      fromZone: 'support', fromHeroIdx: srcHeroIdx,
+      fromZone: 'support',
+      fromOwner: equipOwner,
+      fromHeroIdx: srcHeroIdx,
+      fromZoneSlot: srcSlot,
       _skipReactionCheck: true,
     });
 

@@ -9,6 +9,13 @@
 module.exports = {
   isTargetingArtifact: true,
 
+  // Gerrymander redirect — when opp activates Wheels, our Gerrymander
+  // picks for them. Pick `draw4` so opp deletes 2 cards (permanent
+  // loss vs draw3's recoverable discard).
+  cpuGerrymanderResponse(/* engine, gerryOwnerPi, promptData */) {
+    return { optionId: 'draw4' };
+  },
+
   canActivate(gs, pi) {
     // HOPT check
     const hoptKey = `wheels:${pi}`;
@@ -32,6 +39,7 @@ module.exports = {
         { id: 'draw4', label: 'Draw 4, Delete 2', description: 'Draw 4 cards, then delete 2 from your hand.', color: '#ff8844' },
       ],
       cancellable: true,
+      gerrymanderEligible: true, // 2 distinct effects (Draw3+Discard1 vs Draw4+Delete2).
     });
 
     if (!choice || choice.cancelled) return { cancelled: true };

@@ -98,16 +98,24 @@ module.exports = {
       const eligible = engine.getHeroEligibleActionCards(pi, heroIdx)
         .filter(cn => hasCardType(cardDB[cn], 'Creature'));
 
-      // Grant the token regardless — needed for drag-play fallback if cancelled
-      ctx.grantAdditionalAction(ADDITIONAL_TYPE);
-
       if (eligible.length === 0) {
-        // Nothing to summon — hold phase open so nothing strange happens
-        gs._preventPhaseAdvance = true;
-        engine.log('sword_summon_grant', { player: gs.players[pi].username, hero: hero.name });
+        // No summonable Creature in hand at the time the Sword triggers
+        // → the free Action is wasted, NOT banked. Without this early
+        // return the additional-action token would persist and let the
+        // player summon a Creature later (e.g. drawn next turn) under
+        // the same Attack's grant — which the Sword's text doesn't
+        // allow. Don't grant the token, don't hold the phase.
+        engine.log('sword_summon_no_targets', { player: gs.players[pi].username, hero: hero.name });
         engine.sync();
         return;
       }
+
+      // Grant the token so performImmediateAction can route the summon
+      // through the additional-action machinery. Whatever happens below,
+      // we expire the token before this hook returns — the Sword's free
+      // summon must be the IMMEDIATE next thing or it's forgone, which
+      // means the token never survives this hook in any state.
+      ctx.grantAdditionalAction(ADDITIONAL_TYPE);
 
       const uniqueNames = [...new Set(eligible)];
       const title = uniqueNames.length === 1
@@ -123,12 +131,19 @@ module.exports = {
       });
 
       if (result?.played) {
-        // Consume the token — the summon already happened inside performImmediateAction
+        // Summon already happened inside performImmediateAction — consume
+        // the token so the engine's "did this play use an additional
+        // action?" bookkeeping is right, then phase advances normally.
         engine.consumeAdditionalAction(pi, ADDITIONAL_TYPE);
-        // No _preventPhaseAdvance → phase will advance normally after this hook returns
       } else {
-        // Player cancelled — hold Action Phase open so they can drag-summon instead
-        gs._preventPhaseAdvance = true;
+        // Cancelled — the player forgoes the free summon. Expire the
+        // token immediately so it can't leak into a later action / next
+        // turn via drag-summon. The previous "hold phase open for a
+        // drag-summon fallback" leaked the token because the engine has
+        // no turn-rollover cleanup for additionalActionAvail counters
+        // and `_preventPhaseAdvance` gets cleared on the next action,
+        // letting the unconsumed token survive indefinitely.
+        ctx.expireAdditionalAction();
       }
 
       engine.log('sword_summon_grant', { player: gs.players[pi].username, hero: hero.name });

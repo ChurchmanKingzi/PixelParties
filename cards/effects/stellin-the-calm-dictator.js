@@ -216,6 +216,7 @@ async function runStellinEffect(ctx) {
         { id: 'deck', label: '📚  1 from deck' },
       ],
       cancellable: true,
+      gerrymanderEligible: true, // Batch-from-hand vs targeted-deck-search are distinct effects.
     });
     if (!optRes || optRes.cancelled || !optRes.optionId) return false;
     source = optRes.optionId;
@@ -349,6 +350,13 @@ async function runStellinEffect(ctx) {
 
 module.exports = {
   activeIn: ['support'],
+
+  // Gerrymander redirect — pick `deck` so opp gets only ONE creature
+  // (a search) rather than potentially several from hand. Limits
+  // their volume payoff.
+  cpuGerrymanderResponse(/* engine, gerryOwnerPi, promptData */) {
+    return { optionId: 'deck' };
+  },
 
   attachableHeroes: [ATTACHABLE],
 

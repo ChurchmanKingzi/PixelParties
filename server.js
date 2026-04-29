@@ -3319,6 +3319,12 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     (c.owner === heroOwner || c.controller === heroOwner) && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
   );
   if (!inst) return false;
+  // CC-locked creatures cannot fire their own effects — mirrors the
+  // engine-side filter in getActivatableCreatures and the hook gate in
+  // runHooks. Defensive: a stale activate request from a client whose
+  // UI hasn't seen the freeze/stun yet would otherwise resolve.
+  if (inst.counters?.frozen || inst.counters?.stunned
+      || inst.counters?.negated || inst.counters?.nulled) return false;
 
   if (charmedOwner != null
       && hero.charmedBy !== pi && hero.controlledBy !== pi
@@ -4059,6 +4065,11 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
           color: e.inst?.zone === 'support' ? 'var(--warning)' : 'var(--accent)',
         })),
         cancellable: true,
+        // Each option is a different Hero Effect — distinct effects.
+        // No card-level cpuGerrymanderResponse override; engine falls
+        // back to "first option" which usually picks the lower-tier /
+        // base hero effect over a board-attached upgrade.
+        gerrymanderEligible: true,
       });
       if (!response || response.cancelled) return false;
       const idx = availableEffects.findIndex((_, i) => `effect-${i}` === response.optionId);
@@ -6648,7 +6659,12 @@ io.on('connection', (socket) => {
     return parts.join(' | ');
   }
 
-  async function runOneSelfPlayGame(deckA, deckB) {
+  async function runOneSelfPlayGame(deckA, deckB, opts = {}) {
+    // `cpuSkipCardNames` lives in the caller's destructured options
+    // closure (debug_self_play_run handler) — it's NOT in scope here,
+    // so it must be passed through. Defaulting to [] keeps the A/B
+    // sweep caller, which doesn't expose the option, working too.
+    const cpuSkipCardNames = Array.isArray(opts.cpuSkipCardNames) ? opts.cpuSkipCardNames : [];
     const snapshotDeck = (d) => JSON.parse(JSON.stringify({
       mainDeck: d.mainDeck || [], heroes: d.heroes || [],
       potionDeck: d.potionDeck || [], sideDeck: d.sideDeck || [],
@@ -6722,22 +6738,20 @@ io.on('connection', (socket) => {
             : Promise.resolve();
           drain.then(() => {
             rooms.delete(roomId);
-            // ── Break the room ↔ engine cycle explicitly ──
-            // The engine holds `this.room` (back-ref) and closures on
-            // onGameOver/_cpuDriver capture `room` too. Null just those
-            // edges so V8 doesn't need cycle-collection to reclaim.
-            // Keep gs and cardInstances intact — they don't point back
-            // to room, so they don't contribute to the cycle, and any
-            // pending setImmediate callbacks from card effects (e.g.
-            // Big Gwen's hand-limit recheck) still work against a live
-            // engine reference.
+            // ── Tear-down: break the closure refs that capture `room` ──
+            // We DON'T null `eng.room` or `room.engine` — V8 GC handles
+            // simple 2-cycles natively (mark-and-sweep), and a tail-async
+            // chain (switchTurn → cpuTurn → runPhase → log →
+            // _broadcastEvent → this.room.spectators) was crashing on
+            // those refs being null. The actual leak vectors are the
+            // closure captures on onGameOver and _cpuDriver — null those
+            // and the room becomes unreachable through everything except
+            // the cycle, which V8 reclaims on the next GC pass.
             const eng = room.engine;
             if (eng) {
-              eng.room = null;
               eng.onGameOver = null;
               eng._cpuDriver = null;
             }
-            room.engine = null;
             room._currentDecks = null;
             room._originalDecks = null;
             resolve({ winnerIdx, reason, turns, ms, firstPlayer, diagnosis });
@@ -7040,14 +7054,20 @@ io.on('connection', (socket) => {
       } else if (random) {
         // Pool = user's saved decks + ALL sample decks (Starter + Structure).
         // Self-play is a test tool, so we want broad archetype coverage even
-        // when the user has only a few decks of their own saved.
-        const rows = await db.all('SELECT * FROM decks WHERE user_id = ?', [currentUser.userId]);
-        const userDecks = rows.map(parseDeck).filter(d =>
-          d && Array.isArray(d.heroes) && d.heroes.length > 0
-          && Array.isArray(d.mainDeck) && d.mainDeck.length > 0);
+        // when the user has only a few decks of their own saved. Pass
+        // `samplesOnly: true` to drop user decks entirely — useful for
+        // canonical-deck-only sweeps that shouldn't be polluted by
+        // personal creations.
         const sampleDecks = loadSampleDecks().filter(d =>
           d && Array.isArray(d.heroes) && d.heroes.length > 0
           && Array.isArray(d.mainDeck) && d.mainDeck.length > 0);
+        let userDecks = [];
+        if (!samplesOnly) {
+          const rows = await db.all('SELECT * FROM decks WHERE user_id = ?', [currentUser.userId]);
+          userDecks = rows.map(parseDeck).filter(d =>
+            d && Array.isArray(d.heroes) && d.heroes.length > 0
+            && Array.isArray(d.mainDeck) && d.mainDeck.length > 0);
+        }
         allDecks = [...userDecks, ...sampleDecks];
         // Apply exclusion list. Matches deck name (case-insensitive,
         // substring-in-either-direction) so 'heal burn' excludes
@@ -7248,7 +7268,7 @@ io.on('connection', (socket) => {
           });
           let r;
           try {
-            r = await Promise.race([runOneSelfPlayGame(deckP0, deckP1), outerTimeout]);
+            r = await Promise.race([runOneSelfPlayGame(deckP0, deckP1, { cpuSkipCardNames }), outerTimeout]);
           } finally {
             if (outerTimeoutHandle) clearTimeout(outerTimeoutHandle);
             // Tear down transcription regardless of game outcome.

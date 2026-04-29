@@ -68,6 +68,14 @@ module.exports = {
       if (idx < 0) return;
       ps.mainDeck.splice(idx, 1);
       ps.hand.push(chosenName);
+      const inst = engine._trackCard(chosenName, pi, 'hand');
+
+      // Universal tutor signal so listeners (Cosmic Depths Analyzer /
+      // Gatherer, etc.) react. Mirrors the firing in
+      // actionAddCardFromDeckToHand.
+      await engine.runHooks('onCardAddedToHand', {
+        playerIdx: pi, card: inst, cardName: chosenName,
+      });
 
       // Reveal to opponent (opponent confirms)
       await engine.revealSearchedCards(pi, [chosenName], 'Graveyard Gathering');

@@ -280,6 +280,14 @@ module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
 
+  // Gerrymander redirect — pick `hand` so opp consumes a hand card
+  // for the attach, shrinking their hand. The deck-search path
+  // expands their options instead, which is generally better for
+  // them long-term.
+  cpuGerrymanderResponse(/* engine, gerryOwnerPi, promptData */) {
+    return { optionId: 'hand' };
+  },
+
   /**
    * Check if this specific Training instance can be activated right now.
    * Called by the engine's getFreeActivatableAbilities (after HOPT check).
@@ -380,6 +388,7 @@ module.exports = {
       description: 'Choose an effect:',
       options: [optionA, optionB],
       cancellable: true,
+      gerrymanderEligible: true, // Hand attach vs Deck search are distinct effects.
     });
 
     if (!choice || choice.cancelled) return false;

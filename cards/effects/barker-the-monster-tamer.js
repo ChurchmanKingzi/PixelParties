@@ -103,12 +103,21 @@ module.exports = {
         psp.supportZones[heroIdx][slot] = [opt.name];
         const inst = eng._trackCard(opt.name, cpuIdx, 'support', heroIdx, slot);
         inst.counters.isPlacement = 1;
+        psp._creaturesSummonedThisTurn = (psp._creaturesSummonedThisTurn || 0) + 1;
         await eng.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName: opt.name, zone: 'support', heroIdx, zoneSlot: slot, _skipReactionCheck: true });
         await eng.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _skipReactionCheck: true });
         return true;
       };
       try {
-        const best = await mctsPick(engine, cards, apply);
+        // Horizon=6 (vs default 2): Barker's turn-1 placement is a
+        // once-per-game decision, so we can afford a deeper rollout.
+        // The extra turns give "latent-value" Creatures like Goff
+        // (doubles Burn at end-of-turn — only matters if Burn is
+        // applied AND survives to end-of-turn AND there's a real
+        // payoff) several chances to fire instead of losing to
+        // Harpyformer's immediate +1 free summon, which always lands
+        // within the default window. 6 ≈ 3 of our turns + 3 opp turns.
+        const best = await mctsPick(engine, cards, apply, { horizon: 6 });
         if (best) return { cardName: best.name, source: best.source };
       } catch { /* fall through */ }
       return heuristicPick();
@@ -218,6 +227,13 @@ module.exports = {
         // Track card instance in engine with placement flag
         const inst = engine._trackCard(cardName, pi, 'support', heroIdx, zone.slotIdx);
         inst.counters.isPlacement = 1;
+
+        // Counts as a creature summon for this turn — gates like
+        // Harpyformer's "no creatures summoned yet" inherent-action
+        // and Aggressive Town Guard's first-summon rule must see
+        // Barker's placement, even though it happened before the
+        // Action Phase.
+        ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
 
         engine.log('placement', { card: cardName, by: 'Barker, the Monster Tamer', from: selected.source, heroIdx, zoneSlot: zone.slotIdx });
 

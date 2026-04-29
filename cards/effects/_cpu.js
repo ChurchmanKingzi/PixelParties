@@ -2420,6 +2420,18 @@ function installCpuBrain(engine) {
   // Puzzle mode is unaffected — puzzles don't install the CPU brain.
   const origPromptGeneric = engine.promptGeneric.bind(engine);
   engine.promptGeneric = async function (playerIdx, promptData) {
+    // ── Gerrymander redirect (BEFORE the CPU/human dispatch below) ──
+    // The original engine.promptGeneric also runs this redirect, but
+    // the wrapper short-circuits CPU prompts and would otherwise skip
+    // it. Re-running here ensures the redirect fires regardless of
+    // who's prompted. The `_gerryRewritten` guard inside the helper
+    // prevents double-application if origPromptGeneric is reached.
+    const _gerryRedirect = engine._tryGerrymanderRedirect(playerIdx, promptData);
+    if (_gerryRedirect) {
+      playerIdx = _gerryRedirect.targetPi;
+      promptData = _gerryRedirect.rewrittenData;
+    }
+
     // ── MCTS scripted plan (peek, consume only on match) ──
     let scriptedValue = null;
     if (engine.isCpuPlayer(playerIdx) && Array.isArray(engine._mctsTargetPlan) && engine._mctsTargetPlan.length > 0) {
@@ -2766,10 +2778,40 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // prompts fired during the opponent's turn answer from their OWN side.
   const cpuIdx = promptedPlayerIdx != null ? promptedPlayerIdx : engine._cpuPlayerIdx;
 
+  // ── Gerrymander redirect handling ──
+  // When `_gerryRewritten` is set, the prompt was redirected from opp
+  // to us (the Gerrymander owner). We're picking FOR opp — invert the
+  // intent. The card's per-card `cpuGerrymanderResponse` (looked up by
+  // the ORIGINAL title before the Gerrymander prefix was added) names
+  // the option that's worst for opp; if missing, fall back to safe
+  // defaults below.
+  if (promptData._gerryRewritten) {
+    const origTitle = promptData._gerryOriginalTitle || '';
+    const script = origTitle ? loadCardEffect(origTitle) : null;
+    if (script?.cpuGerrymanderResponse) {
+      try {
+        const override = script.cpuGerrymanderResponse(engine, cpuIdx, promptData);
+        if (override !== undefined) return override;
+      } catch (err) {
+        console.error(`[CPU] ${origTitle} cpuGerrymanderResponse threw:`, err.message);
+      }
+    }
+    // Confirm-cancellable default: decline. Most "may" prompts give
+    // the prompted player a beneficial option; declining hurts them.
+    if (type === 'confirm' && promptData.cancellable) return null;
+    // optionPicker default: pick the first option. Safer than picking
+    // the last (which the standard heuristic does — usually "all-in").
+    if (type === 'optionPicker') {
+      const options = promptData.options || [];
+      if (options.length > 0) return { optionId: options[0].id };
+    }
+    // Fall through to standard handling for other prompt types.
+  }
+
   // Per-card override wins over the generic brain. Card authors export
   // `cpuResponse(engine, promptKind, promptData)` to customize how the CPU
   // responds to prompts their card raises (Barker hero-ability, etc.).
-  const cardName = promptData.title || promptData.source;
+  const cardName = promptData._gerryOriginalTitle || promptData.title || promptData.source;
   if (cardName) {
     const script = loadCardEffect(cardName);
     if (script?.cpuResponse) {
@@ -2782,8 +2824,18 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     }
   }
 
-  // Reactions: prompt type='confirm' with a showCard and an 'Activate' button.
-  if (type === 'confirm' && promptData.confirmLabel && /activate/i.test(promptData.confirmLabel)) {
+  // Reactions: prompt type='confirm' that surfaces a specific card via
+  // `showCard` (the "this is THE card you're being asked to activate"
+  // signal). Covers reaction confirmLabels beyond the original
+  // "Activate" prefix — Cosmic Malfunction's "🌌 Negate!", Deepsea
+  // Idol's "🌊 Negate!", Bamboo Staff's "🕸️ Redirect!", Bamboo
+  // Shield's "🛡️ Defend!", etc. Any cancellable card-effect confirm
+  // with `showCard` is a reaction opt-in; route through the smarter
+  // decision-maker rather than the blanket-decline branch below.
+  if (type === 'confirm'
+      && promptData.cancellable
+      && (promptData.showCard
+          || (promptData.confirmLabel && /activate/i.test(promptData.confirmLabel)))) {
     return cpuReactionDecision(engine, promptData);
   }
 
@@ -4302,9 +4354,49 @@ function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
     if (script?.blockedByHandLock && typeof script.resolve === 'function') {
       base = Math.min(base, 12);
     }
+    // Per-card override: cards whose ENTIRE on-play value is gaining a
+    // fixed amount of gold (Treasure Chest's +10) should rate their hand-
+    // value at the demand-aware value of that gold, NOT the generic
+    // "any 0-cost playable card is worth 25" base. This keeps the
+    // apply-vs-skip delta in mctsGatedActivation honest:
+    //   • low gold (high demand) → gold worth ~×2 → hand-value ~20 → small
+    //     positive delta to play (10 gold gained, 1 hand card lost worth 20,
+    //     net ~0 to slightly positive depending on demand math).
+    //   • high gold (saturated demand) → gold worth ~×0.2 → hand-value ~2
+    //     → strong negative delta to play, so the gate skips.
+    //   • interference (Hammer Throw +1 forced discard) → recon eval sees
+    //     the extra hand cost and skips even at low gold.
+    const goldGain = script?.cpuMeta?.handValueAsGoldGain;
+    if (typeof goldGain === 'number' && goldGain > 0) {
+      const demand = computeGoldDemand(engine, pi);
+      const willMeet  = Math.max(0, Math.min(goldGain, demand - gold));
+      const willSpill = goldGain - willMeet;
+      base = willMeet * 2 + willSpill * 0.2;
+    }
   }
   if (cardIsAscensionCriticalForAnyHero(engine, pi, cardName, cd)) {
     base = Math.max(base, 80);
+  }
+  // Direct-from-deck summon synergy with Cosmic Manipulation. Cards
+  // that opt into `cpuMeta.directDeckSummon` are worth more when CM is
+  // in hand to react to them; CM itself is worth more when a
+  // directDeckSummon trigger is in hand. Generic — any future card
+  // wearing either flag gets the same lift.
+  const script = loadCardEffect(cardName);
+  const ps2 = engine.gs.players[pi];
+  if (script?.cpuMeta?.directDeckSummon || cardName === 'Cosmic Manipulation') {
+    const hand = ps2?.hand || [];
+    const partnerInHand = (() => {
+      if (cardName === 'Cosmic Manipulation') {
+        for (const cn of hand) {
+          if (cn === cardName) continue;
+          if (loadCardEffect(cn)?.cpuMeta?.directDeckSummon) return true;
+        }
+        return false;
+      }
+      return hand.includes('Cosmic Manipulation');
+    })();
+    if (partnerInHand) base += 25;
   }
   if (seenCount >= 1) base *= 0.5;
   return base;
@@ -4849,6 +4941,105 @@ function evaluateState(engine, cpuIdx) {
     }
   }
   score += ownSupVal - oppSupVal;
+
+  // ── Change Counters (Cosmic Depths) ──────────────────────────────
+  // Generic counter resource — Analyzer / Gatherer / Argos accumulate
+  // them passively from opponent draws and tutor effects. Counters
+  // power downstream payoffs:
+  //   • Argos hero effect: remove N → place a Lv N CD Creature.
+  //   • Gatherer: remove ≤3 → draw N.
+  //   • Analyzer: remove ≤6 → spawn 1 Invader Token per 2.
+  //   • Cosmic Manipulation places counters on shuffle-back-this-turn.
+  //   • Invader Token punishes the turn player who owns NO counters.
+  //
+  // Eval values each owned counter at a small flat amount, scaled UP
+  // when the side has consumers on board (cards that turn counters
+  // into payoff). Without consumers, counters are dead weight (worth
+  // ~1 each — still > 0 so the eval prefers acquiring them, but
+  // doesn't over-weight stockpiling). With consumers the per-counter
+  // value rises so MCTS values both the buildup and the eventual
+  // spend.
+  //
+  // The "consumer" detection uses the same `cpuMeta.counterConsumer`
+  // declaration that future cards can opt into. Today: Argos,
+  // Gatherer, Analyzer.
+  const COUNTER_VALUE_BASE     = 1;
+  const COUNTER_VALUE_CONSUMER = 4;
+  const hasCounterConsumer = (ownerIdx) => {
+    const ps2 = gs.players[ownerIdx];
+    if (!ps2) return false;
+    for (const h of (ps2.heroes || [])) {
+      if (!h?.name || h.hp <= 0) continue;
+      if (loadCardEffect(h.name)?.cpuMeta?.counterConsumer) return true;
+    }
+    for (const inst of engine.cardInstances) {
+      if ((inst.controller ?? inst.owner) !== ownerIdx) continue;
+      if (inst.zone !== 'support') continue;
+      if (inst.faceDown) continue;
+      if (inst.counters?.negated || inst.counters?.nulled) continue;
+      if (loadCardEffect(inst.name)?.cpuMeta?.counterConsumer) return true;
+    }
+    return false;
+  };
+  const tallyChangeCountersForSide = (ownerIdx) => {
+    let total = 0;
+    const ps2 = gs.players[ownerIdx];
+    if (!ps2) return 0;
+    for (const h of (ps2.heroes || [])) {
+      if (!h?.name || h.hp <= 0) continue;
+      total += h._changeCounters || 0;
+    }
+    for (const inst of engine.cardInstances) {
+      if (inst.zone !== 'support') continue;
+      if (inst.faceDown) continue;
+      if ((inst.controller ?? inst.owner) !== ownerIdx) continue;
+      total += inst.counters?.changeCounter || 0;
+    }
+    return total;
+  };
+  const ownCounters = tallyChangeCountersForSide(cpuIdx);
+  const oppCounters = tallyChangeCountersForSide(oppIdx);
+  const ownPerCounter = hasCounterConsumer(cpuIdx) ? COUNTER_VALUE_CONSUMER : COUNTER_VALUE_BASE;
+  const oppPerCounter = hasCounterConsumer(oppIdx) ? COUNTER_VALUE_CONSUMER : COUNTER_VALUE_BASE;
+  score += ownCounters * ownPerCounter - oppCounters * oppPerCounter;
+
+  // ── Invader Token end-of-turn pressure ───────────────────────────
+  // Generic "punishes-turn-player-with-no-counters" eval term. Cards
+  // can opt in via:
+  //   cpuMeta.endOfTurnPunisher: {
+  //     conditionFor: 'noChangeCounters',
+  //     // expected damage when the punishment fires (50 for Invader
+  //     // Token's damage mode); the discard branch is roughly worth
+  //     // half the token's average impact, so we use the damage
+  //     // amount as the projection — under-rewards discard, over-
+  //     // rewards damage, but the median signal is right.
+  //     expectedDamage: <number>,
+  //   }
+  // For the active player at eval time: if THEIR side controls 0
+  // counters AND any opp-controlled punisher, project the damage
+  // hit AT END OF TURN. Score deducts for own side (we'll get hit)
+  // or rewards (opp will get hit).
+  const punisherDamageAgainst = (sufferIdx) => {
+    const ps2 = gs.players[sufferIdx];
+    if (!ps2) return 0;
+    if (tallyChangeCountersForSide(sufferIdx) > 0) return 0;
+    let dmg = 0;
+    for (const inst of engine.cardInstances) {
+      if (inst.zone !== 'support') continue;
+      if (inst.faceDown) continue;
+      if ((inst.controller ?? inst.owner) !== sufferIdx) continue;
+      const meta = loadCardEffect(inst.name)?.cpuMeta?.endOfTurnPunisher;
+      if (!meta || meta.conditionFor !== 'noChangeCounters') continue;
+      dmg += meta.expectedDamage || 0;
+    }
+    return dmg;
+  };
+  // The PROJECTED hit lands on whichever side is the active player at
+  // eval time. If we're evaluating mid-CPU-turn, the CPU gets hit. Mid-
+  // opp-turn, the opp gets hit. Use gs.activePlayer as the discriminator.
+  const turnPi = gs.activePlayer;
+  if (turnPi === cpuIdx) score -= punisherDamageAgainst(cpuIdx);
+  else if (turnPi === oppIdx) score += punisherDamageAgainst(oppIdx);
 
   // ── Generic "pile-fuel" scaling ────────────────────────────────────
   // Cards that benefit from cards in their controller's discard pile
@@ -5443,6 +5634,49 @@ const MCTS_MAX_BRANCHES_PER_RECON = 2;
 // blowup on "pick a hero from 6 enemies" style prompts.
 const MCTS_MAX_ALTS_PER_BRANCH = 6;
 
+// ─── Chain-source helpers (extracted from evaluateState) ──────────────
+// Module-level so the MCTS variation builder can read chain-source data
+// without instantiating a full evaluator. Both `cpuMeta.chainSource` and
+// `cpuMeta.onDeathBenefit` are GENERIC card-level declarations — any
+// future card that opts into the same shape gets the same treatment.
+// See loyal-terrier.js for the prototype.
+
+function _mctsCollectArmedChainSources(engine, ownerIdx) {
+  const sources = [];
+  for (const inst of engine.cardInstances) {
+    if (inst.owner !== ownerIdx) continue;
+    if (inst.zone !== 'support') continue;
+    if (inst.faceDown) continue;
+    const script = loadCardEffect(inst.name);
+    const chain = script?.cpuMeta?.chainSource;
+    if (!chain) continue;
+    try {
+      if (chain.isArmed && !chain.isArmed(engine, inst)) continue;
+    } catch { continue; }
+    sources.push({ inst, chain });
+  }
+  return sources;
+}
+
+function _mctsEffectiveOnDeathValue(engine, inst, sources) {
+  if (!inst) return 0;
+  const script = loadCardEffect(inst.name);
+  const meta = script?.cpuMeta;
+  let value = meta?.onDeathBenefit || 0;
+  // Chain sources themselves don't compound chain bonuses on their own
+  // death — killing the Terrier ends the window, killing the Shepherd
+  // ends the revive. Mirror evaluateState's logic exactly.
+  if (meta?.chainSource) return value;
+  for (const { inst: srcInst, chain } of sources) {
+    if (srcInst.id === inst.id) continue;
+    try {
+      if (chain.triggersOn && !chain.triggersOn(engine, inst, srcInst)) continue;
+    } catch { continue; }
+    value += chain.valuePerTrigger || 0;
+  }
+  return value;
+}
+
 // Turn a recorded prompt sequence into a list of plan variations. Each
 // variation is `{ plan, label }`: plan is an array consumed by the target/
 // generic override (null = heuristic placeholder, entries = scripted pick).
@@ -5451,7 +5685,7 @@ const MCTS_MAX_ALTS_PER_BRANCH = 6;
 // alternative at that single position (other positions get null). Because
 // variations are independent (one scripted slot at a time), explored cost
 // is O(sum of alternatives), not O(product).
-function mctsBuildVariationsFromRecord(record, { maxBranches = MCTS_MAX_BRANCHES_PER_RECON, maxAltsPerBranch = MCTS_MAX_ALTS_PER_BRANCH } = {}) {
+function mctsBuildVariationsFromRecord(record, { maxBranches = MCTS_MAX_BRANCHES_PER_RECON, maxAltsPerBranch = MCTS_MAX_ALTS_PER_BRANCH } = {}, engine = null) {
   const variations = [];
   let branchesFound = 0;
   for (let i = 0; i < record.length; i++) {
@@ -5496,6 +5730,47 @@ function mctsBuildVariationsFromRecord(record, { maxBranches = MCTS_MAX_BRANCHES
           const plan = new Array(i).fill(null);
           plan.push(entry);
           variations.push({ plan, label: `#${i} top-${k} of ${heuristicIds.length}` });
+        }
+      }
+
+      // ── "Kill own chain-fuel" variant (Loyal Terrier + Book of
+      //     Doom-style synergies) ──────────────────────────────────────
+      // For multi-select damage cards, also try TARGETING OWN CREATURES
+      // that have positive `effectiveOnDeathValue` — i.e., own creatures
+      // whose death would trigger an armed chain source on our side.
+      // This is a GENERIC variant: any card that opts into
+      // `cpuMeta.chainSource` (Loyal Terrier today, future cards
+      // tomorrow) feeds it. The MCTS rollout plays out the deaths +
+      // chain-trigger damage; the evaluator sees the result and the
+      // arm wins if the payoff exceeds the cost. For non-chain decks
+      // the chain fuel set is empty and this branch is skipped.
+      const ownChainFuelEligible = engine && r.maxSelect > 1 && Array.isArray(r.validTargets);
+      if (ownChainFuelEligible) {
+        const cpuIdx = engine._cpuPlayerIdx;
+        const ownChainSources = _mctsCollectArmedChainSources(engine, cpuIdx);
+        if (ownChainSources.length > 0) {
+          const ownChainFuel = [];
+          for (const t of r.validTargets) {
+            if (t.owner !== cpuIdx) continue;
+            if (t.type !== 'equip' && t.type !== 'creature') continue;
+            const inst = engine.cardInstances.find(c =>
+              c.zone === 'support' && c.owner === t.owner
+              && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
+            if (!inst) continue;
+            const v = _mctsEffectiveOnDeathValue(engine, inst, ownChainSources);
+            if (v > 0) ownChainFuel.push({ target: t, value: v });
+          }
+          if (ownChainFuel.length >= 1) {
+            ownChainFuel.sort((a, b) => b.value - a.value);
+            const take = Math.min(r.maxSelect, ownChainFuel.length);
+            const ids = ownChainFuel.slice(0, take).map(f => f.target.id);
+            const idsKey = JSON.stringify(ids);
+            if (idsKey !== heuristicKey) {
+              const plan = new Array(i).fill(null);
+              plan.push({ kind: 'target', ids });
+              variations.push({ plan, label: `#${i} chain-fuel × ${take}` });
+            }
+          }
         }
       }
     } else {
@@ -5622,7 +5897,9 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
 
   // Enumerate variations across multiple branchable prompts (first
   // MCTS_MAX_BRANCHES_PER_RECON non-scripted prompts with ≥2 alternatives).
-  const extras = mctsBuildVariationsFromRecord(record);
+  // Pass `engine` so the chain-fuel variant (Loyal Terrier-style
+  // self-kill synergy) gets enumerated when applicable.
+  const extras = mctsBuildVariationsFromRecord(record, undefined, engine);
   for (const v of extras) variations.push({ plan: v.plan, label: v.label, score: -Infinity });
 
   if (extras.length > 0) {
@@ -5796,8 +6073,10 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
     });
 
     // Target-plan variation arms (unseeded — will be pulled at least once
-    // during the min-pulls phase below).
-    const extras = mctsBuildVariationsFromRecord(recon.record);
+    // during the min-pulls phase below). Pass `engine` so the chain-fuel
+    // variant gets enumerated for multi-select damage cards with own
+    // chain-source synergies on the board.
+    const extras = mctsBuildVariationsFromRecord(recon.record, undefined, engine);
     for (const v of extras) {
       arms.push({
         candidate,
@@ -6073,7 +6352,7 @@ function shouldMulliganStartingHand(engine, pi) {
  * differences should route through here rather than keying off card
  * level / name heuristics.
  */
-async function mctsPickFromOptions(engine, options, applyFn) {
+async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
   if (!Array.isArray(options) || options.length === 0) return null;
   if (options.length === 1) return options[0];
   // Inside an outer rollout — don't recurse. Return the first option;
@@ -6084,6 +6363,16 @@ async function mctsPickFromOptions(engine, options, applyFn) {
   const prevSilent = _cpuLogSilent;
   let best = options[0];
   let bestScore = -Infinity;
+  // Per-call horizon override. For one-shot decisions like Barker's
+  // turn-1 placement (fires once per game), callers can pay the cost
+  // of a deeper rollout so latent-value Creatures (e.g. Goff's Burn-
+  // doubling at end of subsequent turns) get more turns of simulated
+  // play to actually fire and show their value, instead of losing to
+  // immediate-action Creatures (Harpyformers) that score deterministic
+  // free-summon value within the default 2-turn window.
+  const prevHorizon = _rolloutHorizon;
+  const horizonOverride = Number.isInteger(opts.horizon) ? Math.max(0, opts.horizon) : null;
+  if (horizonOverride !== null) _rolloutHorizon = horizonOverride;
   engine._inMctsSim = true;
   engine.enterFastMode();
   _cpuLogSilent = true;
@@ -6111,6 +6400,7 @@ async function mctsPickFromOptions(engine, options, applyFn) {
     engine._inMctsSim = false;
     engine.exitFastMode();
     _cpuLogSilent = prevSilent;
+    if (horizonOverride !== null) _rolloutHorizon = prevHorizon;
   }
   return best;
 }

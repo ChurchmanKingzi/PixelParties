@@ -1174,6 +1174,30 @@ class GameEngine {
       }
     }
 
+    // Universal post-summon hand-reaction window — fires whenever a
+    // Creature enters a support zone via ANY path (hand play, revive,
+    // illusion, effect-summon, Bomblebee Cluster's own re-summons).
+    // Bomblebee Cluster opts in via `isPostSummonHandReaction`. The
+    // helper is reentrancy-guarded so a Bomblebee Cluster's secondary
+    // summons won't open nested Bomblebee Cluster windows. The full
+    // hookCtx is passed through so listeners can read summon-source
+    // flags (`_summonedByCosmic`, `_summonedFromDeck`, `_isNormalSummon`,
+    // etc.) when their reactionCondition needs them.
+    if (hookName === 'onCardEnterZone' && !hookCtx._skipPostSummonReaction) {
+      const enteringCard = hookCtx.enteringCard;
+      const toZone = hookCtx.toZone;
+      if (enteringCard && toZone === 'support') {
+        const cd = this._getCardDB()[enteringCard.name];
+        if (cd && hasCardType(cd, 'Creature')) {
+          await this._checkPostSummonHandReactions(
+            enteringCard.controller ?? enteringCard.owner,
+            enteringCard,
+            hookCtx,
+          );
+        }
+      }
+    }
+
     return hookCtx;
   }
 
@@ -3783,6 +3807,7 @@ class GameEngine {
     this.log('poison_applied', {
       target: inst.name, stacks: inst.counters.poisonStacks, by: source.name,
     });
+    this.sync();
   }
 
   async actionDrawCards(playerIdx, count, opts = {}) {
@@ -3835,7 +3860,14 @@ class GameEngine {
       drawn.push(inst);
 
       this.log('draw', { player: ps.username, card: cardName });
-      await this.runHooks(HOOKS.ON_DRAW, { playerIdx, card: inst, cardName });
+      // Propagate opts._isResourceDraw to listeners so cards that gate
+      // on "via an effect" (Cosmic Depths Analyzer / Gatherer) can
+      // distinguish the standard resource-phase auto-draw from effect-
+      // induced draws. Other opts pass-through is intentional.
+      await this.runHooks(HOOKS.ON_DRAW, {
+        playerIdx, card: inst, cardName,
+        _isResourceDraw: !!opts._isResourceDraw,
+      });
 
       // Visual pacing: sync + delay between draws so cards appear one by one
       if (drawDelay > 0 && i < count - 1) {
@@ -4005,6 +4037,13 @@ class GameEngine {
     if (!targetCard) return;
     if (targetCard.counters?.immovable) return; // Cannot be destroyed or removed
     if (targetCard.counters?._cardinalImmune) return; // Cardinal Beast immunity
+    if (targetCard.counters?._damageDestroyImmune) {
+      // Generic "fully damage- and destroy-immune" flag (Time Bomblebee
+      // while charged with Bomb Counters). Mirror of the same check in
+      // processCreatureDamageBatch.
+      this.log('destroy_blocked', { card: targetCard.name, reason: 'damage-destroy-immune' });
+      return;
+    }
     // Name-list fallback for Cardinal Beasts whose `_cardinalImmune`
     // counter never got stamped (puzzle preset / revive without hooks).
     // Mirrors the same belt-and-suspenders check in canApplyCreatureStatus.
@@ -4031,6 +4070,19 @@ class GameEngine {
       await this._triggerGateCheck(targetCard.controller ?? targetCard.owner);
       if (this._isGateShielded(targetCard.controller ?? targetCard.owner)) {
         this.log('destroy_blocked', { card: targetCard.name, reason: 'Defending the Gate' });
+        return;
+      }
+    }
+    // Cosmic Depths hand-reaction window — gives the target's owner a
+    // chance to negate the destroy via Cosmic Malfunction (if the
+    // target is a CD Creature and the source is from the opponent).
+    // Damage-kills bypass this path because the damage batch performs
+    // its own death routing without going through actionDestroyCard,
+    // matching the user's "removal effects only, NOT damage" spec.
+    if (targetCard.zone === 'support') {
+      const cancelled = await this._checkCdMovementHandReactions(targetCard, source, 'destroy');
+      if (cancelled) {
+        this.log('destroy_blocked', { card: targetCard.name, reason: 'cosmic-malfunction' });
         return;
       }
     }
@@ -7150,9 +7202,12 @@ class GameEngine {
         // and may set `gs._skipResourceDraw` from inside their resolve
         // to replace the standard draw with their own effect.
         await this._checkResourcePhaseReactions(activeP);
-        // Draw 1 card (unless an Idol-style reaction replaced it)
+        // Draw 1 card (unless an Idol-style reaction replaced it).
+        // `_isResourceDraw: true` flags this as the standard auto-draw
+        // so listeners (Analyzer / Gatherer) can skip it — they only
+        // count effect-induced draws / tutors.
         if (!this.gs._skipResourceDraw) {
-          await this.actionDrawCards(activeP, 1);
+          await this.actionDrawCards(activeP, 1, { _isResourceDraw: true });
         }
         delete this.gs._skipResourceDraw;
         delete this.gs._resourcePhaseLocked;
@@ -7182,6 +7237,10 @@ class GameEngine {
         }
         // Compute which creatures have custom summon conditions that block them
         this.gs.summonBlocked = this.getSummonBlocked(this.gs.activePlayer);
+        // Opp-Action-Phase hand reaction window (Burning Fuse, etc.).
+        // Fires AFTER the active player's per-phase setup so the reactor's
+        // resolve sees a coherent Action Phase state on the active side.
+        await this._checkOppActionPhaseHandReactions(this.gs.activePlayer);
         // Player-controlled — wait for card play or manual skip
         this.sync();
         break;
@@ -7740,10 +7799,20 @@ class GameEngine {
     ps.mainDeck.splice(idx, 1);
     if (!ps.hand) ps.hand = [];
     ps.hand.push(cardName);
+    const inst = this._trackCard(cardName, pi, ZONES.HAND);
 
     this._broadcastEvent('deck_search_add', { cardName, playerIdx: pi });
     this.log('deck_search', {
       player: ps.username, card: cardName, by: opts.source || null,
+    });
+
+    // Universal tutor signal — listeners (Analyzer / Gatherer / future
+    // hand-add reactors) react to ANY card added to hand from the deck
+    // via an effect. Mass Multiplication already fires this directly;
+    // routing it through the canonical helper makes the hook reliable
+    // for every script that uses this path.
+    await this.runHooks(HOOKS.ON_CARD_ADDED_TO_HAND, {
+      playerIdx: pi, card: inst, cardName,
     });
 
     if (opts.shuffle) this.shuffleDeck(pi, 'main');
@@ -8540,7 +8609,7 @@ class GameEngine {
     const oi = pending.ownerIdx === 0 ? 1 : 0;
     const oppSid = this.gs.players[oi]?.socketId;
     if (oppSid) this.io.to(oppSid).emit('card_reveal', { cardName: pending.cardName });
-    if (this.room.spectators) {
+    if (this.room?.spectators) {
       for (const spec of this.room.spectators) {
         if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName: pending.cardName });
       }
@@ -8623,6 +8692,15 @@ class GameEngine {
     }
 
     if (count >= threshold && !this.gs._terrorForceEndTurn) {
+      // Blackstache: "You are unaffected by the effect of 'Terror'."
+      // Even his OWN Terror copies don't fire on his side.
+      if (this._blackstacheBlocksTurnEnd(playerIdx, { name: 'Terror', owner: playerIdx })) {
+        this.log('terror_blocked', {
+          player: this.gs.players[playerIdx]?.username,
+          reason: 'blackstache',
+        });
+        return;
+      }
       this.gs._terrorForceEndTurn = playerIdx;
       this.log('terror_triggered', {
         player: this.gs.players[playerIdx]?.username,
@@ -8630,6 +8708,38 @@ class GameEngine {
         threshold,
       });
     }
+  }
+
+  /**
+   * Gate for "an effect would force `targetPi`'s turn to end."
+   * Called from Terror's threshold check, Flashbang's force-advance,
+   * and any future card that ends a turn on opp's behalf.
+   *
+   * Returns `true` if the effect should be BLOCKED. Rules:
+   *   • If `targetPi` does NOT control a living "Blackstache, Scourge
+   *     of the Pixel Seas", returns false (no block).
+   *   • Terror sources (any side) always blocked when Blackstache is
+   *     present — covers his "unaffected by Terror" clause.
+   *   • Opponent-side sources always blocked — covers his "opp cannot
+   *     end your turn with card effects" clause.
+   *   • Same-side non-Terror sources (Cooldin's own skip-to-End,
+   *     Quick Attack's natural advance) NOT blocked — Blackstache
+   *     doesn't gate the player's own choice to end their turn.
+   *
+   * @param {number} targetPi - The player whose turn would end.
+   * @param {object} source - { name, owner } of the ending effect.
+   * @returns {boolean}
+   */
+  _blackstacheBlocksTurnEnd(targetPi, source) {
+    const ps = this.gs.players[targetPi];
+    if (!ps) return false;
+    const hasBlackstache = (ps.heroes || []).some(h =>
+      h?.name === 'Blackstache, Scourge of the Pixel Seas' && h.hp > 0,
+    );
+    if (!hasBlackstache) return false;
+    if (source?.name === 'Terror') return true;
+    if (source?.owner != null && source.owner !== targetPi) return true;
+    return false;
   }
 
   /**
@@ -8813,7 +8923,7 @@ class GameEngine {
       const otherIdx = targetOwnerIdx === 0 ? 1 : 0;
       const otherSid = this.gs.players[otherIdx]?.socketId;
       if (otherSid) this.io.to(otherSid).emit('card_reveal', { cardName });
-      if (this.room.spectators) {
+      if (this.room?.spectators) {
         for (const spec of this.room.spectators) {
           if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName });
         }
@@ -8864,7 +8974,7 @@ class GameEngine {
       const otherIdx = targetOwnerIdx === 0 ? 1 : 0;
       const otherSid = this.gs.players[otherIdx]?.socketId;
       if (otherSid) this.io.to(otherSid).emit('card_reveal', { cardName: hero.name });
-      if (this.room.spectators) {
+      if (this.room?.spectators) {
         for (const spec of this.room.spectators) {
           if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName: hero.name });
         }
@@ -8890,6 +9000,20 @@ class GameEngine {
    * @param {object} promptData - { type, title, ...typeSpecificData }
    */
   async promptGeneric(playerIdx, promptData) {
+    // ── Gerrymander redirect ────────────────────────────────────────
+    // If the OPPONENT of `playerIdx` controls an active Gerrymander
+    // and the prompt qualifies (multi-option picker for Effect 1, or
+    // cancellable confirm for Effect 2's once-per-turn slot), swap the
+    // recipient to Gerrymander's owner and rewrite the prompt to
+    // indicate they're choosing FOR the original target. The original
+    // resolver is unchanged — it just gets a response from a different
+    // player.
+    const redirect = this._tryGerrymanderRedirect(playerIdx, promptData);
+    if (redirect) {
+      playerIdx = redirect.targetPi;
+      promptData = redirect.rewrittenData;
+    }
+
     // CPU auto-response: resolve immediately without socket round-trip
     if (this.isCpuPlayer(playerIdx)) {
       await this._delay(50); // Minimal delay to let event loop breathe
@@ -8901,6 +9025,104 @@ class GameEngine {
       this.gs.effectPrompt = { ...promptData, ownerIdx: playerIdx };
       this.sync();
     });
+  }
+
+  /**
+   * Returns either null (no redirect) or { targetPi, rewrittenData }
+   * for a Gerrymander redirect. See cards/effects/gerrymander.js for
+   * the full rule description. Eligible prompt shapes:
+   *   • type='optionPicker' with options.length >= 2 AND
+   *     `gerrymanderEligible: true` set on the prompt (opt-in).
+   *     Prompts that are PARAMETER pickers (count, source, target,
+   *     amount) deliberately omit the flag; only "two distinct
+   *     EFFECTS" qualify per the user's spec.
+   *   • type='confirm' with cancellable === true (1/turn — first opp
+   *     "may" the Gerrymander owner sees this turn). All cancellable
+   *     confirms qualify; no flag required.
+   * Disabled when the would-be controller's Gerrymander is frozen /
+   * stunned / negated / nulled.
+   */
+  _tryGerrymanderRedirect(promptedPi, promptData) {
+    if (promptedPi == null || promptedPi < 0) return null;
+    if (!promptData || !promptData.type) return null;
+
+    // Eligibility by prompt shape.
+    let mode = null;
+    if (promptData.type === 'optionPicker'
+        && Array.isArray(promptData.options) && promptData.options.length >= 2
+        && promptData.gerrymanderEligible === true) {
+      mode = 'option';
+    } else if (promptData.type === 'confirm' && promptData.cancellable === true) {
+      mode = 'may';
+    }
+    if (!mode) return null;
+
+    // Find an active Gerrymander on the OPPOSITE side from promptedPi.
+    const oppIdx = promptedPi === 0 ? 1 : 0;
+    const gerry = this._findActiveGerrymander(oppIdx);
+    if (!gerry) return null;
+
+    // Effect 2: once-per-turn cap on cancellable confirms. Stamps the
+    // per-turn flag eagerly here — the redirect IS the once-per-turn
+    // use, regardless of whether the chooser confirms or cancels.
+    if (mode === 'may') {
+      const flagKey = `gerry-may-redirected:${oppIdx}`;
+      if (this.gs.gerryUsed?.[flagKey] === this.gs.turn) return null;
+      if (!this.gs.gerryUsed) this.gs.gerryUsed = {};
+      this.gs.gerryUsed[flagKey] = this.gs.turn;
+    }
+
+    // Don't recursively redirect a Gerrymander-rewritten prompt. The
+    // marker below short-circuits any nested call (e.g., a Gerrymander
+    // owner who ALSO has a Gerrymander on the opposite side somehow).
+    if (promptData._gerryRewritten) return null;
+
+    const oppName = this.gs.players[promptedPi]?.username || 'your opponent';
+    const rewrittenData = {
+      ...promptData,
+      _gerryRewritten: true,
+      _gerryOriginalTitle: promptData.title || '',
+      _gerryOriginalPromptedPi: promptedPi,
+      title: `🗳️ Gerrymander — ${promptData.title || ''}`.trim(),
+    };
+
+    if (mode === 'option') {
+      const labels = (promptData.options || []).map(o => o?.label || '?');
+      const choices = labels.length === 2
+        ? labels.join(' OR ')
+        : labels.slice(0, -1).join(', ') + ', or ' + labels[labels.length - 1];
+      rewrittenData.description = `Choosing FOR ${oppName} — should they ${choices}?\n\n${promptData.description || ''}`.trim();
+    } else {
+      // 'may' confirm
+      const orig = promptData.message || promptData.description || '';
+      rewrittenData.message = `Choosing FOR ${oppName}:\n\n${orig}`.trim();
+    }
+
+    this.log('gerrymander_redirect', {
+      from: this.gs.players[promptedPi]?.username,
+      to: this.gs.players[oppIdx]?.username,
+      mode, originalTitle: promptData.title,
+    });
+
+    return { targetPi: oppIdx, rewrittenData };
+  }
+
+  /**
+   * Finds an active (non-CC'd, face-up, on-board) Gerrymander
+   * controlled by `pi`. Returns the inst or null.
+   */
+  _findActiveGerrymander(pi) {
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== 'support') continue;
+      if (inst.faceDown) continue;
+      if ((inst.controller ?? inst.owner) !== pi) continue;
+      const script = loadCardEffect(inst.name);
+      if (!script?.isGerrymander) continue;
+      if (inst.counters?.frozen || inst.counters?.stunned
+          || inst.counters?.negated || inst.counters?.nulled) continue;
+      return inst;
+    }
+    return null;
   }
 
   /**
@@ -9732,6 +9954,467 @@ class GameEngine {
   }
 
   /**
+   * Post-summon hand-reaction window. Fires whenever a Creature enters
+   * a support zone via ANY path — hand play, revive, illusion, effect-
+   * summon, etc. Bomblebee Cluster opts in via:
+   *   isPostSummonHandReaction: true,
+   *   postSummonReactionCondition?(gs, summoningPi, engine, summonedInst) → bool,
+   *   postSummonReactionResolve(engine, summoningPi, summonedInst) → void
+   * Reentrancy-guarded so a card whose resolve summons more Creatures
+   * (Bomblebee Cluster's own re-summons) cannot recursively re-open
+   * its own window.
+   *
+   * @param {number} summoningPi - Player whose summon just landed.
+   * @param {object} summonedInst - The CardInstance that just entered.
+   */
+  async _checkPostSummonHandReactions(summoningPi, summonedInst, summonHookCtx = {}) {
+    if (this._inPostSummonReaction) return;
+    if (!summonedInst) return;
+
+    const ps = this.gs.players[summoningPi];
+    if (!ps) return;
+
+    if (this.gs.firstTurnProtectedPlayer === summoningPi) return;
+
+    const allCards = this._getCardDB();
+    const seen = new Set();
+    for (let hi = 0; hi < ps.hand.length; hi++) {
+      const cardName = ps.hand[hi];
+      if (seen.has(cardName)) continue;
+      seen.add(cardName);
+
+      const script = loadCardEffect(cardName);
+      if (!script?.isPostSummonHandReaction) continue;
+
+      const cardData = allCards[cardName];
+      const cost = cardData?.cost || 0;
+      if (cost > 0 && (ps.gold || 0) < cost) continue;
+
+      if (script.postSummonReactionCondition &&
+          !script.postSummonReactionCondition(this.gs, summoningPi, this, summonedInst, summonHookCtx)) continue;
+
+      // Spell/Attack reactions need a casting hero who clears school +
+      // level (Wisdom is a valid path). Artifacts skip this check.
+      const isArtifact = cardData?.cardType === 'Artifact';
+      let castingHeroIdx = -1;
+      if (!isArtifact) {
+        for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
+          if (this._canHeroActivateSurprise(summoningPi, heroI, cardName, { spellInHand: true })) {
+            castingHeroIdx = heroI;
+            break;
+          }
+        }
+        if (castingHeroIdx < 0) continue;
+      }
+
+      const confirmed = await this.promptGeneric(summoningPi, {
+        type: 'confirm',
+        title: cardName,
+        message: `${summonedInst.name} was summoned! Activate ${cardName}?`,
+        showCard: cardName,
+        confirmLabel: '💥 Activate!',
+        cancelLabel: 'No',
+        cancellable: true,
+      });
+      if (!confirmed) continue;
+
+      const actualIdx = ps.hand.indexOf(cardName);
+      if (actualIdx < 0) continue;
+      ps.hand.splice(actualIdx, 1);
+      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      if (this.gs._scTracking && summoningPi >= 0 && summoningPi < 2) {
+        this.gs._scTracking[summoningPi].cardsPlayedFromHand++;
+      }
+
+      this._broadcastEvent('card_reveal', { cardName, playerIdx: summoningPi });
+      await this._delay(300);
+
+      this.log('post_summon_reaction', { card: cardName, player: ps.username, trigger: summonedInst.name });
+
+      // Wisdom (level-gap coverage) — pay BEFORE resolution so a turn-end
+      // fired during the reaction can't skip the cost.
+      const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
+        ? this.getWisdomDiscardCost(summoningPi, castingHeroIdx, cardData)
+        : 0;
+      if (wisdomCost > 0) {
+        await this.actionPromptForceDiscard(summoningPi, wisdomCost, {
+          title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+        });
+      }
+
+      this._inPostSummonReaction = true;
+      try {
+        if (script.postSummonReactionResolve) {
+          await script.postSummonReactionResolve(this, summoningPi, summonedInst, summonHookCtx);
+        }
+      } catch (err) {
+        console.error(`[PostSummonReaction] ${cardName} threw:`, err.message);
+      } finally {
+        this._inPostSummonReaction = false;
+      }
+
+      if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
+        ps.deletedPile.push(cardName);
+      } else {
+        ps.discardPile.push(cardName);
+      }
+      this.sync();
+      return; // Only one post-summon reaction per window
+    }
+  }
+
+  /**
+   * Creature-damage-batch hand-reaction window. Fires once per side
+   * per batch when 2+ entries belong to that side and the side's hand
+   * holds a card with `isCreatureDamageBatchReaction: true` (Deepsea
+   * Idol). The card's `creatureDamageBatchCondition` predicate gates
+   * activation; the resolve mutates `entries` to cancel damage on the
+   * activator's side.
+   *
+   * Both sides are checked independently — both players can use their
+   * own Deepsea Idol against the same batch if it hits both. The
+   * reentrancy guard prevents a resolve from re-opening the window
+   * recursively (e.g., if it triggers more damage internally).
+   */
+  async _checkCreatureDamageBatchReactions(entries) {
+    if (this._inCreatureDamageBatchReaction) return;
+    if (!entries || entries.length < 2) return;
+
+    for (let pi = 0; pi < 2; pi++) {
+      // Count entries that would actually deal damage to pi's side —
+      // immune / pre-cancelled entries don't count toward "would take
+      // damage" semantically.
+      const ownDmgEntries = entries.filter(e =>
+        !e.cancelled && !e._immuneCreature
+        && e.inst && e.inst.owner === pi);
+      if (ownDmgEntries.length < 2) continue;
+
+      const ps = this.gs.players[pi];
+      if (!ps) continue;
+      if (this.gs.firstTurnProtectedPlayer === pi) continue;
+
+      const allCards = this._getCardDB();
+      const seen = new Set();
+      for (let hi = 0; hi < ps.hand.length; hi++) {
+        const cardName = ps.hand[hi];
+        if (seen.has(cardName)) continue;
+        seen.add(cardName);
+
+        const script = loadCardEffect(cardName);
+        if (!script?.isCreatureDamageBatchReaction) continue;
+
+        const cardData = allCards[cardName];
+        const cost = cardData?.cost || 0;
+        if (cost > 0 && (ps.gold || 0) < cost) continue;
+
+        if (script.creatureDamageBatchCondition &&
+            !script.creatureDamageBatchCondition(this.gs, pi, this, entries)) continue;
+
+        // Reaction Artifact gate (turn-1 lockout, artifact-lock).
+        if (cardData?.cardType === 'Artifact'
+            && ps._artifactLockTurn === this.gs.turn) continue;
+
+        const source = entries[0]?.source;
+        const sourceName = source?.name || 'an effect';
+        const confirmed = await this.promptGeneric(pi, {
+          type: 'confirm',
+          title: cardName,
+          message: `${ownDmgEntries.length} of your Creatures would take damage from ${sourceName}! Activate ${cardName}?`,
+          showCard: cardName,
+          confirmLabel: '🌊 Negate!',
+          cancelLabel: 'No',
+          cancellable: true,
+        });
+        if (!confirmed) continue;
+
+        const actualIdx = ps.hand.indexOf(cardName);
+        if (actualIdx < 0) continue;
+        ps.hand.splice(actualIdx, 1);
+        if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+        if (this.gs._scTracking && pi >= 0 && pi < 2) {
+          this.gs._scTracking[pi].cardsPlayedFromHand++;
+        }
+
+        this._broadcastEvent('card_reveal', { cardName, playerIdx: pi });
+        await this._delay(300);
+
+        this.log('creature_damage_batch_reaction', {
+          card: cardName, player: ps.username, source: sourceName,
+          affected: ownDmgEntries.length,
+        });
+
+        this._inCreatureDamageBatchReaction = true;
+        try {
+          if (script.creatureDamageBatchResolve) {
+            await script.creatureDamageBatchResolve(this, pi, entries);
+          }
+        } catch (err) {
+          console.error(`[CreatureDamageBatchReaction] ${cardName} threw:`, err.message);
+        } finally {
+          this._inCreatureDamageBatchReaction = false;
+        }
+
+        // Routing — Reaction artifact → discard pile by default. Scripts
+        // can opt into deletedPile via `deleteOnUse`.
+        if (script?.deleteOnUse) {
+          ps.deletedPile.push(cardName);
+        } else {
+          ps.discardPile.push(cardName);
+        }
+        this.sync();
+        break; // One batch reaction per side per batch
+      }
+    }
+  }
+
+  /**
+   * Cosmic Depths "removal of own CD Creature" hand-reaction window.
+   * Called from `actionDestroyCard` AND can be invoked directly by
+   * scripts that move CD Creatures via custom paths (Dive Bomblebee's
+   * deck-bottom splice, etc.). Cosmic Malfunction opts in via:
+   *   isCdMovementReaction: true,
+   *   cdMovementReactionCondition?(gs, victimOwnerPi, engine, victim, source, effectType) → bool,
+   *   cdMovementReactionResolve(engine, victimOwnerPi, victim, source, effectType) → bool
+   *     (return true to indicate the operation should be cancelled).
+   *
+   * Returns `true` if a reaction fired AND requested cancellation; the
+   * caller MUST abort the in-flight removal in that case. Returns
+   * `false` otherwise (no reaction OR reaction declined to cancel).
+   *
+   * Trigger preconditions:
+   *   • victim is a CD Creature (archetype="Cosmic Depths" + Creature)
+   *   • source is provided AND source.owner !== victim.owner (opp source)
+   *   • victim's owner not first-turn protected
+   *   • not already inside another CD-movement reaction (reentrancy)
+   *
+   * Damage-kills DON'T reach this path — the damage batch fires its
+   * own death routing without going through actionDestroyCard.
+   */
+  async _checkCdMovementHandReactions(victim, source, effectType) {
+    if (this._inCdMovementReaction) return false;
+    if (!victim) return false;
+
+    const cardDB = this._getCardDB();
+    const victimCd = cardDB[victim.name];
+    if (!victimCd) return false;
+    if (victimCd.archetype !== 'Cosmic Depths') return false;
+    if (!hasCardType(victimCd, 'Creature')) return false;
+
+    const victimOwner = victim.controller ?? victim.owner;
+    const sourceOwner = source?.owner;
+    if (sourceOwner == null || sourceOwner === victimOwner) return false;
+
+    const ps = this.gs.players[victimOwner];
+    if (!ps) return false;
+    if (this.gs.firstTurnProtectedPlayer === victimOwner) return false;
+
+    const seen = new Set();
+    for (let hi = 0; hi < ps.hand.length; hi++) {
+      const cardName = ps.hand[hi];
+      if (seen.has(cardName)) continue;
+      seen.add(cardName);
+
+      const script = loadCardEffect(cardName);
+      if (!script?.isCdMovementReaction) continue;
+
+      const cardData = cardDB[cardName];
+      const cost = cardData?.cost || 0;
+      if (cost > 0 && (ps.gold || 0) < cost) continue;
+
+      if (script.cdMovementReactionCondition &&
+          !script.cdMovementReactionCondition(this.gs, victimOwner, this, victim, source, effectType)) continue;
+
+      const isArtifact = cardData?.cardType === 'Artifact';
+      let castingHeroIdx = -1;
+      if (!isArtifact) {
+        for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
+          if (this._canHeroActivateSurprise(victimOwner, heroI, cardName, { spellInHand: true })) {
+            castingHeroIdx = heroI;
+            break;
+          }
+        }
+        if (castingHeroIdx < 0) continue;
+      }
+
+      const confirmed = await this.promptGeneric(victimOwner, {
+        type: 'confirm',
+        title: cardName,
+        message: `${source?.name || "An opponent's effect"} would remove ${victim.name}! Activate ${cardName}?`,
+        showCard: cardName,
+        confirmLabel: '🌌 Negate!',
+        cancelLabel: 'No',
+        cancellable: true,
+      });
+      if (!confirmed) continue;
+
+      const actualIdx = ps.hand.indexOf(cardName);
+      if (actualIdx < 0) continue;
+      ps.hand.splice(actualIdx, 1);
+      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      if (this.gs._scTracking && victimOwner >= 0 && victimOwner < 2) {
+        this.gs._scTracking[victimOwner].cardsPlayedFromHand++;
+      }
+
+      this._broadcastEvent('card_reveal', { cardName, playerIdx: victimOwner });
+      await this._delay(300);
+
+      this.log('cd_movement_reaction', {
+        card: cardName, player: ps.username,
+        victim: victim.name, source: source?.name || null, effectType,
+      });
+
+      const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
+        ? this.getWisdomDiscardCost(victimOwner, castingHeroIdx, cardData)
+        : 0;
+      if (wisdomCost > 0) {
+        await this.actionPromptForceDiscard(victimOwner, wisdomCost, {
+          title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+        });
+      }
+
+      this._inCdMovementReaction = true;
+      let cancelOp = false;
+      try {
+        if (script.cdMovementReactionResolve) {
+          cancelOp = !!(await script.cdMovementReactionResolve(this, victimOwner, victim, source, effectType));
+        }
+      } catch (err) {
+        console.error(`[CdMovementReaction] ${cardName} threw:`, err.message);
+      } finally {
+        this._inCdMovementReaction = false;
+      }
+
+      // Routing — Cosmic Malfunction's text says "Delete this card",
+      // so it goes to deletedPile. Scripts opt in via deleteOnUse.
+      if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
+        ps.deletedPile.push(cardName);
+      } else {
+        ps.discardPile.push(cardName);
+      }
+      this.sync();
+      return cancelOp;
+    }
+    return false;
+  }
+
+  /**
+   * Opponent-Action-Phase hand reaction window. Mirrors
+   * `_checkResourcePhaseReactions` but fires for the NON-active player
+   * when the active player enters their Action Phase. Burning Fuse
+   * (Bomblebees) opts in via:
+   *   isOppActionPhaseReaction: true,
+   *   oppActionPhaseReactionCondition?(gs, pi, engine) → bool,
+   *   oppActionPhaseReactionResolve(engine, pi) → void
+   * `pi` is the REACTOR (the non-active player). Same opening-turn lock-
+   * out, same gold-cost gate, same single-card-per-window rule as the
+   * resource-phase counterpart. The standard chain reaction window does
+   * not fire on phase changes (`onPhaseStart` is in REACTION_SKIP_HOOKS),
+   * so this dedicated check is required for phase-triggered hand cards.
+   *
+   * @param {number} activePlayerIdx - The player who just entered Action Phase.
+   *   The reactor is the OPPOSITE player.
+   */
+  async _checkOppActionPhaseHandReactions(activePlayerIdx) {
+    if (this._inOppActionPhaseReaction) return;
+
+    const reactorIdx = activePlayerIdx === 0 ? 1 : 0;
+    const ps = this.gs.players[reactorIdx];
+    if (!ps) return;
+
+    // Same opening-turn lockout — first-turn-protected players can't
+    // interact at all on the opponent's opening turn.
+    if (this.gs.firstTurnProtectedPlayer === reactorIdx) return;
+
+    const allCards = this._getCardDB();
+    const seen = new Set();
+    for (let hi = 0; hi < ps.hand.length; hi++) {
+      const cardName = ps.hand[hi];
+      if (seen.has(cardName)) continue;
+      seen.add(cardName);
+
+      const script = loadCardEffect(cardName);
+      if (!script?.isOppActionPhaseReaction) continue;
+
+      const cardData = allCards[cardName];
+      const cost = cardData?.cost || 0;
+      if (cost > 0 && (ps.gold || 0) < cost) continue;
+
+      if (script.oppActionPhaseReactionCondition &&
+          !script.oppActionPhaseReactionCondition(this.gs, reactorIdx, this)) continue;
+
+      // Spell/Attack reactions need a casting hero who clears school +
+      // level (Wisdom is a valid path). Artifacts skip this. Same gate
+      // shape as _checkAscensionHandReactions.
+      const isArtifact = cardData?.cardType === 'Artifact';
+      let castingHeroIdx = -1;
+      if (!isArtifact) {
+        for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
+          if (this._canHeroActivateSurprise(reactorIdx, heroI, cardName, { spellInHand: true })) {
+            castingHeroIdx = heroI;
+            break;
+          }
+        }
+        if (castingHeroIdx < 0) continue;
+      }
+
+      const confirmed = await this.promptGeneric(reactorIdx, {
+        type: 'confirm',
+        title: cardName,
+        message: `Your opponent entered their Action Phase! Activate ${cardName}?`,
+        showCard: cardName,
+        confirmLabel: '💥 Activate!',
+        cancelLabel: 'No',
+        cancellable: true,
+      });
+      if (!confirmed) continue;
+
+      const actualIdx = ps.hand.indexOf(cardName);
+      if (actualIdx < 0) continue;
+      ps.hand.splice(actualIdx, 1);
+      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      if (this.gs._scTracking && reactorIdx >= 0 && reactorIdx < 2) {
+        this.gs._scTracking[reactorIdx].cardsPlayedFromHand++;
+      }
+
+      this._broadcastEvent('card_reveal', { cardName, playerIdx: reactorIdx });
+      await this._delay(300);
+
+      this.log('opp_action_phase_reaction', { card: cardName, player: ps.username });
+
+      // Wisdom (level-gap coverage) — pay BEFORE resolution so a turn-
+      // end fired during the reaction can't skip the cost.
+      const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
+        ? this.getWisdomDiscardCost(reactorIdx, castingHeroIdx, cardData)
+        : 0;
+      if (wisdomCost > 0) {
+        await this.actionPromptForceDiscard(reactorIdx, wisdomCost, {
+          title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+        });
+      }
+
+      this._inOppActionPhaseReaction = true;
+      try {
+        if (script.oppActionPhaseReactionResolve) {
+          await script.oppActionPhaseReactionResolve(this, reactorIdx);
+        }
+      } catch (err) {
+        console.error(`[OppActionPhaseReaction] ${cardName} threw:`, err.message);
+      } finally {
+        this._inOppActionPhaseReaction = false;
+      }
+
+      // Routing matches the resource-phase reaction handler.
+      if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
+        ps.deletedPile.push(cardName);
+      } else {
+        ps.discardPile.push(cardName);
+      }
+      this.sync();
+      return; // Only one reaction per window
+    }
+  }
+
+  /**
    * @returns {object|null} { effectNegated: boolean } or null
    */
   async _checkSurpriseWindow(targetedHeroes, sourceCard) {
@@ -10483,7 +11166,7 @@ class GameEngine {
     const oi = playerIdx === 0 ? 1 : 0;
     const oppSid = this.gs.players[oi]?.socketId;
     if (oppSid) this.io.to(oppSid).emit('card_reveal', { cardName });
-    if (this.room.spectators) {
+    if (this.room?.spectators) {
       for (const spec of this.room.spectators) {
         if (spec.socketId) this.io.to(spec.socketId).emit('card_reveal', { cardName });
       }
@@ -12023,6 +12706,12 @@ class GameEngine {
           );
           if (!inst) continue;
           if (inst.faceDown) continue;
+          // CC-locked creatures cannot fire their own effects — mirrors the
+          // engine's hook filter at runHooks (frozen/stunned/negated/nulled
+          // creatures are skipped). Spawn Mother's bounce, Slime's split,
+          // and any other creatureEffect all gate on this.
+          if (inst.counters?.frozen || inst.counters?.stunned
+              || inst.counters?.negated || inst.counters?.nulled) continue;
 
           const cd = this.getEffectiveCardData(inst) || cardDB[creatureName];
           if (!cd || !hasCardType(cd, 'Creature')) continue;
@@ -12097,6 +12786,11 @@ class GameEngine {
           if (!inst) continue;
           if (inst.stolenBy !== playerIdx) continue;
           if (inst.faceDown) continue;
+          // CC-locked stolen creatures: same gate as the own-creature loop
+          // above. Slimer / Null Zone debuffs apply regardless of whose
+          // turn the creature is being fired on.
+          if (inst.counters?.frozen || inst.counters?.stunned
+              || inst.counters?.negated || inst.counters?.nulled) continue;
 
           const cd = this.getEffectiveCardData(inst) || cardDB[inst.name];
           if (!cd || !hasCardType(cd, 'Creature')) continue;
@@ -13700,6 +14394,12 @@ class GameEngine {
       if (inst?.counters?._cardinalImmune || inst?.counters?._baihuPetrify
           || isCardinalBeastByName(inst?.name)) {
         e._immuneCreature = true;
+      } else if (inst?.counters?._damageDestroyImmune) {
+        // Generic "fully damage- and destroy-immune" flag. Time Bomblebee
+        // stamps this while it has Bomb Counters; cleared when counters
+        // are removed. Distinct from `_cardinalImmune` so the Cardinal
+        // Beast name fallback and identity stay clean.
+        e._immuneCreature = true;
       } else if (inst?.counters?._guardianImmune && e.canBeNegated !== false) {
         e._immuneCreature = true;
       } else if (inst?.counters?._stealImmortal) {
@@ -13726,6 +14426,12 @@ class GameEngine {
     // values from Royal Corgi) died in this batch. Rechecked after the
     // batch resolves so reactive deletion prompts fire immediately.
     const handLimitAffectedOwners = new Set();
+
+    // Hand-reaction window for cards that gate on the WHOLE batch
+    // (Deepsea Idol). Fires BEFORE the board-level batch hook so a
+    // hand reaction's cancellations are visible to Diamond / Monia /
+    // future board interceptors. Reentrancy-guarded internally.
+    await this._checkCreatureDamageBatchReactions(entries);
 
     // Fire batch hook — cards like Diamond can inspect/cancel entries
     await this.runHooks(HOOKS.BEFORE_CREATURE_DAMAGE_BATCH, {
@@ -14678,6 +15384,8 @@ class GameEngine {
   }
 
   _broadcastChainState() {
+    // Same teardown-safety guard as _broadcastEvent.
+    if (!this.room) return;
     const chainData = this.chain.map(l => ({
       cardName: l.card?.name || 'System',
       controller: l.controller,
@@ -14688,7 +15396,7 @@ class GameEngine {
       if (sid) this.io.to(sid).emit('chain_update', { chain: chainData });
     }
     // Also send to spectators
-    if (this.room.spectators) {
+    if (this.room?.spectators) {
       for (const spec of this.room.spectators) {
         if (spec.socketId) this.io.to(spec.socketId).emit('chain_update', { chain: chainData });
       }
@@ -14697,6 +15405,11 @@ class GameEngine {
 
   _broadcastEvent(event, data) {
     if (this._fastMode) return; // Silent during MCTS simulations.
+    // Self-play teardown nulls `this.room` to break the room↔engine ref
+    // cycle, but tail-async work (a switchTurn → cpuTurn chain that was
+    // already queued) can still reach this method. Bail silently rather
+    // than crash on `this.room.spectators` access.
+    if (!this.room) return;
     // Wolflesia-style Creature spell-cast: when an active spell is being
     // cast through a Creature (gs._spellCasterOverride is set by the
     // server's doPlaySpell), redirect the SOURCE of caster-anchored
@@ -14720,7 +15433,7 @@ class GameEngine {
       const sid = this.gs.players[i]?.socketId;
       if (sid) this.io.to(sid).emit(event, outData);
     }
-    if (this.room.spectators) {
+    if (this.room?.spectators) {
       for (const spec of this.room.spectators) {
         if (spec.socketId) this.io.to(spec.socketId).emit(event, outData);
       }
@@ -14780,6 +15493,10 @@ class GameEngine {
         }
       }
     }
+    // Same teardown-safety guard as _broadcastEvent — sendGameState
+    // and sendSpectatorGameState both deref `room.players` /
+    // `room.spectators` and would crash post-teardown.
+    if (!this.room) return;
     if (this.sendGameState) {
       for (let i = 0; i < 2; i++) {
         this.sendGameState(this.room, i);

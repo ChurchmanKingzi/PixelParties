@@ -17,6 +17,13 @@ module.exports = {
     oneShotEffectSpent: (_engine, _pi, _hi, hero) => !!hero?._willyEffectUsed,
   },
 
+  // Gerrymander redirect — 5 cards has higher long-term value than 30
+  // gold (≈ 6 gold per card via Wisdom). Pick `gold` to deny opp the
+  // bigger payoff.
+  cpuGerrymanderResponse(/* engine, gerryOwnerPi, promptData */) {
+    return { optionId: 'gold' };
+  },
+
   hooks: {
     /**
      * On game start: record the owner's first turn number
@@ -78,6 +85,7 @@ module.exports = {
           { id: 'gold', label: '💰 Gain 30 Gold', description: 'Add 30 Gold to your treasury.', color: '#ffcc00' },
         ],
         cancellable: false,
+        gerrymanderEligible: true, // 5 cards vs 30 gold are distinct mechanical effects.
       });
 
       const picked = choice?.optionId || 'draw';

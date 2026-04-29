@@ -150,7 +150,18 @@ module.exports = {
         // can be taken there), so we don't bother handling those.
         const cur = gs.currentPhase;
         if (cur >= 2 && cur <= 4) {
-          await engine.advanceToPhase(targetIdx, 5);
+          // Blackstache: "your opponent cannot end your turn with card
+          // effects." Flashbang is fundamentally an opp-source turn-end,
+          // so this gate fully no-ops the force-advance when Blackstache
+          // is alive on the target's side. The Flashbang inst is still
+          // untracked below so the card doesn't hang around.
+          if (engine._blackstacheBlocksTurnEnd(targetIdx, { name: CARD_NAME, owner: ctx.cardOwner })) {
+            engine.log('flashbang_blocked', {
+              target: gs.players[targetIdx]?.username, reason: 'blackstache',
+            });
+          } else {
+            await engine.advanceToPhase(targetIdx, 5);
+          }
         }
       }
 

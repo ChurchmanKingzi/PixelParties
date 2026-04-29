@@ -22,17 +22,31 @@ const CIRCLE_NAME   = 'Summoning Circle';
  *    is not counted while it is still in cardInstances)
  */
 function checkArthorAscension(engine, pi, heroIdx, excludeInstId) {
-  const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+  // Resolve the player whose heroes array actually contains Arthor at this
+  // index. Callers pass `ctx.cardOwner` which is charm-aware (equipment on
+  // a charmed hero gets the charmer as `cardOwner`), so a literal
+  // `players[pi].heroes[heroIdx]` can miss when Arthor's true side ≠ pi.
+  // Fall back to scanning both players for the base name; the equipment's
+  // own `c.owner` always matches the side the support zone physically
+  // lives on, so the rest of the check remains coherent.
+  let hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+  let actualOwner = pi;
+  if (!hero || hero.name !== BASE_ARTHOR) {
+    for (let p = 0; p < 2; p++) {
+      const h = engine.gs.players[p]?.heroes?.[heroIdx];
+      if (h?.name === BASE_ARTHOR) { hero = h; actualOwner = p; break; }
+    }
+  }
   if (!hero || hero.name !== BASE_ARTHOR) return;
 
   const hasSword = engine.cardInstances.some(c =>
     c.id !== excludeInstId &&
-    c.owner === pi && c.zone === 'support' &&
+    c.owner === actualOwner && c.zone === 'support' &&
     c.heroIdx === heroIdx && c.name === SWORD_NAME,
   );
   const hasCircle = engine.cardInstances.some(c =>
     c.id !== excludeInstId &&
-    c.owner === pi && c.zone === 'support' &&
+    c.owner === actualOwner && c.zone === 'support' &&
     c.heroIdx === heroIdx && c.name === CIRCLE_NAME,
   );
 

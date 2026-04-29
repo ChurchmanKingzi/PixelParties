@@ -84,6 +84,12 @@ const SACRIFICE_SPEC = {
 function _collectTributeCandidates(engine, playerIdx, selfId) {
   let cs = engine.getSacrificableCreatures(playerIdx);
   if (selfId != null) cs = cs.filter(c => c.inst.id !== selfId);
+  // DDG's text: "not summoned this turn." The generic
+  // `getSacrificableCreatures` deliberately skips this filter (cards
+  // like Sacrifice to Divinity sacrifice anything you control), so
+  // DDG enforces it here.
+  const currentTurn = engine.gs.turn || 0;
+  cs = cs.filter(c => c.inst.turnPlayed !== currentTurn);
   return cs;
 }
 

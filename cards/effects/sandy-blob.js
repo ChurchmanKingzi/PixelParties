@@ -78,6 +78,15 @@ module.exports = {
       const hasOnSummon = !!(enteringScript?.hooks?.onPlay)
         || typeof enteringScript?.beforeSummon === 'function';
       if (!hasOnSummon) return;
+      // If the entering Creature is negated / nulled at the moment its
+      // on-summon would fire (Necromancy stamps `negated` BEFORE firing
+      // onCardEnterZone for exactly this reason), the on-summon effect
+      // ITSELF is silenced by the engine's runHooks filter. Sandy
+      // Blob's text says "WHEN the on-summon effect activates" — if it
+      // doesn't activate, Sandy Blob doesn't react. Bail here so we
+      // don't burn one of the 3 uses on a creature whose effect was
+      // suppressed before it could run.
+      if (entering.counters?.negated || entering.counters?.nulled) return;
 
       // Sandy Blob must be live on the board.
       if (!inst || inst.zone !== 'support') return;

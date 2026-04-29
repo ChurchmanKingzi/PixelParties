@@ -136,6 +136,7 @@ async function runStellanEffect(ctx) {
         { id: 'deck', label: '📚  1 from deck' },
       ],
       cancellable: true,
+      gerrymanderEligible: true, // Batch-from-hand vs targeted-deck-search.
     });
     if (!optRes || optRes.cancelled || !optRes.optionId) return false;
     source = optRes.optionId;
@@ -264,6 +265,12 @@ async function tryFire(ctx) {
 
 module.exports = {
   activeIn: ['hero'],
+
+  // Gerrymander redirect — pick `deck` (single search) over `hand`
+  // (potentially multiple). Limits opp's volume payoff.
+  cpuGerrymanderResponse(/* engine, gerryOwnerPi, promptData */) {
+    return { optionId: 'deck' };
+  },
 
   // CPU self-status target score. Only the damaging statuses (Poison,
   // Burn) actually trigger Stellan when self-inflicted — they tick

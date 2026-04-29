@@ -2098,6 +2098,465 @@ function CosmicSummonEffect({ x, y }) {
   );
 }
 
+// ═══════════════════════════════════════════
+//  BOMBLEBEE ARCHETYPE ANIMATIONS
+//  Seven explosion variants — each Bomblebee
+//  card and Burning Fuse / Bomblebee Cluster
+//  get their own visual identity. Inline styles
+//  + scoped <style> tags so no new global CSS.
+// ═══════════════════════════════════════════
+
+// 1. bomblebee_blast — Bomblebee's single-target 150 dmg.
+//    Sharp single burst; yellow/black wasp-stripe palette;
+//    tight cluster of shrapnel with a bright central flash.
+function BomblebeeBlastEffect({ x, y }) {
+  const particles = useMemo(() => Array.from({ length: 26 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 30 + Math.random() * 60;
+    return {
+      dx: Math.cos(angle) * speed,
+      dy: Math.sin(angle) * speed,
+      size: 3 + Math.random() * 7,
+      color: ['#ffcc00', '#ffaa00', '#ff8800', '#222', '#000', '#fff8aa'][Math.floor(Math.random() * 6)],
+      delay: Math.random() * 60,
+      dur: 380 + Math.random() * 320,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div style={{
+        position: 'absolute', width: 90, height: 90, left: -45, top: -45,
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(255,240,160,0.95) 0%, rgba(255,180,0,0.6) 35%, rgba(120,60,0,0.4) 70%, transparent 100%)',
+        animation: 'bb-blast-flash 480ms ease-out forwards',
+      }} />
+      {particles.map((p, i) => (
+        <div key={i} style={{
+          position: 'absolute',
+          left: -p.size / 2 + 'px', top: -p.size / 2 + 'px',
+          width: p.size + 'px', height: p.size + 'px',
+          borderRadius: '50%',
+          background: p.color,
+          boxShadow: `0 0 5px ${p.color}`,
+          opacity: 0,
+          animation: `bb-blast-particle ${p.dur}ms ease-out ${p.delay}ms forwards`,
+          '--bdx': p.dx + 'px', '--bdy': p.dy + 'px',
+        }} />
+      ))}
+      <style>{`
+        @keyframes bb-blast-flash {
+          0%   { transform: scale(0.25); opacity: 1; }
+          40%  { transform: scale(1.7);  opacity: 0.9; }
+          100% { transform: scale(2.2);  opacity: 0; }
+        }
+        @keyframes bb-blast-particle {
+          0%   { transform: translate(0, 0) scale(1.3); opacity: 1; }
+          22%  { opacity: 1; }
+          100% { transform: translate(var(--bdx), var(--bdy)) scale(0); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// 2. bomblebee_carpet — Carpet Bomblebee's AOE 80 to all opp Heroes.
+//    Cascading row of small bursts walking horizontally; smoky orange.
+//    Each hero zone receives its own animation, but the visual reads
+//    as a strafing run because of the staggered start.
+function BomblebeeCarpetEffect({ x, y, w, h }) {
+  const cw = w || 110;
+  const bursts = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+    offsetX: -cw * 0.45 + (i / 6) * cw * 0.9 + (Math.random() - 0.5) * 8,
+    offsetY: -20 + Math.random() * 40,
+    size: 14 + Math.random() * 12,
+    delay: i * 60 + Math.random() * 30,
+    dur: 380 + Math.random() * 200,
+    hue: 18 + Math.random() * 22, // Orange band
+  })), [cw]);
+  const smoke = useMemo(() => Array.from({ length: 10 }, () => ({
+    offsetX: -cw * 0.35 + Math.random() * cw * 0.7,
+    offsetY: -10 + Math.random() * 30,
+    size: 18 + Math.random() * 14,
+    delay: 200 + Math.random() * 300,
+    dur: 700 + Math.random() * 300,
+  })), [cw]);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      {bursts.map((b, i) => (
+        <div key={'cb' + i} style={{
+          position: 'absolute',
+          left: b.offsetX + 'px', top: b.offsetY + 'px',
+          width: b.size + 'px', height: b.size + 'px',
+          marginLeft: -b.size / 2, marginTop: -b.size / 2,
+          borderRadius: '50%',
+          background: `radial-gradient(circle, hsl(${b.hue}, 100%, 70%) 0%, hsl(${b.hue}, 100%, 45%) 45%, rgba(50,15,0,0.6) 90%, transparent 100%)`,
+          boxShadow: `0 0 12px hsl(${b.hue}, 100%, 55%)`,
+          opacity: 0,
+          animation: `bb-carpet-burst ${b.dur}ms ease-out ${b.delay}ms forwards`,
+        }} />
+      ))}
+      {smoke.map((s, i) => (
+        <div key={'cs' + i} style={{
+          position: 'absolute',
+          left: s.offsetX + 'px', top: s.offsetY + 'px',
+          width: s.size + 'px', height: s.size + 'px',
+          marginLeft: -s.size / 2, marginTop: -s.size / 2,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(80,60,50,0.65) 0%, rgba(40,30,25,0.35) 60%, transparent 100%)',
+          opacity: 0,
+          animation: `bb-carpet-smoke ${s.dur}ms ease-out ${s.delay}ms forwards`,
+        }} />
+      ))}
+      <style>{`
+        @keyframes bb-carpet-burst {
+          0%   { opacity: 0;   transform: scale(0.25); }
+          35%  { opacity: 1;   transform: scale(1.15); }
+          100% { opacity: 0;   transform: scale(1.6); }
+        }
+        @keyframes bb-carpet-smoke {
+          0%   { opacity: 0;   transform: scale(0.6) translateY(0); }
+          40%  { opacity: 0.7; transform: scale(1.1) translateY(-6px); }
+          100% { opacity: 0;   transform: scale(1.6) translateY(-22px); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// 3. bomblebee_dive — Dive Bomblebee's "send to bottom of deck" payload.
+//    Diagonal streak from upper-right (the Bomblebee diving in) +
+//    impact poof at the target zone. White / pale-blue palette so it
+//    reads distinct from the orange explosions.
+function BomblebeeDiveEffect({ x, y }) {
+  const sparks = useMemo(() => Array.from({ length: 14 }, () => {
+    const angle = Math.PI * (0.7 + Math.random() * 0.6); // bottom-left arc
+    const speed = 18 + Math.random() * 32;
+    return {
+      dx: Math.cos(angle) * speed,
+      dy: Math.sin(angle) * speed,
+      size: 3 + Math.random() * 5,
+      color: ['#ffffff', '#ddeeff', '#aaccff', '#88aadd'][Math.floor(Math.random() * 4)],
+      delay: 220 + Math.random() * 80,
+      dur: 360 + Math.random() * 200,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      {/* Streak — long thin trail descending from upper-right */}
+      <div style={{
+        position: 'absolute',
+        left: 60, top: -90, width: 6, height: 140,
+        background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.95) 60%, rgba(160,200,255,0.85) 100%)',
+        borderRadius: '50%',
+        transform: 'rotate(35deg)',
+        transformOrigin: '50% 100%',
+        opacity: 0,
+        boxShadow: '0 0 10px rgba(180,220,255,0.7)',
+        animation: 'bb-dive-streak 280ms ease-in forwards',
+      }} />
+      {/* Impact poof — short, soft white burst at landing point */}
+      <div style={{
+        position: 'absolute',
+        width: 70, height: 70, left: -35, top: -35,
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(180,210,255,0.6) 50%, transparent 100%)',
+        opacity: 0,
+        animation: 'bb-dive-poof 500ms ease-out 230ms forwards',
+      }} />
+      {sparks.map((s, i) => (
+        <div key={'ds' + i} style={{
+          position: 'absolute',
+          left: -s.size / 2 + 'px', top: -s.size / 2 + 'px',
+          width: s.size + 'px', height: s.size + 'px',
+          borderRadius: '50%',
+          background: s.color,
+          boxShadow: `0 0 6px ${s.color}`,
+          opacity: 0,
+          animation: `bb-dive-spark ${s.dur}ms ease-out ${s.delay}ms forwards`,
+          '--ddx': s.dx + 'px', '--ddy': s.dy + 'px',
+        }} />
+      ))}
+      <style>{`
+        @keyframes bb-dive-streak {
+          0%   { opacity: 0; transform: rotate(35deg) translateY(-40px) scaleY(0.6); }
+          40%  { opacity: 1; transform: rotate(35deg) translateY(0)    scaleY(1); }
+          100% { opacity: 0; transform: rotate(35deg) translateY(20px) scaleY(0.8); }
+        }
+        @keyframes bb-dive-poof {
+          0%   { opacity: 0;   transform: scale(0.3); }
+          30%  { opacity: 0.9; transform: scale(1.2); }
+          100% { opacity: 0;   transform: scale(1.7); }
+        }
+        @keyframes bb-dive-spark {
+          0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+          100% { transform: translate(var(--ddx), var(--ddy)) scale(0); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// 4. bomblebee_tick — Time Bomblebee gaining a Bomb Counter.
+//    Small slow ticking spark with a fuse-glow ring; deliberately
+//    UNDER-stated so it doesn't read as a damage event. Yellow-orange
+//    pulse, no shrapnel.
+function BomblebeeTickEffect({ x, y }) {
+  const sparks = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
+    angle: (i / 6) * Math.PI * 2,
+    delay: i * 70 + Math.random() * 40,
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div style={{
+        position: 'absolute',
+        width: 28, height: 28, left: -14, top: -14,
+        borderRadius: '50%',
+        border: '2px solid rgba(255,200,80,0.85)',
+        boxShadow: '0 0 10px rgba(255,180,60,0.7), inset 0 0 6px rgba(255,220,120,0.6)',
+        opacity: 0,
+        animation: 'bb-tick-ring 700ms ease-out forwards',
+      }} />
+      {sparks.map((s, i) => (
+        <div key={'tk' + i} style={{
+          position: 'absolute',
+          left: -3 + 'px', top: -3 + 'px',
+          width: 6, height: 6,
+          borderRadius: '50%',
+          background: '#ffe066',
+          boxShadow: '0 0 6px #ffaa22',
+          opacity: 0,
+          animation: `bb-tick-spark 600ms ease-out ${s.delay}ms forwards`,
+          '--tdx': Math.cos(s.angle) * 22 + 'px',
+          '--tdy': Math.sin(s.angle) * 22 + 'px',
+        }} />
+      ))}
+      <style>{`
+        @keyframes bb-tick-ring {
+          0%   { opacity: 0;   transform: scale(0.5); }
+          40%  { opacity: 0.9; transform: scale(1.3); }
+          100% { opacity: 0;   transform: scale(1.7); }
+        }
+        @keyframes bb-tick-spark {
+          0%   { transform: translate(0, 0) scale(0.6); opacity: 1; }
+          100% { transform: translate(var(--tdx), var(--tdy)) scale(0); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// 5. bomblebee_detonate — Time Bomblebee releasing all Bomb Counters.
+//    Heavy compound explosion with multiple staggered shockwaves and
+//    bright white core. The biggest of the bunch — reads as the
+//    "stored energy unleashed" payoff visual.
+function BomblebeeDetonateEffect({ x, y }) {
+  const particles = useMemo(() => Array.from({ length: 38 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 35 + Math.random() * 75;
+    return {
+      dx: Math.cos(angle) * speed,
+      dy: Math.sin(angle) * speed,
+      size: 4 + Math.random() * 9,
+      color: ['#fff', '#ffeecc', '#ffaa22', '#ff5500', '#ffcc00', '#882200'][Math.floor(Math.random() * 6)],
+      delay: Math.random() * 120,
+      dur: 500 + Math.random() * 500,
+    };
+  }), []);
+  const shockwaves = [0, 130, 250]; // Three staggered waves
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      {shockwaves.map((delay, i) => (
+        <div key={'sw' + i} style={{
+          position: 'absolute',
+          width: 110, height: 110, left: -55, top: -55,
+          borderRadius: '50%',
+          border: `${4 - i}px solid rgba(255,180,80,${0.85 - i * 0.2})`,
+          boxShadow: '0 0 14px rgba(255,140,40,0.8)',
+          opacity: 0,
+          animation: `bb-deto-wave 700ms ease-out ${delay}ms forwards`,
+        }} />
+      ))}
+      <div style={{
+        position: 'absolute',
+        width: 80, height: 80, left: -40, top: -40,
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(255,255,240,1) 0%, rgba(255,180,60,0.85) 30%, rgba(180,40,0,0.5) 70%, transparent 100%)',
+        animation: 'bb-deto-core 600ms ease-out forwards',
+      }} />
+      {particles.map((p, i) => (
+        <div key={'dp' + i} style={{
+          position: 'absolute',
+          left: -p.size / 2 + 'px', top: -p.size / 2 + 'px',
+          width: p.size + 'px', height: p.size + 'px',
+          borderRadius: '50%',
+          background: p.color,
+          boxShadow: `0 0 7px ${p.color}`,
+          opacity: 0,
+          animation: `bb-deto-particle ${p.dur}ms ease-out ${p.delay}ms forwards`,
+          '--ddx': p.dx + 'px', '--ddy': p.dy + 'px',
+        }} />
+      ))}
+      <style>{`
+        @keyframes bb-deto-wave {
+          0%   { opacity: 0;   transform: scale(0.3); }
+          30%  { opacity: 1;   transform: scale(1.2); }
+          100% { opacity: 0;   transform: scale(2.4); }
+        }
+        @keyframes bb-deto-core {
+          0%   { transform: scale(0.4); opacity: 1; }
+          50%  { transform: scale(1.6); opacity: 0.8; }
+          100% { transform: scale(2.0); opacity: 0; }
+        }
+        @keyframes bb-deto-particle {
+          0%   { transform: translate(0, 0) scale(1.4); opacity: 1; }
+          25%  { opacity: 1; }
+          100% { transform: translate(var(--ddx), var(--ddy)) scale(0); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// 6. bomblebee_cluster — Bomblebee Cluster's chained re-summon flash.
+//    Three rapid-fire bursts in sequence with varying sizes. Yellow /
+//    black palette to match the Bomblebee theme; reads as "chain
+//    reaction kicking off" rather than damage.
+function BomblebeeClusterEffect({ x, y }) {
+  const bursts = useMemo(() => [
+    { offsetX: -28, offsetY: -10, size: 32, delay: 0,   hue: 50 },
+    { offsetX: 28,  offsetY: -22, size: 38, delay: 120, hue: 38 },
+    { offsetX: 0,   offsetY: 22,  size: 44, delay: 250, hue: 30 },
+  ], []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      {bursts.map((b, i) => (
+        <div key={'cl' + i} style={{
+          position: 'absolute',
+          left: b.offsetX + 'px', top: b.offsetY + 'px',
+          width: b.size + 'px', height: b.size + 'px',
+          marginLeft: -b.size / 2, marginTop: -b.size / 2,
+          borderRadius: '50%',
+          background: `radial-gradient(circle, hsl(${b.hue},100%,75%) 0%, hsl(${b.hue},100%,50%) 40%, rgba(40,20,0,0.6) 85%, transparent 100%)`,
+          boxShadow: `0 0 14px hsl(${b.hue},100%,55%)`,
+          opacity: 0,
+          animation: `bb-cluster-pop 520ms ease-out ${b.delay}ms forwards`,
+        }} />
+      ))}
+      {/* Trailing wasp-stripe specks */}
+      {Array.from({ length: 14 }).map((_, i) => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 25 + Math.random() * 35;
+        const dx = Math.cos(angle) * dist;
+        const dy = Math.sin(angle) * dist;
+        const isBlack = i % 3 === 0;
+        return (
+          <div key={'cs' + i} style={{
+            position: 'absolute',
+            left: -3, top: -3, width: 6, height: 6,
+            borderRadius: '50%',
+            background: isBlack ? '#1a1100' : '#ffd040',
+            boxShadow: isBlack ? '0 0 3px #000' : '0 0 6px #ffaa20',
+            opacity: 0,
+            animation: `bb-cluster-speck 700ms ease-out ${100 + i * 25}ms forwards`,
+            '--cdx': dx + 'px', '--cdy': dy + 'px',
+          }} />
+        );
+      })}
+      <style>{`
+        @keyframes bb-cluster-pop {
+          0%   { opacity: 0;   transform: scale(0.3); }
+          40%  { opacity: 1;   transform: scale(1.2); }
+          100% { opacity: 0;   transform: scale(1.8); }
+        }
+        @keyframes bb-cluster-speck {
+          0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+          100% { transform: translate(var(--cdx), var(--cdy)) scale(0); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// 7. bomblebee_fuse — Burning Fuse's lit-fuse trail.
+//    A horizontal sparkly fuse line racing across the target zone left-
+//    to-right, then a final flash. Reads as "the wick has been lit" —
+//    the precursor visual to the Bomblebees re-firing right after.
+function BomblebeeFuseEffect({ x, y, w }) {
+  const cw = w || 110;
+  const sparkles = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+    leftPct: (i / 17) * 100,
+    delay: i * 18 + Math.random() * 30,
+    dur: 320 + Math.random() * 180,
+    size: 3 + Math.random() * 4,
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      {/* Fuse wire track */}
+      <div style={{
+        position: 'absolute',
+        left: -cw * 0.45 + 'px', top: -2 + 'px',
+        width: cw * 0.9 + 'px', height: 4 + 'px',
+        background: 'linear-gradient(90deg, rgba(120,80,40,0.6) 0%, rgba(180,140,80,0.85) 50%, rgba(120,80,40,0.6) 100%)',
+        borderRadius: 2,
+        opacity: 0.85,
+      }} />
+      {/* Travelling spark cluster — moves left to right */}
+      <div style={{
+        position: 'absolute',
+        left: -cw * 0.45 + 'px', top: -10 + 'px',
+        width: 18, height: 18,
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, #ffeecc 0%, #ff8800 50%, transparent 90%)',
+        boxShadow: '0 0 14px #ff7700, 0 0 28px #ff5500',
+        opacity: 0,
+        animation: `bb-fuse-travel 700ms cubic-bezier(0.4, 0, 0.6, 1) forwards`,
+        '--fW': (cw * 0.9) + 'px',
+      }} />
+      {/* Stationary sparkles along the track */}
+      {sparkles.map((s, i) => (
+        <div key={'fs' + i} style={{
+          position: 'absolute',
+          left: `calc(${-cw * 0.45 + (s.leftPct / 100) * cw * 0.9}px - 2px)`,
+          top: -2 + 'px',
+          width: s.size + 'px', height: s.size + 'px',
+          borderRadius: '50%',
+          background: '#ffcc44',
+          boxShadow: '0 0 5px #ff9900',
+          opacity: 0,
+          animation: `bb-fuse-spark ${s.dur}ms ease-out ${s.delay}ms forwards`,
+        }} />
+      ))}
+      {/* Final flash at the end of the fuse */}
+      <div style={{
+        position: 'absolute',
+        width: 50, height: 50,
+        left: cw * 0.45 - 25 + 'px', top: -25 + 'px',
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(255,255,200,1) 0%, rgba(255,160,40,0.7) 50%, transparent 100%)',
+        opacity: 0,
+        animation: 'bb-fuse-pop 400ms ease-out 600ms forwards',
+      }} />
+      <style>{`
+        @keyframes bb-fuse-travel {
+          0%   { opacity: 0; transform: translateX(0); }
+          15%  { opacity: 1; }
+          100% { opacity: 1; transform: translateX(var(--fW)); }
+        }
+        @keyframes bb-fuse-spark {
+          0%   { opacity: 0;   transform: scale(0.4); }
+          50%  { opacity: 1;   transform: scale(1.4); }
+          100% { opacity: 0;   transform: scale(0.8); }
+        }
+        @keyframes bb-fuse-pop {
+          0%   { opacity: 0;   transform: scale(0.3); }
+          40%  { opacity: 1;   transform: scale(1.4); }
+          100% { opacity: 0;   transform: scale(2.0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 const ANIM_REGISTRY = {
   explosion: ExplosionEffect,
   cosmic_summon: CosmicSummonEffect,
@@ -2109,6 +2568,315 @@ const ANIM_REGISTRY = {
   flame_strike: FlameStrikeEffect,
   venom_fog: VenomFogEffect,
   poisoned_well: PoisonedWellEffect,
+  // ── Bomblebee archetype (7 explosion variants) ─────────────────────
+  bomblebee_blast: BomblebeeBlastEffect,
+  bomblebee_carpet: BomblebeeCarpetEffect,
+  bomblebee_dive: BomblebeeDiveEffect,
+  bomblebee_tick: BomblebeeTickEffect,
+  bomblebee_detonate: BomblebeeDetonateEffect,
+  bomblebee_cluster: BomblebeeClusterEffect,
+  bomblebee_fuse: BomblebeeFuseEffect,
+  // ── Cosmic Depths archetype ────────────────────────────────────────
+  cosmic_counter_add: (function () {
+    return function CosmicCounterAddEffect({ x, y }) {
+      const sparks = useMemo(() => Array.from({ length: 10 }, (_, i) => ({
+        angle: (i / 10) * Math.PI * 2,
+        size: 4 + Math.random() * 3,
+        delay: Math.random() * 80,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute', width: 36, height: 36, left: -18, top: -18,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(220,180,255,0.95) 0%, rgba(120,60,200,0.7) 50%, transparent 100%)',
+            boxShadow: '0 0 20px rgba(170,100,255,0.7)',
+            opacity: 0,
+            animation: 'cosmic-cnt-flash 600ms ease-out forwards',
+          }} />
+          {sparks.map((s, i) => (
+            <div key={i} style={{
+              position: 'absolute', left: -s.size / 2, top: -s.size / 2,
+              width: s.size + 'px', height: s.size + 'px',
+              borderRadius: '50%',
+              background: '#e0c8ff',
+              boxShadow: '0 0 8px #aa66ff',
+              opacity: 0,
+              animation: `cosmic-cnt-spark 700ms ease-out ${s.delay}ms forwards`,
+              '--cdx': Math.cos(s.angle) * 28 + 'px',
+              '--cdy': Math.sin(s.angle) * 28 + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes cosmic-cnt-flash {
+              0% { opacity: 0; transform: scale(0.3); }
+              40% { opacity: 1; transform: scale(1.3); }
+              100% { opacity: 0; transform: scale(1.7); }
+            }
+            @keyframes cosmic-cnt-spark {
+              0% { transform: translate(0, 0) scale(0.6); opacity: 1; }
+              100% { transform: translate(var(--cdx), var(--cdy)) scale(0); opacity: 0; }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  cosmic_counter_remove: (function () {
+    return function CosmicCounterRemoveEffect({ x, y }) {
+      // Inverse — particles converge inward, then a tiny implosion flash.
+      const sparks = useMemo(() => Array.from({ length: 10 }, (_, i) => ({
+        angle: (i / 10) * Math.PI * 2,
+        size: 4 + Math.random() * 3,
+        delay: Math.random() * 60,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {sparks.map((s, i) => (
+            <div key={i} style={{
+              position: 'absolute', left: -s.size / 2, top: -s.size / 2,
+              width: s.size + 'px', height: s.size + 'px',
+              borderRadius: '50%',
+              background: '#7744cc',
+              boxShadow: '0 0 6px #aa66ff',
+              opacity: 0,
+              animation: `cosmic-cnt-r-spark 600ms ease-in ${s.delay}ms forwards`,
+              '--cdx': Math.cos(s.angle) * 30 + 'px',
+              '--cdy': Math.sin(s.angle) * 30 + 'px',
+            }} />
+          ))}
+          <div style={{
+            position: 'absolute', width: 14, height: 14, left: -7, top: -7,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(170,100,255,0.7) 60%, transparent 100%)',
+            opacity: 0,
+            animation: 'cosmic-cnt-r-flash 350ms ease-out 400ms forwards',
+          }} />
+          <style>{`
+            @keyframes cosmic-cnt-r-spark {
+              0% { transform: translate(var(--cdx), var(--cdy)) scale(1); opacity: 1; }
+              100% { transform: translate(0, 0) scale(0.2); opacity: 0; }
+            }
+            @keyframes cosmic-cnt-r-flash {
+              0% { opacity: 0; transform: scale(0.3); }
+              50% { opacity: 1; transform: scale(1.4); }
+              100% { opacity: 0; transform: scale(1.8); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  cosmic_token_drop: (function () {
+    return function CosmicTokenDropEffect({ x, y }) {
+      // A purple portal opens, a token drops in.
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute', width: 60, height: 14, left: -30, top: -30,
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(180,100,255,0.9) 0%, rgba(80,30,150,0.7) 50%, transparent 100%)',
+            boxShadow: '0 0 14px rgba(170,100,255,0.85)',
+            opacity: 0,
+            animation: 'cosmic-token-portal 800ms ease-out forwards',
+          }} />
+          <div style={{
+            position: 'absolute', width: 18, height: 18, left: -9, top: -25,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, #ddccff 0%, #6633aa 70%, #220033 100%)',
+            boxShadow: '0 0 10px #aa66ff',
+            opacity: 0,
+            animation: 'cosmic-token-fall 700ms cubic-bezier(0.5,0,0.7,1) 200ms forwards',
+          }} />
+          <style>{`
+            @keyframes cosmic-token-portal {
+              0% { opacity: 0; transform: scaleX(0.2) scaleY(0.4); }
+              30% { opacity: 1; transform: scaleX(1.1) scaleY(0.7); }
+              80% { opacity: 1; transform: scaleX(1.3) scaleY(0.9); }
+              100% { opacity: 0; transform: scaleX(0.6) scaleY(0.4); }
+            }
+            @keyframes cosmic-token-fall {
+              0% { opacity: 0; transform: translateY(-10px) scale(0.6); }
+              30% { opacity: 1; transform: translateY(15px) scale(1); }
+              100% { opacity: 0; transform: translateY(35px) scale(0.85); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // 500 Piranhas in a Monster Suit — many small bite marks chomping
+  // the host. Crescents of red + a few teeth-shape sparks; bites
+  // appear at random points across the zone, not concentrically.
+  piranha_bites: (function () {
+    return function PiranhaBitesEffect({ x, y, w, h }) {
+      const cw = w || 110;
+      const ch = h || 140;
+      const bites = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+        offsetX: -cw * 0.42 + Math.random() * cw * 0.84,
+        offsetY: -ch * 0.42 + Math.random() * ch * 0.84,
+        size: 5 + Math.random() * 5,
+        rot: Math.random() * 360,
+        delay: i * 28 + Math.random() * 60,
+        dur: 280 + Math.random() * 180,
+      })), [cw, ch]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {bites.map((b, i) => (
+            <div key={'pb' + i} style={{
+              position: 'absolute',
+              left: b.offsetX + 'px', top: b.offsetY + 'px',
+              width: b.size + 'px', height: (b.size * 0.55) + 'px',
+              marginLeft: -b.size / 2,
+              borderRadius: '50% 50% 0 0 / 100% 100% 0 0',
+              background: 'radial-gradient(ellipse, #ff3322 0%, #aa0000 60%, #440000 100%)',
+              boxShadow: '0 0 4px rgba(255,40,20,0.7), inset 0 -1px 1px rgba(0,0,0,0.6)',
+              transform: `rotate(${b.rot}deg)`,
+              opacity: 0,
+              animation: `piranha-bite ${b.dur}ms ease-out ${b.delay}ms forwards`,
+            }} />
+          ))}
+          {/* Tiny tooth-shape flashes at a few of the bite points to
+              sell the chomp impact. */}
+          {bites.slice(0, 8).map((b, i) => (
+            <div key={'pt' + i} style={{
+              position: 'absolute',
+              left: (b.offsetX + (Math.random() - 0.5) * 6) + 'px',
+              top: (b.offsetY + (Math.random() - 0.5) * 6) + 'px',
+              width: 3, height: 6, marginLeft: -1.5, marginTop: -3,
+              background: '#ffffff',
+              boxShadow: '0 0 4px rgba(255,255,255,0.9)',
+              transform: `rotate(${b.rot + 90}deg)`,
+              opacity: 0,
+              animation: `piranha-tooth 260ms ease-out ${b.delay + 60}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes piranha-bite {
+              0%   { opacity: 0;   transform: scale(0.3) rotate(var(--r, 0deg)); }
+              35%  { opacity: 1;   transform: scale(1.15); }
+              100% { opacity: 0;   transform: scale(1.4); }
+            }
+            @keyframes piranha-tooth {
+              0%   { opacity: 0;   transform: scale(0.4); }
+              50%  { opacity: 0.95; transform: scale(1.1); }
+              100% { opacity: 0;   transform: scale(0.6); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  deepsea_idol_negate: (function () {
+    return function DeepseaIdolNegateEffect({ x, y }) {
+      // Concentric blue-white wave rings + diamond-shaped sparkles.
+      // Reads as "wall of water rising to deflect" — appropriate for a
+      // Deepsea-themed protective negate.
+      const rings = [0, 100, 200];
+      const sparkles = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+        angle: (i / 12) * Math.PI * 2,
+        size: 4 + Math.random() * 4,
+        delay: 200 + Math.random() * 220,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {rings.map((delay, i) => (
+            <div key={'di' + i} style={{
+              position: 'absolute',
+              width: 70, height: 70, left: -35, top: -35,
+              borderRadius: '50%',
+              border: `${3 - i * 0.6}px solid rgba(120,200,255,${0.85 - i * 0.18})`,
+              boxShadow: '0 0 12px rgba(160,220,255,0.8)',
+              opacity: 0,
+              animation: `deepsea-idol-wave 700ms ease-out ${delay}ms forwards`,
+            }} />
+          ))}
+          <div style={{
+            position: 'absolute',
+            width: 50, height: 50, left: -25, top: -25,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(120,200,255,0.7) 50%, transparent 100%)',
+            opacity: 0,
+            animation: 'deepsea-idol-core 500ms ease-out forwards',
+          }} />
+          {sparkles.map((s, i) => (
+            <div key={'dis' + i} style={{
+              position: 'absolute',
+              left: -s.size / 2, top: -s.size / 2,
+              width: s.size + 'px', height: s.size + 'px',
+              background: '#e0f4ff',
+              boxShadow: '0 0 6px #88ccff',
+              transform: 'rotate(45deg)',
+              opacity: 0,
+              animation: `deepsea-idol-spark 600ms ease-out ${s.delay}ms forwards`,
+              '--idx': Math.cos(s.angle) * 32 + 'px',
+              '--idy': Math.sin(s.angle) * 32 + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes deepsea-idol-wave {
+              0%   { opacity: 0;   transform: scale(0.3); }
+              30%  { opacity: 1;   transform: scale(1.3); }
+              100% { opacity: 0;   transform: scale(2.3); }
+            }
+            @keyframes deepsea-idol-core {
+              0%   { opacity: 0;   transform: scale(0.4); }
+              45%  { opacity: 1;   transform: scale(1.4); }
+              100% { opacity: 0;   transform: scale(1.9); }
+            }
+            @keyframes deepsea-idol-spark {
+              0%   { transform: translate(0, 0) rotate(45deg) scale(0.5); opacity: 1; }
+              100% { transform: translate(var(--idx), var(--idy)) rotate(45deg) scale(0); opacity: 0; }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  cosmic_invader_strike: (function () {
+    return function CosmicInvaderStrikeEffect({ x, y }) {
+      const beams = useMemo(() => Array.from({ length: 5 }, (_, i) => ({
+        angle: -Math.PI / 2 + (i - 2) * 0.18,
+        delay: i * 35,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {beams.map((b, i) => (
+            <div key={i} style={{
+              position: 'absolute',
+              left: 0, top: 0, width: 4, height: 60,
+              marginLeft: -2, marginTop: -60,
+              background: 'linear-gradient(180deg, transparent 0%, rgba(220,140,255,0.9) 30%, rgba(255,255,255,1) 100%)',
+              boxShadow: '0 0 6px rgba(180,100,255,0.85)',
+              transform: `rotate(${b.angle * 180 / Math.PI + 90}deg)`,
+              transformOrigin: '50% 100%',
+              opacity: 0,
+              animation: `cosmic-invader-beam 500ms ease-out ${b.delay}ms forwards`,
+            }} />
+          ))}
+          <div style={{
+            position: 'absolute', width: 50, height: 50, left: -25, top: -25,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(170,80,255,0.6) 50%, transparent 100%)',
+            opacity: 0,
+            animation: 'cosmic-invader-pop 600ms ease-out 250ms forwards',
+          }} />
+          <style>{`
+            @keyframes cosmic-invader-beam {
+              0% { opacity: 0; transform-origin: 50% 100%; transform: scaleY(0.2) rotate(var(--rot)); }
+              60% { opacity: 1; transform: scaleY(1) rotate(var(--rot)); }
+              100% { opacity: 0; transform: scaleY(0.4) rotate(var(--rot)); }
+            }
+            @keyframes cosmic-invader-pop {
+              0% { opacity: 0; transform: scale(0.3); }
+              40% { opacity: 1; transform: scale(1.3); }
+              100% { opacity: 0; transform: scale(1.8); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   // ── Boiling Oil ───────────────────────────────────────────────────
   // Red oil raining down from above the target onto a sizzling pool
   // of splat marks at the bottom. Tear-drop droplets fall fast,
@@ -14425,8 +15193,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const zonePickHeroFirstSlot = new Map();
   if (isMyEffectPrompt && ep.type === 'zonePick') {
     for (const z of (ep.zones || [])) {
-      zonePickSet.add(`${myIdx}-${z.heroIdx}-${z.slotIdx}`);
-      if (!zonePickHeroFirstSlot.has(z.heroIdx)) {
+      // Zones default to OWN side (myIdx). Cards that prompt for an
+      // OPP-side zone (Analyzer's Invader-Token spawn, …) pass an
+      // explicit `owner` per zone so the highlight + click hit-test
+      // lands on the right physical board side. The hero-card-click
+      // shortcut stays own-side-only — clicking opp's hero card
+      // shouldn't auto-respond.
+      const zoneOwner = z.owner ?? myIdx;
+      zonePickSet.add(`${zoneOwner}-${z.heroIdx}-${z.slotIdx}`);
+      if (zoneOwner === myIdx && !zonePickHeroFirstSlot.has(z.heroIdx)) {
         zonePickHeroFirstSlot.set(z.heroIdx, z.slotIdx);
       }
     }
@@ -15214,6 +15989,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     🌊{hero.deepseaCounters}
                   </div>
                 )}
+                {/* ── Change Counters (Cosmic Depths) ── */}
+                {hero?.name && hero._changeCounters > 0 && (
+                  <div
+                    onMouseEnter={e => showGameTooltip(e, `Change Counters: ${hero._changeCounters}. Cosmic Depths counters used by Argos and the Cosmic Depths archetype.`)}
+                    onMouseLeave={hideGameTooltip}
+                    style={{
+                      position: 'absolute', left: 4, bottom: 4,
+                      display: 'flex', alignItems: 'center', gap: 2,
+                      padding: '2px 5px',
+                      fontFamily: "'Pixel Intv', 'Press Start 2P', monospace",
+                      fontSize: 'calc(10px * var(--board-scale))',
+                      color: '#ffe9ff',
+                      background: 'linear-gradient(135deg, rgba(102,68,204,0.92), rgba(42,13,102,0.92))',
+                      border: '1px solid #aa66ff',
+                      borderRadius: 4,
+                      textShadow: '0 0 3px #000, 1px 1px 0 #000',
+                      boxShadow: '0 0 6px rgba(170,100,255,0.55)',
+                      zIndex: 5, pointerEvents: 'auto',
+                    }}
+                  >
+                    <span style={{ fontSize: 'calc(12px * var(--board-scale))', filter: 'drop-shadow(0 0 2px rgba(170,100,255,0.7))' }}>🌌</span>
+                    <span style={{ fontWeight: 'bold' }}>×{hero._changeCounters}</span>
+                  </div>
+                )}
                 {/* ── Ascension Orbs ── */}
                 {hero?.name && hero.ascensionOrbs && (
                   <div className="ascension-orbs-container"
@@ -15538,7 +16337,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const isSelectedEquipTarget = equipTargetIds.some(id => selectedSet.has(id));
               const isEquipExploding = equipTargetIds.some(id => explosions.includes(id));
               const isSummonGlow = summonGlow && summonGlow.owner === pi && summonGlow.heroIdx === i && summonGlow.zoneSlot === z;
-              const isZonePickTarget = !isOpp && zonePickSet.has(`${pi}-${i}-${z}`);
+              // zonePick: lookup is keyed by the actual zone owner (set
+              // builder uses `z.owner ?? myIdx`), so dropping the
+              // `!isOpp` guard makes opp-side zone picks (e.g. Analyzer's
+              // Token spawn) clickable on opp's row.
+              const isZonePickTarget = zonePickSet.has(`${pi}-${i}-${z}`);
               // During creature drag: highlight valid zones, dim invalid ones.
               // Surprise-subtype creatures skip the invalid-zone dimming
               // entirely (we only want the orange surprise highlight on
@@ -15809,6 +16612,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       >
                         <span className="head-counter-icon">🐲</span>
                         <span className="head-counter-num">×{cc.headCounter}</span>
+                      </div>
+                    ) : null}
+                    {cc?.bombCounters > 0 ? (
+                      <div className="head-counter-badge"
+                        onMouseEnter={e => showGameTooltip(e, `Bomb Counters: ${cc.bombCounters}. While Time Bomblebee has Bomb Counters, it cannot take damage or be defeated. At the start of the opponent's turn, all Bomb Counters are removed and 150 damage is dealt to a chosen Creature.`)}
+                        onMouseLeave={hideGameTooltip}
+                        style={{ background: 'linear-gradient(135deg, #ffaa22, #ff5500)', borderColor: '#882200' }}
+                      >
+                        <span className="head-counter-icon">💣</span>
+                        <span className="head-counter-num">×{cc.bombCounters}</span>
+                      </div>
+                    ) : null}
+                    {cc?.changeCounter > 0 ? (
+                      <div className="head-counter-badge"
+                        onMouseEnter={e => showGameTooltip(e, `Change Counters: ${cc.changeCounter}. Cosmic Depths counters used by Analyzer, Gatherer, Argos and friends.`)}
+                        onMouseLeave={hideGameTooltip}
+                        style={{ background: 'linear-gradient(135deg, #6644cc, #2a0d66)', borderColor: '#aa66ff', color: '#ffe9ff' }}
+                      >
+                        <span className="head-counter-icon">🌌</span>
+                        <span className="head-counter-num">×{cc.changeCounter}</span>
                       </div>
                     ) : null}
                     {(() => { return cc?.additionalActionAvail ? <div className="additional-action-icon"

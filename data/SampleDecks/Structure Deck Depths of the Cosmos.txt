@@ -1,0 +1,31 @@
+=== PIXEL PARTIES DECK ===
+Name: Structure Deck: Depths of the Cosmos
+Cover: The Cosmic Depths
+
+== HEROES ==
+Blackstache, Scourge of the Pixel Seas
+Argos, the Eye of the Cosmos
+Cooldin, King of Coolness
+
+== MAIN DECK ==
+8x Alchemy
+4x Analyzer from the Cosmic Depths
+4x Coffee
+4x Cosmic Malfunction
+4x Dark Gear
+4x Deepsea Idol
+1x Divine Gift of the Guardian
+4x Gatherer from the Cosmic Depths
+4x Gerrymander
+4x Invader from the Cosmic Depths
+4x Life-Searcher from the Cosmic Depths
+4x Magnetic Glove
+8x Summoning Magic
+3x The Cosmic Depths
+
+== POTION DECK ==
+2x Elixir of Quickness
+2x Magnetic Potion
+1x Resuscitation Potion
+
+== SIDE DECK ==

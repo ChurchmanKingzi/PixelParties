@@ -31,6 +31,12 @@ module.exports = {
   // the card is sitting on the board reacting to other spells.
   activeIn: ['hand', 'area'],
 
+  // Gerrymander redirect — pick `delete` for permanent card loss
+  // over the (often-cleansable) Pollution Token placement.
+  cpuGerrymanderResponse(/* engine, gerryOwnerPi, promptData */) {
+    return { optionId: 'delete' };
+  },
+
   hooks: {
     /**
      * Self-placement on cast: when this Spell's own onPlay fires (still in
@@ -116,6 +122,7 @@ module.exports = {
           description: 'Your Spell triggered Acid Rain. Pick your penalty.',
           options,
           cancellable: false,
+          gerrymanderEligible: true, // Delete cards vs Place Token are distinct effects.
         });
         chosen = result?.optionId || 'delete';
       } else {

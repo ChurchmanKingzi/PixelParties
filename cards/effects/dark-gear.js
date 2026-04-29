@@ -44,12 +44,21 @@ function getFreeZones(gs, playerIdx) {
 
 /**
  * Check if the player controls any creature originally owned by the opponent.
+ *
+ * IMPORTANT: must check `inst.originalOwner`, NOT `inst.owner`. When Dark
+ * Gear's `actionTransferCreature` runs, it sets `inst.owner = toPlayerIdx`
+ * so the creature physically renders on the new side (cardHeroOwner,
+ * creatureCounters key, etc.). The "originally owned by the opponent"
+ * test therefore needs the frozen `originalOwner` field — set in the
+ * CardInstance constructor and never overwritten — to remain accurate
+ * for chained Dark Gear plays.
  */
 function hasOpponentCreatures(engine, playerIdx) {
   for (const inst of engine.cardInstances) {
-    if (inst.controller === playerIdx && inst.zone === 'support' && inst.owner !== playerIdx) {
-      return true;
-    }
+    if (inst.controller !== playerIdx) continue;
+    if (inst.zone !== 'support') continue;
+    const origOwner = inst.originalOwner ?? inst.owner;
+    if (origOwner !== playerIdx) return true;
   }
   return false;
 }

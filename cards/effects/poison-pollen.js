@@ -114,6 +114,7 @@ module.exports = {
             engine.log('status_add', {
               target: e.ref.name, status: 'stunned', owner: e.owner,
             });
+            engine.sync();
           }
         }
       }

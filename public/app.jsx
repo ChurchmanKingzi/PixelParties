@@ -7164,7 +7164,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
   const zonePickSet = new Set();
   if (isMyEffectPrompt && ep.type === 'zonePick') {
     for (const z of (ep.zones || [])) {
-      zonePickSet.add(`${myIdx}-${z.heroIdx}-${z.slotIdx}`);
+      // `owner` lets a card target opp-side zones (Analyzer's Invader-
+      // Token spawn etc.). Defaults to myIdx for the common own-side case.
+      zonePickSet.add(`${z.owner ?? myIdx}-${z.heroIdx}-${z.slotIdx}`);
     }
   }
   const respondToPrompt = (response) => {
@@ -7501,7 +7503,9 @@ function GameBoard({ gameState, lobby, onLeave }) {
               const isSelectedEquipTarget = equipTargetIds.some(id => selectedSet.has(id));
               const isEquipExploding = equipTargetIds.some(id => explosions.includes(id));
               const isSummonGlow = summonGlow && summonGlow.owner === pi && summonGlow.heroIdx === i && summonGlow.zoneSlot === z;
-              const isZonePickTarget = !isOpp && zonePickSet.has(`${pi}-${i}-${z}`);
+              // Set is keyed by the actual zone owner (`z.owner ?? myIdx`),
+              // so the lookup naturally lands on the right side.
+              const isZonePickTarget = zonePickSet.has(`${pi}-${i}-${z}`);
               // During creature drag: highlight valid zones, dim invalid ones
               const isDraggingCreature = !isOpp && playDrag && playDrag.card?.cardType === 'Creature' && !playDrag.isEquip;
               const heroActionActive = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx;
