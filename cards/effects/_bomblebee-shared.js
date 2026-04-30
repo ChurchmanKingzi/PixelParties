@@ -125,11 +125,11 @@ function findOwnBomblebees(engine, pi, opts = {}) {
 /**
  * Re-fire a single Bomblebee's payload AS IF an opponent target had just
  * been defeated. Used by Burning Fuse to retrigger eligible Bomblebees
- * on demand. Burning Fuse RESPECTS each Bomblebee's natural HOPT — so
- * Bomblebees whose effect was already used this turn are skipped at the
- * filter level (see findOwnBomblebees with excludeHoptUsed:true) and
- * never reach this helper. This is consistent with the user's
- * clarification that the once-per-turn limit is honored.
+ * on demand. Burning Fuse passes `bypassHopt: true` so Bomblebees that
+ * already fired their once-per-turn slot this turn fire AGAIN through
+ * this path — Fuse's text explicitly overrides the once-per-turn clause.
+ * The `opts` object is forwarded directly to the per-Bomblebee payload,
+ * which checks `opts.bypassHopt` before consulting / stamping HOPT.
  *
  * The per-Bomblebee body lives on each card's script as a hookless
  * helper (see cards/effects/{bomblebee,carpet-bomblebee,dive-bomblebee,
@@ -147,12 +147,6 @@ async function triggerBomblebeeAsIfDeath(engine, inst, opts = {}) {
   const script = loadCardEffect(inst.name);
   if (!script?.runOpponentDeathPayload) return false;
   try {
-    // No bypassHopt — the natural HOPT gate inside each Bomblebee's
-    // payload is the source of truth. The eligibility filter above
-    // ensures only Bomblebees with an unclaimed HOPT slot reach here,
-    // so passing bypassHopt would only matter if we re-entered this
-    // path for an already-used Bomblebee — which Burning Fuse explicitly
-    // doesn't do anymore.
     await script.runOpponentDeathPayload(engine, inst, opts);
     return true;
   } catch (err) {

@@ -45,20 +45,23 @@ const CARD_NAME = 'Burning Fuse';
 const ANIM_TYPE = 'bomblebee_fuse';
 
 // Eligible = controlled, alive, in support, NOT frozen/stunned/negated/
-// nulled, AND has not used its once-per-turn effect this turn. Time
-// Bomblebee (no HOPT) trivially passes the last gate.
+// nulled. Burning Fuse explicitly IGNORES the once-per-turn clause of
+// each Bomblebee's natural trigger, so already-fired Bomblebees are
+// still re-fired by Fuse. We pass `bypassHopt: true` through to the
+// per-Bomblebee payload below to honor that.
 //
-// We do NOT exclude Bomblebees summoned this turn. A Bomblebee Cluster
-// chain that places fresh Bomblebees should leave them eligible for
-// Burning Fuse later in the same turn — their effect is a passive
-// trigger (not an "activated" creature effect), so summoning sickness
-// doesn't apply, and the only relevant constraint is "have they used
-// their HOPT yet this turn?". Newly-summoned Bomblebees haven't, so
-// they're eligible.
+// Time Bomblebee is EXCLUDED here. Unlike the other three Bomblebees,
+// its trigger has no immediate payoff (it just stacks a Bomb Counter
+// that detonates at the start of the opponent's turn) — re-firing it
+// through Fuse, then immediately destroying it as part of Fuse's
+// "defeat all affected" clause, would erase the counter and produce
+// zero effect. Fuse only makes sense for Bomblebees with an immediate
+// damage payload. If Time is the player's only (or only living)
+// Bomblebee, Fuse is grayed out by `spellPlayCondition` returning
+// false from this same set.
 function eligibleBomblebees(engine, pi) {
-  return findOwnBomblebees(engine, pi, {
-    excludeHoptUsed: true,
-  });
+  const all = findOwnBomblebees(engine, pi);
+  return all.filter(inst => inst.name !== 'Time Bomblebee');
 }
 
 async function runEffect(engine, pi) {
@@ -86,12 +89,12 @@ async function runEffect(engine, pi) {
   await engine._delay(450);
 
   // Re-fire each Bomblebee's payload as if an opp target had died.
-  // HOPT is RESPECTED — each Bomblebee's natural per-turn lock claims
-  // its slot via the regular code path. Sequential so prompts don't
-  // collide.
+  // HOPT is BYPASSED — Burning Fuse's text overrides the once-per-
+  // turn clause, so a Bomblebee that already fired this turn fires
+  // again here. Sequential so prompts don't collide.
   for (const inst of targets) {
     if (inst.zone !== 'support') continue; // Could've left mid-resolve
-    await triggerBomblebeeAsIfDeath(engine, inst);
+    await triggerBomblebeeAsIfDeath(engine, inst, { bypassHopt: true });
   }
 
   // "Defeat all affected 'Bomblebee' Creatures afterwards." Time

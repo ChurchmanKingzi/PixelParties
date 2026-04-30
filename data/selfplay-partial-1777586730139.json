@@ -1,0 +1,266 @@
+{
+  "gamesDone": 10,
+  "total": 1000,
+  "elapsedMs": 749273,
+  "pickerMode": "random",
+  "stats": {
+    "p0wins": 3,
+    "p1wins": 7,
+    "draws": 0,
+    "totalTurns": 119,
+    "totalMs": 405296
+  },
+  "aggregateWinReasons": {
+    "Heroes dead": 9,
+    "Deck-out": 1
+  },
+  "decks": [
+    {
+      "id": "sample-Structure Deck Poison Torture",
+      "name": "Poison Torture",
+      "games": 1,
+      "wins": 1,
+      "losses": 0,
+      "winReasons": {
+        "Heroes dead": 1
+      },
+      "winRate": 1
+    },
+    {
+      "id": "sample-Structure Deck Great Weapon Master",
+      "name": "Great Weapon Master",
+      "games": 1,
+      "wins": 1,
+      "losses": 0,
+      "winReasons": {
+        "Heroes dead": 1
+      },
+      "winRate": 1
+    },
+    {
+      "id": "sample-Structure Deck Lightning Caller",
+      "name": "Lightning Caller",
+      "games": 2,
+      "wins": 2,
+      "losses": 0,
+      "winReasons": {
+        "Heroes dead": 2
+      },
+      "winRate": 1
+    },
+    {
+      "id": "sample-Suicide Bombers",
+      "name": "Suicide Bombers",
+      "games": 1,
+      "wins": 1,
+      "losses": 0,
+      "winReasons": {
+        "Heroes dead": 1
+      },
+      "winRate": 1
+    },
+    {
+      "id": "sample-Structure Deck Shifting Sandlands",
+      "name": "Shifting Sandlands",
+      "games": 2,
+      "wins": 2,
+      "losses": 0,
+      "winReasons": {
+        "Heroes dead": 2
+      },
+      "winRate": 1
+    },
+    {
+      "id": "sample-Structure Deck Slimy Infestation",
+      "name": "Slimy Infestation",
+      "games": 1,
+      "wins": 1,
+      "losses": 0,
+      "winReasons": {
+        "Heroes dead": 1
+      },
+      "winRate": 1
+    },
+    {
+      "id": "sample-Structure Deck Burning Inferno",
+      "name": "Burning Inferno",
+      "games": 3,
+      "wins": 2,
+      "losses": 1,
+      "winReasons": {
+        "Deck-out": 1,
+        "Heroes dead": 1
+      },
+      "winRate": 0.667
+    },
+    {
+      "id": "sample-Structure Deck Spell Industrialization",
+      "name": "Spell Industrialization",
+      "games": 1,
+      "wins": 0,
+      "losses": 1,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Deepsea Terror",
+      "name": "Deepsea Terror",
+      "games": 2,
+      "wins": 0,
+      "losses": 2,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck One-Two-Punch",
+      "name": "One-Two-Punch!",
+      "games": 1,
+      "wins": 0,
+      "losses": 1,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Shadows over Blackport",
+      "name": "Shadows over Blackport",
+      "games": 2,
+      "wins": 0,
+      "losses": 2,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Depths of the Cosmos",
+      "name": "Depths of the Cosmos",
+      "games": 1,
+      "wins": 0,
+      "losses": 1,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Venom Swamp",
+      "name": "Venom Swamp",
+      "games": 2,
+      "wins": 0,
+      "losses": 2,
+      "winReasons": {},
+      "winRate": 0
+    }
+  ],
+  "matchups": [
+    {
+      "idA": "sample-Structure Deck Poison Torture",
+      "nameA": "Poison Torture",
+      "idB": "sample-Structure Deck Spell Industrialization",
+      "nameB": "Spell Industrialization",
+      "games": 1,
+      "aWins": 1,
+      "bWins": 0,
+      "dominance": 1,
+      "dominantSide": "Poison Torture"
+    },
+    {
+      "idA": "sample-Structure Deck Deepsea Terror",
+      "nameA": "Deepsea Terror",
+      "idB": "sample-Structure Deck Great Weapon Master",
+      "nameB": "Great Weapon Master",
+      "games": 1,
+      "aWins": 0,
+      "bWins": 1,
+      "dominance": 1,
+      "dominantSide": "Great Weapon Master"
+    },
+    {
+      "idA": "sample-Structure Deck Lightning Caller",
+      "nameA": "Lightning Caller",
+      "idB": "sample-Structure Deck One-Two-Punch",
+      "nameB": "One-Two-Punch!",
+      "games": 1,
+      "aWins": 1,
+      "bWins": 0,
+      "dominance": 1,
+      "dominantSide": "Lightning Caller"
+    },
+    {
+      "idA": "sample-Structure Deck Deepsea Terror",
+      "nameA": "Deepsea Terror",
+      "idB": "sample-Suicide Bombers",
+      "nameB": "Suicide Bombers",
+      "games": 1,
+      "aWins": 0,
+      "bWins": 1,
+      "dominance": 1,
+      "dominantSide": "Suicide Bombers"
+    },
+    {
+      "idA": "sample-Structure Deck Burning Inferno",
+      "nameA": "Burning Inferno",
+      "idB": "sample-Structure Deck Lightning Caller",
+      "nameB": "Lightning Caller",
+      "games": 1,
+      "aWins": 0,
+      "bWins": 1,
+      "dominance": 1,
+      "dominantSide": "Lightning Caller"
+    },
+    {
+      "idA": "sample-Structure Deck Burning Inferno",
+      "nameA": "Burning Inferno",
+      "idB": "sample-Structure Deck Shadows over Blackport",
+      "nameB": "Shadows over Blackport",
+      "games": 1,
+      "aWins": 1,
+      "bWins": 0,
+      "dominance": 1,
+      "dominantSide": "Burning Inferno"
+    },
+    {
+      "idA": "sample-Structure Deck Depths of the Cosmos",
+      "nameA": "Depths of the Cosmos",
+      "idB": "sample-Structure Deck Shifting Sandlands",
+      "nameB": "Shifting Sandlands",
+      "games": 1,
+      "aWins": 0,
+      "bWins": 1,
+      "dominance": 1,
+      "dominantSide": "Shifting Sandlands"
+    },
+    {
+      "idA": "sample-Structure Deck Shadows over Blackport",
+      "nameA": "Shadows over Blackport",
+      "idB": "sample-Structure Deck Shifting Sandlands",
+      "nameB": "Shifting Sandlands",
+      "games": 1,
+      "aWins": 0,
+      "bWins": 1,
+      "dominance": 1,
+      "dominantSide": "Shifting Sandlands"
+    },
+    {
+      "idA": "sample-Structure Deck Burning Inferno",
+      "nameA": "Burning Inferno",
+      "idB": "sample-Venom Swamp",
+      "nameB": "Venom Swamp",
+      "games": 1,
+      "aWins": 1,
+      "bWins": 0,
+      "dominance": 1,
+      "dominantSide": "Burning Inferno"
+    },
+    {
+      "idA": "sample-Structure Deck Slimy Infestation",
+      "nameA": "Slimy Infestation",
+      "idB": "sample-Venom Swamp",
+      "nameB": "Venom Swamp",
+      "games": 1,
+      "aWins": 1,
+      "bWins": 0,
+      "dominance": 1,
+      "dominantSide": "Slimy Infestation"
+    }
+  ],
+  "onesidedMatchups": [],
+  "tieDetails": [],
+  "savedAt": "2026-04-30T22:17:59.412Z"
+}

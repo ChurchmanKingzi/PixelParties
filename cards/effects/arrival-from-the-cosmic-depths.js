@@ -211,7 +211,12 @@ module.exports = {
         return;
       }
       const ops = gs.players[oi];
+      // `owner: oi` is required — the client's zonePick highlight
+      // hit-tests on `z.owner ?? myIdx`, so without an explicit
+      // owner the prompt lights up the caster's OWN zones instead
+      // of the opponent's.
       const oppZones = oppSlots.map(s => ({
+        owner: oi,
         heroIdx: s.heroIdx, slotIdx: s.slotIdx,
         label: `${ops.heroes?.[s.heroIdx]?.name || 'Hero'} — Slot ${s.slotIdx + 1}`,
       }));

@@ -42,7 +42,7 @@ function decryptPuzzle(encryptedStr) {
 // matches. Useful while debugging CPU behaviour — you can see exactly what
 // the CPU is holding and predict its plays. MUST be `false` for public
 // builds (leaks opponent information).
-const DEBUG_REVEAL_NPC_HAND = true;
+const DEBUG_REVEAL_NPC_HAND = false;
 
 // ===== CARD DATABASE CACHE =====
 // Module-level card DB cache — loaded once, used everywhere.
