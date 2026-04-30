@@ -31,6 +31,11 @@ module.exports = {
       const entering = ctx.enteringCard;
       if (!entering) return;
       if (ctx.toZone !== 'support') return;
+      // Card text re-triggers on-summon effects when a Creature is
+      // PLACED. A move (Slippery Skates, Dark Gear, Diplomacy) is not
+      // a placement — the creature was already on the board, its
+      // on-summon already fired and would re-fire incorrectly here.
+      if (ctx._isMove) return;
       if (entering.id === ctx.card.id) return; // Skip self
 
       // Must be a Creature (not another Artifact / Token).

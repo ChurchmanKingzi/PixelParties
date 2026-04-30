@@ -21,6 +21,13 @@
 //  a "Cosmic Depths" Creature from your hand or
 //  deck whose level == counters removed into
 //  Argos's free Support Zone.
+//
+//  "Place" here means "summon a Creature
+//  regardless of its level" — the placed Creature
+//  fires its normal on-play / entering-zone
+//  hooks, and a deck-source placement triggers
+//  Cosmic Manipulation just like any other
+//  direct-from-deck summon does.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -278,11 +285,19 @@ module.exports = {
     });
     await engine._delay(550);
 
-    // SILENT PLACEMENT — Argos's text says "place," not "summon." Skip
-    // hooks. Cosmic Manipulation's "summon directly from deck" trigger
-    // is NOT fired (Argos isn't a "summon" event in card-text terms).
-    const placeRes = engine.summonCreature(chosenName, pi, heroIdx, slot, {
+    // REAL SUMMON for the placed creature — "place" in Argos's text
+    // means "summon a Creature regardless of its level"; the on-play
+    // and entering-zone hooks fire normally so the summoned Creature
+    // gets its on-summon effects. `_summonedFromDeck` is set when the
+    // source was the deck, which is what Cosmic Manipulation's post-
+    // summon hand-reaction window keys off of.
+    const placeRes = await engine.summonCreatureWithHooks(chosenName, pi, heroIdx, slot, {
       source: CARD_NAME,
+      isPlacement: true,
+      hookExtras: {
+        _summonedBy: CARD_NAME,
+        _summonedFromDeck: source === 'deck',
+      },
     });
     if (!placeRes) return false;
 

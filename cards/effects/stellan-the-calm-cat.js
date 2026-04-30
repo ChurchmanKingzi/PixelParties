@@ -217,6 +217,8 @@ async function runStellanEffect(ctx) {
   const summonRes = await engine.summonCreatureWithHooks(chosenName, pi, heroIdx, slot, {
     source: CARD_NAME,
     countAsSummon: false,
+    isPlacement: true,
+    hookExtras: { _summonedBy: CARD_NAME, _summonedFromDeck: true },
   });
   if (!summonRes) {
     // beforeSummon refused — put card back, shuffle, fizzle.

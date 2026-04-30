@@ -72,8 +72,9 @@ function canHeroSummon(engine, pi, heroIdx, cd) {
 
 /**
  * Heroes (with a free Support slot) that could host a normal summon
- * of `cd`. Returns one {heroIdx, slotIdx} per eligible hero — the
- * leftmost free zone, matching the prompt's "Slot N" labelling.
+ * of `cd`. Returns one {heroIdx, slotIdx} entry per FREE zone across
+ * every eligible hero — the player picks any of their empty slots,
+ * not just the leftmost.
  */
 function getEligibleHeroesForCreature(engine, pi, cd) {
   const ps = engine.gs.players[pi];
@@ -82,12 +83,11 @@ function getEligibleHeroesForCreature(engine, pi, cd) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     if (!canHeroSummon(engine, pi, hi, cd)) continue;
     const zones = ps.supportZones?.[hi] || [[], [], []];
-    let freeSlot = -1;
     for (let zi = 0; zi < 3; zi++) {
-      if ((zones[zi] || []).length === 0) { freeSlot = zi; break; }
+      if ((zones[zi] || []).length === 0) {
+        out.push({ heroIdx: hi, slotIdx: zi });
+      }
     }
-    if (freeSlot < 0) continue;
-    out.push({ heroIdx: hi, slotIdx: freeSlot });
   }
   return out;
 }

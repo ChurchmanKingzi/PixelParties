@@ -120,6 +120,35 @@ function activateDeepseaSpores(engine) {
   });
 }
 
+// ─── Swap-status cleansing ──────────────────
+
+/**
+ * Clear any incapacitation status counters from a freshly tracked
+ * swap-in Creature. A creature swapped INTO a slot must never inherit
+ * negation / freeze / stun / null / mummified state from the creature
+ * that vacated the slot (or from any other source) — `_trackCard`
+ * returns a clean instance, so this is purely defensive against any
+ * future code path that might leak status across a swap. Called from
+ * `tryBouncePlace` (Deepsea bounce-place) and `atomicSwap`
+ * (Castle / Shapeshift / similar).
+ */
+function clearSwapInheritedStatus(inst) {
+  if (!inst?.counters) return;
+  delete inst.counters.negated;
+  delete inst.counters.frozen;
+  delete inst.counters.stunned;
+  delete inst.counters.nulled;
+  delete inst.counters.bound;
+  delete inst.counters.burned;
+  // Buffs whose `clearCountersOnExpire` listed these counters are now
+  // useless on this fresh instance — strip the buff-bag entirely so
+  // the new creature starts with zero pre-existing timed buffs from
+  // the bounced creature's tenure. The standard buff system will
+  // re-create this bag the first time something legitimately buffs
+  // this instance.
+  if (inst.counters.buffs) delete inst.counters.buffs;
+}
+
 // ─── Enumerate bounceable own creatures ─────
 
 /**
@@ -459,6 +488,13 @@ async function tryBouncePlace(ctx) {
   newInst.turnPlayed = gs.turn || 0;
   newInst.counters._bouncedFromName = bouncedName;
   newInst.counters._bouncedFromLevel = bouncedLevel;
+  // The freshly swapped-in Creature must NEVER inherit any
+  // incapacitation status from the bounced Creature (e.g. bouncing a
+  // Necromancy-summoned negated Pirate to swap in a fresh Mummy must
+  // leave the Mummy fully active). _trackCard returns a clean inst,
+  // but we strip these counters explicitly so no future buff-transfer
+  // refactor or shared-state accident can leak status across a swap.
+  clearSwapInheritedStatus(newInst);
 
   // (C) Splice the new card from the player's hand immediately. The
   //     server's creature-play handler marked it via `_resolvingCard`
@@ -838,6 +874,9 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   newInst.counters = newInst.counters || {};
   newInst.counters.isPlacement = 1;
   newInst.turnPlayed = gs.turn || 0;
+  // See clearSwapInheritedStatus's docstring — the swapped-in Creature
+  // does not inherit negation/freeze/stun/null from its predecessor.
+  clearSwapInheritedStatus(newInst);
 
   // (C) Splice the replacement from hand. Capture its hand index
   //     BEFORE splicing so the hand→support flying-card animation

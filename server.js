@@ -42,7 +42,7 @@ function decryptPuzzle(encryptedStr) {
 // matches. Useful while debugging CPU behaviour — you can see exactly what
 // the CPU is holding and predict its plays. MUST be `false` for public
 // builds (leaks opponent information).
-const DEBUG_REVEAL_NPC_HAND = false;
+const DEBUG_REVEAL_NPC_HAND = true;
 
 // ===== CARD DATABASE CACHE =====
 // Module-level card DB cache — loaded once, used everywhere.
@@ -1777,6 +1777,27 @@ function sendGameState(room, playerIdx, extra) {
       }
       return [...names];
     })(),
+    // Reaction-subtype Artifacts that opt into `proactivePlay: true`
+    // can be cast on the player's own turn just like a Normal Artifact
+    // (they merely retain the chain-reaction window during the
+    // opponent's phase changes). Surface them so the client's hand
+    // grey-out doesn't blanket-disable every Reaction Artifact.
+    // Server's `doUseArtifactEffect` (see server.js ~line 4700) already
+    // respects this opt-in; this list mirrors that to the client.
+    proactiveReactionArtifacts: (() => {
+      const ps2 = gs.players[playerIdx];
+      const names = new Set();
+      const cardDB = getCardDB();
+      for (const cn of (ps2?.hand || [])) {
+        if (names.has(cn)) continue;
+        const cd = cardDB[cn];
+        if (cd?.cardType !== 'Artifact') continue;
+        if ((cd.subtype || '').toLowerCase() !== 'reaction') continue;
+        const s = loadCardEffect(cn);
+        if (s?.proactivePlay) names.add(cn);
+      }
+      return [...names];
+    })(),
     // Abilities flagged with `restrictedAttachment: true` can never be
     // attached to a Hero by normal play / generic tutors — Divinity is
     // the inaugural example. Surface them so the client gray-out logic
@@ -2168,6 +2189,7 @@ function sendSpectatorGameState(room) {
     customPlacementCards: [],
     customHostPickCards: [],
     ascendedOnlyAbilities: [],
+    proactiveReactionArtifacts: [],
     awaitingFirstChoice: gs.awaitingFirstChoice || false,
     choosingPlayerName,
     terrorCount: 0,
@@ -3395,6 +3417,10 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   }
 
   room.engine._setPendingPlayLog('creature_effect_activated', { player: gs.players[pi].username, card: creatureName, hero: hero.name });
+  // Clear any leftover Gerrymander-decline marker so we only catch
+  // declines from this activation's prompts (see HOPT-stamp on cancel
+  // below for the Gerrymander veto path).
+  room.engine._lastPromptGerryDeclined = false;
 
   try {
     const isStolenByPi = inst.stolenBy === pi && inst.controller === pi;
@@ -3458,6 +3484,16 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     } else {
       delete gs._pendingCardReveal;
       delete gs._pendingPlayLog;
+      // Gerrymander veto on a "may" confirm consumes the once-per-turn
+      // even though `resolved` came back false — the activator did
+      // commit, opp's Gerrymander declined for them. Stamp HOPT so
+      // the activation can't be retried this turn.
+      if (room.engine._lastPromptGerryDeclined) {
+        room.engine._lastPromptGerryDeclined = false;
+        if (!gs.hoptUsed) gs.hoptUsed = {};
+        gs.hoptUsed[hoptKey] = gs.turn;
+        room.engine.log('gerrymander_veto', { player: gs.players[pi].username, creature: creatureName });
+      }
     }
     await room.engine._flushSurpriseDrawChecks();
     await room.engine._executeDeferredSurprises();
@@ -3545,6 +3581,9 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
   const releaseHopt = () => {
     if (hoptReserved) { delete gs.hoptUsed[hoptKey]; hoptReserved = false; }
   };
+  // Clear any leftover Gerrymander-decline marker so we only catch
+  // declines that happen during this activation's prompts.
+  room.engine._lastPromptGerryDeclined = false;
 
   try {
     const chainResult = await room.engine.executeCardWithChain({
@@ -3613,7 +3652,16 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
     } else {
       // Ability cancelled (user backed out, no legal target, etc.) — roll
       // back the HOPT reservation so the player keeps their once-per-turn.
-      releaseHopt();
+      // EXCEPTION: if a Gerrymander redirect on a "you may" confirm caused
+      // the cancel, the activator did COMMIT to playing the ability — the
+      // opp's Gerrymander vetoed it. The once-per-turn slot is consumed.
+      if (room.engine._lastPromptGerryDeclined) {
+        room.engine._lastPromptGerryDeclined = false;
+        hoptReserved = false; // keep HOPT consumed
+        room.engine.log('gerrymander_veto', { player: gs.players[pi].username, ability: abilityName });
+      } else {
+        releaseHopt();
+      }
       delete gs._pendingCardReveal;
       delete gs._pendingPlayLog;
     }
@@ -3890,6 +3938,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
   }
 
   room.engine._setPendingPlayLog('ability_activated', { player: gs.players[pi].username, card: abilityName, hero: hero.name, level });
+  // Clear any leftover Gerrymander-decline marker so we only catch
+  // declines from this activation's prompts (see HOPT-keep logic below).
+  room.engine._lastPromptGerryDeclined = false;
 
   try {
     const inst = room.engine.cardInstances.find(c =>
@@ -3960,7 +4011,15 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
       inst.heroIdx = origHeroIdx; delete inst.heroOwner;
     }
     if (result === false) {
-      delete gs.hoptUsed[hoptKey];
+      // Standard cancel rolls HOPT back. Gerrymander-vetoed "may"
+      // confirms keep HOPT consumed — the activator committed; opp's
+      // Gerrymander declined for them, the slot is spent.
+      if (room.engine._lastPromptGerryDeclined) {
+        room.engine._lastPromptGerryDeclined = false;
+        room.engine.log('gerrymander_veto', { player: gs.players[pi].username, ability: abilityName });
+      } else {
+        delete gs.hoptUsed[hoptKey];
+      }
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -4092,6 +4151,9 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
   if (!gs._heroEffectInProgress) gs._heroEffectInProgress = {};
   if (gs._heroEffectInProgress[inProgressKey]) return false;
   gs._heroEffectInProgress[inProgressKey] = true;
+  // Clear any leftover Gerrymander-decline marker so we only catch
+  // declines from this activation's prompts.
+  room.engine._lastPromptGerryDeclined = false;
 
   try {
     let chosen;
@@ -4180,6 +4242,15 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     } else {
       delete gs._pendingCardReveal;
       delete gs._pendingPlayLog;
+      // Gerrymander veto on a "may" confirm consumes the once-per-turn
+      // even though `resolved` came back false — the activator did
+      // commit, opp's Gerrymander declined for them.
+      if (room.engine._lastPromptGerryDeclined) {
+        room.engine._lastPromptGerryDeclined = false;
+        if (!gs.hoptUsed) gs.hoptUsed = {};
+        gs.hoptUsed[chosen.hoptKey] = gs.turn;
+        room.engine.log('gerrymander_veto', { player: gs.players[pi].username, hero: hero.name, effect: chosen.name });
+      }
     }
   } catch (err) {
     console.error('[doActivateHeroEffect]', err.message);
@@ -4282,6 +4353,9 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
   const releaseHopt = () => {
     if (hoptReserved) { delete gs.hoptUsed[hoptKey]; hoptReserved = false; }
   };
+  // Clear any leftover Gerrymander-decline marker so we only catch
+  // declines from this activation's prompts.
+  room.engine._lastPromptGerryDeclined = false;
 
   room.engine._setPendingPlayLog('equip_effect_activated', { player: gs.players[pi].username, card: cardName, hero: hero.name });
 
@@ -4294,7 +4368,16 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
       if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
       else room.engine._firePendingPlayLog();
     } else {
-      releaseHopt();
+      // Standard cancel rolls HOPT back. Gerrymander veto on a "may"
+      // confirm keeps it consumed — the activator committed and opp's
+      // Gerrymander declined for them.
+      if (room.engine._lastPromptGerryDeclined) {
+        room.engine._lastPromptGerryDeclined = false;
+        hoptReserved = false; // keep HOPT consumed
+        room.engine.log('gerrymander_veto', { player: gs.players[pi].username, equip: cardName });
+      } else {
+        releaseHopt();
+      }
       delete gs._pendingCardReveal;
       delete gs._pendingPlayLog;
     }

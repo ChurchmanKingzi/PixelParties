@@ -31,6 +31,10 @@ module.exports = {
       // Only react when a Creature lands in a Support zone — abilities
       // / equipment moving don't count.
       if (entering.zone !== 'support') return;
+      // Card text triggers off summons; moves (Slippery Skates,
+      // Dark Gear, Diplomacy) shuffle existing creatures around and
+      // do not count as a fresh summon.
+      if (ctx._isMove) return;
       // Same-side trigger — Hountriever fires off OUR summons only.
       if ((entering.owner ?? entering.controller) !== ctx.cardOriginalOwner) return;
       // Self-exclusion: the dying-into-life Hountriever doesn't trigger

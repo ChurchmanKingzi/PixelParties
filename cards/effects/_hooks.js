@@ -230,13 +230,20 @@ function isArtifactCreature(cd) {
 
 /**
  * A Creature has a "numeric level" when its `level` field is a finite,
- * positive number. Regular Creatures have levels 1..5; Artifact-Creatures
- * (Pollution Spewer) have `null`. Effects that need to scale / gate by
- * level use this to exclude level-less targets.
+ * non-negative number. Regular Creatures have levels 0..5 (Lv0 is a real,
+ * common category — Aggressive Town Guard, Pure Advantage Camel,
+ * Stellin, all Slimes, all Guardian Beasts, the Spirits, etc.); only
+ * Artifact-Creatures (Pollution Spewer and similar) have `level: null`.
+ * Effects that need to scale / gate by level use this to exclude
+ * truly level-less targets.
+ *
+ * Callers that scale a cost by `level` (e.g. Dark Gear's cost = level ×
+ * BASE_COST) get a 0 cost for Lv0 Creatures, which is the intended
+ * behaviour — stealing a Lv0 body is free.
  */
 function hasNumericCreatureLevel(cd) {
   if (!cd) return false;
-  return typeof cd.level === 'number' && cd.level > 0;
+  return typeof cd.level === 'number' && cd.level >= 0;
 }
 
 /**

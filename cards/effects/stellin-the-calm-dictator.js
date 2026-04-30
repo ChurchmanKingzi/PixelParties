@@ -326,6 +326,7 @@ async function runStellinEffect(ctx) {
   const summonRes = await engine.summonCreatureWithHooks(chosenName, pi, heroIdx, slot, {
     source: CARD_NAME,
     countAsSummon: false,
+    hookExtras: { _summonedBy: CARD_NAME, _summonedFromDeck: true },
   });
   if (!summonRes) {
     ps.mainDeck.push(chosenName);

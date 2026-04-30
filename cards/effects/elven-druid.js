@@ -151,7 +151,10 @@ module.exports = {
     // immunity, etc.) all apply.
     const summonRes = await engine.summonCreatureWithHooks(
       chosenName, pi, heroIdx, freeSlot,
-      { source: CARD_NAME }
+      {
+        source: CARD_NAME,
+        hookExtras: { _summonedBy: CARD_NAME, _summonedFromDeck: true },
+      }
     );
     if (!summonRes) {
       // beforeSummon refused (unlikely for an Elven) — put card back

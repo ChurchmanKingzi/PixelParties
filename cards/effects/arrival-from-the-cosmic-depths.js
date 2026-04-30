@@ -106,7 +106,10 @@ function oppFreeSlots(engine, oppIdx) {
   const out = [];
   for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
     const h = ops.heroes[hi];
-    if (!h?.name || h.hp <= 0) continue;
+    // The first-half is a "place" — any Hero's Support Zone qualifies,
+    // including dead / Frozen / Stunned / negated Heroes. Only an
+    // empty Hero slot (no Hero card at all) is skipped.
+    if (!h?.name) continue;
     const zones = ops.supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) {
@@ -232,11 +235,24 @@ module.exports = {
       });
       await engine._delay(450);
 
-      // SILENT PLACEMENT — owner is the OPP since the creature lands on
-      // their side. summonCreature skips onPlay/onCardEnterZone hooks,
-      // matching "place" semantics.
-      const placeRes = engine.summonCreature(firstName, oi, oppPick.heroIdx, oppPick.slotIdx, {
+      // REAL SUMMON on the opponent's side — "place" in card text
+      // means "summon regardless of level" AND "any Hero's Support
+      // Zone (alive/dead/Frozen/Stunned/negated/Bound)". `isPlacement`
+      // declares this so the engine bypasses the normal-summoning
+      // incapacitation gates. Owner is OPP since the slot is on their
+      // side, but `_summonedByPlayer: pi` ensures the post-summon
+      // hand-reaction window (Cosmic Manipulation, etc.) routes back
+      // to YOUR hand — you're the one summoning out of your own deck,
+      // even though the body lands on opp's side.
+      const placeRes = await engine.summonCreatureWithHooks(firstName, oi, oppPick.heroIdx, oppPick.slotIdx, {
         source: CARD_NAME,
+        isPlacement: true,
+        hookExtras: {
+          _summonedBy: CARD_NAME,
+          _summonedByCosmic: true,
+          _summonedFromDeck: true,
+          _summonedByPlayer: pi,
+        },
       });
       if (!placeRes) {
         engine.log('arrival_fizzle', { player: ps.username, reason: 'opp_place_failed' });

@@ -1198,10 +1198,19 @@ class GameEngine {
       if (enteringCard && toZone === 'support') {
         const cd = this._getCardDB()[enteringCard.name];
         if (cd && hasCardType(cd, 'Creature')) {
+          // The "summoning player" is the EFFECT'S caster — not the
+          // slot's controller. Most paths agree (you summon into your
+          // own zone), but cross-side placements (Arrival's first half
+          // puts your deck-search onto opp's side) need to route the
+          // post-summon reaction window to your hand, not opp's. The
+          // summoning source sets `_summonedByPlayer` in hookExtras to
+          // declare who's "doing" the summon; if absent, fall back to
+          // the slot's controller/owner.
+          const summoningPi = hookCtx._summonedByPlayer != null
+            ? hookCtx._summonedByPlayer
+            : (enteringCard.controller ?? enteringCard.owner);
           await this._checkPostSummonHandReactions(
-            enteringCard.controller ?? enteringCard.owner,
-            enteringCard,
-            hookCtx,
+            summoningPi, enteringCard, hookCtx,
           );
         }
       }
@@ -4697,6 +4706,14 @@ class GameEngine {
     // summon entirely — no placement, no onPlay, no onCardEnterZone —
     // which is the point: the cost is paid at summon-declaration time, so
     // a failed cost never leaves a ghost creature momentarily on the board.
+    //
+    // Note: `opts.isPlacement` is INTENTIONALLY orthogonal to this gate.
+    // Placement-style summons still honour the placed Creature's own
+    // beforeSummon (Dark Deepsea God's tribute, 500 Piranhas' tribute,
+    // Invader's by-Cosmic gate, etc.) — those are Creature-specific
+    // restrictions, NOT host-side normal-summoning gates. Only sources
+    // that explicitly own the cost (e.g. Steam Dwarf Engineer's "its own
+    // life is the cost") opt out via `skipBeforeSummon: true`.
     if (!opts.skipBeforeSummon) {
       const ok = await this._runBeforeSummon(cardName, playerIdx, heroIdx, opts.hookExtras);
       if (!ok) return null;
@@ -4708,10 +4725,29 @@ class GameEngine {
     const { inst, actualSlot } = result;
 
     if (!opts.skipHooks) {
+      // "Place" semantics: a placed Creature targets ANY Hero's Support
+      // Zone (own/opp, alive/dead/Frozen/Stunned/negated/Bound) and
+      // bypasses the normal-summoning gates that block plays onto an
+      // incapacitated Hero. Caller signals this via `opts.isPlacement`
+      // when the source card's text says "place"; the flag forces the
+      // dead-hero hook filter off so the placed Creature's own on-
+      // summon effects fire even on a corpse host. Normal summons
+      // ignore the flag entirely.
+      //
+      // Frozen / Stunned / negated host statuses are ALREADY ignored
+      // by the runHooks filter for support-zone listeners (the filter
+      // only checks those statuses on hero/ability zones), so no extra
+      // flag is needed for those — they "just work" for both placements
+      // and normal summons of support-zone Creatures.
+      const hostHero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
+      const onDeadHero = !hostHero?.name || hostHero.hp <= 0;
+      const isPlacement = !!opts.isPlacement;
       const hookCtx = {
         _onlyCard: inst, playedCard: inst, cardName,
         zone: 'support', heroIdx, zoneSlot: actualSlot,
         _skipReactionCheck: opts.skipReactionCheck !== false,
+        _bypassDeadHeroFilter: onDeadHero || isPlacement,
+        _isPlacement: isPlacement,
         ...(opts.hookExtras || {}),
       };
       await this.runHooks('onPlay', hookCtx);
@@ -4723,6 +4759,8 @@ class GameEngine {
       await this.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
         _skipReactionCheck: opts.skipReactionCheck !== false,
+        _bypassDeadHeroFilter: onDeadHero || isPlacement,
+        _isPlacement: isPlacement,
         ...(opts.hookExtras || {}),
       });
     }
@@ -4891,6 +4929,21 @@ class GameEngine {
 
     // Sync guardian immunity to match new controller's side
     this._syncGuardianImmunity(inst, toPlayerIdx);
+
+    this.sync();
+
+    // Fire onCardEnterZone for host-hero listeners (Ingo, Maya, Pes'zet,
+    // etc.) without `_onlyCard` so the new owner's hero-side hooks react
+    // to the creature landing in their zone. `_isMove: true` lets summon-
+    // gated reactors (Sandy Blob, Orthos, Loyal Hountriever, Blood Moon)
+    // opt out — moves are not summons. The moved creature's own
+    // onCardEnterZone hook still fires, but every existing in-tree hook
+    // is either self-excluding or idempotent for self-entry.
+    await this.runHooks('onCardEnterZone', {
+      enteringCard: inst, toZone: 'support', toHeroIdx: destHeroIdx,
+      _skipReactionCheck: true,
+      _isMove: true,
+    });
 
     this.sync();
     return { success: true };
@@ -8083,19 +8136,33 @@ class GameEngine {
     });
 
     if (opts.fireHooks !== false && !opts.negateEffects) {
+      // `actionPlaceCreature` is by definition a "place" — its caller
+      // already chose to skirt the normal-summoning gates. Fire the
+      // placed Creature's own hooks unconditionally even if the host
+      // is KO'd, and surface `_isPlacement: true` so any listener that
+      // wants to distinguish placements from natural summons can.
+      // Frozen / Stunned / negated host statuses are ignored by the
+      // runHooks filter for support-zone listeners already, so no
+      // extra flag is needed for those.
       await this.runHooks('onPlay', {
         _onlyCard: inst, playedCard: inst, cardName,
         zone: ZONES.SUPPORT, heroIdx, zoneSlot: slotIdx,
         _skipReactionCheck: true,
+        _bypassDeadHeroFilter: true,
+        _isPlacement: true,
       });
       await this.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: ZONES.SUPPORT, toHeroIdx: heroIdx,
         _skipReactionCheck: true,
+        _bypassDeadHeroFilter: true,
+        _isPlacement: true,
       });
     } else if (opts.fireHooks !== false && opts.negateEffects) {
       await this.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: ZONES.SUPPORT, toHeroIdx: heroIdx,
         _skipReactionCheck: true,
+        _bypassDeadHeroFilter: true,
+        _isPlacement: true,
       });
     }
 
@@ -9216,8 +9283,21 @@ class GameEngine {
   resolveGenericPrompt(response) {
     if (!this._pendingGenericPrompt) return false;
     const { resolve } = this._pendingGenericPrompt;
+    // Track whether this prompt was a Gerrymander-rewritten "may"
+    // confirm that the chooser DECLINED on behalf of the original
+    // recipient. The server's ability-activation paths read this flag
+    // to decide whether to release the HOPT reservation: a normal
+    // user-cancelled activation rolls HOPT back, but a Gerrymander
+    // veto consumes the once-per-turn — the activator chose to play
+    // the ability, opp's Gerrymander prevented it, the slot is spent.
+    const promptType = this.gs.effectPrompt?.type;
+    const wasGerryRewritten = !!this.gs.effectPrompt?._gerryRewritten;
     this._pendingGenericPrompt = null;
     this.gs.effectPrompt = null;
+    const declined = !!response?.cancelled || (response && response.confirmed === false);
+    if (wasGerryRewritten && promptType === 'confirm' && declined) {
+      this._lastPromptGerryDeclined = true;
+    }
     if (response?.cancelled) {
       resolve(null);
     } else {
@@ -9968,6 +10048,31 @@ class GameEngine {
         }
       } finally {
         this._inAfterDamageReaction = false;
+      }
+
+      // Fire afterSpellResolved for Spell-type after-damage reactions
+      // (Fireshield, Anti Magic Shield, etc.) so hero passives that
+      // listen on cast completion (Beato's orb collector, Zsos'Ssar's
+      // Poison cost, Andras, Luck, etc.) treat reactive Spell casts
+      // the same as normal plays. Without this, Beato casting
+      // Fireshield as a recoil reaction would fail to tick her
+      // Destruction Magic orb because the cast skips
+      // `executeCardWithChain`'s normal afterSpellResolved fire.
+      // Mirrors the same fix already in place for surprise activations
+      // (~line 11400) and reaction-chain Spells (~line 10999).
+      if (cardData?.cardType === 'Spell') {
+        try {
+          await this.runHooks('afterSpellResolved', {
+            spellName: cardName,
+            spellCardData: cardData,
+            heroIdx: targetHeroIdx, casterIdx: targetOwner,
+            damageTargets: [],
+            isSecondCast: false,
+            _skipReactionCheck: true,
+          });
+        } catch (err) {
+          console.error('[Engine] afterSpellResolved (after-damage) error:', err.message);
+        }
       }
 
       // Potions and deleteOnUse cards go to deleted pile; everything else to discard
@@ -13024,15 +13129,34 @@ class GameEngine {
     // can't be fired twice by a rapid double-click.
     if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
     this.gs.hoptUsed[hoptKey] = this.gs.turn;
+    // Clear any leftover Gerrymander-decline marker so we only catch
+    // declines from this activation's prompts.
+    this._lastPromptGerryDeclined = false;
 
     const ctx = this._createContext(inst, { _activator: activatorPi });
+    let resolved = true;
     try {
-      await script.onAreaEffect(ctx);
+      const ret = await script.onAreaEffect(ctx);
+      if (ret === false) resolved = false;
       this.log('area_effect_activated', {
         area: areaName, activator: gs.players[activatorPi]?.username,
       });
     } catch (err) {
       console.error(`[onAreaEffect] ${areaName}:`, err.message);
+    }
+    // If the activation cancelled (user backed out of a prompt), release
+    // the HOPT — they didn't commit. EXCEPTION: a Gerrymander veto
+    // ("you may?" was redirected to opp's Gerrymander, who declined)
+    // counts as a commit; the once-per-turn stays consumed.
+    if (resolved === false) {
+      if (this._lastPromptGerryDeclined) {
+        this._lastPromptGerryDeclined = false;
+        this.log('gerrymander_veto', {
+          player: gs.players[activatorPi]?.username, area: areaName,
+        });
+      } else {
+        delete this.gs.hoptUsed[hoptKey];
+      }
     }
     this.sync();
     return true;

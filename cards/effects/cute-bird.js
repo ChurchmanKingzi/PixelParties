@@ -104,7 +104,11 @@ module.exports = {
       // onCardEnterZone (so Phoenix's counters & subscriptions activate).
       const summonRes = await engine.summonCreatureWithHooks(
         TUTOR_TARGET, pi, heroIdx, zoneSlot,
-        { source: CARD_NAME }
+        {
+          source: CARD_NAME,
+          isPlacement: true,
+          hookExtras: { _summonedBy: CARD_NAME, _summonedFromDeck: true },
+        }
       );
 
       if (!summonRes) {

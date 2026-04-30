@@ -100,14 +100,21 @@ module.exports = {
     if ((ps.gold || 0) < goldCost) return { aborted: true };
 
     // ── Step 2: pick a free support zone ────────────────────────────────
-
+    // Place can target ANY of the player's Heroes' Support Zones —
+    // including dead, Frozen, Stunned, Bound, negated etc. — per the
+    // universal "place" rule. Only fully-empty Hero slots (no name)
+    // are skipped because there's no Support Zone to occupy.
     const freeZones = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const h = ps.heroes[hi];
-      if (!h?.name || h.hp <= 0) continue;
+      if (!h?.name) continue;
       for (let si = 0; si < 3; si++) {
         if ((ps.supportZones?.[hi]?.[si] || []).length === 0) {
-          freeZones.push({ heroIdx: hi, slotIdx: si, label: `${h.name} — Slot ${si + 1}` });
+          const dead = h.hp <= 0;
+          freeZones.push({
+            heroIdx: hi, slotIdx: si,
+            label: `${h.name}${dead ? ' (KO\'d)' : ''} — Slot ${si + 1}`,
+          });
         }
       }
     }
@@ -170,10 +177,17 @@ module.exports = {
       hero: ps.heroes[destHeroIdx]?.name,
     });
 
-    // Fire enter-zone hooks (Ingo, Maya, Layn, etc.)
+    // Fire enter-zone hooks (Ingo, Maya, Layn, etc.). Placement onto
+    // any Hero (alive / dead / Frozen / Stunned / negated / Bound) is
+    // legal per the universal "place" rule, and the placed Creature's
+    // own on-summon hooks must still fire — `_isPlacement: true`
+    // declares the placement-style summon and the dead-hero filter
+    // is bypassed unconditionally for placements.
     await engine.runHooks('onCardEnterZone', {
       enteringCard: inst, toZone: 'support', toHeroIdx: destHeroIdx,
       _skipReactionCheck: true,
+      _bypassDeadHeroFilter: true,
+      _isPlacement: true,
     });
 
     // Lock summoning for the rest of the turn

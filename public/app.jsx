@@ -7531,7 +7531,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                       setPendingAdditionalPlay(null);
                       socket.emit('pending_placement_clear', { roomId: gameState.roomId });
                     }
-                  } : isZonePickTarget ? () => respondToPrompt({ heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
+                  } : isZonePickTarget ? () => respondToPrompt({ owner: pi, heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
                   style={zsMerge('support', (isValidEquipTarget || isZonePickTarget || isProviderZone) ? { cursor: 'pointer' } : undefined)}>
                   {(isPlayTarget || isAutoTarget) && playDrag.card ? (
                     <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />

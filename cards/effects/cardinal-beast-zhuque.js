@@ -11,6 +11,17 @@ const { _checkCardinalWin, _setCardinalImmune } = require('./_cardinal-shared');
 module.exports = {
   creatureEffect: true,
 
+  // Cardinal Beasts are signature win-condition pieces — their once-per-
+  // turn actives are FREE permanent control reductions on the opponent's
+  // side (burn that never expires here, instant 1HP for Xuanwu's revives,
+  // Qinglong's chain, Baihu's freeze). The eval can underweight a single
+  // burn against the +3 commit threshold for `mctsGatedActivation`,
+  // skipping the activation when it's clearly correct to fire it. Force-
+  // commit whenever `canActivateCreatureEffect` returns true (which
+  // already gates "is there a non-burned target?") so the CPU always
+  // uses the active when possible.
+  cpuMeta: { alwaysCommit: true },
+
   hooks: {
     onPlay: async (ctx) => { _setCardinalImmune(ctx); },
     onCardEnterZone: async (ctx) => {

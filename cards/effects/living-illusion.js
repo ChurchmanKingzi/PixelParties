@@ -193,7 +193,11 @@ module.exports = {
       // but the engine re-checks as a safety net.
       const placeResult = await engine.summonCreatureWithHooks(
         creatureName, pi, destZone.heroIdx, destZone.slotIdx,
-        { source: 'Living Illusion', skipReactionCheck: false },
+        {
+          source: 'Living Illusion', skipReactionCheck: false,
+          isPlacement: true,
+          hookExtras: { _summonedBy: 'Living Illusion', _summonedFromDeck: true },
+        },
       );
       // Apply the shared blue illusion tint to the summoned creature —
       // same `_illusionSummon` flag Create Illusion / Staff of Illusions

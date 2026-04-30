@@ -151,12 +151,29 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
 module.exports = {
   canBypassLevelReq: () => true,
 
-  canSummon: (ctx) => ctx._engine.canSatisfySacrifice(
-    ctx.cardOwner, SACRIFICE_SPEC, ctx.card?.id,
-  ),
+  // DDG's text is "tribute 2+ Creatures NOT summoned this turn (sum-
+  // level ≥ 4)". The `canSatisfySacrifice` engine helper doesn't apply
+  // the not-summoned-this-turn rule on its own (cards like Sacrifice
+  // to Divinity sacrifice anything you control), so we layer it on
+  // here via spec.filter — otherwise DDG would highlight as playable
+  // in hand on turns where the only available tributes were summoned
+  // this turn (which can't actually pay the cost).
+  canSummon: (ctx) => {
+    const engine = ctx._engine;
+    const turn = engine.gs?.turn || 0;
+    return engine.canSatisfySacrifice(ctx.cardOwner, {
+      ...SACRIFICE_SPEC,
+      filter: (c) => (c.inst?.turnPlayed || 0) !== turn,
+    }, ctx.card?.id);
+  },
 
-  canBypassFreeZoneRequirement: (gs, pi, heroIdx, cardData, engine) =>
-    engine.canSatisfySacrifice(pi, SACRIFICE_SPEC, null),
+  canBypassFreeZoneRequirement: (gs, pi, heroIdx, cardData, engine) => {
+    const turn = engine.gs?.turn || 0;
+    return engine.canSatisfySacrifice(pi, {
+      ...SACRIFICE_SPEC,
+      filter: (c) => (c.inst?.turnPlayed || 0) !== turn,
+    }, null);
+  },
 
   canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine) => {
     const cands = _collectTributeCandidates(engine, pi, null);

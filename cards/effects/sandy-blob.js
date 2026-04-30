@@ -47,6 +47,12 @@ module.exports = {
       if (!entering) return;
       if (ctx.toZone !== 'support') return;
 
+      // Card text: "when the on-summon effect of a Creature you control
+      // activates". Moves (Slippery Skates, Dark Gear, Diplomacy) are
+      // not summons — the creature was already on the board, its on-
+      // summon already fired. Skip.
+      if (ctx._isMove) return;
+
       // Skip self-entry (Sandy Blob's own placement).
       if (entering.id === inst.id) return;
 

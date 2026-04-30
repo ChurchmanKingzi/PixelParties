@@ -916,6 +916,79 @@ function CosmicDepthsOverlay() {
   );
 }
 
+// Graveyard of Limited Power — dark cemetery backdrop. Tombstones are
+// scattered randomly across the lower half of the screen; each carries
+// a pulsing red light. Random positions / sizes / tilts are seeded once
+// per mount via useMemo so the layout doesn't reshuffle on every render.
+function GraveyardOfLimitedPowerOverlay() {
+  const tombstones = useMemo(() => Array.from({ length: 24 }, () => ({
+    x: Math.random() * 100,
+    y: 32 + Math.random() * 62,
+    scale: 0.7 + Math.random() * 0.85,
+    tilt: -10 + Math.random() * 20,
+    delay: -Math.random() * 3,
+    dur: 1.6 + Math.random() * 1.6,
+  })), []);
+  return (
+    <div className="graveyard-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      overflow: 'hidden',
+    }}>
+      {/* Layer 1: dark, fog-tinted sky with a faint blood-red horizon. */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background:
+          'radial-gradient(ellipse at 50% 100%, rgba(72,12,18,0.78) 0%, rgba(22,10,18,0.92) 45%, rgba(6,4,8,0.97) 100%)',
+      }} />
+      {/* Layer 2: ground silhouette mound at the bottom edge. */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, height: '34%',
+        background:
+          'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(8,4,8,0.6) 55%, rgba(0,0,0,0.88) 100%)',
+      }} />
+      {/* Layer 3: tombstones with red lights. */}
+      {tombstones.map((t, i) => {
+        const w = 16 * t.scale;
+        const h = 26 * t.scale;
+        return (
+          <div key={'tomb' + i} style={{
+            position: 'absolute',
+            left: t.x + '%', top: t.y + '%',
+            width: w + 'px', height: h + 'px',
+            transform: 'translate(-50%, -50%) rotate(' + t.tilt + 'deg)',
+          }}>
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(180deg, #2c2630 0%, #1a161e 75%, #100a10 100%)',
+              borderRadius: (w * 0.5) + 'px ' + (w * 0.5) + 'px 2px 2px',
+              boxShadow: 'inset 0 -2px 4px rgba(0,0,0,0.7), 0 4px 8px rgba(0,0,0,0.55)',
+            }} />
+            <span style={{
+              position: 'absolute',
+              left: '50%', top: '40%',
+              width: (w * 0.32) + 'px', height: (w * 0.32) + 'px',
+              transform: 'translate(-50%, -50%)',
+              background:
+                'radial-gradient(circle, rgba(255,40,40,1) 0%, rgba(180,20,20,0.7) 50%, rgba(120,0,0,0) 100%)',
+              borderRadius: '50%',
+              boxShadow:
+                '0 0 ' + (w * 0.7) + 'px rgba(255,30,30,0.85), '
+                + '0 0 ' + (w * 1.5) + 'px rgba(255,0,0,0.5)',
+              animation: 'graveyardLightPulse ' + t.dur + 's ease-in-out ' + t.delay + 's infinite',
+            }} />
+          </div>
+        );
+      })}
+      <style>{`
+        @keyframes graveyardLightPulse {
+          0%, 100% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.85); }
+          50%      { opacity: 1.0; transform: translate(-50%, -50%) scale(1.18); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // Tarleinn's Floating Island — a wide sky background with a single
 // large grass-topped island floating in the middle, cut by a blue
 // river that snakes across the grass plateau.
@@ -9435,7 +9508,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // — never proactively from hand. Server's `doUseArtifactEffect`
         // enforces the same rule (see line ~4573); mirror it here so the
         // card visibly greys out instead of silently rejecting clicks.
-        if ((card.subtype || '').toLowerCase() === 'reaction') return true;
+        // EXCEPTION: scripts that opt into `proactivePlay: true` (Juice,
+        // …) may also be cast on the player's own turn like a Normal
+        // Artifact, so don't blanket-grey those. The server publishes
+        // the opt-in list as `proactiveReactionArtifacts`.
+        if ((card.subtype || '').toLowerCase() === 'reaction'
+            && !(gameState.proactiveReactionArtifacts || []).includes(cardName)) return true;
         if (me.itemLocked && (me.hand || []).length < 2) return true;
         // Boomerang's "no Artifacts for the rest of this turn" lockout —
         // every Artifact in hand greys out for the duration. Server
@@ -9930,15 +10008,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // "Artifact-activatable" is click-to-use (potions / Wheels-style). It
     // excludes Equipment AND Artifact-Creatures — both of those are drag-
     // to-hero plays instead. Reaction-subtype Artifacts (Invisibility
-    // Cloak, Bomb Arrow, …) are also excluded — they only fire from the
-    // engine's reaction windows, never as a proactive own-turn play.
+    // Cloak, Bomb Arrow, …) are also excluded by default — they only fire
+    // from the engine's reaction windows. EXCEPTION: scripts that opt into
+    // `proactivePlay: true` (Juice, …) ARE click-to-use on the player's
+    // own turn just like a Normal Artifact, so the
+    // `proactiveReactionArtifacts` allow-list re-includes them.
     // (Server's `doUseArtifactEffect` enforces the same gate at line
-    // ~4573; mirroring it here keeps the UI honest.)
+    // ~4700; mirroring it here keeps the UI honest.)
+    const _subtypeLC = (card?.subtype || '').toLowerCase();
+    const _isReactionArtifact = _subtypeLC === 'reaction';
+    const _isProactiveReactionArtifact = _isReactionArtifact
+      && (gameState.proactiveReactionArtifacts || []).includes(cardName);
     const isArtifactActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
       && card.cardType === 'Artifact'
-      && (card.subtype || '').toLowerCase() !== 'equipment'
-      && (card.subtype || '').toLowerCase() !== 'reaction'
-      && !(card.subtype || '').toLowerCase().split('/').some(t => t.trim() === 'creature');
+      && _subtypeLC !== 'equipment'
+      && (!_isReactionArtifact || _isProactiveReactionArtifact)
+      && !_subtypeLC.split('/').some(t => t.trim() === 'creature');
     const isPotionActivatable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Potion';
     const isSurprisePlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
       && (card.subtype || '').toLowerCase() === 'surprise'
@@ -16484,7 +16569,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       setPendingAdditionalPlay(null);
                       socket.emit('pending_placement_clear', { roomId: gameState.roomId });
                     }
-                  } : isZonePickTarget ? () => respondToPrompt({ heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
+                  } : isZonePickTarget ? () => respondToPrompt({ owner: pi, heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
                   style={zsMerge('support', {
                     ...((isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined),
                     ...(isStolen && stolenColor ? { '--charmed-color': stolenColor } : undefined),
@@ -16879,6 +16964,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {(((gameState.areaZones?.[0] || []).includes('Deepsea Castle')) || ((gameState.areaZones?.[1] || []).includes('Deepsea Castle'))) && <DeepseaCastleOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Slippery Ice')) || ((gameState.areaZones?.[1] || []).includes('Slippery Ice'))) && <SlipperyIceOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('The Cosmic Depths')) || ((gameState.areaZones?.[1] || []).includes('The Cosmic Depths'))) && <CosmicDepthsOverlay />}
+            {(((gameState.areaZones?.[0] || []).includes('Graveyard of Limited Power')) || ((gameState.areaZones?.[1] || []).includes('Graveyard of Limited Power'))) && <GraveyardOfLimitedPowerOverlay />}
             {(((gameState.areaZones?.[0] || []).includes("Tarleinn's Floating Island")) || ((gameState.areaZones?.[1] || []).includes("Tarleinn's Floating Island"))) && <FloatingIslandOverlay />}
             {(() => {
               // Gathering Storm is an Attachment Spell — it lives in a

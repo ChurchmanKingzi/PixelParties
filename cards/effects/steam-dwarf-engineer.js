@@ -131,7 +131,12 @@ module.exports = attachSteamEngine({
       {
         source: CARD_NAME,
         skipBeforeSummon: true,
-        hookExtras: { _steamEngineerSummon: true },
+        isPlacement: true,
+        hookExtras: {
+          _steamEngineerSummon: true,
+          _summonedBy: CARD_NAME,
+          _summonedFromDeck: true,
+        },
       },
     );
 

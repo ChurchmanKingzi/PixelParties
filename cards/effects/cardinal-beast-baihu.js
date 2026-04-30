@@ -11,6 +11,11 @@ const { _checkCardinalWin, _setCardinalImmune } = require('./_cardinal-shared');
 module.exports = {
   creatureEffect: true,
 
+  // Always commit the active. See cardinal-beast-zhuque.js for full
+  // rationale — Cardinal Beast actives are always worth firing when
+  // available, and the +3 commit threshold can underweight them.
+  cpuMeta: { alwaysCommit: true },
+
   hooks: {
     onPlay: async (ctx) => { _setCardinalImmune(ctx); },
     onCardEnterZone: async (ctx) => {

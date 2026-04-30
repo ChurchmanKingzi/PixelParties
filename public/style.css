@@ -7175,11 +7175,24 @@ body:has(.textbox-overlay) .tooltip {
   .game-hand-opp .game-gold-icon { font-size: 18px !important; }
   .game-hand-opp .game-gold-value { font-size: 16px !important; }
 
-  /* Compact player hand — allow cards to be cut off */
+  /* Compact player hand. The container is small (54px) but the cards
+     inside remain full-size and interactive. Anchor cards to the
+     BOTTOM of the container so they overflow UPWARD into the board
+     area instead of spilling past the viewport's bottom edge (which
+     was the old bug — `align-items: center` centered the cards on
+     a 54px line at the very bottom of the screen, clipping the
+     lower half). game-hand-me has overflow: visible + z-index 10000
+     so the upward overflow paints on top of the board and stays
+     fully interactive. */
   .game-hand-me {
     min-height: 54px !important;
     padding: 2px 8px !important;
     overflow: visible;
+    align-items: flex-end !important;
+  }
+  .game-hand-me .game-hand-cards {
+    align-items: flex-end !important;
+    overflow: visible !important;
   }
   .game-hand-me .game-hand-avatar-big {
     width: 28px !important; height: 28px !important;
@@ -7238,9 +7251,13 @@ body:has(.textbox-overlay) .tooltip {
   .phase-btn { padding: 1px 5px !important; font-size: 6px !important; min-height: 16px !important; }
   .phase-end-check { font-size: 6px !important; }
   .phase-end-check input { width: 8px !important; height: 8px !important; }
+  /* Keep the phase column anchored to the screen-left, but its inner
+     tracker / buttons must stay in a single ROW (the intended layout).
+     The previous override forced flex-direction: column, which stacked
+     the phase items vertically and broke the strip. */
   .phase-column { zoom: 0.9; left: 0 !important; }
-  .board-phase-tracker { flex-direction: column; gap: 1px !important; }
-  .phase-buttons-row { flex-direction: column; }
+  .board-phase-tracker { flex-direction: row !important; gap: 1px !important; }
+  .phase-buttons-row { flex-direction: row !important; }
 
   /* Compact top bar in battle */
   .game-layout > .top-bar { padding: 2px 8px !important; }

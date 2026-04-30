@@ -9,7 +9,7 @@
 // active effects, Ascension, and the targeting engine.
 
 const { loadCardEffect } = require('./_loader');
-const { PHASES } = require('./_hooks');
+const { PHASES, getCleansableStatuses } = require('./_hooks');
 
 // Small pauses between CPU actions / phase advances so a human spectator
 // can actually follow the sequence. Kept deliberately modest — longer
@@ -29,7 +29,11 @@ let _cpuLogSilent = false;
 // Externally controllable verbose toggle. DEFAULT OFF so live CPU-vs-human
 // games don't spam stdout on tester builds. Console-fired test tools
 // (self-play batches, A/B runs) can enable it explicitly via setCpuVerbose
-// when they want per-decision traces.
+// when they want per-decision traces. Currently ON for the live CPU-tuning
+// pass — paired with `DEBUG_REVEAL_NPC_HAND = true` in server.js, this
+// surfaces both the CPU's hand state and its per-decision reasoning so
+// the tester can correlate "what was held" with "what was picked." Flip
+// back to `false` for a public build.
 let _cpuVerbose = false;
 // Optional transcription function. When set, cpuLog calls it INSTEAD of
 // console.log, regardless of _cpuVerbose. Used by self-play to capture
@@ -699,8 +703,16 @@ async function activateEquipEffects(engine, helpers) {
       }
     }
     cpuLog(`      → activate equip effect "${pick.name}" hero=${pick.heroIdx}`);
+    // Forward per-card cpuMeta hints to the gate. `alwaysCommit` lets
+    // positional / control activations (Slippery Skates) commit despite
+    // an eval-invisible delta; `evaluateThroughTurnEnd` opts the gate
+    // into a rest-of-turn rollout for cards whose value only manifests
+    // later this turn.
+    const equipAlwaysCommit = !!pickScript?.cpuMeta?.alwaysCommit;
+    const equipEvalThroughTurnEnd = !!pickScript?.cpuMeta?.evaluateThroughTurnEnd;
     const committed = await mctsGatedActivation(engine, helpers, `equip-effect ${pick.name}`,
-      () => helpers.doActivateEquipEffect(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneSlot: pick.zoneSlot }));
+      () => helpers.doActivateEquipEffect(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneSlot: pick.zoneSlot }),
+      { alwaysCommit: equipAlwaysCommit, evaluateThroughTurnEnd: equipEvalThroughTurnEnd });
     const hoptKey = `equip-effect:${pick.instId}`;
     if (!committed || gs.hoptUsed?.[hoptKey] !== gs.turn) tried.add(pick.instId);
     await pauseAction(engine);
@@ -1348,8 +1360,23 @@ function heroNeedsCardForAscension(engine, pi, hi, cardName, cardData) {
   if (!hero?.name || hero.hp <= 0) return false;
   const script = loadCardEffect(hero.name);
   if (typeof script?.ascensionNeedsCard !== 'function') return false;
-  try { return !!script.ascensionNeedsCard(cardName, cardData, engine, pi, hi); }
-  catch { return false; }
+  try {
+    if (!script.ascensionNeedsCard(cardName, cardData, engine, pi, hi)) return false;
+  } catch { return false; }
+  // Spell / Creature progressers must ALSO be playable by THIS hero.
+  // Beato collects orbs only when SHE casts the spell or summons the
+  // creature (other heroes' plays don't tick her orbs), so a Lv5
+  // Cardinal Beast that nominally matches her uncollected Summoning
+  // orb is still useless to her pre-Ascension — she can't actually
+  // cast it. Without this gate the gallery-tutor heuristic (Magnetic
+  // Glove, Brilliant Idea) and the hand-value boost both treat
+  // Cardinal Beasts as "Ascension-critical" and waste tutors on them.
+  // Equipment-collection ascensions (Layn / Arthor) skip this gate
+  // since their critical cards are Artifacts, not Spell / Creature.
+  if (cardData?.cardType === 'Spell' || cardData?.cardType === 'Creature') {
+    if (!engine.heroMeetsLevelReq(pi, hi, cardData)) return false;
+  }
+  return true;
 }
 
 function ascensionTargetHero(engine, pi, cardName, cardData) {
@@ -2870,6 +2897,25 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   //   • Plain reaction/trigger confirm: caller checks `if (result)`
   // Returning `{ confirmed: true }` satisfies both. Returning null declines.
   if (type === 'confirm') {
+    // PROACTIVE-CAST GATE: when the CPU is mid-cast of its OWN spell/
+    // creature/artifact and the prompt is from that same card (matched
+    // by `ps._resolvingCard.name === promptData.title`), default to
+    // CONFIRM. The CPU has already committed to the play — declining
+    // here cancels its own card (Brilliant Idea's "Search your deck?"
+    // gate, Magnetic Glove's tutor confirm, etc.) and silently turns
+    // the play into a no-op. Opp-side reaction/trigger confirms (which
+    // arrive on a DIFFERENT title) still go through the decline-default
+    // below; the gerry-rewritten title is unmasked first via
+    // `_gerryOriginalTitle` so a Gerrymander redirect doesn't break
+    // the match.
+    const ownResolving = engine.gs.players?.[promptedPlayerIdx]?._resolvingCard;
+    const promptTitle = promptData._gerryOriginalTitle || promptData.title;
+    if (promptData.cancellable
+        && ownResolving?.name
+        && promptTitle
+        && ownResolving.name === promptTitle) {
+      return { confirmed: true };
+    }
     // Cancellable confirms = OPTIONAL actions (combo follow-ups, sacrifice
     // costs, "do you want to X" opt-ins). Default to DECLINE — opting into a
     // follow-up without the CPU knowing how to execute it leaves the turn
@@ -2958,8 +3004,36 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   if (type === 'cardGalleryMulti') {
     const cards = promptData.cards || [];
     if (!cards.length) return { selectedCards: [] };
-    const c = pickBestGalleryCard(engine, cpuIdx, cards);
-    return { selectedCards: [c.name] };
+    // Score every gallery option, then greedily take the top scorers
+    // up to `selectCount`, respecting any `maxBudget` cost cap (some
+    // prompts let you pick "as many as you can afford" — we shouldn't
+    // exceed the budget). Old behaviour returned ONE card regardless
+    // of the prompt's allowed count, which made Beato's Ascension
+    // Bonus silently grab 1 of 2 free deck-searches and similar
+    // multi-pick prompts under-deliver. Score-stamp via
+    // `pickBestGalleryCard` first so MCTS's
+    // `mctsBuildVariationsFromRecord` gets the same `_galleryScore`
+    // order it relies on for variation exploration.
+    pickBestGalleryCard(engine, cpuIdx, cards); // stamps `_galleryScore` on each
+    const cap = Math.max(1, promptData.selectCount || 1);
+    const costKey = promptData.costKey || 'cost';
+    let budgetRemaining = promptData.maxBudget != null
+      ? promptData.maxBudget
+      : Infinity;
+    const sorted = [...cards].sort((a, b) =>
+      (b._galleryScore || -Infinity) - (a._galleryScore || -Infinity));
+    const seen = new Set();
+    const picks = [];
+    for (const c of sorted) {
+      if (picks.length >= cap) break;
+      if (seen.has(c.name)) continue; // multi-select prompts forbid duplicate names
+      const cost = c[costKey] || 0;
+      if (cost > budgetRemaining) continue;
+      seen.add(c.name);
+      picks.push(c.name);
+      budgetRemaining -= cost;
+    }
+    return { selectedCards: picks };
   }
   // Card-name picker — the prompt Luck raises on activation. Engine default
   // declines cancellable prompts, so Luck never fired for the CPU. Free
@@ -3398,7 +3472,83 @@ function pickHealTarget(engine, ownTargets, enemyTargets, cardName, _config) {
   const lifeforce = safeOwn.filter(t => targetHasFreshLifeforceHowitzer(engine, t));
   if (lifeforce.length) return randomOf(lifeforce);
 
-  // 4) Most-missing-HP own Hero; else lowest-HP own Creature.
+  // 4) Status-cleansing precedence: cards like Juice that "heal from
+  //    negative status effects" don't restore HP — they remove
+  //    statuses. The valid-target list for those cards is already
+  //    pre-filtered to "has a cleansable status," but the heal picker
+  //    used to evaluate by HP-missing only, so a fully-healthy hero
+  //    with a status would be rejected (missing === 0) and the heal
+  //    fell through to the lowest-HP creature instead. Detect status-
+  //    cleansing intent two ways:
+  //      • The card script's getValidTargets pre-filtered all targets
+  //        to ones with a status (every passed-in own target carries
+  //        at least one cleansable status — the safest universal
+  //        check).
+  //      • Card text mentions "negative status" / "cleanse" / "remove
+  //        status" — pattern fallback for cards that take broader
+  //        target sets and let the user pick a status-bearing one.
+  //    When in cleansing mode, prefer Ascended / Ascendable heroes,
+  //    then any hero, then creatures (heroes are far more valuable
+  //    than a 50-HP body even before considering ascension).
+  const targetHasCleansableStatus = (t) => {
+    if (t.type === 'hero') {
+      const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
+      if (!h?.statuses) return false;
+      const negKeys = getCleansableStatuses();
+      return negKeys.some(k => h.statuses[k]);
+    }
+    if (t.type === 'equip' || t.type === 'creature') {
+      const inst = t.cardInstance || findSupportInstance(engine, t);
+      if (!inst?.counters) return false;
+      const negKeys = getCleansableStatuses();
+      return negKeys.some(k => inst.counters[k]);
+    }
+    return false;
+  };
+  const allOwnHaveStatus = safeOwn.length > 0 && safeOwn.every(targetHasCleansableStatus);
+  const cardDB = engine._getCardDB();
+  const cd = cardName ? cardDB[cardName] : null;
+  const effect = (cd?.effect || '').toLowerCase();
+  const looksLikeCleanse = /negative status|cleanse|remove .* status/i.test(effect);
+  if (allOwnHaveStatus || looksLikeCleanse) {
+    const statusOwn = safeOwn.filter(targetHasCleansableStatus);
+    if (statusOwn.length > 0) {
+      const heroes = statusOwn.filter(t => t.type === 'hero');
+      if (heroes.length > 0) {
+        // Ascended / Ascendable heroes carry the deck plan — keep them
+        // on top. Within the same tier, sort by anticipated lethal-tick
+        // first (a 30-burn on a 30-HP hero is a crisis save), then by
+        // raw HP-missing as a secondary signal.
+        const STATUS_DMG_PER_STACK = 30;
+        const scoreHero = (t) => {
+          const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
+          if (!h) return -Infinity;
+          const burn = h.statuses?.burn || 0;
+          const poison = h.statuses?.poison || 0;
+          const tickDmg = STATUS_DMG_PER_STACK * (burn + poison);
+          const lethal = tickDmg > 0 && tickDmg >= h.hp ? 10000 : 0;
+          const ascended = targetIsAscendedOrAscendableHero(engine, t) ? 1000 : 0;
+          const missing = (h.maxHp || 0) - (h.hp || 0);
+          return lethal + ascended + missing;
+        };
+        heroes.sort((a, b) => scoreHero(b) - scoreHero(a));
+        return heroes[0];
+      }
+      // No hero in the cleanse pool — fall back to a creature with a
+      // status. Lowest-HP first so the most fragile body gets the
+      // status removed (e.g. a burn that would kill it next tick).
+      const creatures = statusOwn.filter(t => t.type === 'creature' || t.type === 'equip').map(t => {
+        const inst = t.cardInstance || findSupportInstance(engine, t);
+        return { t, hp: creatureCurrentHp(engine, inst, t) ?? Infinity };
+      });
+      if (creatures.length) {
+        creatures.sort((a, b) => a.hp - b.hp);
+        return creatures[0].t;
+      }
+    }
+  }
+
+  // 5) Most-missing-HP own Hero; else lowest-HP own Creature.
   const ownHeroes = safeOwn.filter(t => t.type === 'hero').map(t => {
     const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
     return { t, missing: (h?.maxHp || 0) - (h?.hp || 0) };
@@ -3720,9 +3870,18 @@ const MCTS_ROLLOUTS_PER_CANDIDATE = 3;
 // turn's rest-of-play. 0 = no extension. 1 = opp's full turn. 2 = our
 // next full turn too. 3 = opp again. 4 = us again. Each +1 adds ~one
 // full turn of simulated play cost per rollout.
-let _rolloutHorizon = 2;
+//
+// Default 6 (≈ rest-of-current + 6 full turns ≈ 7 turns of look-ahead) —
+// an average Pixel Parties match runs ~5 turns per side / 10 total, so
+// 7-turn lookahead covers more than half the game and makes the CPU
+// see end-game pressure (deck-out, ascension windows, hero death
+// timing) instead of greedily optimising the next exchange.
+let _rolloutHorizon = 6;
 function setRolloutHorizon(h) {
-  if (Number.isInteger(h) && h >= 0 && h <= 4) _rolloutHorizon = h;
+  // Cap at 12 (≈ a whole long match) — going higher rarely improves
+  // decisions because the rollout's policy is one-ply greedy past
+  // turn 1 anyway, and snapshot pressure scales linearly per horizon.
+  if (Number.isInteger(h) && h >= 0 && h <= 12) _rolloutHorizon = h;
 }
 function getRolloutHorizon() { return _rolloutHorizon; }
 
@@ -3750,7 +3909,12 @@ function getRolloutBrain() { return _rolloutBrain; }
 // single decision could run for minutes while the watchdog sees gs.turn
 // unchanged and never aborts. On timeout, mctsRankCandidates returns the
 // best-scored candidates so far (or falls back to heuristic if none).
-const MCTS_RANK_BUDGET_MS = 10000;
+//
+// Bumped 10s → 20s to absorb the deeper rollout horizon (default h=6
+// triples the per-rollout cost vs h=2). Most decisions still finish
+// well under this; the cap only matters on heavy-board, many-candidate
+// turns where the extra wall-clock buys a noticeably better pick.
+const MCTS_RANK_BUDGET_MS = 20000;
 // UCB1 total-pull cap per decision. Hard ceiling on how many rollouts a
 // single decision can burn; typically cut short by the wall-clock budget.
 const MCTS_UCB1_TOTAL_PULLS = 80;
@@ -3777,11 +3941,13 @@ const MCTS_EXT_PULLS_MAX = 60;
 const MCTS_EXT_EPSILON_ABS = 3;
 const MCTS_EXT_EPSILON_PCT = 0.01;
 // Late-game bypass: past this turn count, skip MCTS and fall through to the
-// heuristic sort / direct activation. Normal games end well under turn 50;
-// matches that pass turn 80 are almost always attritional stalls (Heal Burn
-// vs Lightning Caller, etc.) where MCTS's snapshot storm outruns GC before
-// its marginal decision quality gets to matter.
-const MCTS_LATE_GAME_TURN_THRESHOLD = 80;
+// heuristic sort / direct activation. A "normal" Pixel Parties match runs
+// ~5 turns per side (10 total), so 200 is effectively never — the bypass
+// exists only to escape pathological attritional stalls (Heal Burn vs
+// Lightning Caller, etc.) where MCTS's snapshot storm would outrun GC. At
+// 200 turns the rollout cost vs marginal decision quality has long since
+// inverted; the heuristic sort is the right answer.
+const MCTS_LATE_GAME_TURN_THRESHOLD = 200;
 
 // ═══════════════════════════════════════════════════════════════════════
 //  DYNAMIC HERO / CREATURE TRACKING
@@ -4313,6 +4479,43 @@ function mctsEnemyCreatureValue(engine, inst) {
   return Math.max(0.3, value);
 }
 
+// Cardinal Beast names used by `estimateHandCardValueFor`'s win-
+// condition floor. Mirrors the array in `evaluateState`'s
+// `scoreCardinalBeasts`; centralised as a Set here for hand-value
+// boosting so the gallery picker treats Beasts as top-tier tutor
+// targets the moment a viable summoner exists on the team.
+const CARDINAL_BEAST_NAMES_FOR_HAND_VALUE = new Set([
+  'Cardinal Beast Baihu',
+  'Cardinal Beast Qinglong',
+  'Cardinal Beast Xuanwu',
+  'Cardinal Beast Zhuque',
+]);
+
+/**
+ * Can ANY hero on `pi`'s team currently summon a Cardinal Beast (Lv5
+ * Summoning Magic Creature)? Probes `heroMeetsLevelReq` with one of
+ * the Beasts as the test creature — picks up Ascended Beato's
+ * Lv1-99 Spell/Creature bypass, any hero that has stacked Lv5+
+ * Summoning Magic, and any future hero with `bypassLevelReq` that
+ * would let them host the summon. Returns false when no hero
+ * qualifies (pre-Ascension Beato, deck without a summoner) so the
+ * gallery picker doesn't tutor un-summonable Beasts.
+ */
+function canTeamSummonCardinalBeasts(engine, pi) {
+  const ps = engine.gs.players[pi];
+  if (!ps) return false;
+  const probe = engine._getCardDB()['Cardinal Beast Baihu'];
+  if (!probe) return false;
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    const h = ps.heroes[hi];
+    if (!h?.name || h.hp <= 0) continue;
+    try {
+      if (engine.heroMeetsLevelReq(pi, hi, probe)) return true;
+    } catch {}
+  }
+  return false;
+}
+
 /**
  * Score for "how valuable would `cardName` be sitting in pi's hand right
  * now". Mirrors the in-eval logic in evaluateState's hand-value pass —
@@ -4408,8 +4611,39 @@ function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
       base = willMeet * 2 + willSpill * 0.2;
     }
   }
+  // Ascension-critical floor — applies UNIVERSALLY to any card that
+  // would progress some Ascendable hero's orb / equipment count
+  // (Beato's school spells, Arthor's Sword/Circle, Layn's Hammer,
+  // and any future Ascendable hero that exports `ascensionNeedsCard`).
+  // Floor MUST stay below the play-payoff (`SLOT_BASE + per-orb`) so
+  // the eval prefers PLAYING the card to hoarding it. Calibration:
+  //   per-orb-value = 400 / N  (where N = orbs/items the hero needs)
+  //   play-payoff   = 30 (SLOT_BASE) + 400/N
+  //   For Beato N=5 (worst case currently): payoff = 30 + 80 = 110.
+  // Keeping the floor at 60 leaves +20 margin for the smallest deck
+  // (Beato) while preserving a 2.4× preference over the default 25-
+  // point base, which is still a strong gallery-tutor signal. Heroes
+  // with fewer orbs (Arthor N=2, Layn N=1) get progressively bigger
+  // play-margins automatically.
   if (cardIsAscensionCriticalForAnyHero(engine, pi, cardName, cd)) {
-    base = Math.max(base, 80);
+    base = Math.max(base, 60);
+  }
+  // Cardinal Beasts win-condition floor. Once at least one hero on the
+  // CPU's team can ACTUALLY summon a Lv5 Summoning Magic Creature
+  // (Ascended Beato bypasses the level requirement; any other hero
+  // that has stacked enough Summoning Magic also qualifies), every
+  // Cardinal Beast in hand is one summon-ready piece of the alt win
+  // condition. Bump the hand floor to 100 so gallery tutors
+  // (Magnetic Glove, Brilliant Idea, Graveyard Gathering, Divine
+  // Gift of Creation, Beato's Ascension Bonus, …) prefer pulling
+  // Beasts over a generic Lv1 Spell. Pre-Ascension the gate fails
+  // (no hero meets the Lv5 Summoning requirement) so this boost
+  // doesn't fire and the CPU isn't lured into useless Beast tutors
+  // it can't yet summon — matches the same playability check
+  // `cardIsAscensionCriticalForAnyHero` uses.
+  if (CARDINAL_BEAST_NAMES_FOR_HAND_VALUE.has(cardName)
+      && canTeamSummonCardinalBeasts(engine, pi)) {
+    base = Math.max(base, 100);
   }
   // Direct-from-deck summon synergy with Cosmic Manipulation. Cards
   // that opt into `cpuMeta.directDeckSummon` are worth more when CM is
@@ -4529,84 +4763,56 @@ function mctsHeroSupportDetails(engine, pi, hi) {
 // estimates; tune after playtesting. Exported so card scripts can call
 // it directly via their `cpuResponse` hook if they want the same logic
 // without relying on auto-detection by option ID.
-function mctsValueGoldVsDraw(engine, pi) {
+function mctsValueGoldVsDraw(engine, pi, opts = {}) {
+  // Two-arm comparison: simulate each option's IMMEDIATE state change
+  // and ask `evaluateState` which board reads better. evaluateState
+  // already prices gold dynamically (gold demand model: each gold up
+  // to demand worth 2×, excess worth 0.2×) and values each hand card
+  // per its own playability via `estimateHandCardValueFor`, so this
+  // delegates the gold-vs-draw call to the same scoring the rest of
+  // the brain uses instead of a hand-tuned heuristic that can drift
+  // out of sync with the evaluator. 1-ply only — full MCTS rollouts
+  // would be more accurate but the prompt fires inside a sync prompt
+  // resolver, and the immediate eval already captures the dominant
+  // signal (gold demand vs deck-pricedness vs hand-card value).
   const gs = engine.gs;
   const ps = gs.players[pi];
   if (!ps) return 'gold';
-  const cardDB = engine._getCardDB();
 
-  // (1) Gold already owned.
-  const gold = ps.gold || 0;
+  const goldAmt = opts.goldAmt != null ? opts.goldAmt : 30;
+  const drawCount = opts.drawCount != null ? opts.drawCount : 5;
 
-  // (2) Average artifact cost across everything the CPU might eventually
-  //     play. We look at hand + main deck + discard pile — anything not
-  //     yet permanently deleted. 0-cost artifacts (tokens, freebies) are
-  //     excluded so they don't drag the average down.
-  let artifactCostSum = 0, artifactCostCount = 0;
-  const pools = [ps.hand, ps.mainDeck, ps.discardPile];
-  for (const pool of pools) {
-    for (const name of (pool || [])) {
-      const cd = cardDB[name];
-      if (!cd || cd.cardType !== 'Artifact') continue;
-      const cost = cd.cost || 0;
-      if (cost <= 0) continue;
-      artifactCostSum += cost;
-      artifactCostCount++;
-    }
-  }
-  const avgArtifactCost = artifactCostCount > 0 ? artifactCostSum / artifactCostCount : 0;
+  // Stash the scalar fields we'll mutate and the array refs we'll
+  // splice. Restore them in place so any outside reference (engine.gs
+  // closures, hooks holding onto ps) keeps pointing at valid arrays.
+  const origGold = ps.gold || 0;
+  const origHand = ps.hand || [];
+  const origDeck = ps.mainDeck || [];
+  const handSnap = [...origHand];
+  const deckSnap = [...origDeck];
 
-  // (2b) On-board cost modifiers. Alchemy (support-zone spell) doubles
-  //      artifact cost per stack. We cap the compounded multiplier at
-  //      4× so pathological stacks don't skew the score off the charts.
-  let alchemyLayers = 0;
-  for (const inst of engine.cardInstances) {
-    if (inst.controller !== pi || inst.zone !== 'support' || inst.faceDown) continue;
-    if (inst.name === 'Alchemy') alchemyLayers++;
-  }
-  const costMult = Math.min(4, Math.pow(2, alchemyLayers));
-  const effAvgCost = avgArtifactCost * costMult;
+  // ── Try GOLD ──────────────────────────────────────────────────────
+  ps.gold = origGold + goldAmt;
+  const goldScore = evaluateState(engine, pi);
 
-  // (3) Hand size. 4 is the rough "neutral" point; > 4 → gold preferred
-  //     (new draws fit less well), < 4 → draws preferred (fill the hand).
-  const handSize = (ps.hand || []).length;
+  // ── Try DRAW ──────────────────────────────────────────────────────
+  ps.gold = origGold;
+  const take = Math.min(drawCount, deckSnap.length);
+  origHand.length = 0;
+  for (const c of handSnap) origHand.push(c);
+  for (let i = 0; i < take; i++) origHand.push(deckSnap[i]);
+  origDeck.length = 0;
+  for (let i = take; i < deckSnap.length; i++) origDeck.push(deckSnap[i]);
+  const drawScore = evaluateState(engine, pi);
 
-  // (4) Kit lean via supportYield on alive, non-incapacitated heroes and
-  //     their attached abilities (same data source as mctsHeroSupportDetails).
-  let kitGoldRate = 0, kitDrawRate = 0;
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
-    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
-    if (engine._isHeroMummified && engine._isHeroMummified(pi, hi)) continue;
-    const ctx = { engine, pi, hi, cpuIdx: engine._cpuPlayerIdx };
-    const apply = (y) => {
-      if (!y) return;
-      kitGoldRate += y.goldPerTurn || 0;
-      // Potion-draws count as 3× regular draws (matches SUPPORT_UNIT_WEIGHTS).
-      kitDrawRate += (y.drawsPerTurn || 0) + (y.potionDrawsPerTurn || 0) * 3;
-    };
-    const heroScript = loadCardEffect(hero.name);
-    if (typeof heroScript?.supportYield === 'function') {
-      try { apply(heroScript.supportYield(ctx)); } catch {}
-    }
-    const abZones = ps.abilityZones?.[hi] || [];
-    for (const slot of abZones) {
-      if (!slot || slot.length === 0) continue;
-      const abScript = loadCardEffect(slot[0]);
-      if (typeof abScript?.supportYield !== 'function') continue;
-      try { apply(abScript.supportYield(slot.length, ctx)); } catch {}
-    }
-  }
+  // ── Restore ───────────────────────────────────────────────────────
+  ps.gold = origGold;
+  origHand.length = 0;
+  for (const c of handSnap) origHand.push(c);
+  origDeck.length = 0;
+  for (const c of deckSnap) origDeck.push(c);
 
-  // Combine. Positive score → GOLD wins.
-  let score = 0;
-  score += (effAvgCost - gold) * 0.5;   // Deck pricier than current purse → want gold
-  score += (handSize - 4) * 1.0;        // Full hand → draws waste slots; empty → want draws
-  score += kitDrawRate * 2.5;           // Kit drawing a lot already → gain gold for variety
-  score -= kitGoldRate * 2.5;           // Kit golding a lot already → gain draws for variety
-
-  return score >= 0 ? 'gold' : 'draw';
+  return drawScore >= goldScore ? 'draw' : 'gold';
 }
 
 // Highest Spell-School ability level on pi's live team. Used to identify
@@ -5275,23 +5481,48 @@ function evaluateState(engine, cpuIdx) {
   //   • Draw: expected-value new card (~15) beats gate threshold.
   // Duplicate copies beyond the first are half-value (HOPT / once-per-
   // turn cards don't benefit from multiple copies in hand).
-  // Opponent hand is opaque — value it flat at 20/card (status quo).
+  //
+  // BOTH sides are valued PER-CARD now — the engine's snapshot already
+  // exposes opp.hand and opp.mainDeck to the evaluator (no fog-of-war
+  // at the engine level), so treating opp's hand as opaque was throwing
+  // away signal the CPU could already see. Per-card valuation lets the
+  // CPU budget defensively against a heavy opp threat (e.g. opp holds
+  // a Lv4 Creature + matching ability) and offensively against a light
+  // one (opp holds only blanks → bias toward tempo). The opp-side
+  // valuation deliberately uses the SAME estimator with opp's pi so
+  // costs/locks/synergies are scored from opp's perspective.
+  //
   // Hand-value scoring — uses the shared `estimateHandCardValueFor`
   // helper so the same valuation drives both `evaluateState`'s hand
   // term and the deck-search heuristic in cpuGenericChoice (Magnetic
   // Glove / Potion picking the highest-impact card from deck instead
   // of random).
-  let ownHandValue = 0;
-  {
+  const valueHand = (handArr, pi) => {
+    let total = 0;
     const counts = {};
-    for (const name of (ps.hand || [])) {
+    for (const name of (handArr || [])) {
       const seen = counts[name] || 0;
-      ownHandValue += estimateHandCardValueFor(engine, cpuIdx, name, seen);
+      total += estimateHandCardValueFor(engine, pi, name, seen);
       counts[name] = seen + 1;
     }
-  }
-  const oppHandValue = 20 * (opp.hand?.length || 0);
+    return total;
+  };
+  const ownHandValue = valueHand(ps.hand, cpuIdx);
+  const oppHandValue = valueHand(opp.hand, oppIdx);
   score += ownHandValue - oppHandValue;
+
+  // ── Top-of-deck preview: cards the opponent will draw next turn ───
+  // The CPU sees opp's deck order during MCTS rollouts (snapshot
+  // includes mainDeck), so it already plays around future opp draws
+  // implicitly. We surface that lookahead at evaluator level too,
+  // weighted at half a hand card's value (opp has to draw and live
+  // to next turn before they can play it). DECK_PREVIEW caps the
+  // window so a deep deck doesn't drown the eval in noise — only
+  // the next ~2 turns of draws matter for tactical planning.
+  const DECK_PREVIEW = 4;
+  const ownDeckPreviewValue = valueHand((ps.mainDeck || []).slice(0, DECK_PREVIEW), cpuIdx) * 0.5;
+  const oppDeckPreviewValue = valueHand((opp.mainDeck || []).slice(0, DECK_PREVIEW), oppIdx) * 0.5;
+  score += ownDeckPreviewValue - oppDeckPreviewValue;
 
   // ── Deck-out awareness ─────────────────────────────────────────────
   // When the CPU's deck is shrinking OR the opponent has shown ANY
@@ -5417,18 +5648,34 @@ function evaluateState(engine, cpuIdx) {
   // moved me from 0.0 → 0.5") and as a jump when fully ready. Symmetric
   // penalty for opponent progress. Uses each hero's script-declared
   // ascensionProgress(engine, pi, hi) → 0..1 when available.
+  // Per-orb reward MUST out-pay the in-hand "Ascension-critical"
+  // boost (`estimateHandCardValueFor` floors qualifying cards at 60)
+  // OR else "play the orb-progresser" exactly cancels "keep it in
+  // hand": −60 hand-value + 30 on-board + (per-orb) orb-progress.
+  // With the old 250-per-full-collection (= 50/orb at N=5), the
+  // delta summed to 0 (or negative) and `mctsGatedActivation` failed
+  // the +3 commit threshold — the CPU sat on its hand. Bumped to
+  // 400-per-full-collection (= 80/orb at N=5) so each progress
+  // step nets +50 vs the hoard (Beato's worst-case orb count). For
+  // heroes with FEWER orbs the per-orb value is naturally larger
+  // (Arthor N=2 → 200/orb, Layn N=1 → 400/orb), so the same fix
+  // produces an even bigger play-incentive automatically — no
+  // per-deck calibration needed. The `ascensionReady` snapshot
+  // (450) stays a discrete jump above 4/5-progress (320) so the
+  // CPU can still tell "ready" from "almost ready" — bumped in
+  // lockstep with the per-orb rate to keep monotonicity.
   const scoreAscension = (ownerIdx, sign) => {
     const pss = gs.players[ownerIdx];
     if (!pss) return;
     for (let hi = 0; hi < (pss.heroes || []).length; hi++) {
       const h = pss.heroes[hi];
       if (!h?.name || h.hp <= 0) continue;
-      if (h.ascensionReady) { score += sign * 300; continue; }
+      if (h.ascensionReady) { score += sign * 450; continue; }
       const script = loadCardEffect(h.name);
       if (typeof script?.ascensionProgress !== 'function') continue;
       try {
         const p = script.ascensionProgress(engine, ownerIdx, hi) || 0;
-        if (p > 0) score += sign * 250 * p;
+        if (p > 0) score += sign * 400 * p;
       } catch {}
     }
   };
@@ -5443,7 +5690,11 @@ function evaluateState(engine, cpuIdx) {
   //   - Per beast on board: +250 (comparable to ascension-ready bonus)
   //   - Bonus for having 3 on board (one more = win): +500
   //   - All 4 on board: +100000 (terminal-value equivalent to game win)
-  //   - Each accessible beast (hand/deck, not yet on board): +40
+  //   - Each in-hand beast: +80 — closer to "ready to summon" than a
+  //                              deck copy, so worth more once a viable
+  //                              summoner exists on the team
+  //   - Each in-deck beast: +30 — still part of the assembly path, but
+  //                              needs to be drawn / tutored first
   //   - Can-potentially-complete bonus (all 4 reachable): +400
   // Symmetric penalty when the opponent is progressing.
   const CARDINAL_BEAST_NAMES = [
@@ -5465,15 +5716,17 @@ function evaluateState(engine, cpuIdx) {
       }
     }
     if (onBoard.size >= 4) return 100000;
-    const pool = [...(pss.hand || []), ...(pss.mainDeck || [])];
-    const accessible = new Set();
+    const inHand = new Set();
+    const inDeck = new Set();
     for (const n of CARDINAL_BEAST_NAMES) {
       if (onBoard.has(n)) continue;
-      if (pool.includes(n)) accessible.add(n);
+      if ((pss.hand || []).includes(n)) inHand.add(n);
+      else if ((pss.mainDeck || []).includes(n)) inDeck.add(n);
     }
-    let s = onBoard.size * 250 + accessible.size * 40;
+    const accessibleSize = inHand.size + inDeck.size;
+    let s = onBoard.size * 250 + inHand.size * 80 + inDeck.size * 30;
     if (onBoard.size === 3) s += 500; // one away from the win
-    if (onBoard.size + accessible.size === 4) s += 400; // complete set reachable
+    if (onBoard.size + accessibleSize === 4) s += 400; // complete set reachable
     return s;
   };
   score += scoreCardinalBeasts(cpuIdx);

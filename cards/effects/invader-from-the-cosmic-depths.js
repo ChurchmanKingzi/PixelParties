@@ -24,7 +24,15 @@
 //  ON-PLAY: when a Cosmic card summons Invader,
 //  you MAY place up to 2 Invader Tokens into free
 //  Support Zones of any Hero either player
-//  controls.
+//  controls. Fires from `onPlay`, so it's silenced
+//  by The Cosmic Depths' "effects negated for the
+//  rest of the turn" clause (intentional — the
+//  Depths' negation IS the trade-off for its
+//  free-additional-Action summon). Real summon
+//  paths (Life-Searcher's place-into-the-same-
+//  zone upgrade, Arrival's second half via the
+//  Lv3→Lv4 chain) are NOT silenced and DO place
+//  the tokens.
 //
 //  ACTIVATED: discard a Lv≤4 Attack or Spell from
 //  hand → deal 80×lvl damage to a chosen target.
@@ -51,7 +59,11 @@ function countOwnInvaders(engine, pi) {
   return n;
 }
 
-/** All free Support Zones on either player's living heroes. */
+/**
+ * All free Support Zones on either player's heroes — dead Heroes
+ * included (Tokens are "placed," and "place" targets any Hero's
+ * Support Zone per the universal rule, including KO'd Heroes).
+ */
 function allFreeSupportSlotsBothSides(engine) {
   const out = [];
   for (let pi = 0; pi < 2; pi++) {
@@ -59,7 +71,7 @@ function allFreeSupportSlotsBothSides(engine) {
     if (!ps) continue;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const h = ps.heroes[hi];
-      if (!h?.name || h.hp <= 0) continue;
+      if (!h?.name) continue;
       const zones = ps.supportZones?.[hi] || [[], [], []];
       for (let zi = 0; zi < 3; zi++) {
         if ((zones[zi] || []).length === 0) {
@@ -71,6 +83,95 @@ function allFreeSupportSlotsBothSides(engine) {
   return out;
 }
 
+/**
+ * Prompt the controller to place up to 2 Invader Tokens into free
+ * Support Zones (any Hero, either side). Used by Invader's beforeSummon
+ * so the place-tokens effect lands BEFORE the summoning source can
+ * silence the placed Invader (The Cosmic Depths' negation path).
+ *
+ * `reservedSlot` (optional) is the slot Invader itself is about to
+ * land in. Excluded from the option list so a careless player doesn't
+ * fill Invader's destination with a token and fizzle the summon.
+ */
+async function placeInvaderTokens(engine, pi, reservedSlot = null) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  if (!ps) return;
+
+  const slotsAvailable = () => {
+    const all = allFreeSupportSlotsBothSides(engine);
+    if (!reservedSlot) return all;
+    return all.filter(s => !(s.owner === reservedSlot.owner
+      && s.heroIdx === reservedSlot.heroIdx
+      && s.slotIdx === reservedSlot.slotIdx));
+  };
+  let freeSlots = slotsAvailable();
+  if (freeSlots.length === 0) return;
+
+  const initialCap = Math.min(freeSlots.length, MAX_TOKEN_PLACES_ON_SUMMON);
+  const opts = [{ id: '0', label: 'Place 0 (skip)' }];
+  for (let n = 1; n <= initialCap; n++) {
+    opts.push({ id: String(n), label: `Place ${n} Invader Token${n === 1 ? '' : 's'}` });
+  }
+  const pick = await engine.promptGeneric(pi, {
+    type: 'optionPicker',
+    title: CARD_NAME,
+    description: `Place up to ${initialCap} Invader Token${initialCap === 1 ? '' : 's'} into free Support Zones (any Hero, either side).`,
+    options: opts,
+    cancellable: false,
+  });
+  const requested = parseInt(pick?.optionId || '0', 10);
+  if (!Number.isFinite(requested) || requested <= 0) return;
+
+  // Synthetic ctx for promptZonePick — Invader isn't on the board yet
+  // (we're inside beforeSummon, before placement), so we build a
+  // pseudo instance routed through the activator.
+  const pseudoInst = {
+    id: 'invader-summon-pseudo',
+    name: CARD_NAME, owner: pi, controller: pi,
+    zone: 'none', heroIdx: -1, zoneSlot: -1, counters: {}, faceDown: false,
+  };
+  const promptCtx = engine._createContext(pseudoInst, {});
+
+  let placed = 0;
+  for (let i = 0; i < requested; i++) {
+    const slots = slotsAvailable();
+    if (slots.length === 0) break;
+
+    let chosen;
+    if (slots.length === 1) {
+      chosen = slots[0];
+    } else {
+      const zones = slots.map(s => ({
+        owner: s.owner, heroIdx: s.heroIdx, slotIdx: s.slotIdx,
+        label: `${s.owner === pi ? '(You) ' : '(Opp) '}${s.heroName} — Slot ${s.slotIdx + 1}`,
+      }));
+      const zp = await promptCtx.promptZonePick(zones, {
+        title: CARD_NAME,
+        description: `Place Invader Token #${i + 1} into which zone?`,
+        cancellable: false,
+        allowEitherSide: true,
+      });
+      if (!zp) break;
+      chosen = { owner: zp.owner ?? pi, heroIdx: zp.heroIdx, slotIdx: zp.slotIdx };
+    }
+
+    const placeRes = engine.summonCreature(INVADER_TOKEN, chosen.owner, chosen.heroIdx, chosen.slotIdx, {
+      source: CARD_NAME,
+    });
+    if (!placeRes) continue;
+    placed++;
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'cosmic_token_drop',
+      owner: chosen.owner, heroIdx: chosen.heroIdx, zoneSlot: chosen.slotIdx,
+    });
+    await engine._delay(220);
+  }
+
+  engine.log('invader_tokens_placed', { player: ps.username, placed });
+  engine.sync();
+}
+
 module.exports = {
   activeIn: ['support'],
   creatureEffect: true,
@@ -78,8 +179,8 @@ module.exports = {
   // ── Pre-placement gate ─────────────────────────────────────────
   async beforeSummon(ctx) {
     // Reject hand plays (no _summonedByCosmic flag) and any non-Cosmic
-    // effect summon. Real summons by Arrival / The Cosmic Depths /
-    // Cosmic Manipulation pass.
+    // effect summon. Real summons by Arrival / Life-Searcher / The
+    // Cosmic Depths / Cosmic Manipulation pass.
     const byCosmic = ctx._summonedByCosmic
       || (typeof ctx._summonedBy === 'string' && isCosmicCard(ctx._summonedBy));
     if (!byCosmic) {
@@ -114,79 +215,22 @@ module.exports = {
   },
 
   // ── ON-PLAY: place up to 2 Invader Tokens (optional) ───────────
+  // Fires only on REAL summons that don't get silenced afterwards —
+  // i.e. Life-Searcher's place-into-the-same-zone path (a real summon
+  // with full hooks). The Cosmic Depths' negation path uses
+  // `summonCreature` (silent) + `actionNegateCreature` BEFORE its
+  // manual onCardEnterZone broadcast, so the runHooks negation filter
+  // suppresses Invader's onPlay there — exactly the design intent
+  // (effects negated for the rest of the turn).
   hooks: {
     onPlay: async (ctx) => {
       if (ctx.playedCard?.id !== ctx.card.id) return;
-
-      const engine = ctx._engine;
-      const gs = engine.gs;
-      const pi = ctx.cardOwner;
-      const ps = gs.players[pi];
-      if (!ps) return;
-
-      let freeSlots = allFreeSupportSlotsBothSides(engine);
-      if (freeSlots.length === 0) return;
-
-      // "You may place UP TO 2" — confirm + count picker.
-      const initialCap = Math.min(freeSlots.length, MAX_TOKEN_PLACES_ON_SUMMON);
-      const opts = [{ id: '0', label: 'Place 0 (skip)' }];
-      for (let n = 1; n <= initialCap; n++) {
-        opts.push({ id: String(n), label: `Place ${n} Invader Token${n === 1 ? '' : 's'}` });
-      }
-      const pick = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
-        title: CARD_NAME,
-        description: `Place up to ${initialCap} Invader Token${initialCap === 1 ? '' : 's'} into free Support Zones (any Hero, either side).`,
-        options: opts,
-        cancellable: false,
-      });
-      const requested = parseInt(pick?.optionId || '0', 10);
-      if (!Number.isFinite(requested) || requested <= 0) return;
-
-      // Sequential per-token zone picker so each placement re-reads the
-      // free-slot list (a previous placement may have filled the only
-      // free zone of a hero).
-      let placed = 0;
-      for (let i = 0; i < requested; i++) {
-        const slots = allFreeSupportSlotsBothSides(engine);
-        if (slots.length === 0) break;
-
-        let chosen;
-        if (slots.length === 1) {
-          chosen = slots[0];
-        } else {
-          const promptCtx = engine._createContext(ctx.card, {});
-          const zones = slots.map(s => ({
-            owner: s.owner, heroIdx: s.heroIdx, slotIdx: s.slotIdx,
-            label: `${s.owner === pi ? '(You) ' : '(Opp) '}${s.heroName} — Slot ${s.slotIdx + 1}`,
-          }));
-          const zp = await promptCtx.promptZonePick(zones, {
-            title: CARD_NAME,
-            description: `Place Invader Token #${i + 1} into which zone?`,
-            cancellable: false,
-            allowEitherSide: true,
-          });
-          if (!zp) break;
-          chosen = { owner: zp.owner ?? pi, heroIdx: zp.heroIdx, slotIdx: zp.slotIdx };
-        }
-
-        // Owner is whoever's side the slot lives on. Token tracks under
-        // that player so its end-of-turn check sees the right
-        // "turn-player controls counters?" predicate.
-        const placeRes = engine.summonCreature(INVADER_TOKEN, chosen.owner, chosen.heroIdx, chosen.slotIdx, {
-          source: CARD_NAME,
-        });
-        if (!placeRes) continue;
-        placed++;
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'cosmic_token_drop',
-          owner: chosen.owner, heroIdx: chosen.heroIdx, zoneSlot: chosen.slotIdx,
-        });
-        await engine._delay(220);
-      }
-
-      engine.log('invader_tokens_placed', { player: ps.username, placed });
-      engine.sync();
+      const reservedSlot = {
+        owner: ctx.cardOwner,
+        heroIdx: ctx.card.heroIdx,
+        slotIdx: ctx.card.zoneSlot,
+      };
+      await placeInvaderTokens(ctx._engine, ctx.cardOwner, reservedSlot);
     },
   },
 

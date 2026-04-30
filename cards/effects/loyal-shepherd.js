@@ -166,7 +166,11 @@ module.exports = {
 
       const placed = await engine.summonCreatureWithHooks(
         replacementName, pi, death.heroIdx, death.zoneSlot,
-        { source: CARD_NAME },
+        {
+          source: CARD_NAME,
+          isPlacement: true,
+          hookExtras: { _summonedBy: CARD_NAME, _summonedFromDeck: true },
+        },
       );
       if (!placed) {
         // Couldn't place — refund.

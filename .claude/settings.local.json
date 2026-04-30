@@ -69,7 +69,16 @@
       "Bash(grep -n \"\\\\\"Gon\\\\\\\\b\\\\|\\\\\"Goff\\\\\\\\b\\\\|name.*Gon\\\\\\\\b\\\\|name.*Goff\\\\\\\\b\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\data\\\\cards.json\")",
       "Bash(grep -lE '\"cardType\":\\\\s*\"Ability\"' \"C:/Pixel Parties WEB/PixelPartiesWeb/data/cards.json\" echo \"---\" grep -B 1 -A 1 '\"cardType\": \"Ability\"' \"C:/Pixel Parties WEB/PixelPartiesWeb/data/cards.json\")",
       "Bash(grep -nE \"play_spell.*emit\\\\b|play_spell\\\\\\\\\\\\\".*emit\" \"C:/Pixel Parties WEB/PixelPartiesWeb/public/app-board.jsx\")",
-      "Bash([ -f \"cards/effects/$f.js\" ])"
+      "Bash([ -f \"cards/effects/$f.js\" ])",
+      "Bash(grep -v \"//\")",
+      "Bash(cat)",
+      "Bash(bash /tmp/audit.sh)",
+      "Bash(comm -13 /tmp/standard_types.txt /tmp/all_types.txt)",
+      "Bash(sort /tmp/standard_types.txt)",
+      "Bash(comm -23 /tmp/all_types.txt /tmp/std_sorted.txt)",
+      "Bash(python3 /tmp/check_cards.py)",
+      "Bash(bash /tmp/audit_custom.sh)",
+      "Bash(bash /tmp/findrisk.sh)"
     ]
   }
 }

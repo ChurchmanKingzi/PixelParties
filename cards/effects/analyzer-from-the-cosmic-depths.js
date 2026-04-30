@@ -52,7 +52,10 @@ function oppFreeSupportSlots(engine, oppIdx) {
   const out = [];
   for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
     const h = ops.heroes[hi];
-    if (!h?.name || h.hp <= 0) continue;
+    // "Place" semantics — any opp Hero's Support Zone qualifies
+    // (including dead / Frozen / Stunned / negated Heroes). Only an
+    // empty Hero slot (no Hero card) is skipped.
+    if (!h?.name) continue;
     const zones = ops.supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) {

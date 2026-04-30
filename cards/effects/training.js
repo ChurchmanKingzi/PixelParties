@@ -90,6 +90,7 @@ async function doHandAttach(engine, playerIdx, heroIdx, maxAttach, trainingZoneI
     const heroName = engine.gs.players[playerIdx]?.heroes?.[heroIdx]?.name || 'Hero';
     const result = await engine.promptGeneric(playerIdx, {
       type: 'abilityAttach',
+      ownerIdx: playerIdx, // Used by CPU cpuResponse to look up the prompted player's state.
       heroIdx,
       eligibleCards: eligible,
       title: 'Training',
@@ -286,6 +287,61 @@ module.exports = {
   // them long-term.
   cpuGerrymanderResponse(/* engine, gerryOwnerPi, promptData */) {
     return { optionId: 'hand' };
+  },
+
+  // ── CPU prompt response for the custom `abilityAttach` prompt ──
+  // Without this, the engine default returns null for cancellable
+  // prompts of unknown type — the CPU silently dropped every Training
+  // activation at the first attach step. Pick by the same tier
+  // priority the main attachAbilities flow uses: stack onto an
+  // existing copy first (T1), then attach a brand-new ability nobody
+  // has yet (T2), then spread to a fresh hero (T3). Within each tier
+  // pick alphabetically for determinism. Returns `{ finished: true }`
+  // once we've already attached at least once and no eligible
+  // candidate beats the current floor (can also short-circuit when
+  // the eligible list is empty).
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'generic') return undefined;
+    const promptData = payload;
+    if (!promptData || promptData.type !== 'abilityAttach') return undefined;
+
+    const eligible = promptData.eligibleCards || [];
+    if (eligible.length === 0) {
+      return promptData.canFinish ? { finished: true } : null;
+    }
+
+    const pi = promptData.ownerIdx;
+    const heroIdx = promptData.heroIdx;
+    const ps = engine.gs.players[pi];
+    if (!ps) return null;
+
+    const livingHeroes = (ps.heroes || []).map((h, i) => ({ h, i }))
+      .filter(({ h }) => h?.name && h.hp > 0);
+
+    const heroHasName = (hi, name) => {
+      const zones = ps.abilityZones?.[hi] || [];
+      for (const z of zones) {
+        if ((z || [])[0] === name) return true;
+      }
+      return false;
+    };
+    const someoneLivingHasName = (name) => livingHeroes.some(({ i }) => heroHasName(i, name));
+    const targetHeroHasName = (name) => heroHasName(heroIdx, name);
+
+    const tier1 = []; // stack onto target hero
+    const tier2 = []; // new — no living hero has it yet
+    const tier3 = []; // spread — others have it
+    for (const name of eligible) {
+      if (targetHeroHasName(name)) tier1.push(name);
+      else if (!someoneLivingHasName(name)) tier2.push(name);
+      else tier3.push(name);
+    }
+
+    const sorted = (arr) => arr.slice().sort((a, b) => a.localeCompare(b));
+    const pick = (sorted(tier1)[0]) || (sorted(tier2)[0]) || (sorted(tier3)[0]);
+    if (!pick) return promptData.canFinish ? { finished: true } : null;
+
+    return { cardName: pick };
   },
 
   /**

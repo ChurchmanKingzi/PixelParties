@@ -259,8 +259,22 @@ module.exports = {
     });
     await engine._delay(500);
 
-    // SILENT PLACEMENT (matches "place" semantics).
-    engine.summonCreature(chosen, pi, sameHero, sameSlot, { source: CARD_NAME });
+    // REAL SUMMON — "place" in card text means "summon regardless of
+    // level" AND "any Hero's Support Zone (alive/dead/Frozen/Stunned/
+    // negated/Bound)". `isPlacement: true` declares this so the engine
+    // bypasses the normal-summoning incapacitation gates. Life-Searcher
+    // IS a Cosmic card by name, so the cosmic flag is set both for
+    // Invader's by-Cosmic gate (the Lv4 upgrade pool includes Invader)
+    // and for Cosmic Manipulation's deck-summon reaction window.
+    await engine.summonCreatureWithHooks(chosen, pi, sameHero, sameSlot, {
+      source: CARD_NAME,
+      isPlacement: true,
+      hookExtras: {
+        _summonedBy: CARD_NAME,
+        _summonedByCosmic: true,
+        _summonedFromDeck: true,
+      },
+    });
 
     engine.log('life_searcher_upgrade', {
       player: ps.username, upgrade: chosen, slot: sameSlot,

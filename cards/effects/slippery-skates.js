@@ -50,6 +50,83 @@ function _isSummonerHero(engine, pi, hi) {
 module.exports = {
   equipEffect: true,
 
+  // The activation produces no immediate evaluator-visible value
+  // (creature count is unchanged, gold/HP/hand sizes are unchanged) —
+  // the move's worth is positional (frees a summoner zone, lands the
+  // creature on a host-hero reactor like Ingo / Maya / Pes'zet). The
+  // standard +3 commit threshold therefore vetoes every activation.
+  // `alwaysCommit` lets the gate pick the best plan from variations
+  // and commit. The activation is already gated by
+  // `canActivateEquipEffect` (must have a creature + adjacent free
+  // zone) AND `cpuCanActivateEquip` (defer in MP1 if zones are tight),
+  // so force-commit is safe.
+  cpuMeta: { alwaysCommit: true },
+
+  // ── CPU prompt response for the custom `skatesMove` prompt ──
+  // The engine's default declines cancellable prompts of unknown type,
+  // which made the CPU silently cancel every Skates activation. Pick
+  // a creature-and-destination pair here. Score destinations by host-
+  // hero reactor synergy (Ingo / Maya / Pes'zet → +bonus) so MCTS gets
+  // a sensible heuristic; no enumeration of alternatives is needed
+  // because the move's eval delta is too small to vary meaningfully.
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'generic') return undefined;
+    const promptData = payload;
+    if (!promptData || promptData.type !== 'skatesMove') return undefined;
+    const pi = promptData.ownerIdx;
+    const ps = engine.gs.players[pi];
+    if (!ps) return null;
+    const creatures = promptData.creatures || [];
+    const destZones = promptData.destZones || [];
+    if (creatures.length === 0 || destZones.length === 0) return null;
+
+    // Score each destination zone by host-hero presence. Reactors that
+    // benefit from creature placement get a positive boost; otherwise
+    // neutral. Zones on the strongest summoner are mildly preferred so
+    // we don't move the creature back onto a non-summoner.
+    const scoreZone = (z) => {
+      const hostHero = ps.heroes?.[z.heroIdx];
+      if (!hostHero?.name) return 0;
+      let s = 0;
+      // Reactor synergy: each of these heroes fires onCardEnterZone for
+      // creatures landing in their owner's zones. Match by exact name.
+      if (hostHero.name === 'Ingo, Investor of Evil') s += 50;       // +4 gold per move
+      if (hostHero.name === 'Maya, the Nature Fairy') s += 40;       // +50 HP buff
+      if (hostHero.name === "Pes'zet, the Plague Bringer") s += 30;  // +1 poison stack on any target
+      // Mild preference for keeping a summoner zone clear by moving
+      // ONTO a non-summoner, but only as a tiebreak.
+      if (!_isSummonerHero(engine, pi, z.heroIdx)) s += 1;
+      return s;
+    };
+    let bestZone = destZones[0];
+    let bestScore = scoreZone(bestZone);
+    for (let i = 1; i < destZones.length; i++) {
+      const sc = scoreZone(destZones[i]);
+      if (sc > bestScore) { bestScore = sc; bestZone = destZones[i]; }
+    }
+
+    // Pick a creature to move. If the equipped hero is a strong summoner
+    // (we want its zones free for next-turn summons) just take the first
+    // creature; otherwise prefer the highest-HP / strongest creature so
+    // the destination receives the more valuable piece.
+    const cardDB = engine._getCardDB();
+    let bestCreature = creatures[0];
+    let bestCreatureScore = -Infinity;
+    for (const c of creatures) {
+      const cd = cardDB[c.name];
+      const lvl = cd?.level || 0;
+      const hp = cd?.hp || 0;
+      const sc = lvl * 100 + hp;
+      if (sc > bestCreatureScore) { bestCreatureScore = sc; bestCreature = c; }
+    }
+
+    return {
+      creatureSlot: bestCreature.zoneSlot,
+      destHeroIdx: bestZone.heroIdx,
+      destSlot: bestZone.slotIdx,
+    };
+  },
+
   /**
    * Only one copy of Slippery Skates per Hero. Prevents the CPU (and any
    * future scripted flow using this hook) from stacking duplicates.
@@ -227,11 +304,16 @@ module.exports = {
 
     engine.sync();
 
-    // Fire onCardEnterZone for the moved card
+    // Fire onCardEnterZone WITHOUT `_onlyCard` so host-hero listeners
+    // (Ingo, Maya, Pes'zet) react to the creature landing in their
+    // zone. `_isMove: true` lets summon-gated reactors (Sandy Blob,
+    // Orthos, Loyal Hountriever, Blood Moon) opt out — moving an
+    // existing creature is not a summon.
     await engine.runHooks('onCardEnterZone', {
-      _onlyCard: inst, enteringCard: inst,
+      enteringCard: inst,
       toZone: 'support', toHeroIdx: destHeroIdx,
       _skipReactionCheck: true,
+      _isMove: true,
     });
 
     engine.log('slippery_skates_move', {

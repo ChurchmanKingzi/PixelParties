@@ -33,6 +33,11 @@ module.exports = {
       const entering = ctx.enteringCard;
       if (!entering) return;
       if (entering.zone !== 'support') return;
+      // Card text: "if this Hero summons a 'Loyal' Creature". Moves
+      // (Slippery Skates, Dark Gear, Diplomacy) shuffle existing
+      // creatures around — the Loyal wasn't summoned by Orthos this
+      // time. Skip.
+      if (ctx._isMove) return;
       // Same side — Orthos only chains off OUR summons.
       const enteringOwner = entering.owner ?? entering.controller;
       if (enteringOwner !== ctx.cardOriginalOwner) return;
