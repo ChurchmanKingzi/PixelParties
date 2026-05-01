@@ -1,0 +1,147 @@
+{
+  "gamesDone": 4,
+  "total": 1000,
+  "elapsedMs": 198613,
+  "pickerMode": "random",
+  "stats": {
+    "p0wins": 2,
+    "p1wins": 2,
+    "draws": 0,
+    "totalTurns": 34,
+    "totalMs": 48872
+  },
+  "aggregateWinReasons": {
+    "Heroes dead": 4
+  },
+  "decks": [
+    {
+      "id": "sample-Structure Deck Lightning Caller",
+      "name": "Lightning Caller",
+      "games": 1,
+      "wins": 1,
+      "losses": 0,
+      "winReasons": {
+        "Heroes dead": 1
+      },
+      "winRate": 1
+    },
+    {
+      "id": "sample-Structure Deck To Attain Divinity",
+      "name": "To Attain Divinity",
+      "games": 1,
+      "wins": 1,
+      "losses": 0,
+      "winReasons": {
+        "Heroes dead": 1
+      },
+      "winRate": 1
+    },
+    {
+      "id": "sample-Structure Deck Great Weapon Master",
+      "name": "Great Weapon Master",
+      "games": 1,
+      "wins": 1,
+      "losses": 0,
+      "winReasons": {
+        "Heroes dead": 1
+      },
+      "winRate": 1
+    },
+    {
+      "id": "sample-Structure Deck Shifting Sandlands",
+      "name": "Shifting Sandlands",
+      "games": 1,
+      "wins": 1,
+      "losses": 0,
+      "winReasons": {
+        "Heroes dead": 1
+      },
+      "winRate": 1
+    },
+    {
+      "id": "sample-Structure Deck Spell Industrialization",
+      "name": "Spell Industrialization",
+      "games": 1,
+      "wins": 0,
+      "losses": 1,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Burning Inferno",
+      "name": "Burning Inferno",
+      "games": 1,
+      "wins": 0,
+      "losses": 1,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Steam Dwarf Mines",
+      "name": "Steam Dwarf Mines",
+      "games": 1,
+      "wins": 0,
+      "losses": 1,
+      "winReasons": {},
+      "winRate": 0
+    },
+    {
+      "id": "sample-Structure Deck Slimy Infestation",
+      "name": "Slimy Infestation",
+      "games": 1,
+      "wins": 0,
+      "losses": 1,
+      "winReasons": {},
+      "winRate": 0
+    }
+  ],
+  "matchups": [
+    {
+      "idA": "sample-Structure Deck Lightning Caller",
+      "nameA": "Lightning Caller",
+      "idB": "sample-Structure Deck Spell Industrialization",
+      "nameB": "Spell Industrialization",
+      "games": 1,
+      "aWins": 1,
+      "bWins": 0,
+      "dominance": 1,
+      "dominantSide": "Lightning Caller"
+    },
+    {
+      "idA": "sample-Structure Deck Burning Inferno",
+      "nameA": "Burning Inferno",
+      "idB": "sample-Structure Deck To Attain Divinity",
+      "nameB": "To Attain Divinity",
+      "games": 1,
+      "aWins": 0,
+      "bWins": 1,
+      "dominance": 1,
+      "dominantSide": "To Attain Divinity"
+    },
+    {
+      "idA": "sample-Structure Deck Great Weapon Master",
+      "nameA": "Great Weapon Master",
+      "idB": "sample-Structure Deck Steam Dwarf Mines",
+      "nameB": "Steam Dwarf Mines",
+      "games": 1,
+      "aWins": 1,
+      "bWins": 0,
+      "dominance": 1,
+      "dominantSide": "Great Weapon Master"
+    },
+    {
+      "idA": "sample-Structure Deck Shifting Sandlands",
+      "nameA": "Shifting Sandlands",
+      "idB": "sample-Structure Deck Slimy Infestation",
+      "nameB": "Slimy Infestation",
+      "games": 1,
+      "aWins": 1,
+      "bWins": 0,
+      "dominance": 1,
+      "dominantSide": "Shifting Sandlands"
+    }
+  ],
+  "onesidedMatchups": [],
+  "tieDetails": [],
+  "savedAt": "2026-05-01T09:58:58.735Z"
+}

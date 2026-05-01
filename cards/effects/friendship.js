@@ -130,9 +130,19 @@ module.exports = {
     },
 
     /**
-     * After a spell resolves: Lv2/3 draw trigger.
-     * Draws 1 (Lv2) or 3 (Lv3) cards when this hero uses a Support Spell.
-     * HOPT per Friendship hero.
+     * After a spell resolves: Lv2/3 draw rider.
+     *
+     * The draw is now tied DIRECTLY to the additional-action grant —
+     * fires only when the spell was just played AS Friendship's
+     * additional action. Spells normally cast from the same hero
+     * (regular Action / Main-phase plays) get no draw, and the per-
+     * turn cap is enforced naturally by the additional action's
+     * own `additionalActionAvail` token (granted once per turn,
+     * consumed exactly once → draw at most once per turn). No
+     * separate HOPT needed.
+     *
+     * Mandatory and silent: `engine.actionDrawCards` doesn't prompt,
+     * so the player can't decline.
      */
     afterSpellResolved: async (ctx) => {
       const engine = ctx._engine;
@@ -141,19 +151,27 @@ module.exports = {
       const heroIdx = ctx.cardHeroIdx;
       const ps = gs.players[pi];
 
-      // Only trigger for spells cast by THIS hero
-      if (ctx.casterIdx !== pi || ctx.heroIdx !== heroIdx) return;
+      // Gate on "was THIS spell played as Friendship's additional
+      // action on THIS Hero?". server.js's spell-play path stamps
+      // `ctx.viaAdditionalProvider` with the consumed provider inst
+      // (or null when the play was a normal action). We require the
+      // provider to be a Friendship card belonging to the same
+      // (player, hero) pair as the listener — if Friendship-A's
+      // additional action fired Heal on Hero-A and Friendship-B is
+      // also on the board, only Friendship-A draws.
+      const provider = ctx.viaAdditionalProvider;
+      if (!provider || provider.name !== 'Friendship') return;
+      if (provider.owner !== pi || provider.heroIdx !== heroIdx) return;
 
-      // Only for Support Magic Spells
+      // Sanity: the spell must still be a Support Magic Spell. The
+      // additional-action filter already enforces this at play time,
+      // but defensive: a future change to the filter shouldn't silently
+      // start drawing on Trick / Destruction Magic.
       const spellData = ctx.spellCardData;
       if (!spellData || spellData.spellSchool1 !== 'Support Magic') return;
 
       const level = getFriendshipLevel(ps, heroIdx);
-      if (level < 2) return; // Lv1 doesn't draw
-
-      // HOPT check per Friendship hero
-      const hoptKey = `friendship-draw:${pi}:${heroIdx}`;
-      if (!engine.claimHOPT(hoptKey, pi)) return;
+      if (level < 2) return; // Lv1 grants the action but no draw
 
       const drawCount = level >= 3 ? 3 : 1;
 

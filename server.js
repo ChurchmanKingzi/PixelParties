@@ -67,10 +67,34 @@ function getCardArray() {
 // whatsoever in the log. This at least tells us what threw.
 process.on('unhandledRejection', (reason, promise) => {
   console.error('[unhandledRejection]', reason?.stack || reason);
+  flushSelfPlayTrail('unhandledRejection');
 });
 process.on('uncaughtException', (err) => {
   console.error('[uncaughtException]', err?.stack || err);
+  flushSelfPlayTrail('uncaughtException');
 });
+process.on('SIGINT', () => {
+  console.error('[SIGINT] flushing trail and exiting');
+  flushSelfPlayTrail('SIGINT');
+  process.exit(130);
+});
+process.on('beforeExit', () => flushSelfPlayTrail('beforeExit'));
+
+// Module-level handle for the active self-play trail file. Set by
+// debug_self_play_run when a batch starts, cleared on normal completion.
+// The flush helper above lets every fatal handler force-sync remaining
+// buffered writes — for a hard V8 OOM none of those handlers fire, but
+// every per-action sync write already on disk survives the crash.
+let _activeSelfPlayTrailFd = null;
+function flushSelfPlayTrail(reason) {
+  if (_activeSelfPlayTrailFd == null) return;
+  try {
+    fs.writeSync(_activeSelfPlayTrailFd, `\n=== TRAIL FLUSH (${reason}) at ${new Date().toISOString()} ===\n`);
+    fs.fsyncSync(_activeSelfPlayTrailFd);
+    fs.closeSync(_activeSelfPlayTrailFd);
+  } catch {}
+  _activeSelfPlayTrailFd = null;
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -3190,6 +3214,13 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       await room.engine.runHooks('afterSpellResolved', {
         spellName: cardName, spellCardData: cardData, heroIdx, casterIdx: pi,
         damageTargets: uniqueTargets, isSecondCast: !!gs._bartasSecondCast,
+        // The provider instance whose additional-action token was just
+        // consumed by THIS spell-play, or null if the spell was cast as
+        // a normal action. Friendship's draw rider gates on this so it
+        // only fires for spells played AS the additional action — a
+        // normally-cast Support Magic Spell from the same Hero no longer
+        // pays the draw bonus.
+        viaAdditionalProvider: additionalConsumed ? consumedInst : null,
         _skipReactionCheck: true,
       });
     }
@@ -6900,6 +6931,11 @@ io.on('connection', (socket) => {
       startGameEngine(room, roomId, firstPlayer, (engine) => {
         engine._isSelfPlay = true;
         engine._cpuPlayerIdx = firstPlayer;
+        // Attach action trail fd if the batch opened one. Engine's
+        // _trailWrite sync-writes each entry so the file survives a
+        // hard V8 OOM (uncaughtException doesn't fire on FATAL OOM,
+        // but writes already on disk persist). null fd → no-op.
+        if (opts.trailFd != null) engine._trailFd = opts.trailFd;
         // Per-game runtime CPU skip list: blocks the CPU brain's
         // proactive-play scanner from picking specific cards. Read by
         // _cpu.js next to the per-card `cpuSkipProactive` flag. Used
@@ -7325,8 +7361,28 @@ io.on('connection', (socket) => {
       // Incremental save path so a crash doesn't lose everything. Writes
       // the running summary to disk after each game. On process death,
       // this file is the user's recovery point.
-      const partialSavePath = path.join(__dirname, 'data', `selfplay-partial-${Date.now()}.json`);
+      const batchTimestamp = Date.now();
+      const partialSavePath = path.join(__dirname, 'data', `selfplay-partial-${batchTimestamp}.json`);
       console.log(`[self-play] incremental save → ${partialSavePath}`);
+      // OOM-survival action trail. Every CPU action / summon / rollout
+      // candidate / turn switch is sync-written to this file via the
+      // engine's _trailWrite helper. Sync writes survive a hard V8 OOM
+      // (which is fatal and can't be caught), so on a crash the disk
+      // has the action sequence right up to the moment Node died — the
+      // tail of this file names what was running. Costs ~50µs per
+      // entry and only a few hundred entries per game, so per-batch
+      // overhead is negligible.
+      const trailPath = path.join(__dirname, 'data', `selfplay-trail-${batchTimestamp}.log`);
+      let trailFd = null;
+      try {
+        trailFd = fs.openSync(trailPath, 'w');
+        _activeSelfPlayTrailFd = trailFd;
+        fs.writeSync(trailFd, `=== self-play batch start ${new Date().toISOString()} count=${count} mode=${pickerMode} ===\n`);
+        console.log(`[self-play] action trail → ${trailPath}`);
+      } catch (err) {
+        console.error('[self-play] failed to open trail file:', err.message);
+        trailFd = null;
+      }
       // Emit a "started" event to the BROWSER side so the user sees
       // immediate confirmation in their dev console rather than
       // staring at silence until the first game completes ~30s later.
@@ -7364,6 +7420,11 @@ io.on('connection', (socket) => {
         // Announce decks BEFORE the game runs — if the game hangs, this
         // is the last line in the log and pinpoints the offending matchup.
         console.log(`[self-play] Game ${i + 1}/${count} starting: ${nameP0} vs ${nameP1}`);
+        if (trailFd != null) {
+          try {
+            fs.writeSync(trailFd, `\n=== GAME ${i + 1}/${count}: ${nameP0} vs ${nameP1} @ ${new Date().toISOString()} ===\n`);
+          } catch { /* best-effort */ }
+        }
         // Browser-side start signal so the dev console gets immediate
         // feedback that the next game has begun. Without this the user
         // only sees output once a game COMPLETES (the
@@ -7406,7 +7467,7 @@ io.on('connection', (socket) => {
           });
           let r;
           try {
-            r = await Promise.race([runOneSelfPlayGame(deckP0, deckP1, { cpuSkipCardNames }), outerTimeout]);
+            r = await Promise.race([runOneSelfPlayGame(deckP0, deckP1, { cpuSkipCardNames, trailFd }), outerTimeout]);
           } finally {
             if (outerTimeoutHandle) clearTimeout(outerTimeoutHandle);
             // Tear down transcription regardless of game outcome.
@@ -7738,10 +7799,27 @@ io.on('connection', (socket) => {
         console.error('[self-play] report write failed:', werr.message);
       }
 
+      // Close the action-trail file. Module-level handle is cleared too
+      // so the process-level fatal handlers don't try to flush an fd that
+      // might be reassigned by a later batch.
+      if (trailFd != null) {
+        try {
+          fs.writeSync(trailFd, `\n=== self-play batch end ${new Date().toISOString()} ===\n`);
+          fs.fsyncSync(trailFd);
+          fs.closeSync(trailFd);
+        } catch {}
+        if (_activeSelfPlayTrailFd === trailFd) _activeSelfPlayTrailFd = null;
+      }
+
       socket.emit('debug_self_play_result', summary);
     })().catch(err => {
       console.error('[self-play] runner threw:', err.message, err.stack);
       setCpuVerbose(_prevVerbose_sp);
+      // Close trail on error path too.
+      if (_activeSelfPlayTrailFd != null) {
+        try { fs.fsyncSync(_activeSelfPlayTrailFd); fs.closeSync(_activeSelfPlayTrailFd); } catch {}
+        _activeSelfPlayTrailFd = null;
+      }
       socket.emit('debug_self_play_result', { ok: false, msg: err.message });
     });
   });

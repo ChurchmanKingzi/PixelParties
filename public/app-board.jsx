@@ -989,6 +989,106 @@ function GraveyardOfLimitedPowerOverlay() {
   );
 }
 
+// The First Circle of Hell — gray wasteland: ash-gray sky fading to
+// a dark, lifeless ground with scattered rubble silhouettes and
+// drifting ash particles. Deliberately low-saturation and static —
+// the card's identity is "everything here is dust" rather than
+// anything dramatic.
+function FirstCircleOfHellOverlay() {
+  const rubble = useMemo(() => Array.from({ length: 22 }, () => ({
+    x: Math.random() * 100,
+    y: 56 + Math.random() * 38,
+    scale: 0.6 + Math.random() * 1.2,
+    tilt: -28 + Math.random() * 56,
+    // Three rough silhouette shapes — picked at random per piece so
+    // the wasteland reads as varied rubble rather than identical
+    // tombstones.
+    shape: Math.floor(Math.random() * 3),
+    shade: 16 + Math.floor(Math.random() * 18),
+  })), []);
+  const ashes = useMemo(() => Array.from({ length: 18 }, () => ({
+    x: Math.random() * 100,
+    delay: -Math.random() * 14,
+    dur: 10 + Math.random() * 14,
+    drift: -16 + Math.random() * 32,
+    size: 2 + Math.random() * 3,
+    opacity: 0.18 + Math.random() * 0.32,
+  })), []);
+  return (
+    <div className="first-circle-of-hell-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
+    }}>
+      {/* Layer 1: ash-gray sky. Deliberately desaturated so the
+          wasteland reads cold and joyless. */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background:
+          'linear-gradient(180deg, rgba(56,56,62,0.78) 0%, rgba(40,40,46,0.86) 45%, rgba(22,22,26,0.92) 100%)',
+      }} />
+      {/* Layer 2: lighter ashen haze across the middle band. */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, top: '36%', height: '28%',
+        background:
+          'linear-gradient(180deg, rgba(80,78,82,0.0) 0%, rgba(110,108,112,0.22) 50%, rgba(80,78,82,0.0) 100%)',
+        mixBlendMode: 'screen',
+      }} />
+      {/* Layer 3: cracked-earth ground silhouette. */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, height: '38%',
+        background:
+          'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(20,20,24,0.55) 40%, rgba(8,8,10,0.92) 100%)',
+      }} />
+      {/* Layer 4: scattered rubble silhouettes — three jagged shapes.
+          Solid dark blocks with uneven clip-paths to suggest broken
+          stones. No glow; this is dead earth. */}
+      {rubble.map((r, i) => {
+        const w = 18 * r.scale;
+        const h = 14 * r.scale;
+        const clip = r.shape === 0
+          ? 'polygon(20% 100%, 0% 35%, 28% 0%, 70% 12%, 100% 60%, 80% 100%)'
+          : r.shape === 1
+            ? 'polygon(0% 100%, 15% 20%, 50% 0%, 90% 28%, 100% 100%)'
+            : 'polygon(10% 100%, 0% 50%, 35% 8%, 80% 22%, 100% 80%, 60% 100%)';
+        const tone = `rgb(${r.shade}, ${r.shade}, ${r.shade + 4})`;
+        return (
+          <div key={'rb' + i} style={{
+            position: 'absolute',
+            left: r.x + '%', top: r.y + '%',
+            width: w + 'px', height: h + 'px',
+            transform: 'translate(-50%, -50%) rotate(' + r.tilt + 'deg)',
+            background: tone,
+            clipPath: clip,
+            boxShadow: 'inset 0 -1px 2px rgba(0,0,0,0.6)',
+          }} />
+        );
+      })}
+      {/* Layer 5: slow drifting ash particles. Use simple round
+          divs that float gently upward; the slow loop makes the
+          air feel "stale" rather than energetic. */}
+      {ashes.map((a, i) => (
+        <div key={'ash' + i} style={{
+          position: 'absolute',
+          left: a.x + '%', top: '102%',
+          width: a.size + 'px', height: a.size + 'px',
+          borderRadius: '50%',
+          background: 'rgba(180,180,184,1)',
+          opacity: a.opacity,
+          ['--drift']: a.drift + 'px',
+          animation: 'firstCircleAshFloat ' + a.dur + 's linear ' + a.delay + 's infinite',
+        }} />
+      ))}
+      <style>{`
+        @keyframes firstCircleAshFloat {
+          0%   { transform: translate(0, 0); opacity: 0; }
+          15%  { opacity: var(--ashOpacity, 1); }
+          90%  { opacity: var(--ashOpacity, 1); }
+          100% { transform: translate(var(--drift, 0), -120vh); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // Tarleinn's Floating Island — a wide sky background with a single
 // large grass-topped island floating in the middle, cut by a blue
 // river that snakes across the grass plateau.
@@ -2630,8 +2730,220 @@ function BomblebeeFuseEffect({ x, y, w }) {
   );
 }
 
+// Guardian Beast Gou: white protective bubble engulfing the target.
+// Three rings + a single rim-circling highlight. The component
+// receives the slot's anchor coordinates from `GameAnimationRenderer`;
+// inner CSS positions everything relative to that anchor so the
+// bubble auto-centers regardless of slot size.
+function ShieldBubbleEffect({ x, y }) {
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-shield-bubble-core" />
+      <div className="anim-shield-bubble-rim" />
+      <div className="anim-shield-bubble-glint" />
+    </div>
+  );
+}
+
+// Guardian Beast Ji: massive cyan-white shock that stuns the target.
+// Bigger and bluer than the standard `electric_strike` (which is
+// yellow and tuned for damage hits). Layered visuals: a wide cyan
+// flash, two giant zigzag bolts crashing down vertically, a halo
+// of inward-converging arc bolts, and a burst of crackling sparks.
+function StunStrikeEffect({ x, y }) {
+  const bolts = useMemo(() => Array.from({ length: 22 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 70 + Math.random() * 60;
+    return {
+      startX: Math.cos(angle) * dist,
+      startY: Math.sin(angle) * dist,
+      size: 14 + Math.random() * 14,
+      delay: Math.random() * 250,
+      dur: 200 + Math.random() * 200,
+      rotation: (angle * 180 / Math.PI) + 180,
+    };
+  }), []);
+  const sparks = useMemo(() => Array.from({ length: 22 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 18 + Math.random() * 38;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 3 + Math.random() * 6,
+      color: ['#7ddcff','#aef','#fff','#9be8ff','#cff'][Math.floor(Math.random() * 5)],
+      delay: 280 + Math.random() * 200,
+      dur: 300 + Math.random() * 300,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-stun-flash" />
+      <div className="anim-stun-megabolt anim-stun-megabolt-1">⚡</div>
+      <div className="anim-stun-megabolt anim-stun-megabolt-2">⚡</div>
+      {bolts.map((b, i) => (
+        <div key={'sb'+i} className="anim-stun-bolt" style={{
+          '--startX': b.startX + 'px', '--startY': b.startY + 'px', '--size': b.size + 'px',
+          '--rotation': b.rotation + 'deg',
+          animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
+        }}>⚡</div>
+      ))}
+      {sparks.map((s, i) => (
+        <div key={'ss'+i} className="anim-explosion-particle" style={{
+          '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+          '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Guardian Beast Niu: golden power-up. A warm gold flash bursts
+// outward, a halo ring expands around the hero, an upward shaft of
+// light rises behind them, and sparkles + small stars twinkle as
+// they spiral out. Tuned to feel like a buff "landing" rather than
+// an attack — warm, celebratory, ~700ms total.
+function NiuPowerUpEffect({ x, y }) {
+  const sparkles = useMemo(() => Array.from({ length: 18 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 22 + Math.random() * 38;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 8,
+      size: 4 + Math.random() * 6,
+      color: ['#ffd700','#fff4a3','#ffe455','#fff','#ffb84a'][Math.floor(Math.random() * 5)],
+      delay: Math.random() * 200,
+      dur: 400 + Math.random() * 350,
+    };
+  }), []);
+  const stars = useMemo(() => Array.from({ length: 8 }, (_, i) => {
+    const angle = (i / 8) * Math.PI * 2 + Math.random() * 0.4;
+    const dist = 40 + Math.random() * 25;
+    return {
+      x: Math.cos(angle) * dist,
+      y: Math.sin(angle) * dist - 10,
+      size: 14 + Math.random() * 8,
+      delay: 60 + Math.random() * 220,
+      dur: 500 + Math.random() * 250,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-niu-shaft" />
+      <div className="anim-niu-flash" />
+      <div className="anim-niu-halo" />
+      {stars.map((s, i) => (
+        <div key={'nis'+i} className="anim-niu-star" style={{
+          '--tx': s.x + 'px', '--ty': s.y + 'px',
+          fontSize: s.size + 'px',
+          animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }}>★</div>
+      ))}
+      {sparkles.map((s, i) => (
+        <div key={'nip'+i} className="anim-explosion-particle" style={{
+          '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+          '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+          boxShadow: `0 0 8px ${s.color}, 0 0 4px #fff`,
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Guardian Beast She: two large snake fangs lunging down from above
+// the target, snapping shut on impact, then withdrawing. Tuned to
+// fire SIMULTANEOUSLY across every selected target — the card
+// broadcasts all snake_bite events in one frame, then waits a
+// shared beat before applying Poison. Greenish-yellow venom flash
+// at impact + a few venom drip particles sell the "envenomation"
+// read.
+function SnakeBiteEffect({ x, y }) {
+  const drips = useMemo(() => Array.from({ length: 8 }, () => ({
+    dx: -22 + Math.random() * 44,
+    fall: 22 + Math.random() * 26,
+    size: 4 + Math.random() * 4,
+    delay: 350 + Math.random() * 150,
+    dur: 350 + Math.random() * 200,
+  })), []);
+  const splat = useMemo(() => Array.from({ length: 14 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 14 + Math.random() * 26;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 4,
+      size: 3 + Math.random() * 5,
+      color: ['#9be84a','#c8ff5a','#7bcc2a','#dffaa0','#aef27c'][Math.floor(Math.random() * 5)],
+      delay: 320 + Math.random() * 120,
+      dur: 320 + Math.random() * 240,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-snake-fang anim-snake-fang-left" />
+      <div className="anim-snake-fang anim-snake-fang-right" />
+      <div className="anim-snake-bite-flash" />
+      {drips.map((d, i) => (
+        <div key={'sd'+i} className="anim-snake-venom-drip" style={{
+          '--dx': d.dx + 'px', '--fall': d.fall + 'px', '--size': d.size + 'px',
+          animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+        }} />
+      ))}
+      {splat.map((s, i) => (
+        <div key={'ss'+i} className="anim-explosion-particle" style={{
+          '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+          '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+          boxShadow: `0 0 6px ${s.color}`,
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Cannibalism (Mao's starting Ability): a meat drumstick wobbles
+// over the eating Hero and "shrinks in bites" — three quick scale-
+// down beats sell the "eat-eat-eat" read. Green healing particles
+// rise out of the Hero around the meat to communicate the heal.
+// Tuned to ~900ms total so the heal numbers can land just after the
+// animation peaks.
+function CannibalismChompEffect({ x, y }) {
+  const particles = useMemo(() => Array.from({ length: 16 }, () => {
+    const xOff = -52 + Math.random() * 104;
+    return {
+      xOff,
+      startY: 18 + Math.random() * 22,
+      endY: -68 - Math.random() * 70,
+      size: 4 + Math.random() * 6,
+      glyph: Math.random() < 0.55 ? '+' : '✦',
+      color: ['#7dff90','#9bff77','#48e860','#bfff9b','#aaffba'][Math.floor(Math.random() * 5)],
+      delay: 220 + Math.random() * 380,
+      dur: 480 + Math.random() * 320,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-cannibalism-flash" />
+      <div className="anim-cannibalism-meat">🍖</div>
+      <div className="anim-cannibalism-bite anim-cannibalism-bite-1">✧</div>
+      <div className="anim-cannibalism-bite anim-cannibalism-bite-2">✧</div>
+      {particles.map((p, i) => (
+        <div key={'cp'+i} className="anim-cannibalism-particle" style={{
+          left: p.xOff + 'px',
+          top: p.startY + 'px',
+          fontSize: p.size + 'px',
+          color: p.color,
+          textShadow: `0 0 6px ${p.color}, 0 0 3px #fff`,
+          '--endY': p.endY + 'px',
+          animationDelay: p.delay + 'ms',
+          animationDuration: p.dur + 'ms',
+        }}>{p.glyph}</div>
+      ))}
+    </div>
+  );
+}
+
 const ANIM_REGISTRY = {
   explosion: ExplosionEffect,
+  shield_bubble: ShieldBubbleEffect,
+  stun_strike: StunStrikeEffect,
+  niu_powerup: NiuPowerUpEffect,
+  snake_bite: SnakeBiteEffect,
+  cannibalism_chomp: CannibalismChompEffect,
   cosmic_summon: CosmicSummonEffect,
   creature_death: CreatureDeathEffect,
   freeze: FreezeEffect,
@@ -8263,12 +8575,24 @@ function CardNamePickerPrompt({ ep, onRespond }) {
 // Status select prompt component (for Beer, etc.) — must be a proper component for hooks
 function CardGalleryMultiPrompt({ ep, onRespond }) {
   const cards = ep.cards || [];
-  const maxSelect = ep.selectCount || 3;
+  // `ep.validCounts` (optional): array of integers — only those exact
+  // selection counts confirm. Used by Guardian Beast pickers where the
+  // delete cost is a SET (Tu's 3/6/9, Shu's multiples of 4, Ji's exactly
+  // 3, etc.). When provided, it OVERRIDES min/max gating: the
+  // confirm button is enabled iff `selected.length` is in the set.
+  // The cap on what's clickable still uses max(validCounts) so the
+  // player can't select past the largest valid total.
+  const validCounts = Array.isArray(ep.validCounts) && ep.validCounts.length > 0
+    ? ep.validCounts.slice().sort((a, b) => a - b)
+    : null;
+  const maxSelect = validCounts ? validCounts[validCounts.length - 1] : (ep.selectCount || 3);
   // `ep.minSelect` was previously guarded by a falsy `||` check, which
   // turned a legitimate `minSelect: 0` into the `maxSelect` fallback —
   // forcing "select all" and making the confirm button impossible to
   // enable unless every card was picked. Use explicit null-check instead.
-  const minSelect = ep.minSelect != null ? ep.minSelect : (ep.maxBudget != null ? 1 : maxSelect);
+  const minSelect = validCounts
+    ? validCounts[0]
+    : (ep.minSelect != null ? ep.minSelect : (ep.maxBudget != null ? 1 : maxSelect));
   const maxBudget = ep.maxBudget;
   const costKey = ep.costKey || 'cost';
   // Track selections by gallery INDEX rather than card name so duplicate
@@ -8276,11 +8600,58 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
   // card in the discard pile) can be checked / unchecked independently.
   // We map back to `{ selectedCards: [names] }` at response time so all
   // existing callers that read names out of the response keep working.
+  // We ALSO emit `selectedIndices` so callers that need to disambiguate
+  // duplicate names (Guardian Beast delete pickers) can map back to the
+  // gallery entry's `entryId` without a fragile linear-search fallback.
   const [selected, setSelected] = useState([]);
+
+  // Reset selection whenever a new prompt arrives. Without this, when
+  // a card script chains two `cardGalleryMulti` prompts back-to-back
+  // (Zhu picks own pile, then opp pile), React reuses the SAME
+  // component instance — `useState([])` only initializes once, so
+  // the second picker would inherit the first picker's selection.
+  // Keying on `ep.cards` (a fresh array per prompt) catches every
+  // new invocation.
+  useEffect(() => { setSelected([]); }, [ep.cards]);
 
   const totalCost = maxBudget != null
     ? selected.reduce((sum, idx) => sum + (cards[idx]?.[costKey] || 0), 0)
     : 0;
+
+  // Optional "unique-name floor": some pickers (Guardian Beast Zhu)
+  // require the selection to include at least N distinct names drawn
+  // from a tagged subset. `requiredUniqueNames` is the candidate name
+  // list; `requiredUniqueCount` is the minimum unique-from-it count
+  // that must be selected for confirm to enable. When unset (most
+  // pickers), this gate is bypassed.
+  const requiredUniqueNames = Array.isArray(ep.requiredUniqueNames) ? ep.requiredUniqueNames : null;
+  const requiredUniqueCount = Number.isInteger(ep.requiredUniqueCount) ? ep.requiredUniqueCount : 0;
+  const uniqueNamesPicked = requiredUniqueNames && requiredUniqueCount > 0
+    ? new Set(selected
+        .map(i => cards[i]?.name)
+        .filter(n => n && requiredUniqueNames.includes(n)))
+    : null;
+  const meetsUniqueGate = !uniqueNamesPicked || uniqueNamesPicked.size >= requiredUniqueCount;
+
+  // Late-stage cap: once the remaining slots equal the remaining
+  // unique-name floor, every further pick MUST be a new unique-from-
+  // list contribution. Anything else gets grayed out and refused.
+  // Example (Zhu, 8 picks needed, 3 unique-GB floor): with 5 cards
+  // selected and 0 unique GBs picked, only the GBs in
+  // `requiredUniqueNames` can fill the last 3 slots. Toggling-OFF
+  // an already-selected card stays allowed regardless, otherwise
+  // the player could lock themselves out via misclicks.
+  const slotsLeft = maxSelect - selected.length;
+  const uniqueShortfall = uniqueNamesPicked
+    ? Math.max(0, requiredUniqueCount - uniqueNamesPicked.size)
+    : 0;
+  const onlyNewUniqueAllowed = uniqueShortfall > 0 && slotsLeft <= uniqueShortfall;
+  const isNewUniqueContribution = (idx) => {
+    const name = cards[idx]?.name;
+    if (!name || !requiredUniqueNames) return false;
+    if (!requiredUniqueNames.includes(name)) return false;
+    return !uniqueNamesPicked.has(name);
+  };
 
   const toggleCard = (idx) => {
     setSelected(prev => {
@@ -8289,6 +8660,22 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
         return prev.filter(i => i !== idx);
       }
       if (prev.length >= maxSelect) return prev;
+      // Late-stage unique-floor gate — when slots are at the floor,
+      // only NEW unique-from-list names are allowed in. Re-derive
+      // here against `prev` (toggleCard's setState callback runs
+      // independently of the outer-scope snapshot) to avoid races.
+      if (requiredUniqueNames && requiredUniqueCount > 0) {
+        const prevUnique = new Set(prev
+          .map(i => cards[i]?.name)
+          .filter(n => n && requiredUniqueNames.includes(n)));
+        const prevShortfall = Math.max(0, requiredUniqueCount - prevUnique.size);
+        const prevSlotsLeft = maxSelect - prev.length;
+        if (prevShortfall > 0 && prevSlotsLeft <= prevShortfall) {
+          const name = cards[idx]?.name;
+          const isNewUnique = name && requiredUniqueNames.includes(name) && !prevUnique.has(name);
+          if (!isNewUnique) return prev;
+        }
+      }
       // Budget check
       if (maxBudget != null) {
         const entryCost = cards[idx]?.[costKey] || 0;
@@ -8300,10 +8687,16 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
     });
   };
 
-  const canConfirm = selected.length >= minSelect && selected.length <= maxSelect;
+  const canConfirm = (validCounts
+    ? validCounts.includes(selected.length)
+    : (selected.length >= minSelect && selected.length <= maxSelect))
+    && meetsUniqueGate;
 
   const confirmSelection = () => {
-    onRespond({ selectedCards: selected.map(i => cards[i]?.name).filter(Boolean) });
+    onRespond({
+      selectedCards: selected.map(i => cards[i]?.name).filter(Boolean),
+      selectedIndices: [...selected],
+    });
   };
 
   // Enter/Space confirms selection
@@ -8340,6 +8733,11 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
               (Cost: {totalCost}/{maxBudget})
             </span>
           )}
+          {uniqueNamesPicked && (
+            <span style={{ marginLeft: 8, color: meetsUniqueGate ? 'var(--success)' : '#ffaa33', fontWeight: 600 }}>
+              ({ep.uniqueGateLabel || 'Unique'}: {uniqueNamesPicked.size}/{requiredUniqueCount})
+            </span>
+          )}
         </div>
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           <div className="deck-viewer-grid">
@@ -8350,7 +8748,13 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
               const entryCost = entry[costKey] || 0;
               const wouldExceedBudget = maxBudget != null && !isSel && totalCost + entryCost > maxBudget;
               const atMax = !isSel && selected.length >= maxSelect;
-              const dimmed = wouldExceedBudget || atMax;
+              // Late-stage unique-floor gate dims any card that isn't
+              // a new contribution to the unique-name floor (Zhu's
+              // "last 3 slots must be different Guardian Beasts" rule).
+              // Already-selected cards are exempt so the player can
+              // still toggle them off if they made a mistake.
+              const blockedByUniqueGate = onlyNewUniqueAllowed && !isSel && !isNewUniqueContribution(i);
+              const dimmed = wouldExceedBudget || atMax || blockedByUniqueGate;
               return (
                 <div key={entry.name + '-' + i} style={{ position: 'relative' }}>
                   <CardMini card={card}
@@ -8370,7 +8774,19 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
           <button className={'btn ' + (ep.confirmClass || '')} style={{ padding: '8px 24px', fontSize: 12 }}
             disabled={!canConfirm}
             onClick={confirmSelection}>
-            {ep.confirmLabel || `Confirm (${selected.length}/${maxSelect})`}
+            {(() => {
+              if (canConfirm) return ep.confirmLabel || `Confirm (${selected.length}/${maxSelect})`;
+              // Not confirmable yet — when validCounts is set, hint
+              // which exact counts are valid. Otherwise show the
+              // standard min/max range hint.
+              if (validCounts) {
+                return `Select ${validCounts.join(' / ')} cards (currently ${selected.length})`;
+              }
+              if (selected.length < minSelect) {
+                return `Select at least ${minSelect} (currently ${selected.length})`;
+              }
+              return ep.confirmLabel || `Confirm (${selected.length}/${maxSelect})`;
+            })()}
           </button>
         </div>
       </div>
@@ -10373,11 +10789,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           for (const el of areaEls) {
             const r = el.getBoundingClientRect();
             if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
-              // Find first hero that can cast this card — canHeroPlayCard
-              // hits the server-computed heroPlayableCards map which already
-              // incorporates schools / area-empty / action-economy rules.
-              for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-                if (canHeroPlayCard(me, hi, card)) { targetHero = hi; break; }
+              // Find first hero that can cast this card. During any-hero
+              // heroAction (Hu) the prompt's `heroIndicesByCard` is the
+              // authoritative server-validated list — `canHeroPlayCard`
+              // hits the regular action-economy gate which returns false
+              // for every hero during an immediate-action prompt. During
+              // hero-locked heroAction (Coffee) the locked hero is the
+              // only legal caster. Otherwise fall back to the standard
+              // map.
+              const isAnyHeroAction = heroActionPrompt
+                && (heroActionPrompt.eligibleCards || []).includes(card.name);
+              if (isAnyHeroAction && heroActionHeroIdx2 !== undefined) {
+                targetHero = heroActionHeroIdx2;
+              } else if (isAnyHeroAction) {
+                const allowed = (heroActionPrompt.heroIndicesByCard || {})[card.name] || [];
+                for (const hi of allowed) {
+                  const h = me.heroes[hi];
+                  if (h?.name && h.hp > 0) { targetHero = hi; break; }
+                }
+              } else {
+                for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+                  if (canHeroPlayCard(me, hi, card)) { targetHero = hi; break; }
+                }
               }
             }
           }
@@ -10553,52 +10986,71 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           } else if (card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment') {
             socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx });
           } else if ((card.cardType === 'Spell' || card.cardType === 'Attack') && isPlayable) {
-            // Hero-locked path: a heroAction prompt names a single Hero
-            // who's getting the additional Action (Body Swap, Coffee,
-            // Trample Sounds, any future immediate-additional card).
-            // Clicking an eligible card auto-routes to that Hero — no
-            // hero picker, no fallthrough to "any Hero who can cast".
-            // The prompt's `eligibleCards` list is already narrowed
-            // server-side to only what THIS hero can legally cast, so
-            // the click is always safe to dispatch directly.
-            if (isHeroAction) {
+            // Hero-locked heroAction (Coffee, Trample Sounds, Body Swap,
+            // Victory Phoenix Tackle, …). Prompt config bakes a specific
+            // `heroIdx`; clicking any eligible card auto-routes there.
+            // The prompt's `eligibleCards` is already narrowed server-
+            // side to only what THIS hero can legally cast, so the
+            // dispatch is always safe.
+            if (isHeroAction && heroActionPrompt.heroIdx !== undefined) {
               socket.emit('effect_prompt_response', {
                 roomId: gameState.roomId,
                 response: { cardName, handIndex: idx, heroIdx: heroActionPrompt.heroIdx },
               });
             } else {
-              // Normal flow: find every Hero that could cast this card,
-              // own + charmed opponent. Wolflesia-style Creature
-              // spell-casters appear in the eligible list as
-              // `creatureInstId`-tagged entries — clicking one routes
-              // through `play_spell` with `heroIdx` set to the
-              // Creature's host slot, where the engine's bypass
-              // additional-action picks it up. Single eligible
-              // auto-plays; multiple eligible opens the picker popup.
+              // Either Action Phase normal play OR any-hero heroAction
+              // (Guardian Beast Hu via `performImmediateActionAnyHero`
+              // — the prompt omits heroIdx so the player picks the
+              // caster). Build the per-card eligible-hero list. For
+              // any-hero mode the server provides `heroIndicesByCard`
+              // (Hu's grant doesn't live in the regular action-economy
+              // map, so `canHeroPlayCard` would return false for every
+              // hero and the click would silently fizzle). Wolflesia-
+              // style Creature spell-casters appear as `creatureInstId`-
+              // tagged entries in the normal-flow path only.
               const eligible = [];
-              for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-                if (canHeroPlayCard(me, hi, card)) {
-                  eligible.push({ idx: hi, name: me.heroes[hi].name });
+              if (isHeroAction && heroActionPrompt.heroIndicesByCard) {
+                const allowedHeroIdxs = heroActionPrompt.heroIndicesByCard[cardName] || [];
+                for (const hi of allowedHeroIdxs) {
+                  const h = me.heroes[hi];
+                  if (h?.name && h.hp > 0) eligible.push({ idx: hi, name: h.name });
                 }
-              }
-              for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
-                const oppHero = opp.heroes[hi];
-                if (oppHero?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card)) {
-                  eligible.push({ idx: hi, name: oppHero.name, charmedOwner: oppIdx });
+              } else {
+                for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+                  if (canHeroPlayCard(me, hi, card)) {
+                    eligible.push({ idx: hi, name: me.heroes[hi].name });
+                  }
                 }
-              }
-              if (card.cardType === 'Spell') {
-                for (const c of (gameState.creatureSpellCasters || [])) {
-                  if (!(c.eligibleHandCards || []).includes(card.name)) continue;
-                  eligible.push({
-                    idx: c.heroIdx,
-                    name: `${c.cardName} (Creature)`,
-                    creatureInstId: c.creatureInstId,
-                  });
+                for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
+                  const oppHero = opp.heroes[hi];
+                  if (oppHero?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card)) {
+                    eligible.push({ idx: hi, name: oppHero.name, charmedOwner: oppIdx });
+                  }
+                }
+                if (card.cardType === 'Spell') {
+                  for (const c of (gameState.creatureSpellCasters || [])) {
+                    if (!(c.eligibleHandCards || []).includes(card.name)) continue;
+                    eligible.push({
+                      idx: c.heroIdx,
+                      name: `${c.cardName} (Creature)`,
+                      creatureInstId: c.creatureInstId,
+                    });
+                  }
                 }
               }
               if (eligible.length === 1) {
-                socket.emit('play_spell', { roomId: gameState.roomId, cardName, handIndex: idx, heroIdx: eligible[0].idx, charmedOwner: eligible[0].charmedOwner, viaCreatureInstId: eligible[0].creatureInstId });
+                // During heroAction, the play has to land via the
+                // effect prompt (hero-locked: Coffee; any-hero: Hu).
+                // `play_spell` would fail server-side because no
+                // additional-action token covers the card.
+                if (isHeroAction) {
+                  socket.emit('effect_prompt_response', {
+                    roomId: gameState.roomId,
+                    response: { cardName, handIndex: idx, heroIdx: eligible[0].idx },
+                  });
+                } else {
+                  socket.emit('play_spell', { roomId: gameState.roomId, cardName, handIndex: idx, heroIdx: eligible[0].idx, charmedOwner: eligible[0].charmedOwner, viaCreatureInstId: eligible[0].creatureInstId });
+                }
               } else if (eligible.length > 1) {
                 setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isHeroAction });
               }
@@ -10612,19 +11064,55 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               setAbilityAttachPick({ cardName, handIndex: idx, card });
             }
           } else if (card.cardType === 'Creature' && isPlayable) {
-            // Hero-locked path: heroAction prompt is up and this
-            // Creature is in its eligibleCards. Auto-summon onto the
-            // prompt's named Hero — no hero picker. The first free
-            // Support Zone on that hero is used; performImmediate
-            // Action's server validation checks the slot.
+            // heroAction Creature click. Two sub-modes:
+            //   • Hero-locked (Coffee): prompt config has heroIdx.
+            //     Auto-summon onto that Hero's leftmost free Support
+            //     Zone — no hero picker.
+            //   • Any-hero (Guardian Beast Hu via
+            //     `performImmediateActionAnyHero`): prompt config
+            //     omits heroIdx. Build the list of own Heroes with a
+            //     free Support Zone; auto-emit if exactly one is
+            //     eligible, otherwise open the spellHeroPick picker
+            //     so the player can choose. The picker's button
+            //     handler honors `isHeroAction` and routes through
+            //     `effect_prompt_response`.
             if (isHeroAction) {
               const lockedHi = heroActionPrompt.heroIdx;
-              const lockedSlot = findFreeSupportSlot(me, lockedHi);
-              if (lockedSlot >= 0) {
-                socket.emit('effect_prompt_response', {
-                  roomId: gameState.roomId,
-                  response: { cardName, handIndex: idx, heroIdx: lockedHi, zoneSlot: lockedSlot },
-                });
+              if (lockedHi !== undefined) {
+                const lockedSlot = findFreeSupportSlot(me, lockedHi);
+                if (lockedSlot >= 0) {
+                  socket.emit('effect_prompt_response', {
+                    roomId: gameState.roomId,
+                    response: { cardName, handIndex: idx, heroIdx: lockedHi, zoneSlot: lockedSlot },
+                  });
+                }
+              } else {
+                // Any-hero mode — narrow heroes to those the SERVER
+                // already validated as eligible for this Creature (level
+                // / school / canSummon / once-per-game / etc.) via
+                // `heroIndicesByCard`. Cross-check that each still has
+                // a free Support Zone in the live client snapshot —
+                // catches the rare race where an interleaved server
+                // event filled a slot. The auto-emit lands the Creature
+                // in the leftmost free slot, mirroring the Coffee path.
+                const eligible = [];
+                const allowedHeroIdxs = (heroActionPrompt.heroIndicesByCard || {})[cardName]
+                  || [];
+                for (const hi of allowedHeroIdxs) {
+                  const h = me.heroes[hi];
+                  if (!h?.name || h.hp <= 0) continue;
+                  const slot = findFreeSupportSlot(me, hi);
+                  if (slot < 0) continue;
+                  eligible.push({ idx: hi, name: h.name, zoneSlot: slot });
+                }
+                if (eligible.length === 1) {
+                  socket.emit('effect_prompt_response', {
+                    roomId: gameState.roomId,
+                    response: { cardName, handIndex: idx, heroIdx: eligible[0].idx, zoneSlot: eligible[0].zoneSlot },
+                  });
+                } else if (eligible.length > 1) {
+                  setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isCreature: true, isHeroAction: true });
+                }
               }
               setHandDrag(null); setPlayDrag(null); setAbilityDrag(null); return;
             }
@@ -10806,11 +11294,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
           if (prev.targetHero < 0 || prev.targetSlot < 0) return null;
 
-          // Hero Action mode (Coffee) — send as effect_prompt_response
+          // Hero Action mode (Coffee, Guardian Beast Hu, …). Hero-locked
+          // variants (Coffee) ignore `heroIdx` in the response and use
+          // the heroIdx already baked into the prompt config; any-hero
+          // variants (Guardian Beast Hu via `performImmediateActionAnyHero`)
+          // REQUIRE `heroIdx` in the response and bail out with no play
+          // if it's missing — which silently fizzled Creature drops
+          // before this fix. Always include both `heroIdx` AND
+          // `zoneSlot` so both engine paths resolve cleanly.
           if (isHeroAction) {
             socket.emit('effect_prompt_response', {
               roomId: gameState.roomId,
-              response: { cardName: prev.cardName, handIndex: prev.idx, zoneSlot: prev.targetSlot },
+              response: {
+                cardName: prev.cardName,
+                handIndex: prev.idx,
+                heroIdx: prev.targetHero,
+                zoneSlot: prev.targetSlot,
+              },
             });
             return null;
           }
@@ -11099,6 +11599,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const deckSearchPendingRef = useRef([]); // Card names queued before sync triggers opp draw anim
   const [reactionChain, setReactionChain] = useState(null); // [{id, cardName, owner, cardType, isInitialCard, negated, status}]
   const [cameraFlash, setCameraFlash] = useState(false);
+  // Guardian Beast Zhu skip-turn overlay. Set when the engine
+  // broadcasts `zhu_skip_turn_animation` (own-screen and opp-screen
+  // both render it; `sleeperIsMe` flips the "ASLEEP" label between
+  // "You're asleep!" and "Opponent is asleep!").
+  const [zhuSkipAnim, setZhuSkipAnim] = useState(null); // { sleeperIsMe, sleeperName, id }
   const [toughnessHpChanges, setToughnessHpChanges] = useState([]); // [{id, amount, owner, heroIdx}]
   const toughnessHpSuppressRef = useRef({}); // { 'owner-heroIdx': true } — suppress damage numbers for Toughness HP removal
   const manualHpSuppressRef = useRef({}); // { 'owner-heroIdx': true } — suppress BOTH damage + heal numbers for one tick when explicit popups handle them (Luna Kiai split, future split-popup cards)
@@ -11159,6 +11664,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const onChainDone = () => {
       setTimeout(() => setReactionChain(null), 800);
     };
+    // Guardian Beast Zhu skip-turn overlay. Two-phase:
+    //   • 'fell_asleep'   — fires when Zhu's effect resolves (right
+    //     after the 16-card deletion). Sets up the threat: "you fell
+    //     asleep" is read as "you're about to lose your turn".
+    //   • 'slept_through' — fires when the asleep player's turn would
+    //     have started but is skipped instead. Reads as "the threat
+    //     just landed".
+    // Both clients receive the event; the label flips based on whether
+    // the recipient is the sleeper. Animation runs ~1700ms, matching
+    // the engine's await delay.
+    const onZhuSkipTurn = ({ sleeperOwner, sleeperName, phase }) => {
+      const sleeperIsMe = sleeperOwner === myIdx;
+      const id = Date.now() + Math.random();
+      setZhuSkipAnim({ sleeperIsMe, sleeperName, phase: phase || 'fell_asleep', id });
+      if (window.playSFX) window.playSFX('ui_prompt_open', { dedupe: 1500 });
+      setTimeout(() => {
+        setZhuSkipAnim(curr => (curr && curr.id === id) ? null : curr);
+      }, 1700);
+    };
+    socket.on('zhu_skip_turn_animation', onZhuSkipTurn);
+
     const onCameraFlash = () => {
       setCameraFlash(true);
       setTimeout(() => setCameraFlash(false), 900);
@@ -13858,6 +14384,153 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('deck_to_discard_animation', onDeckToDiscard);
+
+    // Discard pile → Deleted pile flying-card animation. Fired by
+    // Guardian Beast deletion costs (and Mao's "delete 5 cards from
+    // your discard" Hero effect) so the player sees their cards
+    // physically migrate from one pile to the other instead of just
+    // silently disappearing. Mirrors `onDeckToDiscard` but with the
+    // discard pile as the source.
+    const onDiscardToDeleted = ({ owner, cardNames }) => {
+      const isMe = owner === myIdx;
+      if (!Array.isArray(cardNames) || cardNames.length === 0) return;
+      const srcSel = isMe ? '[data-my-discard]' : '[data-opp-discard]';
+      const tgtSel = isMe ? '[data-my-deleted]' : '[data-opp-deleted]';
+      const srcEl = document.querySelector(srcSel);
+      const tgtEl = document.querySelector(tgtSel);
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const srcX = sr.left + sr.width / 2;
+      const srcY = sr.top + sr.height / 2;
+      const dx = (tr.left + tr.width / 2) - srcX;
+      const dy = (tr.top + tr.height / 2) - srcY;
+
+      // Reuse the same keyframe shape as deck→discard. The `dtds`
+      // CSS variables match its keyframe so the visual flow feels
+      // consistent across pile-migration animations.
+      if (!document.getElementById('deck-to-discard-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'deck-to-discard-keyframes';
+        style.textContent = `
+          @keyframes deckToDiscard {
+            0%   { transform: translate(0,0) scale(1); opacity: 1; }
+            20%  { transform: translate(0,-18px) scale(1.08); opacity: 1; }
+            80%  { transform: translate(var(--dtdsDx), calc(var(--dtdsDy) - 10px)) scale(0.92); opacity: 1; }
+            100% { transform: translate(var(--dtdsDx), var(--dtdsDy)) scale(0.72); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      const travelMs = 700;
+      for (let i = 0; i < cardNames.length; i++) {
+        const card = document.createElement('div');
+        const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardNames[i]) : null;
+        const delay = i * 160; // stagger so a 5-card delete reads as a wave
+        card.style.cssText = [
+          'position:fixed',
+          `left:${srcX - 32}px`, `top:${srcY - 44}px`,
+          'width:64px', 'height:88px', 'z-index:10200', 'pointer-events:none',
+          'border-radius:4px', 'overflow:hidden',
+          // Subtle red-purple glow to differentiate from the deck→
+          // discard purple flight — makes "going to deleted" feel
+          // distinct from "going to discard" at a glance.
+          'box-shadow:0 0 12px rgba(255,80,140,0.7),0 0 4px rgba(140,40,80,0.5)',
+          `--dtdsDx:${dx}px`, `--dtdsDy:${dy}px`,
+          `animation:deckToDiscard ${travelMs}ms ease-in-out ${delay}ms forwards`,
+          'opacity:0',
+        ].join(';');
+        if (imgUrl) {
+          const img = document.createElement('img');
+          img.src = imgUrl;
+          img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+          img.draggable = false;
+          card.appendChild(img);
+          card.style.opacity = '1';
+        } else {
+          card.style.background = 'linear-gradient(135deg,#3a1a2a,#2a0a1a)';
+          card.style.opacity = '1';
+          card.innerHTML = `<div style="color:#fcc;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardNames[i]}</div>`;
+        }
+        document.body.appendChild(card);
+        setTimeout(() => card.remove(), delay + travelMs + 150);
+      }
+    };
+    socket.on('discard_to_deleted_animation', onDiscardToDeleted);
+
+    // Deleted pile → Discard pile flying-card animation. Reverse of
+    // `onDiscardToDeleted` — fired when an effect resurrects cards
+    // out of the deleted pile (Yang). Distinct green-cyan glow ("back
+    // from oblivion") so a glance distinguishes it from the red-purple
+    // deletion flight.
+    const onDeletedToDiscard = ({ owner, cardNames }) => {
+      const isMe = owner === myIdx;
+      if (!Array.isArray(cardNames) || cardNames.length === 0) return;
+      const srcSel = isMe ? '[data-my-deleted]' : '[data-opp-deleted]';
+      const tgtSel = isMe ? '[data-my-discard]' : '[data-opp-discard]';
+      const srcEl = document.querySelector(srcSel);
+      const tgtEl = document.querySelector(tgtSel);
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const srcX = sr.left + sr.width / 2;
+      const srcY = sr.top + sr.height / 2;
+      const dx = (tr.left + tr.width / 2) - srcX;
+      const dy = (tr.top + tr.height / 2) - srcY;
+
+      // Reuses the deck→discard keyframe ensured by onDeckToDiscard /
+      // onDiscardToDeleted; the per-instance --dtdsDx / --dtdsDy vars
+      // drive the flight delta, so no new keyframe is needed.
+      if (!document.getElementById('deck-to-discard-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'deck-to-discard-keyframes';
+        style.textContent = `
+          @keyframes deckToDiscard {
+            0%   { transform: translate(0,0) scale(1); opacity: 1; }
+            20%  { transform: translate(0,-18px) scale(1.08); opacity: 1; }
+            80%  { transform: translate(var(--dtdsDx), calc(var(--dtdsDy) - 10px)) scale(0.92); opacity: 1; }
+            100% { transform: translate(var(--dtdsDx), var(--dtdsDy)) scale(0.72); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      const travelMs = 700;
+      for (let i = 0; i < cardNames.length; i++) {
+        const card = document.createElement('div');
+        const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardNames[i]) : null;
+        const delay = i * 160;
+        card.style.cssText = [
+          'position:fixed',
+          `left:${srcX - 32}px`, `top:${srcY - 44}px`,
+          'width:64px', 'height:88px', 'z-index:10200', 'pointer-events:none',
+          'border-radius:4px', 'overflow:hidden',
+          // Green-cyan glow — "rescued from oblivion" read, distinct
+          // from the red-purple flight when cards are deleted.
+          'box-shadow:0 0 12px rgba(80,255,180,0.75),0 0 4px rgba(40,140,100,0.55)',
+          `--dtdsDx:${dx}px`, `--dtdsDy:${dy}px`,
+          `animation:deckToDiscard ${travelMs}ms ease-in-out ${delay}ms forwards`,
+          'opacity:0',
+        ].join(';');
+        if (imgUrl) {
+          const img = document.createElement('img');
+          img.src = imgUrl;
+          img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+          img.draggable = false;
+          card.appendChild(img);
+          card.style.opacity = '1';
+        } else {
+          card.style.background = 'linear-gradient(135deg,#1a3a2a,#0a2a1a)';
+          card.style.opacity = '1';
+          card.innerHTML = `<div style="color:#cfc;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardNames[i]}</div>`;
+        }
+        document.body.appendChild(card);
+        setTimeout(() => card.remove(), delay + travelMs + 150);
+      }
+    };
+    socket.on('deleted_to_discard_animation', onDeletedToDiscard);
+
     const onDeckToAbility = ({ owner, heroIdx, slotIdx, cardName, count, source }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       // 'hand' source flies cards out of the player's hand instead of
@@ -14379,7 +15052,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('reaction_chain_update', onChainUpdate); socket.off('reaction_chain_resolving_start', onChainResolvingStart);
       socket.off('reaction_chain_link_resolving', onChainLinkResolving); socket.off('reaction_chain_link_resolved', onChainLinkResolved);
       socket.off('reaction_chain_link_negated', onChainLinkNegated); socket.off('reaction_chain_done', onChainDone);
-      socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('kiai_hp_split', onKiaiHpSplit); socket.off('creature_zone_move', onCreatureZoneMove); socket.off('fighting_atk_change', onFightingAtk);
+      socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('kiai_hp_split', onKiaiHpSplit); socket.off('creature_zone_move', onCreatureZoneMove); socket.off('fighting_atk_change', onFightingAtk); socket.off('zhu_skip_turn_animation', onZhuSkipTurn);
       socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick);
       socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange);
       socket.off('deepsea_spores_activated', onDeepseaSporesActivated);
@@ -14427,6 +15100,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('discard_to_deck_animation', onDiscardToDeck);
       socket.off('play_pile_transfer', onPileTransfer);
       socket.off('deck_to_discard_animation', onDeckToDiscard);
+      socket.off('discard_to_deleted_animation', onDiscardToDeleted);
+      socket.off('deleted_to_discard_animation', onDeletedToDiscard);
       socket.off('deck_to_ability_animation', onDeckToAbility);
       socket.off('punch_box_animation', onPunchBox);
       socket.off('tears_of_creation_animation', onTearsOfCreation);
@@ -15841,15 +16516,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             for (let z = 0; z < 3; z++) { if ((supZ[z] || []).length === 0) return false; }
             return true;
           })();
-          // During Coffee's heroAction prompt, canHeroPlayCard is too strict
-          // (returns false for a hero who's already acted this turn); the
-          // prompt's eligibleCards list + targeted heroIdx are authoritative.
+          // During heroAction (Coffee, Hu's any-hero variant, …),
+          // `canHeroPlayCard` is too strict — it goes through the
+          // regular action-economy gate (`heroPlayableCards`), which
+          // returns false for a hero who has already used their main
+          // action this turn or for any hero during an immediate-action
+          // prompt. The prompt itself is authoritative:
+          //   • Hero-locked variants (Coffee): `eligibleCards` is the
+          //     server-validated card list AND `heroIdx === i` pins
+          //     the only allowed caster.
+          //   • Any-hero variants (Hu): `heroIdx` is undefined and
+          //     `heroIndicesByCard[cardName]` enumerates the heroes
+          //     the server already validated as legal casters
+          //     (level / Wisdom / Divinity / school / canSummon /
+          //     once-per-game). Without this branch, every hero's tile
+          //     dimmed during a Spell/Attack drag because
+          //     `canHeroPlayCard` returned false on all of them.
           const heroActionEligibleHere = !isOpp
             && gameState.effectPrompt?.type === 'heroAction'
             && gameState.effectPrompt?.ownerIdx === myIdx
-            && gameState.effectPrompt?.heroIdx === i
             && playDrag?.card
-            && (gameState.effectPrompt.eligibleCards || []).includes(playDrag.card.name);
+            && (gameState.effectPrompt.eligibleCards || []).includes(playDrag.card.name)
+            && (gameState.effectPrompt.heroIdx !== undefined
+                ? gameState.effectPrompt.heroIdx === i
+                : ((gameState.effectPrompt.heroIndicesByCard || {})[playDrag.card.name] || []).includes(i));
           const creatureIneligible = !isOpp && playDrag && playDrag.card?.cardType === 'Creature' && !playDrag.isEquip && (() => {
             if (heroActionEligibleHere) return findFreeSupportSlot(p, i) < 0;
             if (!canHeroPlayCard(p, i, playDrag.card)) return true;
@@ -16965,6 +17655,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {(((gameState.areaZones?.[0] || []).includes('Slippery Ice')) || ((gameState.areaZones?.[1] || []).includes('Slippery Ice'))) && <SlipperyIceOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('The Cosmic Depths')) || ((gameState.areaZones?.[1] || []).includes('The Cosmic Depths'))) && <CosmicDepthsOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Graveyard of Limited Power')) || ((gameState.areaZones?.[1] || []).includes('Graveyard of Limited Power'))) && <GraveyardOfLimitedPowerOverlay />}
+            {(((gameState.areaZones?.[0] || []).includes('The First Circle of Hell')) || ((gameState.areaZones?.[1] || []).includes('The First Circle of Hell'))) && <FirstCircleOfHellOverlay />}
             {(((gameState.areaZones?.[0] || []).includes("Tarleinn's Floating Island")) || ((gameState.areaZones?.[1] || []).includes("Tarleinn's Floating Island"))) && <FloatingIslandOverlay />}
             {(() => {
               // Gathering Storm is an Attachment Spell — it lives in a
@@ -17011,9 +17702,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isOppAreaValid = isTargeting && validTargetIds.has(oppAreaId);
                 // Area drag highlight: light up the player's own empty Area
                 // Zone whenever they're dragging an Area-subtype card they
-                // have at least one hero capable of casting.
+                // have at least one hero capable of casting. During any-
+                // hero heroAction (Hu) the prompt's `heroIndicesByCard`
+                // is the authoritative caster list — `canHeroPlayCard`
+                // returns false for every hero during an immediate-action
+                // prompt, so without this branch the Area Zone wouldn't
+                // light up even when a Wisdom/Divinity hero could cast.
                 const draggingArea = !!(playDrag?.card && (playDrag.card.subtype || '').toLowerCase() === 'area');
-                const anyCasterForArea = draggingArea && (me.heroes || []).some((h, hi) => canHeroPlayCard(me, hi, playDrag.card));
+                const heroActionEligibleArea = draggingArea
+                  && gameState.effectPrompt?.type === 'heroAction'
+                  && gameState.effectPrompt?.ownerIdx === myIdx
+                  && (gameState.effectPrompt.eligibleCards || []).includes(playDrag.card.name);
+                const anyCasterForArea = draggingArea && (
+                  heroActionEligibleArea
+                    ? (gameState.effectPrompt.heroIdx !== undefined
+                        ? (() => {
+                            const h = me.heroes[gameState.effectPrompt.heroIdx];
+                            return h?.name && h.hp > 0;
+                          })()
+                        : ((gameState.effectPrompt.heroIndicesByCard || {})[playDrag.card.name] || []).length > 0)
+                    : (me.heroes || []).some((h, hi) => canHeroPlayCard(me, hi, playDrag.card))
+                );
                 const myAreaEmpty = (gameState.areaZones?.[myIdx] || []).length === 0;
                 const myAreaDropEligible = draggingArea && anyCasterForArea && myAreaEmpty;
                 // Area-effect activation — card exports `areaEffect: true`
@@ -17438,6 +18147,41 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div className="chain-owner-dot" style={{ background: link.owner === myIdx ? 'var(--accent)' : 'var(--danger)' }} />
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Guardian Beast Zhu skip-turn (Boar zodiac, sloth themed) ──
+           Fullscreen gray-out fade with floating "Zzz" glyphs and a
+           prominent label. Renders on BOTH clients with the message
+           keyed off who's actually skipping. */}
+      {zhuSkipAnim && (
+        <div className="zhu-skip-overlay">
+          <div className="zhu-skip-veil" />
+          <div className="zhu-skip-zzz zhu-skip-zzz-1">Z</div>
+          <div className="zhu-skip-zzz zhu-skip-zzz-2">z</div>
+          <div className="zhu-skip-zzz zhu-skip-zzz-3">z</div>
+          <div className="zhu-skip-zzz zhu-skip-zzz-4">Z</div>
+          <div className="zhu-skip-zzz zhu-skip-zzz-5">z</div>
+          <div className="zhu-skip-label">
+            <div className="zhu-skip-icon">💤</div>
+            <div className="zhu-skip-title">
+              {(() => {
+                const slept = zhuSkipAnim.phase === 'slept_through';
+                const who = zhuSkipAnim.sleeperName || 'Opponent';
+                if (slept) {
+                  return zhuSkipAnim.sleeperIsMe
+                    ? 'You slept through your turn!'
+                    : `${who} slept through their turn!`;
+                }
+                return zhuSkipAnim.sleeperIsMe
+                  ? 'You fell asleep!'
+                  : `${who} fell asleep!`;
+              })()}
+            </div>
+            <div className="zhu-skip-sub">
+              {zhuSkipAnim.phase === 'slept_through' ? 'Turn skipped.' : 'Their next turn will be skipped.'}
+            </div>
           </div>
         </div>
       )}
@@ -18308,9 +19052,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       handIndex: pick.handIndex, heroIdx: h.idx,
                     });
                   } else if (pick.isHeroAction) {
+                    // For Creature picks in heroAction mode (Hu's
+                    // any-hero variant), zoneSlot is required by
+                    // `performImmediateActionAnyHero`. The picker's
+                    // eligible-entries carry it (the host-slot we
+                    // probed up-front via findFreeSupportSlot).
+                    const response = {
+                      cardName: pick.cardName,
+                      handIndex: pick.handIndex,
+                      heroIdx: h.idx,
+                    };
+                    if (pick.isCreature && h.zoneSlot != null) {
+                      response.zoneSlot = h.zoneSlot;
+                    }
                     socket.emit('effect_prompt_response', {
                       roomId: gameState.roomId,
-                      response: { cardName: pick.cardName, handIndex: pick.handIndex, heroIdx: h.idx },
+                      response,
                     });
                   } else if (pick.isCreature) {
                     socket.emit('play_creature', {

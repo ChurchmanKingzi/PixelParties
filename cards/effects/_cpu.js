@@ -108,6 +108,9 @@ async function runCpuTurn(engine, helpers) {
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
   if (!stillCpuTurn(engine, cpuIdx)) return;
+  if (typeof engine._trailWrite === 'function') {
+    engine._trailWrite('cpuTurnStart', { note: `cpu=p${cpuIdx} hand=${ps.hand.length}` });
+  }
   // Stash helpers on the engine so card-script-level MCTS picks
   // (mctsPickFromOptions, …) can reuse them for rollouts without
   // re-plumbing helper construction.
@@ -3942,12 +3945,14 @@ const MCTS_EXT_EPSILON_ABS = 3;
 const MCTS_EXT_EPSILON_PCT = 0.01;
 // Late-game bypass: past this turn count, skip MCTS and fall through to the
 // heuristic sort / direct activation. A "normal" Pixel Parties match runs
-// ~5 turns per side (10 total), so 200 is effectively never — the bypass
-// exists only to escape pathological attritional stalls (Heal Burn vs
-// Lightning Caller, etc.) where MCTS's snapshot storm would outrun GC. At
-// 200 turns the rollout cost vs marginal decision quality has long since
-// inverted; the heuristic sort is the right answer.
-const MCTS_LATE_GAME_TURN_THRESHOLD = 200;
+// ~5 turns per side (10 total), so 51 is well past any honest decision
+// horizon — the bypass exists to escape pathological attritional stalls
+// (Heal Burn vs Lightning Caller, etc.) where MCTS's snapshot storm would
+// outrun GC and crash the process. At 50+ turns the rollout cost vs
+// marginal decision quality has long since inverted; the heuristic sort
+// is the right answer. Threshold is "turn ≥ N skips" — turn 50 still uses
+// MCTS, turn 51 onwards is heuristic-only.
+const MCTS_LATE_GAME_TURN_THRESHOLD = 51;
 
 // ═══════════════════════════════════════════════════════════════════════
 //  DYNAMIC HERO / CREATURE TRACKING
@@ -5387,6 +5392,70 @@ function evaluateState(engine, cpuIdx) {
   score += computePileFuelContribution(ps, cpuIdx);
   score -= computePileFuelContribution(opp, oppIdx);
 
+  // ── Once-per-game spend cost ────────────────────────────────────
+  // Generic "this card carries a finite, high-impact effect that's
+  // gone once fired" eval term. Cards opt in via:
+  //
+  //   cpuMeta: {
+  //     oncePerGameSpend: {
+  //       spent(engine, pi) → boolean,   // has THIS player burned it?
+  //       cost: <number>,                 // value lost when spent
+  //     },
+  //   }
+  //
+  // After the spend, we apply `cost` to the spender's score (negative
+  // for own, positive for opp). MCTS rollouts will only commit the
+  // spend when the local payoff exceeds this cost — so e.g. Guardian
+  // Beast Zhu's "skip opp's turn + delete 16 cards" no longer fires
+  // for marginal upside; the CPU saves it for game-deciding swings.
+  // Walking each side's name set (hand + discard + deleted +
+  // currently-tracked instances) catches the spend even after the
+  // source card has died, since we still need to apply the cost.
+  const opgSpendCostFor = (sideIdx) => {
+    const ps2 = gs.players[sideIdx];
+    if (!ps2) return 0;
+    const seen = new Set();
+    const collect = (arr) => { for (const n of (arr || [])) seen.add(n); };
+    collect(ps2.hand);
+    collect(ps2.discardPile);
+    collect(ps2.deletedPile);
+    for (const inst of engine.cardInstances) {
+      if ((inst.controller ?? inst.owner) === sideIdx) seen.add(inst.name);
+    }
+    let total = 0;
+    for (const name of seen) {
+      const meta = loadCardEffect(name)?.cpuMeta?.oncePerGameSpend;
+      if (!meta?.spent || typeof meta.cost !== 'number') continue;
+      let spent = false;
+      try { spent = !!meta.spent(engine, sideIdx); } catch {}
+      if (spent) total += meta.cost;
+    }
+    return total;
+  };
+  score -= opgSpendCostFor(cpuIdx);
+  score += opgSpendCostFor(oppIdx);
+
+  // ── First Circle of Hell parity awareness ───────────────────────
+  // While ANY First Circle is in an Area zone, every player's discard
+  // pile gets wiped at the start of their next turn if it currently
+  // holds an ODD number of cards. Discard contents matter to Guardian
+  // Beasts (delete-cost fuel), Mao (re-fire cost), Niu (post-deletion
+  // bonus) etc., so losing the whole pile is a major setback. Apply a
+  // per-card penalty to odd-count own discards so MCTS prefers
+  // playing a card that flips the parity to even before turn end.
+  // The bonus side is smaller — we don't aggressively force opp's
+  // parity since opp can react during their own turn between the
+  // current eval frame and their actual turn-start trigger.
+  const firstCircleActive = engine.cardInstances.some(c =>
+    c.zone === 'area' && c.name === 'The First Circle of Hell'
+  );
+  if (firstCircleActive) {
+    const ownDpLen = ps.discardPile?.length || 0;
+    if (ownDpLen > 0 && (ownDpLen % 2) === 1) score -= 4 * ownDpLen;
+    const oppDpLen = opp.discardPile?.length || 0;
+    if (oppDpLen > 0 && (oppDpLen % 2) === 1) score += 2 * oppDpLen;
+  }
+
   // ── Cute Hydra damage potential ────────────────────────────────────
   // Each Head Counter caps the number of distinct targets her HOPT
   // can hit for 100 each. Useful damage tops out at the count of
@@ -5854,7 +5923,61 @@ async function rolloutRestOfTurn(engine, helpers) {
 // { score, record, completed }. Record is only populated when requested.
 async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, record = false } = {}) {
   const cpuIdx = engine._cpuPlayerIdx;
-  const snap = engine.snapshot();
+  const candidateName = candidate?.cardName || candidate?.abilityName || '?';
+  // Trail the rollout BEFORE snapshotting — the snapshot itself can
+  // trip the heap guard, and we want the trail to name this candidate.
+  // Note: trail-on-rollout is the ONE kind that's recorded even when
+  // _inMctsSim is true (set on the OUTER MCTS rollout for nested ones),
+  // so the trail names every rollout boundary across all nesting depths.
+  if (typeof engine._trailWrite === 'function') {
+    engine._trailWrite('rollout', {
+      cardName: candidateName,
+      note: `${candidate?.cardType || ''} lvl${candidate?.level ?? '?'} hero${candidate?.heroIdx ?? '?'}`,
+    });
+  }
+  // Periodic forced GC. Only fires when Node was launched with
+  // `--expose-gc`; otherwise it's a no-op. In tight rollout loops V8's
+  // incremental GC can't keep up with the per-rollout transient
+  // allocation, so committed memory climbs even though everything is
+  // technically reclaimable. Every 100th rollout, give V8 a chance to
+  // do a full Mark-Compact pass before the heap thresholds trip. Costs
+  // ~10-50ms per call, so amortized ~0.5ms per rollout. If self-play
+  // is launched WITHOUT --expose-gc this is a no-op and the heap
+  // pressure is managed by the per-turn snapshot cap and heap checks.
+  if (typeof global.gc === 'function' && (engine._snapshotsTaken || 0) % 100 === 0) {
+    try { global.gc(); } catch {}
+  }
+  // Per-candidate heap-delta tracking. Sample heapUsed BEFORE snapshot
+  // and AFTER restore; the difference is what each rollout failed to
+  // reclaim. Steady-state ~0; in a death spiral, accumulates per
+  // rollout. Heap-trip diagnostics surface the top offenders so the
+  // user can see "Steam Dwarf Brewer leaked 12MB/rollout × 200 calls".
+  const heapBefore = process.memoryUsage().heapUsed;
+  // Capture hook state PRE-rollout. Diffed against the post-rollout state
+  // (read just before engine.restore() puts it back) to attribute hook
+  // fires to THIS rollout — independent of who the candidate is. When
+  // a rollout leaks more than LEAKY_ROLLOUT_THRESHOLD_MB, we emit a
+  // `leakyRollout` trail entry naming the top hooks AND top board
+  // cards that fired during it. That is what tells us the actual
+  // source (Steam Dwarf Brewer-as-board-passive vs Steam Dwarf
+  // Brewer-as-candidate, or some entirely different card on the board).
+  const histBefore = { ...engine._hookHistogramThisTurn };
+  const firesBefore = { ...engine._hookFiresByCard };
+  // Snapshot can throw the heap-trip guard. Attach the in-flight
+  // candidate so the post-mortem in self-play logs names the exact card
+  // whose rollout pushed allocation over the cap — without this the
+  // diagnosis only points at mctsRunOneRollout, which names every rollout.
+  let snap;
+  try {
+    snap = engine.snapshot();
+  } catch (err) {
+    const cn = candidate?.cardName || candidate?.abilityName || 'unknown';
+    const ct = candidate?.cardType ? ` ${candidate.cardType}` : '';
+    const lv = candidate?.level != null ? ` lvl${candidate.level}` : '';
+    const hi = candidate?.heroIdx != null && candidate.heroIdx >= 0 ? ` hero${candidate.heroIdx}` : '';
+    err.message = `${err.message} [rollout candidate: "${cn}"${ct}${lv}${hi}]`;
+    throw err;
+  }
   // Mark "inside MCTS sim" so the engine's CPU driver (fired by switchTurn
   // during opp-upkeep advances) doesn't recurse into the opp's brain. This
   // is separate from _fastMode — self-play games run with _fastMode=true
@@ -5887,9 +6010,56 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
     delete engine._mctsTargetPlan;
     if (recordBuf) delete engine._mctsTargetRecord;
     engine.exitFastMode();
+    // Capture hook state RIGHT BEFORE restore — restore reverts these
+    // counters, so this is our only chance to read what fired during
+    // the rollout. The diff against histBefore / firesBefore = the
+    // rollout's own hook activity, free of cross-rollout pollution.
+    const histAfter = { ...engine._hookHistogramThisTurn };
+    const firesAfter = { ...engine._hookFiresByCard };
     engine.restore(snap);
     engine._inMctsSim = prevInSim;
     _cpuLogSilent = prevSilent;
+    // Per-candidate heap-delta tracking (post-restore). A healthy GC
+    // makes this ~0 — the snapshot/restore pair should release every
+    // transient. Death-spiral signature: per-rollout deltas in the MB
+    // range that accumulate across hundreds of rollouts before V8
+    // can keep up. Surfaced via `_describeHeapTripDiagnostics`.
+    const heapAfter = process.memoryUsage().heapUsed;
+    const deltaMb = (heapAfter - heapBefore) / 1024 / 1024;
+    if (!engine._candidateHeapDelta) engine._candidateHeapDelta = Object.create(null);
+    const cur = engine._candidateHeapDelta[candidateName] || { calls: 0, totalMb: 0 };
+    cur.calls += 1;
+    cur.totalMb += deltaMb;
+    engine._candidateHeapDelta[candidateName] = cur;
+    // Leaky-rollout detector: when a rollout's net heap delta exceeds
+    // the threshold, dump the per-rollout hook + per-card fire breakdown
+    // as a trail entry. This is independent of which CANDIDATE the
+    // MCTS chose — the breakdown shows which BOARD cards' hooks fired
+    // and which hook NAMES dominated, so we can identify a passive on
+    // the board (Steam Engine, etc.) or an opp-side reaction as the
+    // actual leak source. 0.5MB is well above normal noise (transient
+    // alloc cleared by restore) and well below the per-rollout deltas
+    // seen in the Steam-Dwarf death spiral (~3-7MB/rollout).
+    const LEAKY_ROLLOUT_THRESHOLD_MB = 0.5;
+    if (deltaMb >= LEAKY_ROLLOUT_THRESHOLD_MB && typeof engine._trailWrite === 'function') {
+      const diffMap = (after, before) => {
+        const out = {};
+        for (const k of Object.keys(after)) {
+          const d = (after[k] || 0) - (before[k] || 0);
+          if (d > 0) out[k] = d;
+        }
+        return out;
+      };
+      const hookDiff = diffMap(histAfter, histBefore);
+      const cardDiff = diffMap(firesAfter, firesBefore);
+      const top = (obj, n) => Object.entries(obj)
+        .sort((a, b) => b[1] - a[1]).slice(0, n)
+        .map(([k, v]) => `${k}:${v}`).join(' ');
+      engine._trailWrite('leakyRollout', {
+        cardName: candidateName,
+        note: `+${deltaMb.toFixed(2)}MB hooks=[${top(hookDiff, 6)}] cards=[${top(cardDiff, 6)}]`,
+      });
+    }
   }
   return { score, record: recordBuf || [], completed };
 }
@@ -6098,18 +6268,29 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   // recon + per variation), so opt-in only.
   const evaluateThroughTurnEnd = !!options.evaluateThroughTurnEnd;
 
-  // ── Nested-rollout / late-game short-circuit ──
+  // ── Nested-rollout / late-game / overload short-circuit ──
   // Skip the gate when we're already inside an MCTS simulation — running
   // another full recon+variation per gated activation compounds cost
   // exponentially. The signal is `_inMctsSim`, not `_fastMode`; the
   // latter also fires for whole-game self-play, which would disable the
   // gate everywhere and never invoke the evaluator's synergy terms.
   // Also bypass past MCTS_LATE_GAME_TURN_THRESHOLD — long stalls OOM
-  // before the gate's marginal filter value matters.
-  if (engine._inMctsSim || (engine.gs?.turn || 0) >= MCTS_LATE_GAME_TURN_THRESHOLD) {
+  // before the gate's marginal filter value matters. AND bypass when
+  // `_mctsKilledThisTurn` is set: an earlier rollout this turn tripped
+  // the heap/snapshot caps, so committing without re-rolling-out is the
+  // right policy (mirrors the inMctsSim bypass).
+  if (engine._inMctsSim
+      || engine._mctsKilledThisTurn
+      || (engine.gs?.turn || 0) >= MCTS_LATE_GAME_TURN_THRESHOLD) {
     try { await actionFn(); return true; }
     catch { return false; }
   }
+
+  // Wrap the entire MCTS body in an overload-catch. If any of the
+  // snapshot calls below throw `_mctsOverload`, we fall through to the
+  // bypass policy (commit the action without rolling out) so the live
+  // turn can continue with heuristic for the remaining decisions.
+  try {
 
   const cpuIdx = engine._cpuPlayerIdx;
   // ── Skip baseline ──
@@ -6259,6 +6440,20 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
     delete engine._mctsTargetPlan;
   }
   return true;
+
+  } catch (err) {
+    if (err && err._mctsOverload) {
+      // Heap/snapshot cap tripped during this gate's recon. Flag is
+      // set, so all subsequent gates this turn will hit the bypass at
+      // the top and commit directly. For THIS gate, mirror the bypass
+      // policy: commit the action (best-effort) so the live turn
+      // progresses with the heuristic action still applied.
+      console.error(`[MCTS overload in gate "${desc}"] ${err.message}`);
+      try { await actionFn(); return true; }
+      catch { return false; }
+    }
+    throw err;
+  }
 }
 
 // Evaluator-greedy candidate ranking, used as the in-rollout brain when
@@ -6274,7 +6469,24 @@ async function rankCandidatesEvalGreedy(engine, helpers, candidates) {
   const cpuIdx = engine._cpuPlayerIdx;
   const scored = [];
   for (const cand of candidates) {
-    const snap = engine.snapshot();
+    if (engine._mctsKilledThisTurn) {
+      scored.push({ cand, score: -Infinity });
+      continue;
+    }
+    let snap;
+    try {
+      snap = engine.snapshot();
+    } catch (err) {
+      if (err && err._mctsOverload) {
+        // Cap tripped — score remaining candidates as -Infinity and
+        // let the heuristic tiebreak below order them. The kill flag
+        // is set by the throw site so all subsequent MCTS calls this
+        // turn will short-circuit.
+        scored.push({ cand, score: -Infinity });
+        continue;
+      }
+      throw err;
+    }
     let score = -Infinity;
     try {
       const applied = await applyActionCandidate(engine, helpers, cand);
@@ -6312,18 +6524,37 @@ async function rankCandidatesEvalGreedy(engine, helpers, candidates) {
 //   5. Return candidates sorted by best variation score, each decorated with
 //      a scriptedTargetPlan that the real play should follow.
 async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_ROLLOUTS_PER_CANDIDATE) {
-  // ── Nested-MCTS / late-game short-circuit ──
+  // Auto-clear the kill-flag on LIVE turn change only. Without the
+  // `!_inMctsSim` gate, a nested mctsRankCandidates call inside a
+  // rollout (where gs.turn is the simulated turn, not the live turn)
+  // would clear the flag and re-enable MCTS mid-spiral. Inside a sim
+  // the bypass at the top of this function already short-circuits, so
+  // we only need this reset to fire when the LIVE game has genuinely
+  // moved to a new turn.
+  const liveTurn = engine.gs?.turn || 0;
+  if (!engine._inMctsSim && engine._mctsKilledTurnTag !== liveTurn) {
+    engine._mctsKilledTurnTag = liveTurn;
+    engine._mctsKilledThisTurn = false;
+  }
+
+  // ── Nested-MCTS / late-game / overload short-circuit ──
   // Skip MCTS inside an outer rollout (nested simulations explode the cost
   // of a single rollout exponentially). The correct signal is `_inMctsSim`,
   // set only while simulating; `_fastMode` alone also fires for whole-game
   // self-play, which would disable MCTS everywhere and defeat the point.
   // Also skip past MCTS_LATE_GAME_TURN_THRESHOLD — at that point the match
-  // is stalling and snapshot pressure is the actual risk.
-  if (engine._inMctsSim || (engine.gs?.turn || 0) >= MCTS_LATE_GAME_TURN_THRESHOLD) {
+  // is stalling and snapshot pressure is the actual risk. AND skip if
+  // `_mctsKilledThisTurn` is set — an earlier rollout this real turn
+  // tripped the heap / snapshot cap, so further rollouts would just
+  // accelerate the death spiral.
+  const mctsBypass = engine._inMctsSim
+    || engine._mctsKilledThisTurn
+    || liveTurn >= MCTS_LATE_GAME_TURN_THRESHOLD;
+  if (mctsBypass) {
     // Inside rollouts: rank candidates per the configured rollout brain.
     // evalGreedy: try each, score post-apply, pick highest (lets rollouts
-    // discover synergies). Late-game bypass uses heuristic regardless —
-    // it's explicitly the "stop thinking" cheap path.
+    // discover synergies). Late-game / overload bypass uses heuristic
+    // regardless — it's explicitly the "stop thinking" cheap path.
     if (engine._inMctsSim && _rolloutBrain === 'evalGreedy') {
       return await rankCandidatesEvalGreedy(engine, helpers, candidates);
     }
@@ -6338,16 +6569,35 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   let totalRollouts = 0;
   let budgetExceeded = false;
 
+  // Wrap the rollout body so MCTS_OVERLOAD throws (per-turn snapshot cap
+  // / heap thresholds) gracefully fall through to heuristic instead of
+  // crashing the live game. The overload handler also stamps
+  // `_mctsKilledThisTurn`, which the bypass check at the top of this
+  // function honors on subsequent calls in the same real turn.
+  try {
+
   // ── Recon phase: one rollout per candidate to enumerate variations ──
   // Seeds the heuristic arm of each candidate with the recon score; opens
   // additional "arms" per target-plan variation found in the recon trace.
   // Each arm = (candidate, variation). UCB1 allocates pulls across arms.
   const arms = []; // { candidate, variation:{plan,label}, scoreSum, visits }
+  // Optional GC between candidate rounds — only fires when Node was
+  // launched with --expose-gc, otherwise it's a no-op. Manually
+  // collecting between top-level candidates lets V8 reclaim transient
+  // rollout allocation that its incremental GC otherwise lets pile up
+  // until Mark-Compact thrashes. A big help on heavy-allocation decks.
+  const gcBetweenCandidates = () => {
+    if (typeof global.gc === 'function') {
+      try { global.gc(); } catch {}
+    }
+  };
   for (const candidate of candidates) {
     if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS) {
       budgetExceeded = true;
       break;
     }
+    if (engine._mctsKilledThisTurn) break;
+    gcBetweenCandidates();
     const recon = await mctsRunOneRollout(engine, helpers, candidate, { record: true });
     totalRollouts++;
 
@@ -6381,6 +6631,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
       budgetExceeded = true;
       break;
     }
+    if (engine._mctsKilledThisTurn) break;
     const r = await mctsRunOneRollout(engine, helpers, arm.candidate, { plan: arm.variation.plan });
     totalRollouts++;
     if (r.completed) {
@@ -6399,6 +6650,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
       budgetExceeded = true;
       break;
     }
+    if (engine._mctsKilledThisTurn) break;
     const visitedArms = arms.filter(a => a.visits > 0);
     if (visitedArms.length === 0) break;
     const totalVisits = visitedArms.reduce((s, a) => s + a.visits, 0);
@@ -6440,6 +6692,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
       budgetExceeded = true;
       break;
     }
+    if (engine._mctsKilledThisTurn) break;
     const visited = arms.filter(a => a.visits > 0);
     if (visited.length < 2) break;
     let topAvg = -Infinity;
@@ -6536,6 +6789,28 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
     || ((b.casterAtk || 0) - (a.casterAtk || 0)));
   for (const c of unseen) out.push({ ...c, scriptedTargetPlan: null });
   return out;
+
+  } catch (err) {
+    if (err && err._mctsOverload) {
+      // Engine tripped the per-turn snapshot cap or a heap threshold.
+      // The flag `_mctsKilledThisTurn` is already set by the throw site,
+      // so subsequent mctsRankCandidates calls this real turn will hit
+      // the bypass at the top of the function. Surface the diagnostic
+      // string to console.error AND the trail file (the throw message
+      // contains topHooks / topNames / candidateAlloc / recent-trail —
+      // exactly what we need to find the offending card).
+      console.error(`[MCTS overload at turn ${engine.gs?.turn}] ${err.message}`);
+      if (typeof engine._trailWrite === 'function') {
+        engine._trailWrite('mctsOverload', { note: err.message.slice(0, 400) });
+      }
+      cpuLog(`  [MCTS overload] falling through to heuristic for the rest of this turn`);
+      return [...candidates].sort((a, b) =>
+        (b.level - a.level)
+        || (b.typeScore - a.typeScore)
+        || ((b.casterAtk || 0) - (a.casterAtk || 0)));
+    }
+    throw err;
+  }
 }
 
 // ─── Turbo mode runner ─────────────────────────────────────────────────
@@ -6644,7 +6919,9 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
   if (options.length === 1) return options[0];
   // Inside an outer rollout — don't recurse. Return the first option;
   // the caller's heuristic ordering (if any) acts as the cheap default.
-  if (engine._inMctsSim) return options[0];
+  // Same bypass for `_mctsKilledThisTurn` so post-overload pickers
+  // don't take new snapshots that re-trip the cap.
+  if (engine._inMctsSim || engine._mctsKilledThisTurn) return options[0];
 
   const cpuIdx = engine._cpuPlayerIdx;
   const prevSilent = _cpuLogSilent;
@@ -6665,7 +6942,22 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
   _cpuLogSilent = true;
   try {
     for (const opt of options) {
-      const snap = engine.snapshot();
+      // Honor the kill-flag mid-loop too: a previous option's rollout
+      // may have tripped the cap. Bail out with whatever's best so far.
+      if (engine._mctsKilledThisTurn) break;
+      let snap;
+      try {
+        snap = engine.snapshot();
+      } catch (err) {
+        if (err && err._mctsOverload) {
+          // Cap tripped during this option's snapshot. Stop sampling
+          // further options; return the best so far (defaults to
+          // options[0] if no option scored).
+          console.error(`[MCTS overload in pickFromOptions] ${err.message}`);
+          break;
+        }
+        throw err;
+      }
       let score = -Infinity;
       try {
         const ok = await applyFn(engine, opt);

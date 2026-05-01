@@ -14,6 +14,39 @@ const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
 const MAX_PENDING_TRIGGERS = 200;
 const MAX_CARD_INSTANCES = 2000;
 
+// ── HEAP / SNAPSHOT GUARDS ──────────────────────────────────────────────
+// The earlier guard checked only `process.memoryUsage().heapUsed > 2500MB`
+// — the wrong metric. V8 keeps `heapUsed` artificially low under
+// allocation pressure by running constant Mark-Compacts (the "death
+// spiral" preceding a hard OOM), so the trip never fires until V8 dies.
+// `rss` (resident set size) tracks committed memory and is the real
+// proxy for the `--max-old-space-size` ceiling. We trip on whichever
+// metric crosses first. Defaults assume an 8GB heap; lower limits will
+// trip earlier (which is fine — bandaid is to bail out, not to optimize).
+const HEAP_CHECK_RSS_MB = 4500;
+const HEAP_CHECK_TOTAL_MB = 4000;
+const HEAP_CHECK_USED_MB = 2500;
+// Per-turn cap on OUTER snapshots — see snapshot()'s comment for what
+// "outer" means (snapshots taken at the LIVE-turn level, not nested
+// inside an already-committed rollout). With the outer-only counter,
+// healthy turns sit around 50-300 outer snapshots: ~150 from
+// mctsRankCandidates' rollout pulls plus ~5-30 from mctsGatedActivation
+// recon+variation pairs. A death spiral runs into the thousands of
+// outer rollouts in a single turn (the original Heal-Burn / Steam-Dwarf
+// crashes were ~1000-1500). Cap at 1500 to catch those while leaving
+// 5x headroom over honest decisions.
+const MAX_SNAPSHOTS_PER_TURN = 1500;
+// Per-CALL heap check for damage events. The snapshot-level and
+// runHooks-level heap checks both run at boundary points (snapshot
+// taken / hook fired) — but a single MCTS rollout that fires many
+// damage events back-to-back through a recursive chain (Prophecy of
+// Tempeste redirect → host damage → another Tempeste / recoil hook
+// → another damage event …) can blow past several GB of allocation
+// between hook-counter checkpoints without crossing a snapshot
+// boundary. Sampling rss inside actionDealDamage at every Nth call
+// closes that gap. Threshold mirrors the snapshot check.
+const DAMAGE_HEAP_CHECK_EVERY = 25;
+
 // Cardinal Beast name allowlist — the engine's absolute-immunity shield
 // is supposed to be stamped on each Cardinal Beast's instance via its
 // onPlay hook (`_setCardinalImmune` in `_cardinal-shared.js`). The
@@ -261,6 +294,14 @@ class GameEngine {
     // the diagnostic names which hook is dominating so we can pinpoint
     // the looping card.
     this._hookHistogramThisTurn = Object.create(null);
+    // Per-CARD hook-fire counter. Different from `_hookHistogramThisTurn`
+    // (which is keyed by hook name): this is keyed by card name, so we
+    // can name which CARDS fired the most hooks during a turn / rollout.
+    // mctsRunOneRollout diffs this around each rollout to identify the
+    // board cards driving heavy allocation — independent of which
+    // candidate the MCTS happened to choose. Snapshot-saved so per-
+    // rollout deltas come out clean (post − pre = this rollout only).
+    this._hookFiresByCard = Object.create(null);
     // When the cap trips we set this flag, log once, then make every
     // further runHooks call in the same turn a silent no-op so the
     // turn can unwind through advancePhase → End → switchTurn instead
@@ -323,16 +364,186 @@ class GameEngine {
   //  Restore reverts the engine to exactly that snapshot, preserving refs.
   // ═══════════════════════════════════════════
 
+  /**
+   * Build a one-line diagnostic string for heap-trip / hook-cap throws.
+   * Surfaces what's likely allocating: the per-turn hook histogram (top 8),
+   * the in-flight cardInstances frequency table (top 5), and the recent
+   * action trail (last 16 entries — see `_trailWrite`). Cheap — only
+   * called when we're about to throw, so the hot snapshot path pays
+   * nothing.
+   */
+  _describeHeapTripDiagnostics() {
+    const hist = this._hookHistogramThisTurn || {};
+    const topHooks = Object.entries(hist)
+      .sort((a, b) => b[1] - a[1]).slice(0, 8)
+      .map(([h, n]) => `${h}:${n}`).join(' ') || '(none)';
+    const nameCounts = Object.create(null);
+    for (const inst of this.cardInstances || []) {
+      const k = inst?.name || '(unnamed)';
+      nameCounts[k] = (nameCounts[k] || 0) + 1;
+    }
+    const topNames = Object.entries(nameCounts)
+      .sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([n, c]) => `${n}×${c}`).join(', ') || '(none)';
+    // Per-candidate heap delta breakdown (set by mctsRunOneRollout). Names
+    // the candidates whose rollouts are accumulating the most heap that
+    // GC can't reclaim. CORRELATION not causation — a card the MCTS
+    // happens to favor will top this list even if the leak is elsewhere.
+    // Cross-reference with `topFiringCards` (which counts hook fires
+    // independent of candidate) to find the actual board-level source.
+    const allocByCandidate = this._candidateHeapDelta || {};
+    const allocEntries = Object.entries(allocByCandidate)
+      .map(([cn, s]) => ({
+        cn,
+        calls: s.calls || 0,
+        total: s.totalMb || 0,
+        avg: (s.totalMb || 0) / Math.max(1, s.calls || 1),
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+    const candidateAlloc = allocEntries.length === 0
+      ? '(none)'
+      : allocEntries.map(c => `"${c.cn}":${c.total.toFixed(0)}MB/${c.calls}=${c.avg.toFixed(1)}MB-avg`).join(', ');
+
+    // Top hook-firing CARDS for the current turn — keyed by card name,
+    // counts every onPlay / onCardEnterZone / passive trigger / etc.
+    // Independent of MCTS candidate choice. A card with millions of
+    // hook fires is the actual workhorse driving allocation, regardless
+    // of which decision spawned the rollout.
+    const fires = this._hookFiresByCard || {};
+    const topFiringCards = Object.entries(fires)
+      .sort((a, b) => b[1] - a[1]).slice(0, 8)
+      .map(([n, c]) => `${n}×${c}`).join(', ') || '(none)';
+
+    return {
+      snapshots: this._snapshotsTaken || 0,
+      hooksFired: this._hooksFiredThisTurn || 0,
+      instances: (this.cardInstances || []).length,
+      topHooks,
+      topNames,
+      topFiringCards,
+      trail: this._recentTrail(16),
+      candidateAlloc,
+    };
+  }
+
+  /**
+   * Action trail — best-effort breadcrumbs for post-mortems.
+   *
+   * Two layers:
+   *   1. In-memory ring buffer (`_actionTrail`, last 128 entries). Always
+   *      updated. Heap-trip throws embed the last 16 via
+   *      `_describeHeapTripDiagnostics()` so the thrown error message
+   *      names what we were doing right before allocation blew up.
+   *   2. Optional sync write to a file descriptor (`_trailFd`). Self-
+   *      play opens a per-batch trail file and attaches the fd; live
+   *      play leaves _trailFd null and pays nothing extra. Sync writes
+   *      survive even a hard V8 OOM (which is fatal and synchronous —
+   *      uncaughtException doesn't fire), so the disk has the action
+   *      sequence right up to the moment Node died.
+   *
+   * Skips MCTS-internal mutations (we don't want every simulated summon
+   * inside a rollout) — only the rollout BOUNDARY itself is trailed
+   * with kind 'rollout', which is the bookkeeping that names which
+   * candidate's rollout was running when allocation blew up.
+   */
+  _trailWrite(kind, payload = {}) {
+    if (this._inMctsSim && kind !== 'rollout') return;
+    const entry = {
+      turn: this.gs?.turn,
+      phase: this.gs?.currentPhase,
+      ap: this.gs?.activePlayer,
+      sim: this._inMctsSim ? 1 : 0,
+      snaps: this._snapshotsTaken || 0,
+      hooks: this._hooksFiredThisTurn || 0,
+      inst: (this.cardInstances || []).length,
+      kind,
+      ...payload,
+    };
+    if (!this._actionTrail) this._actionTrail = [];
+    this._actionTrail.push(entry);
+    if (this._actionTrail.length > 128) this._actionTrail.shift();
+    if (this._trailFd != null) {
+      try {
+        const fs = require('fs');
+        const ext = entry.cardName ? ` "${entry.cardName}"` : '';
+        const ext2 = entry.note ? ` ${entry.note}` : '';
+        const line = `t=${entry.turn} ph=${entry.phase} ap=${entry.ap}${entry.sim?' sim':''} snaps=${entry.snaps} hooks=${entry.hooks} inst=${entry.inst} ${entry.kind}${ext}${ext2}\n`;
+        fs.writeSync(this._trailFd, line);
+      } catch {
+        // Disk full / fd closed — stop trying. Don't crash the game.
+        this._trailFd = null;
+      }
+    }
+  }
+
+  /** Format the most recent N trail entries as a one-line summary. */
+  _recentTrail(n = 16) {
+    if (!this._actionTrail || this._actionTrail.length === 0) return '(empty)';
+    const tail = this._actionTrail.slice(-n);
+    return tail.map(e => {
+      const sim = e.sim ? 'sim:' : '';
+      const cn = e.cardName ? ` "${e.cardName}"` : '';
+      const ap = e.ap != null ? `/p${e.ap}` : '';
+      return `${sim}t${e.turn}/ph${e.phase}${ap} ${e.kind}${cn}`;
+    }).join(' → ');
+  }
+
   snapshot() {
-    // Allocation gate: checked every ~20 snapshots (counter lives on
-    // engine, bounded). Every MCTS rollout takes a snapshot, so this
-    // fires at roughly rollout rate even in synchronous loops that
-    // bypass runHooks. 2.5GB ceiling is the same as inline runHooks.
+    // Per-turn counters — auto-reset only on LIVE turn change. Inside a
+    // rollout, `gs.turn` mutates as the sim advances through future
+    // turns; without the `!_inMctsSim` gate, the reset fires on each
+    // sim-boundary and the per-turn cap never accumulates across the
+    // rollouts of one real turn.
+    const turn = this.gs?.turn || 0;
+    if (!this._inMctsSim && this._snapshotTurnTag !== turn) {
+      this._snapshotTurnTag = turn;
+      this._snapshotsThisTurn = 0;
+      this._mctsKilledThisTurn = false;
+      this._candidateHeapDelta = null;
+    }
+    // Per-turn cap counts OUTER snapshots only (i.e. snapshots taken
+    // when we're not already inside a rollout). Inner snapshots from
+    // `rankCandidatesEvalGreedy` etc. happen DURING an already-committed
+    // outer rollout — they're its cost, not new work the live turn is
+    // doing. Counting them inflated normal turns past 3000 (with
+    // horizon=6 each outer rollout fires ~30 inner snapshots) and made
+    // the cap trip on healthy MCTS. The OUTER count is the right metric:
+    // real death spirals are characterized by thousands of OUTER rollouts
+    // in one turn, not thousands of inner ones inside a few.
+    if (!this._inMctsSim) {
+      this._snapshotsThisTurn = (this._snapshotsThisTurn || 0) + 1;
+    }
     this._snapshotsTaken = (this._snapshotsTaken || 0) + 1;
-    if (this._snapshotsTaken % 20 === 0) {
-      const heapMB = process.memoryUsage().heapUsed / 1024 / 1024;
-      if (heapMB > 2500) {
-        throw new Error(`Snapshot heap check tripped: heapUsed=${Math.round(heapMB)}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase}. Refusing to take more snapshots this turn.`);
+
+    // Hard per-turn cap. Catches death spirals where MCTS rollouts
+    // accumulate transient allocation faster than V8 can GC. Throws an
+    // error tagged `MCTS_OVERLOAD` so mctsRankCandidates can catch and
+    // fall through to heuristic, marking _mctsKilledThisTurn so any
+    // later MCTS calls in this same real turn also short-circuit.
+    if (this._snapshotsThisTurn > MAX_SNAPSHOTS_PER_TURN) {
+      this._mctsKilledThisTurn = true;
+      const d = this._describeHeapTripDiagnostics();
+      const err = new Error(`MCTS_OVERLOAD: per-turn snapshot cap exceeded (${this._snapshotsThisTurn} > ${MAX_SNAPSHOTS_PER_TURN}) at turn ${turn} phase ${this.gs?.currentPhase}. Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
+      err._mctsOverload = true;
+      throw err;
+    }
+
+    // Memory check every 10 snapshots (was 20 — tightened after V8 OOM
+    // happened with `heapUsed` still under 2.5GB but `rss` past 8GB).
+    // Trip on whichever metric crosses first; rss is the real proxy for
+    // committed memory hitting `--max-old-space-size`.
+    if (this._snapshotsTaken % 10 === 0) {
+      const mu = process.memoryUsage();
+      const rssM = Math.round(mu.rss / 1024 / 1024);
+      const totM = Math.round(mu.heapTotal / 1024 / 1024);
+      const usedM = Math.round(mu.heapUsed / 1024 / 1024);
+      if (rssM > HEAP_CHECK_RSS_MB || totM > HEAP_CHECK_TOTAL_MB || usedM > HEAP_CHECK_USED_MB) {
+        this._mctsKilledThisTurn = true;
+        const d = this._describeHeapTripDiagnostics();
+        const err = new Error(`MCTS_OVERLOAD: heap check tripped: rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${turn} phase ${this.gs?.currentPhase} (snapshots=${d.snapshots} thisTurn=${this._snapshotsThisTurn} hooks=${d.hooksFired} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
+        err._mctsOverload = true;
+        throw err;
       }
     }
     const _clone = (v) => {
@@ -397,7 +608,7 @@ class GameEngine {
     } finally {
       if (deferredRef) this.gs._deferredSurprises = deferredRef;
     }
-    return {
+    const result = {
       gs: gsSnap,
       _deferredSurprisesSnap: deferredSnap,
       cardInstances: instSnaps,
@@ -420,10 +631,24 @@ class GameEngine {
       // cap on the LIVE game. Same applies to the other counters below.
       _hooksFiredThisTurn: this._hooksFiredThisTurn,
       _hookHistogramThisTurn: { ...this._hookHistogramThisTurn },
+      _hookFiresByCard: { ...this._hookFiresByCard },
       _hookCapTrippedThisTurn: this._hookCapTrippedThisTurn,
       _actionRecursionDepth: this._actionRecursionDepth,
       _actionRecursionTrace: [...this._actionRecursionTrace],
     };
+    // Periodic snapshot-size sample for diagnostics. Once every 200
+    // snapshots, JSON-serialize the snap and trail-write its size.
+    // Cheap-to-skip in the common case (just an integer mod check);
+    // expensive only on the sample tick (~100KB-MB stringify) so the
+    // amortized cost stays low. If snap size grows turn-over-turn,
+    // gs has accumulating state — that's the structural leak.
+    if (this._snapshotsTaken % 200 === 0) {
+      try {
+        const sizeKb = Math.round(JSON.stringify(result).length / 1024);
+        this._trailWrite('snapSize', { note: `snap=${sizeKb}KB inst=${this.cardInstances?.length || 0} snaps=${this._snapshotsTaken}` });
+      } catch { /* ignore stringify failures */ }
+    }
+    return result;
   }
 
   restore(snap) {
@@ -527,6 +752,9 @@ class GameEngine {
     this._hookHistogramThisTurn = snap._hookHistogramThisTurn
       ? { ...snap._hookHistogramThisTurn }
       : Object.create(null);
+    this._hookFiresByCard = snap._hookFiresByCard
+      ? { ...snap._hookFiresByCard }
+      : Object.create(null);
     this._hookCapTrippedThisTurn = !!snap._hookCapTrippedThisTurn;
     this._actionRecursionDepth = snap._actionRecursionDepth || 0;
     this._actionRecursionTrace = Array.isArray(snap._actionRecursionTrace)
@@ -627,8 +855,29 @@ class GameEngine {
 
     if (type === 'cardGalleryMulti') {
       const cards = promptData.cards || [];
-      if (cards.length === 0) return { selectedCards: [] };
-      return { selectedCards: [cards[0].name] };
+      if (cards.length === 0) return { selectedCards: [], selectedIndices: [] };
+      // If `validCounts` is set, pick the smallest achievable valid
+      // count (cheap path for deletion costs, lets MCTS rollouts
+      // resolve quickly). Otherwise fall back to single-card pick.
+      const validCounts = Array.isArray(promptData.validCounts) && promptData.validCounts.length > 0
+        ? promptData.validCounts.slice().sort((a, b) => a - b)
+        : null;
+      let pickN = 1;
+      if (validCounts) {
+        // Smallest valid count that fits in the gallery.
+        pickN = validCounts.find(n => n <= cards.length) || 0;
+        if (pickN <= 0) return { selectedCards: [], selectedIndices: [] };
+      } else {
+        pickN = Math.min(promptData.minSelect != null ? promptData.minSelect : 1, cards.length);
+        if (pickN <= 0) pickN = 1;
+      }
+      const indices = [];
+      const names = [];
+      for (let i = 0; i < pickN && i < cards.length; i++) {
+        indices.push(i);
+        names.push(cards[i].name);
+      }
+      return { selectedCards: names, selectedIndices: indices };
     }
 
     if (type === 'zonePick') {
@@ -1019,12 +1268,17 @@ class GameEngine {
     // is the only reliable catch. 2.5GB ceiling leaves 5.5GB of GC
     // headroom on the 8GB heap. Normal play stays under 500MB, so 2.5GB
     // means something is allocating badly.
-    if (this._hooksFiredThisTurn > 0 && this._hooksFiredThisTurn % 50 === 0) {
-      const heapMB = process.memoryUsage().heapUsed / 1024 / 1024;
-      if (heapMB > 2500) {
+    if (this._hooksFiredThisTurn > 0 && this._hooksFiredThisTurn % 20 === 0) {
+      const mu = process.memoryUsage();
+      const rssM = Math.round(mu.rss / 1024 / 1024);
+      const totM = Math.round(mu.heapTotal / 1024 / 1024);
+      const usedM = Math.round(mu.heapUsed / 1024 / 1024);
+      if (rssM > HEAP_CHECK_RSS_MB || totM > HEAP_CHECK_TOTAL_MB || usedM > HEAP_CHECK_USED_MB) {
         this._turnHooksKilled = true;
         this._hookCapTrippedThisTurn = true;
-        throw new Error(`Inline heap check tripped: heapUsed=${Math.round(heapMB)}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._hooksFiredThisTurn} hooks. Hooks disabled rest-of-turn. Likely runaway allocation.`);
+        this._mctsKilledThisTurn = true;
+        const d = this._describeHeapTripDiagnostics();
+        throw new Error(`Inline heap check tripped: rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._hooksFiredThisTurn} hooks (snapshots=${d.snapshots} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. Hooks disabled rest-of-turn. Likely runaway allocation.`);
       }
     }
     // Within-snapshot cap short-circuit: once the cap trips in this
@@ -1040,10 +1294,8 @@ class GameEngine {
     if (this._hooksFiredThisTurn > MAX_HOOKS_PER_TURN) {
       this._hookCapTrippedThisTurn = true;
       this._turnHooksKilled = true; // stick for the whole real turn
-      const top = Object.entries(this._hookHistogramThisTurn)
-        .sort((a, b) => b[1] - a[1]).slice(0, 8)
-        .map(([h, n]) => `${h}:${n}`).join(' ');
-      throw new Error(`MAX_HOOKS_PER_TURN exceeded (${this._hooksFiredThisTurn}) at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} active p${this.gs?.activePlayer}. Top hooks: ${top}. Hooks disabled for rest of this turn (incl. other rollouts). Likely infinite hook-firing loop.`);
+      const d = this._describeHeapTripDiagnostics();
+      throw new Error(`MAX_HOOKS_PER_TURN exceeded (${this._hooksFiredThisTurn}) at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} active p${this.gs?.activePlayer}. Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Recent trail: ${d.trail}. Hooks disabled for rest of this turn (incl. other rollouts). Likely infinite hook-firing loop.`);
     }
     // Add engine reference and defaults to context
     hookCtx._engine = this;
@@ -1108,28 +1360,51 @@ class GameEngine {
       const hookFn = card.getHook(hookName);
       const ctx = this._createContext(card, hookCtx);
 
+      // Per-card hook-fire counter — used by `mctsRunOneRollout`'s
+      // leak detector to identify which BOARD cards (not just the
+      // candidate) drove allocation during a leaky rollout.
+      const cardKey = card.name || '?';
+      this._hookFiresByCard[cardKey] = (this._hookFiresByCard[cardKey] || 0) + 1;
+
       try {
-        await Promise.race([
-          Promise.resolve(hookFn(ctx)),
-          new Promise((_, rej) => {
-            // Reschedule the timeout as long as the engine shows signs of
-            // progress — any interactive prompt pending, OR any sync() since
-            // the last check. Only reject when the hook is truly idle for
-            // EFFECT_TIMEOUT_MS. Prevents false-positive timeouts on complex
-            // hero effects (Bill, Fiona) that issue many fast CPU prompts.
-            let lastTick = this._hookProgressTick;
-            const check = () => {
-              if (this._pendingGenericPrompt || this._pendingPrompt ||
-                  this._hookProgressTick !== lastTick) {
-                lastTick = this._hookProgressTick;
-                setTimeout(check, EFFECT_TIMEOUT_MS);
-              } else {
-                rej(new Error('Hook timeout'));
-              }
-            };
-            setTimeout(check, EFFECT_TIMEOUT_MS);
-          }),
-        ]);
+        if (this._fastMode) {
+          // Fast mode (MCTS sim, self-play): skip the Promise.race timeout
+          // entirely. Hooks are synthetic with no real-time blocking
+          // possible, but the race spawns a `setTimeout(check, 5000)`
+          // per hook fire that is NEVER cleared when the hook resolves
+          // first — it sits in libuv's timer queue for 5 seconds with a
+          // closure pinning timer state. In a death spiral with ~10K+
+          // hook fires per rollout × hundreds of rollouts/turn, libuv
+          // accumulates millions of pending timers. THAT is the actual
+          // OOM driver: each timer holds native + heap state that V8
+          // can't reclaim until expiry, while the rollout loop keeps
+          // creating more. Skipping the race in fastMode dropped the
+          // Heal-Burn / Poison-Torture per-rollout heap delta from
+          // 5-12MB to expected near-zero in testing.
+          await hookFn(ctx);
+        } else {
+          await Promise.race([
+            Promise.resolve(hookFn(ctx)),
+            new Promise((_, rej) => {
+              // Reschedule the timeout as long as the engine shows signs of
+              // progress — any interactive prompt pending, OR any sync() since
+              // the last check. Only reject when the hook is truly idle for
+              // EFFECT_TIMEOUT_MS. Prevents false-positive timeouts on complex
+              // hero effects (Bill, Fiona) that issue many fast CPU prompts.
+              let lastTick = this._hookProgressTick;
+              const check = () => {
+                if (this._pendingGenericPrompt || this._pendingPrompt ||
+                    this._hookProgressTick !== lastTick) {
+                  lastTick = this._hookProgressTick;
+                  setTimeout(check, EFFECT_TIMEOUT_MS);
+                } else {
+                  rej(new Error('Hook timeout'));
+                }
+              };
+              setTimeout(check, EFFECT_TIMEOUT_MS);
+            }),
+          ]);
+        }
       } catch (err) {
         console.error(`[Engine] Hook "${hookName}" on card "${card.name}" (${card.id}) failed:`, err.message);
       }
@@ -2750,6 +3025,29 @@ class GameEngine {
   }
 
   async _actionDealDamageImpl(source, target, amount, type, opts) {
+    // ── Per-damage-call heap check ──
+    // A recursive damage cascade (Prophecy of Tempeste redirect →
+    // host damage → another redirect / poison tick / on-hero-KO
+    // hook → more damage events …) can run inside a single MCTS
+    // rollout without ever crossing a snapshot or runHooks-counter
+    // boundary, so the snapshot-level and inline-hook heap checks
+    // never fire. Sampling rss every Nth damage call inside the
+    // damage path itself catches that. Tagged `MCTS_OVERLOAD` so
+    // mctsRankCandidates / mctsGatedActivation catch and fall through.
+    this._damageCallsTotal = (this._damageCallsTotal || 0) + 1;
+    if (this._damageCallsTotal % DAMAGE_HEAP_CHECK_EVERY === 0) {
+      const mu = process.memoryUsage();
+      const rssM = Math.round(mu.rss / 1024 / 1024);
+      const totM = Math.round(mu.heapTotal / 1024 / 1024);
+      const usedM = Math.round(mu.heapUsed / 1024 / 1024);
+      if (rssM > HEAP_CHECK_RSS_MB || totM > HEAP_CHECK_TOTAL_MB || usedM > HEAP_CHECK_USED_MB) {
+        this._mctsKilledThisTurn = true;
+        const d = this._describeHeapTripDiagnostics();
+        const err = new Error(`MCTS_OVERLOAD: damage-call heap check tripped: rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._damageCallsTotal} damage calls (snapshots=${d.snapshots} hooks=${d.hooksFired} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
+        err._mctsOverload = true;
+        throw err;
+      }
+    }
     // ── Already-dead guard ──
     // If the target hero is already at 0 HP AT ENTRY, skip the damage
     // pipeline entirely. This doesn't block lethal damage (hp is still
@@ -2856,6 +3154,24 @@ class GameEngine {
           if (hookCtx.cannotBeReduced && buffData.damageMultiplier < 1) continue;
           hookCtx.amount = Math.ceil(hookCtx.amount * buffData.damageMultiplier);
         }
+      }
+    }
+
+    // Niu-Enhanced consumption (Guardian Beast Niu). The buff lives on
+    // the SOURCE hero (independent of Niu still being on the board) and
+    // accumulates flat bonus damage from each activation; consumed on
+    // the next Attack damage event from that hero. Bypasses multipliers
+    // by routing through `_flatBonus` (same channel as Darge's arrows).
+    if ((type === 'attack') && source?.owner != null && source?.heroIdx >= 0) {
+      const sourceHero = this.gs.players[source.owner]?.heroes?.[source.heroIdx];
+      const niuBuff = sourceHero?.buffs?.niu_enhanced;
+      const niuBonus = niuBuff?.totalDamage || 0;
+      if (niuBonus > 0) {
+        hookCtx._flatBonus = (hookCtx._flatBonus || 0) + niuBonus;
+        await this.actionRemoveBuff(sourceHero, source.owner, source.heroIdx, 'niu_enhanced');
+        this.log('niu_enhanced_strike', {
+          hero: sourceHero.name, bonus: niuBonus, stacks: niuBuff.stacks || 1,
+        });
       }
     }
 
@@ -4619,6 +4935,14 @@ class GameEngine {
     const cd = cardDB[cardName];
     if (cd && (cd.cardType === 'Creature' || cd.cardType === 'Token')) {
       ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
+      // Guardian Beasts archetype: stamp the per-turn flag so subsequent
+      // Guardian Beast summons in the same turn don't claim the
+      // first-of-turn additional Action. Centralized here so every
+      // summon path (normal hand play, Guardian's Appearance,
+      // Reincarnation tutors, etc.) updates it consistently.
+      if (cd.archetype === 'Guardian Beasts') {
+        ps._guardianBeastSummonedThisTurn = true;
+      }
     }
     // Log token placements
     if (cd && (cd.cardType === 'Token')) {
@@ -4671,6 +4995,7 @@ class GameEngine {
   }
 
   summonCreature(cardName, playerIdx, heroIdx, zoneSlot = -1, opts = {}) {
+    this._trailWrite('summon', { cardName, note: `p${playerIdx}/h${heroIdx}` });
     const placeResult = this.safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot);
     if (!placeResult) return null;
 
@@ -6100,6 +6425,13 @@ class GameEngine {
         for (let z = 0; z < 3; z++) { if ((supZones[z] || []).length === 0) { hasFree = true; break; } }
         if (!hasFree) continue;
         if (ps.summonLocked) continue;
+        // Card-specific canSummon gate. Guardian Beasts require an
+        // empty discard pile, Invader from the Cosmic Depths requires
+        // a Cosmic source, etc. Without this, additional-action paths
+        // (Hu, Coffee, Trample Sounds, …) silently bypass the gate
+        // and let the player play Creatures their own canSummon
+        // would otherwise refuse.
+        if (!this.isCreatureSummonable(cardName, playerIdx, heroIdx)) continue;
       }
       // Once-per-game cards (Divine Gift, etc.)
       const script = loadCardEffect(cardName);
@@ -6818,27 +7150,38 @@ class GameEngine {
 
       ps.hand.splice(handIndex, 1);
 
-      // Centralized creature summon — handles placement, tracking, summoning sickness
-      const placeResult = this.summonCreature(cardName, playerIdx, heroIdx, zoneSlot, { source: config.title });
+      // Route through `summonCreatureWithHooks` so beforeSummon (sacrifice
+      // costs, by-Cosmic gates, etc.) fires. The earlier path called
+      // `summonCreature` directly — which silently bypassed sacrifice
+      // requirements (Dragon Pilot, Steam Dwarf Engineer, DDG, 500
+      // Piranhas, …). hookExtras carries the `_isNormalSummon: true`
+      // flag so triggers like Spawn Mother's AOE / Orthos's Loyal
+      // gate still fire for additional-action plays.
+      const placeResult = await this.summonCreatureWithHooks(
+        cardName, playerIdx, heroIdx, zoneSlot,
+        {
+          source: config.title,
+          hookExtras: { _isNormalSummon: true },
+        },
+      );
       if (!placeResult) {
-        ps.discardPile.push(cardName);
-        this.log('creature_fizzle', { card: cardName, reason: 'zone_occupied', by: config.title });
-        return { played: false };
+        // Self-place inside beforeSummon (DDG bounce-place, 500
+        // Piranhas tribute) — the card is already on the board, no
+        // refund. Otherwise the cost was refused / cancelled and we
+        // return the card to hand.
+        if (ps._placementConsumedByCard === cardName) {
+          delete ps._placementConsumedByCard;
+          this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title, selfPlaced: true });
+        } else {
+          ps.hand.push(cardName);
+          this.log('creature_fizzle', { card: cardName, reason: 'beforeSummon_or_placement_failed', by: config.title });
+          return { played: false };
+        }
+      } else {
+        const { actualSlot } = placeResult;
+        this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: actualSlot, cardName });
+        this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title });
       }
-      const { inst, actualSlot } = placeResult;
-
-      this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: actualSlot, cardName });
-
-      // `_isNormalSummon: true` mirrors the doPlayCreature hand-summon
-      // path so on-summon effects gated on it (Spawn Mother's AOE,
-      // Orthos's Loyal trigger, etc.) fire — Trample Sounds in the
-      // Forest and other "free additional Action" pathways route through
-      // here, and players reasonably expect those to count as a hand
-      // summon for the purpose of triggered abilities.
-      await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualSlot, _isNormalSummon: true, _skipReactionCheck: true });
-      await this.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _isNormalSummon: true, _skipReactionCheck: true });
-
-      this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title });
 
     } else {
       // Spell or Attack
@@ -6929,8 +7272,14 @@ class GameEngine {
     if (!ps) return { played: false };
     const cardDB = this._getCardDB();
 
-    // Collect eligible cards across ALL alive heroes
+    // Collect eligible cards across ALL alive heroes. Also build a
+    // per-card → eligible-hero-indices map so the client knows which
+    // Heroes can cast each highlighted card without re-deriving action-
+    // economy state (the regular `heroPlayableCards` map omits these
+    // cards because the player has no available main / additional /
+    // bonus action — Hu's grant lives only inside this prompt).
     const eligibleSet = new Set();
+    const heroIndicesByCard = {};
     const activatableAbilities = [];
 
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -6944,7 +7293,11 @@ class GameEngine {
           return cd && config.allowedCardTypes.includes(cd.cardType);
         });
       }
-      for (const name of heroEligible) eligibleSet.add(name);
+      for (const name of heroEligible) {
+        eligibleSet.add(name);
+        if (!heroIndicesByCard[name]) heroIndicesByCard[name] = [];
+        heroIndicesByCard[name].push(hi);
+      }
 
       // Activatable abilities on this hero
       if (!config.skipAbilities) {
@@ -6970,6 +7323,7 @@ class GameEngine {
       type: 'heroAction',
       // heroIdx intentionally omitted — allows all heroes
       eligibleCards: eligible,
+      heroIndicesByCard,
       activatableAbilities,
       title: config.title || 'Immediate Action',
       description: config.description || 'Use an action with any Hero!',
@@ -7020,23 +7374,43 @@ class GameEngine {
     if (!ACTION_TYPES.includes(cardData.cardType)) return { played: false };
 
     if (cardData.cardType === 'Creature') {
+      // Splice the card from hand FIRST (matches the normal play path
+      // — beforeSummon hooks like Dragon Pilot's tribute and Dark
+      // Deepsea God's bounce-place expect the spell-target to already
+      // be off the hand stack when they prompt for sacrifice). If
+      // anything fizzles below we refund the splice.
       ps.hand.splice(handIndex, 1);
-      const placeResult = this.safePlaceInSupport(cardName, playerIdx, responseHeroIdx, zoneSlot ?? -1);
+      const placeResult = await this.summonCreatureWithHooks(
+        cardName, playerIdx, responseHeroIdx, zoneSlot ?? -1,
+        {
+          source: config.title,
+          // `_isNormalSummon: true` — additional-action paths should
+          // fire on-summon triggers gated on this flag (Spawn Mother's
+          // AOE, Orthos's Loyal trigger, etc.). Same rationale as the
+          // hero-locked variant.
+          hookExtras: { _isNormalSummon: true },
+        },
+      );
       if (!placeResult) {
-        ps.discardPile.push(cardName);
-        this.log('creature_fizzle', { card: cardName, reason: 'zone_occupied', by: config.title });
-        return { played: false };
+        // beforeSummon failed (sacrifice cancelled, beforeSummon
+        // refused, or zone unavailable). Some cards self-place
+        // inside beforeSummon (DDG bounce-place, 500 Piranhas) and
+        // signal it via `_placementConsumedByCard`. In that case the
+        // card is on the board already — leave it. Otherwise refund
+        // to hand so the player isn't punished for cancelling.
+        if (ps._placementConsumedByCard === cardName) {
+          delete ps._placementConsumedByCard;
+          this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title, selfPlaced: true });
+        } else {
+          ps.hand.push(cardName);
+          this.log('creature_fizzle', { card: cardName, reason: 'beforeSummon_or_placement_failed', by: config.title });
+          return { played: false };
+        }
+      } else {
+        const { actualSlot } = placeResult;
+        this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx: responseHeroIdx, zoneSlot: actualSlot, cardName });
+        this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title });
       }
-      const { inst, actualSlot } = placeResult;
-      // Propagate guardian immunity to newly placed creatures
-      this._syncGuardianImmunity(inst, playerIdx);
-      this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx: responseHeroIdx, zoneSlot: actualSlot, cardName });
-      // `_isNormalSummon: true` — same rationale as performImmediateAction:
-      // free-additional-action paths (Trample Sounds, etc.) should fire
-      // on-summon triggers gated on this flag.
-      await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx: responseHeroIdx, zoneSlot: actualSlot, _isNormalSummon: true, _skipReactionCheck: true });
-      await this.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: responseHeroIdx, _isNormalSummon: true, _skipReactionCheck: true });
-      this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title });
     } else {
       // Spell or Attack
       ps.hand.splice(handIndex, 1);
@@ -7221,6 +7595,9 @@ class GameEngine {
         ps.heroesActedThisTurn = [];
         ps.heroesAttackedThisTurn = [];
         ps._creaturesSummonedThisTurn = 0;
+        // Guardian Beasts: cleared so the first Guardian Beast summon
+        // of the new turn correctly grants the additional-Action grant.
+        ps._guardianBeastSummonedThisTurn = false;
         delete ps._creationLockedNames;
         delete ps._revealedCardCounts;
         delete ps._revealedHandIndices;
@@ -7520,6 +7897,17 @@ class GameEngine {
   async switchTurn() {
     // If game already ended (e.g. all heroes dead during End Phase), don't continue
     if (this.gs.result) return;
+    // Heap snapshot at turn boundary — lets us see growth across the
+    // game without waiting for the heap-trip threshold to fire. If
+    // rss climbs steadily turn-over-turn, there's a structural leak;
+    // if it stays flat, the per-turn GC is keeping up.
+    const mu = process.memoryUsage();
+    const rssM = Math.round(mu.rss / 1024 / 1024);
+    const totM = Math.round(mu.heapTotal / 1024 / 1024);
+    const usedM = Math.round(mu.heapUsed / 1024 / 1024);
+    this._trailWrite('switchTurn', {
+      note: `ending p${this.gs.activePlayer} rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB`,
+    });
 
     // Fire end-of-turn hooks for the ENDING player FIRST — even in puzzle
     // mode where the puzzle-failure check below would otherwise short-
@@ -7536,13 +7924,43 @@ class GameEngine {
     if (this._cpuPlayerIdx >= 0) {
       const nextPlayer = this.gs.activePlayer === 0 ? 1 : 0;
       if (this.isPuzzle && nextPlayer === this._cpuPlayerIdx) {
-        // Temporarily switch to opponent to process their start-of-turn
-        // damage sources. Burn / Poison run first (auto, no choices),
-        // then we fire ON_TURN_START hooks so any opp-turn-start damage
-        // source like Gathering Storm gets a chance to clear the
-        // puzzle BEFORE we declare failure. The CPU auto-responds to
-        // any prompts those hooks raise (target picks, etc.) via the
-        // engine's CPU prompt-handling path.
+        // Guardian Beast Zhu's skip-next-turn flag short-circuits the
+        // entire CPU "turn" — no status damage, no ON_TURN_START hooks,
+        // no failure. The opponent is asleep; nothing happens to or
+        // for them. Hand back to the human after a brief animation so
+        // the Zhu activator gets their bonus turn cleanly.
+        const cpuPs = this.gs.players[this._cpuPlayerIdx];
+        if (cpuPs?._skipNextTurn) {
+          delete cpuPs._skipNextTurn;
+          this.gs.activePlayer = this._cpuPlayerIdx;
+          this.gs.turn++;
+          this.log('turn_skipped', {
+            player: cpuPs.username, by: 'Guardian Beast Zhu',
+            turn: this.gs.turn, in: 'puzzle',
+          });
+          this._broadcastEvent('zhu_skip_turn_animation', {
+            sleeperOwner: this._cpuPlayerIdx,
+            sleeperName: cpuPs.username,
+            phase: 'slept_through',
+          });
+          this.sync();
+          await this._delay(1700);
+          // Hand back to the human and start their fresh turn —
+          // currentPhase resets to START via `startTurn()`, status
+          // damage / hooks fire, and the puzzle continues.
+          this.gs.activePlayer = this._cpuPlayerIdx === 0 ? 1 : 0;
+          this.gs.turn++;
+          await this.startTurn();
+          this.sync();
+          return;
+        }
+        // No skip — temporarily switch to opponent to process their
+        // start-of-turn damage sources. Burn / Poison run first (auto,
+        // no choices), then we fire ON_TURN_START hooks so any opp-
+        // turn-start damage source like Gathering Storm gets a chance
+        // to clear the puzzle BEFORE we declare failure. The CPU auto-
+        // responds to any prompts those hooks raise (target picks,
+        // etc.) via the engine's CPU prompt-handling path.
         this.gs.activePlayer = this._cpuPlayerIdx;
         this.gs.turn++;
         await this.processBurnDamage();
@@ -7577,6 +7995,41 @@ class GameEngine {
     }
     this.gs.activePlayer = this.gs.activePlayer === 0 ? 1 : 0;
     this.gs.turn++;
+
+    // Guardian Beast Zhu's "skip your opponent's next turn". Checked
+    // BEFORE startTurn() so an asleep player takes NO status damage,
+    // no ON_TURN_START hooks, no buff expiry — nothing happens to or
+    // for them. The turn counter still increments (so per-turn caps
+    // still tick). After a brief screen-graying / falling-asleep
+    // animation, recurse into switchTurn to flip back to the original
+    // player. Safety: clear the flag BEFORE the recurse to avoid a
+    // multi-Zhu deadlock skipping the same player forever.
+    {
+      const nowActive = this.gs.players[this.gs.activePlayer];
+      if (nowActive?._skipNextTurn) {
+        delete nowActive._skipNextTurn;
+        this.log('turn_skipped', {
+          player: nowActive.username, by: 'Guardian Beast Zhu',
+          turn: this.gs.turn,
+        });
+        this._broadcastEvent('zhu_skip_turn_animation', {
+          sleeperOwner: this.gs.activePlayer,
+          sleeperName: nowActive.username,
+          phase: 'slept_through',
+        });
+        this.sync();
+        await this._delay(1700);
+        // Advance straight to End Phase, then switchTurn back. The
+        // standard switchTurn handles the start-of-turn ticks for
+        // the OTHER player on the recursive call.
+        if (!this.gs.result) {
+          this.gs.currentPhase = 5; // End phase
+          await this.switchTurn();
+          return;
+        }
+      }
+    }
+
     await this.startTurn();
 
     // Singleplayer CPU turn driver. Only fires in non-puzzle CPU games, where
@@ -14621,6 +15074,26 @@ class GameEngine {
     entries = entries.filter(e => !e.inst?.faceDown);
     if (entries.length === 0) return;
 
+    // Per-call heap check (matches the hero damage path). Damage
+    // batches are the OTHER recursive entry point — Tempeste's
+    // creature-redirect, multi-target spells with chain reactions,
+    // creature death triggers spawning more damage, etc. Sampling
+    // every Nth batch closes the same gap as the hero-side check.
+    this._damageCallsTotal = (this._damageCallsTotal || 0) + 1;
+    if (this._damageCallsTotal % DAMAGE_HEAP_CHECK_EVERY === 0) {
+      const mu = process.memoryUsage();
+      const rssM = Math.round(mu.rss / 1024 / 1024);
+      const totM = Math.round(mu.heapTotal / 1024 / 1024);
+      const usedM = Math.round(mu.heapUsed / 1024 / 1024);
+      if (rssM > HEAP_CHECK_RSS_MB || totM > HEAP_CHECK_TOTAL_MB || usedM > HEAP_CHECK_USED_MB) {
+        this._mctsKilledThisTurn = true;
+        const d = this._describeHeapTripDiagnostics();
+        const err = new Error(`MCTS_OVERLOAD: creature-damage-batch heap check tripped: rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._damageCallsTotal} damage calls (snapshots=${d.snapshots} hooks=${d.hooksFired} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
+        err._mctsOverload = true;
+        throw err;
+      }
+    }
+
     // Mark Cardinal Beast immune, Baihu-petrified, and Guardian-shielded creatures
     // — they stay in batch for animations but damage will be cancelled before HP reduction
     // Guardian immunity is pierced by true damage (canBeNegated: false).
@@ -14731,6 +15204,22 @@ class GameEngine {
             if (e.cannotBeReduced && bd.damageMultiplier < 1) continue;
             e.amount = Math.ceil(e.amount * bd.damageMultiplier);
           }
+        }
+      }
+      // Niu-Enhanced consumption (Guardian Beast Niu) — same as in the
+      // hero damage path, but for Attacks targeting Creatures. Reads
+      // and consumes the buff on the SOURCE hero (independent of Niu
+      // being on the board).
+      if (e.type === 'attack' && e.source?.owner != null && e.source?.heroIdx >= 0) {
+        const srcHero = this.gs.players[e.source.owner]?.heroes?.[e.source.heroIdx];
+        const niuBuff = srcHero?.buffs?.niu_enhanced;
+        const niuBonus = niuBuff?.totalDamage || 0;
+        if (niuBonus > 0) {
+          e._flatBonus = (e._flatBonus || 0) + niuBonus;
+          await this.actionRemoveBuff(srcHero, e.source.owner, e.source.heroIdx, 'niu_enhanced');
+          this.log('niu_enhanced_strike', {
+            hero: srcHero.name, bonus: niuBonus, stacks: niuBuff.stacks || 1,
+          });
         }
       }
       // Flat bonus that bypasses multipliers (parity with the hero

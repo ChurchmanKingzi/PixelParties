@@ -1586,7 +1586,7 @@ function GameTooltip() {
   }, []);
   if (!tip) return null;
   return (
-    <div className="game-tooltip" style={{ position: 'fixed', left: tip.x, top: tip.y, transform: 'translateY(-50%)', zIndex: 9990 }}>
+    <div className="game-tooltip" style={{ position: 'fixed', left: tip.x, top: tip.y, transform: 'translateY(-50%)', zIndex: 10000 }}>
       {tip.text}
     </div>
   );
@@ -1691,7 +1691,10 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
 
 function BuffColumn({ buffs, cardName }) {
   if (!buffs || Object.keys(buffs).length === 0) return null;
-  const BUFF_ICONS = { cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' } };
+  // Tooltip values may be a string OR a function (data) → string. Function
+  // form is for buffs whose tooltip needs to read the buff's per-instance
+  // data — Guardian Beast Niu's stacking damage bonus is the first user.
+  const BUFF_ICONS = { cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` } };
   // medusa_petrified is surfaced through the Stunned status badge (as the
   // "Petrified" variant), so don't also render it as a separate buff icon —
   // that would double-represent the same effect. null_zone_negated is the
@@ -1717,11 +1720,15 @@ function BuffColumn({ buffs, cardName }) {
       .join('-');
   return (
     <div className="buff-column">
-      {Object.entries(buffs).filter(([key]) => !BUFF_HIDDEN.has(key)).map(([key]) => {
+      {Object.entries(buffs).filter(([key]) => !BUFF_HIDDEN.has(key)).map(([key, data]) => {
         const def = BUFF_ICONS[key] || { icon: '✦', tooltip: humanizeBuffKey(key) };
+        // Function-form tooltips read the buff's per-instance data so
+        // dynamic content (Niu's accumulated bonus damage etc.) renders
+        // the live value at hover time.
+        const tooltipText = typeof def.tooltip === 'function' ? def.tooltip(data) : def.tooltip;
         return (
           <div key={key} className="buff-icon"
-            onMouseEnter={e => { showGameTooltip(e, def.tooltip); showBoardTip(); }}
+            onMouseEnter={e => { showGameTooltip(e, tooltipText); showBoardTip(); }}
             onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
             {def.icon}
           </div>

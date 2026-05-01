@@ -21,9 +21,22 @@
 //  Eligibility for the FIRST pick: only CD
 //  Creatures whose lvl+1 counterpart also exists
 //  somewhere in your deck (post-removal of the
-//  first pick). CD Creatures with no lvl+1
-//  counterpart available are filtered out so the
-//  spell can't fizzle on the second step.
+//  first pick) AND can be NORMALLY summoned by
+//  one of your Heroes — alive, not frozen /
+//  stunned / bound, meets the level + spell-school
+//  requirement, and passes the per-card canSummon
+//  gate. CD Creatures with no eligible Hero for
+//  their lvl+1 counterpart are filtered out so the
+//  spell can't fizzle on the second step. With no
+//  valid (first, upgrade) pair Arrival itself is
+//  grayed out in hand.
+//
+//  The second half is a NORMAL summon, NOT a place:
+//  it must go onto a Hero capable of summoning the
+//  Creature at its required level. Dead, Frozen,
+//  Stunned, negated, or Bound Heroes cannot host it.
+//  (The first-half placement onto opp is the only
+//  "place" semantics in this card.)
 //
 //  Invader gate: the second-half summon is a real
 //  summon by a "Cosmic" card (Arrival itself), so
@@ -78,21 +91,82 @@ function deckCdCreaturesByLevel(engine, pi) {
   return byLevel;
 }
 
-/** First-pick eligibility: CD Creature in deck, has lvl+1 counterpart available. */
+/**
+ * Can this Hero NORMALLY summon `cd`? Mirrors the gate The Cosmic Depths
+ * uses: alive, not frozen / stunned / bound, and meets the level +
+ * spell-school requirement (heroMeetsLevelReq accounts for negation,
+ * Wisdom, ascension bypasses, Forager reductions, etc.).
+ */
+function canHeroSummonCd(engine, pi, heroIdx, cd) {
+  const ps = engine.gs.players[pi];
+  const hero = ps?.heroes?.[heroIdx];
+  if (!hero?.name) return false;
+  if (hero.hp <= 0) return false;
+  if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.bound) return false;
+  return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+}
+
+/**
+ * Free Support Zones on your Heroes that could host a normal summon of
+ * `cd`. One entry per FREE zone across every eligible Hero.
+ */
+function eligibleOwnSlotsFor(engine, pi, cd) {
+  const ps = engine.gs.players[pi];
+  if (!ps) return [];
+  const out = [];
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    if (!canHeroSummonCd(engine, pi, hi, cd)) continue;
+    const zones = ps.supportZones?.[hi] || [[], [], []];
+    for (let zi = 0; zi < 3; zi++) {
+      if ((zones[zi] || []).length === 0) {
+        out.push({ heroIdx: hi, slotIdx: zi });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Whether Arrival can summon CD Creature `name` onto our side right
+ * now: an eligible Hero with a free slot exists AND the per-card
+ * canSummon gate (e.g. Invader's "by Cosmic" + 1-at-a-time cap) passes.
+ * `_summonedByCosmic` + `_summonedBy` flags are passed so Invader's
+ * canSummon sees Arrival as a valid Cosmic source.
+ */
+function isCdSummonableForArrival(engine, pi, name) {
+  const cardDB = engine._getCardDB();
+  const cd = cardDB[name];
+  if (!cd) return false;
+  if (!canSummonInvaderViaSource(name, CARD_NAME)) return false;
+  if (eligibleOwnSlotsFor(engine, pi, cd).length === 0) return false;
+  if (!engine.isCreatureSummonable(name, pi, -1, {
+    _summonedByCosmic: true,
+    _summonedBy: CARD_NAME,
+  })) return false;
+  return true;
+}
+
+/** First-pick eligibility: CD Creature in deck, has a lvl+1 counterpart that
+ *  at least one of your Heroes can NORMALLY summon. Without an eligible
+ *  Hero for the second half the card itself grays out. */
 function firstPickCandidates(engine, pi) {
   const byLevel = deckCdCreaturesByLevel(engine, pi);
-  const cardDB = engine._getCardDB();
   const out = new Set();
   for (const [lvlStr, names] of Object.entries(byLevel)) {
     const lvl = parseInt(lvlStr, 10);
     const upgrades = byLevel[lvl + 1];
     if (!upgrades || upgrades.length === 0) continue;
+    // Restrict to upgrades that can ACTUALLY be summoned: hero level/
+    // status check + per-card canSummon gate. A spell can't fizzle on
+    // its committed second step, so filter these out at the gallery.
+    const summonableUpgrades = upgrades.filter(u => isCdSummonableForArrival(engine, pi, u));
+    if (summonableUpgrades.length === 0) continue;
     for (const name of names) {
       // For names that have only ONE copy in deck, ensure the upgrade
       // pool isn't exclusively that name (defensive — same name in
       // adjacent level slots is impossible per the data, but kept for
       // future-proofing).
-      const upgradesUsable = upgrades.filter(u => !(u === name && upgrades.length === 1 && names.length === 1));
+      const upgradesUsable = summonableUpgrades.filter(u => !(u === name && summonableUpgrades.length === 1 && names.length === 1));
       if (upgradesUsable.length === 0) continue;
       out.add(name);
     }
@@ -120,23 +194,6 @@ function oppFreeSlots(engine, oppIdx) {
   return out;
 }
 
-function ownFreeSlots(engine, pi) {
-  const ps = engine.gs.players[pi];
-  if (!ps) return [];
-  const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
-    if (!h?.name || h.hp <= 0) continue;
-    const zones = ps.supportZones?.[hi] || [[], [], []];
-    for (let zi = 0; zi < 3; zi++) {
-      if ((zones[zi] || []).length === 0) {
-        out.push({ heroIdx: hi, slotIdx: zi });
-      }
-    }
-  }
-  return out;
-}
-
 module.exports = {
   inherentAction: true, // Treated as a free additional Action when cast.
 
@@ -152,9 +209,13 @@ module.exports = {
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return true;
     if (hoptUsed(gs, pi)) return false;
-    // Both halves need a free zone on each side.
+    // First half needs a free zone on opp's side (any Hero, even dead).
     if (oppFreeSlots(engine, pi === 0 ? 1 : 0).length === 0) return false;
-    if (ownFreeSlots(engine, pi).length === 0) return false;
+    // Second half needs an eligible (first, summonable upgrade) pair —
+    // an upgrade is "summonable" only if some own Hero can host the
+    // normal summon (alive, not frozen/stunned/bound, meets level
+    // requirement, passes per-card canSummon). When no pair exists the
+    // card grays out in hand.
     if (firstPickCandidates(engine, pi).size === 0) return false;
     return true;
   },
@@ -268,16 +329,21 @@ module.exports = {
       });
 
       // ── STEP 3: Pick the lvl+1 second creature, summon on own side.
-      // Re-tally the deck since we just removed one copy.
+      // Re-tally the deck since we just removed one copy. Filter to
+      // creatures an own Hero can ACTUALLY summon — first-half placement
+      // could in principle have shifted state (e.g. a freshly placed
+      // Cosmic Depths creature triggering a passive that froze a Hero),
+      // so we re-check rather than trust the play-time filter.
       const upgradeLvl = (firstCd.level ?? 0) + 1;
       const upgradeNames = (ps.mainDeck || []).filter(cn => {
         if (!COSMIC_DEPTHS_CREATURES.has(cn)) return false;
         const cd = cardDB[cn];
-        return cd && (cd.level ?? 0) === upgradeLvl;
+        if (!cd || (cd.level ?? 0) !== upgradeLvl) return false;
+        return isCdSummonableForArrival(engine, pi, cn);
       });
       if (upgradeNames.length === 0) {
-        // Should be impossible per firstPickCandidates' filter, but
-        // defensive — if the data shifted mid-resolve, log and exit.
+        // Should be rare given firstPickCandidates' filter, but
+        // defensive — if state shifted mid-resolve, log and exit.
         engine.log('arrival_fizzle', { player: ps.username, reason: 'no_upgrade' });
         return;
       }
@@ -309,7 +375,11 @@ module.exports = {
       if (secondDeckIdx < 0) return;
 
       // ── STEP 4: Pick own-side zone, summon with hooks.
-      const ownSlots = ownFreeSlots(engine, pi);
+      // Only Heroes that can NORMALLY summon `secondName` are offered —
+      // dead, Frozen, Stunned, Bound, or level-incapable Heroes are
+      // excluded. The second half is a real summon, not a place.
+      const secondCd = cardDB[secondName];
+      const ownSlots = secondCd ? eligibleOwnSlotsFor(engine, pi, secondCd) : [];
       if (ownSlots.length === 0) {
         engine.log('arrival_fizzle', { player: ps.username, reason: 'no_own_slot' });
         return;

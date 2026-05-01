@@ -78,7 +78,14 @@
       "Bash(comm -23 /tmp/all_types.txt /tmp/std_sorted.txt)",
       "Bash(python3 /tmp/check_cards.py)",
       "Bash(bash /tmp/audit_custom.sh)",
-      "Bash(bash /tmp/findrisk.sh)"
+      "Bash(bash /tmp/findrisk.sh)",
+      "Bash(awk -F'cards=\\\\\\\\[' '{print $2}')",
+      "Bash(awk -F']' '{print $1}')",
+      "Bash(awk '{for\\(i=1;i<=NF;i++\\) if\\($i ~ /^t=/\\) print $i}')",
+      "Bash(grep -E \"\\\\.js$\")",
+      "Bash(python -c \"import json; json.load\\(open\\('/c/Pixel Parties WEB/PixelPartiesWeb/data/cards.json'\\)\\)\")",
+      "Bash(echo \"JSON exit=$?\")",
+      "Bash(grep -E \"^\\(fighting|destruction-magic|leadership|negation|toughness\\)\\\\.js$\")"
     ]
   }
 }
