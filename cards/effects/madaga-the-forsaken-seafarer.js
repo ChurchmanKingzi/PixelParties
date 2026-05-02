@@ -90,24 +90,13 @@ module.exports = {
     await engine._delay(1200);
 
     // ── Step 3: Search deck for copy, add to hand ──
-
-    ps.mainDeck.splice(deckIdx, 1);
-    ps.hand.push(chosenCard);
-
-    // Face-up draw animation for the searched card
-    engine._broadcastEvent('deck_search_add', { cardName: chosenCard, playerIdx: pi });
-    engine.log('deck_search', { player: ps.username, card: chosenCard, by: 'Madaga, the Forsaken Seafarer' });
-    engine.sync();
-
-    // Show reveal prompt to opponent
-    await engine._delay(500);
-    const oi = pi === 0 ? 1 : 0;
-    await engine.promptGeneric(oi, {
-      type: 'deckSearchReveal',
-      cardName: chosenCard,
-      searcherName: ps.username,
-      title: 'Madaga, the Forsaken Seafarer',
-      cancellable: false,
+    // Route through the canonical helper so ON_CARD_ADDED_TO_HAND
+    // fires (Cosmic Depths Analyzer / Gatherer key off this hook for
+    // any opponent search). Helper handles splice + push + tracking +
+    // deck-search animation + log + hook + opp reveal.
+    await engine.actionAddCardFromDeckToHand(pi, chosenCard, {
+      source: 'Madaga, the Forsaken Seafarer',
+      reveal: true,
     });
 
     // Clear the hand reveal

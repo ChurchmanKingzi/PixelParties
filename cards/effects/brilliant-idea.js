@@ -68,27 +68,15 @@ module.exports = {
       if (!result || !result.cardName) return;
 
       // Verify the card is actually in the deck
-      const deckIdx = ps.mainDeck.indexOf(result.cardName);
-      if (deckIdx < 0) return;
+      if (ps.mainDeck.indexOf(result.cardName) < 0) return;
 
-      // Remove from deck, add to hand
-      ps.mainDeck.splice(deckIdx, 1);
-      ps.hand.push(result.cardName);
-
-      // Broadcast deck search event
-      engine._broadcastEvent('deck_search_add', { cardName: result.cardName, playerIdx: pi });
-      engine.log('deck_search', { player: ps.username, card: result.cardName, by: 'Brilliant Idea' });
-      engine.sync();
-
-      // Show reveal prompt to opponent
-      await engine._delay(500);
-      const oi = pi === 0 ? 1 : 0;
-      await engine.promptGeneric(oi, {
-        type: 'deckSearchReveal',
-        cardName: result.cardName,
-        searcherName: ps.username,
-        title: 'Brilliant Idea',
-        cancellable: false,
+      // Route through the canonical helper so ON_CARD_ADDED_TO_HAND
+      // fires (Cosmic Depths Analyzer / Gatherer key off this hook for
+      // any opponent search). Helper handles splice + push + tracking
+      // + deck-search animation + log + hook + opp reveal.
+      await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
+        source: 'Brilliant Idea',
+        reveal: true,
       });
     },
   },

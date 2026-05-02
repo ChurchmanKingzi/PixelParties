@@ -16,6 +16,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { secondActionHooks } = require('./_second-action-shared');
 
 const ADDITIONAL_TYPE = 'reiza_second_action';
 
@@ -54,6 +55,12 @@ module.exports = {
   activeIn: ['hero'],
 
   hooks: {
+    // Spread the shared second-action lifecycle (onAdditionalActionUsed,
+    // onPhaseEnd cleanup, onCardLeaveZone). Reiza's own `onActionUsed`
+    // below takes precedence over the shared one but explicitly invokes
+    // it as its first step.
+    ...secondActionHooks,
+
     // ── Effect 1: Single-target Attack → Stun + Poison (independent) ──
     afterSpellResolved: async (ctx) => {
       const engine = ctx._engine;
@@ -135,6 +142,14 @@ module.exports = {
 
     // ── Effect 2: Second Action when all opponent targets are Poisoned ──
     onActionUsed: async (ctx) => {
+      // Run the shared second-action lifecycle FIRST. This ensures
+      // Reiza's grant fizzles on action 2 of the Action Phase
+      // (regardless of which provider the player consumed) — matching
+      // the Soul Shard Ba pattern. Without this, the server's
+      // post-action `hasMore` check sees Reiza's avail=1 and refuses
+      // to auto-advance to Main Phase 2.
+      await secondActionHooks.onActionUsed(ctx);
+
       // Only trigger on the controller's main action (not additional actions)
       if (ctx.isAdditional) return;
       if (ctx.playerIdx !== ctx.cardOwner) return;
@@ -143,6 +158,13 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
+
+      // Card text: "this Hero may perform a second Action after the
+      // player's main Action during the Action Phase". Strictly gate
+      // the trigger to Action Phase so manual `runHooks('onActionUsed')`
+      // calls fired from other code paths (Necromancy in Main Phase,
+      // for example) don't grant the bonus prematurely.
+      if ((gs.currentPhase || 0) !== 3) return; // PHASES.ACTION
 
       // Hero must be alive
       const ps = gs.players[pi];
@@ -156,11 +178,17 @@ module.exports = {
       const oppIdx = pi === 0 ? 1 : 0;
       if (!allOpponentTargetsPoisoned(gs, oppIdx, engine)) return;
 
-      // Register and grant the additional action (hero-restricted to Reiza)
+      // Register and grant the additional action. `isSecondActionGrant`
+      // routes the grant through the engine's second-action gating so it
+      // only becomes reachable as the actual second Action of the
+      // Action Phase (post-action-1, pre-action-2) — same machinery
+      // Soul Shard Ba uses via `_second-action-shared`.
       engine.registerAdditionalActionType(ADDITIONAL_TYPE, {
         label: hero.name,
         allowedCategories: ['creature', 'spell', 'attack', 'ability_activation'],
         heroRestricted: true,
+        isSecondActionGrant: true,
+        sourceLabel: hero.name,
       });
       ctx.grantAdditionalAction(ADDITIONAL_TYPE);
 

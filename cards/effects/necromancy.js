@@ -94,6 +94,79 @@ module.exports = {
   freeActivation: true,
   noDefaultFlash: true, // Skip the generic gold sparkle — Necromancy plays its own animation
 
+  // CPU per-hero attachment scoring. Necromancy's value is entirely
+  // gated on the host Hero's Summoning Magic level (the cap on which
+  // Creatures from discard the activation can revive) AND on whose
+  // school requirements those Creatures actually meet via the host's
+  // existing ability stacks. Without this hook, `scoreAbilityPlacement`
+  // sees Necromancy as "no school unlocks, no scaling" and ranks
+  // every Hero ~equally — the CPU would slap Necromancy onto whichever
+  // Hero won the random tiebreak even when only one of them can host
+  // a summon-from-discard.
+  //
+  // Score formula: each Creature in OWN discard the host could summon
+  // post-attach is worth +50 (≈ a free Creature on the board next
+  // activation). Latent fuel — Creatures still in deck the host could
+  // summon if they reach the discard pile — adds +10 per match,
+  // gated at deck.length ≥ 22 so the bonus isn't free-rolling into
+  // deck-out territory.
+  cpuMeta: {
+    attachmentBonus(engine, pi, heroIdx) {
+      const ps = engine.gs.players?.[pi];
+      if (!ps) return 0;
+      const abZones = ps.abilityZones?.[heroIdx] || [];
+      // Necromancy's revive cap = stack level on this Hero AFTER the
+      // pending attach (= existing-stack + 1).
+      let necroLevel = 0;
+      for (const slot of abZones) {
+        if (!slot) continue;
+        if (slot[0] === 'Necromancy') necroLevel = Math.max(necroLevel, slot.length);
+      }
+      necroLevel += 1;
+      if (necroLevel <= 0) return 0;
+
+      const cardDB = engine._getCardDB();
+
+      // Predicate: could THIS host summon `cd` right now (post-attach)?
+      // Mirrors `heroCanSummon` from the live activation path: each
+      // declared spell school must be covered by the Hero's stack of
+      // that school (Performance copies count via the engine helper).
+      // The level cap from Necromancy is applied separately below.
+      const heroCanSummon = (cd) => {
+        const cLvl = cd.level || 0;
+        if (cd.spellSchool1) {
+          if (engine.countAbilitiesForSchool(cd.spellSchool1, abZones) < cLvl) return false;
+        }
+        if (cd.spellSchool2) {
+          if (engine.countAbilitiesForSchool(cd.spellSchool2, abZones) < cLvl) return false;
+        }
+        return true;
+      };
+
+      let summonable = 0;
+      for (const name of (ps.discardPile || [])) {
+        const cd = cardDB[name];
+        if (!cd || cd.cardType !== 'Creature') continue;
+        if ((cd.level || 0) > necroLevel) continue;
+        if (!heroCanSummon(cd)) continue;
+        summonable++;
+      }
+
+      let latent = 0;
+      if ((ps.mainDeck?.length || 0) >= 22) {
+        for (const name of ps.mainDeck) {
+          const cd = cardDB[name];
+          if (!cd || cd.cardType !== 'Creature') continue;
+          if ((cd.level || 0) > necroLevel) continue;
+          if (!heroCanSummon(cd)) continue;
+          latent++;
+        }
+      }
+
+      return summonable * 50 + latent * 10;
+    },
+  },
+
   /**
    * Pre-check: can this hero activate Necromancy right now?
    * Requires eligible creatures in discard AND a free support zone.
@@ -182,24 +255,54 @@ module.exports = {
     // Track card instance
     const inst = engine._trackCard(creatureName, pi, 'support', hi, si);
 
-    // Apply negation until start of controller's next turn
-    // Current turn = gs.turn (pi's turn), next pi turn = gs.turn + 2
-    engine.actionNegateCreature(inst, 'Necromancy', {
-      expiresAtTurn: gs.turn + 2,
-      expiresForPlayer: pi,
-    });
+    // Apply negation until start of controller's next turn — UNLESS the
+    // summoned Creature opts out via `bypassNecromancyNegation: true`
+    // (Soul Shards). Without this opt-out, the standard runHooks
+    // `negated`-zone filter silently swallows the Soul Shard's
+    // discard-trigger onPlay, defeating the whole archetype. The flag
+    // is checked via the loaded card script so the immunity is purely
+    // archetype-driven, not per-summon-source.
+    const summonedScript = require('./_loader').loadCardEffect(creatureName);
+    const skipNegate = summonedScript?.bypassNecromancyNegation === true;
+    if (!skipNegate) {
+      // Current turn = gs.turn (pi's turn), next pi turn = gs.turn + 2
+      engine.actionNegateCreature(inst, 'Necromancy', {
+        expiresAtTurn: gs.turn + 2,
+        expiresForPlayer: pi,
+      });
+    }
 
     engine.log('necromancy', {
       player: ps.username, creature: creatureName, level,
-      heroIdx: hi, zoneSlot: si,
+      heroIdx: hi, zoneSlot: si, negated: !skipNegate,
     });
 
     // Emit summon effect glow
     engine._broadcastEvent('summon_effect', { owner: pi, heroIdx: hi, zoneSlot: si, cardName: creatureName });
 
-    // Fire on-summon hooks (but effects are negated, so most won't trigger)
-    await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName: creatureName, zone: 'support', heroIdx: hi, zoneSlot: si });
-    await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: hi });
+    // Fire on-summon hooks. `_summonedFromDiscard` and
+    // `_summonedByNecromancy` flags let archetype-trigger creatures
+    // (Soul Shards) detect that this is a discard-pile revival and
+    // fire their unique effects accordingly. `_necromancyLevel` is
+    // the stack size, used by Soul Shard Ka to gate its "level
+    // 0/1/2 or lower" search at level − 1. Negated creatures' hooks
+    // still get filtered out by the runHooks zone-status check, but
+    // Soul Shards skip the negation above so their hooks run.
+    const summonExtras = {
+      _summonedFromDiscard: true,
+      _summonedByNecromancy: true,
+      _necromancyLevel: level,
+    };
+    await engine.runHooks('onPlay', {
+      _onlyCard: inst, playedCard: inst,
+      cardName: creatureName, zone: 'support',
+      heroIdx: hi, zoneSlot: si,
+      ...summonExtras,
+    });
+    await engine.runHooks('onCardEnterZone', {
+      enteringCard: inst, toZone: 'support', toHeroIdx: hi,
+      ...summonExtras,
+    });
 
     // Necromancy summon counts as an additional action
     await engine.runHooks('onActionUsed', {

@@ -63,17 +63,20 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   // Step A: Source handling. If the Area was picked from the deck, pull
   // it out and drop it onto the end of the hand, then shuffle the deck
   // (search-from-deck convention). Pull AFTER we've committed, so a
-  // cancelled prompt earlier doesn't leak.
+  // cancelled prompt earlier doesn't leak. Routed through the canonical
+  // helper so ON_CARD_ADDED_TO_HAND fires (Cosmic Depths Analyzer /
+  // Gatherer key off this hook for any opp search effect, including
+  // Cooldin's Area-tutor flow). `reveal: false` skips the helper's
+  // reveal modal — the Area is about to land on the board anyway, so
+  // the modal would just delay the play with no extra disclosure.
   if (fromDeck) {
-    const deckIdx = ps.mainDeck.indexOf(cardName);
-    if (deckIdx < 0) return false;
-    ps.mainDeck.splice(deckIdx, 1);
-    // Shuffle the deck — standard Fisher-Yates.
-    for (let i = ps.mainDeck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [ps.mainDeck[i], ps.mainDeck[j]] = [ps.mainDeck[j], ps.mainDeck[i]];
-    }
-    ps.hand.push(cardName);
+    if (ps.mainDeck.indexOf(cardName) < 0) return false;
+    const ok = await engine.actionAddCardFromDeckToHand(pi, cardName, {
+      source: 'Cooldin, King of Coolness',
+      reveal: false,
+      shuffle: true,
+    });
+    if (!ok) return false;
   }
 
   const handIndex = ps.hand.lastIndexOf(cardName);

@@ -156,31 +156,21 @@ module.exports = {
     }
 
     // Verify card is in deck
-    const deckIdx = ps.mainDeck.indexOf(searchResult.cardName);
-    if (deckIdx < 0) {
+    if (ps.mainDeck.indexOf(searchResult.cardName) < 0) {
       if (lockAfter) ctx.lockHand();
       engine.sync();
       return true;
     }
 
-    // Move card from deck to hand
-    ps.mainDeck.splice(deckIdx, 1);
-    ps.hand.push(searchResult.cardName);
-
-    // ── Step 3: Reveal to opponent ──
-
-    engine._broadcastEvent('deck_search_add', { cardName: searchResult.cardName, playerIdx: pi });
-    engine.log('deck_search', { player: ps.username, card: searchResult.cardName, by: 'Navigation' });
-    engine.sync();
-
-    await engine._delay(500);
-    const oi = pi === 0 ? 1 : 0;
-    await engine.promptGeneric(oi, {
-      type: 'deckSearchReveal',
-      cardName: searchResult.cardName,
-      searcherName: ps.username,
-      title: 'Navigation',
-      cancellable: false,
+    // ── Step 3: Move card from deck to hand + reveal to opponent ──
+    // Route through the canonical helper so ON_CARD_ADDED_TO_HAND
+    // fires (Cosmic Depths Analyzer / Gatherer counter generators
+    // key off this hook for any opp search effect). Helper handles
+    // splice + push + tracking + deck-search animation + log +
+    // hook + opp reveal.
+    await engine.actionAddCardFromDeckToHand(pi, searchResult.cardName, {
+      source: 'Navigation',
+      reveal: true,
     });
 
     // ── Step 4: Lock hand if Lv1 or Lv2 ──

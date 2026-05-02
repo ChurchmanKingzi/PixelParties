@@ -12,6 +12,15 @@ module.exports = {
   freeActivation: true,
   noDefaultFlash: true,
 
+  // CPU should ALWAYS fire Luck — onFreeActivate has no immediate
+  // state delta (it just stores the declared name on the inst), so
+  // the MCTS activation gate's eval-delta heuristic reads ~0 and
+  // would otherwise skip the activation forever. The future-turn
+  // payoff (free 2/3/4 cards if opp plays the named card next turn)
+  // is invisible to the gate but real, and the activation itself is
+  // free with no downside.
+  cpuMeta: { alwaysCommit: true },
+
   /**
    * On activation: prompt for a card name via cardNamePicker.
    * Store selection on the hero and display to both players.
@@ -26,12 +35,20 @@ module.exports = {
     const hero = ps?.heroes?.[heroIdx];
     if (!hero) return false;
 
-    // Build list of all available card names (that have effect scripts or are in the card DB)
+    // Build list of all available card names. Tokens are excluded —
+    // they're spawned by effects and never "played from hand," so they
+    // can't trigger Luck's draw. Reaction and Surprise subtype cards
+    // are also excluded: Reactions fire in chain windows on the
+    // opponent's turn, and Surprises sit hidden in face-down zones
+    // until triggered, so neither is "played" on the opponent's own
+    // turn — declaring one is almost always wasted.
     const cardDB = engine._getCardDB();
     const allNames = Object.keys(cardDB).filter(n => {
       const cd = cardDB[n];
       if (!cd) return false;
       if (cd.cardType === 'Token') return false;
+      const sub = (cd.subtype || '').toLowerCase();
+      if (sub === 'reaction' || sub === 'surprise') return false;
       return true;
     }).sort((a, b) => a.localeCompare(b));
 
@@ -57,8 +74,24 @@ module.exports = {
     ctx.card.counters.luckLevel = level;
     ctx.card.counters.luckOwner = pi;
 
-    // Reveal the declared card to both players
-    engine._broadcastEvent('card_reveal', { cardName: declared });
+    // Stream the DECLARED card to the opponent as if THAT card had
+    // just been activated. The server's free-ability handler set
+    // `gs._pendingCardReveal = { cardName: 'Luck', ... }` before
+    // calling onFreeActivate; after the picker resolved we know the
+    // declared name, so we hand the canonical reveal channel the
+    // declared name instead. The post-activation
+    // `_firePendingCardReveal()` then broadcasts the declared card to
+    // the opponent (and spectators) — same prominent overlay any
+    // played card gets, no double-overlay with Luck on top.
+    if (gs._pendingCardReveal) {
+      gs._pendingCardReveal.cardName = declared;
+    } else {
+      // Fallback: human activator path may have already fired the
+      // pending reveal during prompt resolution. Manually broadcast
+      // the declared card so the opponent still sees the streamed
+      // image of "what Luck called".
+      engine._broadcastEvent('card_reveal', { cardName: declared });
+    }
     await engine._delay(300);
 
     // Flash on Luck's ability zone

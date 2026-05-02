@@ -8371,6 +8371,211 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // Soul Shard Ba — bonus second-action grant. Distinct from
+  // `necromancy_summon` (which has already played for Ba's arrival):
+  // no skulls, no big radial flash. Instead a tight indigo vortex
+  // over the host Hero with rising soul motes and orbiting runic
+  // sparks — "this Hero now carries a borrowed action".
+  soul_shard_dark_grant: (() => {
+    return function SoulShardDarkGrantEffect({ x, y }) {
+      const motes = useMemo(() => Array.from({ length: 14 }, () => {
+        const xOff = -22 + Math.random() * 44;
+        return {
+          xOff,
+          startY: 30 + Math.random() * 10,
+          endY: -55 - Math.random() * 50,
+          size: 5 + Math.random() * 6,
+          delay: Math.random() * 400,
+          dur: 700 + Math.random() * 400,
+          opacity: 0.55 + Math.random() * 0.35,
+        };
+      }), []);
+      const runes = useMemo(() => Array.from({ length: 7 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 32 + Math.random() * 18;
+        return {
+          endX: Math.cos(angle) * dist,
+          endY: Math.sin(angle) * dist - 10,
+          size: 14 + Math.random() * 8,
+          delay: 80 + Math.random() * 280,
+          dur: 600 + Math.random() * 350,
+          char: ['✦','✧','✶','◆','★'][Math.floor(Math.random() * 5)],
+          rot: -25 + Math.random() * 50,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{
+            width: 130, height: 130, marginLeft: -65, marginTop: -65,
+            background: 'radial-gradient(circle, rgba(60,10,90,.85) 0%, rgba(80,30,140,.5) 35%, rgba(20,0,40,.25) 60%, transparent 80%)',
+          }} />
+          <div className="anim-flame-flash" style={{
+            width: 80, height: 80, marginLeft: -40, marginTop: -40,
+            animationDelay: '180ms',
+            background: 'radial-gradient(circle, rgba(140,60,200,.5) 0%, rgba(60,20,120,.3) 50%, transparent 70%)',
+          }} />
+          {motes.map((m, i) => (
+            <div key={'sbm'+i} style={{
+              position: 'absolute', left: m.xOff, top: m.startY,
+              width: m.size, height: m.size, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(180,100,255,.95), rgba(80,20,150,.4))',
+              boxShadow: '0 0 10px rgba(160,60,255,.7), 0 0 18px rgba(80,20,140,.4)',
+              opacity: 0,
+              animation: `holySparkleRise ${m.dur}ms ease-out ${m.delay}ms forwards`,
+            }} />
+          ))}
+          {runes.map((r, i) => (
+            <div key={'sbr'+i} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: r.size, opacity: 0,
+              color: '#cf9bff',
+              transform: `rotate(${r.rot}deg)`,
+              textShadow: '0 0 8px rgba(180,80,255,.85), 0 0 16px rgba(80,20,140,.55)',
+              animation: `musicNoteFloat ${r.dur}ms ease-out ${r.delay}ms forwards`,
+              '--endX': r.endX + 'px', '--endY': r.endY + 'px',
+              '--noteOpacity': 0.95,
+            }}>{r.char}</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // Soul Shard Sekhem — fire blast that scales with `intensity` (the
+  // number of distinct Soul Shards fueling the strike). 1 shard is a
+  // small ember-spark; 8+ shards is a screen-shaking inferno with a
+  // white-hot core, rising flame pillar, and a delayed second-wave
+  // burst. Intensity is forwarded from the broadcast payload via
+  // `play_zone_animation` → `onZoneAnim` → `playAnimation` →
+  // `GameAnimationRenderer`.
+  soul_shard_inferno: (() => {
+    return function SoulShardInfernoEffect({ x, y, intensity }) {
+      const i = Math.max(1, Math.min(intensity || 1, 8));
+      const t = (i - 1) / 7; // 0..1 normalized
+      const lerp = (a, b) => a + (b - a) * t;
+      const flashSize = lerp(90, 260);
+      const innerFlashSize = lerp(60, 170);
+      const flameCount = Math.round(lerp(14, 38));
+      const sparkCount = Math.round(lerp(10, 30));
+      const flameSizeMin = lerp(10, 18);
+      const flameSizeMax = lerp(18, 36);
+      const radius = lerp(50, 120);
+      const flames = useMemo(() => Array.from({ length: flameCount }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = radius * (0.55 + Math.random() * 0.55);
+        return {
+          startX: Math.cos(angle) * dist,
+          startY: Math.sin(angle) * dist,
+          size: flameSizeMin + Math.random() * (flameSizeMax - flameSizeMin),
+          delay: Math.random() * 220,
+          dur: 260 + Math.random() * 220,
+          char: ['🔥','🔥','🔥','🔥','✦','·'][Math.floor(Math.random() * 6)],
+        };
+      }), []);
+      const sparks = useMemo(() => Array.from({ length: sparkCount }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (15 + Math.random() * 30) * (0.8 + t * 0.9);
+        return {
+          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+          size: 2 + Math.random() * (4 + t * 4),
+          color: ['#ff3300','#ff7700','#ffbb00','#ff1100','#ffaa00','#ffe680'][Math.floor(Math.random() * 6)],
+          delay: 240 + Math.random() * 200,
+          dur: 320 + Math.random() * 280,
+        };
+      }), []);
+      // Vertical pillar of rising flame motes — only for medium+ intensity (3+).
+      const pillar = useMemo(() => i < 3 ? [] : Array.from({ length: Math.round(lerp(0, 14)) }, () => ({
+        xOff: -22 + Math.random() * 44,
+        startY: 30 + Math.random() * 18,
+        endY: -60 - Math.random() * (60 + t * 80),
+        size: 6 + Math.random() * (8 + t * 8),
+        delay: 80 + Math.random() * 320,
+        dur: 600 + Math.random() * 380,
+      })), []);
+      // Delayed secondary burst — only for high intensity (5+).
+      const showSecondBurst = i >= 5;
+      // Screen camera shake / vignette flash — only for very high (6+).
+      const showShockwave = i >= 6;
+      // White-hot core flash — only for max-tier (7+).
+      const showWhiteCore = i >= 7;
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Outer fire flash */}
+          <div className="anim-flame-flash" style={{
+            width: flashSize, height: flashSize,
+            marginLeft: -flashSize / 2, marginTop: -flashSize / 2,
+            background: 'radial-gradient(circle, rgba(255,140,30,.85) 0%, rgba(255,60,0,.55) 35%, rgba(160,20,0,.25) 65%, transparent 80%)',
+          }} />
+          {/* Inner flash (delayed) */}
+          <div className="anim-flame-flash" style={{
+            width: innerFlashSize, height: innerFlashSize,
+            marginLeft: -innerFlashSize / 2, marginTop: -innerFlashSize / 2,
+            animationDelay: '120ms',
+            background: 'radial-gradient(circle, rgba(255,220,120,.9) 0%, rgba(255,120,0,.5) 50%, transparent 80%)',
+          }} />
+          {/* White-hot core (max tier only) */}
+          {showWhiteCore && (
+            <div className="anim-flame-flash" style={{
+              width: 50, height: 50, marginLeft: -25, marginTop: -25,
+              animationDelay: '60ms', animationDuration: '500ms',
+              background: 'radial-gradient(circle, rgba(255,255,240,1) 0%, rgba(255,200,100,.7) 40%, transparent 70%)',
+            }} />
+          )}
+          {/* Flame shards radiating outward */}
+          {flames.map((f, idx) => (
+            <div key={'sf'+idx} className="anim-flame-shard" style={{
+              '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
+              animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
+            }}>{f.char}</div>
+          ))}
+          {/* Sparks */}
+          {sparks.map((s, idx) => (
+            <div key={'ss'+idx} className="anim-explosion-particle" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }} />
+          ))}
+          {/* Rising pillar (intensity 3+) */}
+          {pillar.map((p, idx) => (
+            <div key={'sp'+idx} style={{
+              position: 'absolute', left: p.xOff, top: p.startY,
+              width: p.size, height: p.size, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,200,80,.95), rgba(220,60,0,.5))',
+              boxShadow: '0 0 12px rgba(255,140,30,.85), 0 0 22px rgba(180,40,0,.5)',
+              opacity: 0,
+              animation: `holySparkleRise ${p.dur}ms ease-out ${p.delay}ms forwards`,
+            }} />
+          ))}
+          {/* Secondary delayed burst (intensity 5+) */}
+          {showSecondBurst && (
+            <div className="anim-flame-flash" style={{
+              width: flashSize * 1.15, height: flashSize * 1.15,
+              marginLeft: -flashSize * 1.15 / 2, marginTop: -flashSize * 1.15 / 2,
+              animationDelay: '420ms', animationDuration: '520ms',
+              background: 'radial-gradient(circle, rgba(255,80,0,.7) 0%, rgba(180,30,0,.4) 45%, transparent 75%)',
+            }} />
+          )}
+          {/* Shockwave ring (intensity 6+) */}
+          {showShockwave && (
+            <div style={{
+              position: 'absolute', left: 0, top: 0,
+              width: 0, height: 0, borderRadius: '50%',
+              border: '4px solid rgba(255,160,40,.85)',
+              boxShadow: '0 0 28px rgba(255,140,40,.7)',
+              animation: `soulShardShockwave 700ms ease-out 80ms forwards`,
+            }} />
+          )}
+          <style>{`
+            @keyframes soulShardShockwave {
+              0%   { width: 0; height: 0; margin-left: 0; margin-top: 0; opacity: .9; border-width: 6px; }
+              100% { width: ${flashSize * 1.6}px; height: ${flashSize * 1.6}px;
+                     margin-left: ${-flashSize * 0.8}px; margin-top: ${-flashSize * 0.8}px;
+                     opacity: 0; border-width: 1px; }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
 };
 
 function IceEncaseEffect({ x, y }) {
@@ -8417,37 +8622,50 @@ function IceEncaseEffect({ x, y }) {
   );
 }
 
-function GameAnimationRenderer({ type, x, y, w, h }) {
+function GameAnimationRenderer({ type, x, y, w, h, ...rest }) {
   const Component = ANIM_REGISTRY[type];
   if (!Component) return null;
-  return <Component x={x} y={y} w={w} h={h} />;
+  // Forward extra props (intensity, custom payload, etc.) so animations
+  // that key off broadcast-side parameters can scale themselves. Extras
+  // come from `play_zone_animation` payloads via `onZoneAnim` →
+  // `playAnimation(..., options)` → setGameAnims spread → here.
+  return <Component x={x} y={y} w={w} h={h} {...rest} />;
 }
 
-// Renders a Creature card with an attached Hero "underneath".
-// While the player hovers, the Creature visually swaps to the
-// attached Hero card (mirrors the Performance hover-flip pattern
-// in AbilityStack below). When not hovered, shows the Creature's
-// own art with a small "📎 Hero attached" badge so the user can
-// tell at a glance that an attachment is present.
-function AttachableCreatureCard({ creatureName, attachedHero, ...boardCardProps }) {
+// Renders a Creature card with an "underneath" overlay card revealed
+// on hover (mirrors the Performance hover-flip pattern in AbilityStack
+// below). Two flavours, exclusive:
+//   • `attachedHero` — Goff/Gon-style attached Hero (📎 badge).
+//   • `mimicCreature` — Soul Shard Sah's `_effectOverride` mimic
+//     (🎭 badge — show the Creature whose effect Sah is currently
+//     copying so the player can tell at a glance which kit is loaded).
+// When not hovered, shows the Creature's own art with the appropriate
+// corner badge.
+function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, ...boardCardProps }) {
   const [hovered, setHovered] = useState(false);
-  const showName = hovered ? attachedHero : creatureName;
+  const overlay = attachedHero || mimicCreature;
+  const showName = hovered ? overlay : creatureName;
+  const isMimic = !attachedHero && !!mimicCreature;
+  const badgeIcon = isMimic ? '🎭' : '📎';
+  const badgeColor = isMimic ? '#cf9bff' : '#ffd700';
+  const badgeShortName = (overlay || '').split(',')[0] || (isMimic ? 'Mimic' : 'Hero');
+  const badgeTitle = isMimic ? `Mimicking: ${overlay}` : `Attached: ${overlay}`;
   return (
     <div className="attachable-creature-wrap"
       style={{ position: 'relative', width: '100%', height: '100%' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}>
       <BoardCard {...boardCardProps} cardName={showName} />
-      {!hovered && (
+      {!hovered && overlay && (
         <div className="attached-hero-badge"
-          title={`Attached: ${attachedHero}`}
+          title={badgeTitle}
           style={{
             position: 'absolute', top: 2, left: 2,
-            background: 'rgba(0,0,0,.65)', color: '#ffd700',
+            background: 'rgba(0,0,0,.65)', color: badgeColor,
             fontSize: 10, padding: '1px 4px', borderRadius: 3,
             pointerEvents: 'none', zIndex: 5,
           }}>
-          📎 {attachedHero?.split(',')[0] || 'Hero'}
+          {badgeIcon} {badgeShortName}
         </div>
       )}
     </div>
@@ -8755,6 +8973,18 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
               // still toggle them off if they made a mistake.
               const blockedByUniqueGate = onlyNewUniqueAllowed && !isSel && !isNewUniqueContribution(i);
               const dimmed = wouldExceedBudget || atMax || blockedByUniqueGate;
+              // Pile-side badge for Guardian Beast deletion pickers:
+              // entries from the activator's discard pile carry
+              // `pileSide: 'own'`, opp's pile entries `pileSide: 'opp'`.
+              // Renders a small corner tag so the player can see at a
+              // glance which pile each card belongs to without having
+              // to remember the pile order.
+              const pileSide = entry.pileSide;
+              const pileBadge = pileSide === 'own'
+                ? { text: 'Yours', color: '#7dff90', bg: 'rgba(20,80,30,0.85)' }
+                : pileSide === 'opp'
+                  ? { text: "Opp's", color: '#ff9090', bg: 'rgba(80,20,30,0.85)' }
+                  : null;
               return (
                 <div key={entry.name + '-' + i} style={{ position: 'relative' }}>
                   <CardMini card={card}
@@ -8764,6 +8994,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
                       filter: isSel ? 'brightness(1.2)' : (dimmed ? 'brightness(0.4) saturate(0.3)' : 'none'),
                     }} />
                   {isSel && <div style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 3, zIndex: 5 }}>✓</div>}
+                  {pileBadge && <div style={{ position: 'absolute', top: 3, left: 3, background: pileBadge.bg, color: pileBadge.color, fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 3, zIndex: 5, letterSpacing: '0.5px', textShadow: '0 0 2px rgba(0,0,0,0.9)' }}>{pileBadge.text}</div>}
                   {maxBudget != null && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd700', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
                 </div>
               );
@@ -9332,6 +9563,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
     prevMulliganRef.current = !!gameState.mulliganPending;
   }, [gameState.mulliganPending]);
+  // Also clear when the roomId changes — covers puzzle/tutorial retry,
+  // which spins up a fresh room (new roomId) without going through the
+  // mulligan flow. Without this, every retry stacks the new run's
+  // events on top of the prior attempt's log. Distinct ref from
+  // `prevRoomIdRef` above (which suppresses draw animations on retry
+  // and is mutated synchronously during render).
+  const prevRoomIdLogRef = useRef(null);
+  useEffect(() => {
+    if (prevRoomIdLogRef.current && prevRoomIdLogRef.current !== gameState.roomId) {
+      setActionLog([]);
+      setSideDeckPhase(null);
+      setSideDeckDone(false);
+    }
+    prevRoomIdLogRef.current = gameState.roomId;
+  }, [gameState.roomId]);
   const [pingFlash, setPingFlash] = useState(null); // { color }
   const chatBodyRef = useRef(null);
   const actionLogRef = useRef(null);
@@ -11738,7 +11984,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setBurnTickingHeroes(keys);
       setTimeout(() => setBurnTickingHeroes([]), 1500);
     };
-    const onZoneAnim = ({ type, owner, heroIdx, zoneSlot, zoneType, permId }) => {
+    const onZoneAnim = ({ type, owner, heroIdx, zoneSlot, zoneType, permId, ...rest }) => {
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(type);
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       let sel;
@@ -11755,7 +12001,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else {
         sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
       }
-      setTimeout(() => playAnimation(type, sel, { duration: 1000 }), 100);
+      // Forward broadcast-side extras (intensity etc.) into the
+      // animation entry so per-card animations can scale themselves.
+      setTimeout(() => playAnimation(type, sel, { duration: 1000, ...rest }), 100);
     };
     const onLevelChange = ({ delta, owner, heroIdx, zoneSlot }) => {
       const entry = { id: Date.now() + Math.random(), delta, owner, heroIdx, zoneSlot };
@@ -13193,13 +13441,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (!el) return;
       const r = el.getBoundingClientRect();
       const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-      // Box base
+      // Backdrop flash — a soft red radial pulse so the player's eye is
+      // drawn to the stunned target zone even if they were watching the
+      // triggering effect's animation elsewhere on the board.
+      const flash = document.createElement('div');
+      flash.style.cssText = `
+        position:fixed;left:${cx - 90}px;top:${cy - 90}px;
+        width:180px;height:180px;border-radius:50%;
+        background:radial-gradient(circle,rgba(255,80,80,.55) 0%,rgba(180,30,30,.3) 45%,transparent 75%);
+        pointer-events:none;z-index:9999;opacity:0;
+        animation:jumpscareFlash .6s ease-out forwards;
+      `;
+      document.body.appendChild(flash);
+      setTimeout(() => flash.remove(), 700);
+      // Box base — bumped from 32px → 56px so it's clearly visible on
+      // the hero zone, and centered better (was offset by -16px which
+      // sat the box partially off the zone).
       const box = document.createElement('div');
       box.textContent = '🎁';
       box.style.cssText = `
-        position:fixed;left:${cx - 16}px;top:${cy}px;font-size:32px;
+        position:fixed;left:${cx - 28}px;top:${cy - 10}px;font-size:56px;
         pointer-events:none;z-index:10000;
-        animation:jumpscareBoxShake .4s ease-in-out forwards;
+        filter:drop-shadow(0 0 6px rgba(255,60,60,.8));
+        animation:jumpscareBoxShake .55s ease-in-out forwards;
       `;
       document.body.appendChild(box);
       // Spring out after shake
@@ -13207,29 +13471,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const spring = document.createElement('div');
         spring.textContent = '🤡';
         spring.style.cssText = `
-          position:fixed;left:${cx - 18}px;top:${cy - 10}px;font-size:36px;
+          position:fixed;left:${cx - 32}px;top:${cy - 14}px;font-size:64px;
           pointer-events:none;z-index:10001;opacity:0;
-          animation:jumpscareSpring .5s ease-out forwards;
+          filter:drop-shadow(0 0 8px rgba(255,80,80,.9));
+          animation:jumpscareSpring .7s ease-out forwards;
         `;
         document.body.appendChild(spring);
-        // Scare stars
-        for (let i = 0; i < 6; i++) {
+        // Scare stars — bigger and more of them so the burst reads.
+        for (let i = 0; i < 10; i++) {
           const star = document.createElement('div');
           star.textContent = '⭐';
-          const angle = (i / 6) * Math.PI * 2;
-          const dist = 30 + Math.random() * 20;
+          const angle = (i / 10) * Math.PI * 2;
+          const dist = 50 + Math.random() * 30;
           star.style.cssText = `
-            position:fixed;left:${cx}px;top:${cy - 20}px;font-size:12px;
+            position:fixed;left:${cx}px;top:${cy - 20}px;font-size:22px;
             pointer-events:none;z-index:10001;opacity:0;
-            animation:jumpscareStars .5s ease-out ${i * 50}ms forwards;
+            filter:drop-shadow(0 0 4px rgba(255,220,80,.9));
+            animation:jumpscareStars .7s ease-out ${i * 35}ms forwards;
             --js-x:${Math.cos(angle) * dist}px;--js-y:${Math.sin(angle) * dist - 15}px;
           `;
           document.body.appendChild(star);
-          setTimeout(() => star.remove(), 600 + i * 50);
+          setTimeout(() => star.remove(), 800 + i * 35);
         }
-        setTimeout(() => spring.remove(), 600);
-      }, 350);
-      setTimeout(() => box.remove(), 800);
+        setTimeout(() => spring.remove(), 800);
+      }, 450);
+      setTimeout(() => box.remove(), 1000);
     };
     socket.on('jumpscare_box', onJumpscareBox);
     const onAntiMagicBubble = ({ owner, heroIdx }) => {
@@ -16571,9 +16837,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const ascensionTarget = !isOpp && playDrag?.isAscension && playDrag.targetHero === i;
           // During heroAction, dim all heroes except the Coffee hero
           const heroActionDimmed = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx && gameState.effectPrompt?.heroIdx !== undefined && gameState.effectPrompt?.heroIdx !== i;
-          // Dim heroes that can't use hero-restricted additional actions (e.g. Reiza's extra action)
+          // Dim heroes that can't use hero-restricted additional actions
+          // (e.g. Soul Shard Ba's bonus second Action, Reiza's extra Action).
+          // A generic per-player bonus — Torchure / Claussss-style
+          // `_bonusMainActions`, or Ghuanjun-style `bonusActions` — lets ANY
+          // Hero spend the second Action, so the heroRestricted dim must
+          // back off when one of those is also active alongside the
+          // hero-restricted grant.
+          //
+          // Note: `bonusActions` and `bonusMainActions` are exposed at the
+          // gameState top level (not on `me`/per-player), so read them from
+          // there. The pre-existing `me.bonusActions?.remaining` access was
+          // always undefined, which silently made the Ghuanjun bypass a
+          // no-op too.
           const additionalActionDimmed = !isOpp && !isDead && isMyTurn && currentPhase === 3 && (me.heroesActedThisTurn?.length > 0)
-            && !(me.bonusActions?.remaining > 0) && (() => {
+            && !(gameState.bonusActions?.remaining > 0)
+            && !(gameState.bonusMainActions > 0)
+            && (() => {
             const aas = gameState.additionalActions || [];
             if (aas.length === 0) return false;
             // If all additional actions are hero-restricted, dim heroes without providers
@@ -17367,6 +17647,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           return <AttachableCreatureCard
                             creatureName={cards[0]}
                             attachedHero={cc.attachedHero}
+                            hp={curHp} maxHp={mHp} hpPosition="creature"
+                            skins={gameSkins} style={creatureStyle}
+                            tooltipCardOverride={tooltipOverride}
+                          />;
+                        }
+                        // Soul Shard Sah's mimic: `_effectOverride`
+                        // names the Creature whose effect Sah currently
+                        // copies. Same hover-flip pattern as the
+                        // attached-Hero case so the player can preview
+                        // the mimicked Creature's card at a glance.
+                        if (cc?._effectOverride && cc._effectOverride !== cards[0]) {
+                          return <AttachableCreatureCard
+                            creatureName={cards[0]}
+                            mimicCreature={cc._effectOverride}
                             hp={curHp} maxHp={mHp} hpPosition="creature"
                             skins={gameSkins} style={creatureStyle}
                             tooltipCardOverride={tooltipOverride}

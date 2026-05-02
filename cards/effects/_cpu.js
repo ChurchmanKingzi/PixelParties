@@ -109,7 +109,15 @@ async function runCpuTurn(engine, helpers) {
   const ps = gs.players[cpuIdx];
   if (!stillCpuTurn(engine, cpuIdx)) return;
   if (typeof engine._trailWrite === 'function') {
-    engine._trailWrite('cpuTurnStart', { note: `cpu=p${cpuIdx} hand=${ps.hand.length}` });
+    // Log the full hand contents (not just the size) so post-mortem
+    // analysis can diff hand_at_turn_N vs hand_at_turn_M and see
+    // whether specific cards (e.g. Summoning Magic) are sitting in
+    // hand for many turns instead of being attached/played. Joined
+    // with " | " so the log line stays single-line readable.
+    const handDump = (ps.hand || []).join(' | ') || '(empty)';
+    engine._trailWrite('cpuTurnStart', {
+      note: `cpu=p${cpuIdx} hand=${ps.hand.length} cards=[${handDump}]`,
+    });
   }
   // Stash helpers on the engine so card-script-level MCTS picks
   // (mctsPickFromOptions, …) can reuse them for rollouts without
@@ -635,10 +643,28 @@ async function activateHeroEffects(engine, helpers) {
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
       if (tried.has(hi)) continue;
-      // Check if hero has ANY available hero-effect we haven't claimed HOPT on.
+      // Check if hero has ANY available hero-effect we haven't claimed
+      // HOPT on AND whose `canActivateHeroEffect` (when defined) returns
+      // true. The canActivate pre-check prevents the gate from firing on
+      // heroes whose effect would self-reject inside `doActivateHeroEffect`
+      // (e.g. Argos with 0 Change Counters): without it, the gate's recon
+      // sees `skip == best` because the action no-ops, the heuristic gate
+      // logs a misleading SKIP, and the hero gets branded `tried` for the
+      // rest of the turn even though nothing was actually attempted.
       const script = loadCardEffect(hero.name);
       const hoptKey = `hero-effect:${hero.name}:${cpuIdx}:${hi}`;
-      const available = (script?.heroEffect && script?.onHeroEffect && gs.hoptUsed?.[hoptKey] !== gs.turn);
+      let available = (script?.heroEffect && script?.onHeroEffect && gs.hoptUsed?.[hoptKey] !== gs.turn);
+      if (available && script.canActivateHeroEffect) {
+        try {
+          const inst = engine.cardInstances.find(c =>
+            c.owner === cpuIdx && c.zone === 'hero' && c.heroIdx === hi);
+          if (!inst) { available = false; }
+          else {
+            const ctx = engine._createContext(inst, { event: 'canHeroEffectCheck' });
+            available = !!script.canActivateHeroEffect(ctx);
+          }
+        } catch { available = false; }
+      }
       // Also check equipped hero-effect providers (e.g. Mummy Token, treatAsEquip heroes).
       const hasEquippedEffect = engine.cardInstances.some(ci => {
         if (ci.owner !== cpuIdx || ci.zone !== 'support' || ci.heroIdx !== hi) return false;
@@ -646,7 +672,15 @@ async function activateHeroEffects(engine, helpers) {
         const eq = loadCardEffect(ci.name);
         if (!eq?.heroEffect || !eq?.onHeroEffect) return false;
         const hk = `hero-effect:${ci.name}:${cpuIdx}:${hi}`;
-        return gs.hoptUsed?.[hk] !== gs.turn;
+        if (gs.hoptUsed?.[hk] === gs.turn) return false;
+        // Same canActivate pre-check for equipped providers.
+        if (eq.canActivateHeroEffect) {
+          try {
+            const ctx = engine._createContext(ci, { event: 'canHeroEffectCheck' });
+            return !!eq.canActivateHeroEffect(ctx);
+          } catch { return false; }
+        }
+        return true;
       });
       if (available || hasEquippedEffect) { pickIdx = hi; break; }
     }
@@ -818,6 +852,24 @@ async function activateFreeAbilities(engine, helpers) {
         if (!script?.freeActivation || !script.onFreeActivate) continue;
         const hoptKey = `free-ability:${abilityName}:${cpuIdx}`;
         if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
+        // Pre-check `canFreeActivate` so we don't fire the gate on
+        // abilities whose activation would self-reject inside
+        // `doActivateFreeAbility` (e.g. Alchemy with insufficient
+        // gold or empty potion deck). Without this, every pass over
+        // the abilities list re-tries an Alchemy that can't fire,
+        // producing a stream of misleading `FORCE-COMMIT → SKIPPED/
+        // FAILED` lines and burning evaluator cycles. Same fix
+        // pattern as the hero-effect canActivate pre-check.
+        if (script.canFreeActivate) {
+          try {
+            const inst = engine.cardInstances.find(c =>
+              c.owner === cpuIdx && c.zone === 'ability'
+              && c.heroIdx === hi && c.zoneSlot === zi);
+            if (!inst) continue;
+            const ctx = engine._createContext(inst, { event: 'canFreeActivateCheck' });
+            if (!script.canFreeActivate(ctx, slot.length)) continue;
+          } catch { continue; }
+        }
         pick = { heroIdx: hi, zoneIdx: zi, abilityName, key };
         break;
       }
@@ -829,10 +881,16 @@ async function activateFreeAbilities(engine, helpers) {
     const wasClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
     cpuLog(`      → activate free ability "${pick.abilityName}" hero=${pick.heroIdx} zone=${pick.zoneIdx}`);
     const pickAbilityScript = loadCardEffect(pick.abilityName);
-    const pickAbilityIsDrawOnly = !!pickAbilityScript?.blockedByHandLock;
+    // Always-commit triggers: (a) cards flagged `blockedByHandLock`
+    // (draw / tutor abilities — eval systematically under-rewards
+    // gold→card trades), and (b) cards opting into `cpuMeta.alwaysCommit`
+    // (Luck — no immediate state delta, only a future-turn payoff that
+    // the eval can't see, but functionally a free reactive draw).
+    const pickAbilityAlwaysCommit = !!pickAbilityScript?.blockedByHandLock
+      || !!pickAbilityScript?.cpuMeta?.alwaysCommit;
     const committed = await mctsGatedActivation(engine, helpers, `free-ability ${pick.abilityName}`,
       () => helpers.doActivateFreeAbility(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneIdx: pick.zoneIdx }),
-      { alwaysCommit: pickAbilityIsDrawOnly });
+      { alwaysCommit: pickAbilityAlwaysCommit });
     const nowClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
     cpuLog(`      ← free ability "${pick.abilityName}" ${committed && nowClaimed ? 'OK' : 'SKIPPED/FAILED'}`);
     if (!committed || (!wasClaimed && !nowClaimed)) tried.add(pick.key);
@@ -934,6 +992,12 @@ async function playArtifacts(engine, helpers) {
     if (!pick) return;
 
     const handLenBefore = ps.hand.length;
+    // Count copies of the SPECIFIC artifact name in hand. Hand-size-only
+    // checks misreport self-replacing artifacts as failed: Magnetic Glove
+    // discards itself (-1 from hand) AND tutors a new card (+1 to hand),
+    // leaving the hand size unchanged. The per-name count drops 1→0
+    // when Glove resolves regardless of what tutored card was added.
+    const myCardCountBefore = ps.hand.filter(n => n === pick.cardName).length;
     cpuLog(`      → play artifact "${pick.cardName}" (${pick.kind}) hero=${pick.heroIdx}`);
     const actionFn = async () => {
       if (pick.kind === 'equipment' || pick.kind === 'artifactCreature') {
@@ -972,9 +1036,10 @@ async function playArtifacts(engine, helpers) {
         alwaysCommit: pickIsDrawOnly || pickIsEquipment || pickAlwaysCommit,
         evaluateThroughTurnEnd: pickEvalThroughTurnEnd,
       });
-    const shrank = ps.hand.length < handLenBefore;
-    cpuLog(`      ← artifact "${pick.cardName}" ${committed && shrank ? 'OK' : 'SKIPPED/FAILED'} (hand ${handLenBefore}→${ps.hand.length})`);
-    if (!committed || !shrank) tried.add(pick.cardName);
+    const myCardCountAfter = ps.hand.filter(n => n === pick.cardName).length;
+    const consumed = myCardCountAfter < myCardCountBefore;
+    cpuLog(`      ← artifact "${pick.cardName}" ${committed && consumed ? 'OK' : 'SKIPPED/FAILED'} (hand ${handLenBefore}→${ps.hand.length})`);
+    if (!committed || !consumed) tried.add(pick.cardName);
     await pauseAction(engine);
   }
 }
@@ -1655,7 +1720,21 @@ async function fireAdditionalActions(engine, helpers) {
         });
       }
     };
-    const committed = await mctsGatedActivation(engine, helpers, `additional ${pick.cardType} ${pick.cardName}`, actionFn);
+    // Always-commit triggers, mirroring activateFreeAbilities:
+    //  • `blockedByHandLock` — draw / tutor inherent-action Spells
+    //    (Graveyard Gathering, Brilliant Idea, etc.). The eval's
+    //    gold-vs-hand-value model systematically under-rewards
+    //    "trade gold for a card" plays, but a free additional-action
+    //    tutor with no resource cost is essentially always tempo-
+    //    positive — especially the Ascension-critical ones.
+    //  • `cpuMeta.alwaysCommit` — explicit opt-in for cards whose
+    //    payoff is invisible to the eval (future-turn synergy, no
+    //    immediate state delta). Same flag used by activateFreeAbilities.
+    const pickScript = loadCardEffect(pick.cardName);
+    const pickAlwaysCommit = !!pickScript?.blockedByHandLock
+      || !!pickScript?.cpuMeta?.alwaysCommit;
+    const committed = await mctsGatedActivation(engine, helpers, `additional ${pick.cardType} ${pick.cardName}`, actionFn,
+      { alwaysCommit: pickAlwaysCommit });
     const shrank = ps.hand.length < handLenBefore;
     cpuLog(`      ← additional "${pick.cardName}" ${committed && shrank ? 'OK' : 'SKIPPED/FAILED'}`);
     if (!committed || !shrank) tried.add(pick.cardName + '|' + pick.heroIdx);
@@ -1944,12 +2023,47 @@ function scoreAbilityPlacement(engine, pi, heroIdx, cardName) {
     return 0;
   }
 
+  // ── Per-card attachment bonus ─────────────────────────────────────
+  // Cards whose value depends on which Hero they're attached to
+  // (because the ability's effect READS state on the host Hero — its
+  // existing ability stacks, archetype-specific board state, etc.)
+  // can declare:
+  //
+  //   cpuMeta: {
+  //     attachmentBonus(engine, pi, heroIdx) → number
+  //   }
+  //
+  // Returned points are summed straight onto the placement score so
+  // the candidate-loop above prefers the genuinely-best host. The
+  // function is called with `pi` and the prospective `heroIdx`; the
+  // ability has NOT been attached yet, so the implementer simulates
+  // the post-attach state themselves (reading existing ability stacks
+  // + bumping the new level by 1 internally where relevant).
+  //
+  // Generic — no per-card hardcoding here. Necromancy uses this to
+  // weight heroes by "Summoning Magic level on this hero × Creatures
+  // currently in own discard the hero could summon"; any future
+  // attachment-sensitive ability opts in the same way.
+  let attachmentBonus = 0;
+  const script = (() => {
+    try { return require('./_loader').loadCardEffect(cardName); }
+    catch { return null; }
+  })();
+  if (typeof script?.cpuMeta?.attachmentBonus === 'function') {
+    try {
+      const v = script.cpuMeta.attachmentBonus(engine, pi, heroIdx);
+      if (Number.isFinite(v)) attachmentBonus = v;
+    } catch (err) {
+      console.error(`[CPU] ${cardName} attachmentBonus threw:`, err.message);
+    }
+  }
+
   // Scaling cards add value proportional to the new level (each level
   // reached cranks Heal/Phoenix Tackle/etc. higher). Heuristically the
   // bonus is `scalingValue * newLevel`; combined with the unlock term
   // it lets a 3-Heal deck still want Support Magic Lv3 even when the
   // deck has nothing requiring Support Magic Lv2/Lv3 to cast.
-  return unlock * 100 + scalingValue * newLevel + currentLevel * 10;
+  return unlock * 100 + scalingValue * newLevel + currentLevel * 10 + attachmentBonus;
 }
 
 // Cheap helper: does ANY card in hand+deck require this school for its
@@ -2176,6 +2290,12 @@ async function attachAbilities(engine, helpers) {
     placedThisTurn.add(pick.cardName);
 
     cpuLog(`      → attach ability "${pick.cardName}" to hero ${pick.heroIdx} [${tierLabel}]`);
+    if (typeof engine._trailWrite === 'function') {
+      engine._trailWrite('attach', {
+        cardName: pick.cardName,
+        note: `p${cpuIdx}/h${pick.heroIdx} tier=${tierLabel}`,
+      });
+    }
     await helpers.doPlayAbility(helpers.room, cpuIdx, {
       cardName: pick.cardName,
       handIndex: pick.handIdx,
@@ -2352,6 +2472,14 @@ function mctsEnumerateGenericAlternatives(promptData) {
 function installCpuBrain(engine) {
   if (engine._cpuBrainInstalled) return;
   engine._cpuBrainInstalled = true;
+
+  // Expose the brain's evaluator so per-card `cpuResponse` hooks can
+  // run "simulate-and-score" decisions (mill targets, hand-vs-discard
+  // choices, etc.) using the same eval the gate uses. Same `evaluateState(engine, cpuIdx)`
+  // signature; safe to call any time during the CPU's turn but
+  // guarded internally against MCTS re-entry by the caller (see
+  // Magenta / Soul Shard Ren).
+  engine._cpuEvaluateState = (cpuIdx) => evaluateState(engine, cpuIdx);
 
   const origTarget = engine._getCpuTargetResponse.bind(engine);
   const origGeneric = engine._getCpuGenericResponse.bind(engine);
@@ -2540,21 +2668,44 @@ function installCpuBrain(engine) {
       // opponent's turn (Shield of Life, Cure, etc.).
       const picked = scriptedPick || engine._getCpuTargetResponse(validTargets, config, playerIdx);
       // ── MCTS recon recording ──
+      // For damage Attacks/Spells with both own and enemy targets,
+      // strip own-side targets out of the recorded `validTargets` so
+      // MCTS variation enumeration never explores "Icebolt own Hero"
+      // alternatives. The heuristic at `cpuPickTargets` already drops
+      // them; without filtering the record too, MCTS would still try
+      // each own target and a noisy rollout could pick one that
+      // freezes our own Hero for the post-CC `immune` payoff — far
+      // less valuable than a Spell + 120 HP.
       if (Array.isArray(engine._mctsTargetRecord)) {
         const maxSel = Math.max(1, config.maxTotal || config.maxSelect || 1);
-        engine._mctsTargetRecord.push({
-          kind: 'target',
-          title: config.title,
-          cancellable: !!config.cancellable,
-          maxSelect: maxSel,
-          validTargets: validTargets.map(t => ({
+        const recCardName = config.title;
+        const recCd = recCardName ? engine._getCardDB()[recCardName] : null;
+        const recIsDamage = recCd?.cardType === 'Attack'
+          || (recCd?.cardType === 'Spell' && inferDamage(config) > 0);
+        const recHasOwn = validTargets.some(t => t.owner === playerIdx);
+        const recHasEnemy = validTargets.some(t => t.owner != null && t.owner !== playerIdx);
+        const recDropOwn = recIsDamage && recHasOwn && recHasEnemy
+          && !config.allowOwnSide
+          && !config.selfDamage
+          && !config.appliesStatus
+          && !looksLikeHeal(recCd, config)
+          && !looksLikeBuff(recCd, config);
+        const recordedTargets = (recDropOwn
+          ? validTargets.filter(t => t.owner !== playerIdx)
+          : validTargets).map(t => ({
             id: t.id,
             owner: t.owner,
             heroIdx: t.heroIdx,
             name: t.name,
             hp: t.hp,
             type: t.type,
-          })),
+          }));
+        engine._mctsTargetRecord.push({
+          kind: 'target',
+          title: config.title,
+          cancellable: !!config.cancellable,
+          maxSelect: maxSel,
+          validTargets: recordedTargets,
           picked,
           wasScripted: !!scriptedPick,
         });
@@ -2628,19 +2779,74 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
   const ownTargets = validTargets.filter(t => t.owner === cpuIdx);
   const enemyTargets = validTargets.filter(t => t.owner != null && t.owner !== cpuIdx);
 
-  // Attack cards that reach this picker weren't classified as a buff/heal
-  // above — they deal damage. Targeting own units just self-damages for
-  // no gain. Filter own-side targets out when ANY enemy target is
-  // available. The notable trap this closes is Ghuanjun: his afterDamage
-  // grants own targets an 'immortal' buff that expires at the END of
-  // his own turn, so attacking own units to "buff" them is almost
-  // useless — without this drop, the CPU would keep picking own targets
-  // because the picker otherwise falls through to the enemy branch only
-  // when ownTargets is empty. `config.isBuff === true` still gets
-  // respected (looksLikeBuff catches those above). `allowOwnSide`
-  // lets a rare attack-shaped card opt out of this guard.
-  if (cd?.cardType === 'Attack' && ownTargets.length > 0 && enemyTargets.length > 0
-      && !config.allowOwnSide) {
+  // Attack cards AND damage Spells (Icebolt, Eraser Beam, …) that reach
+  // this picker weren't classified as a buff/heal/self-status above —
+  // they deal damage. Targeting own units normally just self-damages
+  // for no gain that outweighs the cost; the only "benefit" the rollout
+  // can discover is the post-CC `immune` status the engine grants at
+  // end-of-turn (Frozen own hero → CC-immune next opp turn), which is
+  // explicitly devalued in `evaluateState` so paths like self-Icebolt
+  // score correctly negative.
+  //
+  // EXCEPTION — pileFuel-welcomed own targets: when the controller has
+  // any active card whose `cpuMeta.pileFuel.discardFilter` matches an
+  // own-side target, killing that own unit moves it to the discard
+  // pile where the same pileFuel converts it into ongoing eval value
+  // (Soul Shards in own discard for re-summon, future archetypes with
+  // the same shape). The simulate-and-score branch below evaluates
+  // every candidate (own + enemy) on the same objective scale via
+  // `evaluateState` delta and lets MCTS arithmetic decide whether
+  // self-targeting is genuinely better than hitting enemy. NOT a
+  // heuristic — the picker pays the per-candidate eval cost only
+  // when own targets are actually pileFuel-favoured, and the eval
+  // numbers come from the cards' own `cpuMeta` declarations.
+  const damageAmount = inferDamage(config);
+  // Damage-shape detection: Attack, damage Spell (Icebolt, …), and
+  // damage-shape Artifact (Book of Doom — declares baseDamage in its
+  // targetingConfig). The simulate-and-score branch below works for
+  // any of these so long as `damageAmount > 0`.
+  const isDamageCard = cd?.cardType === 'Attack'
+    || (cd?.cardType === 'Spell' && damageAmount > 0)
+    || (cd?.cardType === 'Artifact' && damageAmount > 0);
+  const allowSelfDestruct = isDamageCard
+    && damageAmount > 0
+    && ownTargets.length > 0
+    && !engine._inMctsSim
+    && ownTargetsAreSelfDestructWelcome(engine, ownTargets, cpuIdx);
+
+  if (allowSelfDestruct) {
+    // Simulate-and-score across the full pool. Drop fully immune
+    // candidates first (sim would just return ~no delta for them),
+    // then rank by eval delta, take top N for multi-select.
+    const pool = [...ownTargets, ...enemyTargets].filter(t => !isTargetImmune(engine, t));
+    if (pool.length > 0) {
+      const scored = [];
+      for (const t of pool) {
+        const s = simulateDamageTargetScore(engine, t, damageAmount, cpuIdx);
+        if (s == null) continue;
+        scored.push({ t, s });
+      }
+      if (scored.length > 0) {
+        scored.sort((a, b) => b.s - a.s);
+        const cap = Math.min(scored.length, Math.max(1, config.maxTotal || config.maxSelect || 1));
+        // Multi-select (Book of Doom): greedy top-N by eval delta.
+        // Single-select: pick best with a small ε-tiebreak so the CPU
+        // isn't perfectly predictable when scores tie.
+        if (cap > 1) return scored.slice(0, cap).map(x => x.t.id);
+        const top = scored[0].s;
+        const eps = Math.max(1, Math.abs(top) * 0.03);
+        const tied = scored.filter(x => x.s >= top - eps).map(x => x.t);
+        return [randomOf(tied).id];
+      }
+    }
+    // Pool was empty (everything immune) — fall through to enemy/ally
+    // logic below; the enemy branch will return [] for cancellable
+    // prompts, decline-friendly.
+  } else if (isDamageCard && ownTargets.length > 0 && enemyTargets.length > 0
+             && !config.allowOwnSide) {
+    // Default: strip own targets so the existing enemy-only picker
+    // doesn't accidentally rationalise self-damage. `allowOwnSide`
+    // lets rare damage-shaped cards (e.g. recoil-as-cost) opt out.
     ownTargets.length = 0;
   }
 
@@ -3045,6 +3251,17 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // peek at opp.hand / mainDeck / potionDeck and weight by likelihood. Log
   // of last turn's plays adds a pattern bonus for cards opp already cast.
   if (type === 'cardNamePicker') {
+    // User-spec'd Luck heuristic:
+    //   1. If opp has played a particular card every / close-to-every
+    //      turn so far → name that (the strongest predictor of "they'll
+    //      play it again next turn").
+    //   2. Else → random card in opp's hand (any one card — pure
+    //      probabilistic guess at their next play).
+    //   3. Else (hand empty / no playable hand cards) → random card
+    //      from their main deck.
+    // All picks are filtered to "playable" cards (excluding Heroes /
+    // Ascended Heroes / Tokens, which can't be cast from hand and so
+    // can't trigger Luck).
     const allowed = promptData.cardNames;
     if (!Array.isArray(allowed) || allowed.length === 0) return null;
     const oppIdx = cpuIdx === 0 ? 1 : 0;
@@ -3052,55 +3269,90 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     if (!opp) return null;
     const cardDB = engine._getCardDB();
     const allowedSet = new Set(allowed);
-    // Heroes / Ascended Heroes / Tokens never "play from hand" and can't
-    // trigger Luck — exclude so we don't waste the declaration on them.
+    // Area cards can only be cast while the caster's own area zone is
+    // empty (engine gate at `getPlayableActionCards`). If opp already
+    // controls an Area, a named Area card is dead until the existing
+    // Area leaves play — almost certainly NOT during the next turn —
+    // so skip Area-subtype cards entirely while opp's area zone is
+    // occupied.
+    const oppHasArea = ((engine.gs.areaZones?.[oppIdx]) || []).length > 0;
     const isPlayable = (name) => {
       if (!allowedSet.has(name)) return false;
       const cd = cardDB[name];
       if (!cd) return false;
       const t = cd.cardType;
-      return t !== 'Hero' && t !== 'Ascended Hero' && t !== 'Token';
+      if (t === 'Hero' || t === 'Ascended Hero' || t === 'Token') return false;
+      // Reaction and Surprise subtypes don't get "played on opp's own
+      // turn" — Reactions fire in chain windows, Surprises trigger
+      // from face-down zones — so declaring them is almost always a
+      // wasted Luck. Defense-in-depth: Luck's onFreeActivate also
+      // filters these out of the prompt's `cardNames` list.
+      const sub = (cd.subtype || '').toLowerCase();
+      if (sub === 'reaction' || sub === 'surprise') return false;
+      // Areas are blocked from being cast while another Area occupies
+      // the caster's area zone. If opp already has one in play, the
+      // named Area can't be played next turn either.
+      if (sub === 'area' && oppHasArea) return false;
+      return true;
     };
-    const scores = new Map();
-    const bump = (name, amt) => {
-      if (!isPlayable(name)) return;
-      scores.set(name, (scores.get(name) || 0) + amt);
-    };
-    // Opp's hand — about to be played, strongest signal.
-    for (const n of (opp.hand || [])) bump(n, 4);
-    // Main deck + potion deck — future draws, ~1 per turn.
-    for (const n of (opp.mainDeck || [])) bump(n, 1);
-    for (const n of (opp.potionDeck || [])) bump(n, 1);
-    // Last-turn plays via the engine's action log. Each entry carries the
-    // turn it fired on; we bump anything tagged `card_played` /
-    // `creature_summoned` for opp in `turn === gs.turn - 1`.
-    const prevTurn = (engine.gs.turn || 1) - 1;
-    if (prevTurn >= 1) {
-      const oppName = opp.username;
-      const log = engine.actionLog || [];
-      for (let i = log.length - 1; i >= 0; i--) {
-        const e = log[i];
-        if (e.turn == null) continue;
-        if (e.turn < prevTurn) break;
-        if (e.turn !== prevTurn) continue;
-        if (e.player !== oppName) continue;
-        if (!e.card) continue;
-        if (e.type === 'card_played' || e.type === 'creature_summoned') {
-          bump(e.card, 3);
-        }
+
+    // ── 1. Pattern match across ALL opp turns ───────────────────────
+    // Walk the engine action log for `card_played` / `creature_summoned`
+    // events tagged with opp's username. Group by turn so a card cast
+    // multiple times in one turn doesn't inflate the "appeared in N
+    // distinct turns" count. Threshold: appeared in ≥80% of opp's turns
+    // played so far AND ≥2 distinct turns. That excludes one-shot plays
+    // and weak coincidences while catching deck-staple repeats.
+    const oppName = opp.username;
+    const log = engine.actionLog || [];
+    const turnsByCard = new Map(); // name → Set<turnNumber>
+    const oppTurnsSeen = new Set();
+    // The play-log uses three event types: `spell_played` (Spells +
+    // Attacks), `creature_summoned` (Creatures), and `card_played`
+    // (Potions + Artifacts). All three trigger Luck's hooks, so all
+    // three count toward "what does opp tend to play".
+    const PLAY_TYPES = new Set(['spell_played', 'creature_summoned', 'card_played']);
+    for (const e of log) {
+      if (e.turn == null) continue;
+      if (e.player !== oppName) continue;
+      oppTurnsSeen.add(e.turn);
+      if (!e.card) continue;
+      if (!PLAY_TYPES.has(e.type)) continue;
+      if (!isPlayable(e.card)) continue;
+      let s = turnsByCard.get(e.card);
+      if (!s) { s = new Set(); turnsByCard.set(e.card, s); }
+      s.add(e.turn);
+    }
+    const oppTurnCount = oppTurnsSeen.size;
+    if (oppTurnCount >= 2 && turnsByCard.size > 0) {
+      const PATTERN_RATIO = 0.8; // "close to every turn"
+      let bestName = null, bestCount = 0;
+      for (const [name, turns] of turnsByCard) {
+        if (turns.size > bestCount) { bestName = name; bestCount = turns.size; }
+      }
+      if (bestName && bestCount >= 2 && bestCount >= Math.ceil(oppTurnCount * PATTERN_RATIO)) {
+        return { cardName: bestName };
       }
     }
-    if (scores.size === 0) {
-      // Opponent is empty (or holds only heroes / tokens) — still declare
-      // SOMETHING so Luck fires. Free activation, no downside.
-      const fallback = allowed.find(isPlayable);
-      return fallback ? { cardName: fallback } : null;
+
+    // ── 2. Random card from opp's hand ───────────────────────────────
+    const handCandidates = (opp.hand || []).filter(isPlayable);
+    if (handCandidates.length > 0) {
+      return { cardName: randomOf(handCandidates) };
     }
-    let best = null, bestScore = -Infinity;
-    for (const [name, sc] of scores) {
-      if (sc > bestScore) { best = name; bestScore = sc; }
+
+    // ── 3. Random card from opp's main deck ──────────────────────────
+    const deckCandidates = (opp.mainDeck || []).filter(isPlayable);
+    if (deckCandidates.length > 0) {
+      return { cardName: randomOf(deckCandidates) };
     }
-    return best ? { cardName: best } : null;
+
+    // ── Final fallback — declare ANY playable allowed name so Luck
+    //    fires (free activation, no downside). Only reached when opp
+    //    has no playable hand AND no playable deck (extremely rare —
+    //    all-Hero / all-Token state).
+    const fallback = allowed.find(isPlayable);
+    return fallback ? { cardName: fallback } : null;
   }
   if (type === 'zonePick') {
     const zones = promptData.zones || [];
@@ -3313,6 +3565,117 @@ function looksLikeBuff(cd, config) {
 function inferDamage(config) {
   const d = config.baseDamage ?? config.damage ?? 0;
   return Number.isFinite(d) ? d : 0;
+}
+
+/**
+ * "Does the controller have any active card whose pileFuel.discardFilter
+ * matches at least one of these own-side targets?" — opens the
+ * simulate-and-score branch for damage-card targeting that lets the
+ * CPU self-target own units when killing them is evaluator-positive
+ * (e.g. Soul Shards going board → discard for re-summon fuel). Cheap
+ * pre-check: walks the controller's tracked instances once, collects
+ * the discard filters that are "active" (presenceWeight > 0), then
+ * checks each own target's name against them. Generic via cpuMeta —
+ * NO archetype names appear here.
+ */
+function ownTargetsAreSelfDestructWelcome(engine, ownTargets, ownerIdx) {
+  if (!ownTargets?.length) return false;
+  const ps = engine.gs.players?.[ownerIdx];
+  if (!ps) return false;
+  const filters = [];
+  for (const inst of engine.cardInstances) {
+    if ((inst.controller ?? inst.owner) !== ownerIdx) continue;
+    if (inst.faceDown) continue;
+    if (inst.counters?.negated || inst.counters?.nulled) continue;
+    const meta = loadCardEffect(inst.name)?.cpuMeta?.pileFuel;
+    if (!meta?.discardFilter) continue;
+    const w = (meta.presenceWeights || { support: 1.0, hand: 0.5 })[inst.zone];
+    if (!w) continue;
+    filters.push(meta.discardFilter);
+  }
+  if (filters.length === 0) return false;
+  const cardDB = engine._getCardDB();
+  for (const t of ownTargets) {
+    let name = null;
+    if (t.type === 'hero') {
+      name = ps.heroes?.[t.heroIdx]?.name;
+    } else if (t.type === 'creature' || t.type === 'equip') {
+      const inst = t.cardInstance || findSupportInstance(engine, t);
+      name = inst?.name;
+    }
+    if (!name) continue;
+    const cd = cardDB[name];
+    if (!cd) continue;
+    if (filters.some(f => { try { return f(cd); } catch { return false; } })) return true;
+  }
+  return false;
+}
+
+/**
+ * Simulate "this candidate takes `damage`" and return the resulting
+ * `evaluateState(ownerIdx)` score, with all mutations restored before
+ * returning. Used by the simulate-and-score damage picker so own
+ * Soul Shards (and any future pileFuel-rewarded own target) can be
+ * compared against enemy targets on a single objective scale —
+ * the eval naturally accounts for HP loss, on-board value loss, AND
+ * pileFuel discardValue when a creature dies into discard. No
+ * heuristics inside; the eval does the arithmetic.
+ *
+ * Caller MUST guard against MCTS re-entry (`engine._inMctsSim`).
+ * Returns null on any state we can't simulate cleanly.
+ */
+function simulateDamageTargetScore(engine, target, damage, ownerIdx) {
+  const evalState = engine._cpuEvaluateState;
+  if (typeof evalState !== 'function') return null;
+  if (!target || target.owner == null) return null;
+  const gs = engine.gs;
+  if (target.type === 'hero') {
+    const h = gs.players[target.owner]?.heroes?.[target.heroIdx];
+    if (!h || h.hp <= 0) return null;
+    const before = h.hp;
+    h.hp = Math.max(0, h.hp - damage);
+    let score = null;
+    try { score = evalState(ownerIdx); } catch {}
+    h.hp = before;
+    return score;
+  }
+  if (target.type === 'creature' || target.type === 'equip') {
+    const inst = target.cardInstance || findSupportInstance(engine, target);
+    if (!inst) return null;
+    const cd = engine.getEffectiveCardData(inst);
+    const maxHp = cd?.hp ?? 0;
+    const dmgBefore = inst.counters?.damageTaken || 0;
+    const hp = Math.max(0, maxHp - dmgBefore);
+    if (hp <= 0) return null;
+    if (damage < hp) {
+      // Non-lethal — bump damageTaken, score, restore.
+      const had = inst.counters?.damageTaken !== undefined;
+      inst.counters.damageTaken = dmgBefore + damage;
+      let score = null;
+      try { score = evalState(ownerIdx); } catch {}
+      if (had) inst.counters.damageTaken = dmgBefore;
+      else delete inst.counters.damageTaken;
+      return score;
+    }
+    // Lethal — move support → discard, score, restore.
+    const instOwner = inst.owner;
+    const heroIdx = inst.heroIdx;
+    const slotIdx = inst.zoneSlot;
+    const ps = gs.players[instOwner];
+    if (!ps?.supportZones?.[heroIdx]) return null;
+    const slotBefore = [...(ps.supportZones[heroIdx][slotIdx] || [])];
+    const zoneBefore = inst.zone;
+    ps.supportZones[heroIdx][slotIdx] = [];
+    ps.discardPile.push(inst.name);
+    inst.zone = 'discard';
+    let score = null;
+    try { score = evalState(ownerIdx); } catch {}
+    inst.zone = zoneBefore;
+    ps.discardPile.pop();
+    ps.supportZones[heroIdx][slotIdx] = slotBefore;
+    return score;
+  }
+  return null;
 }
 
 // ─── Enemy targeting ──────────────────────────────────────────────────
@@ -5709,6 +6072,30 @@ function evaluateState(engine, cpuIdx) {
       if (oppMaxAtk >= weakestOwnHp) score -= 400; // anticipated kill next turn
       else score -= 0.4 * oppMaxAtk;                // expected chip damage
     }
+  }
+
+  // ── Self-CC / self-immunity disincentive ────────────────────────
+  // The engine grants `statuses.immune` (one-turn CC immunity) to
+  // every hero whose Frozen / Stunned / Negated / Bound status
+  // expires at END phase (`processStatusExpiry`). MCTS rollouts
+  // fast-forward through CPU's End phase before scoring, so a
+  // self-Freeze cast (e.g. self-Icebolt) leaves the rollout's eval
+  // looking at an own hero who's now `immune` — which `isTargetImmune`
+  // treats as an UN-targetable safe state. Without an explicit
+  // penalty, the rollout can rationalise self-CC as "I bought a
+  // turn of CC-immunity" and pay an absurd HP/spell cost for the
+  // privilege. The buff lasts ONE turn and protects only against
+  // negative statuses, not damage — its real value is much lower
+  // than any spell + 100 HP it took to gain. Penalize own immune
+  // heavily; symmetric small reward for opp immune (we couldn't
+  // CC them next turn anyway, but at least they used a slot up).
+  for (const h of (ps.heroes || [])) {
+    if (!h?.name || h.hp <= 0) continue;
+    if (h.statuses?.immune) score -= 200;
+  }
+  for (const h of (opp.heroes || [])) {
+    if (!h?.name || h.hp <= 0) continue;
+    if (h.statuses?.immune) score += 30;
   }
 
   // Ascension progress. When a hero becomes ascensionReady, the next hand

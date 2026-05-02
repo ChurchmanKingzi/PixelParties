@@ -2,12 +2,13 @@
 //  CARD EFFECT: "Argos, the Eye of the Cosmos"
 //  Hero (400 HP, 80 ATK)
 //  Cosmic Depths archetype.
-//  NOTE: Argos is NOT a "Cosmic" card by name
-//  ("Cosmos" ≠ "Cosmic"), so Argos cannot
-//  summon/place "Invader from the Cosmic Depths"
-//  — Invader's "summoned by Cosmic" gate
-//  rejects, and Argos's place picker filters
-//  Invader out at gallery-build time.
+//  Argos counts as a "Cosmic" summoner via the
+//  archetype-membership check in `isCosmicCard`
+//  (he's in `COSMIC_DEPTHS_ANY`), so his hero
+//  effect CAN place "Invader from the Cosmic
+//  Depths" — Invader's "summoned by Cosmic" gate
+//  passes for archetype family members regardless
+//  of the literal "Cosmic" substring.
 //
 //  PASSIVE 1 (opp turn-start): put as many Change
 //  Counters onto Argos as opp.hand.length.
@@ -59,7 +60,11 @@ function cdCreaturesAtLevelInHandOrDeck(engine, pi, lvl) {
       if (!COSMIC_DEPTHS_CREATURES.has(cn)) continue;
       const cd = cardDB[cn];
       if (!cd || (cd.level ?? 0) !== lvl) continue;
-      // Argos isn't a Cosmic card, so Invader can't be placed via Argos.
+      // Belt-and-suspenders: with the archetype-based `isCosmicCard`,
+      // this returns true for Invader-via-Argos. Kept so a future
+      // tightening of the rule (e.g. restricting Invader placement
+      // to specific Cosmic sources) lands here cleanly without
+      // touching every CD card's picker.
       if (!canSummonInvaderViaSource(cn, CARD_NAME)) continue;
       seen.add(cn);
       out.push({ name: cn, source });

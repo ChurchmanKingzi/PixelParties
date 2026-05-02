@@ -18,12 +18,15 @@
 //  ────────────────
 //  Some cards (Invader, Life-Searcher) only fire
 //  their on-summon trigger when summoned BY a
-//  "Cosmic" card. The literal-substring check
-//  excludes Argos ("Cosmos"). Effects that summon
-//  CD Creatures should pass `_summonedByCosmic:
-//  true` and `_summonedBy: <sourceCardName>` in
-//  their summon helper's hookExtras so the target
-//  can detect it.
+//  "Cosmic" card. The gate now checks membership
+//  in the Cosmic Depths archetype family
+//  (COSMIC_DEPTHS_ANY), which includes Argos
+//  ("Cosmos") — Argos's hero effect can therefore
+//  be the legitimate summoner that places Invader.
+//  Effects that summon CD Creatures should pass
+//  `_summonedByCosmic: true` and `_summonedBy:
+//  <sourceCardName>` in their summon helper's
+//  hookExtras so the target can detect it.
 //
 //  Invader's hand-summon block is enforced by
 //  `canSummonInvaderViaSource` — every CD card
@@ -73,12 +76,18 @@ const SELF_COUNTERING_CARDS = new Set([
 // ─── PREDICATES ─────────────────────────────
 
 /**
- * Strict literal-substring test for the "Cosmic" card gate. "Cosmos"
- * (Argos) does NOT qualify — only names containing "Cosmic" exactly.
+ * Cosmic Depths archetype membership test. Returns true for any card
+ * in the family — including Argos, the Eye of the Cosmos (whose name
+ * uses "Cosmos" rather than "Cosmic"). Argos was previously excluded
+ * by the prior literal-substring check, which made his hero effect
+ * unable to count as a "Cosmic" summoner for Invader's gate. Routing
+ * the check through the canonical `COSMIC_DEPTHS_ANY` set fixes that
+ * and naturally extends to any future Cosmic Depths card added to
+ * the archetype.
  */
 function isCosmicCard(name) {
   if (!name) return false;
-  return name.includes('Cosmic');
+  return COSMIC_DEPTHS_ANY.has(name);
 }
 
 /**

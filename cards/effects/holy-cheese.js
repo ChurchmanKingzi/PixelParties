@@ -81,20 +81,13 @@ module.exports = {
     if (!cd || !hasCardType(cd, 'Spell')) return;
     if (cd.spellSchool1 !== 'Support Magic' && cd.spellSchool2 !== 'Support Magic') return;
 
-    // Move from deck to hand + opponent reveal
-    ps.mainDeck.splice(deckIdx, 1);
-    ps.hand.push(result.cardName);
-    engine._broadcastEvent('deck_search_add', { cardName: result.cardName, playerIdx: pi });
-    engine.log('deck_search', { player: ps.username, card: result.cardName, by: 'Holy Cheese' });
-    engine.sync();
-
-    await engine._delay(500);
-    await engine.promptGeneric(oi, {
-      type: 'deckSearchReveal',
-      cardName: result.cardName,
-      searcherName: ps.username,
-      title: 'Holy Cheese',
-      cancellable: false,
+    // Move from deck to hand + opponent reveal — routed through the
+    // canonical helper so on-card-added-to-hand fires (Cosmic Depths
+    // Analyzer / Gatherer count this as an opp search and gain
+    // Change Counters off it).
+    await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
+      source: 'Holy Cheese',
+      reveal: true,
     });
 
     // ── Step 2: Opponent picks one of their own targets to heal for 100 ──

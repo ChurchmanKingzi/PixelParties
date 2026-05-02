@@ -124,24 +124,15 @@ module.exports = {
     if (!cd || !hasCardType(cd, 'Spell')) return;
     if (cd.spellSchool1 !== 'Decay Magic' && cd.spellSchool2 !== 'Decay Magic') return;
 
-    // Remove from deck, add to hand
-    ps.mainDeck.splice(deckIdx, 1);
-    ps.hand.push(result.cardName);
-
-    // Broadcast deck search event (face-up draw animation for opponent)
-    engine._broadcastEvent('deck_search_add', { cardName: result.cardName, playerIdx: pi });
-    engine.log('deck_search', { player: ps.username, card: result.cardName, by: 'Sickly Cheese' });
-    engine.sync();
-
-    // Show reveal prompt to opponent
-    await engine._delay(500);
-    const oi = pi === 0 ? 1 : 0;
-    await engine.promptGeneric(oi, {
-      type: 'deckSearchReveal',
-      cardName: result.cardName,
-      searcherName: ps.username,
-      title: 'Sickly Cheese',
-      cancellable: false,
+    // Route through the canonical helper so on-card-added-to-hand
+    // fires — Cosmic Depths Analyzer / Gatherer key off this hook to
+    // gain Change Counters from any opponent search effect, including
+    // Cheese-family tutors. Helper handles deck splice, hand push,
+    // instance tracking, deck-search animation, log entry,
+    // ON_CARD_ADDED_TO_HAND hook, and the opponent reveal prompt.
+    await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
+      source: 'Sickly Cheese',
+      reveal: true,
     });
   },
 };

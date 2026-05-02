@@ -82,21 +82,13 @@ module.exports = {
     if (deckIdx < 0) return;
     if (!hasCardType(cardDB[result.cardName], 'Attack')) return;
 
-    // Step 2: Move the Attack from deck to hand and reveal
-    ps.mainDeck.splice(deckIdx, 1);
-    ps.hand.push(result.cardName);
-    engine._broadcastEvent('deck_search_add', { cardName: result.cardName, playerIdx: pi });
-    engine.log('deck_search', { player: ps.username, card: result.cardName, by: 'Cool Cheese' });
-    engine.sync();
-
-    await engine._delay(500);
-    const oi = pi === 0 ? 1 : 0;
-    await engine.promptGeneric(oi, {
-      type: 'deckSearchReveal',
-      cardName: result.cardName,
-      searcherName: ps.username,
-      title: 'Cool Cheese',
-      cancellable: false,
+    // Step 2: Move the Attack from deck to hand and reveal. Route
+    // through the canonical helper so on-card-added-to-hand fires —
+    // Cosmic Depths Analyzer / Gatherer count this as a search and
+    // gain Change Counters off it like any other tutor.
+    await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
+      source: 'Cool Cheese',
+      reveal: true,
     });
 
     // Step 3: Offer the "pay double" option to avoid the lock. Only

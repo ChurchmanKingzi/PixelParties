@@ -157,13 +157,20 @@ function buildDiscardGallery(engine, activatorIdx) {
     const ps = engine.gs?.players?.[pi];
     if (!ps) continue;
     const dp = ps.discardPile || [];
-    const tag = pi === activatorIdx ? '(yours)' : '(opp)';
+    const isOwn = pi === activatorIdx;
+    const tag = isOwn ? '(yours)' : '(opp)';
+    // `pileSide` is consumed by `CardGalleryMultiPrompt` to render a
+    // corner badge so the player can tell at a glance which discard
+    // pile each card belongs to. The verbose `label` is kept for
+    // legacy / log readers.
+    const pileSide = isOwn ? 'own' : 'opp';
     for (let i = 0; i < dp.length; i++) {
       out.push({
         name: dp[i],
         source: 'discard',
         entryId: `dp-${pi}-${i}`,
         label: `${dp[i]} ${tag}`,
+        pileSide,
       });
     }
   }

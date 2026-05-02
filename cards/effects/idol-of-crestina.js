@@ -101,29 +101,20 @@ module.exports = {
       return;
     }
 
-    const deckIdx = ps.mainDeck.indexOf(pickedName);
-    if (deckIdx < 0) {
+    if (ps.mainDeck.indexOf(pickedName) < 0) {
       engine.sync();
       return;
     }
 
-    ps.mainDeck.splice(deckIdx, 1);
-    ps.hand.push(pickedName);
-
-    engine._broadcastEvent('deck_search_add', { cardName: pickedName, playerIdx: pi });
-    engine.log('idol_of_crestina_search', { player: ps.username, card: pickedName });
-    engine.sync();
-
-    // Standard tutor etiquette: shuffle + reveal to opponent.
-    engine.shuffleDeck(pi, 'main');
-    await engine._delay(500);
-    const oi = pi === 0 ? 1 : 0;
-    await engine.promptGeneric(oi, {
-      type: 'deckSearchReveal',
-      cardName: pickedName,
-      searcherName: ps.username,
-      title: CARD_NAME,
-      cancellable: false,
+    // Route through the canonical helper so ON_CARD_ADDED_TO_HAND fires
+    // (Cosmic Depths Analyzer / Gatherer key off this hook for any
+    // opponent search). Helper handles splice + push + tracking +
+    // deck-search animation + log + hook + opponent reveal.
+    await engine.actionAddCardFromDeckToHand(pi, pickedName, {
+      source: CARD_NAME,
+      reveal: true,
+      shuffle: true,
     });
+    engine.log('idol_of_crestina_search', { player: ps.username, card: pickedName });
   },
 };

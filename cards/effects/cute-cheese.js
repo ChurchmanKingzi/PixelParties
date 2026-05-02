@@ -70,28 +70,18 @@ module.exports = {
     if (!result || !result.cardName) return;
 
     // Verify the card is actually in the deck and is a Creature
-    const deckIdx = ps.mainDeck.indexOf(result.cardName);
-    if (deckIdx < 0) return;
+    if (ps.mainDeck.indexOf(result.cardName) < 0) return;
     if (!hasCardType(cardDB[result.cardName], 'Creature')) return;
 
-    // Remove from deck, add to hand
-    ps.mainDeck.splice(deckIdx, 1);
-    ps.hand.push(result.cardName);
-
-    // Broadcast deck search event (face-up draw animation for opponent)
-    engine._broadcastEvent('deck_search_add', { cardName: result.cardName, playerIdx: pi });
-    engine.log('deck_search', { player: ps.username, card: result.cardName, by: 'Cute Cheese' });
-    engine.sync();
-
-    // Show reveal prompt to opponent — halts game until they click OK
-    await engine._delay(500);
-    const oi = pi === 0 ? 1 : 0;
-    await engine.promptGeneric(oi, {
-      type: 'deckSearchReveal',
-      cardName: result.cardName,
-      searcherName: ps.username,
-      title: 'Cute Cheese',
-      cancellable: false,
+    // Route through the canonical helper so on-card-added-to-hand
+    // fires — Cosmic Depths Analyzer / Gatherer key off this hook
+    // to gain Change Counters from any opponent search effect,
+    // including Cheese-family tutors. The helper handles deck splice,
+    // hand push, instance tracking, deck-search animation, log entry,
+    // ON_CARD_ADDED_TO_HAND hook, and opponent reveal prompt.
+    await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
+      source: 'Cute Cheese',
+      reveal: true,
     });
   },
 };

@@ -31,9 +31,20 @@ module.exports = {
     const srcHeroIdx = source.heroIdx ?? -1;
     if (srcHeroIdx < 0) return false;
 
-    // Creature source: check creature is alive
-    if (source.zone === 'support') {
-      const creatureHp = source.counters?.currentHp ?? engine._getCardDB()[source.name]?.hp ?? 0;
+    // Detect creature source. Creature-effect callers pass a wrapper
+    // object `{ name, owner, heroIdx, cardInstance }` — no `zone` field
+    // — so checking only `source.zone === 'support'` (the legacy direct-
+    // instance shape) misses the standard wrapper case and the recoil
+    // wrongly falls through to the hero branch. Honour both shapes.
+    const srcInst = source.cardInstance
+      || (source.zone === 'support' ? source : null);
+    if (srcInst) {
+      // Look up the live instance — `source.cardInstance` may be a
+      // stale snapshot if the creature has moved/died since the
+      // damage was queued.
+      const liveInst = engine.cardInstances.find(c => c.id === srcInst.id);
+      if (!liveInst || liveInst.zone !== 'support') return false;
+      const creatureHp = liveInst.counters?.currentHp ?? engine._getCardDB()[liveInst.name]?.hp ?? 0;
       return creatureHp > 0;
     }
 
@@ -66,18 +77,23 @@ module.exports = {
     engine._broadcastEvent('fireshield_corona', { owner: pi, heroIdx: targetHeroIdx });
     await engine._delay(600);
 
-    // Determine recoil target: creature source → hit the creature; hero source → hit the hero
+    // Determine recoil target: creature source → hit the creature;
+    // hero source → hit the hero. Same detection logic as
+    // `afterDamageCondition` above — honour both the
+    // `{ ..., cardInstance }` wrapper passed by every creature script
+    // and the legacy direct-instance shape.
     const srcOwner = source.owner;
     const srcHeroIdx = source.heroIdx;
-    const isCreatureSource = source.zone === 'support';
+    const srcInstHint = source.cardInstance
+      || (source.zone === 'support' ? source : null);
 
-    if (isCreatureSource) {
-      // Creature source — deal recoil to the creature
-      const srcInst = engine.cardInstances.find(c =>
-        c.owner === srcOwner && c.zone === 'support' && c.heroIdx === srcHeroIdx && c.id === source.id
-      ) || source;
+    if (srcInstHint) {
+      // Creature source — deal recoil to the creature itself, NOT to
+      // its host hero. Look up the live inst by id so a stale snapshot
+      // never lands the recoil on the wrong target.
+      const srcInst = engine.cardInstances.find(c => c.id === srcInstHint.id) || srcInstHint;
       const creatureHp = srcInst.counters?.currentHp ?? engine._getCardDB()[srcInst.name]?.hp ?? 0;
-      if (creatureHp > 0) {
+      if (srcInst.zone === 'support' && creatureHp > 0) {
         await engine.actionDealCreatureDamage(
           { name: 'Fireshield', owner: pi, heroIdx: targetHeroIdx },
           srcInst, recoil, 'other',

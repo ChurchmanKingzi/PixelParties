@@ -102,13 +102,18 @@ module.exports = {
 
     const chosen = result.selectedCards;
 
-    // Move chosen cards from deck to hand
+    // Move chosen cards from deck to hand. Route each through the
+    // canonical helper so ON_CARD_ADDED_TO_HAND fires per add (Cosmic
+    // Depths Analyzer / Gatherer key off this hook for any opp search
+    // effect). `reveal: false` defers disclosure to the multi-card
+    // revealSearchedCards call below so opp sees a single reveal
+    // sequence instead of one per card.
     for (const name of chosen) {
-      const idx = ps.mainDeck.indexOf(name);
-      if (idx >= 0) {
-        ps.mainDeck.splice(idx, 1);
-        ps.hand.push(name);
-      }
+      if (ps.mainDeck.indexOf(name) < 0) continue;
+      await engine.actionAddCardFromDeckToHand(pi, name, {
+        source: 'Eternal Butterfly Ascension',
+        reveal: false,
+      });
     }
 
     // Shuffle deck after searching

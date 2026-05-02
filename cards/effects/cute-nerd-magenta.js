@@ -27,6 +27,73 @@ module.exports = {
     return { drawsPerTurn: 2 };
   },
 
+  /**
+   * CPU prompt response for the deck-mill cardGallery (Step 2 below).
+   * The default `pickBestGalleryCard` scores candidates by
+   * `estimateHandCardValueFor` — which is the "if it were in hand"
+   * value, the OPPOSITE of what a mill prompt wants (we want the
+   * candidate whose move from deck → discard creates the most value).
+   * Use `evaluateState` delta directly: snapshot, splice the candidate
+   * from deck onto discard, score, restore. Picks the highest delta.
+   *
+   * For a controller with any pileFuel-armed source (Soul Shards →
+   * `SOUL_SHARD_PILE_FUEL.discardFilter` matches Shards in discard),
+   * milling a Soul Shard from deck flips evaluator-positive without
+   * any per-archetype hardcoding here — just the pileFuel declaration
+   * on the relevant cards.
+   *
+   * Skipped during MCTS rollouts (per-candidate eval inside an outer
+   * rollout would be O(N) extra eval calls per gallery prompt). The
+   * gate at the call site (`engine._inMctsSim` defers to the default).
+   */
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type !== 'cardGallery') return undefined;
+    if (promptData?.title !== CARD_NAME) return undefined;
+    if (engine._inMctsSim) return undefined;
+    const pi = engine._cpuPlayerIdx;
+    const ps = engine.gs.players?.[pi];
+    if (!ps) return undefined;
+    const cards = promptData.cards || [];
+    if (!cards.length) return undefined;
+    const evalState = engine._cpuEvaluateState;
+    if (typeof evalState !== 'function') return undefined;
+    // Magenta's Step 1 (hand-discard) has already pushed the chosen
+    // card name onto the top of the discard pile by the time this
+    // gallery prompt fires. Excluding that exact name from the deck-
+    // mill candidate set ensures the two halves of Magenta's effect
+    // contribute DIFFERENT names to discard — milling the same name
+    // would just stack a second copy that the deck already had to
+    // give up, halving the unique-name yield. The eval-delta scorer
+    // would happily pick the same name in pileFuel-stacking decks
+    // (each copy in discard scores separately), so this filter is a
+    // hard rule, not a heuristic.
+    const justDiscardedName = ps.discardPile?.[ps.discardPile.length - 1] || null;
+    const eligibleCards = justDiscardedName
+      ? cards.filter(c => c.name !== justDiscardedName)
+      : cards;
+    // Defensive: if filtering would empty the pool (deck contains only
+    // copies of the just-discarded name — pathological), fall back to
+    // the full pool so the prompt still resolves.
+    const pool = eligibleCards.length > 0 ? eligibleCards : cards;
+    let best = null;
+    let bestScore = -Infinity;
+    for (const c of pool) {
+      const name = c.name;
+      const idx = (ps.mainDeck || []).indexOf(name);
+      if (idx < 0) continue;
+      ps.mainDeck.splice(idx, 1);
+      ps.discardPile.push(name);
+      let score = -Infinity;
+      try { score = evalState(pi); } catch {}
+      ps.discardPile.pop();
+      ps.mainDeck.splice(idx, 0, name);
+      if (score > bestScore) { bestScore = score; best = c; }
+    }
+    if (!best) return undefined;
+    return { cardName: best.name, source: best.source };
+  },
+
   canActivateHeroEffect(ctx) {
     const ps = ctx.players[ctx.cardOwner];
     return (ps?.hand || []).length > 0 && (ps?.mainDeck || []).length > 0;

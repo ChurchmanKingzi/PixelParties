@@ -45,6 +45,11 @@ module.exports = {
       exclusiveTypes: false,
       maxPerType: { hero: 99, equip: 99 },
       maxTotal: maxTargets,
+      // Per-target damage hint — read by the CPU's `inferDamage` so
+      // the simulate-and-score targeting branch correctly evaluates
+      // each candidate at 50 dmg. Without this the CPU treats Book
+      // of Doom as 0-damage and skips the eval-delta path entirely.
+      baseDamage: DAMAGE_PER_TARGET,
     };
   },
 

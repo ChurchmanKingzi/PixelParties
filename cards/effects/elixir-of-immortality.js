@@ -71,8 +71,11 @@ module.exports = {
 
   hooks: {
     /**
-     * Hero KO: collect the dead hero for deferred processing.
-     * Do NOT revive here — wait for a batch checkpoint.
+     * Hero KO: collect the dead hero. Resolve immediately for single-shot
+     * sources (creature effects, abilities, hero effects) — defer for
+     * Spells / Attacks / Surprises (anything inside _spellResolutionDepth)
+     * since those may kill multiple heroes at once and the player should
+     * see a single batched revive prompt at afterSpellResolved.
      */
     onHeroKO: async (ctx) => {
       // Defensive: skip if this instance has already been deleted from the
@@ -99,6 +102,18 @@ module.exports = {
       if (!perm._pendingHeroes) perm._pendingHeroes = [];
       if (!perm._pendingHeroes.some(ph => ph.heroIdx === heroIdx)) {
         perm._pendingHeroes.push({ name: hero.name, heroIdx, maxHp: hero.maxHp || 400 });
+      }
+
+      // Single-shot deaths: resolve right here. Spells / Attacks / Surprises
+      // increment _spellResolutionDepth (server.js:doPlaySpell) so AOE-from-
+      // hand stays batched and falls through to afterSpellResolved. For
+      // every other damage source (Creature onPlay damage like Soul Shard
+      // Sekhem; ability activations; hero effects; etc.) the depth is 0
+      // and there's no batching to wait for — without this immediate path
+      // the death would only get revived at onPhaseEnd (turn-end), which
+      // breaks the card's "immediate revive" promise.
+      if ((engine.gs._spellResolutionDepth || 0) === 0) {
+        await resolveElixirPending(engine, pi, perm);
       }
     },
 

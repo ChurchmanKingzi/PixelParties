@@ -112,21 +112,16 @@ module.exports = {
     if (!cd || !hasCardType(cd, 'Spell')) return;
     if (cd.spellSchool1 !== 'Destruction Magic' && cd.spellSchool2 !== 'Destruction Magic') return;
 
-    // Move from deck to hand + opponent reveal
-    ps.mainDeck.splice(deckIdx, 1);
-    ps.hand.push(result.cardName);
-    engine._broadcastEvent('deck_search_add', { cardName: result.cardName, playerIdx: pi });
-    engine.log('deck_search', { player: ps.username, card: result.cardName, by: 'Angry Cheese' });
-    engine.sync();
-
-    await engine._delay(500);
-    const oi = pi === 0 ? 1 : 0;
-    await engine.promptGeneric(oi, {
-      type: 'deckSearchReveal',
-      cardName: result.cardName,
-      searcherName: ps.username,
-      title: 'Angry Cheese',
-      cancellable: false,
+    // Route through the canonical helper so the on-card-added-to-hand
+    // hook fires — Cosmic Depths Analyzer / Gatherer key off this hook
+    // to gain Change Counters from any opponent search effect, including
+    // gated ones like the Cheese-family tutors. Manual splice + push
+    // bypassed the hook entirely; using the helper keeps the visual
+    // flight, opponent reveal, log entry, and instance tracking
+    // identical to other tutors.
+    await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
+      source: 'Angry Cheese',
+      reveal: true,
     });
   },
 };

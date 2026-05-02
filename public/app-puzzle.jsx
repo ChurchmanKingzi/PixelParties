@@ -937,6 +937,22 @@ function PuzzleCreator() {
   // For Cute Hydra: number of Head Counters on the creature being edited.
   // Null when the open editor target isn't a Cute Hydra.
   const [editHeadCounter, setEditHeadCounter] = useState(null);
+  // For Cosmic Depths counter-consumers (Argos / Analyzer / Gatherer):
+  // number of Change Counters this card starts the puzzle with. Argos is
+  // a Hero (counters live on `hero._changeCounters`); Analyzer + Gatherer
+  // are Creatures (counters live on `inst.counters.changeCounter` and
+  // are puzzle-saved under `_creatureStatuses[hi-slot].changeCounter`).
+  // Null when the open editor target isn't one of these cards.
+  const [editChangeCounter, setEditChangeCounter] = useState(null);
+  // Cards whose puzzle starting state can include Change Counters.
+  // Hardcoded here because the script-side `cpuMeta.counterConsumer`
+  // flag isn't reachable from the client; mirrors the convention used
+  // for the Head-Counter / Sleeping-Beauty editors above.
+  const COUNTER_CONSUMER_HEROES = new Set(['Argos, the Eye of the Cosmos']);
+  const COUNTER_CONSUMER_CREATURES = new Set([
+    'Analyzer from the Cosmic Depths',
+    'Gatherer from the Cosmic Depths',
+  ]);
   const openStatEditor = useCallback((si, zt, hi, slot) => {
     const p = players[si];
     if (zt === 'hero') {
@@ -945,6 +961,12 @@ function PuzzleCreator() {
       setEditHp(String(h.hp)); setEditMaxHp(String(h.maxHp)); setEditAtk(String(h.atk));
       setEditStatuses({ ...(h.statuses || {}) });
       setEditBuffs({ ...(h.buffs || {}) });
+      // Argos starts the puzzle with N Change Counters — hydrate the
+      // counter input from the saved hero state. Null for non-Argos
+      // heroes so the editor section stays hidden.
+      setEditChangeCounter(COUNTER_CONSUMER_HEROES.has(h.name)
+        ? (h._changeCounters || 0)
+        : null);
     } else if (zt === 'support') {
       const cards = p.supportZones[hi][slot]; if (!cards.length) return;
       const c = getCard(cards[0]);
@@ -975,6 +997,12 @@ function PuzzleCreator() {
       setEditLinkedHeroSlot(c?.name === 'Sleeping Beauty'
         ? (typeof cs._linkedHeroIdx === 'number' ? cs._linkedHeroIdx : null)
         : null);
+      // Analyzer / Gatherer can start the puzzle with N Change Counters
+      // — hydrate from the saved creature-status. Null for other
+      // Creatures so the editor section stays hidden.
+      setEditChangeCounter(COUNTER_CONSUMER_CREATURES.has(c?.name)
+        ? (cs.changeCounter || 0)
+        : null);
     }
   }, [players, getCard]);
 
@@ -992,6 +1020,15 @@ function PuzzleCreator() {
         } else {
           p.heroes[hi].statuses = { ...editStatuses };
           p.heroes[hi].buffs = Object.keys(editBuffs).length > 0 ? { ...editBuffs } : undefined;
+        }
+        // Argos: persist Change Counters as `_changeCounters` on the
+        // hero — the engine reads this directly via the shared cosmic
+        // helpers (getChangeCounters / removeChangeCounters), so the
+        // puzzle Argos starts with the authored counter value.
+        if (editChangeCounter != null && editChangeCounter > 0) {
+          p.heroes[hi]._changeCounters = editChangeCounter;
+        } else {
+          delete p.heroes[hi]._changeCounters;
         }
       }
       return p;
@@ -1052,11 +1089,18 @@ function PuzzleCreator() {
       if (c?.name === 'Sleeping Beauty' && editLinkedHeroSlot != null) {
         merged._linkedHeroIdx = editLinkedHeroSlot;
       }
+      // Analyzer / Gatherer: persist starting Change Counters. The
+      // server's puzzle loader applies this to `inst.counters.changeCounter`
+      // (see `cs.changeCounter` branch alongside `cs.headCounter`).
+      delete merged.changeCounter;
+      if (editChangeCounter != null && editChangeCounter > 0) {
+        merged.changeCounter = editChangeCounter;
+      }
       p._creatureStatuses[hi + '-' + slot] = merged;
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, updatePlayer, getCard]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, updatePlayer, getCard]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -1866,6 +1910,46 @@ function PuzzleCreator() {
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
                   Caps the number of different targets Hydra's once-per-turn strike can hit.
+                </div>
+              </div>
+            )}
+            {/* Cosmic Depths Change Counter editor — visible when the
+                edit target is a counter-consumer (Argos hero / Analyzer /
+                Gatherer). Authors can preset the starting counter value
+                so a puzzle Argos can immediately spend e.g. 3 counters
+                to place a Lv3 CD Creature on turn 1. Saved as
+                `hero._changeCounters` for Argos and as
+                `_creatureStatuses[hi-slot].changeCounter` for the
+                Creatures — both surfaces are read by the shared cosmic
+                helpers without further server-side translation. */}
+            {editChangeCounter != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  🌌 Change Counters
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    disabled={(editChangeCounter || 0) <= 0}
+                    onClick={() => setEditChangeCounter(Math.max(0, (editChangeCounter || 0) - 1))}>
+                    −
+                  </button>
+                  <input className="input" type="number" min={0}
+                    value={editChangeCounter ?? 0}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10);
+                      setEditChangeCounter(Number.isFinite(n) && n >= 0 ? n : 0);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
+                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#cf9bff' }} />
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    onClick={() => setEditChangeCounter((editChangeCounter || 0) + 1)}>
+                    +
+                  </button>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                  Cosmic Depths counters this card starts the puzzle with — spendable on turn 1.
                 </div>
               </div>
             )}

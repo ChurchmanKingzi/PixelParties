@@ -152,27 +152,22 @@ async function runRiderTutor(engine, pi) {
   }
 
   const chosenName = picked.cardName;
-  const idx = (ps.mainDeck || []).indexOf(chosenName);
-  if (idx < 0) {
+  if ((ps.mainDeck || []).indexOf(chosenName) < 0) {
     engine.shuffleDeck(pi, 'main');
     return;
   }
-  ps.mainDeck.splice(idx, 1);
-  engine.shuffleDeck(pi, 'main');
-  ps.hand.push(chosenName);
 
-  engine._broadcastEvent('deck_search_add', { cardName: chosenName, playerIdx: pi });
-  engine.log('elven_rider_tutor', { player: ps.username, added: chosenName });
-
-  // Opponent-side reveal modal
-  const oi = pi === 0 ? 1 : 0;
-  await engine.promptGeneric(oi, {
-    type: 'deckSearchReveal',
-    cardName: chosenName,
-    searcherName: ps.username,
-    title: CARD_NAME,
-    cancellable: false,
+  // Route through the canonical helper so ON_CARD_ADDED_TO_HAND fires
+  // (Cosmic Depths Analyzer / Gatherer key off this hook). Helper
+  // handles splice + push + tracking + deck-search animation +
+  // log + hook + opponent reveal. `shuffle: true` shuffles after
+  // the splice, matching the original Fisher-Yates call.
+  await engine.actionAddCardFromDeckToHand(pi, chosenName, {
+    source: CARD_NAME,
+    reveal: true,
+    shuffle: true,
   });
+  engine.log('elven_rider_tutor', { player: ps.username, added: chosenName });
 }
 
 module.exports = {

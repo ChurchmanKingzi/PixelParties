@@ -155,21 +155,26 @@ module.exports = {
 
     const chosenAbility = abilityPick.cardName;
 
-    // Verify still in deck, move to hand temporarily, then attach via engine
-    const deckIdx = ps.mainDeck.indexOf(chosenAbility);
-    if (deckIdx < 0) return true;
-    ps.mainDeck.splice(deckIdx, 1);
-    ps.hand.push(chosenAbility);
+    // Verify still in deck, move to hand temporarily, then attach via
+    // engine. Route through the canonical helper so the brief hand-add
+    // fires ON_CARD_ADDED_TO_HAND (Cosmic Depths Analyzer / Gatherer
+    // key off this hook for any opponent search effect, including
+    // Ska's tutor-then-attach flow). Helper covers deck-search anim,
+    // tracking, log, hook, and opponent reveal.
+    if (ps.mainDeck.indexOf(chosenAbility) < 0) return true;
+    await engine.actionAddCardFromDeckToHand(pi, chosenAbility, {
+      source: CARD_NAME,
+      reveal: true,
+    });
 
     const attachResult = await engine.attachAbilityFromHand(pi, chosenAbility, targetHeroIdx, {
       skipAbilityGivenCheck: true,
     });
 
     if (!attachResult?.success) {
-      // Attachment failed — return card to hand (player keeps it)
+      // Attachment failed — card stays in hand (player keeps it).
       engine.log('ska_attach_failed', { player: ps.username, card: chosenAbility });
     } else {
-      engine._broadcastEvent('deck_search_add', { cardName: chosenAbility, playerIdx: pi });
       engine.log('ska_attach', { player: ps.username, ability: chosenAbility, hero: heroName });
       engine.shuffleDeck(pi);
     }

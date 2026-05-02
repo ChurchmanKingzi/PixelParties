@@ -121,25 +121,29 @@ module.exports = {
     const copies = Math.min(Math.floor(deleted.length / 4), copiesInDeck);
 
     // Pull copies from deck only. Stops early if the deck runs out
-    // (shouldn't happen given the cap, but defensive).
+    // (shouldn't happen given the cap, but defensive). The FIRST pull
+    // routes through the canonical helper so it streams the deck-
+    // search animation, opens the opp reveal, AND fires
+    // ON_CARD_ADDED_TO_HAND (Cosmic Depths Analyzer / Gatherer counter
+    // listener). Subsequent pulls of the SAME name happen silently —
+    // re-broadcasting would produce duplicate reveals, and the per-
+    // effect counter rule means Analyzer should gain only 1 counter
+    // for this single Shu activation regardless of copy count.
     let pulled = 0;
-    let firstPulled = false;
     for (let i = 0; i < copies; i++) {
-      const deckIdx = ps.mainDeck.indexOf(targetName);
-      if (deckIdx < 0) break;
-      ps.mainDeck.splice(deckIdx, 1);
-      ps.hand.push(targetName);
-      pulled++;
-      // Stream the FIRST pulled copy to the opponent like a standard
-      // search (`deck_search_add` triggers the deck-flying-card animation,
-      // and the deckSearchReveal prompt below shows the opponent the
-      // searched card once). Subsequent identical copies share the
-      // same name, so re-broadcasting would just produce a duplicate
-      // reveal.
-      if (!firstPulled) {
-        engine._broadcastEvent('deck_search_add', { cardName: targetName, playerIdx: pi });
-        firstPulled = true;
+      if (i === 0) {
+        const ok = await engine.actionAddCardFromDeckToHand(pi, targetName, {
+          source: CARD_NAME,
+          reveal: false, // explicit deckSearchReveal at the bottom
+        });
+        if (!ok) break;
+      } else {
+        const deckIdx = ps.mainDeck.indexOf(targetName);
+        if (deckIdx < 0) break;
+        ps.mainDeck.splice(deckIdx, 1);
+        ps.hand.push(targetName);
       }
+      pulled++;
     }
     if (pulled > 0) engine.shuffleDeck(pi, 'main');
 

@@ -233,8 +233,26 @@ class CardInstance {
     return script.activeIn.includes(zone || this.zone);
   }
 
-  /** Get a specific hook function, or null. */
+  /** Get a specific hook function, or null.
+   *
+   * If `counters._effectOverride` is set (Soul Shard Sah's mimic), look up
+   * the hook on the override script first. The override fully replaces this
+   * card's runtime hooks for the duration the override is set — Sah's own
+   * `onPlay` has already fired by the time the override is bound, and Sah
+   * has no other hooks of its own, so falling through is unnecessary. The
+   * `_effectOverride` counter mirrors the engine path at server.js (which
+   * routes `creatureEffect` / `canActivateCreatureEffect` /
+   * `onCreatureEffect` lookups through the override script too), keeping
+   * passive triggers and active activations consistent.
+   */
   getHook(hookName) {
+    const override = this.counters?._effectOverride;
+    if (override) {
+      const ovScript = loadCardEffect(override);
+      const ovHook = ovScript?.hooks?.[hookName];
+      if (ovHook) return ovHook;
+      return null;
+    }
     const script = this.loadScript();
     if (!script?.hooks) return null;
     return script.hooks[hookName] || null;
@@ -1406,6 +1424,25 @@ class GameEngine {
           ]);
         }
       } catch (err) {
+        // Fatal errors that mean "the engine is structurally broken
+        // for the rest of this rollout/turn" must propagate UP rather
+        // than being swallowed and continuing on to the next listener.
+        // Otherwise the for-loop keeps inviting fresh listeners to
+        // reproduce the same damage cascade — that's how Heal↔Howitzer
+        // ↔Shield cycles reach 5M+ damage calls in a single rollout
+        // before the heap check finally fires.
+        //   • `_mctsOverload`           — heap / snapshot / damage-call
+        //                                 caps tripped; rollout MUST
+        //                                 abort so MCTS falls through
+        //                                 to heuristic.
+        //   • `_actionRecursionExceeded` — MAX_ACTION_RECURSION fired
+        //                                 inside actionDealDamage /
+        //                                 actionHealHero; the cycle is
+        //                                 active and continuing only
+        //                                 fires more inner damage.
+        if (err?._mctsOverload || err?._actionRecursionExceeded) {
+          throw err;
+        }
         console.error(`[Engine] Hook "${hookName}" on card "${card.name}" (${card.id}) failed:`, err.message);
       }
 
@@ -2966,6 +3003,12 @@ class GameEngine {
             new Promise((_, rej) => setTimeout(() => rej(new Error('Effect timeout')), EFFECT_TIMEOUT_MS)),
           ]);
         } catch (err) {
+          // Same re-throw policy as runHooks: fatal recursion / MCTS-
+          // overload errors must propagate so chain resolution doesn't
+          // hide a damage-cascade trip.
+          if (err?._mctsOverload || err?._actionRecursionExceeded) {
+            throw err;
+          }
           console.error(`[Engine] Effect resolve failed for "${link.card?.name}":`, err.message);
         }
       }
@@ -3014,7 +3057,23 @@ class GameEngine {
       const msg = this._buildActionRecursionReport('actionDealDamage', target, amount, type);
       this._actionRecursionDepth--;
       this._actionRecursionTrace.pop();
-      throw new Error(msg);
+      // Tag so runHooks's per-listener catch propagates the throw out
+      // of the hook chain instead of swallowing it. Without this, the
+      // cycle re-enters via the next listener and we end up with 5M+
+      // damage calls before the heap check trips.
+      const err = new Error(msg);
+      err._actionRecursionExceeded = true;
+      // Inside MCTS rollouts, also tag as `_mctsOverload` and set
+      // `_mctsKilledThisTurn` so the existing rollout-abort plumbing
+      // (mctsRankCandidates / rankCandidatesEvalGreedy / etc.) catches
+      // the throw and falls through to the heuristic. Live-play
+      // recursion errors continue propagating to the original action
+      // call site as a regular error.
+      if (this._inMctsSim) {
+        err._mctsOverload = true;
+        this._mctsKilledThisTurn = true;
+      }
+      throw err;
     }
     try {
       return await this._actionDealDamageImpl(source, target, amount, type, opts);
@@ -3594,7 +3653,18 @@ class GameEngine {
       const msg = this._buildActionRecursionReport('actionHealHero', target, amount, null);
       this._actionRecursionDepth--;
       this._actionRecursionTrace.pop();
-      throw new Error(msg);
+      // Tag so runHooks's per-listener catch re-throws this fatal error
+      // (matching the actionDealDamage path). MCTS-sim path also tags
+      // `_mctsOverload` so the rollout aborts and falls through to the
+      // heuristic; live-play recursion bubbles up to the action call
+      // site as a regular error.
+      const err = new Error(msg);
+      err._actionRecursionExceeded = true;
+      if (this._inMctsSim) {
+        err._mctsOverload = true;
+        this._mctsKilledThisTurn = true;
+      }
+      throw err;
     }
     try {
       return await this._actionHealHeroImpl(source, target, amount);
@@ -4105,11 +4175,23 @@ class GameEngine {
     // ripped from deck but never reaching hand).
     if (ps.handLocked) return null;
 
-    const idx = (ps.mainDeck || []).indexOf(cardName);
-    if (idx < 0) return null;
+    if ((ps.mainDeck || []).indexOf(cardName) < 0) return null;
 
-    ps.mainDeck.splice(idx, 1);
-    ps.hand.push(cardName);
+    // Route through the canonical helper so ON_CARD_ADDED_TO_HAND
+    // fires (Cosmic Depths Analyzer / Gatherer key off this hook for
+    // any opp search effect). actionAddCardFromDeckToHand handles
+    // splice + push + tracking + deck_search_add anim + log + hook +
+    // reveal-to-opp prompt; passing `reveal: false` skips the
+    // helper's single-card reveal so callers can still use the
+    // multi-reveal flow if they want — `revealSearchedCards` below
+    // re-broadcasts deck_search_add and opens the standard reveal
+    // prompt for THIS title, which is the original behaviour callers
+    // expect.
+    const ok = await this.actionAddCardFromDeckToHand(playerIdx, cardName, {
+      source: title,
+      reveal: false,
+    });
+    if (!ok) return null;
 
     await this.revealSearchedCards(playerIdx, [cardName], title);
 
@@ -7598,6 +7680,26 @@ class GameEngine {
         // Guardian Beasts: cleared so the first Guardian Beast summon
         // of the new turn correctly grants the additional-Action grant.
         ps._guardianBeastSummonedThisTurn = false;
+        // Soul Shards: per-name 1/turn cap. Wipe the whole map so every
+        // Shard becomes summonable again (subject to its other gates).
+        delete ps._soulShardSummonedThisTurn;
+        // Snapshot the names already in this player's discard pile at
+        // turn start — universal "was the card sent here this turn?"
+        // gate. Covers EVERY card type (Creatures, Spells, Attacks,
+        // Artifacts, Potions, Abilities) because the discard pile is a
+        // flat name list with no per-type filtering. A name is "not sent
+        // there this turn" iff it's in this Set AND currently present
+        // in the discard pile. New entries arriving mid-turn (deaths,
+        // mill, forced discard, post-resolution Spell discard, etc.)
+        // are correctly excluded since the snapshot is taken before
+        // any of those events can occur this turn.
+        // Used by Thep, the Court Scribe (Soul Shard placement) and
+        // future effects with the same shape.
+        // NOTE: puzzle startup bypasses this `startTurn` and rebuilds
+        // its own per-turn flags (see server.js createPuzzleGame); the
+        // snapshot is also rebuilt there from the puzzle's preset
+        // discard pile.
+        ps._discardNamesAtTurnStart = new Set(ps.discardPile || []);
         delete ps._creationLockedNames;
         delete ps._revealedCardCounts;
         delete ps._revealedHandIndices;
@@ -7861,12 +7963,31 @@ class GameEngine {
     // moment a second action begins — we never decrement it here, because the skip
     // must fire once per second-action-slot attempt, and the slot is defined by
     // _actionsPlayedThisPhase === 1.
+    //
+    // The same gate also applies to `isSecondActionGrant`-flagged
+    // additionalActionType providers (Soul Shard Ba and any future card
+    // routed through `_second-action-shared`): a hero-restricted second
+    // action is still a "second action this Action Phase", so the
+    // engine refuses to advance past it. The player keeps the option
+    // to take action 2 (consuming or fizzling the grant) before the
+    // phase ends.
     if (current === PHASES.ACTION && targetPhase === PHASES.MAIN2) {
       const ps = this.gs.players[playerIdx];
       const actionsPlayed = ps?._actionsPlayedThisPhase || 0;
-      if (ps?._bonusMainActions > 0 && actionsPlayed === 1) {
-        this.sync();
-        return true; // Stay in Action Phase — player has a pending 2nd-action grace slot
+      if (actionsPlayed === 1) {
+        if (ps?._bonusMainActions > 0) {
+          this.sync();
+          return true; // Stay in Action Phase — Torchure-style grace slot
+        }
+        for (const inst of this.cardInstances) {
+          if (inst.owner !== playerIdx) continue;
+          if (!inst.counters?.additionalActionAvail) continue;
+          const config = this._additionalActionTypes?.[inst.counters?.additionalActionType];
+          if (config?.isSecondActionGrant) {
+            this.sync();
+            return true; // Stay in Action Phase — second-action grant is reachable
+          }
+        }
       }
     }
 
@@ -9270,7 +9391,7 @@ class GameEngine {
           }
         }
         if (terrorCount > 0) {
-          const t = 10 - terrorCount; // 1 copy = 9, 2 copies = 8, 3 copies = 7
+          const t = 8 - terrorCount; // 1 copy = 7, 2 copies = 6, 3 copies = 5
           if (t < threshold) threshold = t;
         }
       }
@@ -12498,6 +12619,23 @@ class GameEngine {
   }
 
   /**
+   * Returns true iff a second-action grant config is currently active —
+   * i.e. the player is exactly at the "action 2 of Action Phase" slot.
+   * Returns true (= no block) for any non-second-action-grant config.
+   *
+   * Centralised so all consumers (UI listings, find-for-card lookups,
+   * server-side ability/hero-effect consume loops) share one rule.
+   */
+  _isSecondActionGrantAvailable(playerIdx, config) {
+    if (!config?.isSecondActionGrant) return true;
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return false;
+    const isActionPhase = (this.gs.currentPhase || 0) === PHASES.ACTION;
+    const actionsPlayed = ps._actionsPlayedThisPhase || 0;
+    return isActionPhase && actionsPlayed === 1;
+  }
+
+  /**
    * Get all available additional actions for a player.
    * Returns array of { typeId, label, actionType, providers: [{cardId, cardName, heroIdx, zoneSlot}], eligibleHandCards: [cardName] }
    */
@@ -12513,6 +12651,11 @@ class GameEngine {
       const typeId = inst.counters.additionalActionType;
       const config = this._additionalActionTypes[typeId];
       if (!config) continue;
+      // Second-action grants only fire as the actual second action of
+      // the Action Phase — hide them outside the action-1 → action-2
+      // window so the bonus can't be spent as a third action, fired
+      // mid-Main-Phase, etc.
+      if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
       if (!byType[typeId]) byType[typeId] = { typeId, label: config.label, allowedCategories: config.allowedCategories || [], heroRestricted: !!config.heroRestricted, providers: [], eligibleHandCards: [] };
       byType[typeId].providers.push({ cardId: inst.id, cardName: inst.name, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
     }
@@ -12702,6 +12845,9 @@ class GameEngine {
       const typeId = inst.counters.additionalActionType;
       const config = this._additionalActionTypes[typeId];
       if (!config) continue;
+      // Second-action grants are only available as the actual second
+      // action of the Action Phase — see `_isSecondActionGrantAvailable`.
+      if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
       // Hero-restricted: provider must be on the same hero as the spell caster
       if (config.heroRestricted && heroIdx != null && inst.heroIdx !== heroIdx) continue;
       // Check category
@@ -12812,9 +12958,47 @@ class GameEngine {
       if (inst.owner !== playerIdx) continue;
       if (!inst.counters.additionalActionType || !inst.counters.additionalActionAvail) continue;
       const config = this._additionalActionTypes[inst.counters.additionalActionType];
+      if (!config) continue;
+      // Second-action grants (Ba, Reiza, …) only fire as the actual
+      // second Action of the Action Phase — must mirror the same gate
+      // every other consumer applies (`findAdditionalActionForCategory`,
+      // `findAdditionalActionForCard`, `getAdditionalActions`). Without
+      // this, the UI lights up Action-cost abilities (Adventurousness)
+      // and creature effects (`creatureActionCost`) during Main Phase
+      // while a second-Action grant is active; clicks then fizzle on
+      // the consume-side gate.
+      if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
       if (config?.allowedCategories?.includes(category)) return true;
     }
     return false;
+  }
+
+  /**
+   * Like `findAdditionalActionForCard`, but matched by category instead of
+   * a hand-card name. Returns the typeId of the first provider that:
+   *   • belongs to `playerIdx`,
+   *   • has `additionalActionAvail > 0`,
+   *   • passes `_isSecondActionGrantAvailable` (second-action grants
+   *     only fire as the actual second action of the Action Phase),
+   *   • passes `heroRestricted` (provider's host hero matches `heroIdx`),
+   *   • lists `category` in `allowedCategories`.
+   *
+   * Used by ability / creature-effect activation paths to find a
+   * matching second-action grant when the player is at the action-2 slot.
+   */
+  findAdditionalActionForCategory(playerIdx, category, heroIdx) {
+    for (const inst of this.cardInstances) {
+      if (inst.owner !== playerIdx) continue;
+      if (!inst.counters.additionalActionType || !inst.counters.additionalActionAvail) continue;
+      const typeId = inst.counters.additionalActionType;
+      const config = this._additionalActionTypes[typeId];
+      if (!config) continue;
+      if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
+      if (config.heroRestricted && heroIdx != null && inst.heroIdx !== heroIdx) continue;
+      if (!config.allowedCategories?.includes(category)) continue;
+      return typeId;
+    }
+    return null;
   }
 
   /**
@@ -16295,11 +16479,22 @@ class GameEngine {
     if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
 
     // ── State transfer ──
+    // HP rule: Ascension grants the INTRINSIC HP delta between the
+    // base Hero's `cards.json` max HP and the Ascended Hero's
+    // `cards.json` max HP — applied to BOTH current HP and current
+    // max HP. Computing the delta against the base's printed max HP
+    // (rather than `hero.maxHp`, which can be modified mid-game by
+    // Resuscitation Potion / Toughness / etc.) preserves any pre-
+    // existing max-HP buff: a Resuscitated 250-max Beato Witch
+    // ascending into a 350-max Eternal Butterfly correctly gains the
+    // full 150 HP delta and ends up at 400/400, not at 350/350 (which
+    // would silently revert the Resuscitation buff).
     const oldName = hero.name;
-    const oldMaxHp = hero.maxHp || cardDB[oldName]?.hp || 0;
-    const hpLost = Math.max(0, oldMaxHp - hero.hp);
-    const newMaxHp = newCardData.hp || oldMaxHp;
-    const newHp = Math.max(1, newMaxHp - hpLost);
+    const oldBaseMaxHp = cardDB[oldName]?.hp || 0;
+    const newBaseMaxHp = newCardData.hp || oldBaseMaxHp;
+    const ascensionDelta = newBaseMaxHp - oldBaseMaxHp;
+    const newMaxHp = Math.max(1, (hero.maxHp || oldBaseMaxHp) + ascensionDelta);
+    const newHp = Math.max(1, (hero.hp || 0) + ascensionDelta);
 
     hero.name = cardName;
     hero.hp = newHp;

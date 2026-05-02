@@ -3037,11 +3037,22 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     || ((ps._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
   );
   const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
+  // Reaction-subtype Spells / Attacks / Creatures are exempt from the
+  // action-economy machinery — they never consume an action slot, never
+  // burn an additional-action provider, and never bump
+  // `_actionsPlayedThisPhase` (which would otherwise misclassify them
+  // as "the second action this Action Phase" and trigger second-action
+  // grant fizzles, _bonusMainActions consumption, onActionUsed hooks,
+  // etc.). The proactive-play path is the only one a Reaction can
+  // reach; non-proactive Reactions go through the chain-reaction
+  // window and never touch this counter.
+  const isReactionSubtype = (cardData.subtype || '').toLowerCase() === 'reaction';
   // Wolflesia-style Creature spell-cast: force-consume the bypass
   // additional action regardless of phase, so the play never counts
   // as the host hero's main action even when they had a free slot.
   const forceAdditional = _viaCreature != null;
-  const needsAdditional = forceAdditional || (isMainPhase && !isInherentAction) || actionAlreadyUsed;
+  const needsAdditional = !isReactionSubtype
+    && (forceAdditional || (isMainPhase && !isInherentAction) || actionAlreadyUsed);
   let additionalConsumed = false;
   let consumedInst = null;
   if (needsAdditional) {
@@ -3056,10 +3067,17 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     additionalConsumed = true;
   }
 
-  if (isActionPhase) {
+  // Track whether THIS play's increment crossed into action-2 and
+  // consumed _bonusMainActions, so a cancellation can roll back both
+  // the counter and the bonus-action slot.
+  let actionCounterIncrementedHere = false;
+  let bonusMainActionsConsumedHere = false;
+  if (isActionPhase && !isReactionSubtype) {
     ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
+    actionCounterIncrementedHere = true;
     if (ps._actionsPlayedThisPhase === 2 && (ps._bonusMainActions || 0) > 0) {
       ps._bonusMainActions = 0;
+      bonusMainActionsConsumedHere = true;
     }
   }
 
@@ -3143,7 +3161,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         ps.spellsPlayedThisTurn = (ps.spellsPlayedThisTurn || 0) + 1;
       }
       if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
-      if (!isInherentAction && !additionalConsumed && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+      if (!isInherentAction && !additionalConsumed && !isReactionSubtype && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
       if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
       if (isActionPhase && !additionalConsumed && !isInherentAction) {
         await room.engine.advanceToPhase(pi, 4);
@@ -3173,8 +3191,20 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       delete gs._spellDamageLog;
       delete gs._spellExcludeTargets;
       delete gs._spellCancelled;
+      // Roll back ALL action-economy bookkeeping — the Spell never
+      // resolved, so the Action resource wasn't actually spent. Without
+      // this, a cancelled action-2 attempt leaves _actionsPlayedThisPhase
+      // stuck at 2, which makes the engine's `_isSecondActionGrantAvailable`
+      // gate hide every isSecondActionGrant provider (those require
+      // actionsPlayed===1) — the player can't retry their second action.
       if (additionalConsumed && consumedInst) {
         consumedInst.counters.additionalActionAvail = 1;
+      }
+      if (actionCounterIncrementedHere) {
+        ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
+      }
+      if (bonusMainActionsConsumedHere) {
+        ps._bonusMainActions = 1;
       }
       // Spell was cancelled pre-resolution — release the in-flight lock
       // now (the finally would also catch this, but being explicit makes
@@ -3206,8 +3236,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // normal turn slot — they're explicitly "extra beyond the normal".
     // Marking the hero here would force any follow-up normal action in
     // Action Phase to need ANOTHER additional action, which isn't the
-    // intended semantics of `additionalConsumed`.
-    if (!isInherentAction && !additionalConsumed && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+    // intended semantics of `additionalConsumed`. Reaction-subtype plays
+    // are similarly action-economy-exempt (don't spend the Action
+    // resource at all).
+    if (!isInherentAction && !additionalConsumed && !isReactionSubtype && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
     if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
 
     if (!gs._spellNegatedByEffect) {
@@ -3315,7 +3347,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       ps.spellsPlayedThisTurn = (ps.spellsPlayedThisTurn || 0) + 1;
     }
 
-    if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction) {
+    if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction && !isReactionSubtype) {
       await room.engine.runHooks('onActionUsed', {
         actionType: cardData.cardType.toLowerCase(), playerIdx: pi, cardName, playedCardName: cardName, heroIdx,
         isAdditional: false, _skipReactionCheck: true,
@@ -3349,10 +3381,18 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       await room.engine.advanceToPhase(pi, 4);
     }
     if (isActionPhase && additionalConsumed && !gs._preventPhaseAdvance) {
-      const hasMore = room.engine.cardInstances.some(c =>
-        c.owner === pi && c.counters.additionalActionAvail
-      );
-      if (!hasMore) {
+      // Only `isSecondActionGrant` providers gate the post-action-2
+      // advance. Generic additional-action providers (Friendship,
+      // Wolflesia, Lizbeth, etc.) are designed for Main Phase use and
+      // don't represent unspent Action resource — they shouldn't trap
+      // the player in Action Phase after the second Action has been
+      // performed.
+      const hasMoreSecondAction = room.engine.cardInstances.some(c => {
+        if (c.owner !== pi || !c.counters?.additionalActionAvail) return false;
+        const config = room.engine._additionalActionTypes?.[c.counters.additionalActionType];
+        return !!config?.isSecondActionGrant;
+      });
+      if (!hasMoreSecondAction) {
         await room.engine.advanceToPhase(pi, 4);
       }
     }
@@ -3423,13 +3463,40 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   const isActionPhase = gs.currentPhase === 3;
   const isMainPhase   = gs.currentPhase === 2 || gs.currentPhase === 4;
   const isActionCost  = !!script.creatureActionCost;
-  let hasAdditionalForActionCost = false;
+  // Action-resource gate. Creatures with `creatureActionCost: true`
+  // consume the player's per-Action-Phase Action — same resource as
+  // Spells / Attacks / abilities with `actionCost: true`. By default
+  // the player gets one Action per Action Phase; for ANY action 2+
+  // (main slot already used, or playing in Main Phase) we need a
+  // matching additional-action provider. heroRestricted +
+  // isSecondActionGrant are honoured by `findAdditionalActionForCategory`.
+  let consumedAdditionalCreatureInst = null;
+  // True iff this creature-effect activation will spend the Hero's main
+  // Action slot — used in the success branch below to decide whether
+  // to push the Hero into `heroesActedThisTurn`.
+  let creatureEffectIsMainAction = false;
   if (isActionCost) {
     if (isActionPhase) {
-      // Allowed.
+      const acPs = gs.players[pi];
+      const actionsPlayedThisPhase = acPs._actionsPlayedThisPhase || 0;
+      const hasBonusAlready = (acPs.bonusActions?.heroIdx === heroIdx && acPs.bonusActions.remaining > 0)
+        || ((acPs._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1);
+      const actionAlreadyUsed = (acPs.heroesActedThisTurn?.length > 0) && !hasBonusAlready;
+      if (actionAlreadyUsed) {
+        const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx);
+        if (!typeId) return false;
+        consumedAdditionalCreatureInst = room.engine.consumeAdditionalAction(pi, typeId);
+        if (!consumedAdditionalCreatureInst) return false;
+      } else if (!hasBonusAlready) {
+        // Fresh Action Phase activation — no bonus, no provider — this
+        // IS the player's main Action for the phase.
+        creatureEffectIsMainAction = true;
+      }
     } else if (isMainPhase) {
-      hasAdditionalForActionCost = room.engine.hasAdditionalActionForCategory(pi, 'ability_activation');
-      if (!hasAdditionalForActionCost) return false;
+      const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx);
+      if (!typeId) return false;
+      consumedAdditionalCreatureInst = room.engine.consumeAdditionalAction(pi, typeId);
+      if (!consumedAdditionalCreatureInst) return false;
     } else {
       return false;
     }
@@ -3494,23 +3561,23 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[hoptKey] = gs.turn;
       }
-      // Action-cost creatures consume the Action on success — phase
-      // advance in Action Phase, additional-action consumption in Main
-      // Phase. Mirrors the doActivateActionCost path for abilities.
-      if (isActionCost) {
-        if (isActionPhase) {
-          await room.engine.advanceToPhase(pi, 4);
-        } else if (hasAdditionalForActionCost) {
-          for (const inst2 of room.engine.cardInstances) {
-            if (inst2.owner !== pi) continue;
-            if (!inst2.counters?.additionalActionType || !inst2.counters?.additionalActionAvail) continue;
-            const config = room.engine._additionalActionTypes[inst2.counters.additionalActionType];
-            if (config?.allowedCategories?.includes('ability_activation')) {
-              room.engine.consumeAdditionalAction(pi, inst2.counters.additionalActionType, inst2.id);
-              break;
-            }
-          }
+      // Action-cost creatures consume the Action on success. Mirror
+      // the doPlaySpell / doActivateAbility bookkeeping: bump the phase
+      // counter, push the activating Hero into `heroesActedThisTurn`
+      // (so a follow-up Spell/Attack/Creature/Ability play correctly
+      // requires an additional-action provider), then advance phase
+      // (which the engine will refuse if a second-action grant is alive).
+      if (isActionCost && isActionPhase) {
+        const acPs = gs.players[pi];
+        acPs._actionsPlayedThisPhase = (acPs._actionsPlayedThisPhase || 0) + 1;
+        if (acPs._actionsPlayedThisPhase === 2 && (acPs._bonusMainActions || 0) > 0) {
+          acPs._bonusMainActions = 0;
         }
+        if (creatureEffectIsMainAction) {
+          if (!acPs.heroesActedThisTurn) acPs.heroesActedThisTurn = [];
+          if (!acPs.heroesActedThisTurn.includes(heroIdx)) acPs.heroesActedThisTurn.push(heroIdx);
+        }
+        await room.engine.advanceToPhase(pi, 4);
       }
     } else {
       delete gs._pendingCardReveal;
@@ -3524,6 +3591,11 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[hoptKey] = gs.turn;
         room.engine.log('gerrymander_veto', { player: gs.players[pi].username, creature: creatureName });
+      } else if (consumedAdditionalCreatureInst) {
+        // Standard cancel — refund the additional-action provider
+        // consumed upfront. The action-counter increment / heroesActedThisTurn
+        // push live in the success branch above, so they don't need rollback.
+        consumedAdditionalCreatureInst.counters.additionalActionAvail = 1;
       }
     }
     await room.engine._flushSurpriseDrawChecks();
@@ -3720,7 +3792,12 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   const creatureHero = ps.heroes?.[heroIdx];
   if (creatureHero?.statuses?.charmed) return false;
 
-  const additionalTypeId = !isInherentAction ? room.engine.findAdditionalActionForCard(pi, cardName, heroIdx) : null;
+  // Reaction-subtype Creatures are exempt from the action-economy
+  // machinery — see the Spell/Attack path for the rationale.
+  const isReactionSubtype = (cardData.subtype || '').toLowerCase() === 'reaction';
+  const additionalTypeId = (!isInherentAction && !isReactionSubtype)
+    ? room.engine.findAdditionalActionForCard(pi, cardName, heroIdx)
+    : null;
   const usingAdditional = !!additionalTypeId;
   const actionsPlayedThisPhase = ps._actionsPlayedThisPhase || 0;
   const hasBonusAction = isActionPhase && (
@@ -3728,7 +3805,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     || ((ps._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
   );
   const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
-  if ((isMainPhase || actionAlreadyUsed) && !usingAdditional && !isInherentAction) return false;
+  if ((isMainPhase || actionAlreadyUsed) && !usingAdditional && !isInherentAction && !isReactionSubtype) return false;
 
   if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
   const totalZones = ps.supportZones[heroIdx].length;
@@ -3767,10 +3844,17 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   const nthCreature = ps.hand.slice(0, handIndex + 1).filter(c => c === cardName).length;
   ps._resolvingCard = { name: cardName, nth: nthCreature };
 
-  if (isActionPhase) {
+  // Track whether THIS play's increment crossed into action-2 and
+  // consumed _bonusMainActions, so a cancellation can roll back both
+  // the counter and the bonus-action slot.
+  let actionCounterIncrementedHere = false;
+  let bonusMainActionsConsumedHere = false;
+  if (isActionPhase && !isReactionSubtype) {
     ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
+    actionCounterIncrementedHere = true;
     if (ps._actionsPlayedThisPhase === 2 && (ps._bonusMainActions || 0) > 0) {
       ps._bonusMainActions = 0;
+      bonusMainActionsConsumedHere = true;
     }
   }
 
@@ -3801,14 +3885,26 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       const negatedDiscardOwner = room.engine._consumeHandCardOrigin(pi, cardName);
       gs.players[negatedDiscardOwner].discardPile.push(cardName);
       room.engine.log('creature_negated', { card: cardName, player: ps.username });
+      // Mark the casting Hero as having spent their Action — same gate
+      // as the spell/attack path. A negated Creature still consumes the
+      // Action resource (the spell-school requirement, action-economy,
+      // and chain-reaction window all already fired).
+      if (!isInherentAction && !additionalConsumed && !isReactionSubtype) {
+        if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
+        if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+      }
       if (isActionPhase && !usingAdditional) {
         await room.engine.advanceToPhase(pi, 4);
       }
       if (isActionPhase && usingAdditional) {
-        const hasMore = room.engine.cardInstances.some(c =>
-          c.owner === pi && c.counters.additionalActionAvail
-        );
-        if (!hasMore) await room.engine.advanceToPhase(pi, 4);
+        // Only `isSecondActionGrant` providers gate the post-action-2
+        // advance — see the doPlaySpell counterpart for rationale.
+        const hasMoreSecondAction = room.engine.cardInstances.some(c => {
+          if (c.owner !== pi || !c.counters?.additionalActionAvail) return false;
+          const config = room.engine._additionalActionTypes?.[c.counters.additionalActionType];
+          return !!config?.isSecondActionGrant;
+        });
+        if (!hasMoreSecondAction) await room.engine.advanceToPhase(pi, 4);
       }
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
@@ -3819,8 +3915,17 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     if (placementConsumed) delete ps._placementConsumedByCard;
     if (!beforeSummonOk && !placementConsumed) {
       ps._resolvingCard = null;
+      // Roll back ALL action-economy bookkeeping — the Creature never
+      // resolved (beforeSummon cancelled the play), so the Action
+      // resource wasn't actually spent.
       if (additionalConsumed && consumedInst) {
         consumedInst.counters.additionalActionAvail = 1;
+      }
+      if (actionCounterIncrementedHere) {
+        ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
+      }
+      if (bonusMainActionsConsumedHere) {
+        ps._bonusMainActions = 1;
       }
       room.engine.log('creature_fizzle', { card: cardName, reason: 'beforeSummon_cancelled' });
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
@@ -3839,6 +3944,17 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         // their fizzle discard back to the original owner's pile.
         const fizzleDiscardOwner = room.engine._consumeHandCardOrigin(pi, cardName);
         gs.players[fizzleDiscardOwner].discardPile.push(cardName);
+        // Roll back action-economy bookkeeping — the Creature couldn't
+        // be placed, so the Action resource wasn't actually spent.
+        if (additionalConsumed && consumedInst) {
+          consumedInst.counters.additionalActionAvail = 1;
+        }
+        if (actionCounterIncrementedHere) {
+          ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
+        }
+        if (bonusMainActionsConsumedHere) {
+          ps._bonusMainActions = 1;
+        }
         room.engine.log('creature_fizzle', { card: cardName, reason: 'zone_occupied' });
         for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
         return true;
@@ -3864,6 +3980,19 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
 
     if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
 
+    // Mark the summoning Hero as having spent their Action — mirrors
+    // the doPlaySpell convention. Skipped for additional-action plays
+    // (Friendship-style "extra beyond the normal"), inherent plays,
+    // and Reaction-subtype Creatures (action-economy exempt). Without
+    // this, summoning a Creature as action 1 leaves
+    // `heroesActedThisTurn` empty, so the engine's action-already-used
+    // gate would let any other Hero perform action 2 unrestricted —
+    // bypassing the heroRestricted gate on Soul Shard Ba's grant etc.
+    if (!isInherentAction && !additionalConsumed && !isReactionSubtype) {
+      if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
+      if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+    }
+
     if (!placementConsumed) {
       // `_isNormalSummon: true` flags this as a player-driven summon
       // gated against THIS hero's spell-school + level requirements.
@@ -3875,15 +4004,17 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualZoneSlot, _isNormalSummon: true });
       await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _isNormalSummon: true });
     }
-    await room.engine.runHooks('onActionUsed', {
-      actionType: 'creature', playerIdx: pi, cardName, heroIdx,
-      isAdditional: usingAdditional, _skipReactionCheck: true,
-    });
-    if (usingAdditional) {
-      await room.engine.runHooks('onAdditionalActionUsed', {
+    if (!isReactionSubtype) {
+      await room.engine.runHooks('onActionUsed', {
         actionType: 'creature', playerIdx: pi, cardName, heroIdx,
-        _skipReactionCheck: true,
+        isAdditional: usingAdditional, _skipReactionCheck: true,
       });
+      if (usingAdditional) {
+        await room.engine.runHooks('onAdditionalActionUsed', {
+          actionType: 'creature', playerIdx: pi, cardName, heroIdx,
+          _skipReactionCheck: true,
+        });
+      }
     }
     // Universal action-resolved hook (see doPlaySpell for rationale).
     await room.engine.runHooks('onAnyActionResolved', {
@@ -3897,10 +4028,14 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       await room.engine.advanceToPhase(pi, 4);
     }
     if (isActionPhase && usingAdditional) {
-      const hasMore = room.engine.cardInstances.some(c =>
-        c.owner === pi && c.counters.additionalActionAvail
-      );
-      if (!hasMore) {
+      // Only `isSecondActionGrant` providers gate the post-action-2
+      // advance — see the doPlaySpell counterpart for rationale.
+      const hasMoreSecondAction = room.engine.cardInstances.some(c => {
+        if (c.owner !== pi || !c.counters?.additionalActionAvail) return false;
+        const config = room.engine._additionalActionTypes?.[c.counters.additionalActionType];
+        return !!config?.isSecondActionGrant;
+      });
+      if (!hasMoreSecondAction) {
         await room.engine.advanceToPhase(pi, 4);
       }
     }
@@ -3954,17 +4089,60 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
 
   const isActionPhase = gs.currentPhase === 3;
   const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
-  const hasAdditional = isMainPhase && room.engine.hasAdditionalActionForCategory(pi, 'ability_activation');
-  if (!isActionPhase && !hasAdditional) return false;
+  if (!isActionPhase && !isMainPhase) return false;
+
+  // Action-resource gate. Action-cost abilities are an "Action" — same
+  // resource as Spells / Attacks / Creatures. By default the player
+  // gets one Action per Action Phase; spending it auto-advances them
+  // to Main Phase 2 (unless a second-action grant is alive). For ANY
+  // action 2+ — main slot already used, or playing in Main Phase — we
+  // need a matching additional-action provider. heroRestricted +
+  // isSecondActionGrant are honoured by `findAdditionalActionForCategory`,
+  // so an unmatched Hero can't sneak past a Soul Shard Ba style grant.
+  const actingPs = gs.players[pi];
+  const actionsPlayedThisPhase = actingPs._actionsPlayedThisPhase || 0;
+  const hasBonusActionAlready = isActionPhase && (
+    (actingPs.bonusActions?.heroIdx === heroIdx && actingPs.bonusActions.remaining > 0)
+    || ((actingPs._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
+  );
+  const actionAlreadyUsed = isActionPhase
+    && (actingPs.heroesActedThisTurn?.length > 0)
+    && !hasBonusActionAlready;
+  const needsAdditional = isMainPhase || actionAlreadyUsed;
+  let consumedAdditionalInst = null;
+  if (needsAdditional) {
+    const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx);
+    if (!typeId) return false;
+    consumedAdditionalInst = room.engine.consumeAdditionalAction(pi, typeId);
+    if (!consumedAdditionalInst) return false;
+  }
 
   if (!gs.hoptUsed) gs.hoptUsed = {};
   gs.hoptUsed[hoptKey] = gs.turn;
 
+  // Track whether THIS activation's bookkeeping needs to be rolled
+  // back if the user cancels mid-resolution (no target chosen, etc.).
+  let actionCounterIncrementedHere = false;
+  let bonusMainActionsConsumedHere = false;
+  let heroesActedPushedHere = false;
   if (isActionPhase) {
-    const actingPs = gs.players[pi];
     actingPs._actionsPlayedThisPhase = (actingPs._actionsPlayedThisPhase || 0) + 1;
+    actionCounterIncrementedHere = true;
     if (actingPs._actionsPlayedThisPhase === 2 && (actingPs._bonusMainActions || 0) > 0) {
       actingPs._bonusMainActions = 0;
+      bonusMainActionsConsumedHere = true;
+    }
+    // Mark the activating Hero as having used the Action resource —
+    // mirrors the doPlaySpell / doPlayCreature convention. Skip when a
+    // matching additional-action provider was consumed (the slot was
+    // a bonus, not the hero's main action), and when this play is via
+    // _bonusMainActions (also a bonus slot).
+    if (!consumedAdditionalInst && !hasBonusActionAlready) {
+      if (!actingPs.heroesActedThisTurn) actingPs.heroesActedThisTurn = [];
+      if (!actingPs.heroesActedThisTurn.includes(heroIdx)) {
+        actingPs.heroesActedThisTurn.push(heroIdx);
+        heroesActedPushedHere = true;
+      }
     }
   }
 
@@ -3986,17 +4164,8 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
 
     if (chainResult.negated) {
       if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
-      else if (hasAdditional) {
-        for (const inst2 of room.engine.cardInstances) {
-          if (inst2.owner !== pi) continue;
-          if (!inst2.counters.additionalActionType || !inst2.counters.additionalActionAvail) continue;
-          const config = room.engine._additionalActionTypes[inst2.counters.additionalActionType];
-          if (config?.allowedCategories?.includes('ability_activation')) {
-            room.engine.consumeAdditionalAction(pi, inst2.counters.additionalActionType, inst2.id);
-            break;
-          }
-        }
-      }
+      // (additional-action providers were already consumed upfront before
+      // activation, so no manual consume is needed here on negation.)
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -4050,12 +4219,35 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
         room.engine.log('gerrymander_veto', { player: gs.players[pi].username, ability: abilityName });
       } else {
         delete gs.hoptUsed[hoptKey];
+        // Standard cancel ALSO rolls back the action-economy
+        // bookkeeping — the ability never resolved, so the Action
+        // resource wasn't actually spent. Without this rollback, a
+        // cancelled action-2 attempt leaves _actionsPlayedThisPhase
+        // stuck at 2 (which makes the engine hide isSecondActionGrant
+        // providers) and the consumed additional-action provider lost.
+        if (consumedAdditionalInst) {
+          consumedAdditionalInst.counters.additionalActionAvail = 1;
+        }
+        if (actionCounterIncrementedHere) {
+          actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
+        }
+        if (bonusMainActionsConsumedHere) {
+          actingPs._bonusMainActions = 1;
+        }
+        if (heroesActedPushedHere && actingPs.heroesActedThisTurn) {
+          const idx = actingPs.heroesActedThisTurn.indexOf(heroIdx);
+          if (idx >= 0) actingPs.heroesActedThisTurn.splice(idx, 1);
+        }
       }
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
 
-    const usingAdditional = hasAdditional && !isActionPhase;
+    // `usingAdditional` reflects whether this activation consumed an
+    // additional-action provider (Main-Phase activation, or Action-Phase
+    // action-2 via a second-action grant). Hook flag mirrors the
+    // doPlaySpell convention.
+    const usingAdditional = !!consumedAdditionalInst;
     await room.engine.runHooks('onActionUsed', {
       actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx,
       isAdditional: usingAdditional, _skipReactionCheck: true,
@@ -4074,17 +4266,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
 
     if (isActionPhase) {
       await room.engine.advanceToPhase(pi, 4);
-    } else if (hasAdditional) {
-      for (const inst2 of room.engine.cardInstances) {
-        if (inst2.owner !== pi) continue;
-        if (!inst2.counters.additionalActionType || !inst2.counters.additionalActionAvail) continue;
-        const config = room.engine._additionalActionTypes[inst2.counters.additionalActionType];
-        if (config?.allowedCategories?.includes('ability_activation')) {
-          room.engine.consumeAdditionalAction(pi, inst2.counters.additionalActionType, inst2.id);
-          break;
-        }
-      }
     }
+    // (additional-action providers were already consumed upfront before
+    // activation, so no manual consume is needed here on success.)
   } catch (err) {
     console.error('[doActivateAbility]', err.message);
   }
@@ -6130,12 +6314,21 @@ io.on('connection', (socket) => {
 
       const heroes = (pz.heroes || []).map(h => {
         if (!h || !h.name) return { name: null, hp: 0, maxHp: 0, atk: 0, baseAtk: 0, statuses: {} };
-        return {
+        const out = {
           name: h.name, hp: h.hp ?? 0, maxHp: h.maxHp ?? h.hp ?? 0,
           atk: h.atk ?? 0, baseAtk: h.baseAtk ?? h.atk ?? 0,
           statuses: normalizePuzzleStatuses(h.statuses),
           buffs: h.buffs ? JSON.parse(JSON.stringify(h.buffs)) : undefined,
         };
+        // Cosmic Depths Change Counters on a Hero (Argos) — authored
+        // in the puzzle editor as `h._changeCounters`. The shared
+        // cosmic helpers (getChangeCounters, removeChangeCounters)
+        // read this directly off the Hero object, so propagating the
+        // raw value through is sufficient.
+        if (typeof h._changeCounters === 'number' && h._changeCounters > 0) {
+          out._changeCounters = h._changeCounters;
+        }
+        return out;
       });
       while (heroes.length < 3) heroes.push({ name: null, hp: 0, maxHp: 0, atk: 0, baseAtk: 0, statuses: {} });
 
@@ -6360,6 +6553,18 @@ io.on('connection', (socket) => {
             if (typeof cs.headCounter === 'number' && cs.headCounter > 0) {
               inst.counters.headCounter = cs.headCounter;
             }
+            // Cosmic Depths Change Counter — authored in the puzzle
+            // editor for Analyzer / Gatherer. Stamped onto
+            // `inst.counters.changeCounter`, which the shared cosmic
+            // helpers read directly via `getChangeCounters` so
+            // downstream activations (move, spawn, draw) can spend
+            // these starting counters on turn 1. Argos's counter
+            // counterpart lives on the Hero object as
+            // `hero._changeCounters` and is loaded straight from the
+            // puzzle JSON without needing a translation here.
+            if (typeof cs.changeCounter === 'number' && cs.changeCounter > 0) {
+              inst.counters.changeCounter = cs.changeCounter;
+            }
             // Sleeping Beauty's linked-hero slot — authored in the puzzle
             // editor. The link is per-SLOT (matches in-game behavior:
             // a Hero swapped into the slot inherits the tether). Owner
@@ -6400,6 +6605,14 @@ io.on('connection', (socket) => {
           ps._creaturesSummonedThisTurn = 0; ps.bonusActions = null; ps._bonusMainActions = 0;
           ps._actionsPlayedThisPhase = 0;
           ps.abilityGivenThisTurn = [false, false, false];
+          // Mirror the engine's startTurn discard-snapshot — without
+          // this, puzzles start with an empty Set and any "was this
+          // card already in discard before this turn?" gate (Thep, the
+          // Court Scribe; future same-shape effects) would treat every
+          // pre-placed discard card as "freshly added this turn" and
+          // filter it out. Universal across card types — discard pile
+          // is name-only.
+          ps._discardNamesAtTurnStart = new Set(ps.discardPile || []);
           for (const hero of (ps.heroes || [])) { if (hero?._actionsThisTurn) hero._actionsThisTurn = 0; }
         }
         room.engine._resetTerrorTracking();
@@ -8399,10 +8612,33 @@ io.on('connection', (socket) => {
           rooms.delete(activeRoomId);
           return;
         }
-        // Singleplayer rooms: same idea, but cleanupRoom also clears the
-        // synthetic CPU user's activeGames entry.
+        // Singleplayer rooms: F5 / browser refresh fires `disconnect`
+        // and then re-runs `auth` once the new socket comes up — if we
+        // tear the room down immediately, the reconnect grace window
+        // in the auth handler has nothing to attach to and the user
+        // gets booted to the main menu. Mark the player as disconnected
+        // and start a generous cleanup timer instead. The existing
+        // reconnect path (auth handler, ~line 5003) clears the timer
+        // and restores socketId on return. There's no opponent to
+        // declare a winner against, so the only thing that fires on
+        // expiry is the room cleanup itself.
         if (room.type === 'singleplayer') {
-          cleanupRoom(activeRoomId);
+          const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+          if (pi < 0) { cleanupRoom(activeRoomId); return; }
+          // Dual-tab guard: ignore if a newer connection already took
+          // this slot (the disconnect we're hearing is the OLD socket
+          // closing after `superseded`).
+          if (room.players[pi]?.socketId !== socket.id) return;
+          room.gameState.players[pi].disconnected = true;
+          // Hold onto the room for 5 minutes — plenty for a refresh
+          // / brief network blip. Anything longer than that is "the
+          // user closed the tab" and we'd rather reclaim resources.
+          const SP_RECONNECT_GRACE_MS = 5 * 60 * 1000;
+          const timer = setTimeout(() => {
+            disconnectTimers.delete(currentUser.userId);
+            cleanupRoom(activeRoomId);
+          }, SP_RECONNECT_GRACE_MS);
+          disconnectTimers.set(currentUser.userId, timer);
           return;
         }
         const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);

@@ -85,7 +85,12 @@
       "Bash(grep -E \"\\\\.js$\")",
       "Bash(python -c \"import json; json.load\\(open\\('/c/Pixel Parties WEB/PixelPartiesWeb/data/cards.json'\\)\\)\")",
       "Bash(echo \"JSON exit=$?\")",
-      "Bash(grep -E \"^\\(fighting|destruction-magic|leadership|negation|toughness\\)\\\\.js$\")"
+      "Bash(grep -E \"^\\(fighting|destruction-magic|leadership|negation|toughness\\)\\\\.js$\")",
+      "Bash(grep -E \"^\\(wisdom|magic|charme|necromancy|biomancy|fighting|alchemy|diplomacy|divinity|creativity|training|navigation|luck|resistance|cannibalism|smugness|singing|friendship\\)\\\\.js$\")",
+      "Bash(grep -n \"statuses\\\\?\\\\\\\\.immune\\\\|statuses\\\\\\\\.immune\\\\|\\\\\\\\.immune\\\\\\\\b\" \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/_cpu.js\")",
+      "Bash(grep -n \"negative_status_immune\\\\|hero\\\\\\\\.buffs\\\\|hero\\\\\\\\.statuses\\\\\\\\.immune\\\\|buffs\\\\\\\\.immune\\\\|buffs\\\\\\\\?.immune\\\\|buffs\\\\\\\\[\" \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/_cpu.js\")",
+      "Bash(grep -n \"const helpers\\\\|helpers = {\\\\|evaluateState,\" \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/_cpu.js\")",
+      "Bash(grep -n \"helpers = {\\\\|helpers:\\\\s*{\\\\|module:\\\\s*{\\\\|helpers\\\\s*}\\\\|^\\\\s*helpers\\\\s*=\\\\|sendGameState,\\\\s*sendSpectatorGameState\\\\|installCpuBrain.*helpers\\\\|makeCpuDriver\" \"C:/Pixel Parties WEB/PixelPartiesWeb/server.js\")"
     ]
   }
 }

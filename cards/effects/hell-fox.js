@@ -165,31 +165,23 @@ module.exports = {
       }
 
       const pickedName = searchResult.cardName;
-      const deckIdx = controllerPs.mainDeck.indexOf(pickedName);
-      if (deckIdx < 0) {
+      if (controllerPs.mainDeck.indexOf(pickedName) < 0) {
         engine.shuffleDeck(controllerIdx, 'main');
         engine.sync();
         return;
       }
 
-      controllerPs.mainDeck.splice(deckIdx, 1);
-      controllerPs.hand.push(pickedName);
-
-      engine._broadcastEvent('deck_search_add', { cardName: pickedName, playerIdx: controllerIdx });
-      engine.log('hell_fox_search', { player: controllerPs.username, card: pickedName });
-
-      // Standard reveal-to-opponent + shuffle.
-      engine.shuffleDeck(controllerIdx, 'main');
-      engine.sync();
-      await engine._delay(400);
-      const oi = controllerIdx === 0 ? 1 : 0;
-      await engine.promptGeneric(oi, {
-        type: 'deckSearchReveal',
-        cardName: pickedName,
-        searcherName: controllerPs.username,
-        title: CARD_NAME,
-        cancellable: false,
+      // Route through the canonical helper so ON_CARD_ADDED_TO_HAND
+      // fires (Cosmic Depths Analyzer / Gatherer key off this hook).
+      // Helper handles splice + push + tracking + deck-search animation
+      // + log + hook + opponent reveal. `shuffle: true` keeps the
+      // post-search shuffle the original code performed.
+      await engine.actionAddCardFromDeckToHand(controllerIdx, pickedName, {
+        source: CARD_NAME,
+        reveal: true,
+        shuffle: true,
       });
+      engine.log('hell_fox_search', { player: controllerPs.username, card: pickedName });
     },
   },
 };

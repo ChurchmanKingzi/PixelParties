@@ -81,26 +81,25 @@ module.exports = attachSteamEngine({
     if (!result || result.cancelled || !result.cardName) return false;
 
     // Verify the card is actually in the deck
-    const deckIdx = ps.mainDeck.indexOf(result.cardName);
-    if (deckIdx < 0) return false;
+    if (ps.mainDeck.indexOf(result.cardName) < 0) return false;
 
     // Pay the HP cost now — we've committed
     decreaseCreatureMaxHp(engine, inst, HP_COST);
 
-    // Remove from deck, add to hand
-    ps.mainDeck.splice(deckIdx, 1);
-    ps.hand.push(result.cardName);
-
-    // Broadcast reveal + search event
-    engine._broadcastEvent('deck_search_add', {
-      cardName: result.cardName, playerIdx: pi,
+    // Route through the canonical helper so ON_CARD_ADDED_TO_HAND fires
+    // (Cosmic Depths Analyzer / Gatherer key off this hook for any
+    // opponent search effect). Helper handles deck splice, hand push,
+    // instance tracking, deck-search animation, log entry, hook firing,
+    // and opponent reveal prompt.
+    await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
+      source: 'Steam Dwarf Diver',
+      reveal: true,
     });
     engine.log('steam_diver_search', {
       player: ps.username,
       card: result.cardName,
       hpPaid: HP_COST,
     });
-    engine.sync();
     return true;
   },
 });

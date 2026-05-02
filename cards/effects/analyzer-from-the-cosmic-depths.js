@@ -17,9 +17,12 @@
 //
 //  ACTIVE 2 (once/turn): Remove up to 6 Change
 //  Counters from this Creature to place 1 Invader
-//  Token into an opponent free Support Zone for
-//  every 2 counters removed (so 2/4/6 counters →
-//  1/2/3 Tokens).
+//  Token into EITHER player's free Support Zone
+//  for every 2 counters removed (so 2/4/6 counters
+//  → 1/2/3 Tokens). Dead Heroes' Support Zones
+//  count too — Tokens are "placed," and "place"
+//  targets any Hero's Support Zone per the
+//  universal rule.
 //
 //  Both actives have INDEPENDENT once-per-turn
 //  slots — the engine's per-instance creature-
@@ -46,20 +49,27 @@ function stampHopt(gs, key, instId) {
   gs.hoptUsed[`${key}:${instId}`] = gs.turn;
 }
 
-function oppFreeSupportSlots(engine, oppIdx) {
-  const ops = engine.gs.players[oppIdx];
-  if (!ops) return [];
+/**
+ * All free Support Zones on either player's heroes — dead Heroes
+ * included (Tokens are "placed," and "place" targets any Hero's
+ * Support Zone per the universal rule, including KO'd Heroes). Only
+ * an entirely-empty Hero slot (no Hero card placed at all) is
+ * skipped. Mirrors `allFreeSupportSlotsBothSides` in invader-from-
+ * the-cosmic-depths.js.
+ */
+function allFreeSupportSlotsBothSides(engine) {
   const out = [];
-  for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-    const h = ops.heroes[hi];
-    // "Place" semantics — any opp Hero's Support Zone qualifies
-    // (including dead / Frozen / Stunned / negated Heroes). Only an
-    // empty Hero slot (no Hero card) is skipped.
-    if (!h?.name) continue;
-    const zones = ops.supportZones?.[hi] || [[], [], []];
-    for (let zi = 0; zi < 3; zi++) {
-      if ((zones[zi] || []).length === 0) {
-        out.push({ heroIdx: hi, slotIdx: zi });
+  for (let pi = 0; pi < 2; pi++) {
+    const ps = engine.gs.players[pi];
+    if (!ps) continue;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const h = ps.heroes[hi];
+      if (!h?.name) continue;
+      const zones = ps.supportZones?.[hi] || [[], [], []];
+      for (let zi = 0; zi < 3; zi++) {
+        if ((zones[zi] || []).length === 0) {
+          out.push({ owner: pi, heroIdx: hi, slotIdx: zi, heroName: h.name });
+        }
       }
     }
   }
@@ -117,13 +127,13 @@ async function runMove(engine, inst, ctx) {
 async function runSpawn(engine, inst, ctx) {
   const gs = engine.gs;
   const pi = inst.controller ?? inst.owner;
-  const oi = pi === 0 ? 1 : 0;
   const have = getChangeCounters(inst);
   if (have < 2) return false; // Need at least 2 counters for 1 Token
 
   // Build option list — only counts that produce a valid Token output.
-  // Capped by both 6-counter ceiling AND by current opp free slots.
-  const freeSlots = oppFreeSupportSlots(engine, oi);
+  // Capped by both 6-counter ceiling AND by current free slots on
+  // either side (per "either player's free Support Zone").
+  const freeSlots = allFreeSupportSlotsBothSides(engine);
   if (freeSlots.length === 0) return false;
 
   const maxByCounters = Math.min(have, 6);
@@ -141,7 +151,7 @@ async function runSpawn(engine, inst, ctx) {
   const pick = await engine.promptGeneric(pi, {
     type: 'optionPicker',
     title: CARD_NAME,
-    description: `Remove 2 Counters per Invader Token (max 6 / 3 Tokens). Opp free slots: ${freeSlots.length}.`,
+    description: `Remove 2 Counters per Invader Token (max 6 / 3 Tokens). Free Support Zones: ${freeSlots.length}.`,
     options: opts,
     cancellable: true,
   });
@@ -153,48 +163,42 @@ async function runSpawn(engine, inst, ctx) {
   const cost = tokens * 2;
   removeChangeCounters(engine, inst, cost);
 
-  // Place Tokens into opp free slots — pick which ones if more options
-  // than tokens. Simple sequential prompt per token.
+  // Place Tokens — pick which slot per token, drawn from the
+  // combined both-sides slot pool. `allowEitherSide: true` makes the
+  // client highlight free zones on BOTH boards, matching Invader's
+  // on-summon token placer.
+  const promptCtx = engine._createContext(inst, {});
   for (let i = 0; i < tokens; i++) {
-    const slots = oppFreeSupportSlots(engine, oi);
+    const slots = allFreeSupportSlotsBothSides(engine);
     if (slots.length === 0) break;
 
     let chosen;
     if (slots.length === 1) {
       chosen = slots[0];
     } else {
-      // Use promptZonePick on a synthetic activator-context. The picker
-      // expects `zones` with {heroIdx, slotIdx, label, owner?}. `owner`
-      // is critical here: Tokens land on OPP'S side, so we must tell
-      // the client to highlight opp's free zones, not ours. Without it
-      // the client falls back to `myIdx` and lets the player click
-      // their own zones — visually wrong, and the placement still
-      // resolves on opp's side from the matching index, so the user
-      // sees Tokens "teleport" to opp's identical slot.
-      const ops = gs.players[oi];
       const zones = slots.map(s => ({
-        heroIdx: s.heroIdx, slotIdx: s.slotIdx, owner: oi,
-        label: `${ops.heroes?.[s.heroIdx]?.name || 'Hero'} — Slot ${s.slotIdx + 1}`,
+        owner: s.owner, heroIdx: s.heroIdx, slotIdx: s.slotIdx,
+        label: `${s.owner === pi ? '(You) ' : '(Opp) '}${s.heroName} — Slot ${s.slotIdx + 1}`,
       }));
-      const promptCtx = engine._createContext(inst, {});
       const zp = await promptCtx.promptZonePick(zones, {
         title: CARD_NAME,
-        description: `Place Invader Token #${i + 1} into which opponent zone?`,
+        description: `Place Invader Token #${i + 1} into which Support Zone?`,
         cancellable: false,
+        allowEitherSide: true,
       });
       if (!zp) break;
-      chosen = { heroIdx: zp.heroIdx, slotIdx: zp.slotIdx };
+      chosen = { owner: zp.owner ?? pi, heroIdx: zp.heroIdx, slotIdx: zp.slotIdx };
     }
 
     // Silent place — Invader Token has its own onTurnEnd; no place-side
-    // hooks needed. Owner is the OPP since the Token sits in their zone.
-    const placeRes = engine.summonCreature(INVADER_TOKEN, oi, chosen.heroIdx, chosen.slotIdx, {
+    // hooks needed. The Token sits in `chosen.owner`'s zone.
+    const placeRes = engine.summonCreature(INVADER_TOKEN, chosen.owner, chosen.heroIdx, chosen.slotIdx, {
       source: CARD_NAME,
     });
     if (!placeRes) continue;
     engine._broadcastEvent('play_zone_animation', {
       type: 'cosmic_token_drop',
-      owner: oi, heroIdx: chosen.heroIdx, zoneSlot: chosen.slotIdx,
+      owner: chosen.owner, heroIdx: chosen.heroIdx, zoneSlot: chosen.slotIdx,
     });
     await engine._delay(220);
   }
@@ -211,9 +215,11 @@ module.exports = {
   activeIn: ['support'],
   creatureEffect: true,
 
-  // Gerrymander redirect (sub-ability picker only) — pick `move` over
-  // `spawn`. The Spawn path puts harmful Invader Tokens on our side;
-  // forcing Move keeps the counters defensive instead.
+  // Gerrymander redirect (sub-ability picker only) — flip `spawn` to
+  // `move`. Spawn lets the activator drop Invader Tokens on EITHER
+  // side; the activator will naturally pick our side, so forcing move
+  // keeps the counters strictly defensive (the activator has to pin
+  // them to a single non-Analyzer card instead of weaponising them).
   cpuGerrymanderResponse(/* engine, gerryOwnerPi, promptData */) {
     return { optionId: 'move' };
   },
@@ -238,10 +244,8 @@ module.exports = {
     const moveAvail = !hoptUsed(gs, HOPT_MOVE, inst.id) && have > 0
       && allBoardTargets(engine).some(t => !(t.kind === 'creature' && t.ref?.id === inst.id));
 
-    const pi = inst.controller ?? inst.owner;
-    const oi = pi === 0 ? 1 : 0;
     const spawnAvail = !hoptUsed(gs, HOPT_SPAWN, inst.id)
-      && have >= 2 && oppFreeSupportSlots(engine, oi).length > 0;
+      && have >= 2 && allFreeSupportSlotsBothSides(engine).length > 0;
 
     return moveAvail || spawnAvail;
   },
@@ -251,13 +255,12 @@ module.exports = {
     const gs = engine.gs;
     const inst = ctx.card;
     const pi = inst.controller ?? inst.owner;
-    const oi = pi === 0 ? 1 : 0;
     const have = getChangeCounters(inst);
 
     const moveAvail = !hoptUsed(gs, HOPT_MOVE, inst.id) && have > 0
       && allBoardTargets(engine).some(t => !(t.kind === 'creature' && t.ref?.id === inst.id));
     const spawnAvail = !hoptUsed(gs, HOPT_SPAWN, inst.id)
-      && have >= 2 && oppFreeSupportSlots(engine, oi).length > 0;
+      && have >= 2 && allFreeSupportSlotsBothSides(engine).length > 0;
 
     if (!moveAvail && !spawnAvail) return false;
 
@@ -268,7 +271,7 @@ module.exports = {
     else {
       const opts = [];
       opts.push({ id: 'move',  label: 'Move Change Counters to another card' });
-      opts.push({ id: 'spawn', label: 'Spend Counters → Invader Tokens (opp side)' });
+      opts.push({ id: 'spawn', label: 'Spend Counters → Invader Tokens (either side)' });
       const pick = await engine.promptGeneric(pi, {
         type: 'optionPicker',
         title: CARD_NAME,

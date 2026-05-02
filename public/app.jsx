@@ -4978,6 +4978,195 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // Soul Shard Ba — bonus second-action grant. Distinct from
+  // `necromancy_summon` (which has already played for Ba's arrival):
+  // no skulls, no big radial flash. Instead a tight indigo vortex
+  // over the host Hero with rising soul motes and orbiting runic
+  // sparks — "this Hero now carries a borrowed action".
+  soul_shard_dark_grant: (() => {
+    return function SoulShardDarkGrantEffect({ x, y }) {
+      const motes = useMemo(() => Array.from({ length: 14 }, () => {
+        const xOff = -22 + Math.random() * 44;
+        return {
+          xOff,
+          startY: 30 + Math.random() * 10,
+          endY: -55 - Math.random() * 50,
+          size: 5 + Math.random() * 6,
+          delay: Math.random() * 400,
+          dur: 700 + Math.random() * 400,
+          opacity: 0.55 + Math.random() * 0.35,
+        };
+      }), []);
+      const runes = useMemo(() => Array.from({ length: 7 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 32 + Math.random() * 18;
+        return {
+          endX: Math.cos(angle) * dist,
+          endY: Math.sin(angle) * dist - 10,
+          size: 14 + Math.random() * 8,
+          delay: 80 + Math.random() * 280,
+          dur: 600 + Math.random() * 350,
+          char: ['✦','✧','✶','◆','★'][Math.floor(Math.random() * 5)],
+          rot: -25 + Math.random() * 50,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{
+            width: 130, height: 130, marginLeft: -65, marginTop: -65,
+            background: 'radial-gradient(circle, rgba(60,10,90,.85) 0%, rgba(80,30,140,.5) 35%, rgba(20,0,40,.25) 60%, transparent 80%)',
+          }} />
+          <div className="anim-flame-flash" style={{
+            width: 80, height: 80, marginLeft: -40, marginTop: -40,
+            animationDelay: '180ms',
+            background: 'radial-gradient(circle, rgba(140,60,200,.5) 0%, rgba(60,20,120,.3) 50%, transparent 70%)',
+          }} />
+          {motes.map((m, i) => (
+            <div key={'sbm'+i} style={{
+              position: 'absolute', left: m.xOff, top: m.startY,
+              width: m.size, height: m.size, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(180,100,255,.95), rgba(80,20,150,.4))',
+              boxShadow: '0 0 10px rgba(160,60,255,.7), 0 0 18px rgba(80,20,140,.4)',
+              opacity: 0,
+              animation: `holySparkleRise ${m.dur}ms ease-out ${m.delay}ms forwards`,
+            }} />
+          ))}
+          {runes.map((r, i) => (
+            <div key={'sbr'+i} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: r.size, opacity: 0,
+              color: '#cf9bff',
+              transform: `rotate(${r.rot}deg)`,
+              textShadow: '0 0 8px rgba(180,80,255,.85), 0 0 16px rgba(80,20,140,.55)',
+              animation: `musicNoteFloat ${r.dur}ms ease-out ${r.delay}ms forwards`,
+              '--endX': r.endX + 'px', '--endY': r.endY + 'px',
+              '--noteOpacity': 0.95,
+            }}>{r.char}</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // Soul Shard Sekhem — fire blast that scales with `intensity` (the
+  // number of distinct Soul Shards fueling the strike). See app-board.jsx
+  // for the full per-tier visual breakdown; this is the same component.
+  soul_shard_inferno: (() => {
+    return function SoulShardInfernoEffect({ x, y, intensity }) {
+      const i = Math.max(1, Math.min(intensity || 1, 8));
+      const t = (i - 1) / 7;
+      const lerp = (a, b) => a + (b - a) * t;
+      const flashSize = lerp(90, 260);
+      const innerFlashSize = lerp(60, 170);
+      const flameCount = Math.round(lerp(14, 38));
+      const sparkCount = Math.round(lerp(10, 30));
+      const flameSizeMin = lerp(10, 18);
+      const flameSizeMax = lerp(18, 36);
+      const radius = lerp(50, 120);
+      const flames = useMemo(() => Array.from({ length: flameCount }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = radius * (0.55 + Math.random() * 0.55);
+        return {
+          startX: Math.cos(angle) * dist,
+          startY: Math.sin(angle) * dist,
+          size: flameSizeMin + Math.random() * (flameSizeMax - flameSizeMin),
+          delay: Math.random() * 220,
+          dur: 260 + Math.random() * 220,
+          char: ['🔥','🔥','🔥','🔥','✦','·'][Math.floor(Math.random() * 6)],
+        };
+      }), []);
+      const sparks = useMemo(() => Array.from({ length: sparkCount }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (15 + Math.random() * 30) * (0.8 + t * 0.9);
+        return {
+          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+          size: 2 + Math.random() * (4 + t * 4),
+          color: ['#ff3300','#ff7700','#ffbb00','#ff1100','#ffaa00','#ffe680'][Math.floor(Math.random() * 6)],
+          delay: 240 + Math.random() * 200,
+          dur: 320 + Math.random() * 280,
+        };
+      }), []);
+      const pillar = useMemo(() => i < 3 ? [] : Array.from({ length: Math.round(lerp(0, 14)) }, () => ({
+        xOff: -22 + Math.random() * 44,
+        startY: 30 + Math.random() * 18,
+        endY: -60 - Math.random() * (60 + t * 80),
+        size: 6 + Math.random() * (8 + t * 8),
+        delay: 80 + Math.random() * 320,
+        dur: 600 + Math.random() * 380,
+      })), []);
+      const showSecondBurst = i >= 5;
+      const showShockwave = i >= 6;
+      const showWhiteCore = i >= 7;
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{
+            width: flashSize, height: flashSize,
+            marginLeft: -flashSize / 2, marginTop: -flashSize / 2,
+            background: 'radial-gradient(circle, rgba(255,140,30,.85) 0%, rgba(255,60,0,.55) 35%, rgba(160,20,0,.25) 65%, transparent 80%)',
+          }} />
+          <div className="anim-flame-flash" style={{
+            width: innerFlashSize, height: innerFlashSize,
+            marginLeft: -innerFlashSize / 2, marginTop: -innerFlashSize / 2,
+            animationDelay: '120ms',
+            background: 'radial-gradient(circle, rgba(255,220,120,.9) 0%, rgba(255,120,0,.5) 50%, transparent 80%)',
+          }} />
+          {showWhiteCore && (
+            <div className="anim-flame-flash" style={{
+              width: 50, height: 50, marginLeft: -25, marginTop: -25,
+              animationDelay: '60ms', animationDuration: '500ms',
+              background: 'radial-gradient(circle, rgba(255,255,240,1) 0%, rgba(255,200,100,.7) 40%, transparent 70%)',
+            }} />
+          )}
+          {flames.map((f, idx) => (
+            <div key={'sf'+idx} className="anim-flame-shard" style={{
+              '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
+              animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
+            }}>{f.char}</div>
+          ))}
+          {sparks.map((s, idx) => (
+            <div key={'ss'+idx} className="anim-explosion-particle" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }} />
+          ))}
+          {pillar.map((p, idx) => (
+            <div key={'sp'+idx} style={{
+              position: 'absolute', left: p.xOff, top: p.startY,
+              width: p.size, height: p.size, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,200,80,.95), rgba(220,60,0,.5))',
+              boxShadow: '0 0 12px rgba(255,140,30,.85), 0 0 22px rgba(180,40,0,.5)',
+              opacity: 0,
+              animation: `holySparkleRise ${p.dur}ms ease-out ${p.delay}ms forwards`,
+            }} />
+          ))}
+          {showSecondBurst && (
+            <div className="anim-flame-flash" style={{
+              width: flashSize * 1.15, height: flashSize * 1.15,
+              marginLeft: -flashSize * 1.15 / 2, marginTop: -flashSize * 1.15 / 2,
+              animationDelay: '420ms', animationDuration: '520ms',
+              background: 'radial-gradient(circle, rgba(255,80,0,.7) 0%, rgba(180,30,0,.4) 45%, transparent 75%)',
+            }} />
+          )}
+          {showShockwave && (
+            <div style={{
+              position: 'absolute', left: 0, top: 0,
+              width: 0, height: 0, borderRadius: '50%',
+              border: '4px solid rgba(255,160,40,.85)',
+              boxShadow: '0 0 28px rgba(255,140,40,.7)',
+              animation: `soulShardShockwave 700ms ease-out 80ms forwards`,
+            }} />
+          )}
+          <style>{`
+            @keyframes soulShardShockwave {
+              0%   { width: 0; height: 0; margin-left: 0; margin-top: 0; opacity: .9; border-width: 6px; }
+              100% { width: ${flashSize * 1.6}px; height: ${flashSize * 1.6}px;
+                     margin-left: ${-flashSize * 0.8}px; margin-top: ${-flashSize * 0.8}px;
+                     opacity: 0; border-width: 1px; }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
 };
 
 function IceEncaseEffect({ x, y }) {
@@ -5024,10 +5213,12 @@ function IceEncaseEffect({ x, y }) {
   );
 }
 
-function GameAnimationRenderer({ type, x, y, w, h }) {
+function GameAnimationRenderer({ type, x, y, w, h, ...rest }) {
   const Component = ANIM_REGISTRY[type];
   if (!Component) return null;
-  return <Component x={x} y={y} w={w} h={h} />;
+  // Forward extra props (intensity, custom payload, etc.) so animations
+  // that key off broadcast-side parameters can scale themselves.
+  return <Component x={x} y={y} w={w} h={h} {...rest} />;
 }
 
 // Renders an ability zone stack — handles Performance visual transformation
@@ -6594,12 +6785,13 @@ function GameBoard({ gameState, lobby, onLeave }) {
       setBurnTickingHeroes(keys);
       setTimeout(() => setBurnTickingHeroes([]), 1500);
     };
-    const onZoneAnim = ({ type, owner, heroIdx, zoneSlot }) => {
+    const onZoneAnim = ({ type, owner, heroIdx, zoneSlot, ...rest }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const sel = zoneSlot >= 0
         ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
         : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
-      setTimeout(() => playAnimation(type, sel, { duration: 1000 }), 100);
+      // Forward broadcast-side extras into the animation entry.
+      setTimeout(() => playAnimation(type, sel, { duration: 1000, ...rest }), 100);
     };
     const onLevelChange = ({ delta, owner, heroIdx, zoneSlot }) => {
       const entry = { id: Date.now() + Math.random(), delta, owner, heroIdx, zoneSlot };
