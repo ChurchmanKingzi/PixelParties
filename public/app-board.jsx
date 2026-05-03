@@ -2938,6 +2938,83 @@ function CannibalismChompEffect({ x, y }) {
 }
 
 const ANIM_REGISTRY = {
+  // Golden-light cleanse burst — Johanna, Crusader of Light. Fires
+  // on each ally Hero whose negative statuses are stripped when
+  // Johanna becomes un-incapacitated. Layered: a soft warm glow halo,
+  // a radial sunburst of light beams, and a small flurry of bright
+  // gold sparkles drifting outward.
+  johanna_cleanse: (function () {
+    return function JohannaCleanseEffect({ x, y }) {
+      const beams = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+        angle: (i / 12) * 360,
+        delay: Math.random() * 80,
+      })), []);
+      const sparkles = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+        angle: (i / 18) * Math.PI * 2 + Math.random() * 0.4,
+        dist: 40 + Math.random() * 30,
+        size: 3 + Math.random() * 4,
+        delay: Math.random() * 200,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Warm halo */}
+          <div style={{
+            position: 'absolute', width: 110, height: 110, left: -55, top: -55,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,240,180,0.85) 0%, rgba(255,210,80,0.55) 45%, transparent 75%)',
+            boxShadow: '0 0 36px rgba(255,225,140,0.85), 0 0 14px rgba(255,200,80,0.6)',
+            opacity: 0,
+            animation: 'johanna-halo 1100ms ease-out forwards',
+          }} />
+          {/* Radial sunburst beams */}
+          {beams.map((b, i) => (
+            <div key={'b' + i} style={{
+              position: 'absolute', width: 4, height: 70, left: -2, top: -35,
+              background: 'linear-gradient(to top, transparent 0%, rgba(255,235,150,0.95) 40%, rgba(255,255,220,1) 100%)',
+              borderRadius: 2,
+              transformOrigin: '50% 50%',
+              transform: `rotate(${b.angle}deg) translateY(-30px) scaleY(0)`,
+              opacity: 0,
+              animation: `johanna-beam 900ms ease-out ${b.delay}ms forwards`,
+            }} />
+          ))}
+          {/* Drifting gold sparkles */}
+          {sparkles.map((s, i) => (
+            <div key={'s' + i} style={{
+              position: 'absolute', left: -s.size / 2, top: -s.size / 2,
+              width: s.size + 'px', height: s.size + 'px',
+              borderRadius: '50%',
+              background: '#fff5c8',
+              boxShadow: '0 0 8px #ffd86a, 0 0 16px rgba(255,200,80,0.7)',
+              opacity: 0,
+              animation: `johanna-sparkle 1200ms ease-out ${s.delay}ms forwards`,
+              '--jcx': Math.cos(s.angle) * s.dist + 'px',
+              '--jcy': Math.sin(s.angle) * s.dist + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes johanna-halo {
+              0%   { opacity: 0; transform: scale(0.4); }
+              35%  { opacity: 1; transform: scale(1.15); }
+              70%  { opacity: 0.85; transform: scale(1.35); }
+              100% { opacity: 0; transform: scale(1.6); }
+            }
+            @keyframes johanna-beam {
+              0%   { opacity: 0; transform: rotate(var(--ja, 0deg)) translateY(-15px) scaleY(0); }
+              25%  { opacity: 1; }
+              60%  { opacity: 1; }
+              100% { opacity: 0; transform: rotate(var(--ja, 0deg)) translateY(-55px) scaleY(1.4); }
+            }
+            @keyframes johanna-sparkle {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              30%  { opacity: 1; transform: translate(calc(var(--jcx) * 0.3), calc(var(--jcy) * 0.3)) scale(1.1); }
+              100% { opacity: 0; transform: translate(var(--jcx), var(--jcy)) scale(0.2); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   explosion: ExplosionEffect,
   shield_bubble: ShieldBubbleEffect,
   stun_strike: StunStrikeEffect,
@@ -5554,6 +5631,206 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  club_bash: (() => {
+    // 🏏 oni club — held HORIZONTAL, descends straight down from above
+    // the target, slams flat, then unleashes a HUGE multi-stage impact:
+    // a hard screen-shake-style flash, expanding shockwave rings, a
+    // big radial spark explosion, rising dust, and a delayed 💥 echo.
+    // Used by Rebelliokai Oblivious Oni's 150-dmg AoE.
+    return function ClubBashEffect({ x, y }) {
+      const sparks = useMemo(() => Array.from({ length: 28 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 60 + Math.random() * 90;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed * 0.55 - 12,
+          size: 5 + Math.random() * 9,
+          delay: 460 + Math.random() * 160,
+          dur: 460 + Math.random() * 320,
+          color: ['#2a1808', '#4a2c12', '#7a4f24', '#c08440', '#ffd070', '#fff5b0'][Math.floor(Math.random() * 6)],
+        };
+      }), []);
+      const debrisChunks = useMemo(() => Array.from({ length: 10 }, () => {
+        const angle = -Math.PI + Math.random() * Math.PI; // -180° to 0° → upward arc
+        const speed = 50 + Math.random() * 70;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed * 0.7 - 18,
+          size: 8 + Math.random() * 8,
+          delay: 470 + Math.random() * 100,
+          dur: 620 + Math.random() * 280,
+          rotate: -180 + Math.random() * 360,
+          glyph: ['🪨', '◤', '◢', '◣'][Math.floor(Math.random() * 4)],
+        };
+      }), []);
+      const dustMotes = useMemo(() => Array.from({ length: 22 }, () => ({
+        xOff: -56 + Math.random() * 112,
+        startY: 4 + Math.random() * 12,
+        riseY: -(28 + Math.random() * 44),
+        size: 10 + Math.random() * 14,
+        delay: 470 + Math.random() * 280,
+        dur: 620 + Math.random() * 380,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* The club — drawn horizontally via a -90° rotation on a
+              square emoji. Descends straight down (no extra rotation
+              during the drop), accelerating into the ground. */}
+          <div style={{
+            position: 'absolute', left: -56, top: 0,
+            width: 112, height: 56,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 96, lineHeight: '56px',
+            transform: 'rotate(-90deg)',
+            transformOrigin: '50% 50%',
+            filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.85)) drop-shadow(0 0 4px rgba(120,80,30,0.7))',
+            animation: 'clubBashHorizontalSlam 460ms cubic-bezier(0.4, 0, 0.9, 1) forwards',
+          }}>🏏</div>
+
+          {/* Hard impact flash — bright white-yellow disc at landing */}
+          <div style={{
+            position: 'absolute', left: -90, top: -18,
+            width: 180, height: 180, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,220,1) 0%, rgba(255,210,100,0.8) 30%, rgba(220,120,40,0.45) 60%, rgba(120,60,20,0.15) 80%, transparent 95%)',
+            opacity: 0,
+            animation: 'clubBashHardFlash 520ms ease-out 440ms forwards',
+          }} />
+
+          {/* White-hot core flash — punctuates the hit */}
+          <div style={{
+            position: 'absolute', left: -42, top: -8,
+            width: 84, height: 84, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,240,160,0.8) 50%, transparent 80%)',
+            opacity: 0,
+            animation: 'clubBashCore 360ms ease-out 460ms forwards',
+          }} />
+
+          {/* Outer brown shockwave ring */}
+          <div style={{
+            position: 'absolute', left: -38, top: -8,
+            width: 76, height: 76, borderRadius: '50%',
+            border: '5px solid rgba(140, 80, 30, 0.9)',
+            opacity: 0,
+            animation: 'clubBashShockwave 720ms ease-out 460ms forwards',
+          }} />
+          {/* Mid-tier gold ring */}
+          <div style={{
+            position: 'absolute', left: -32, top: -6,
+            width: 64, height: 64, borderRadius: '50%',
+            border: '4px solid rgba(255, 210, 90, 0.9)',
+            opacity: 0,
+            animation: 'clubBashShockwave 580ms ease-out 480ms forwards',
+          }} />
+          {/* Inner white-hot ring (tightest, fastest) */}
+          <div style={{
+            position: 'absolute', left: -24, top: -4,
+            width: 48, height: 48, borderRadius: '50%',
+            border: '3px solid rgba(255, 250, 220, 0.95)',
+            opacity: 0,
+            animation: 'clubBashShockwave 440ms ease-out 500ms forwards',
+          }} />
+
+          {/* Big 💥 glyph — pops at the impact point, lingers */}
+          <div style={{
+            position: 'absolute', left: -38, top: -22,
+            fontSize: 76, lineHeight: '52px',
+            filter: 'drop-shadow(0 0 10px rgba(255,180,40,0.85)) drop-shadow(0 0 4px rgba(255,255,200,0.6))',
+            opacity: 0,
+            animation: 'clubBashImpactGlyph 720ms ease-out 460ms forwards',
+          }}>💥</div>
+
+          {/* Radial sparks (large, fast) */}
+          {sparks.map((s, i) => (
+            <div key={'cbs' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: s.size + 'px', height: s.size + 'px',
+              borderRadius: '50% 55% 40% 60% / 60% 40% 60% 40%',
+              background: s.color,
+              boxShadow: `0 0 ${s.size * 2}px ${s.color}`,
+              opacity: 0,
+              '--cbDx': s.dx + 'px',
+              '--cbDy': s.dy + 'px',
+              animation: `clubBashSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
+            }} />
+          ))}
+
+          {/* Rocky debris chunks — burst out and fall */}
+          {debrisChunks.map((d, i) => (
+            <div key={'cbr' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: d.size + 'px', lineHeight: '1',
+              filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.6))',
+              opacity: 0,
+              '--cbRdx': d.dx + 'px',
+              '--cbRdy': d.dy + 'px',
+              '--cbRot': d.rotate + 'deg',
+              animation: `clubBashDebris ${d.dur}ms cubic-bezier(0.2, 0.5, 0.6, 1) ${d.delay}ms forwards`,
+            }}>{d.glyph}</div>
+          ))}
+
+          {/* Rising dust cloud — wide, billowing */}
+          {dustMotes.map((d, i) => (
+            <div key={'cbd' + i} style={{
+              position: 'absolute', left: d.xOff + 'px', top: d.startY + 'px',
+              width: d.size + 'px', height: d.size + 'px', borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(190,150,100,0.75) 0%, rgba(140,100,60,0.45) 55%, transparent 90%)',
+              opacity: 0,
+              '--cbRiseY': d.riseY + 'px',
+              animation: `clubBashDust ${d.dur}ms ease-out ${d.delay}ms forwards`,
+            }} />
+          ))}
+
+          <style>{`
+            @keyframes clubBashHorizontalSlam {
+              0%   { transform: translate(0, -200px) rotate(-90deg); opacity: 0; }
+              25%  { transform: translate(0, -130px) rotate(-90deg); opacity: 1; }
+              80%  { transform: translate(0, 0) rotate(-90deg); opacity: 1; }
+              92%  { transform: translate(0, 8px) rotate(-90deg); opacity: 1; }
+              100% { transform: translate(0, 4px) rotate(-90deg); opacity: 1; }
+            }
+            @keyframes clubBashHardFlash {
+              0%   { opacity: 0; transform: scale(0.35); }
+              25%  { opacity: 1; transform: scale(1.15); }
+              55%  { opacity: 0.85; transform: scale(1.55); }
+              100% { opacity: 0; transform: scale(2.1); }
+            }
+            @keyframes clubBashCore {
+              0%   { opacity: 0; transform: scale(0.3); }
+              30%  { opacity: 1; transform: scale(1.2); }
+              100% { opacity: 0; transform: scale(1.8); }
+            }
+            @keyframes clubBashShockwave {
+              0%   { opacity: 0.95; transform: scale(0.4); border-width: 5px; }
+              100% { opacity: 0; transform: scale(4.8); border-width: 0.5px; }
+            }
+            @keyframes clubBashImpactGlyph {
+              0%   { opacity: 0; transform: scale(0.4); }
+              18%  { opacity: 1; transform: scale(1.6); }
+              45%  { opacity: 1; transform: scale(1.35); }
+              75%  { opacity: 0.7; transform: scale(1.25); }
+              100% { opacity: 0; transform: scale(1.55); }
+            }
+            @keyframes clubBashSpark {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.3); }
+              22%  { opacity: 1; transform: translate(calc(var(--cbDx) * 0.3), calc(var(--cbDy) * 0.3)) scale(1.1); }
+              100% { opacity: 0; transform: translate(var(--cbDx), var(--cbDy)) scale(0.45); }
+            }
+            @keyframes clubBashDebris {
+              0%   { opacity: 0; transform: translate(0, 0) rotate(0deg); }
+              15%  { opacity: 1; transform: translate(calc(var(--cbRdx) * 0.25), calc(var(--cbRdy) * 0.25)) rotate(calc(var(--cbRot) * 0.3)); }
+              60%  { opacity: 1; transform: translate(calc(var(--cbRdx) * 0.7), calc(var(--cbRdy) * 0.5)) rotate(calc(var(--cbRot) * 0.7)); }
+              100% { opacity: 0; transform: translate(var(--cbRdx), calc(var(--cbRdy) + 30px)) rotate(var(--cbRot)); }
+            }
+            @keyframes clubBashDust {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              25%  { opacity: 0.8; transform: translate(0, calc(var(--cbRiseY) * 0.35)) scale(1.1); }
+              100% { opacity: 0; transform: translate(0, var(--cbRiseY)) scale(1.7); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   anger_mark: (() => {
     // 💢 anger symbol — pops in and fades (Challenge redirect)
     return function AngerMarkEffect({ x, y }) {
@@ -5561,6 +5838,32 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
           display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ fontSize: 52, animation: 'tigerFadeInOut 1s ease-in-out forwards', marginLeft: -26, marginTop: -36 }}>💢</div>
+        </div>
+      );
+    };
+  })(),
+  weird_doll_grow: (() => {
+    // 🪆 doll — pops in small, swells rapidly outward, fades to nothing
+    // (Weird Doll: an Ability is sent to the discard pile)
+    return function WeirdDollGrowEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{
+            fontSize: 52,
+            marginLeft: -26, marginTop: -26,
+            filter: 'drop-shadow(0 0 8px rgba(255,180,200,0.7))',
+            animation: 'weirdDollGrow 700ms ease-out forwards',
+          }}>🪆</div>
+          <style>{`
+            @keyframes weirdDollGrow {
+              0%   { opacity: 0; transform: scale(0.2); }
+              18%  { opacity: 1; transform: scale(0.7); }
+              45%  { opacity: 0.85; transform: scale(1.7); }
+              75%  { opacity: 0.4; transform: scale(2.6); }
+              100% { opacity: 0; transform: scale(3.4); }
+            }
+          `}</style>
         </div>
       );
     };
@@ -8790,6 +9093,83 @@ function CardNamePickerPrompt({ ep, onRespond }) {
   );
 }
 
+// Reusable searchable pile/deck viewer modal. Used for ALL non-
+// interactive pile inspections — both decks (main + potion) and both
+// piles (discard + deleted), for own and opponent. The search input
+// filters the rendered grid by case-insensitive substring match on
+// card name; the header shows "(filtered/total)" while a filter is
+// active so the player can quickly answer "how many of card X are
+// still in this pile?".
+function PileSearchModal({ title, cards, onClose }) {
+  const [filter, setFilter] = useState('');
+  const TYPE_ORDER = ['Hero', 'Creature', 'Spell', 'Attack', 'Artifact', 'Ability', 'Potion', 'Ascended Hero', 'Token'];
+  const sorted = useMemo(() => {
+    return [...(cards || [])].sort((a, b) => {
+      const ca = CARDS_BY_NAME[a], cb = CARDS_BY_NAME[b];
+      const ta = TYPE_ORDER.indexOf(ca?.cardType || '');
+      const tb = TYPE_ORDER.indexOf(cb?.cardType || '');
+      if (ta !== tb) return ta - tb;
+      return a.localeCompare(b);
+    });
+  }, [cards]);
+  const trimmed = filter.trim().toLowerCase();
+  const filtered = trimmed
+    ? sorted.filter(n => n.toLowerCase().includes(trimmed))
+    : sorted;
+  const total = sorted.length;
+  const showing = filtered.length;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <DraggablePanel
+        className="modal animate-in deck-viewer-modal"
+        style={{ maxWidth: 600, display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexShrink: 0 }}>
+          <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
+            {title} ({trimmed ? `${showing}/${total}` : total})
+          </span>
+          <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={onClose}>✕ CLOSE</button>
+        </div>
+        <input
+          type="text"
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          placeholder="🔍 Filter by name..."
+          autoFocus
+          style={{
+            width: '100%',
+            padding: '6px 10px',
+            marginBottom: 10,
+            fontSize: 12,
+            background: 'var(--bg2)',
+            border: '1px solid var(--bg4)',
+            borderRadius: 4,
+            color: 'var(--text)',
+            flexShrink: 0,
+            boxSizing: 'border-box',
+          }}
+        />
+        {filtered.length > 0 ? (
+          <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+            <div className="deck-viewer-grid">
+              {filtered.map((name, i) => {
+                const card = CARDS_BY_NAME[name];
+                if (!card) return null;
+                return <CardMini key={name + '-' + i} card={card} onClick={() => {}} style={{ width: '100%', height: 120 }} />;
+              })}
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 20 }}>
+            {trimmed ? 'No cards match the filter.' : 'Empty'}
+          </div>
+        )}
+      </DraggablePanel>
+    </div>
+  );
+}
+
 // Status select prompt component (for Beer, etc.) — must be a proper component for hooks
 function CardGalleryMultiPrompt({ ep, onRespond }) {
   const cards = ep.cards || [];
@@ -8946,14 +9326,27 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
         </div>
         <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12, flexShrink: 0 }}>
           {ep.description}
-          {maxBudget != null && (
+          {maxBudget != null && !ep.hideCostUI && (
             <span style={{ marginLeft: 8, color: totalCost > maxBudget * 0.8 ? '#ffaa33' : 'var(--accent)', fontWeight: 600 }}>
-              (Cost: {totalCost}/{maxBudget})
+              ({ep.budgetLabel || 'Cost'}: {totalCost}/{maxBudget})
             </span>
           )}
           {uniqueNamesPicked && (
             <span style={{ marginLeft: 8, color: meetsUniqueGate ? 'var(--success)' : '#ffaa33', fontWeight: 600 }}>
               ({ep.uniqueGateLabel || 'Unique'}: {uniqueNamesPicked.size}/{requiredUniqueCount})
+            </span>
+          )}
+          {/* Live selection count for cap-based multi-pick prompts.
+              Shown when there's a hard maxSelect (≥1) and no visible
+              budget counter already taking that role. Helps the player
+              track progress against an "up to X" cap (Terror Tengu's
+              chain-summon cap, etc.). Also shown when `hideCostUI`
+              suppresses the budget counter — the player still wants a
+              "selected so far" indicator even if the budget itself is
+              hidden. */}
+          {(maxBudget == null || ep.hideCostUI) && maxSelect >= 1 && (
+            <span style={{ marginLeft: 8, color: selected.length >= maxSelect ? 'var(--success)' : 'var(--accent)', fontWeight: 600 }}>
+              (Selected: {selected.length}/{maxSelect})
             </span>
           )}
         </div>
@@ -8995,7 +9388,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
                     }} />
                   {isSel && <div style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 3, zIndex: 5 }}>✓</div>}
                   {pileBadge && <div style={{ position: 'absolute', top: 3, left: 3, background: pileBadge.bg, color: pileBadge.color, fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 3, zIndex: 5, letterSpacing: '0.5px', textShadow: '0 0 2px rgba(0,0,0,0.9)' }}>{pileBadge.text}</div>}
-                  {maxBudget != null && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd700', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
+                  {maxBudget != null && !ep.hideCostUI && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd700', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
                 </div>
               );
             })}
@@ -9334,13 +9727,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Pile-transfer handshake: every card arriving via a server-driven
       // `play_pile_transfer` (Deepsea bounce, Castle swap, Monstrosity
       // second-bounce, Shu'Chaku artifact return, etc.) already has its
-      // own flying-card animation. Consume one slot of the pending
-      // counter per new hand card and skip the auto branches below.
+      // own flying-card animation. Consume up to one slot of the pending
+      // counter per new hand card and ADVANCE the auto-branch start
+      // index past those covered cards, so the branches below still
+      // animate any REMAINING new cards (e.g. when Rebelliokai Backup
+      // Bakus's recur fires a pile-transfer for ITSELF and then
+      // `actionDrawCards` adds a +1 draw — the recur's pile-transfer
+      // covers Bakus, but the drawn card still needs its deck-flight).
+      // Pile-transfer cards land at the START of the new-hand-cards
+      // range because the broadcast fires before the state mutation
+      // that pushes the card.
       const delta = newHand.length - prevLen;
+      let autoStart = prevLen;
       if (delta > 0 && pileTransferToHandPendingMeRef.current > 0) {
-        pileTransferToHandPendingMeRef.current = Math.max(0, pileTransferToHandPendingMeRef.current - delta);
-        prevHandLenRef.current = newHand.length;
-        return;
+        const consumed = Math.min(delta, pileTransferToHandPendingMeRef.current);
+        pileTransferToHandPendingMeRef.current -= consumed;
+        autoStart += consumed;
+        if (autoStart >= newHand.length) {
+          prevHandLenRef.current = newHand.length;
+          return;
+        }
       }
       // Length-neutral hand change with a pending pile-transfer-to-hand —
       // this is the Deepsea bounce-place swap: hand contents changed
@@ -9352,7 +9758,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (delta <= 0 && pileTransferToHandPendingMeRef.current > 0) {
         pileTransferToHandPendingMeRef.current = Math.max(0, pileTransferToHandPendingMeRef.current - 1);
       }
-      if (newHand.length > prevLen && !stealInProgressRef.current && deckDecreased) {
+      if (newHand.length > autoStart && !stealInProgressRef.current && deckDecreased) {
         // If cards arrived via steal, skip draw animation for them
         const skipCount = stealSkipDrawRef.current;
         if (skipCount > 0) {
@@ -9364,8 +9770,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // normal engine-driven draws, the `draw` log already fires its
         // SFX; the 80ms dedupe suppresses the duplicate here.
         if (window.playSFX) {
-          for (let i = prevLen; i < newHand.length; i++) {
-            setTimeout(() => window.playSFX('draw', { dedupe: 80 }), (i - prevLen) * 80);
+          for (let i = autoStart; i < newHand.length; i++) {
+            setTimeout(() => window.playSFX('draw', { dedupe: 80 }), (i - autoStart) * 80);
           }
         }
         const deckEl = document.querySelector('[data-my-deck]');
@@ -9374,7 +9780,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const potionRect = potionDeckEl?.getBoundingClientRect();
         if (deckRect) {
           const newAnims = [];
-          for (let i = prevLen; i < newHand.length; i++) {
+          for (let i = autoStart; i < newHand.length; i++) {
             const isPotion = CARDS_BY_NAME[newHand[i]]?.cardType === 'Potion';
             const srcRect = (isPotion && potionRect) ? potionRect : deckRect;
             newAnims.push({
@@ -9391,7 +9797,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }, 500);
         }
         }
-      } else if (newHand.length > prevLen && !stealInProgressRef.current && !deckDecreased && discardDecreased) {
+      } else if (newHand.length > autoStart && !stealInProgressRef.current && !deckDecreased && discardDecreased) {
         // Cards reclaimed from the discard pile into hand (Spontaneous
         // Reappearance, etc.) — animate from the discard pile rect so
         // every returned card visibly flies out of discard into its
@@ -9400,7 +9806,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const discardRect = discardEl?.getBoundingClientRect();
         if (discardRect) {
           const newAnims = [];
-          for (let i = prevLen; i < newHand.length; i++) {
+          for (let i = autoStart; i < newHand.length; i++) {
             newAnims.push({
               id: Date.now() + Math.random() + i,
               cardName: newHand[i],
@@ -9414,14 +9820,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             setDrawAnimCards(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
           }, 500);
         }
-      } else if (newHand.length > prevLen && !stealInProgressRef.current && !deckDecreased) {
+      } else if (newHand.length > autoStart && !stealInProgressRef.current && !deckDecreased) {
         // Cards arrived without deck or discard changing — likely stolen from
         // opponent's hand. Animate from opponent's hand area.
         const oppHandEl = document.querySelector('.game-hand-opp .game-hand-cards');
         const oppRect = oppHandEl?.getBoundingClientRect();
         if (oppRect) {
           const newAnims = [];
-          for (let i = prevLen; i < newHand.length; i++) {
+          for (let i = autoStart; i < newHand.length; i++) {
             newAnims.push({
               id: Date.now() + Math.random() + i,
               cardName: newHand[i],
@@ -14401,7 +14807,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Generic pile-to-pile flying card animation. Used for moves the
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
-    const onPileTransfer = ({ owner, cardName, from, to, fromHeroIdx, fromSlotIdx, fromHandIdx, toHandIdx, toHeroIdx, toSlotIdx }) => {
+    const onPileTransfer = ({ owner, cardName, from, to, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, flightStyle }) => {
       const isMe = owner === myIdx;
       const ownerLabel = isMe ? 'me' : 'opp';
       // Pre-register the upcoming hand arrival so the hand-count auto-
@@ -14419,9 +14825,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const elementFor = (pile, extras = {}) => {
         if (pile === 'discard') return document.querySelector(isMe ? '[data-my-discard]' : '[data-opp-discard]');
         if (pile === 'deleted') return document.querySelector(isMe ? '[data-my-deleted]' : '[data-opp-deleted]');
+        if (pile === 'deck')    return document.querySelector(isMe ? '[data-my-deck]'    : '[data-opp-deck]');
         if (pile === 'area')    return document.querySelector(`[data-area-zone][data-area-owner="${ownerLabel}"]`);
         if (pile === 'support' && extras.heroIdx != null && extras.slotIdx != null) {
           return document.querySelector(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${extras.heroIdx}"][data-support-slot="${extras.slotIdx}"]`);
+        }
+        if (pile === 'ability' && extras.heroIdx != null && extras.slotIdx != null) {
+          return document.querySelector(`[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${extras.heroIdx}"][data-ability-slot="${extras.slotIdx}"]`);
+        }
+        if (pile === 'surprise' && extras.heroIdx != null) {
+          return document.querySelector(`[data-surprise-zone][data-surprise-owner="${ownerLabel}"][data-surprise-hero="${extras.heroIdx}"]`);
+        }
+        if (pile === 'permanent' && extras.permId != null) {
+          return document.querySelector(`[data-perm-id="${extras.permId}"][data-perm-owner="${ownerLabel}"]`);
         }
         if (pile === 'hand') {
           const base = isMe ? '.game-hand-me' : '.game-hand-opp';
@@ -14439,7 +14855,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
         return null;
       };
-      const srcEl = elementFor(from, { heroIdx: fromHeroIdx, slotIdx: fromSlotIdx, handIdx: fromHandIdx });
+      const srcEl = elementFor(from, { heroIdx: fromHeroIdx, slotIdx: fromSlotIdx, handIdx: fromHandIdx, permId: fromPermId });
       const tgtEl = elementFor(to,   { handIdx: toHandIdx, heroIdx: toHeroIdx, slotIdx: toSlotIdx });
       if (!srcEl || !tgtEl) return;
 
@@ -14491,9 +14907,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const dx = (tr.left + tr.width  / 2) - srcX;
       const dy = (tr.top  + tr.height / 2) - srcY;
 
-      if (!document.getElementById('pile-transfer-keyframes')) {
+      // Bumped id (`-v2`) when adding the windstorm keyframe so existing
+      // sessions with the old stylesheet (which only had `pileTransfer`
+      // + `pileTransferToHand`) get the new sheet injected. Without
+      // this, the guard would short-circuit on the old element and
+      // `pileTransferWindstorm` would never be defined — the card
+      // would just snap to opacity:0 with no motion.
+      if (!document.getElementById('pile-transfer-keyframes-v2')) {
         const style = document.createElement('style');
-        style.id = 'pile-transfer-keyframes';
+        style.id = 'pile-transfer-keyframes-v2';
         style.textContent = `
           @keyframes pileTransfer {
             0%   { transform: translate(0,0) scale(1); opacity: 1; }
@@ -14510,6 +14932,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             80%  { transform: translate(var(--ptDx), calc(var(--ptDy) - 10px)) scale(0.98); opacity: 1; }
             100% { transform: translate(var(--ptDx), var(--ptDy)) scale(1); opacity: 1; }
           }
+          /* Windstorm variant: card is buffeted along its journey by
+             gusts of wind. Lateral push/pull on every keyframe stop,
+             swinging rotation, end with multiple full spins as it gets
+             swept into the destination. Used by Tengu Windstorm's
+             board → deck bounce. */
+          @keyframes pileTransferWindstorm {
+            0%   { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+            8%   { transform: translate(calc(var(--ptDx) * 0.04 + 55px), calc(var(--ptDy) * 0.08 - 40px)) rotate(-30deg) scale(1.12); opacity: 1; }
+            18%  { transform: translate(calc(var(--ptDx) * 0.18 - 70px), calc(var(--ptDy) * 0.16 + 50px)) rotate(45deg) scale(1.05); opacity: 1; }
+            30%  { transform: translate(calc(var(--ptDx) * 0.30 + 80px), calc(var(--ptDy) * 0.28 - 60px)) rotate(-55deg) scale(1.0); opacity: 1; }
+            42%  { transform: translate(calc(var(--ptDx) * 0.42 - 85px), calc(var(--ptDy) * 0.42 + 65px)) rotate(75deg) scale(0.95); opacity: 1; }
+            55%  { transform: translate(calc(var(--ptDx) * 0.55 + 70px), calc(var(--ptDy) * 0.55 - 55px)) rotate(-65deg) scale(0.9); opacity: 1; }
+            68%  { transform: translate(calc(var(--ptDx) * 0.70 - 50px), calc(var(--ptDy) * 0.70 + 40px)) rotate(55deg) scale(0.85); opacity: 1; }
+            80%  { transform: translate(calc(var(--ptDx) * 0.82 + 35px), calc(var(--ptDy) * 0.82 - 28px)) rotate(-40deg) scale(0.78); opacity: 0.95; }
+            90%  { transform: translate(calc(var(--ptDx) * 0.92 - 18px), calc(var(--ptDy) * 0.92 + 14px)) rotate(180deg) scale(0.7); opacity: 0.85; }
+            100% { transform: translate(var(--ptDx), var(--ptDy)) rotate(720deg) scale(0.45); opacity: 0; }
+          }
         `;
         document.head.appendChild(style);
       }
@@ -14518,13 +14957,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
       const isToHand = (to === 'hand');
       const isToSupport = (to === 'support');
-      // Hand-landing and support-landing use a teal glow (matches
-      // Deepsea's aesthetic) and the solid-landing variant; discard/
-      // deleted/area destinations keep the classic violet fade-out.
-      const glow = (isToHand || isToSupport)
-        ? 'box-shadow:0 0 14px rgba(100,220,255,0.85),0 0 4px rgba(60,170,230,0.55)'
-        : 'box-shadow:0 0 12px rgba(180,80,255,0.7),0 0 4px rgba(120,40,200,0.5)';
-      const anim = (isToHand || isToSupport) ? 'pileTransferToHand' : 'pileTransfer';
+      const isWindstorm = (flightStyle === 'windstorm');
+      // Glow palette per flight style:
+      //   • windstorm → cool cyan-white "wind sheen" (matches the
+      //     swirling rotation + chaotic path).
+      //   • hand / support landing → teal glow + solid landing variant
+      //     (Deepsea aesthetic).
+      //   • default discard / deleted / area / deck → classic violet
+      //     fade-out.
+      let glow;
+      if (isWindstorm) {
+        glow = 'box-shadow:0 0 18px rgba(180,230,255,0.95),0 0 6px rgba(120,180,230,0.7)';
+      } else if (isToHand || isToSupport) {
+        glow = 'box-shadow:0 0 14px rgba(100,220,255,0.85),0 0 4px rgba(60,170,230,0.55)';
+      } else {
+        glow = 'box-shadow:0 0 12px rgba(180,80,255,0.7),0 0 4px rgba(120,40,200,0.5)';
+      }
+      // Animation + duration:
+      //   • windstorm runs 1200ms (longer, so the chaos reads).
+      //   • hand/support uses solid-land variant @ 700ms.
+      //   • default uses the standard fade variant @ 700ms.
+      const anim = isWindstorm
+        ? 'pileTransferWindstorm'
+        : (isToHand || isToSupport ? 'pileTransferToHand' : 'pileTransfer');
+      const durationMs = isWindstorm ? 1200 : 700;
+      const easing = isWindstorm ? 'cubic-bezier(.45,.05,.55,.95)' : 'ease-in-out';
       card.style.cssText = [
         'position:fixed',
         `left:${srcX - 32}px`, `top:${srcY - 44}px`,
@@ -14532,7 +14989,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         'border-radius:4px', 'overflow:hidden',
         glow,
         `--ptDx:${dx}px`, `--ptDy:${dy}px`,
-        `animation:${anim} 700ms ease-in-out forwards`,
+        `animation:${anim} ${durationMs}ms ${easing} forwards`,
         'opacity:0',
       ].join(';');
       if (imgUrl) {
@@ -14548,7 +15005,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         card.innerHTML = `<div style="color:#c8a;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardName}</div>`;
       }
       document.body.appendChild(card);
-      setTimeout(() => card.remove(), 800);
+      setTimeout(() => card.remove(), durationMs + 100);
     };
     socket.on('play_pile_transfer', onPileTransfer);
     const onDeckToDiscard = ({ owner, cardNames, deleteMode, holdDuration }) => {
@@ -14660,6 +15117,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const onDiscardToDeleted = ({ owner, cardNames }) => {
       const isMe = owner === myIdx;
       if (!Array.isArray(cardNames) || cardNames.length === 0) return;
+      // Pre-register the names with the deletedPile-growth auto-
+      // detector so it doesn't spawn a phantom board→deleted flight
+      // when Phase C of `_scheduleSelfDeleteTransit` finally pushes
+      // the redirected card to deletedPile (and a same-named card
+      // happens to be on the board). Same handshake the
+      // deck_to_discard handler uses — see L14582.
+      const pending = isMe ? deckToDiscardPendingMeRef.current : deckToDiscardPendingOppRef.current;
+      pending.deleted.push(...cardNames);
       const srcSel = isMe ? '[data-my-discard]' : '[data-opp-discard]';
       const tgtSel = isMe ? '[data-my-deleted]' : '[data-opp-deleted]';
       const srcEl = document.querySelector(srcSel);
@@ -14733,6 +15198,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const onDeletedToDiscard = ({ owner, cardNames }) => {
       const isMe = owner === myIdx;
       if (!Array.isArray(cardNames) || cardNames.length === 0) return;
+      // Pre-register so the discardPile-growth auto-detector doesn't
+      // spawn a phantom board→discard flight when this animation
+      // lands at the discard pile (or when Phase A of
+      // `_scheduleSelfDeleteTransit` pushes a redirected card to
+      // discardPile). Mirrors the deck_to_discard handshake.
+      const pending = isMe ? deckToDiscardPendingMeRef.current : deckToDiscardPendingOppRef.current;
+      pending.discard.push(...cardNames);
       const srcSel = isMe ? '[data-my-deleted]' : '[data-opp-deleted]';
       const tgtSel = isMe ? '[data-my-discard]' : '[data-opp-discard]';
       const srcEl = document.querySelector(srcSel);
@@ -17850,6 +18322,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (opp.handLocked) debuffs.push({ key: 'hand-opp', icon: '🔒', text: `${opp.username} cannot draw or search any more cards this turn!`, color: '#cc8800' });
             if (me.flashbanged) debuffs.push({ key: 'flashbanged-me', icon: '⚪', text: 'Flashbanged — your turn will end after your first Action!', color: '#ffffff' });
             if (opp.flashbanged) debuffs.push({ key: 'flashbanged-opp', icon: '⚪', text: `Flashbanged — ${opp.username}'s turn will end after their first Action!`, color: '#dddddd' });
+            // Giga Steroids — owner-wide second-Action grant for
+            // effect activations. Set on resolve, cleared on consume
+            // / fizzle / expire by Giga Steroids' hooks.
+            if (me.onSteroids) debuffs.push({ key: 'steroids-me', icon: '💪', text: 'On Steroids — You can use a second Action for an active effect this Action Phase!', color: '#ff66dd' });
+            if (opp.onSteroids) debuffs.push({ key: 'steroids-opp', icon: '💪', text: `On Steroids — Your opponent can use a second Action for an active effect this Action Phase!`, color: '#cc44aa' });
             if (debuffs.length === 0) return null;
             return (
               <div className="phase-debuffs">
@@ -18903,70 +19380,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </div>
       )}
 
-      {/* Deck viewer */}
-      {deckViewer && (() => {
-        const raw = deckViewer === 'potion' ? (me.potionDeckCards || []) : (me.mainDeckCards || []);
-        const TYPE_ORDER = ['Hero','Creature','Spell','Attack','Artifact','Ability','Potion','Ascended Hero','Token'];
-        const sorted = [...raw].sort((a, b) => {
-          const ca = CARDS_BY_NAME[a], cb = CARDS_BY_NAME[b];
-          const ta = TYPE_ORDER.indexOf(ca?.cardType || ''), tb = TYPE_ORDER.indexOf(cb?.cardType || '');
-          if (ta !== tb) return ta - tb;
-          return a.localeCompare(b);
-        });
-        return (
-          <div className="modal-overlay" onClick={() => setDeckViewer(null)}>
-            <DraggablePanel className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
-                  {deckViewer === 'potion' ? '🧪 POTION DECK' : '📋 MAIN DECK'} ({sorted.length})
-                </span>
-                <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setDeckViewer(null)}>✕ CLOSE</button>
-              </div>
-              <div className="deck-viewer-grid">
-                {sorted.map((name, i) => {
-                  const card = CARDS_BY_NAME[name];
-                  if (!card) return null;
-                  return <CardMini key={name + '-' + i} card={card} onClick={() => {}} style={{ width: '100%', height: 120 }} />;
-                })}
-              </div>
-            </DraggablePanel>
-          </div>
-        );
-      })()}
+      {/* Deck viewer (own main / potion deck) — searchable */}
+      {deckViewer && (
+        <PileSearchModal
+          title={deckViewer === 'potion' ? '🧪 POTION DECK' : '📋 MAIN DECK'}
+          cards={deckViewer === 'potion' ? (me.potionDeckCards || []) : (me.mainDeckCards || [])}
+          onClose={() => setDeckViewer(null)}
+        />
+      )}
 
-      {/* Pile viewer (discard/deleted) */}
-      {pileViewer && (() => {
-        const TYPE_ORDER = ['Hero','Creature','Spell','Attack','Artifact','Ability','Potion','Ascended Hero','Token'];
-        const sorted = [...(pileViewer.cards || [])].sort((a, b) => {
-          const ca = CARDS_BY_NAME[a], cb = CARDS_BY_NAME[b];
-          const ta = TYPE_ORDER.indexOf(ca?.cardType || ''), tb = TYPE_ORDER.indexOf(cb?.cardType || '');
-          if (ta !== tb) return ta - tb;
-          return a.localeCompare(b);
-        });
-        return (
-          <div className="modal-overlay" onClick={() => setPileViewer(null)}>
-            <DraggablePanel className="modal animate-in deck-viewer-modal">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
-                  {pileViewer.title} ({sorted.length})
-                </span>
-                <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setPileViewer(null)}>✕ CLOSE</button>
-              </div>
-              {sorted.length > 0 ? (
-                <div className="deck-viewer-grid">
-                  {sorted.map((name, i) => {
-                    const card = CARDS_BY_NAME[name];
-                    if (!card) return null;
-                    return <CardMini key={name + '-' + i} card={card} onClick={() => {}} style={{ width: '100%', height: 120 }} />;
-                  })}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 20 }}>Empty</div>
-              )}
-            </DraggablePanel>
-          </div>
-        );
-      })()}
+      {/* Pile viewer (own/opp discard or deleted) — searchable */}
+      {pileViewer && (
+        <PileSearchModal
+          title={pileViewer.title}
+          cards={pileViewer.cards || []}
+          onClose={() => setPileViewer(null)}
+        />
+      )}
 
       {/* ── Effect Prompt: Confirm Dialog ── */}
       {isMyEffectPrompt && ep.type === 'confirm' && (
@@ -19470,15 +19900,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div style={{ fontSize: 11, color: '#cc66ff', opacity: .8, marginBottom: 8 }}>
               Selected: {handPickSelected.size}/{ep.maxSelect || 3} (min {minSel})
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: canConfirm ? '#cc66ff' : '#555', color: canConfirm ? '#cc66ff' : '#555' }}
                 disabled={!canConfirm}
                 onClick={() => {
                   const selected = [...handPickSelected].map(idx => ({ handIndex: idx, cardName: me.hand[idx] }));
                   respondToPrompt({ selectedCards: selected });
                 }}>{ep.confirmLabel || 'Confirm'}</button>
-              <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
-                onClick={() => respondToPrompt({ cancelled: true })}>Cancel</button>
+              {ep.cancellable !== false && (
+                <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                  onClick={() => respondToPrompt({ cancelled: true })}>Cancel</button>
+              )}
             </div>
           </DraggablePanel>
         );

@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
 Name: Structure Deck: Guardians of the Treasure Cave
+Cover: Guardian Beast Zhu
 
 == HEROES ==
 Cooldin, King of Coolness

@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
 Name: Structure Deck: Parts of the Soul
+Cover: Soul Shard Sekhem
 
 == HEROES ==
 Cute Nerd Magenta

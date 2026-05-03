@@ -21,6 +21,7 @@ const {
   markSummonedPerTurnLimit,
   promptOptionalOnSummon,
 } = require('./_deepsea-shared');
+const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Deepsea Skeleton';
 
@@ -32,6 +33,44 @@ module.exports = {
   getBouncePlacementTargets: getBouncePlacementTargetsList,
   beforeSummon: tryBouncePlace,
   canSummon: (ctx) => canSummonPerTurnLimit(ctx, CARD_NAME),
+
+  /**
+   * CPU prompt response for Deepsea Skeleton's deck-mill multi-picker.
+   * The default `cardGalleryMulti` picker scores each candidate via
+   * `pickBestGalleryCard` and greedily takes the top scorers — but
+   * its eval-delta scoring doesn't simulate the engine's
+   * `selfDeleteOnExternalDiscard` redirect (Rebelliokai archetype).
+   * That means the scorer would happily target a Rebelliokai, even
+   * though the actual mill routes the card straight to the deleted
+   * pile — wasted from any "feed the discard pile" perspective.
+   *
+   * Mutate `promptData.cards` to drop self-deleting candidates, then
+   * return `undefined` so the engine's default picker takes over
+   * with the filtered pool. Mutation is the simplest way to feed a
+   * pre-filtered list into the existing scorer without re-implementing
+   * its `estimateHandCardValueFor` valuation logic in this file.
+   */
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type !== 'cardGalleryMulti') return undefined;
+    if (promptData?.title !== CARD_NAME) return undefined;
+    const cards = promptData.cards || [];
+    if (!cards.length) return undefined;
+    const filtered = cards.filter(c => {
+      const cs = loadCardEffect(c.name);
+      return !cs?.selfDeleteOnExternalDiscard;
+    });
+    // If every candidate was self-deleting, leave the prompt
+    // unchanged — the prompt is `cancellable: true` with `minSelect: 0`,
+    // so the default picker can also legitimately pick zero. Better
+    // to let the engine handle the empty-after-filter case via its
+    // own logic than to forcibly skip.
+    if (filtered.length === 0) return undefined;
+    if (filtered.length < cards.length) {
+      promptData.cards = filtered;
+    }
+    return undefined; // defer to engine default with filtered pool
+  },
 
   hooks: {
     onPlay: async (ctx) => {

@@ -4967,6 +4967,186 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  club_bash: (() => {
+    // 🏏 oni club — held HORIZONTAL, descends straight down from above
+    // the target, slams flat, then unleashes a HUGE multi-stage impact:
+    // a hard screen-shake-style flash, expanding shockwave rings, a
+    // big radial spark explosion, rising dust, and a delayed 💥 echo.
+    // Used by Rebelliokai Oblivious Oni's 150-dmg AoE.
+    return function ClubBashEffect({ x, y }) {
+      const sparks = useMemo(() => Array.from({ length: 28 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 60 + Math.random() * 90;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed * 0.55 - 12,
+          size: 5 + Math.random() * 9,
+          delay: 460 + Math.random() * 160,
+          dur: 460 + Math.random() * 320,
+          color: ['#2a1808', '#4a2c12', '#7a4f24', '#c08440', '#ffd070', '#fff5b0'][Math.floor(Math.random() * 6)],
+        };
+      }), []);
+      const debrisChunks = useMemo(() => Array.from({ length: 10 }, () => {
+        const angle = -Math.PI + Math.random() * Math.PI;
+        const speed = 50 + Math.random() * 70;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed * 0.7 - 18,
+          size: 8 + Math.random() * 8,
+          delay: 470 + Math.random() * 100,
+          dur: 620 + Math.random() * 280,
+          rotate: -180 + Math.random() * 360,
+          glyph: ['🪨', '◤', '◢', '◣'][Math.floor(Math.random() * 4)],
+        };
+      }), []);
+      const dustMotes = useMemo(() => Array.from({ length: 22 }, () => ({
+        xOff: -56 + Math.random() * 112,
+        startY: 4 + Math.random() * 12,
+        riseY: -(28 + Math.random() * 44),
+        size: 10 + Math.random() * 14,
+        delay: 470 + Math.random() * 280,
+        dur: 620 + Math.random() * 380,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute', left: -56, top: 0,
+            width: 112, height: 56,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 96, lineHeight: '56px',
+            transform: 'rotate(-90deg)',
+            transformOrigin: '50% 50%',
+            filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.85)) drop-shadow(0 0 4px rgba(120,80,30,0.7))',
+            animation: 'clubBashHorizontalSlam 460ms cubic-bezier(0.4, 0, 0.9, 1) forwards',
+          }}>🏏</div>
+          <div style={{
+            position: 'absolute', left: -90, top: -18,
+            width: 180, height: 180, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,220,1) 0%, rgba(255,210,100,0.8) 30%, rgba(220,120,40,0.45) 60%, rgba(120,60,20,0.15) 80%, transparent 95%)',
+            opacity: 0,
+            animation: 'clubBashHardFlash 520ms ease-out 440ms forwards',
+          }} />
+          <div style={{
+            position: 'absolute', left: -42, top: -8,
+            width: 84, height: 84, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,240,160,0.8) 50%, transparent 80%)',
+            opacity: 0,
+            animation: 'clubBashCore 360ms ease-out 460ms forwards',
+          }} />
+          <div style={{
+            position: 'absolute', left: -38, top: -8,
+            width: 76, height: 76, borderRadius: '50%',
+            border: '5px solid rgba(140, 80, 30, 0.9)',
+            opacity: 0,
+            animation: 'clubBashShockwave 720ms ease-out 460ms forwards',
+          }} />
+          <div style={{
+            position: 'absolute', left: -32, top: -6,
+            width: 64, height: 64, borderRadius: '50%',
+            border: '4px solid rgba(255, 210, 90, 0.9)',
+            opacity: 0,
+            animation: 'clubBashShockwave 580ms ease-out 480ms forwards',
+          }} />
+          <div style={{
+            position: 'absolute', left: -24, top: -4,
+            width: 48, height: 48, borderRadius: '50%',
+            border: '3px solid rgba(255, 250, 220, 0.95)',
+            opacity: 0,
+            animation: 'clubBashShockwave 440ms ease-out 500ms forwards',
+          }} />
+          <div style={{
+            position: 'absolute', left: -38, top: -22,
+            fontSize: 76, lineHeight: '52px',
+            filter: 'drop-shadow(0 0 10px rgba(255,180,40,0.85)) drop-shadow(0 0 4px rgba(255,255,200,0.6))',
+            opacity: 0,
+            animation: 'clubBashImpactGlyph 720ms ease-out 460ms forwards',
+          }}>💥</div>
+          {sparks.map((s, i) => (
+            <div key={'cbs' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: s.size + 'px', height: s.size + 'px',
+              borderRadius: '50% 55% 40% 60% / 60% 40% 60% 40%',
+              background: s.color,
+              boxShadow: `0 0 ${s.size * 2}px ${s.color}`,
+              opacity: 0,
+              '--cbDx': s.dx + 'px',
+              '--cbDy': s.dy + 'px',
+              animation: `clubBashSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
+            }} />
+          ))}
+          {debrisChunks.map((d, i) => (
+            <div key={'cbr' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: d.size + 'px', lineHeight: '1',
+              filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.6))',
+              opacity: 0,
+              '--cbRdx': d.dx + 'px',
+              '--cbRdy': d.dy + 'px',
+              '--cbRot': d.rotate + 'deg',
+              animation: `clubBashDebris ${d.dur}ms cubic-bezier(0.2, 0.5, 0.6, 1) ${d.delay}ms forwards`,
+            }}>{d.glyph}</div>
+          ))}
+          {dustMotes.map((d, i) => (
+            <div key={'cbd' + i} style={{
+              position: 'absolute', left: d.xOff + 'px', top: d.startY + 'px',
+              width: d.size + 'px', height: d.size + 'px', borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(190,150,100,0.75) 0%, rgba(140,100,60,0.45) 55%, transparent 90%)',
+              opacity: 0,
+              '--cbRiseY': d.riseY + 'px',
+              animation: `clubBashDust ${d.dur}ms ease-out ${d.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes clubBashHorizontalSlam {
+              0%   { transform: translate(0, -200px) rotate(-90deg); opacity: 0; }
+              25%  { transform: translate(0, -130px) rotate(-90deg); opacity: 1; }
+              80%  { transform: translate(0, 0) rotate(-90deg); opacity: 1; }
+              92%  { transform: translate(0, 8px) rotate(-90deg); opacity: 1; }
+              100% { transform: translate(0, 4px) rotate(-90deg); opacity: 1; }
+            }
+            @keyframes clubBashHardFlash {
+              0%   { opacity: 0; transform: scale(0.35); }
+              25%  { opacity: 1; transform: scale(1.15); }
+              55%  { opacity: 0.85; transform: scale(1.55); }
+              100% { opacity: 0; transform: scale(2.1); }
+            }
+            @keyframes clubBashCore {
+              0%   { opacity: 0; transform: scale(0.3); }
+              30%  { opacity: 1; transform: scale(1.2); }
+              100% { opacity: 0; transform: scale(1.8); }
+            }
+            @keyframes clubBashShockwave {
+              0%   { opacity: 0.95; transform: scale(0.4); border-width: 5px; }
+              100% { opacity: 0; transform: scale(4.8); border-width: 0.5px; }
+            }
+            @keyframes clubBashImpactGlyph {
+              0%   { opacity: 0; transform: scale(0.4); }
+              18%  { opacity: 1; transform: scale(1.6); }
+              45%  { opacity: 1; transform: scale(1.35); }
+              75%  { opacity: 0.7; transform: scale(1.25); }
+              100% { opacity: 0; transform: scale(1.55); }
+            }
+            @keyframes clubBashSpark {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.3); }
+              22%  { opacity: 1; transform: translate(calc(var(--cbDx) * 0.3), calc(var(--cbDy) * 0.3)) scale(1.1); }
+              100% { opacity: 0; transform: translate(var(--cbDx), var(--cbDy)) scale(0.45); }
+            }
+            @keyframes clubBashDebris {
+              0%   { opacity: 0; transform: translate(0, 0) rotate(0deg); }
+              15%  { opacity: 1; transform: translate(calc(var(--cbRdx) * 0.25), calc(var(--cbRdy) * 0.25)) rotate(calc(var(--cbRot) * 0.3)); }
+              60%  { opacity: 1; transform: translate(calc(var(--cbRdx) * 0.7), calc(var(--cbRdy) * 0.5)) rotate(calc(var(--cbRot) * 0.7)); }
+              100% { opacity: 0; transform: translate(var(--cbRdx), calc(var(--cbRdy) + 30px)) rotate(var(--cbRot)); }
+            }
+            @keyframes clubBashDust {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              25%  { opacity: 0.8; transform: translate(0, calc(var(--cbRiseY) * 0.35)) scale(1.1); }
+              100% { opacity: 0; transform: translate(0, var(--cbRiseY)) scale(1.7); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   anger_mark: (() => {
     // 💢 anger symbol — pops in and fades (Challenge redirect)
     return function AngerMarkEffect({ x, y }) {
@@ -4974,6 +5154,32 @@ const ANIM_REGISTRY = {
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
           display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ fontSize: 52, animation: 'tigerFadeInOut 1s ease-in-out forwards', marginLeft: -26, marginTop: -36 }}>💢</div>
+        </div>
+      );
+    };
+  })(),
+  weird_doll_grow: (() => {
+    // 🪆 doll — pops in small, swells rapidly outward, fades to nothing
+    // (Weird Doll: an Ability is sent to the discard pile)
+    return function WeirdDollGrowEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{
+            fontSize: 52,
+            marginLeft: -26, marginTop: -26,
+            filter: 'drop-shadow(0 0 8px rgba(255,180,200,0.7))',
+            animation: 'weirdDollGrow 700ms ease-out forwards',
+          }}>🪆</div>
+          <style>{`
+            @keyframes weirdDollGrow {
+              0%   { opacity: 0; transform: scale(0.2); }
+              18%  { opacity: 1; transform: scale(0.7); }
+              45%  { opacity: 0.85; transform: scale(1.7); }
+              75%  { opacity: 0.4; transform: scale(2.6); }
+              100% { opacity: 0; transform: scale(3.4); }
+            }
+          `}</style>
         </div>
       );
     };
@@ -5304,6 +5510,13 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
           {maxBudget != null && (
             <span style={{ marginLeft: 8, color: totalCost > maxBudget * 0.8 ? '#ffaa33' : 'var(--accent)', fontWeight: 600 }}>
               (Cost: {totalCost}/{maxBudget})
+            </span>
+          )}
+          {/* Live selection count for cap-based multi-pick prompts —
+              mirrors the X/Y counter in the live-game gallery. */}
+          {maxBudget == null && maxSelect >= 1 && (
+            <span style={{ marginLeft: 8, color: selected.length >= maxSelect ? 'var(--success)' : 'var(--accent)', fontWeight: 600 }}>
+              (Selected: {selected.length}/{maxSelect})
             </span>
           )}
         </div>

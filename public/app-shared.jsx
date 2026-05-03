@@ -162,13 +162,32 @@ const SFX_MASTER_MULTIPLIER = 0.33;
  *                   first one that fires within opts.categoryDedupe ms
  *   opts.categoryDedupe — window for opts.category (default 400ms)
  */
+// Sounds that are virtually always called from multiple overlapping
+// handlers (Escape keypress fires both the global ui_cancel handler
+// and any per-screen Escape handler that closes its own overlay; cancel
+// button clicks similarly bubble through multiple click listeners).
+// We auto-default these to a short dedupe window so the call sites
+// don't all have to remember `{ dedupe: 80 }` themselves — the
+// resulting double-/triple-fire of the cancel chime is one of the
+// most-reported QoL papercuts.
+const _AUTO_DEDUPE_SFX = { ui_cancel: 250, ui_click: 60 };
+
 function playSFX(name, opts = {}) {
   if (!name) return;
   const now = performance.now();
+  // Apply an auto-dedupe default for known UI sounds when the caller
+  // didn't pass an explicit `dedupe`. Explicit `dedupe: 0` from a
+  // caller still wins (treated as "I really do want every call to
+  // play"). We test for `opts.dedupe == null` so explicit zero stays
+  // a deliberate opt-out.
+  let dedupe = opts.dedupe;
+  if (dedupe == null && _AUTO_DEDUPE_SFX[name] != null) {
+    dedupe = _AUTO_DEDUPE_SFX[name];
+  }
   // Same-name dedupe (batch draws, burn ticks, etc.).
-  if (opts.dedupe) {
+  if (dedupe) {
     const last = _sfxRecentPlays[name] || 0;
-    if (now - last < opts.dedupe) return;
+    if (now - last < dedupe) return;
   }
   // Cross-name category dedupe. One attack = one "effect" sound: whichever
   // effect-class sound fires first (spell_cast, slash, elem_*, etc.) wins
@@ -178,7 +197,7 @@ function playSFX(name, opts = {}) {
     if (now - last < (opts.categoryDedupe || 400)) return;
     _sfxCategoryPlays[opts.category] = now;
   }
-  if (opts.dedupe) _sfxRecentPlays[name] = now;
+  if (dedupe) _sfxRecentPlays[name] = now;
   const intrinsic = SFX_VOLUME_OVERRIDES[name] != null ? SFX_VOLUME_OVERRIDES[name] : 1;
   const delaySec = opts.delay && opts.delay > 0 ? opts.delay / 1000 : 0;
   // MIDI branch (victory / defeat). Prefer a decoded .wav buffer if one
@@ -700,13 +719,22 @@ if (typeof document !== 'undefined') {
       || ['cancel', 'close', 'back', '×', '✕', 'x'].includes(label);
     // ui_click uses its intrinsic (SFX_VOLUME_OVERRIDES) for a uniform level.
     // ui_cancel keeps its explicit attenuation.
-    if (isCancel) playSFX('ui_cancel', { dedupe: 40, volume: 0.4 });
-    else playSFX('ui_click', { dedupe: 40 });
+    // Caller-side dedupe values stay shorter than the global auto-
+    // dedupe so explicit per-callsite tightening still works (e.g.
+    // batch-draw chimes still pass their own 40-80ms window). The
+    // auto-dedupe kicks in for any callsite that DOESN'T pass an
+    // explicit `dedupe` (most of the cancel-handler call sites).
+    if (isCancel) playSFX('ui_cancel', { dedupe: 250, volume: 0.4 });
+    else playSFX('ui_click', { dedupe: 60 });
   }, { capture: true });
 
-  // Escape key → ui_cancel.
+  // Escape key → ui_cancel. Matches the auto-dedupe window so any
+  // overlap with feature-screen Escape handlers (puzzle creator,
+  // board, deck/pile viewers) collapses to a single chime per
+  // physical Escape press, regardless of which handler reaches the
+  // SFX first.
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') playSFX('ui_cancel', { dedupe: 40 });
+    if (e.key === 'Escape') playSFX('ui_cancel', { dedupe: 250 });
   });
 }
 
@@ -717,14 +745,38 @@ if (typeof document !== 'undefined') {
 // submenu, the second sees no submenu and opens Surrender). Registered
 // in CAPTURE phase on window so it runs BEFORE every feature handler;
 // calling stopImmediatePropagation() suppresses the ghost Escape entirely.
-// 150ms is comfortably longer than any OS repeat cadence and shorter than
-// a deliberate double-tap.
+//
+// Two suppression strategies, layered:
+//
+//   1. `e.repeat === true` — the browser tags every OS-repeat event
+//      (the steady stream of keydowns the OS fires while a key stays
+//      held). Suppressing those unconditionally means a held Escape
+//      registers as exactly one event regardless of duration. Without
+//      this, a half-second hold on Escape would toggle Give-Up open /
+//      closed / open / closed / … as the menu's own state-update
+//      causes the next repeat keydown to flip the wrong way.
+//
+//   2. Time-based 250ms window — defends against double-fire patterns
+//      that DON'T set `e.repeat` (e.g. focus jumps, programmatic
+//      KeyboardEvent dispatches from libraries, browsers without
+//      `repeat` support). 250ms is comfortably longer than any OS
+//      repeat cadence and shorter than a deliberate double-tap.
+//
+// Either trigger calls `stopImmediatePropagation()` so no other
+// handler — capture, bubble, or the global SFX listener at L708 —
+// sees the event. That collapses the cascade into a single ui_cancel
+// chime.
 (function installEscapeDedupe() {
   let lastAt = 0;
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
+    if (e.repeat) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
     const now = Date.now();
-    if (now - lastAt < 150) {
+    if (now - lastAt < 250) {
       e.stopImmediatePropagation();
       e.preventDefault();
       return;

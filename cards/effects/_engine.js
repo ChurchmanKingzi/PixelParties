@@ -265,6 +265,26 @@ class CardInstance {
   }
 }
 
+/**
+ * "External" sources for the selfDeleteOnExternalDiscard redirect.
+ * A card landing in a discard pile is considered to come from an
+ * external source if it was previously in a player's deck, discard
+ * pile, deleted pile, or potion deck — i.e. anywhere that is NOT
+ * the hand or any board zone (support, ability, area, surprise,
+ * hero, permanent). Used by `actionMoveCard` and `actionMillCards`
+ * to route Rebelliokai-style "if sent here from outside hand/board,
+ * delete it instead" Creatures to the deleted pile.
+ */
+const _EXTERNAL_DISCARD_SOURCES = new Set([
+  ZONES.DECK,
+  ZONES.DISCARD,
+  ZONES.DELETED,
+  ZONES.POTION,
+]);
+function _isExternalDiscardSource(fromZone) {
+  return _EXTERNAL_DISCARD_SOURCES.has(fromZone);
+}
+
 // ═══════════════════════════════════════════
 //  GAME ENGINE
 // ═══════════════════════════════════════════
@@ -1196,6 +1216,76 @@ class GameEngine {
   }
 
   /**
+   * Walk discardPile / deletedPile (per player) and ensure every card
+   * whose script declares an `activeIn` zone matching the pile + a
+   * handler for `hookName` has at least one tracked CardInstance per
+   * pile entry. Called from `runHooks` before listener dispatch as a
+   * safety net for "I listen while sitting in the discard / deleted
+   * pile" effects (Rebelliokai Backup Bakus's recur trigger, etc.) —
+   * the various paths that put a card into those piles aren't all
+   * listener-aware (Magenta's manual splice, certain mill / damage
+   * paths, the self-delete redirect helpers).
+   *
+   * Cheap to run: short pile + script-flag filtering, only walks when
+   * the hook name is one a pile-resident listener might react to.
+   * Idempotent — adds missing trackers but never goes above the pile
+   * count.
+   */
+  _ensurePileListeners(hookName) {
+    if (!hookName) return;
+    // Hooks that pile-resident listeners realistically observe. Hand
+    // / board hooks (onPlay, onAttackDeclare, beforeDamage, …) are
+    // skipped — their listeners must be on the board / hand to fire,
+    // and rebuilding pile listeners for those events would be wasted
+    // work.
+    const PILE_RELEVANT_HOOKS = new Set([
+      'onDiscard', 'onCardEnterZone', 'onCardLeaveZone',
+      'onDelete', 'onCreatureDeath', 'onMill',
+      'onTurnStart', 'onTurnEnd',
+    ]);
+    if (!PILE_RELEVANT_HOOKS.has(hookName)) return;
+
+    const pilesToCheck = [
+      { key: 'discardPile', zone: ZONES.DISCARD },
+      { key: 'deletedPile', zone: ZONES.DELETED },
+    ];
+
+    for (let pi = 0; pi < 2; pi++) {
+      const ps = this.gs.players[pi];
+      if (!ps) continue;
+      for (const { key, zone } of pilesToCheck) {
+        const pile = ps[key];
+        if (!Array.isArray(pile) || pile.length === 0) continue;
+
+        // Tally pile occurrences by name.
+        const counts = {};
+        for (const name of pile) counts[name] = (counts[name] || 0) + 1;
+
+        for (const name in counts) {
+          const script = loadCardEffect(name);
+          if (!script?.hooks?.[hookName]) continue;
+          const activeIn = script.activeIn;
+          // Scripts without `activeIn` are active everywhere — they
+          // already qualify. Otherwise the pile zone must be in the
+          // declared list.
+          if (activeIn && !activeIn.includes(zone)) continue;
+
+          // Tally trackers for THIS player at zone (including the
+          // pile-zone trackers we'd be adding here on a re-entry).
+          let trackedCount = 0;
+          for (const inst of this.cardInstances) {
+            if (inst.owner === pi && inst.name === name && inst.zone === zone) trackedCount++;
+          }
+          const missing = counts[name] - trackedCount;
+          for (let i = 0; i < missing; i++) {
+            this._trackCard(name, pi, zone);
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Move a single card from one player's discard pile to another (or the
    * same) player's hand, then fire ON_CARD_ADDED_FROM_DISCARD_TO_HAND.
    * Centralises what was previously scattered splice+push pairs across
@@ -1320,6 +1410,27 @@ class GameEngine {
     hookCtx._hookName = hookName;
     hookCtx.cancelled = hookCtx.cancelled || false;
     hookCtx.gameState = this.gs;
+
+    // ── Pile-listener safety net ──
+    // Some cards listen for events WHILE sitting in their discard or
+    // deleted pile (Rebelliokai Backup Bakus's recur-on-Rebelliokai-
+    // discard trigger is the first such pattern in the codebase). The
+    // engine's various paths to discardPile / deletedPile aren't all
+    // listener-aware: Magenta-style manual hand splices don't update
+    // `inst.zone`, mill paths only track instances for cards with
+    // `onMill` hooks, the damage-batch death path untracks the dying
+    // inst entirely, and self-delete redirects push by name only via
+    // `_scheduleSelfDeleteTransit`'s setTimeouts. Any of those leave a
+    // card sitting in the pile with no tracked instance — and so no
+    // listener — even though its script declares one.
+    //
+    // Before dispatching any hook, walk the relevant piles and ensure
+    // every card whose script declares a matching `activeIn` zone +
+    // hook handler has at least N tracked instances at that zone,
+    // where N is the number of copies sitting in that pile. This is
+    // idempotent (only adds missing trackers, never duplicates beyond
+    // pile count) and bounded (at most a few cards per pile).
+    this._ensurePileListeners(hookName);
 
     // Gather all cards that have this hook AND are active in their current zone
     const listeners = this.cardInstances.filter(c => {
@@ -4240,10 +4351,14 @@ class GameEngine {
   async actionDrawCards(playerIdx, count, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
-    if (ps.handLocked) return [];
+    // `opts._unpreventable: true` lets a card-effect draw bypass both
+    // the hand-locked debuff and the BEFORE_DRAW_BATCH cancellation
+    // hook. Used by Champion, the Stormbringer's "this draw cannot be
+    // prevented" forced-draw on the opponent.
+    if (ps.handLocked && !opts._unpreventable) return [];
 
     // Fire batch-level draw hook (Intrude, etc.) — only for effect draws, not Resource Phase
-    if (!opts._skipBatchHook && this.gs.currentPhase !== PHASES.RESOURCE) {
+    if (!opts._skipBatchHook && !opts._unpreventable && this.gs.currentPhase !== PHASES.RESOURCE) {
       const batchCtx = { playerIdx, amount: count, deckType: 'main', _skipReactionCheck: true };
       await this.runHooks(HOOKS.BEFORE_DRAW_BATCH, batchCtx);
       count = Math.max(0, batchCtx.amount);
@@ -4264,9 +4379,13 @@ class GameEngine {
     const drawn = [];
     const drawDelay = count > 1 ? (opts.drawDelay ?? 300) : 0;
     for (let i = 0; i < count; i++) {
-      const hookCtx = { playerIdx, cancelled: false };
-      await this.runHooks(HOOKS.BEFORE_DRAW, hookCtx);
-      if (hookCtx.cancelled) continue;
+      // `_unpreventable` also bypasses the per-card BEFORE_DRAW
+      // cancel hook (no listener can refuse the draw).
+      if (!opts._unpreventable) {
+        const hookCtx = { playerIdx, cancelled: false };
+        await this.runHooks(HOOKS.BEFORE_DRAW, hookCtx);
+        if (hookCtx.cancelled) continue;
+      }
 
       if (ps.mainDeck.length === 0) {
         this.log('deck_out', { player: ps.username });
@@ -4611,6 +4730,86 @@ class GameEngine {
       toSlot    = -1;
     }
 
+    // ── selfDeleteOnExternalDiscard redirect ──
+    // Cards (Rebelliokai Creatures, etc.) that self-delete when sent
+    // to discard from anywhere except the hand or the board. Only
+    // "external" sources (deck / discard / deleted / potion) qualify;
+    // hand and any board zone (support / ability / area / surprise /
+    // hero / permanent) route to discard normally.
+    //
+    // The redirect runs the delete-rescue gate upfront (a beforeDelete
+    // claim suppresses the entire transit) and then either:
+    //
+    //   • DECK / DELETED source → fires the appropriate preceding
+    //     pile-flight animation (`deck_to_discard_animation` or
+    //     `deleted_to_discard_animation`) and hands off to
+    //     `_scheduleSelfDeleteTransit` for the visible round-trip
+    //     (Phase A pushes to discardPile when the flight lands,
+    //     Phase B splices + chained discard→deleted, Phase C pushes
+    //     to deletedPile when the chained flight lands). actionMoveCard
+    //     returns early — Phase A/B/C own the pile state from here.
+    //   • DISCARD / POTION source → no canonical preceding-flight
+    //     animation exists, so the helper runs without one. The card
+    //     transit is still visible (chained discard→deleted plays).
+    if (toZone === ZONES.DISCARD && _isExternalDiscardSource(fromZone)) {
+      const _selfDelScript = loadCardEffect(cardInstance.name);
+      if (_selfDelScript?.selfDeleteOnExternalDiscard) {
+        const owner = cardInstance.owner;
+        const originalOwner = cardInstance.originalOwner ?? owner;
+        const moveSource = opts.source || opts.deathSource?.name || 'self-delete (move)';
+
+        // Delete-rescue gate first — beforeDelete listeners (Cute
+        // Hydra, Guardian Beast Zhu) get a chance to suppress the
+        // whole redirect. Identical contract to the deleted-pile-
+        // bound branch below.
+        const rescued = await this._tryBeforeDelete(cardInstance.name, originalOwner, {
+          fromZone, fromInstance: cardInstance, source: moveSource,
+        });
+        if (rescued) {
+          this.log('delete_rescued', {
+            card: cardInstance.name, from: fromZone, source: moveSource,
+          });
+          return;
+        }
+
+        // Remove from source zone state (mirrors the standard move
+        // flow's `_removeCardFromState` step) and untrack the
+        // instance — the helper places the card by name in Phase A
+        // / C; no instance is needed for transient discard or final
+        // deleted state in this path.
+        this._removeCardFromState(cardInstance);
+        this._untrackCard(cardInstance.id);
+
+        // Preceding pile-flight animation. landAtMs = 560 (80% of
+        // the standard 700ms travel — when the keyframe puts the
+        // card at the discard pile rect just before its fade tail).
+        if (fromZone === ZONES.DECK) {
+          this._broadcastEvent('deck_to_discard_animation', {
+            owner,
+            cardNames:    [cardInstance.name],
+            deleteMode:   false,
+            holdDuration: 0,
+          });
+        } else if (fromZone === ZONES.DELETED) {
+          this._broadcastEvent('deleted_to_discard_animation', {
+            owner,
+            cardNames: [cardInstance.name],
+            source:    moveSource,
+          });
+        }
+        // DISCARD / POTION: no preceding animation, but Phase A still
+        // pushes the card to discardPile at landAtMs and Phase B/C
+        // play the chained transit so the self-delete remains visible.
+
+        this._scheduleSelfDeleteTransit(owner, [{
+          name:     cardInstance.name,
+          landAtMs: 560,
+        }], { source: moveSource });
+
+        return;
+      }
+    }
+
     // Generic support→hand transfer animation. Fires BEFORE state
     // mutations so DOM coords still reflect the source slot. Covers
     // The White Eye, Shu'Chaku's artifact bounce, and any future card
@@ -4758,7 +4957,14 @@ class GameEngine {
       if (inst) {
         inst.zone = ZONES.DISCARD;
         this.log('discard', { player: ps.username, card: cardName });
-        await this.runHooks(HOOKS.ON_DISCARD, { playerIdx, card: inst, cardName, discardedCardName: cardName, _fromHand: true });
+        await this.runHooks(HOOKS.ON_DISCARD, {
+          playerIdx, card: inst, cardName, discardedCardName: cardName,
+          // See `actionDiscardHandCard` for the rationale — listeners
+          // that need self-detection compare `ctx.discardedInstId`
+          // against their own `ctx.card.id`.
+          discardedInstId: inst.id,
+          _fromHand: true,
+        });
       }
     }
   }
@@ -4803,6 +5009,18 @@ class GameEngine {
     this.log('discard', { player: ps.username, card: cardName, source: opts.source || null });
     await this.runHooks(HOOKS.ON_DISCARD, {
       playerIdx, card: inst, cardName, discardedCardName: cardName,
+      // Propagate the calling effect's source tag so listeners can
+      // attribute the discard to a specific archetype / card. Used by
+      // Rebelliokai Kind Kitsune (and any future "when discarded by
+      // <X>'s effect" listener) to filter by `DISCARD_SOURCE_TAG`.
+      source: opts.source || null,
+      // Discarded card's instance id. `_createContext` rebinds
+      // `ctx.card` to the LISTENING inst, so the discarded card's
+      // identity has to be carried via a non-`card` field. Listeners
+      // that need self-detection ("only the JUST-discarded copy fires,
+      // not other copies that were already in discard") compare
+      // `ctx.discardedInstId === ctx.card.id`.
+      discardedInstId: inst?.id ?? null,
       _fromHand: true,
       _skipReactionCheck: opts.skipReactionCheck !== false,
     });
@@ -4835,6 +5053,12 @@ class GameEngine {
 
     const toMill     = Math.min(count, ps.mainDeck.length);
     const milledCards = [];
+    // Cards the selfDeleteOnExternalDiscard redirect re-routed from
+    // discard → deleted on this mill. Used to broadcast the chained
+    // discard→deleted flying-card animation after the standard
+    // deck→discard one, so the player sees the redirect happen
+    // visually (matches "The First Circle of Hell" mass-delete style).
+    const redirectedToDeleted = [];
     const pileKey    = opts.deleteMode ? 'deletedPile' : 'discardPile';
 
     // Helper that wraps the actual pile push with the delete-rescue
@@ -4842,7 +5066,37 @@ class GameEngine {
     // gate is a cheap script-lookup miss and we fall through to the
     // ordinary push.
     const pushOrRescue = async (cardName) => {
-      if (opts.deleteMode) {
+      // selfDeleteOnExternalDiscard redirect: a deck → discard mill is
+      // an external-source discard. Cards that opt in (Rebelliokai
+      // Creatures) genuinely transit through the discard pile —
+      // appearing in it briefly when the deck→discard animation
+      // lands, then vanishing as they fly to the deleted pile. The
+      // pile-state transitions for those cards are owned end-to-end
+      // by `_scheduleSelfDeleteTransit` (Phase A pushes to
+      // discardPile, Phase B splices, Phase C pushes to deletedPile)
+      // — so we DO NOT push them to discardPile here, otherwise the
+      // pile UI updates immediately at sync-time and the card "pops"
+      // into the discard pile while the deck→discard flying animation
+      // is still in mid-air.
+      //
+      // Mills that ALREADY head to the deleted pile (`opts.deleteMode`)
+      // skip the redirect path — they animate straight to deleted as
+      // before.
+      let wasRedirected = false;
+      if (!opts.deleteMode) {
+        const _selfDelScript = loadCardEffect(cardName);
+        if (_selfDelScript?.selfDeleteOnExternalDiscard) {
+          wasRedirected = true;
+        }
+      }
+
+      // Delete-rescue gate: cards heading to the deleted pile (either
+      // because `opts.deleteMode` is set, OR the
+      // selfDeleteOnExternalDiscard rule is going to redirect them
+      // there shortly) get a chance to claim a beforeDelete rescue.
+      // For redirected cards we run the gate UPFRONT so a rescue
+      // suppresses the entire transit (no animation, no pile pushes).
+      if (opts.deleteMode || wasRedirected) {
         const rescued = await this._tryBeforeDelete(cardName, playerIdx, {
           fromZone: ZONES.DECK,
           fromInstance: null,
@@ -4850,7 +5104,19 @@ class GameEngine {
         });
         if (rescued) return false; // rescue claimed it — no push
       }
-      ps[pileKey].push(cardName);
+
+      // Destination push:
+      //  - opts.deleteMode  → straight to deletedPile (no transit)
+      //  - wasRedirected    → DEFER all pushes to the transit helper
+      //                       (Phase A pushes to discardPile only when
+      //                       the deck→discard animation lands)
+      //  - default          → discardPile (normal mill)
+      if (wasRedirected) {
+        redirectedToDeleted.push(cardName);
+      } else {
+        const pile = opts.deleteMode ? 'deletedPile' : 'discardPile';
+        ps[pile].push(cardName);
+      }
       return true;
     };
 
@@ -4892,7 +5158,9 @@ class GameEngine {
     // For any milled card whose script has an onMill hook, create a tracked
     // instance in the discard/deleted zone so it can fire as a listener.
     // (Cards in the deck normally have no tracked instances.)
-    const { loadCardEffect } = require('./_loader');
+    // `loadCardEffect` is the module-level import — the redundant local
+    // re-require that used to live here put `pushOrRescue`'s closure
+    // into a temporal dead zone for the same name.
     const destZoneMill = opts.deleteMode ? ZONES.DELETED : ZONES.DISCARD;
     for (const cardName of milledCards) {
       const existing = this.cardInstances.find(
@@ -4936,20 +5204,88 @@ class GameEngine {
       ps._oppHasMilledMe = true;
     }
 
-    // Broadcast face-up flying-card animation: deck → discard (purely visual)
-    this._broadcastEvent('deck_to_discard_animation', {
-      owner:        playerIdx,
-      cardNames:    milledCards,
-      deleteMode:   !!opts.deleteMode,
-      holdDuration: opts.holdDuration || 0,
-    });
+    // Broadcast face-up flying-card animation: deck → discard (purely visual).
+    //
+    // When some milled cards were redirected to the deleted pile by
+    // the selfDeleteOnExternalDiscard rule, the deck→discard leg is
+    // STILL animated to the discard pile (deleteMode: false) for
+    // those cards — the chained discard→deleted broadcast below
+    // takes them the rest of the way, so the player sees the cards
+    // "transit" through discard before being deleted (mirrors The
+    // First Circle of Hell's mass-delete visual). Mills that ALREADY
+    // headed to deleted (`opts.deleteMode === true`) animate
+    // straight to deleted as before.
+    // Split the deck→discard broadcast based on whether cards will
+    // self-delete on arrival. Non-redirected cards keep the caller's
+    // holdDuration (Magenta's 2 s reveal etc.); redirected cards
+    // skip the hold entirely — the chained transit animation IS the
+    // reveal for those, and the hold only adds dead time before the
+    // self-delete kicks in. Skipped when nothing got redirected (one
+    // unified broadcast) or `opts.deleteMode` is set (mill straight
+    // to deleted, no transit involved).
+    const redirectedSet = new Set(redirectedToDeleted);
+    const nonRedirectedMilled = !opts.deleteMode
+      ? milledCards.filter(c => !redirectedSet.has(c))
+      : milledCards;
 
-    // Wait for animation only if there's a hold (Magenta's 2s reveal); otherwise skip
-    if (opts.holdDuration) {
+    if (nonRedirectedMilled.length > 0) {
+      this._broadcastEvent('deck_to_discard_animation', {
+        owner:        playerIdx,
+        cardNames:    nonRedirectedMilled,
+        deleteMode:   !!opts.deleteMode,
+        holdDuration: opts.holdDuration || 0,
+      });
+    }
+
+    if (redirectedToDeleted.length > 0 && !opts.deleteMode) {
+      // Redirected cards: no hold. They fly to discard, briefly land
+      // (50 ms pause via _scheduleSelfDeleteTransit), then the chained
+      // discard→deleted fires.
+      this._broadcastEvent('deck_to_discard_animation', {
+        owner:        playerIdx,
+        cardNames:    redirectedToDeleted,
+        deleteMode:   false,
+        holdDuration: 0,
+      });
+    }
+
+    // selfDeleteOnExternalDiscard transit. Each redirected card is
+    // currently sitting in discardPile (the mill push routed it
+    // there) — schedule its splice + chained discard→deleted flight
+    // + final deletedPile push so the visual flow reads as:
+    // deck → discard (lands) → 50 ms pause → discard → deleted
+    // (lands at deletedPile).
+    //
+    // CRITICAL: scheduled BEFORE the holdDuration `await` below so
+    // the transit's setTimeout starts ticking from real wall-clock
+    // time — i.e. the same moment the broadcasts fire. setTimeouts
+    // fire during the engine's await with no issue.
+    //
+    // landAtMs uses the standard 560 ms (80 % of the 700 ms travel)
+    // since redirected cards always animate with no hold (split
+    // broadcast above). Per-card stagger (200 ms) walks the
+    // redirected-cards-only ordering since their broadcast is
+    // independent of the non-redirected one.
+    if (redirectedToDeleted.length > 0 && !opts.deleteMode) {
+      const schedule = redirectedToDeleted.map((name, idx) => ({
+        name,
+        landAtMs: idx * 200 + 560,
+      }));
+      this._scheduleSelfDeleteTransit(playerIdx, schedule, {
+        source: opts.source || 'self-delete (mill)',
+      });
+    }
+
+    // Wait for animation only if there's a hold (Magenta's 2 s
+    // reveal) AND there are non-redirected cards to apply it to.
+    // Skipped when every milled card was redirected — those cards
+    // get a no-hold broadcast above and the transit handles their
+    // visuals.
+    if (opts.holdDuration && nonRedirectedMilled.length > 0) {
       const travelMs = 700;
       const holdMs   = opts.holdDuration;
       const fadeMs   = 300;
-      await this._delay((milledCards.length - 1) * 200 + travelMs + holdMs + fadeMs + 100);
+      await this._delay((nonRedirectedMilled.length - 1) * 200 + travelMs + holdMs + fadeMs + 100);
     }
 
     this.sync();
@@ -5357,6 +5693,113 @@ class GameEngine {
   }
 
   /**
+   * Run the "self-delete on external discard" rule's three pile
+   * transitions for redirected cards (Rebelliokai Creatures, etc.)
+   * after the preceding pile-flight animation has been broadcast:
+   *
+   *   Phase A — at `landAtMs` (when the preceding animation lands at
+   *     the discard pile rect): push the card onto discardPile + sync.
+   *     The pile-UI count goes up at the moment the visual flying
+   *     card arrives — not earlier. Callers MUST NOT push the card
+   *     to discardPile themselves; this helper owns the pile state
+   *     end-to-end.
+   *   Phase B — at `landAtMs + 50` (the requested pause-at-discard):
+   *     splice the card out of discardPile + sync (count drops),
+   *     then broadcast a chained `discard_to_deleted_animation` — a
+   *     fresh copy appears at the discard pile rect and flies to
+   *     the deleted pile rect.
+   *   Phase C — at Phase B + 560 (chained animation's visual landing
+   *     — 80 % of the 700 ms travel): push onto deletedPile + sync.
+   *     The card is "permanently placed" the moment the chained
+   *     animation visually arrives at the deleted pile.
+   *
+   * Each entry's `landAtMs` should match the moment that card's
+   * preceding-animation visual lands at the discard pile rect —
+   * factor in the source animation's per-card stagger (200 ms for
+   * `deck_to_discard_animation`, 160 ms for `deleted_to_discard_
+   * animation`) so each redirected card transits with its own
+   * correct timing in multi-card batches.
+   *
+   * Fire-and-forget via setTimeout — the engine's resolve loop
+   * returns immediately and the visual + state moves play out
+   * asynchronously.
+   *
+   * @param {number} playerIdx
+   * @param {Array<{ name: string, landAtMs: number }>} schedule
+   * @param {object} [opts]
+   * @param {string} [opts.source]
+   */
+  _scheduleSelfDeleteTransit(playerIdx, schedule, opts = {}) {
+    if (!schedule || schedule.length === 0) return;
+
+    // ── MCTS / fast-mode short-circuit ──
+    // The Phase A/B/C `setTimeout` callbacks below capture `this`
+    // (the engine instance) and read `this.gs` at fire time. During
+    // an MCTS rollout we snapshot, mutate, evaluate, then RESTORE
+    // — but the timers don't unschedule on restore. They fire
+    // milliseconds later against the now-restored REAL game state
+    // and shove phantom card names into the player's discard /
+    // deleted piles, manifesting as Rebelliokai cards "appearing"
+    // out of nowhere on the CPU's side after the AI thinks for a
+    // few seconds. (Same hazard for `_fastMode` self-play sims.)
+    //
+    // Simulation paths don't need the visual transit at all — the
+    // eval-state scorer reads pile contents synchronously and
+    // doesn't care about timing. Apply the terminal state (card
+    // ends up in `deletedPile`) inline and return without
+    // scheduling any timers; the snapshot/restore cycle then
+    // correctly rolls back the change with no leftover work
+    // queued against the real engine.
+    if (this._inMctsSim || this._fastMode) {
+      const ps = this.gs.players[playerIdx];
+      if (!ps) return;
+      if (!ps.deletedPile) ps.deletedPile = [];
+      for (const { name } of schedule) {
+        ps.deletedPile.push(name);
+      }
+      return;
+    }
+
+    const PAUSE_MS       = 50;
+    const VISUAL_LAND_MS = 560; // 80 % of 700 ms standard pile-flight travel
+
+    for (const { name, landAtMs } of schedule) {
+      const moveStartsAt = landAtMs + PAUSE_MS;
+      const placedAt     = moveStartsAt + VISUAL_LAND_MS;
+
+      // Phase A: card "arrives" at discard pile — push + sync.
+      setTimeout(() => {
+        const ps = this.gs.players[playerIdx];
+        if (!ps) return;
+        ps.discardPile.push(name);
+        this.sync();
+      }, landAtMs);
+
+      // Phase B: 50 ms later, vanish from discardPile + chained anim.
+      setTimeout(() => {
+        const ps = this.gs.players[playerIdx];
+        if (!ps) return;
+        const idx = ps.discardPile.indexOf(name);
+        if (idx >= 0) ps.discardPile.splice(idx, 1);
+        this.sync();
+        this._broadcastEvent('discard_to_deleted_animation', {
+          owner:     playerIdx,
+          cardNames: [name],
+          source:    opts.source || 'self-delete',
+        });
+      }, moveStartsAt);
+
+      // Phase C: chained animation lands — push to deletedPile + sync.
+      setTimeout(() => {
+        const ps = this.gs.players[playerIdx];
+        if (!ps) return;
+        ps.deletedPile.push(name);
+        this.sync();
+      }, placedAt);
+    }
+  }
+
+  /**
    * Resolve deferred spell recoil (Fire Bolts, etc.).
    * Called by the server after afterSpellResolved completes, so recoil
    * happens after all spell casts (including Bartas second cast).
@@ -5690,6 +6133,23 @@ class GameEngine {
             (this.gs._batchDiscardCountByPlayer[playerIdx] || 0) + 1;
         }
 
+        // Optional flight animation per discarded card. Used by
+        // Champion, the Stormbringer's "your opponent must discard"
+        // step so the opponent's discards mirror the windstorm flight
+        // the activator's own hand cards take. The broadcast goes out
+        // BEFORE the sync() below — the client captures the source
+        // hand-slot rect at broadcast-receipt time, before React
+        // processes the upcoming state update that shrinks the hand.
+        if (actuallyDiscarded && opts.flightStyle && resolvedCardName) {
+          this._broadcastEvent('play_pile_transfer', {
+            owner:       playerIdx,
+            cardName:    resolvedCardName,
+            from:        'hand',
+            to:          deleteMode ? 'deleted' : 'discard',
+            flightStyle: opts.flightStyle,
+          });
+        }
+
         // Only fire onDiscard / onDelete for cards that ACTUALLY hit
         // the destination pile. A delete-rescued card (Cute Hydra)
         // never landed in deletedPile, so its on-delete listeners
@@ -5867,16 +6327,31 @@ class GameEngine {
     const statusDef = STATUS_EFFECTS[statusName];
     const isNegative = statusDef?.negative === true;
 
+    // Per-status default animation when the source card didn't pass an
+    // explicit `opts.animationType`. Mirrors the client's status-diff
+    // detector (see `app-board.jsx`'s gained-status branches): when a
+    // status actually lands, the diff detector fires these animations
+    // automatically. When a status is BLOCKED, no diff happens and the
+    // detector never fires — so we have to broadcast the animation
+    // ourselves so blocks still read visually (Snow Cannon's freeze
+    // hitting a Johanna-protected ally, etc.).
+    const _DEFAULT_STATUS_ANIM = {
+      frozen:  'freeze',
+      burned:  'flame_strike',
+      negated: 'electric_strike',
+    };
+
     // Helper: play animation on blocked status (find hero position first)
     const playBlockedAnim = () => {
-      if (!opts.animationType) return;
+      const animType = opts.animationType || _DEFAULT_STATUS_ANIM[statusName];
+      if (!animType) return;
       const ownerIdx = this._findHeroOwner(target);
       if (ownerIdx < 0) return;
       const ps = this.gs.players[ownerIdx];
       const heroIdx = (ps.heroes || []).indexOf(target);
       if (heroIdx >= 0) {
         this._broadcastEvent('play_zone_animation', {
-          type: opts.animationType, owner: ownerIdx, heroIdx, zoneSlot: -1,
+          type: animType, owner: ownerIdx, heroIdx, zoneSlot: -1,
         });
       }
     };
@@ -5898,6 +6373,30 @@ class GameEngine {
         this.log('status_blocked', { target: this._heroLabel(target), status: statusName, reason: 'charmed' });
         playBlockedAnim();
         return false;
+      }
+
+      // Johanna, Crusader of Light: while she is alive AND not
+      // incapacitated (frozen / stunned / negated), her sibling Heroes
+      // are immune to negative statuses. The status SELECTION is still
+      // valid (Heroes can be CHOSEN as targets — same pattern as first-
+      // turn-protection); the status simply doesn't land.
+      // Johanna herself is NOT covered by her own protection.
+      if (target?.hp !== undefined) {
+        const ownerIdx = this._findHeroOwner(target);
+        if (ownerIdx >= 0) {
+          const ownerPs = this.gs.players[ownerIdx];
+          for (let hi = 0; hi < (ownerPs?.heroes || []).length; hi++) {
+            const johanna = ownerPs.heroes[hi];
+            if (!johanna?.name) continue;
+            if (johanna.name !== 'Johanna, Crusader of Light') continue;
+            if (johanna === target) continue; // Johanna doesn't protect herself
+            if (johanna.hp <= 0) continue;
+            if (johanna.statuses?.frozen || johanna.statuses?.stunned || johanna.statuses?.negated) continue;
+            this.log('status_blocked', { target: this._heroLabel(target), status: statusName, reason: 'johanna_protected' });
+            playBlockedAnim();
+            return false;
+          }
+        }
       }
 
       // Immune status blocks all negative statuses
@@ -5957,6 +6456,35 @@ class GameEngine {
       delete hero.statuses[key];
       this.log('status_remove', { target: hero.name, status: key, by: source });
       removed.push(key);
+    }
+    // Fire `onStatusRemoved` per-removed-status as a fire-and-forget
+    // microtask. Keeps the function sync (return value semantics
+    // unchanged for the existing 10+ cleanse callers — Cure, Beer,
+    // Coffee, Tea, Juice, Waitress, etc.) while still letting hook
+    // listeners (Johanna's protection re-evaluation, any future
+    // cleanse-reactive card) observe the cleanse. Without this,
+    // the cleanse path silently bypassed every onStatusRemoved
+    // listener — only `actionRemoveStatus` ever fired the hook.
+    //
+    // Skipped during MCTS / fast-mode simulations: the microtask
+    // would resolve AFTER `engine.restore(snap)` swaps `this.gs`
+    // back to the real game state, so any listener mutations the
+    // hooks make would land on the REAL state (mirror of the
+    // `_scheduleSelfDeleteTransit` setTimeout leak fixed above).
+    // Simulations don't need the hook fire — eval-state scoring
+    // reads `hero.statuses` directly, so the synchronous splice
+    // above is sufficient.
+    if (removed.length > 0 && !this._inMctsSim && !this._fastMode) {
+      Promise.resolve().then(async () => {
+        for (const key of removed) {
+          await this.runHooks(HOOKS.ON_STATUS_REMOVED, {
+            target: hero, status: key, heroOwner: playerIdx, heroIdx,
+            _viaCleanse: true, _skipReactionCheck: true,
+          });
+        }
+      }).catch(err => {
+        console.error('[cleanseHeroStatuses hook fire]', err.message);
+      });
     }
     return removed;
   }
@@ -7939,8 +8467,14 @@ class GameEngine {
 
   /**
    * Advance to a specific phase (for skipping Action Phase → Main Phase 2).
+   * `opts.manual === true` signals the player explicitly clicked the
+   * phase button — that path bypasses the second-action grace gate so
+   * the player can voluntarily skip past unused second-action grants.
+   * The default (no opts) is for engine/server AUTO-advance after an
+   * action resolves, where the grace gate KEEPS the player in Action
+   * Phase so a freshly-granted bonus isn't accidentally skipped.
    */
-  async advanceToPhase(playerIdx, targetPhase) {
+  async advanceToPhase(playerIdx, targetPhase, opts = {}) {
     if (playerIdx !== this.gs.activePlayer) return false;
     // Spell-resolution-in-flight guard — see advancePhase() comment.
     if ((this.gs._spellResolutionDepth || 0) > 0) return false;
@@ -7958,9 +8492,11 @@ class GameEngine {
     if (!allowed || !allowed.includes(targetPhase)) return false;
 
     // Generic bonus action system: if a card granted a second-action grace slot
-    // (Torchure), keep the player in Action Phase when they try to advance after
-    // their first action. The flag is consumed (or lost) in the play handlers the
-    // moment a second action begins — we never decrement it here, because the skip
+    // (Torchure), keep the player in Action Phase when AUTO-advance fires after
+    // their first action — so a freshly-granted bonus isn't accidentally skipped
+    // past on the implicit "phase advances after the action you just played"
+    // path. The flag is consumed (or lost) in the play handlers the moment a
+    // second action begins — we never decrement it here, because the skip
     // must fire once per second-action-slot attempt, and the slot is defined by
     // _actionsPlayedThisPhase === 1.
     //
@@ -7968,10 +8504,17 @@ class GameEngine {
     // additionalActionType providers (Soul Shard Ba and any future card
     // routed through `_second-action-shared`): a hero-restricted second
     // action is still a "second action this Action Phase", so the
-    // engine refuses to advance past it. The player keeps the option
-    // to take action 2 (consuming or fizzling the grant) before the
-    // phase ends.
-    if (current === PHASES.ACTION && targetPhase === PHASES.MAIN2) {
+    // engine auto-keeps the player in Action Phase. The player keeps
+    // the option to take action 2 (consuming or fizzling the grant)
+    // before the phase ends.
+    //
+    // `opts.manual === true` SKIPS this gate — when the player clicks
+    // the Main Phase 2 button explicitly, they're consciously choosing
+    // to leave their unused second action behind. Without this carve-
+    // out the engine would refuse the manual click and the player
+    // would be stuck in Action Phase until they used or fizzled the
+    // grant, which is the bug.
+    if (!opts.manual && current === PHASES.ACTION && targetPhase === PHASES.MAIN2) {
       const ps = this.gs.players[playerIdx];
       const actionsPlayed = ps?._actionsPlayedThisPhase || 0;
       if (actionsPlayed === 1) {
@@ -12534,11 +13077,23 @@ class GameEngine {
           }
         }
 
-        // Non-initial cards go to discard after resolving
+        // Non-initial cards go to discard after resolving — UNLESS
+        // their script opts out via `skipPostResolveDiscard: true`.
+        // Reaction Creatures (Rebelliokai Courtly Kirin) summon
+        // THEMSELVES into a support zone in their resolve and must
+        // not be auto-pushed to discard on top of that, otherwise
+        // they'd end up in two places at once (board + discard).
+        // The negated branch above keeps its discard push regardless
+        // — a negated Reaction Creature paid its cost but didn't
+        // actually land, so the discard pile is its correct
+        // destination there.
         if (!link.isInitialCard) {
-          await this._delay(250);
-          const ps = this.gs.players[link.owner];
-          if (ps) ps.discardPile.push(link.cardName);
+          const linkScript = loadCardEffect(link.cardName);
+          if (!linkScript?.skipPostResolveDiscard) {
+            await this._delay(250);
+            const ps = this.gs.players[link.owner];
+            if (ps) ps.discardPile.push(link.cardName);
+          }
         }
 
         this._broadcastEvent('reaction_chain_link_resolved', {
@@ -13390,7 +13945,29 @@ class GameEngine {
     const result = [];
     const currentPhase = this.gs.currentPhase;
     const isMainPhase = currentPhase === 2 || currentPhase === 4;
-    if (!isMainPhase) return [];
+    const isActionPhase = currentPhase === 3;
+    if (!isMainPhase && !isActionPhase) return [];
+
+    // Phase + action-economy gate for `heroEffectActionCost: true` heroes.
+    // Mirrors the same logic doPlaySpell / doPlayCreature use when the
+    // player tries to spend their per-Action-Phase Action: Action Phase
+    // needs the main slot or a bonus / second-action grant; Main Phase
+    // needs an additional-action provider for 'ability_activation'.
+    // Heroes WITHOUT the flag remain Main-Phase-only and free.
+    const canSpendHeroActionCost = (heroIdx) => {
+      if (isActionPhase) {
+        const actionsPlayed = ps._actionsPlayedThisPhase || 0;
+        const hasBonus = (ps.bonusActions?.heroIdx === heroIdx && ps.bonusActions.remaining > 0)
+          || ((ps._bonusMainActions || 0) > 0 && actionsPlayed === 1);
+        const actionAlreadyUsed = (ps.heroesActedThisTurn?.length > 0) && !hasBonus;
+        if (!actionAlreadyUsed) return true;
+        return !!this.findAdditionalActionForCategory(playerIdx, 'ability_activation', heroIdx);
+      }
+      if (isMainPhase) {
+        return !!this.findAdditionalActionForCategory(playerIdx, 'ability_activation', heroIdx);
+      }
+      return false;
+    };
 
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
@@ -13402,6 +13979,17 @@ class GameEngine {
 
       const script = loadCardEffect(hero.name);
       if (!script?.heroEffect) continue;
+
+      // Phase eligibility:
+      //   • heroEffectActionCost heroes — Action Phase OR Main Phase
+      //     (with action availability per `canSpendHeroActionCost`).
+      //   • Standard hero effects — Main Phase only (free activation).
+      const isActionCost = !!script.heroEffectActionCost;
+      if (isActionCost) {
+        if (!canSpendHeroActionCost(hi)) continue;
+      } else if (!isMainPhase) {
+        continue;
+      }
 
       // HOPT per hero instance (soft — each copy is independent)
       const hoptKey = `hero-effect:${hero.name}:${playerIdx}:${hi}`;
@@ -13425,8 +14013,12 @@ class GameEngine {
       result.push({ heroIdx: hi, heroName: hero.name });
     }
 
-    // Also check equipped hero cards in support zones (Initiation Ritual)
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    // Also check equipped hero cards in support zones (Initiation Ritual).
+    // Equipped Hero-effect cards are free Main-Phase activations only —
+    // heroEffectActionCost isn't a meaningful pattern for the equip
+    // (it's not the player's primary Hero spending an Action). Skip in
+    // Action Phase entirely.
+    if (isMainPhase) for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       // Same Bound rationale as the main hero-effect branch — Bound
@@ -13454,10 +14046,14 @@ class GameEngine {
       }
     }
 
-    // Also check charmed opponent heroes (Charme Lv3)
+    // Also check charmed opponent heroes (Charme Lv3). Charmed Heroes
+    // activate via Main Phase only (consistent with the original design
+    // — heroEffectActionCost on a charmed Hero would let the borrowing
+    // player spend their OWN action through the opponent's Hero, which
+    // is a cross-side action-economy mess we don't support).
     const oi = playerIdx === 0 ? 1 : 0;
     const ops = this.gs.players[oi];
-    if (ops) {
+    if (isMainPhase && ops) {
       for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
         const hero = ops.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
@@ -13486,8 +14082,9 @@ class GameEngine {
       }
     }
 
-    // Also check controlled opponent heroes (Controlled Attack)
-    if (ops) {
+    // Also check controlled opponent heroes (Controlled Attack). Same
+    // Main-Phase-only restriction as the charmed branch above.
+    if (isMainPhase && ops) {
       for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
         const hero = ops.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
@@ -14789,13 +15386,26 @@ class GameEngine {
       }
     }
 
-    // Helper: play the animation even when blocked (the effect visually "hits" but doesn't stick)
+    // Helper: play the animation even when blocked (the effect visually
+    // "hits" but doesn't stick). Falls back to a per-status default
+    // animation when the caller didn't pass an explicit
+    // `opts.animationType` — this matches the client's status-diff
+    // detector (which fires `freeze` / `flame_strike` /
+    // `electric_strike` automatically when the status actually lands).
+    // Without the fallback, blocked statuses (Johanna's protection,
+    // immune buffs, freeze_immune, etc.) would be silently invisible
+    // because no source card threads its own animationType through.
+    const _DEFAULT_STATUS_ANIM_HERO = {
+      frozen:  'freeze',
+      burned:  'flame_strike',
+      negated: 'electric_strike',
+    };
     const playBlockedAnim = () => {
-      if (opts.animationType) {
-        this._broadcastEvent('play_zone_animation', {
-          type: opts.animationType, owner: playerIdx, heroIdx, zoneSlot: -1,
-        });
-      }
+      const animType = opts.animationType || _DEFAULT_STATUS_ANIM_HERO[statusName];
+      if (!animType) return;
+      this._broadcastEvent('play_zone_animation', {
+        type: animType, owner: playerIdx, heroIdx, zoneSlot: -1,
+      });
     };
 
     // Shielded (first-turn protection) blocks ALL status effects — no exceptions
@@ -14803,6 +15413,30 @@ class GameEngine {
       this.log('status_blocked', { target: hero.name, status: statusName, reason: 'shielded' });
       playBlockedAnim();
       return;
+    }
+
+    // Johanna, Crusader of Light: while alive AND not incapacitated
+    // (frozen / stunned / negated), her sibling Heroes are immune to
+    // negative status effects. Same pattern as first-turn-protection
+    // — selection / targeting still works, the status simply doesn't
+    // land. Johanna herself is NOT covered by her own protection.
+    // The mirror gate in `actionAddStatus` (for the creature/generic
+    // path) was already added; THIS gate catches the hero-specific
+    // path (`addHeroStatus`) which most Spells / Artifacts use to
+    // freeze / stun / negate Heroes (Snow Cannon, etc.).
+    if (statusDef?.negative) {
+      const johannaPs = this.gs.players[playerIdx];
+      for (let jhi = 0; jhi < (johannaPs?.heroes || []).length; jhi++) {
+        const johanna = johannaPs.heroes[jhi];
+        if (!johanna?.name) continue;
+        if (johanna.name !== 'Johanna, Crusader of Light') continue;
+        if (jhi === heroIdx) continue; // doesn't protect herself
+        if (johanna.hp <= 0) continue;
+        if (johanna.statuses?.frozen || johanna.statuses?.stunned || johanna.statuses?.negated) continue;
+        this.log('status_blocked', { target: hero.name, status: statusName, reason: 'johanna_protected' });
+        playBlockedAnim();
+        return;
+      }
     }
 
     // Submerged heroes: immune to all status effects while owner has other alive non-submerged heroes

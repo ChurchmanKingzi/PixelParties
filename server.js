@@ -1728,6 +1728,11 @@ function sendGameState(room, playerIdx, extra) {
       handLocked: ps.handLocked || false,
       flashbanged: ps._flashbangedDebuff || false,
       forsaken: ps._discardToDeleteActive || false,
+      // Giga Steroids — owner-wide second-Action grant for effect
+      // activations. Set on resolve, cleared on consume / fizzle /
+      // expire by Giga Steroids' hooks. Read by the client to render
+      // the "On Steroids" buff badge in the top-of-board strip.
+      onSteroids: ps.onSteroids || false,
       creationLockedNames: (pi === playerIdx && ps._creationLockedNames) ? [...ps._creationLockedNames] : [],
       handLockBlockedCards: (ps.handLocked && pi === playerIdx) ? (() => {
         const blocked = new Set();
@@ -2184,6 +2189,11 @@ function sendSpectatorGameState(room) {
       handLocked: ps.handLocked || false,
       flashbanged: ps._flashbangedDebuff || false,
       forsaken: ps._discardToDeleteActive || false,
+      // Giga Steroids — owner-wide second-Action grant for effect
+      // activations. Set on resolve, cleared on consume / fizzle /
+      // expire by Giga Steroids' hooks. Read by the client to render
+      // the "On Steroids" buff badge in the top-of-board strip.
+      onSteroids: ps.onSteroids || false,
       supportSpellLocked: ps.supportSpellLocked || false,
       permanents: ps.permanents || [],
       oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
@@ -3377,6 +3387,25 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       _skipReactionCheck: true,
     });
 
+    // Spell-driven force-end-of-turn rider. A Spell's onPlay sets
+    // `gs._spellEndsTurn = true` to request that the turn end as soon
+    // as the Spell finishes resolving (Tanuki Escape's "immediately
+    // end your turn afterwards" clause). The advance has to happen
+    // HERE — not inside onPlay — because `advanceToPhase` short-
+    // circuits while `_spellResolutionDepth > 0` (see its guard), and
+    // depth is only released by `_releaseSpellDepth()` above. Runs
+    // BEFORE the auto-MAIN2 advance below so we skip the transient
+    // MAIN2 state when the spell was cast in Action Phase.
+    if (gs._spellEndsTurn) {
+      delete gs._spellEndsTurn;
+      if (!gs.result) {
+        const cur = gs.currentPhase;
+        // Legal transitions to END are MAIN1 / ACTION / MAIN2 → END.
+        if (cur === 2 || cur === 3 || cur === 4) {
+          await room.engine.advanceToPhase(pi, 5);
+        }
+      }
+    }
     if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction && !gs._preventPhaseAdvance) {
       await room.engine.advanceToPhase(pi, 4);
     }
@@ -3514,7 +3543,15 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     if (!script.canActivateCreatureEffect(checkCtx)) return false;
   }
 
-  room.engine._setPendingPlayLog('creature_effect_activated', { player: gs.players[pi].username, card: creatureName, hero: hero.name });
+  // `actionCost` discriminator on the log entry — true iff this
+  // activation consumed the player's Action resource (creatureActionCost
+  // creatures like Spawn Mother). Cards that scan the action log for
+  // "first Action this turn" (Tengu Windstorm) filter on this so a
+  // FREE creature-effect activation doesn't poison the count.
+  room.engine._setPendingPlayLog('creature_effect_activated', {
+    player: gs.players[pi].username, card: creatureName, hero: hero.name,
+    actionCost: !!isActionCost,
+  });
   // Clear any leftover Gerrymander-decline marker so we only catch
   // declines from this activation's prompts (see HOPT-stamp on cancel
   // below for the Gerrymander veto path).
@@ -4146,7 +4183,16 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
     }
   }
 
-  room.engine._setPendingPlayLog('ability_activated', { player: gs.players[pi].username, card: abilityName, hero: hero.name, level });
+  // `doPlayAbility` is the action-cost ability path (Adventurousness,
+  // Alchemy with full gold cost, etc.) — always tag with actionCost:
+  // true so log scanners can distinguish from the FREE-ability path
+  // (`doActivateFreeAbility`) which logs the same `ability_activated`
+  // type. Tengu Windstorm's "first Action this turn" check filters
+  // on this discriminator; free abilities don't count as Actions.
+  room.engine._setPendingPlayLog('ability_activated', {
+    player: gs.players[pi].username, card: abilityName, hero: hero.name, level,
+    actionCost: true,
+  });
   // Clear any leftover Gerrymander-decline marker so we only catch
   // declines from this activation's prompts (see HOPT-keep logic below).
   room.engine._lastPromptGerryDeclined = false;
@@ -4280,7 +4326,14 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
-  if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return false;
+  // Hero effects normally fire only in Main Phase. Heroes with
+  // `heroEffectActionCost: true` (Champion, the Stormbringer, …) opt in
+  // to Action-Phase activation as well, paying with an Action slot.
+  // The detailed phase + action-economy gate runs after collecting
+  // available effects below — here we just block out-of-bounds phases.
+  const isMainPhase   = gs.currentPhase === 2 || gs.currentPhase === 4;
+  const isActionPhase = gs.currentPhase === 3;
+  if (!isMainPhase && !isActionPhase) return false;
   if (gs.potionTargeting) return false;
 
   const heroOwner = charmedOwner != null ? charmedOwner : pi;
@@ -4399,7 +4452,104 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     }
     if (!chosen?.inst) return false;
 
-    room.engine._setPendingPlayLog('hero_effect_activated', { player: gs.players[pi].username, hero: hero.name, effect: chosen.name });
+    // ── Action-economy gate for `heroEffectActionCost: true` heroes ──
+    // Mirror of the doPlaySpell / doPlayCreature / actionCost-Ability
+    // path — consume the player's main Action slot in Action Phase, or
+    // an additional-action provider in Main Phase. Heroes WITHOUT the
+    // flag take the standard free Main-Phase activation path (no
+    // bookkeeping below).
+    const isActionCost = !!chosen.script.heroEffectActionCost;
+    // Action-locking effects (Treasure Hunter's Backpack et al.) block
+    // Action plays. Free hero-effect activations skip this check (they
+    // aren't "Actions"); action-cost activations DO consume an Action,
+    // so the lock applies.
+    if (isActionCost && hero._actionLockedTurn === gs.turn) return false;
+    let consumedAdditionalHeroInst = null;
+    let actionCounterIncrementedHere = false;
+    let bonusMainActionsConsumedHereHE = false;
+    let heroesActedPushedHereHE = false;
+    let mainSlotConsumedHere = false;
+    if (isActionCost) {
+      const actingPs = gs.players[pi];
+      if (isActionPhase) {
+        const actionsPlayed = actingPs._actionsPlayedThisPhase || 0;
+        const hasBonus = (actingPs.bonusActions?.heroIdx === heroIdx && actingPs.bonusActions.remaining > 0)
+          || ((actingPs._bonusMainActions || 0) > 0 && actionsPlayed === 1);
+        const actionAlreadyUsed = (actingPs.heroesActedThisTurn?.length > 0) && !hasBonus;
+        if (actionAlreadyUsed) {
+          // Action 2+ in Action Phase — needs a matching additional-
+          // action provider, otherwise activation is illegal.
+          const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx);
+          if (!typeId) return false;
+          consumedAdditionalHeroInst = room.engine.consumeAdditionalAction(pi, typeId);
+          if (!consumedAdditionalHeroInst) return false;
+        } else {
+          // This activation IS the player's main Action for this
+          // Action Phase. Increment the counter + mark hero acted so
+          // Tarleinn / second-action-grant interactions stay
+          // consistent with Spell/Attack/Creature plays.
+          actingPs._actionsPlayedThisPhase = (actingPs._actionsPlayedThisPhase || 0) + 1;
+          actionCounterIncrementedHere = true;
+          if (actingPs._actionsPlayedThisPhase === 2 && (actingPs._bonusMainActions || 0) > 0) {
+            actingPs._bonusMainActions = 0;
+            bonusMainActionsConsumedHereHE = true;
+          }
+          if (!hasBonus) {
+            mainSlotConsumedHere = true;
+            if (!actingPs.heroesActedThisTurn) actingPs.heroesActedThisTurn = [];
+            if (!actingPs.heroesActedThisTurn.includes(heroIdx)) {
+              actingPs.heroesActedThisTurn.push(heroIdx);
+              heroesActedPushedHereHE = true;
+            }
+          }
+        }
+      } else if (isMainPhase) {
+        // Main Phase action-cost activation — must come from an
+        // additional-action provider (no main slot to spend here).
+        const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx);
+        if (!typeId) return false;
+        consumedAdditionalHeroInst = room.engine.consumeAdditionalAction(pi, typeId);
+        if (!consumedAdditionalHeroInst) return false;
+      }
+    } else if (!isMainPhase) {
+      // Standard hero effect attempted outside Main Phase (Action Phase
+      // requested, but the script doesn't opt into actionCost). Deny.
+      return false;
+    }
+    const refundActionCost = () => {
+      if (!isActionCost) return;
+      const actingPs = gs.players[pi];
+      if (consumedAdditionalHeroInst) {
+        consumedAdditionalHeroInst.counters.additionalActionAvail = 1;
+        consumedAdditionalHeroInst = null;
+      }
+      if (actionCounterIncrementedHere) {
+        actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
+        actionCounterIncrementedHere = false;
+      }
+      if (bonusMainActionsConsumedHereHE) {
+        actingPs._bonusMainActions = (actingPs._bonusMainActions || 0) + 1;
+        bonusMainActionsConsumedHereHE = false;
+      }
+      if (heroesActedPushedHereHE) {
+        const arr = actingPs.heroesActedThisTurn || [];
+        const idxIn = arr.indexOf(heroIdx);
+        if (idxIn >= 0) arr.splice(idxIn, 1);
+        heroesActedPushedHereHE = false;
+      }
+    };
+
+    // `actionCost` discriminator — true iff this hero-effect
+    // activation consumed the Action resource (heroEffectActionCost
+    // heroes like Champion, the Stormbringer). FREE hero effects
+    // (Cooldin's terraform, Magenta's mill, etc.) log the same type
+    // but with `actionCost: false`, so log scanners that count
+    // "Actions performed this turn" (Tengu Windstorm) only see the
+    // ones that actually spent the slot.
+    room.engine._setPendingPlayLog('hero_effect_activated', {
+      player: gs.players[pi].username, hero: hero.name, effect: chosen.name,
+      actionCost: !!isActionCost,
+    });
 
     const chainResult = await room.engine.executeCardWithChain({
       cardName: chosen.name, owner: pi, cardType: 'Hero', goldCost: 0, resolve: null,
@@ -4448,12 +4598,24 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       delete gs._preventPhaseAdvance;
       // Universal action-resolved hook — Hero Effect activations count
       // as Actions for Flashbang's purposes even though they don't
-      // consume the action-phase slot.
+      // consume the action-phase slot (unless heroEffectActionCost).
       await room.engine.runHooks('onAnyActionResolved', {
-        actionType: 'hero_effect', playerIdx: pi, cardName: chosen.name, heroIdx,
-        isAdditional: false, isInherent: true, isFree: false,
+        actionType:   'hero_effect',
+        playerIdx:    pi,
+        cardName:     chosen.name,
+        heroIdx,
+        isAdditional: !!consumedAdditionalHeroInst,
+        isInherent:   !isActionCost,
+        isFree:       false,
         _skipReactionCheck: true,
       });
+      // Action-cost activation auto-advance: same path as doPlaySpell /
+      // doPlayCreature when the main Action slot was the resource.
+      // Stays in Action Phase only when a second-action grant is alive
+      // (matches the auto-advance gate over there).
+      if (isActionCost && isActionPhase && mainSlotConsumedHere && !gs._preventPhaseAdvance) {
+        await room.engine.advanceToPhase(pi, 4);
+      }
     } else {
       delete gs._pendingCardReveal;
       delete gs._pendingPlayLog;
@@ -4465,6 +4627,11 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[chosen.hoptKey] = gs.turn;
         room.engine.log('gerrymander_veto', { player: gs.players[pi].username, hero: hero.name, effect: chosen.name });
+      } else if (isActionCost) {
+        // Plain cancellation (no Gerrymander veto, no commitment past
+        // chain resolution) — refund the action resource so the player
+        // didn't burn their slot for a back-out.
+        refundActionCost();
       }
     }
   } catch (err) {
@@ -5517,7 +5684,12 @@ io.on('connection', (socket) => {
     sendSpectatorGameState(room);
   });
 
-  // Advance phase (player clicks a phase button)
+  // Advance phase (player clicks a phase button). The click is
+  // ALWAYS manual — bypass the engine's second-action grace gate so
+  // the player can voluntarily leave Action Phase even with an unused
+  // bonus action (Claussss/Ba/Torchure-style grants). Engine-internal
+  // auto-advance call sites (doPlaySpell, doPlayCreature, …) do NOT
+  // pass `manual` and keep the grace behavior.
   socket.on('advance_phase', ({ roomId, targetPhase }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
@@ -5525,7 +5697,7 @@ io.on('connection', (socket) => {
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
     if (targetPhase !== undefined) {
-      room.engine.advanceToPhase(pi, targetPhase).catch(err => console.error('[Engine] advanceToPhase error:', err.message));
+      room.engine.advanceToPhase(pi, targetPhase, { manual: true }).catch(err => console.error('[Engine] advanceToPhase error:', err.message));
     } else {
       room.engine.advancePhase(pi).catch(err => console.error('[Engine] advancePhase error:', err.message));
     }

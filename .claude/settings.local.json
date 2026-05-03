@@ -90,7 +90,17 @@
       "Bash(grep -n \"statuses\\\\?\\\\\\\\.immune\\\\|statuses\\\\\\\\.immune\\\\|\\\\\\\\.immune\\\\\\\\b\" \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/_cpu.js\")",
       "Bash(grep -n \"negative_status_immune\\\\|hero\\\\\\\\.buffs\\\\|hero\\\\\\\\.statuses\\\\\\\\.immune\\\\|buffs\\\\\\\\.immune\\\\|buffs\\\\\\\\?.immune\\\\|buffs\\\\\\\\[\" \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/_cpu.js\")",
       "Bash(grep -n \"const helpers\\\\|helpers = {\\\\|evaluateState,\" \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/_cpu.js\")",
-      "Bash(grep -n \"helpers = {\\\\|helpers:\\\\s*{\\\\|module:\\\\s*{\\\\|helpers\\\\s*}\\\\|^\\\\s*helpers\\\\s*=\\\\|sendGameState,\\\\s*sendSpectatorGameState\\\\|installCpuBrain.*helpers\\\\|makeCpuDriver\" \"C:/Pixel Parties WEB/PixelPartiesWeb/server.js\")"
+      "Bash(grep -n \"helpers = {\\\\|helpers:\\\\s*{\\\\|module:\\\\s*{\\\\|helpers\\\\s*}\\\\|^\\\\s*helpers\\\\s*=\\\\|sendGameState,\\\\s*sendSpectatorGameState\\\\|installCpuBrain.*helpers\\\\|makeCpuDriver\" \"C:/Pixel Parties WEB/PixelPartiesWeb/server.js\")",
+      "Bash(grep -rn \"counters\\\\.isPlacement\\\\|counters\\\\?\\\\\\\\.isPlacement\" \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/\")",
+      "Bash(grep -n \"app-board\" public/index.html)",
+      "Bash(ls public/*.html)",
+      "Bash(git status *)",
+      "Bash(grep -nC1 \"prevLen\\\\|autoStart\" public/app-board.jsx)",
+      "Bash(awk 'NR>=9540 && NR<=9690' public/app-board.jsx)",
+      "Bash(grep -n \"handLocked:.*ps\\\\|handLocked: gs\\\\|ps\\\\\\\\.handLocked\\\\|gs.players.*handLocked\" \"C:/Pixel Parties WEB/PixelPartiesWeb/server.js\")",
+      "Bash(awk -F: '$2+0 > 5390 && $2+0 < 5900')",
+      "Bash(awk 'NR>=5390 && NR<=5900 && /cardDB/' \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/_cpu.js\")",
+      "Bash(awk *)"
     ]
   }
 }

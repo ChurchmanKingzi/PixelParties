@@ -17,10 +17,12 @@
 //       Hell Fox / Loyal Shepherd / etc. all see
 //       the death.
 //    3. Place the chosen Loyal into Rottweiler's
-//       vacated slot. "Place" (not "summon") —
-//       skip summoning sickness so the placed
-//       Loyal can act THIS turn. Entry hooks
-//       (onPlay, onCardEnterZone) still fire so
+//       vacated slot. Standard summoning sickness
+//       applies — the placed Loyal can't activate
+//       its creatureEffect or react until next
+//       turn, same as any other freshly-summoned
+//       Creature. Entry hooks (onPlay,
+//       onCardEnterZone) still fire so
 //       Hountriever / Pinpom-style triggers chain
 //       off the placement.
 //    4. Reveal the deck-tutored card to the
@@ -137,10 +139,12 @@ module.exports = {
     }
     const { inst: placedInst, actualSlot } = placeResult;
 
-    // "Place" semantics: no summoning sickness. Setting turnPlayed to
-    // a previous turn lets the placed Loyal use its creatureEffect
-    // and react to triggers immediately.
-    placedInst.turnPlayed = (gs.turn || 1) - 1;
+    // The placed Loyal arrives with standard summoning sickness —
+    // `safePlaceInSupport` → `_trackCard` already stamps `turnPlayed
+    // = gs.turn`, which is the same convention every other "summon
+    // from deck" card uses (Khet, Ka, Cosmic Manipulation, …). The
+    // Loyal's `creatureEffect` (HOPT) and any "fresh creature" gates
+    // wait until next turn just like a hand-summoned Loyal would.
 
     // Reveal + shuffle, standard tutor etiquette.
     engine.shuffleDeck(pi, 'main');

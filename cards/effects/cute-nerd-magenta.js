@@ -15,6 +15,8 @@
 //  (holdDuration: 2000 on actionMillCards).
 // ═══════════════════════════════════════════
 
+const { loadCardEffect } = require('./_loader');
+
 const CARD_NAME = 'Cute Nerd Magenta';
 
 module.exports = {
@@ -69,12 +71,28 @@ module.exports = {
     // (each copy in discard scores separately), so this filter is a
     // hard rule, not a heuristic.
     const justDiscardedName = ps.discardPile?.[ps.discardPile.length - 1] || null;
-    const eligibleCards = justDiscardedName
-      ? cards.filter(c => c.name !== justDiscardedName)
-      : cards;
+    // Exclude:
+    //   • The just-discarded name (Step 1 cost) so the mill yields a
+    //     DIFFERENT name in discard and doubles the unique-name churn.
+    //   • Cards that opt into `selfDeleteOnExternalDiscard` (Rebelliokai
+    //     archetype). Milling these routes the card straight to the
+    //     deleted pile via the engine's external-discard redirect — it
+    //     never lands in discard, so any "feed the discard pile"
+    //     calculus the eval-delta scorer captures over-credits the mill.
+    //     The resolver's snapshot doesn't replicate the redirect, so the
+    //     scorer would happily target a Rebelliokai. Hard skip is
+    //     simpler and correct: the CPU should never elect to mill a
+    //     self-deleting card.
+    const eligibleCards = cards.filter(c => {
+      if (justDiscardedName && c.name === justDiscardedName) return false;
+      const cs = loadCardEffect(c.name);
+      if (cs?.selfDeleteOnExternalDiscard) return false;
+      return true;
+    });
     // Defensive: if filtering would empty the pool (deck contains only
-    // copies of the just-discarded name — pathological), fall back to
-    // the full pool so the prompt still resolves.
+    // copies of the just-discarded name or self-deleting cards —
+    // pathological), fall back to the full pool so the prompt still
+    // resolves. The CPU shouldn't soft-lock on an unwinnable choice.
     const pool = eligibleCards.length > 0 ? eligibleCards : cards;
     let best = null;
     let bestScore = -Infinity;
@@ -88,6 +106,26 @@ module.exports = {
       try { score = evalState(pi); } catch {}
       ps.discardPile.pop();
       ps.mainDeck.splice(idx, 0, name);
+
+      // Declarative `cpuMeta.onMillBenefit` — eval-delta above only
+      // captures "card moved from deck to discard"; it does NOT fire
+      // the would-be `onMill` hook (no `actionMillCards` call inside
+      // the snapshot frame, since that's async + side-effecting).
+      // Cards whose mill triggers a beneficial payoff (Mystery Box's
+      // "draw 2 when milled", any future similar trigger) advertise
+      // their post-mill value via this field so the picker correctly
+      // rewards selecting them as targets. Number or function form
+      // both supported — function gets `(engine, pi)` so the card
+      // can self-gate on HOPT / per-turn-once / etc.
+      const cs = loadCardEffect(name);
+      const benefit = cs?.cpuMeta?.onMillBenefit;
+      let benefitValue = 0;
+      if (typeof benefit === 'number') benefitValue = benefit;
+      else if (typeof benefit === 'function') {
+        try { benefitValue = benefit(engine, pi) || 0; } catch { benefitValue = 0; }
+      }
+      score += benefitValue;
+
       if (score > bestScore) { bestScore = score; best = c; }
     }
     if (!best) return undefined;

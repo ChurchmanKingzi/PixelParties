@@ -26,6 +26,33 @@ module.exports = {
   activeIn: ['hand', 'deck', 'discard', 'deleted', 'support', 'ability'],
   neverPlayable: true, // 'No effect when played' — never usable from hand directly
 
+  cpuMeta: {
+    /**
+     * Declarative bonus for "this card has a beneficial onMill hook".
+     * Mill-target pickers (Cute Nerd Magenta's deck-mill response,
+     * Deepsea Skeleton's multi-pick, any future "choose what to mill"
+     * effect) read this to credit the card's post-mill payoff at
+     * selection time — the eval-delta that mill scorers run does not
+     * fire `onMill` itself, so a generic eval state would otherwise
+     * see "Mystery Box in discard" the same as any neverPlayable
+     * 0-cost Artifact and pick arbitrarily between Box and Glass of
+     * Marbles (whose `onDiscard` requires `_fromHand`, NOT a deck
+     * mill — so Marbles' draw-2 wouldn't actually fire either way).
+     *
+     * Value: 50 ≈ 2 × the engine's default unknown-card hand value
+     * (~25 per card from `estimateHandCardValueFor`'s baseline),
+     * matching Box's "draw 2 cards" payoff. Function form lets the
+     * card self-gate on its shared HOPT — once the per-turn trigger
+     * has fired, milling another Box is a no-op and the bonus
+     * collapses to 0 so the picker doesn't double-reward.
+     */
+    onMillBenefit(engine, pi) {
+      const hoptKey = `mystery-box:${pi}`;
+      if (engine?.gs?.hoptUsed?.[hoptKey] === engine.gs.turn) return 0;
+      return 50;
+    },
+  },
+
   hooks: {
     onMill: async (ctx) => {
       // Must be the owner's own deck being milled

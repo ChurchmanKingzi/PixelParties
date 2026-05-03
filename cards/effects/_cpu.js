@@ -362,6 +362,42 @@ async function runActionPhase(engine, helpers) {
     });
   }
 
+  // ── Hero-Effect Action activations as first-class candidates ──────
+  // Heroes whose script declares `heroEffectActionCost: true`
+  // (Champion, the Stormbringer, …) can be activated as the player's
+  // Action — same resource budget as a Spell/Attack/Creature play.
+  // Without these as candidates the CPU never fires Champion's effect
+  // because nothing else proposes it during Action Phase, and the
+  // free-effect path (`activateHeroEffects`) skips action-cost effects
+  // entirely (those need an additional-action provider in Main Phase
+  // and the CPU rarely has one).
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+    if (hero._actionLockedTurn === gs.turn) continue;
+    const script = loadCardEffect(hero.name);
+    if (!script?.heroEffectActionCost || !script?.heroEffect || !script?.onHeroEffect) continue;
+    const hoptKey = `hero-effect:${hero.name}:${cpuIdx}:${hi}`;
+    if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
+    if (script.canActivateHeroEffect) {
+      try {
+        const inst = engine.cardInstances.find(c =>
+          c.owner === cpuIdx && c.zone === 'hero' && c.heroIdx === hi);
+        if (!inst) continue;
+        const ctx = engine._createContext(inst, { event: 'canHeroEffectCheck' });
+        if (!script.canActivateHeroEffect(ctx)) continue;
+      } catch { continue; }
+    }
+    candidates.push({
+      cardType: 'HeroEffectAction',
+      cardName: hero.name,
+      heroIdx:  hi,
+      level:    0,
+      typeScore: 0,
+    });
+  }
+
   cpuLog(`  Action Phase candidates: ${candidates.length}`);
   if (candidates.length === 0) {
     const picked = await tryActionCostingAbility(engine, helpers);
@@ -415,9 +451,12 @@ async function runActionPhase(engine, helpers) {
     }
 
     const handLenBefore = ps.hand.length;
-    const abilityHoptKey = pick.cardType === 'AbilityAction'
-      ? `ability-action:${pick.abilityName}:${cpuIdx}`
-      : null;
+    let abilityHoptKey = null;
+    if (pick.cardType === 'AbilityAction') {
+      abilityHoptKey = `ability-action:${pick.abilityName}:${cpuIdx}`;
+    } else if (pick.cardType === 'HeroEffectAction') {
+      abilityHoptKey = `hero-effect:${pick.cardName}:${cpuIdx}:${pick.heroIdx}`;
+    }
     const hoptBefore = abilityHoptKey ? gs.hoptUsed?.[abilityHoptKey] : null;
     cpuLog(`    → Action Phase try: ${pick.cardType} "${pick.cardName}" (lvl ${pick.level}) hero=${pick.heroIdx}${pick.scriptedTargetPlan ? ' [scripted targets]' : ''}`);
     await pausePhase(engine);
@@ -434,6 +473,14 @@ async function runActionPhase(engine, helpers) {
         await helpers.doActivateAbility(helpers.room, cpuIdx, {
           heroIdx: pick.heroIdx,
           zoneIdx: pick.zoneIdx,
+        });
+      } else if (pick.cardType === 'HeroEffectAction') {
+        // Hero-effect activation that costs an Action (Champion, the
+        // Stormbringer, …). Routed through the same socket helper
+        // human players use; doActivateHeroEffect's `heroEffectActionCost`
+        // path consumes the main Action slot on the chosen hero.
+        await helpers.doActivateHeroEffect(helpers.room, cpuIdx, {
+          heroIdx: pick.heroIdx,
         });
       } else if (pick.cardType === 'Creature') {
         // MCTS picked the zone slot during candidate enumeration; honor
@@ -930,6 +977,25 @@ async function activateCreatureEffects(engine, helpers) {
 
         const key = `${cardName}|${hi}|${zi}|${inst.id}`;
         if (tried.has(key)) continue;
+
+        // Per-card "wait for a better state" predicate — Timid Tanuki
+        // and any future card whose effect's value scales with a
+        // turn-progressive state (Tanuki: more Rebelliokai in discard
+        // = more draws) opts in via `cpuMeta.shouldActivateNow`. The
+        // hook returns `false` to defer the activation; the loop adds
+        // the inst to `tried` and moves on, and the `runMainPhase`
+        // pass in MP2 (`tried` is re-initialized per call) re-tries
+        // it once the rest-of-turn state has filled in.
+        if (typeof script.cpuMeta?.shouldActivateNow === 'function') {
+          let shouldFire = true;
+          try {
+            shouldFire = !!script.cpuMeta.shouldActivateNow(engine, cpuIdx);
+          } catch { shouldFire = true; }
+          if (!shouldFire) {
+            tried.add(key);
+            continue;
+          }
+        }
 
         pick = { heroIdx: hi, zoneSlot: zi, cardName, instId: inst.id, key };
         break;
@@ -1494,7 +1560,8 @@ function cardIsAscensionCriticalForAnyHero(engine, pi, cardName, cardData) {
 // critical cards are equipments played in the Main Phase and don't reach
 // this check, but the same per-hero rule applies.
 function candidateProgressesAscension(engine, pi, candidate, cardDB) {
-  if (!candidate || candidate.cardType === 'AbilityAction') return false;
+  if (!candidate || candidate.cardType === 'AbilityAction'
+      || candidate.cardType === 'HeroEffectAction') return false;
   const hi = candidate.heroIdx;
   if (hi == null) return false;
   const cd = cardDB[candidate.cardName];
@@ -5798,6 +5865,64 @@ function evaluateState(engine, cpuIdx) {
   score -= opgSpendCostFor(cpuIdx);
   score += opgSpendCostFor(oppIdx);
 
+  // ── Rebelliokai archetype scoring ───────────────────────────────
+  // Almost every Rebelliokai effect scales on the count of UNIQUE
+  // Rebelliokai-Creature names in the controller's discard pile —
+  // Tanuki Escape's bounce budget, Kirin Firebreath's strike count,
+  // Kappa Sword Slash's level reduction, Oblivious Oni's gate, the
+  // shared cost-pool for the Spells / Attacks. The eval treats every
+  // unique name in the pile as fuel that future plays can spend.
+  //
+  // Scoring axes (per side, opp side scored as negative):
+  //   • +25 per UNIQUE Rebelliokai Creature name in discard pile.
+  //     The first copy of a name introduces archetype fuel; later
+  //     copies of the same name don't add to the unique count and
+  //     so contribute nothing — naturally encoding "no copies in
+  //     discard yet → highest priority to land there".
+  //   • +10 per Courtly Kirin in hand. Kirin's reaction-summon
+  //     negate option is meaningful tempo while she sits in hand
+  //     unspent; pulling her out of hand for archetype fuel costs
+  //     us that defensive value, so the discard delta for Kirin
+  //     comes out smaller than for non-Kirin Rebelliokai (≈+15 vs
+  //     +25). Matches the user-spec'd "Kirin's discard desirability
+  //     a bit lower than the others'".
+  //
+  // The eval delta naturally cascades: Inventing's MCTS gate sees
+  // post-discard state with a Rebelliokai now in pile (+25) and
+  // commits when CPU has Rebelliokai in hand. Champion's full-hand
+  // refresh similarly scores positive when multiple Rebelliokai are
+  // about to flip from hand → discard. No alwaysCommit override or
+  // hard-coded force-discard heuristic needed — MCTS does the work.
+  // Tuned so the discard delta for a fresh non-Kirin Rebelliokai (+40)
+  // sits comfortably above one card's typical hand-value swing (~25),
+  // letting MCTS commit Inventing / Champion when the CPU is sitting
+  // on Rebelliokai pile-fuel even after factoring in opponent draws
+  // and HOPT consumption. Kirin's reserve-value (+15) drops her
+  // discard delta to +25 — a bit lower than the others, exactly
+  // matching the user-spec'd gradient.
+  const REBELLIOKAI_DISCARD_VALUE = 40;
+  const KIRIN_HAND_RESERVE_VALUE  = 15;
+  const KIRIN_NAME = 'Rebelliokai Courtly Kirin';
+  const cardDB = engine._getCardDB();
+  const rebelScoreFor = (sidePs) => {
+    if (!sidePs) return 0;
+    const uniqueDiscardNames = new Set();
+    for (const cn of (sidePs.discardPile || [])) {
+      const cd = cardDB[cn];
+      if (cd?.archetype === 'Rebelliokai' && cd?.cardType === 'Creature') {
+        uniqueDiscardNames.add(cn);
+      }
+    }
+    let kirinHandCopies = 0;
+    for (const cn of (sidePs.hand || [])) {
+      if (cn === KIRIN_NAME) kirinHandCopies++;
+    }
+    return uniqueDiscardNames.size * REBELLIOKAI_DISCARD_VALUE
+         + kirinHandCopies        * KIRIN_HAND_RESERVE_VALUE;
+  };
+  score += rebelScoreFor(ps);
+  score -= rebelScoreFor(opp);
+
   // ── First Circle of Hell parity awareness ───────────────────────
   // While ANY First Circle is in an Area zone, every player's discard
   // pile gets wiped at the start of their next turn if it currently
@@ -6205,6 +6330,16 @@ async function applyActionCandidate(engine, helpers, candidate) {
     await helpers.doActivateAbility(helpers.room, cpuIdx, {
       heroIdx, zoneIdx: candidate.zoneIdx,
     });
+    return engine.gs.hoptUsed?.[hoptKey] === engine.gs.turn && hoptBefore !== engine.gs.turn;
+  }
+  if (cardType === 'HeroEffectAction') {
+    // Hero-effect activation during rollout (Champion, the Stormbringer,
+    // …). Same HOPT-claim signal as AbilityAction above — the hand
+    // doesn't shrink for hero-effect activations either, so the HOPT
+    // stamp is what tells us the play actually fired vs. fizzled.
+    const hoptKey = `hero-effect:${cardName}:${cpuIdx}:${heroIdx}`;
+    const hoptBefore = engine.gs.hoptUsed?.[hoptKey];
+    await helpers.doActivateHeroEffect(helpers.room, cpuIdx, { heroIdx });
     return engine.gs.hoptUsed?.[hoptKey] === engine.gs.turn && hoptBefore !== engine.gs.turn;
   }
   if (cardType === 'Creature') {

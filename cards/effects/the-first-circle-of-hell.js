@@ -34,6 +34,8 @@
 //     reanimations.
 // ═══════════════════════════════════════════
 
+const { loadCardEffect } = require('./_loader');
+
 const CARD_NAME = 'The First Circle of Hell';
 
 /** Mass-delete every card in `pi`'s discard pile. Walks end-to-start
@@ -71,19 +73,62 @@ async function massDeleteDiscardPile(engine, pi) {
 }
 
 /** Mass-return every card in `pi`'s deleted pile back to the discard
- *  pile. No rescue gate — this path isn't "deleting" anything. */
+ *  pile. No rescue gate — this path isn't "deleting" anything.
+ *
+ *  Cards that opt into `selfDeleteOnExternalDiscard` (Rebelliokai
+ *  Creatures, etc.) self-delete the moment they would land in the
+ *  discard pile from this "anywhere except hand or board" source.
+ *  Per the rule, we still let them transit through the discard pile
+ *  in game state (so the player sees discardPile +1 then -1 / deletedPile
+ *  +1 in sync with the animations). The transit handler
+ *  `_scheduleSelfDeleteTransit` schedules each redirected card's
+ *  splice + chained discard→deleted flight + final deletedPile push
+ *  using the same timings the mill path uses. */
 function massReturnDeletedPile(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps?.deletedPile?.length) return [];
   const returned = ps.deletedPile.slice();
   ps.deletedPile.length = 0;
   ps.discardPile = ps.discardPile || [];
-  for (const name of returned) ps.discardPile.push(name);
+
+  const redirected = [];
+  for (const name of returned) {
+    const script = loadCardEffect(name);
+    if (script?.selfDeleteOnExternalDiscard) {
+      // Defer the pile pushes to `_scheduleSelfDeleteTransit` so the
+      // discardPile UI count only goes up when the deleted→discard
+      // flying animation visually lands at the discard pile. Pushing
+      // here would make the card appear in the discard pile UI
+      // immediately on the next sync — before the visual flying
+      // animation has even reached the pile rect.
+      redirected.push(name);
+    } else {
+      ps.discardPile.push(name);
+    }
+  }
+
   engine._broadcastEvent('deleted_to_discard_animation', {
     owner: pi, cardNames: returned, source: CARD_NAME,
   });
+
+  if (redirected.length > 0) {
+    // landAtMs per card mirrors the deleted_to_discard_animation's
+    // 160ms per-card stagger + 560ms visual-landing offset (80% of
+    // the 700ms travel).
+    const schedule = redirected.map(name => ({
+      name,
+      landAtMs: returned.indexOf(name) * 160 + 560,
+    }));
+    engine._scheduleSelfDeleteTransit(pi, schedule, {
+      source: `${CARD_NAME} return → self-delete`,
+    });
+  }
+
   engine.log('first_circle_return', {
-    player: ps.username, count: returned.length, source: CARD_NAME,
+    player: ps.username,
+    count: returned.length,
+    redirected: redirected.length,
+    source: CARD_NAME,
   });
   engine.sync();
   return returned;
