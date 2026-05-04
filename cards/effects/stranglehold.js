@@ -76,6 +76,15 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'attack',
+        // Damage is target-specific (50 × target's negative-status count
+        // + atkBonus). The picker uses one number for all candidates,
+        // so we pass `atkBonus + 50` — assumes ~1 negative status on
+        // average. Underestimates against debuff-heavy targets (CPU
+        // misses some kill shots) but a positive signal beats zero
+        // (random tiebreak). Ideally pickEnemyTargets would consult
+        // a per-target damage callback, but threading that through is
+        // a wider refactor.
+        baseDamage: atkBonus + 50,
         title: 'Stranglehold',
         description: `Deal 50 × negative statuses on target` + (atkBonus > 0 ? ` + ${atkBonus} ATK` : '') + '.',
         confirmLabel: '⚔️ Stranglehold!',

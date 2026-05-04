@@ -49,6 +49,7 @@ module.exports = attachSteamEngine({
       side: 'any',
       types: ['hero', 'creature'],
       damageType: 'creature',
+      baseDamage: damage,
       title: CARD_NAME,
       description: `Spray a target with flames for ${damage} damage (equal to this Creature's current HP, max ${DAMAGE_CAP}).`,
       confirmLabel: `🔥 Flamethrower! (${damage})`,

@@ -44,6 +44,8 @@
 //     side, so a second copy can't re-bounce.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 const CARD_NAME = 'The Spawn Mother';
 const AOE_DAMAGE = 100;
 const HOPT_AOE_PREFIX    = 'spawn-mother-aoe';
@@ -74,11 +76,20 @@ function _allOpponentHeroTargets(gs, pi) {
 }
 
 function _allBoardCreatures(engine, excludeInstId) {
+  const cardDB = engine._getCardDB();
   const out = [];
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if (inst.id === excludeInstId) continue; // Exclude Spawn Mother herself
     if (inst.faceDown) continue;
+    // The support zone holds Creatures, Equip Artifacts, Attachments,
+    // Tokens, etc. "Targets" in card text means Heroes + Creatures
+    // ONLY — Equips / Attachments / Permanents / Areas don't have HP
+    // and shouldn't be hit by board-wide damage. Filter via the
+    // engine's standard `hasCardType('Creature', cd)` check (matches
+    // `Creature/Token` hybrids correctly).
+    const cd = engine.getEffectiveCardData?.(inst) || cardDB[inst.name];
+    if (!cd || !hasCardType(cd, 'Creature')) continue;
     out.push(inst);
   }
   return out;

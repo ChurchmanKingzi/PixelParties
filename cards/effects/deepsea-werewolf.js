@@ -37,6 +37,7 @@ module.exports = {
       const target = await ctx.promptDamageTarget({
         side: 'any', types: ['hero', 'creature'],
         damageType: 'creature',
+        baseDamage: DAMAGE,
         title: CARD_NAME,
         description: `Deal ${DAMAGE} damage to a target.`,
         confirmLabel: `🐺 ${DAMAGE} Damage!`,

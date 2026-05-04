@@ -93,6 +93,11 @@ function getStealableCreatures(engine, playerIdx) {
 
 module.exports = {
   isTargetingArtifact: true,
+  // The card's cost in cards.json (5) is the BASE cost — text says "this
+  // Artifact's Cost is multiplied by the Creature's original level". The
+  // resolve handler computes `level × BASE_COST` and deducts it manually,
+  // so the engine must NOT auto-deduct the base cost on top.
+  manualGoldCost: true,
 
   canActivate(gs, pi, engine) {
     // Need engine reference — passed by the server for targeting artifacts

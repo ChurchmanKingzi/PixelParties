@@ -123,6 +123,7 @@ module.exports = {
         types: ['hero', 'creature'],
         min: 1,
         max: N,
+        baseDamage: PER_TARGET_DAMAGE,
         title: CARD_NAME,
         description: `Choose up to ${N} different target${N > 1 ? 's' : ''}. Deal ${PER_TARGET_DAMAGE} damage to each.`,
         confirmLabel: `🔥 Strike! (${PER_TARGET_DAMAGE} ×N)`,

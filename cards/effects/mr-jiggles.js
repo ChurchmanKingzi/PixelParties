@@ -30,6 +30,7 @@ module.exports = {
       side: 'enemy',
       max: 2,
       min: 1,
+      baseDamage: DAMAGE,
       title: CARD_NAME,
       description: `Deal ${DAMAGE} damage to up to 2 targets your opponent controls.`,
       confirmLabel: `🎉 ${DAMAGE} each!`,

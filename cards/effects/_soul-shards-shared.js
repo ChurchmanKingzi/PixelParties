@@ -168,6 +168,58 @@ const SOUL_SHARD_PILE_FUEL = {
   deckMinSize: 22,
 };
 
+/**
+ * Shared `summonEffectActivates(ctx)` predicate for the seven
+ * "discard-gated" Soul Shards (Ba, Ib, Ka, Khet, Ren, Sekhem, Shut).
+ * Their on-summon effect ONLY runs when summoned from discard — a
+ * normal hand summon hits an early `if (!ctx._summonedFromDiscard)
+ * return;` and produces no effect.
+ *
+ * Sandy Blob and any future "when an on-summon effect activates"
+ * trigger consult this predicate via `loadCardEffect(name)
+ * .summonEffectActivates(ctx)` so they correctly skip the trigger
+ * when the entry condition isn't met.
+ */
+function soulShardEffectActivates_FromDiscard(ctx) {
+  return !!ctx?._summonedFromDiscard;
+}
+
+/**
+ * Shared predicate variant for Soul Shard Sah, whose on-summon
+ * effect gates on `_summonedByNecromancy` (stricter — only fires when
+ * Necromancy itself summoned Sah, not any from-discard path).
+ */
+function soulShardEffectActivates_FromNecromancy(ctx) {
+  return !!ctx?._summonedByNecromancy;
+}
+
+/**
+ * Stamp the "effect actually fired this turn" marker on a Soul
+ * Shard's instance. Each Shard calls this at the END of its
+ * successful onPlay path (AFTER the effect has committed —
+ * post-summon, post-heal, post-mill, etc.). If the onPlay early-
+ * returns mid-flow (gallery cancelled, no eligible cards, deck
+ * empty, etc.), the marker stays unset.
+ *
+ * Sandy Blob's onCardEnterZone listener checks this marker AFTER
+ * the predicate passes — both must agree before the trigger fires.
+ * This catches the case where the entry condition was met (Shard
+ * summoned from discard) but the player declined the optional
+ * action mid-flow.
+ *
+ * Per-instance per-turn semantics: a fresh inst (re-summon, revive,
+ * etc.) starts with no marker and must earn the stamp through its
+ * own successful execution. The per-name 1/turn cap on Soul Shards
+ * means a single inst won't run onPlay twice the same turn.
+ */
+function markSoulShardEffectFired(ctx) {
+  const inst = ctx?.card;
+  const engine = ctx?._engine;
+  if (!inst || !engine) return;
+  if (!inst.counters) inst.counters = {};
+  inst.counters._summonEffectFiredTurn = engine.gs.turn;
+}
+
 module.exports = {
   ARCHETYPE,
   SOUL_SHARD_NAMES,
@@ -178,4 +230,7 @@ module.exports = {
   canSummonSoulShard,
   distinctCreatureNamesInDiscard,
   distinctSoulShardsOnBoard,
+  soulShardEffectActivates_FromDiscard,
+  soulShardEffectActivates_FromNecromancy,
+  markSoulShardEffectFired,
 };

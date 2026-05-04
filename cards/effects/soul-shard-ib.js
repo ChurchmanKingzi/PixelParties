@@ -24,6 +24,8 @@ const {
   canSummonSoulShard, markSoulShardSummoned,
   distinctCreatureNamesInDiscard,
   SOUL_SHARD_PILE_FUEL,
+  soulShardEffectActivates_FromDiscard,
+  markSoulShardEffectFired,
 } = require('./_soul-shards-shared');
 
 const CARD_NAME = 'Soul Shard Ib';
@@ -34,6 +36,8 @@ module.exports = {
   bypassNecromancyNegation: true,
   canSummon: canSummonSoulShard,
   cpuMeta: { pileFuel: SOUL_SHARD_PILE_FUEL },
+  // Sandy Blob gate — heal effect only runs when summoned from discard.
+  summonEffectActivates: soulShardEffectActivates_FromDiscard,
 
   hooks: {
     onPlay: async (ctx) => {
@@ -60,6 +64,8 @@ module.exports = {
       const source = { name: CARD_NAME, owner: pi, heroIdx, cardInstance: ctx.card };
       await engine.actionHealHero(source, hero, healAmount);
 
+      // Effect fully committed — Sandy Blob marker.
+      markSoulShardEffectFired(ctx);
       engine.log('soul_shard_ib_heal', {
         player: gs.players[pi]?.username, hero: hero.name,
         distinctCreatures: distinct, healed: healAmount,

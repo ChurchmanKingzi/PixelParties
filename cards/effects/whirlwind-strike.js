@@ -27,6 +27,7 @@ module.exports = {
         types: ['hero'],
         side: 'enemy',
         max: 2,
+        baseDamage: atkDamage,
         title: 'Whirlwind Strike',
         description: `Deal ${atkDamage} damage to up to 2 Heroes and all their Creatures.`,
         confirmLabel: `🌪️ Whirlwind! (${atkDamage})`,

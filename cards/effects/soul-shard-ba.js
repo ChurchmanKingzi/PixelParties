@@ -25,6 +25,8 @@
 const {
   canSummonSoulShard, markSoulShardSummoned,
   SOUL_SHARD_PILE_FUEL,
+  soulShardEffectActivates_FromDiscard,
+  markSoulShardEffectFired,
 } = require('./_soul-shards-shared');
 const {
   secondActionGrant, secondActionHooks,
@@ -37,6 +39,8 @@ module.exports = {
   bypassNecromancyNegation: true,
   canSummon: canSummonSoulShard,
   cpuMeta: { pileFuel: SOUL_SHARD_PILE_FUEL },
+  // Sandy Blob gate — effect only runs when summoned from discard.
+  summonEffectActivates: soulShardEffectActivates_FromDiscard,
 
   hooks: {
     ...secondActionHooks,
@@ -52,6 +56,8 @@ module.exports = {
         sourceLabel: CARD_NAME,
         animationType: 'soul_shard_dark_grant',
       });
+      // Effect fully committed — Sandy Blob marker.
+      markSoulShardEffectFired(ctx);
       await engine._delay(800);
     },
   },

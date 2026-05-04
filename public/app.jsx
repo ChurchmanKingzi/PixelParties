@@ -2914,15 +2914,27 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
         <div className="board-card-text">{cardName || '?'}</div>
       )}
       {label && <div className="board-card-label">{label}</div>}
-      {hp != null && hpPosition && (
-        <div className={'board-card-hp board-card-hp-' + hpPosition}>
-          {hp}
-        </div>
-      )}
-      {atk != null && hpPosition === 'hero' && (
-        <div className="board-card-atk board-card-atk-hero">
-          {atk}
-        </div>
+      {/* Hero cards: HP + ATK go through the responsive flex strip so
+          they auto-stack on cards too narrow for both on one row.
+          Mirrors the BoardCard implementation in app-board.jsx; both
+          files share the `.board-card-stats-hero` CSS in style.css. */}
+      {hpPosition === 'hero' ? (
+        (hp != null || atk != null) && (
+          <div className="board-card-stats-hero">
+            {hp != null && (
+              <div className="board-card-hp-num">{hp}</div>
+            )}
+            {atk != null && (
+              <div className="board-card-atk-num">{atk}</div>
+            )}
+          </div>
+        )
+      ) : (
+        hp != null && hpPosition && (
+          <div className={'board-card-hp board-card-hp-' + hpPosition}>
+            {hp}
+          </div>
+        )
       )}
       {tt && card && ReactDOM.createPortal(
         <div className="board-tooltip">

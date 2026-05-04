@@ -14,7 +14,8 @@ const emptyPlayer = () => ({
   supportZones: [[[], [], []], [[], [], []], [[], [], []]],
   surpriseZones: [[], [], []],
   hand: [], gold: 0, permanents: [], islandZoneCount: [0, 0, 0],
-  mainDeck: [], potionDeck: [], discardPile: [], deletedPile: [],
+  mainDeck: [], potionDeck: [], sideDeck: [],
+  discardPile: [], deletedPile: [],
 });
 
 // Dream-Landers attach pairs. Each Creature listed here can hold the
@@ -172,7 +173,20 @@ function PuzzleCreator() {
   };
   const saved = useMemo(loadSaved, []);
 
-  const [players, setPlayers] = useState(saved?.players || [emptyPlayer(), emptyPlayer()]);
+  // Normalize saved-state players so any field added after the save was
+  // taken (e.g. `sideDeck`) defaults to a safe empty value. Without
+  // this, drag-drop helpers that call `pp[key].push(...)` would throw
+  // on saves predating the field.
+  const normalizePlayer = (raw) => {
+    const base = emptyPlayer();
+    if (!raw) return base;
+    return { ...base, ...raw, sideDeck: Array.isArray(raw.sideDeck) ? raw.sideDeck : [] };
+  };
+  const [players, setPlayers] = useState(
+    (saved?.players || []).length === 2
+      ? saved.players.map(normalizePlayer)
+      : [emptyPlayer(), emptyPlayer()]
+  );
   const [areaZones, setAreaZones] = useState(saved?.areaZones || [[], []]);
   const [hand, setHand] = useState(saved?.hand || []);
   const [oppHand, setOppHand] = useState(saved?.oppHand || []);
@@ -1538,6 +1552,24 @@ function PuzzleCreator() {
                   </> : <div className="board-zone-empty">Deck</div>}
                 </div>
               )}
+              {/* Side Deck — editor-only zone right of the Deck. The
+                  in-game board has no Side Deck slot in its layout, so
+                  this stays hidden during test play; cards like Divine
+                  Gift of Edge access `ps.sideDeck` directly via the
+                  player state the server builds from this list. */}
+              {hi === 2 && (
+                <div className="board-zone" style={{ position: 'absolute', left: '100%', top: 0, marginLeft: 'calc(var(--zone-w) + 16px * var(--board-scale))', ...zs('deck'), cursor: p.sideDeck?.length ? 'pointer' : undefined, ...(dragOverZone === 'side-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
+                  onClick={() => (p.sideDeck?.length || 0) > 0 && setViewPile({ si, key: 'sideDeck' })}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('side-' + si); }}
+                  onDragLeave={() => setDragOverZone(null)}
+                  onDrop={(e) => handlePileDrop(e, si, 'sideDeck')}
+                  title="Side Deck (editor only — not visible during play)">
+                  {(p.sideDeck?.length || 0) > 0 ? <>
+                    <img src={user?.cardback || '/cardback.png'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                    <div className="board-card-label">{p.sideDeck.length}</div>
+                  </> : <div className="board-zone-empty">Side Deck</div>}
+                </div>
+              )}
             </div>
           );
           if (hi < 2) return [group, <div key={'sp' + hi} className="board-area-spacer" />];
@@ -1770,7 +1802,7 @@ function PuzzleCreator() {
       {/* ── Pile Viewer Modal ── */}
       {viewPile && (() => {
         const pile = players[viewPile.si][viewPile.key] || [];
-        const labels = { discardPile: 'Discard Pile', deletedPile: 'Deleted Pile', mainDeck: 'Deck', potionDeck: 'Potion Deck' };
+        const labels = { discardPile: 'Discard Pile', deletedPile: 'Deleted Pile', mainDeck: 'Deck', potionDeck: 'Potion Deck', sideDeck: 'Side Deck' };
         const sideLabel = viewPile.si === 0 ? 'You' : 'Opponent';
         if (pile.length === 0) { setViewPile(null); return null; }
         return (

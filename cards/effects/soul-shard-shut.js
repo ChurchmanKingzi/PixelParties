@@ -16,6 +16,8 @@
 const {
   canSummonSoulShard, markSoulShardSummoned,
   SOUL_SHARD_PILE_FUEL,
+  soulShardEffectActivates_FromDiscard,
+  markSoulShardEffectFired,
 } = require('./_soul-shards-shared');
 
 const CARD_NAME = 'Soul Shard Shut';
@@ -26,6 +28,8 @@ module.exports = {
   bypassNecromancyNegation: true,
   canSummon: canSummonSoulShard,
   cpuMeta: { pileFuel: SOUL_SHARD_PILE_FUEL },
+  // Sandy Blob gate — effect only runs when summoned from discard.
+  summonEffectActivates: soulShardEffectActivates_FromDiscard,
 
   // CPU: this is a pure-positive "you may mill 5" prompt — under any
   // Soul-Shard pileFuel-armed board, milling 5 cards into discard is
@@ -69,6 +73,8 @@ module.exports = {
       const milled = await engine.actionMillCards(pi, MILL_COUNT, {
         source: CARD_NAME, selfInflicted: true,
       });
+      // Effect fully committed — Sandy Blob marker.
+      markSoulShardEffectFired(ctx);
       engine.log('soul_shard_shut_mill', {
         player: ps.username, milled: milled.length,
       });

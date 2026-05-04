@@ -19,6 +19,8 @@ const {
   canSummonSoulShard, markSoulShardSummoned,
   distinctSoulShardsOnBoard,
   SOUL_SHARD_PILE_FUEL,
+  soulShardEffectActivates_FromDiscard,
+  markSoulShardEffectFired,
 } = require('./_soul-shards-shared');
 
 const CARD_NAME = 'Soul Shard Sekhem';
@@ -29,6 +31,8 @@ module.exports = {
   bypassNecromancyNegation: true,
   canSummon: canSummonSoulShard,
   cpuMeta: { pileFuel: SOUL_SHARD_PILE_FUEL },
+  // Sandy Blob gate — effect only runs when summoned from discard.
+  summonEffectActivates: soulShardEffectActivates_FromDiscard,
 
   hooks: {
     onPlay: async (ctx) => {
@@ -53,6 +57,7 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'creature',
+        baseDamage: damage,
         title: CARD_NAME,
         description: `Deal ${damage} damage to a target. (${distinct} distinct Soul Shard${distinct === 1 ? '' : 's'} on the board × ${DAMAGE_PER_SHARD}.)`,
         confirmLabel: `🔥 ${damage} Damage!`,
@@ -88,6 +93,8 @@ module.exports = {
           { sourceOwner: pi, canBeNegated: true },
         );
       }
+      // Effect fully committed — Sandy Blob marker.
+      markSoulShardEffectFired(ctx);
       engine.log('soul_shard_sekhem_strike', {
         player: gs.players[pi]?.username, distinct, damage,
       });

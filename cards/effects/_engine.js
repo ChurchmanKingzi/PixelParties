@@ -76,6 +76,18 @@ const MAX_ACTION_RECURSION = 20;
 // a hook via runHooks. Normal turns fire a few hundred hook invocations;
 // 10,000 in one turn is pathological. Counter resets in startTurn.
 const MAX_HOOKS_PER_TURN = 10000;
+// Per-turn damage-event cap. Companion to MAX_HOOKS_PER_TURN aimed
+// specifically at the runaway damage cascade pattern: heal-reverse
+// (Overheal Shock) bouncing into Shield-of-Death/Shield-of-Life
+// retaliations, redirect chains (Tempeste), creature-death triggers
+// spawning more damage, etc. Without this, a single MCTS rollout's
+// simulated turn could fire millions of damage events back-to-back
+// (5.7M observed in the field) before any boundary check trips,
+// leaking allocation per call faster than V8 can keep up. Normal
+// turns fire well under 100 damage calls; 50,000 is a 500x safety
+// margin that still catches genuine cascades early — long before
+// the heap ceiling is approached.
+const MAX_DAMAGE_CALLS_PER_TURN = 50000;
 const CHAIN_TIMEOUT_MS = 30000; // 30s to respond to chain prompt
 const EFFECT_TIMEOUT_MS = 5000; // 5s max for a single effect to execute
 
@@ -328,6 +340,33 @@ class GameEngine {
     this._actionRecursionTrace = [];
     // Per-turn hook-invocation counter (see MAX_HOOKS_PER_TURN).
     this._hooksFiredThisTurn = 0;
+    // Per-turn damage-event counter (see MAX_DAMAGE_CALLS_PER_TURN). Reset
+    // in startTurn alongside the hook counter — deliberately NOT gated on
+    // `_inMctsSim` since each simulated turn inside a rollout deserves
+    // its own cascade budget; an exploding-cascade rollout still trips
+    // its own per-simulated-turn cap and aborts cleanly via MCTS_OVERLOAD.
+    this._damageCallsThisTurn = 0;
+    // Per-hook heap-delta accumulators — populated only when
+    // `MCTS_HOOK_HEAP_PROFILE=1` is set, dumped on overload via
+    // `_dumpOverloadDiagnostics`. Keyed by hook name (e.g. `afterDamage`)
+    // and `hookName@cardName` (e.g. `afterDamage@Shield of Death`) so
+    // a leaking listener can be identified by name even when the
+    // candidate-level rollup is muddied by cross-card hook sharing.
+    this._hookHeapDeltaByName = Object.create(null);
+    this._hookHeapDeltaByCard = Object.create(null);
+    // Cached env-var read — runHooks fires thousands of times per turn
+    // and `process.env.X` does an object lookup per call. Stash the
+    // boolean once at engine construction. Setting the flag mid-process
+    // (after the engine is constructed) won't take effect; that's fine
+    // for self-play where the harness sets env before launch.
+    this._hookHeapProfileEnabled = process.env.MCTS_HOOK_HEAP_PROFILE === '1';
+    // Throttle flag for the post-overload force-GC. Set when MCTS overload
+    // throws this turn; cleared at the next live-turn boundary inside
+    // snapshot()'s reset block (alongside `_mctsKilledThisTurn`). The
+    // GC trigger itself runs from the rollout's `finally` cleanup so
+    // V8 reclaims the leaked transients between rollouts instead of
+    // letting the heap stay bloated for the rest of the turn.
+    this._gcTrippedThisTurn = false;
     // Hook-name frequency map for the current turn — when the cap trips,
     // the diagnostic names which hook is dominating so we can pinpoint
     // the looping card.
@@ -466,6 +505,126 @@ class GameEngine {
   }
 
   /**
+   * Best-effort force-GC, throttled to once per live turn. Fired from each
+   * MCTS_OVERLOAD throw site so V8 reclaims the leaked rollout transients
+   * before the next rollout starts — without this, the heap stays bloated
+   * at ~2.5GB for the rest of the game and every subsequent turn re-trips
+   * the heap check after only ~20 hooks (observed in field telemetry as
+   * the runaway-OHS death spiral).
+   *
+   * `--expose-gc` is required for `global.gc` to exist. When unavailable
+   * (typical production build) this is a no-op, and the existing inline
+   * heap caps remain the only line of defense — same behavior as before.
+   * The throttle flag is reset in snapshot()'s live-turn boundary block.
+   */
+  _tryForceGcOnTrip() {
+    if (this._gcTrippedThisTurn) return;
+    this._gcTrippedThisTurn = true;
+    if (typeof global.gc !== 'function') return;
+    try { global.gc(); } catch {}
+  }
+
+  /**
+   * Bundled overload diagnostics — fires after `_tryForceGcOnTrip()` at
+   * each MCTS_OVERLOAD throw site. Three independent telemetry layers,
+   * all throttled to once per live turn:
+   *
+   *   1. Trail JSON dump (always, no opt-in). Writes the ring buffer +
+   *      hook histograms + per-card fire counts + per-hook heap deltas
+   *      + candidate heap deltas to a side file alongside the process.
+   *      The thrown error message embeds only the last 16 trail entries
+   *      and a top-N summary; the side file has the FULL state snapshot
+   *      so a post-mortem can correlate "which hook fired most" against
+   *      "which hook leaked most." File is small (~10-50KB).
+   *
+   *   2. v8 heap snapshot (opt-in: `MCTS_HEAP_SNAPSHOT_ON_OVERLOAD=1`).
+   *      Writes a `.heapsnapshot` file loadable in Chrome DevTools'
+   *      Memory panel. Compare two consecutive overload snapshots in
+   *      DevTools' "Comparison" view to identify the retainer chain
+   *      holding the leaked allocation. File is large (~100-300MB) so
+   *      gated behind an env flag — only enable when actively chasing
+   *      a leak. The Comparison view is what actually cracks the leak;
+   *      the trail JSON only narrows the suspect hook.
+   *
+   *   3. Hook heap-delta histogram capture (opt-in:
+   *      `MCTS_HOOK_HEAP_PROFILE=1`). When this flag is set, runHooks
+   *      samples `process.memoryUsage().heapUsed` before/after each
+   *      listener invocation and accumulates positive deltas into
+   *      `_hookHeapDeltaByName` (e.g. `afterDamage`) and
+   *      `_hookHeapDeltaByCard` (e.g. `afterDamage@Shield of Death`).
+   *      The dump in #1 includes both. Per-call heap sampling adds
+   *      ~10µs per hook fire — measurable but acceptable for diagnostic
+   *      runs (~5-10% overhead on a hook-heavy turn). The aggregate
+   *      signal across thousands of fires surfaces the leaking listener
+   *      by name even when individual calls are noisy.
+   */
+  _dumpOverloadDiagnostics(reason) {
+    if (this._diagDumpedThisTurn) return;
+    this._diagDumpedThisTurn = true;
+    const ts = Date.now();
+    const turn = this.gs?.turn || 0;
+    const phase = this.gs?.currentPhase;
+    const safeReason = String(reason || 'unknown').replace(/[^a-z0-9-]/gi, '_');
+    // Lazy require — keeps `fs` / `v8` / `path` out of the engine's
+    // hot-path import graph in production where dumps never fire.
+    let fs, path, v8;
+    try { fs = require('fs'); path = require('path'); v8 = require('v8'); }
+    catch { return; }
+    const cwd = (() => { try { return process.cwd(); } catch { return '.'; } })();
+
+    // ── #1: Trail + state JSON dump (always) ──
+    try {
+      const fn = path.join(cwd, `mcts-overload-${ts}-t${turn}-${safeReason}.trail.json`);
+      const payload = {
+        reason: safeReason,
+        turn, phase,
+        activePlayer: this.gs?.activePlayer,
+        timestamp: new Date().toISOString(),
+        // Counters at trip moment.
+        damageCallsThisTurn: this._damageCallsThisTurn,
+        damageCallsTotal: this._damageCallsTotal,
+        hooksFiredThisTurn: this._hooksFiredThisTurn,
+        snapshotsThisTurn: this._snapshotsThisTurn,
+        snapshotsTotal: this._snapshotsTaken,
+        instanceCount: (this.cardInstances || []).length,
+        memory: (() => { try { const mu = process.memoryUsage(); return { rssMB: Math.round(mu.rss/1048576), heapTotalMB: Math.round(mu.heapTotal/1048576), heapUsedMB: Math.round(mu.heapUsed/1048576), externalMB: Math.round(mu.external/1048576) }; } catch { return null; } })(),
+        // Per-name aggregates — full maps, not the truncated top-N
+        // version embedded in the thrown error message.
+        hookHistogram: { ...(this._hookHistogramThisTurn || {}) },
+        hookFiresByCard: { ...(this._hookFiresByCard || {}) },
+        // Per-hook & per-card heap deltas — only populated when
+        // MCTS_HOOK_HEAP_PROFILE=1 was set.
+        hookHeapDeltaByName: { ...(this._hookHeapDeltaByName || {}) },
+        hookHeapDeltaByCard: { ...(this._hookHeapDeltaByCard || {}) },
+        // Per-candidate heap deltas (already populated by
+        // mctsRunOneRollout regardless of profiling flag).
+        candidateHeapDelta: { ...(this._candidateHeapDelta || {}) },
+        // Full ring buffer (not just last 16).
+        trail: [...((this._actionTrail) || [])],
+        // Recursion trace — names which cards were actively chained
+        // at the moment of the trip. Empty when no recursion was in
+        // flight, populated when the hero/heal recursion cap fired.
+        actionRecursionTrace: [...((this._actionRecursionTrace) || [])],
+      };
+      fs.writeFileSync(fn, JSON.stringify(payload, null, 2));
+      console.error(`[overload] trail dump → ${fn}`);
+    } catch (err) {
+      console.error('[overload] trail dump failed:', err.message);
+    }
+
+    // ── #2: v8 heap snapshot (opt-in) ──
+    if (process.env.MCTS_HEAP_SNAPSHOT_ON_OVERLOAD === '1') {
+      try {
+        const fn = path.join(cwd, `mcts-overload-${ts}-t${turn}-${safeReason}.heapsnapshot`);
+        v8.writeHeapSnapshot(fn);
+        console.error(`[overload] heap snapshot → ${fn} (load in Chrome DevTools → Memory)`);
+      } catch (err) {
+        console.error('[overload] heap snapshot failed:', err.message);
+      }
+    }
+  }
+
+  /**
    * Action trail — best-effort breadcrumbs for post-mortems.
    *
    * Two layers:
@@ -539,6 +698,9 @@ class GameEngine {
       this._snapshotsThisTurn = 0;
       this._mctsKilledThisTurn = false;
       this._candidateHeapDelta = null;
+      // Allow one fresh post-overload GC + diagnostic dump per live turn.
+      this._gcTrippedThisTurn = false;
+      this._diagDumpedThisTurn = false;
     }
     // Per-turn cap counts OUTER snapshots only (i.e. snapshots taken
     // when we're not already inside a rollout). Inner snapshots from
@@ -561,6 +723,8 @@ class GameEngine {
     // later MCTS calls in this same real turn also short-circuit.
     if (this._snapshotsThisTurn > MAX_SNAPSHOTS_PER_TURN) {
       this._mctsKilledThisTurn = true;
+      this._tryForceGcOnTrip();
+      this._dumpOverloadDiagnostics('snapshot-cap');
       const d = this._describeHeapTripDiagnostics();
       const err = new Error(`MCTS_OVERLOAD: per-turn snapshot cap exceeded (${this._snapshotsThisTurn} > ${MAX_SNAPSHOTS_PER_TURN}) at turn ${turn} phase ${this.gs?.currentPhase}. Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
       err._mctsOverload = true;
@@ -578,6 +742,8 @@ class GameEngine {
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
       if (rssM > HEAP_CHECK_RSS_MB || totM > HEAP_CHECK_TOTAL_MB || usedM > HEAP_CHECK_USED_MB) {
         this._mctsKilledThisTurn = true;
+        this._tryForceGcOnTrip();
+        this._dumpOverloadDiagnostics('snapshot-heap');
         const d = this._describeHeapTripDiagnostics();
         const err = new Error(`MCTS_OVERLOAD: heap check tripped: rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${turn} phase ${this.gs?.currentPhase} (snapshots=${d.snapshots} thisTurn=${this._snapshotsThisTurn} hooks=${d.hooksFired} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
         err._mctsOverload = true;
@@ -1385,6 +1551,8 @@ class GameEngine {
         this._turnHooksKilled = true;
         this._hookCapTrippedThisTurn = true;
         this._mctsKilledThisTurn = true;
+        this._tryForceGcOnTrip();
+        this._dumpOverloadDiagnostics('inline-hook-heap');
         const d = this._describeHeapTripDiagnostics();
         throw new Error(`Inline heap check tripped: rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._hooksFiredThisTurn} hooks (snapshots=${d.snapshots} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. Hooks disabled rest-of-turn. Likely runaway allocation.`);
       }
@@ -1402,6 +1570,8 @@ class GameEngine {
     if (this._hooksFiredThisTurn > MAX_HOOKS_PER_TURN) {
       this._hookCapTrippedThisTurn = true;
       this._turnHooksKilled = true; // stick for the whole real turn
+      this._tryForceGcOnTrip();
+      this._dumpOverloadDiagnostics('hooks-cap');
       const d = this._describeHeapTripDiagnostics();
       throw new Error(`MAX_HOOKS_PER_TURN exceeded (${this._hooksFiredThisTurn}) at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} active p${this.gs?.activePlayer}. Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Recent trail: ${d.trail}. Hooks disabled for rest of this turn (incl. other rollouts). Likely infinite hook-firing loop.`);
     }
@@ -1495,6 +1665,21 @@ class GameEngine {
       const cardKey = card.name || '?';
       this._hookFiresByCard[cardKey] = (this._hookFiresByCard[cardKey] || 0) + 1;
 
+      // Per-hook heap-delta sampling — opt-in via env flag because
+      // process.memoryUsage() costs ~10µs per call and a hook-heavy
+      // turn fires thousands of hooks. Off in production (zero cost),
+      // on for diagnostic batches. Aggregates into the per-turn
+      // accumulators dumped by _dumpOverloadDiagnostics on overload.
+      // Per-call deltas are noisy (one listener may allocate transients
+      // that the next listener's run sees as freed); the accumulated
+      // sum across many fires surfaces the genuine leakers above the
+      // noise floor.
+      const profileHeap = this._hookHeapProfileEnabled;
+      let heapBefore = 0;
+      if (profileHeap) {
+        try { heapBefore = process.memoryUsage().heapUsed; } catch { heapBefore = 0; }
+      }
+
       try {
         if (this._fastMode) {
           // Fast mode (MCTS sim, self-play): skip the Promise.race timeout
@@ -1552,9 +1737,38 @@ class GameEngine {
         //                                 active and continuing only
         //                                 fires more inner damage.
         if (err?._mctsOverload || err?._actionRecursionExceeded) {
+          // Still record the heap delta on fatal exits — leak attribution
+          // matters most when the hook that crashed the process is the
+          // one we want to identify.
+          if (profileHeap) {
+            try {
+              const delta = process.memoryUsage().heapUsed - heapBefore;
+              if (delta > 0) {
+                this._hookHeapDeltaByName[hookName] = (this._hookHeapDeltaByName[hookName] || 0) + delta;
+                const k = `${hookName}@${cardKey}`;
+                this._hookHeapDeltaByCard[k] = (this._hookHeapDeltaByCard[k] || 0) + delta;
+              }
+            } catch {}
+          }
           throw err;
         }
         console.error(`[Engine] Hook "${hookName}" on card "${card.name}" (${card.id}) failed:`, err.message);
+      }
+
+      // Per-hook heap-delta capture (success path). Negative deltas
+      // (the listener allocated transients that GC reclaimed before
+      // the next sample) are clamped to 0 — what we care about is
+      // RETAINED allocation, and reporting negatives would obscure
+      // the leakers when summed alongside them.
+      if (profileHeap) {
+        try {
+          const delta = process.memoryUsage().heapUsed - heapBefore;
+          if (delta > 0) {
+            this._hookHeapDeltaByName[hookName] = (this._hookHeapDeltaByName[hookName] || 0) + delta;
+            const k = `${hookName}@${cardKey}`;
+            this._hookHeapDeltaByCard[k] = (this._hookHeapDeltaByCard[k] || 0) + delta;
+          }
+        } catch {}
       }
 
       // Propagate cancellation back to shared hookCtx
@@ -3183,6 +3397,8 @@ class GameEngine {
       if (this._inMctsSim) {
         err._mctsOverload = true;
         this._mctsKilledThisTurn = true;
+        this._tryForceGcOnTrip();
+        this._dumpOverloadDiagnostics('damage-recursion');
       }
       throw err;
     }
@@ -3205,6 +3421,28 @@ class GameEngine {
     // damage path itself catches that. Tagged `MCTS_OVERLOAD` so
     // mctsRankCandidates / mctsGatedActivation catch and fall through.
     this._damageCallsTotal = (this._damageCallsTotal || 0) + 1;
+    this._damageCallsThisTurn = (this._damageCallsThisTurn || 0) + 1;
+    // ── Per-turn damage-event cap ──
+    // A runaway cascade (heal-reverse Overheal Shock + Shield-of-Death
+    // retaliation, redirect chains, recursive on-KO triggers, …) can
+    // fire millions of damage events in a single simulated turn without
+    // ever crossing the snapshot/hook/heap boundaries. Cap at
+    // MAX_DAMAGE_CALLS_PER_TURN so we abort the cascade EARLY — long
+    // before the per-call heap sample below would catch it. Throws an
+    // MCTS_OVERLOAD-tagged error so mctsRankCandidates / mctsGated-
+    // Activation fall through to heuristic, mirroring the snapshot-cap
+    // path. Hits inside live play (rare, but possible during a
+    // pathological reaction chain) propagate to the action call site
+    // as a regular error and end the cascade safely.
+    if (this._damageCallsThisTurn > MAX_DAMAGE_CALLS_PER_TURN) {
+      this._mctsKilledThisTurn = true;
+      this._tryForceGcOnTrip();
+      this._dumpOverloadDiagnostics('damage-cap');
+      const d = this._describeHeapTripDiagnostics();
+      const err = new Error(`MCTS_OVERLOAD: per-turn damage-call cap exceeded (${this._damageCallsThisTurn} > ${MAX_DAMAGE_CALLS_PER_TURN}) at turn ${this.gs?.turn} phase ${this.gs?.currentPhase}. Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
+      err._mctsOverload = true;
+      throw err;
+    }
     if (this._damageCallsTotal % DAMAGE_HEAP_CHECK_EVERY === 0) {
       const mu = process.memoryUsage();
       const rssM = Math.round(mu.rss / 1024 / 1024);
@@ -3212,6 +3450,8 @@ class GameEngine {
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
       if (rssM > HEAP_CHECK_RSS_MB || totM > HEAP_CHECK_TOTAL_MB || usedM > HEAP_CHECK_USED_MB) {
         this._mctsKilledThisTurn = true;
+        this._tryForceGcOnTrip();
+        this._dumpOverloadDiagnostics('damage-heap');
         const d = this._describeHeapTripDiagnostics();
         const err = new Error(`MCTS_OVERLOAD: damage-call heap check tripped: rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._damageCallsTotal} damage calls (snapshots=${d.snapshots} hooks=${d.hooksFired} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
         err._mctsOverload = true;
@@ -3774,6 +4014,8 @@ class GameEngine {
       if (this._inMctsSim) {
         err._mctsOverload = true;
         this._mctsKilledThisTurn = true;
+        this._tryForceGcOnTrip();
+        this._dumpOverloadDiagnostics('heal-recursion');
       }
       throw err;
     }
@@ -7149,6 +7391,13 @@ class GameEngine {
       if (ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== hi) { own[hi] = playable; continue; }
       if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) { own[hi] = playable; continue; }
       if (hero._actionLockedTurn === this.gs.turn) { own[hi] = playable; continue; }
+      // Divine Gift of Skill lock — clears once the hero has Magic Arts
+      // ≥ 1, so the hero stays highlight-eligible the moment they're
+      // unblocked. Mirror in `validateActionPlay` (the authoritative
+      // server-side gate); without this entry, the client highlights
+      // the hero as a valid caster while every action attempt silently
+      // fails.
+      if (this.isHeroSkillLocked(playerIdx, hi)) { own[hi] = playable; continue; }
 
       // Pre-load hero script and equip scripts for per-card checks
       const heroScript = loadCardEffect(hero.name);
@@ -7330,6 +7579,8 @@ class GameEngine {
         // Combo lock does NOT apply to charmed heroes
         if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) continue;
         if (hero._actionLockedTurn === this.gs.turn) continue;
+        // Skill lock — applies regardless of borrow side.
+        if (this.isHeroSkillLocked(oppIdx, hi)) continue;
 
         const heroScript = loadCardEffect(hero.name);
         const equipScripts = [];
@@ -7503,6 +7754,12 @@ class GameEngine {
       }
       if (!bypass) return null;
     }
+
+    // Divine Gift of Skill lock — the chosen hero can't perform Actions
+    // this turn unless they have Magic Arts >= 1. Spell/Attack/Creature
+    // plays are Actions, so they hit this gate. Ability/hero-effect Action
+    // gates re-check via `engine.isHeroSkillLocked` from server.js.
+    if (this.isHeroSkillLocked(heroOwner, heroIdx)) return null;
 
     // Generic per-player Spell lock — set by cards that declare themselves
     // "the only Spell you play this turn" (Eraser Beam). Cleared at turn
@@ -8231,6 +8488,15 @@ class GameEngine {
         delete ps._creationLockedNames;
         delete ps._revealedCardCounts;
         delete ps._revealedHandIndices;
+        delete ps._magicLevelReductions;
+        delete ps._bonusAbilityAttachments;
+        // Drop the visible Divine Gift of Skill "Blessed" buff icon
+        // alongside the bonus-attachments map — the bonus and the
+        // action lock both expire at turn boundary, so the badge has
+        // nothing left to advertise.
+        for (const hero of (ps.heroes || [])) {
+          if (hero?.buffs?.blessed_skill) delete hero.buffs.blessed_skill;
+        }
         // Per-instance per-turn reveal flag (Luna Kiai). Walk the
         // player's hand instances and clear the flag — the inst itself
         // persists across turns, but the reveal is per-turn-only.
@@ -8273,6 +8539,16 @@ class GameEngine {
     this._hookHistogramThisTurn = Object.create(null);
     this._hookCapTrippedThisTurn = false;
     this._turnHooksKilled = false;
+    // Reset per-turn damage-event counter (see MAX_DAMAGE_CALLS_PER_TURN).
+    // Each simulated turn inside an MCTS rollout gets a fresh budget so
+    // that turn-internal cascades trip their own cap; cumulative live-
+    // turn pressure is captured by the snapshot/heap caps instead.
+    this._damageCallsThisTurn = 0;
+    // Reset per-hook heap-delta accumulators (only populated when
+    // MCTS_HOOK_HEAP_PROFILE=1; otherwise these stay empty and the
+    // reset is a cheap no-op).
+    this._hookHeapDeltaByName = Object.create(null);
+    this._hookHeapDeltaByCard = Object.create(null);
 
     // Process status effects FIRST — before any card hooks fire
     // This ensures burn damage only hits burns from previous turns,
@@ -9793,6 +10069,13 @@ class GameEngine {
    */
   async promptEffectTarget(playerIdx, validTargets, config = {}) {
     if (!validTargets || validTargets.length === 0) return [];
+    // Learning forces the inner spell to commit — the caster can't back
+    // out of a target prompt opened by a Learning-cast spell. Scoped to
+    // the caster: opponent reaction prompts during the same window
+    // (Anti-Magic, surprises, redirects) keep their normal cancel button.
+    if (this.gs._learningCasting === playerIdx) {
+      config = { ...config, cancellable: false };
+    }
     // CPU auto-response: resolve immediately. Pass playerIdx through so
     // the brain can distinguish "my own targets" from "enemy targets" for
     // the CARD CONTROLLER, not the active player. Reactive cards (Shield
@@ -10250,6 +10533,13 @@ class GameEngine {
    * @param {object} promptData - { type, title, ...typeSpecificData }
    */
   async promptGeneric(playerIdx, promptData) {
+    // Learning forces the inner spell to commit — galleries / confirms /
+    // pickers opened by the caster during a Learning-cast spell can't
+    // be cancelled. Scoped to the caster: opponent reaction confirms in
+    // the same window (Anti-Magic, surprises) stay cancellable.
+    if (this.gs._learningCasting === playerIdx && promptData) {
+      promptData = { ...promptData, cancellable: false };
+    }
     // ── Gerrymander redirect ────────────────────────────────────────
     // If the OPPONENT of `playerIdx` controls an active Gerrymander
     // and the prompt qualifies (multi-option picker for Effect 1, or
@@ -13732,6 +14022,10 @@ class GameEngine {
       // outright.
       if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
       if (hero._actionLockedTurn === this.gs.turn) continue;
+      // Divine Gift of Skill lock — action-cost ability activations
+      // are Actions, so the lock applies. Mirror in the charmed/
+      // controlled branches below (they consume the same Action slot).
+      if (this.isHeroSkillLocked(playerIdx, hi)) continue;
 
       for (let zi = 0; zi < (ps.abilityZones[hi] || []).length; zi++) {
         const slot = (ps.abilityZones[hi] || [])[zi] || [];
@@ -13766,6 +14060,10 @@ class GameEngine {
         // rationale as the own-side branch above.
         if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
         if (hero._actionLockedTurn === this.gs.turn) continue;
+        // Skill lock applies to the hero regardless of who's borrowing
+        // it — `oi` is the side the hero lives on, so its ability zones
+        // (and the Magic Arts threshold) read from there.
+        if (this.isHeroSkillLocked(oi, hi)) continue;
 
         for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
           const slot = (ops.abilityZones[hi] || [])[zi] || [];
@@ -13794,6 +14092,7 @@ class GameEngine {
         // Bound doesn't block ability activations — see own-side branch.
         if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
         if (hero._actionLockedTurn === this.gs.turn) continue;
+        if (this.isHeroSkillLocked(oi, hi)) continue;
 
         for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
           const slot = (ops.abilityZones[hi] || [])[zi] || [];
@@ -14967,6 +15266,26 @@ class GameEngine {
   }
 
   /**
+   * Divine Gift of Skill lock — the chosen hero cannot perform an Action
+   * for the rest of the turn unless they have Magic Arts >= 1. Returns
+   * `true` when an Action play should be blocked.
+   *
+   * Used at every Action-resource gate (Spell/Attack/Creature plays via
+   * validateActionPlay, ability-action activations, hero-effect
+   * activations). Hero-effect "free" activations and ability passives
+   * are NOT Actions and are not gated.
+   */
+  isHeroSkillLocked(playerIdx, heroIdx) {
+    const ps = this.gs.players[playerIdx];
+    const hero = ps?.heroes?.[heroIdx];
+    if (!hero) return false;
+    if (hero._skillLockTurn !== this.gs.turn) return false;
+    const abZones = ps.abilityZones?.[heroIdx] || [];
+    if (this.countAbilitiesForSchool('Magic Arts', abZones) >= 1) return false;
+    return true;
+  }
+
+  /**
    * Check if a hero meets the spell school / level requirements for a card,
    * considering the generic bypassLevelReq flag on the hero.
    * Use this in card modules (reactions, surprises, etc.) instead of manually
@@ -15158,6 +15477,16 @@ class GameEngine {
         const r = Number(script.reduceCardLevel(cardData, this, playerIdx)) || 0;
         if (r > 0) total += r;
       } catch { /* card threw — ignore, no reduction */ }
+    }
+    // Player-side per-turn reductions (Divine Gift of Magic, etc.).
+    // Stored as `ps._magicLevelReductions = [{ cardName, amount }, …]` and
+    // cleared at turn start. Each entry that matches `cardData.name`
+    // contributes its amount.
+    const ps = this.gs.players[playerIdx];
+    if (ps?._magicLevelReductions && cardData.name) {
+      for (const r of ps._magicLevelReductions) {
+        if (r.cardName === cardData.name) total += r.amount;
+      }
     }
     return Math.max(0, rawLevel - total);
   }
@@ -15590,6 +15919,22 @@ class GameEngine {
           delete inst.counters._baihuPetrify;
         }
       }
+      // Decrement multi-turn creature freeze durations (Divine Gift of Biseria, etc.)
+      // `frozenDuration` is the controller-turn countdown; `frozen` itself
+      // stays a truthy `1` for the existing engine checks.
+      for (const inst of this.cardInstances) {
+        if (inst.owner !== ap || inst.zone !== 'support') continue;
+        if (!inst.counters.frozenDuration) continue;
+        if (inst.counters.frozenDuration > 1) {
+          inst.counters.frozenDuration--;
+          this.log('status_tick', { target: inst.name, status: 'frozen', remaining: inst.counters.frozenDuration });
+        } else {
+          delete inst.counters.frozen;
+          delete inst.counters.frozenDuration;
+          delete inst.counters.frozenAppliedBy;
+          this.log('status_remove', { target: inst.name, status: 'frozen', by: 'duration' });
+        }
+      }
     } else if (phaseName === 'START') {
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
@@ -15898,6 +16243,18 @@ class GameEngine {
     // creature death triggers spawning more damage, etc. Sampling
     // every Nth batch closes the same gap as the hero-side check.
     this._damageCallsTotal = (this._damageCallsTotal || 0) + 1;
+    this._damageCallsThisTurn = (this._damageCallsThisTurn || 0) + 1;
+    // Per-turn cascade cap — same path as the hero-damage version. See
+    // MAX_DAMAGE_CALLS_PER_TURN comment for the rationale.
+    if (this._damageCallsThisTurn > MAX_DAMAGE_CALLS_PER_TURN) {
+      this._mctsKilledThisTurn = true;
+      this._tryForceGcOnTrip();
+      this._dumpOverloadDiagnostics('creature-cap');
+      const d = this._describeHeapTripDiagnostics();
+      const err = new Error(`MCTS_OVERLOAD: per-turn damage-call cap exceeded (creature-batch ${this._damageCallsThisTurn} > ${MAX_DAMAGE_CALLS_PER_TURN}) at turn ${this.gs?.turn} phase ${this.gs?.currentPhase}. Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
+      err._mctsOverload = true;
+      throw err;
+    }
     if (this._damageCallsTotal % DAMAGE_HEAP_CHECK_EVERY === 0) {
       const mu = process.memoryUsage();
       const rssM = Math.round(mu.rss / 1024 / 1024);
@@ -15905,6 +16262,8 @@ class GameEngine {
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
       if (rssM > HEAP_CHECK_RSS_MB || totM > HEAP_CHECK_TOTAL_MB || usedM > HEAP_CHECK_USED_MB) {
         this._mctsKilledThisTurn = true;
+        this._tryForceGcOnTrip();
+        this._dumpOverloadDiagnostics('creature-heap');
         const d = this._describeHeapTripDiagnostics();
         const err = new Error(`MCTS_OVERLOAD: creature-damage-batch heap check tripped: rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._damageCallsTotal} damage calls (snapshots=${d.snapshots} hooks=${d.hooksFired} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
         err._mctsOverload = true;

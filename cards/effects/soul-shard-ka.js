@@ -32,6 +32,8 @@
 const {
   canSummonSoulShard, markSoulShardSummoned,
   SOUL_SHARD_PILE_FUEL,
+  soulShardEffectActivates_FromDiscard,
+  markSoulShardEffectFired,
 } = require('./_soul-shards-shared');
 const { hasCardType } = require('./_hooks');
 
@@ -78,6 +80,11 @@ module.exports = {
   bypassNecromancyNegation: true,
   canSummon: canSummonSoulShard,
   cpuMeta: { pileFuel: SOUL_SHARD_PILE_FUEL },
+  // Gates Sandy Blob (and future "when on-summon effect activates"
+  // listeners) — Ka's effect ONLY runs when summoned from discard.
+  // A normal hand summon hits the `_summonedFromDiscard` early return
+  // below and produces no effect, so Sandy Blob shouldn't fire.
+  summonEffectActivates: soulShardEffectActivates_FromDiscard,
 
   hooks: {
     onPlay: async (ctx) => {
@@ -213,6 +220,12 @@ module.exports = {
       });
 
       engine.shuffleDeck(pi, 'main');
+      // Effect fully committed — stamp the activation marker so Sandy
+      // Blob (and similar "when on-summon effect activates" listeners)
+      // know this onPlay actually did its thing. Mid-flow cancellations
+      // (gallery cancel, no eligible cards, etc.) early-returned above
+      // and never reach this line.
+      markSoulShardEffectFired(ctx);
       engine.log('soul_shard_ka_search_summon', {
         player: ps.username, summoned: chosenName,
         heroIdx: chosenHost.heroIdx, zoneSlot: placeRes.actualSlot,

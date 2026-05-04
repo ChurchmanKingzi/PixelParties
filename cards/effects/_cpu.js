@@ -19,6 +19,14 @@ const PAUSE_BETWEEN_PHASES = 450;
 // Delay for each CPU prompt decision during card resolution (targeting, picks,
 // confirms). Puzzle mode keeps the original 50ms via the original prompt path.
 const CPU_PROMPT_DELAY = 350;
+// Hard wall-clock cap on a single CPU turn. If the CPU's runCpuTurn doesn't
+// finish in this much real time, all subsequent MCTS evaluations fall back
+// to heuristic ordering and remaining safety-loop iterations bail out, so
+// the turn force-advances to End instead of the brain stalling. 90s is
+// generous — a healthy turn finishes in under 10s; this cap exists solely
+// to break out of pathological infinite-loop / stuck-await scenarios that
+// would otherwise hang the game indefinitely.
+const MAX_CPU_TURN_MS = 90000;
 
 // Set to false when the CPU is stable. Keep verbose while we're still shaking
 // out freeze bugs — every major decision point logs so a hang can be traced.
@@ -70,6 +78,20 @@ function shuffle(arr) {
 
 function stillCpuTurn(engine, cpuIdx) {
   return !engine.gs.result && engine.gs.activePlayer === cpuIdx;
+}
+
+/**
+ * True when the live CPU turn has run past its hard wall-clock cap. Used
+ * by main-phase / action-phase safety loops and the MCTS gates to bail
+ * out cleanly instead of grinding through more rollouts on a stuck turn.
+ * Always false inside MCTS rollouts (`_inMctsSim`) so the deadline only
+ * trips on the real turn, not on the simulated branches the live brain
+ * is evaluating.
+ */
+function cpuPastDeadline(engine) {
+  if (engine?._inMctsSim) return false;
+  const dl = engine?._cpuTurnDeadline;
+  return typeof dl === 'number' && Date.now() >= dl;
 }
 
 /**
@@ -125,6 +147,13 @@ async function runCpuTurn(engine, helpers) {
   engine._cpuHelpers = helpers;
 
   const turnStartT = Date.now();
+  // Deadline applies to LIVE turns only — nested rollouts re-enter
+  // runCpuTurn with `_inMctsSim` set; cpuPastDeadline returns false in
+  // that case so the existing per-decision MCTS budget remains the only
+  // cost cap inside rollouts.
+  if (!engine._inMctsSim) {
+    engine._cpuTurnDeadline = turnStartT + MAX_CPU_TURN_MS;
+  }
   cpuLog(`===== TURN START turn=${gs.turn} phase=${gs.currentPhase} hand=${ps.hand.length} gold=${ps.gold} fast=${!!engine._fastMode} =====`);
   cpuLog('hand:', ps.hand);
 
@@ -445,6 +474,10 @@ async function runActionPhase(engine, helpers) {
 
   for (const pick of candidates) {
     if (!stillCpuTurn(engine, cpuIdx)) return false;
+    if (cpuPastDeadline(engine)) {
+      cpuLog(`  Action Phase: turn deadline hit — bailing`);
+      return false;
+    }
     if (engine.gs.currentPhase !== 3) {
       cpuLog(`  Action Phase: currentPhase=${engine.gs.currentPhase}, early-exit`);
       return true;
@@ -603,38 +636,56 @@ async function tryAscend(engine, helpers) {
 
 async function runMainPhase(engine, helpers) {
   for (let guard = 0; guard < 12; guard++) {
+    if (cpuPastDeadline(engine)) { cpuLog('  MainPhase: turn deadline hit — bailing'); return; }
     const before = snapshotProgress(engine);
     cpuLog(`  MainPhase pass ${guard + 1} — snapshot=${before}`);
+
+    // First pass: Creatures whose `canSummon` requires an empty discard
+    // pile (Guardian Beasts archetype today; generic for any future
+    // archetype with the same shape). Must run BEFORE artifacts/potions
+    // — once any card lands in the discard pile, the summon window
+    // closes for the rest of the turn.
+    cpuLog('    → playDiscardSensitiveCreatures');
+    await playDiscardSensitiveCreatures(engine, helpers);
+    cpuLog('    ← playDiscardSensitiveCreatures');
+    if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+    if (cpuPastDeadline(engine)) return;
 
     cpuLog('    → playArtifacts');
     await playArtifacts(engine, helpers);
     cpuLog('    ← playArtifacts');
     if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+    if (cpuPastDeadline(engine)) return;
 
     cpuLog('    → playPotions');
     await playPotions(engine, helpers);
     cpuLog('    ← playPotions');
     if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+    if (cpuPastDeadline(engine)) return;
 
     cpuLog('    → attachAbilities');
     await attachAbilities(engine, helpers);
     cpuLog('    ← attachAbilities');
     if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+    if (cpuPastDeadline(engine)) return;
 
     cpuLog('    → placeSurprises');
     await placeSurprises(engine, helpers);
     cpuLog('    ← placeSurprises');
     if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+    if (cpuPastDeadline(engine)) return;
 
     cpuLog('    → fireAdditionalActions');
     await fireAdditionalActions(engine, helpers);
     cpuLog('    ← fireAdditionalActions');
     if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+    if (cpuPastDeadline(engine)) return;
 
     cpuLog('    → activateBoardEffects');
     await activateBoardEffects(engine, helpers);
     cpuLog('    ← activateBoardEffects');
     if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+    if (cpuPastDeadline(engine)) return;
 
     const after = snapshotProgress(engine);
     cpuLog(`  MainPhase pass ${guard + 1} end — before=${before} after=${after}`);
@@ -1028,6 +1079,131 @@ function snapshotProgress(engine) {
     (sum, hz) => sum + hz.reduce((s, slot) => s + (slot?.length || 0), 0), 0,
   );
   return ps.hand.length + '|' + ps.gold + '|' + supportCount + '|' + ps.abilityGivenThisTurn.filter(Boolean).length;
+}
+
+// ─── Discard-sensitive creature pre-pass ────────────────────────────────
+// Some Creatures (Guardian Beasts archetype today; any future archetype
+// with the same shape generically) gate their summon on "no cards in your
+// discard pile". Once ANY card the player plays this turn lands in the
+// discard pile (Spell, Attack, Artifact, Potion), the gate slams shut and
+// no further copies can be summoned this turn — even paid ones. The
+// existing Main-Phase order (artifacts → potions → … → fireAdditionalActions)
+// would unconditionally lose the summon window by playing a discard-bound
+// card first.
+//
+// This pre-pass runs BEFORE artifacts/potions and tries each
+// discard-sensitive Creature in hand through the normal
+// `mctsGatedActivation` path. The detection is generic — a Creature is
+// "discard-sensitive" iff its `canSummon` returns true now AND would
+// return false with one extra card in the discard pile. No card / archetype
+// names are hard-coded.
+//
+// Why MCTS-friendly: each summon still goes through the gate, so the
+// rollout sees the post-summon state (Guardian Beast on the board, plus
+// whatever it'll do during the rest of the simulated turn). If the
+// rollout shows the summon is genuinely worse than skipping (very rare —
+// these creatures are specifically designed to be free or near-free),
+// the gate refuses to commit, and the creature stays in hand for a
+// later turn / Action Phase. The pre-pass merely ensures the option
+// is EVALUATED before discard-bound plays consume the window.
+
+function detectDiscardSensitiveSummon(script, engine, pi) {
+  if (!script?.canSummon) return false;
+  const ps = engine.gs?.players?.[pi];
+  if (!ps) return false;
+  const ctx = { _engine: engine, cardOwner: pi };
+  let beforeRes = false;
+  try { beforeRes = !!script.canSummon(ctx); } catch { beforeRes = false; }
+  if (!beforeRes) return false;
+  // Probe with a placeholder name in the discard. We don't actually
+  // mutate the canonical pile — push then pop so any other concurrent
+  // reader sees the original state immediately after.
+  const origDiscard = ps.discardPile;
+  const probedDiscard = ['__cpu-probe__', ...(origDiscard || [])];
+  ps.discardPile = probedDiscard;
+  let afterRes = true;
+  try { afterRes = !!script.canSummon(ctx); } catch { afterRes = true; }
+  ps.discardPile = origDiscard;
+  return beforeRes && !afterRes;
+}
+
+async function playDiscardSensitiveCreatures(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  if (!ps) return;
+  const cardDB = engine._getCardDB();
+  const tried = new Set();
+
+  for (let safety = 0; safety < 12; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (cpuPastDeadline(engine)) return;
+
+    let pick = null;
+    for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
+      const cardName = ps.hand[handIdx];
+      const cd = cardDB[cardName];
+      if (!cd || cd.cardType !== 'Creature') continue;
+      if ((cd.subtype || '').toLowerCase() === 'surprise') continue;
+      const triedKey = cardName + '|' + handIdx;
+      if (tried.has(triedKey)) continue;
+      const script = loadCardEffect(cardName);
+      if (!script) continue;
+      if (script.cpuSkipProactive) continue;
+      if (engine.gs?._cpuSkipProactiveNames?.has?.(cardName)) continue;
+      // Discard-sensitive only — pure summons fall through to the regular
+      // fireAdditionalActions / Action Phase paths.
+      if (!detectDiscardSensitiveSummon(script, engine, cpuIdx)) continue;
+      if (!isFirstTurnSafe(engine, cpuIdx, cardName, cd)) continue;
+
+      const heroIdx = pickHeroForActionCard(engine, cpuIdx, cd, cardName);
+      if (heroIdx < 0) continue;
+      const v = engine.validateActionPlay(cpuIdx, cardName, handIdx, heroIdx, [cd.cardType]);
+      if (!v) continue;
+      if (!v.isMainPhase) continue;
+      // Either the summon is itself an inherent additional Action (free
+      // first-of-turn) OR there's an external additional-action source
+      // available (Adventurousness, Friendship, etc.). If neither, the
+      // summon would have to consume the Main Phase action — which we
+      // don't have in MP1; defer to the regular fireAdditionalActions
+      // pass so the loop's progress check doesn't infinite-spin trying
+      // the same unplayable card.
+      if (!v.isInherentAction) {
+        const typeId = engine.findAdditionalActionForCard(cpuIdx, cardName, heroIdx);
+        if (!typeId) continue;
+      }
+      const zoneSlot = pickCreatureZoneSlot(engine, cpuIdx, heroIdx);
+      if (zoneSlot < 0) continue;
+      pick = { cardName, handIdx, heroIdx, zoneSlot };
+      break;
+    }
+    if (!pick) return;
+
+    const handLenBefore = ps.hand.length;
+    cpuLog(`      → discard-sensitive creature "${pick.cardName}" hero=${pick.heroIdx} zone=${pick.zoneSlot}`);
+    const actionFn = async () => {
+      await helpers.doPlayCreature(helpers.room, cpuIdx, {
+        cardName: pick.cardName,
+        handIndex: pick.handIdx,
+        heroIdx: pick.heroIdx,
+        zoneSlot: pick.zoneSlot,
+      });
+    };
+    const pickScript = loadCardEffect(pick.cardName);
+    // Always commit: by definition, if the summon doesn't happen NOW,
+    // the next discard-bound play will permanently close the summon
+    // window for this turn. The pre-pass exists to ensure this option
+    // is taken — letting the gate refuse over a sub-1-point eval delta
+    // misses the asymmetry. Card-specific cpuMeta opt-in still applies
+    // for evaluateThroughTurnEnd if a card declares it.
+    const pickEvalThroughTurnEnd = !!pickScript?.cpuMeta?.evaluateThroughTurnEnd;
+    const committed = await mctsGatedActivation(engine, helpers, `discard-sensitive ${pick.cardName}`, actionFn,
+      { alwaysCommit: true, evaluateThroughTurnEnd: pickEvalThroughTurnEnd });
+    const shrank = ps.hand.length < handLenBefore;
+    cpuLog(`      ← discard-sensitive "${pick.cardName}" ${committed && shrank ? 'OK' : 'SKIPPED/FAILED'}`);
+    if (!committed || !shrank) tried.add(pick.cardName + '|' + pick.handIdx);
+    await pauseAction(engine);
+  }
 }
 
 // ─── Artifacts ──────────────────────────────────────────────────────────
@@ -3820,6 +3996,15 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect) {
     if (teamMaxSchoolLvls[oppIdx] == null) teamMaxSchoolLvls[oppIdx] = mctsTeamMaxSchoolLvl(gs, oppIdx);
     return teamMaxSchoolLvls[oppIdx];
   };
+  // When the prompt's targetingConfig forgets to declare `baseDamage`,
+  // `damage` lands as 0 here — every formula below would multiply by 0
+  // and collapse to an all-zero score (random tiebreak). Treat
+  // unknown-damage prompts as "value-only" picks: score purely by the
+  // unit's dynamic value so the CPU still focuses on the highest-impact
+  // target instead of rolling a coin between Jenny and Bill. Cards
+  // SHOULD declare baseDamage; this is the safety net for any that
+  // slip through.
+  const damageKnown = damage > 0;
   const scoreTarget = (t) => {
     if (t.type === 'hero') {
       const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
@@ -3827,6 +4012,12 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect) {
       const immortal = !!h.buffs?.immortal;
       if (immortal && h.hp <= 1 && damage > 0) return -Infinity; // wasted
       const value = mctsEnemyHeroDynamicValue(engine, t.owner, t.heroIdx, teamMax(t.owner));
+      if (!damageKnown) {
+        // Unknown damage — still prefer low-HP and high-value heroes, but
+        // skip the kill-shot bonus (we don't know whether the card kills).
+        const focusBonus = Math.max(0, 40 - h.hp * 0.3);
+        return 100 * value + focusBonus;
+      }
       const effDamage = Math.min(damage, immortal ? Math.max(0, h.hp - 1) : h.hp);
       const lethal = !immortal && damage > 0 && damage >= h.hp;
       // Kill-shot reward scales with hero value — lethal on a 1.0× hero
@@ -3844,6 +4035,11 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect) {
       const immortal = !!inst?.counters?.buffs?.immortal;
       if (immortal && hp <= 1 && damage > 0) return -Infinity;
       const value = mctsEnemyCreatureValue(engine, inst);
+      if (!damageKnown) {
+        // Unknown damage — value-only fallback, with the same
+        // hero/creature gap (creatures rank below heroes).
+        return 50 * value - 30;
+      }
       const effDamage = Math.min(damage, immortal ? Math.max(0, hp - 1) : hp);
       const killable = !immortal && damage > 0 && damage >= hp;
       const killBonus = killable ? 80 * value : 0;
@@ -6803,6 +6999,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   // right policy (mirrors the inMctsSim bypass).
   if (engine._inMctsSim
       || engine._mctsKilledThisTurn
+      || cpuPastDeadline(engine)
       || (engine.gs?.turn || 0) >= MCTS_LATE_GAME_TURN_THRESHOLD) {
     try { await actionFn(); return true; }
     catch { return false; }
@@ -7071,6 +7268,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // accelerate the death spiral.
   const mctsBypass = engine._inMctsSim
     || engine._mctsKilledThisTurn
+    || cpuPastDeadline(engine)
     || liveTurn >= MCTS_LATE_GAME_TURN_THRESHOLD;
   if (mctsBypass) {
     // Inside rollouts: rank candidates per the configured rollout brain.
@@ -7114,7 +7312,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
     }
   };
   for (const candidate of candidates) {
-    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS) {
+    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;
     }
@@ -7149,7 +7347,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // ── Ensure-min-pulls phase: pull each zero-visit arm once ──
   for (const arm of arms) {
     if (arm.visits > 0) continue;
-    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS) {
+    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;
     }
@@ -7168,7 +7366,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // infinite UCB (they'd have been pulled in the min-pulls phase — this
   // is defensive).
   while (!budgetExceeded && totalRollouts < MCTS_UCB1_TOTAL_PULLS) {
-    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS) {
+    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;
     }
@@ -7210,7 +7408,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
   // truly-equal case without spending more pulls on it.
   let extensionPulls = 0;
   while (!budgetExceeded && extensionPulls < MCTS_EXT_PULLS_MAX) {
-    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS) {
+    if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;
     }

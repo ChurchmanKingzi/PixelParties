@@ -25,6 +25,10 @@ function PlayScreen() {
   const [joinTarget, setJoinTarget] = useState(null);
   const [lobby, setLobby] = useState(null);
   const [playerJoined, setPlayerJoined] = useState(null);
+  // Top-10 ranked players, fetched once on mount and refreshed every 60s.
+  // The endpoint filters out players with 0 ranked games so the list
+  // reflects actual competition rather than 1000-ELO defaults.
+  const [leaderboard, setLeaderboard] = useState([]);
   const [gameState, setGameState] = useState(() => {
     // Check for buffered reconnection state
     const pending = _pendingGameState;
@@ -69,6 +73,35 @@ function PlayScreen() {
         if (firstLegalSample) setSelectedDeck(firstLegalSample.id);
       }
     })();
+  }, []);
+
+  // Leaderboard refresh — initial fetch on mount, then every 60s. Pulled
+  // separately from the room poll so a slow leaderboard query (DB scan)
+  // doesn't gate the room list refresh cadence.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const data = await api('/leaderboard');
+        if (!cancelled) setLeaderboard(data?.players || []);
+      } catch {
+        if (!cancelled) setLeaderboard([]);
+      }
+    };
+    load();
+    const intv = setInterval(load, 60000);
+    // Server broadcasts `leaderboard_updated` whenever a ranked set
+    // finishes and ELOs change. React immediately so the lobby's
+    // standings reflect the new ELOs without waiting up to 60s for
+    // the poll. Fires for every client (in-lobby, in-room, spectating)
+    // — anyone with the leaderboard panel rendered gets a fresh view.
+    const onLeaderboardUpdated = () => load();
+    socket.on('leaderboard_updated', onLeaderboardUpdated);
+    return () => {
+      cancelled = true;
+      clearInterval(intv);
+      socket.off('leaderboard_updated', onLeaderboardUpdated);
+    };
   }, []);
 
   // Socket events
@@ -317,7 +350,7 @@ function PlayScreen() {
         </div>
 
         {/* In Progress */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, borderRight: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column' }}>
           <div className="orbit-font" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent2)', borderBottom: '1px solid var(--bg4)' }}>
             IN PROGRESS ({activeRooms.length})
           </div>
@@ -338,6 +371,50 @@ function PlayScreen() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Leaderboard — top 10 ranked players. Empty until at least one
+            player has finished a ranked set (server filters out anyone
+            with ranked_games = 0 so default-1000 accounts don't pollute
+            the list). 1st = gold crown + gold name, 2nd = smaller silver
+            crown + silver name, 3rd = bronze name, 4–10 use each
+            player's own profile color. */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="orbit-font" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent4)', borderBottom: '1px solid var(--bg4)' }}>
+            LEADERBOARD ({leaderboard.length})
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+            {leaderboard.length === 0 && (
+              <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, padding: 20 }}>
+                No ranked players yet — be the first!
+              </div>
+            )}
+            {leaderboard.map(p => {
+              // Tier styling. Tier 1 / 2 / 3 override the player's
+              // profile color with gold / silver / bronze; ranks 4+
+              // render their selected color so the line still feels
+              // personal even outside the medal tier.
+              const tier = p.rank === 1 ? 'gold' : p.rank === 2 ? 'silver' : p.rank === 3 ? 'bronze' : null;
+              const nameColor =
+                tier === 'gold'   ? '#ffd24a' :
+                tier === 'silver' ? '#d8d8e6' :
+                tier === 'bronze' ? '#cd7f32' :
+                p.color || '#00f0ff';
+              const crown = tier === 'gold' ? '👑' : tier === 'silver' ? '🥈' : tier === 'bronze' ? '🥉' : null;
+              return (
+                <div key={p.username} className={'leaderboard-row leaderboard-row-' + (tier || 'normal')}>
+                  <span className="leaderboard-rank">#{p.rank}</span>
+                  {crown && (
+                    <span className={'leaderboard-crown leaderboard-crown-' + tier}>{crown}</span>
+                  )}
+                  <span className="leaderboard-name" style={{ color: nameColor }}>
+                    {p.username}
+                  </span>
+                  <span className="leaderboard-elo">{p.elo}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

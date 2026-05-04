@@ -75,6 +75,12 @@ module.exports = {
     cancellable: true,
     exclusiveTypes: true,
     maxPerType: { hero: 1, equip: 1 },
+    // Per-target damage hint — read by the CPU's `inferDamage` so the
+    // simulate-and-score targeting branch can correctly evaluate kill
+    // shots and high-value picks. Without this the CPU treats Acid
+    // Vial as 0-damage, all targets score 0, and tiebreaker randomness
+    // wastes the splash on whichever hero rolls highest.
+    baseDamage: 150,
   },
 
   validateSelection(selectedIds, validTargets) {

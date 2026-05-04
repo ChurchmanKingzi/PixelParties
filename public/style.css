@@ -681,6 +681,97 @@ body {
 }
 .room-card:hover { border-color: var(--accent); }
 
+/* ===== LEADERBOARD ===== */
+/* Top-10 ranked players panel on the multiplayer screen. Each row is a
+   tight three-column flex layout: rank • [optional crown] • name (grows
+   to fill) • ELO. Tier classes (gold/silver/bronze) decorate the row
+   for the medal positions; rank 4–10 render their selected profile
+   color via inline style only. Names are inline-styled (server returns
+   the player's color) so the tier color override naturally wins via
+   later-CSS-rule precedence on the medal tiers. */
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  background: var(--bg3);
+  border: 1px solid var(--bg4);
+  font-size: 11px;
+  transition: border-color .15s ease, background .15s ease;
+}
+.leaderboard-row:hover { border-color: var(--accent4); }
+.leaderboard-rank {
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 10px;
+  color: var(--text2);
+  min-width: 26px;
+}
+.leaderboard-name {
+  flex: 1;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: .3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.leaderboard-elo {
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text);
+  min-width: 44px;
+  text-align: right;
+}
+.leaderboard-crown {
+  font-size: 16px;
+  line-height: 1;
+}
+/* Smaller silver / bronze crowns vs the rank-1 gold crown to make the
+   visual hierarchy obvious. The gold crown is full-size; silver
+   shrinks to 13px; bronze omits the crown by spec but the medal
+   emoji `🥉` doubles as a crown-like marker, kept at 12px. */
+.leaderboard-crown-gold   { font-size: 18px; filter: drop-shadow(0 0 4px rgba(255,210,74,.6)); }
+.leaderboard-crown-silver { font-size: 13px; filter: drop-shadow(0 0 3px rgba(216,216,230,.5)); }
+.leaderboard-crown-bronze { font-size: 12px; filter: drop-shadow(0 0 3px rgba(205,127,50,.5)); }
+
+/* Tier styling. Gold (rank 1) gets a subtle golden gradient line under
+   the name plus a faint glow on the row; silver (rank 2) gets a softer
+   silver glow; bronze (rank 3) gets a copper-tinted glow. Ranks 4–10
+   reuse the default row styling and rely on the player's own profile
+   color for the name. */
+.leaderboard-row-gold {
+  background: linear-gradient(90deg, rgba(255,210,74,.16) 0%, rgba(255,210,74,.04) 60%, transparent 100%);
+  border-color: rgba(255,210,74,.55);
+  box-shadow: 0 0 12px rgba(255,210,74,.18), inset 0 0 8px rgba(255,210,74,.06);
+}
+.leaderboard-row-gold .leaderboard-name {
+  text-shadow: 0 0 4px rgba(255,210,74,.5), 0 0 8px rgba(255,210,74,.25);
+  background-image: linear-gradient(90deg, #ffd24a 0%, #ffae3b 50%, #ffd24a 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent !important;
+}
+.leaderboard-row-silver {
+  background: linear-gradient(90deg, rgba(216,216,230,.14) 0%, rgba(216,216,230,.03) 60%, transparent 100%);
+  border-color: rgba(216,216,230,.45);
+  box-shadow: 0 0 8px rgba(216,216,230,.14);
+}
+.leaderboard-row-silver .leaderboard-name {
+  text-shadow: 0 0 3px rgba(216,216,230,.45);
+}
+.leaderboard-row-bronze {
+  background: linear-gradient(90deg, rgba(205,127,50,.14) 0%, rgba(205,127,50,.03) 60%, transparent 100%);
+  border-color: rgba(205,127,50,.45);
+  box-shadow: 0 0 6px rgba(205,127,50,.14);
+}
+.leaderboard-row-bronze .leaderboard-name {
+  text-shadow: 0 0 3px rgba(205,127,50,.4);
+}
+
 /* ===== HERO SLOT ===== */
 .hero-column {
   display: flex;
@@ -4338,6 +4429,13 @@ body {
   overflow: hidden;
   cursor: default;
   flex-shrink: 0;
+  /* Container query context for the responsive HP/ATK strip below.
+     `inline-size` containment means children can use @container (max-
+     width: …) to react to THIS card's rendered width — not the
+     viewport width. Lets the hero stats strip switch from row to
+     stacked layout when the card itself is too narrow for both
+     numbers, without any JS measurement. */
+  container-type: inline-size;
 }
 .board-card.flipped { transform: rotate(180deg); }
 
@@ -4381,6 +4479,60 @@ body {
 .board-card-atk-hero {
   bottom: 3px;
   right: 5px;
+}
+
+/* Hero HP/ATK responsive container.
+   Used on Hero board cards in place of the legacy `.board-card-hp-hero`
+   + `.board-card-atk-hero` pair. Lays HP and ATK out as flex children
+   in a single absolute-positioned strip pinned to the bottom of the
+   card.
+
+   Two layouts:
+     • Default (card is wide enough): horizontal — HP on the left,
+       ATK on the right, both anchored at the card's bottom edge.
+       Matches the legacy positioning (left:5px / right:5px corners).
+     • Compact (card narrower than 55px via container query below):
+       vertical — HP stacked on TOP of ATK, both horizontally
+       centered. `flex-direction: column` puts the FIRST child (HP)
+       at the container's top edge and the SECOND child (ATK) below;
+       since the container is bottom-anchored at `bottom:3px` and
+       grows upward to fit content, the bottom child (ATK) ends up
+       at the card's bottom and HP sits ABOVE ATK. */
+.board-card-stats-hero {
+  position: absolute;
+  bottom: 3px;
+  left: 5px;
+  right: 5px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  font-size: calc(10px * var(--board-scale));
+  color: #fff;
+  text-shadow: 0 0 4px #000, 0 0 2px #000, 1px 1px 0 #000;
+  z-index: 4;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* Compact layout for narrow cards (low resolution / small board scale).
+   Threshold of 55px is below the default card width (64px @ scale 1.0)
+   and above the smallest practical scale that keeps cards legible at
+   all — so cards render side-by-side under normal play but stack
+   vertically the moment the player drops into a low-resolution view.
+   `flex-direction: column` + `align-items: center` produces HP-on-top
+   and ATK-below, both horizontally centered. The container's bottom
+   edge stays pinned at `bottom: 3px`; with two stacked children the
+   container's height is now ~2 lines and its top edge moves UP into
+   the card body. */
+@container (max-width: 55px) {
+  .board-card-stats-hero {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    row-gap: calc(1px * var(--board-scale));
+  }
 }
 .board-card-hp-creature {
   bottom: 3px;

@@ -78,6 +78,7 @@ module.exports = {
       side: 'any',
       types: ['hero', 'creature'],
       damageType: 'other',
+      baseDamage: 50,
       title: CARD_NAME,
       description: 'Deal 50 damage to any target.',
       confirmLabel: '⚔️ 50 Damage!',

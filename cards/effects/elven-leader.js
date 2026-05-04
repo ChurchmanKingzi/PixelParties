@@ -80,6 +80,7 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'creature',
+        baseDamage: DAMAGE,
         title: CARD_NAME,
         description: remaining === 1
           ? `Deal ${DAMAGE} damage to any target. (Last hit)`

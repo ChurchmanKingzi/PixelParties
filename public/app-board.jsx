@@ -33,7 +33,22 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
   // the hover tooltip renders without changing the card image / name by
   // passing `tooltipCardOverride`. Falls back to the canonical card.
-  const tooltipTarget = tooltipCardOverride || card;
+  // When the BoardCard renders with live stats (hero / creature on the
+  // battle board), pass them through to the tooltip via `_liveHp` /
+  // `_liveMaxHp` / `_liveAtk` so the hover preview shows
+  // `currentHp / maxHp` and current ATK instead of the base card-DB
+  // values. CardTooltipContent prefers `_live*` over `card.*`.
+  const tooltipBase = tooltipCardOverride || card;
+  const tooltipTarget = (() => {
+    if (!tooltipBase) return null;
+    if (hp == null && maxHp == null && atk == null) return tooltipBase;
+    return {
+      ...tooltipBase,
+      _liveHp:    hp    != null ? hp    : tooltipBase._liveHp,
+      _liveMaxHp: maxHp != null ? maxHp : tooltipBase._liveMaxHp,
+      _liveAtk:   atk   != null ? atk   : tooltipBase._liveAtk,
+    };
+  })();
 
   // Foil support
   const foilType = card?.foil || null;
@@ -76,16 +91,31 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
       {hp != null && maxHp != null && hp > maxHp && (
         <div className="board-card-overheal-barrier" />
       )}
-      {hp != null && hpPosition && (
-        <div className={'board-card-hp board-card-hp-' + hpPosition}
-          style={hp != null && maxHp != null && hp > maxHp ? { color: '#44ff88' } : undefined}>
-          {hp}
-        </div>
-      )}
-      {atk != null && hpPosition === 'hero' && (
-        <div className="board-card-atk board-card-atk-hero">
-          {atk}
-        </div>
+      {/* Hero cards: HP + ATK go through the responsive flex strip so
+          they auto-stack vertically on cards too narrow to fit both
+          numbers on one row. Other positions (creature) keep the
+          single-stat absolute layout. */}
+      {hpPosition === 'hero' ? (
+        (hp != null || atk != null) && (
+          <div className="board-card-stats-hero">
+            {hp != null && (
+              <div className="board-card-hp-num"
+                style={maxHp != null && hp > maxHp ? { color: '#44ff88' } : undefined}>
+                {hp}
+              </div>
+            )}
+            {atk != null && (
+              <div className="board-card-atk-num">{atk}</div>
+            )}
+          </div>
+        )
+      ) : (
+        hp != null && hpPosition && (
+          <div className={'board-card-hp board-card-hp-' + hpPosition}
+            style={maxHp != null && hp > maxHp ? { color: '#44ff88' } : undefined}>
+            {hp}
+          </div>
+        )
       )}
     </div>
   );
@@ -7501,6 +7531,557 @@ const ANIM_REGISTRY = {
     };
   })(),
 
+  // ── Divine Gift of Biseria ────────────────────────────────
+  //  An ENORMOUS freeze — 12 huge ice sheets crash inward
+  //  from all directions (cardinal + diagonal + 2 vertical
+  //  spikes), a full-screen frost shockwave radiates out, a
+  //  brilliant blue-white core flash slams the target, then a
+  //  thick ice cage lingers as snowflakes drift down and
+  //  crystalline shards erupt skyward. Reaches well beyond the
+  //  target's bounds (2-3× cw/ch) — the visual sells "engulfed
+  //  in glaciers". Total runtime ~2.4s.
+  biseria_ice_engulf: (() => {
+    return function BiseriaIceEngulfEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      // 12 enormous slabs from all 8 compass directions + 4 extras.
+      const slabs = [
+        // Cardinal slabs — long, wide, heavily oversized.
+        { w: cw * 2.4, h: ch * 0.7,   sx: 0, sy: -ch * 2.2, ex: 0, ey: -ch * 0.20, delay: 0,   rot: 0,   key: 'N' },
+        { w: cw * 2.4, h: ch * 0.7,   sx: 0, sy:  ch * 2.2, ex: 0, ey:  ch * 0.20, delay: 30,  rot: 0,   key: 'S' },
+        { w: cw * 0.7, h: ch * 1.9,   sx: -cw * 2.0, sy: 0, ex: -cw * 0.30, ey: 0, delay: 60,  rot: 0,   key: 'W' },
+        { w: cw * 0.7, h: ch * 1.9,   sx:  cw * 2.0, sy: 0, ex:  cw * 0.30, ey: 0, delay: 90,  rot: 0,   key: 'E' },
+        // Diagonal slabs — angled to fill the corners.
+        { w: cw * 1.6, h: ch * 0.55,  sx: -cw * 1.8, sy: -ch * 1.8, ex: -cw * 0.15, ey: -ch * 0.15, delay: 130, rot: 35,  key: 'NW' },
+        { w: cw * 1.6, h: ch * 0.55,  sx:  cw * 1.8, sy: -ch * 1.8, ex:  cw * 0.15, ey: -ch * 0.15, delay: 150, rot: -35, key: 'NE' },
+        { w: cw * 1.6, h: ch * 0.55,  sx: -cw * 1.8, sy:  ch * 1.8, ex: -cw * 0.15, ey:  ch * 0.15, delay: 170, rot: -35, key: 'SW' },
+        { w: cw * 1.6, h: ch * 0.55,  sx:  cw * 1.8, sy:  ch * 1.8, ex:  cw * 0.15, ey:  ch * 0.15, delay: 190, rot: 35,  key: 'SE' },
+        // Vertical spikes — long, narrow, drive top/bottom flush.
+        { w: cw * 0.4, h: ch * 1.2,   sx: -cw * 0.45, sy: -ch * 2.4, ex: -cw * 0.45, ey: -ch * 0.05, delay: 220, rot: 0,   key: 'spikeNL' },
+        { w: cw * 0.4, h: ch * 1.2,   sx:  cw * 0.45, sy: -ch * 2.4, ex:  cw * 0.45, ey: -ch * 0.05, delay: 250, rot: 0,   key: 'spikeNR' },
+        { w: cw * 0.4, h: ch * 1.2,   sx: -cw * 0.45, sy:  ch * 2.4, ex: -cw * 0.45, ey:  ch * 0.05, delay: 280, rot: 0,   key: 'spikeSL' },
+        { w: cw * 0.4, h: ch * 1.2,   sx:  cw * 0.45, sy:  ch * 2.4, ex:  cw * 0.45, ey:  ch * 0.05, delay: 310, rot: 0,   key: 'spikeSR' },
+      ];
+      const snowflakes = useMemo(() => Array.from({ length: 30 }, () => ({
+        x: -cw * 1.4 + Math.random() * cw * 2.8,
+        startY: -ch * 1.6 - 20,
+        endY: ch * 1.6 + Math.random() * 40,
+        size: 10 + Math.random() * 14,
+        delay: 700 + Math.random() * 700,
+        dur: 900 + Math.random() * 700,
+        char: ['❄','❅','❆','✦','✧'][Math.floor(Math.random() * 5)],
+        rot: -120 + Math.random() * 240,
+      })), [cw, ch]);
+      const shards = useMemo(() => Array.from({ length: 18 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 60 + Math.random() * cw * 1.2;
+        return {
+          dx: Math.cos(angle) * dist,
+          dy: Math.sin(angle) * dist - 30, // bias upward
+          size: 14 + Math.random() * 22,
+          delay: 380 + Math.random() * 220,
+          dur: 600 + Math.random() * 400,
+          rot: -180 + Math.random() * 360,
+        };
+      }), [cw]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Cold-light shockwave — expands far beyond the target */}
+          <div style={{
+            position: 'absolute', left: -cw * 2.2, top: -ch * 2.2,
+            width: cw * 4.4, height: ch * 4.4, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(160,210,255,0.6) 0%, rgba(120,180,240,0.35) 35%, rgba(90,150,220,0.15) 60%, transparent 80%)',
+            opacity: 0,
+            animation: 'biseriaShockwave 700ms ease-out 0ms forwards',
+            mixBlendMode: 'screen',
+          }} />
+          {/* Outer frost halo — sustained big blue glow */}
+          <div style={{
+            position: 'absolute', left: -cw * 1.6, top: -ch * 1.6,
+            width: cw * 3.2, height: ch * 3.2, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(220,240,255,0.55) 0%, rgba(170,215,250,0.4) 40%, rgba(130,185,235,0.15) 70%, transparent 100%)',
+            filter: 'blur(8px)',
+            opacity: 0,
+            animation: 'biseriaHalo 1500ms ease-in-out 200ms forwards',
+          }} />
+          {/* Frost-fog overlay — covers the immediate target zone densely */}
+          <div style={{
+            position: 'absolute',
+            left: -cw * 0.8, top: -ch * 0.8,
+            width: cw * 1.6, height: ch * 1.6, borderRadius: 8,
+            background: 'radial-gradient(ellipse at center, rgba(245,252,255,0.85) 0%, rgba(210,235,250,0.65) 50%, rgba(170,210,240,0.3) 90%, transparent 100%)',
+            filter: 'blur(6px)',
+            opacity: 0,
+            animation: 'biseriaFog 1800ms ease-in 350ms forwards',
+          }} />
+          {/* The 12 enormous ice slabs */}
+          {slabs.map((slab) => (
+            <div key={'bs' + slab.key} style={{
+              position: 'absolute',
+              left: slab.sx - slab.w / 2, top: slab.sy - slab.h / 2,
+              width: slab.w, height: slab.h, borderRadius: 4,
+              background: 'linear-gradient(135deg, rgba(245,252,255,0.97) 0%, rgba(195,225,250,0.92) 35%, rgba(155,200,240,0.88) 65%, rgba(220,240,255,0.95) 100%)',
+              boxShadow: '0 0 24px rgba(140,195,240,0.85), 0 0 50px rgba(110,170,225,0.5), inset 0 0 28px rgba(255,255,255,0.7), inset 0 4px 10px rgba(255,255,255,0.85), inset 0 -2px 6px rgba(120,180,235,0.4)',
+              border: '1.5px solid rgba(255,255,255,0.7)',
+              opacity: 0,
+              animation: `biseriaSlab 480ms cubic-bezier(0.22, 0.95, 0.3, 1) ${slab.delay}ms forwards`,
+              '--bsEndX': (slab.ex - slab.sx) + 'px',
+              '--bsEndY': (slab.ey - slab.sy) + 'px',
+              '--bsRot': slab.rot + 'deg',
+            }} />
+          ))}
+          {/* Center slam — brilliant white-blue burst when slabs collide */}
+          <div style={{
+            position: 'absolute', left: -cw * 0.9, top: -ch * 0.9,
+            width: cw * 1.8, height: ch * 1.8, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(220,240,255,0.85) 25%, rgba(170,215,250,0.4) 55%, transparent 80%)',
+            opacity: 0,
+            animation: 'biseriaSlam 600ms ease-out 360ms forwards',
+            mixBlendMode: 'screen',
+          }} />
+          {/* Crystalline shards bursting outward post-slam */}
+          {shards.map((s, i) => (
+            <div key={'bsh' + i} style={{
+              position: 'absolute', left: -s.size / 2, top: -s.size,
+              width: s.size * 0.45, height: s.size * 1.4,
+              background: 'linear-gradient(to bottom, rgba(245,252,255,0.95), rgba(180,220,250,0.85), rgba(140,195,240,0.5))',
+              borderRadius: '50% 50% 35% 35% / 60% 60% 40% 40%',
+              boxShadow: '0 0 8px rgba(160,210,250,0.8)',
+              transform: `rotate(${s.rot}deg)`,
+              opacity: 0,
+              animation: `biseriaShard ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              '--bshDx': s.dx + 'px',
+              '--bshDy': s.dy + 'px',
+            }} />
+          ))}
+          {/* Snowflakes drifting down — long tail */}
+          {snowflakes.map((s, i) => (
+            <div key={'bf' + i} style={{
+              position: 'absolute', left: s.x, top: s.startY,
+              fontSize: s.size, color: '#ffffff',
+              filter: 'drop-shadow(0 0 5px rgba(170,215,250,0.95))',
+              transform: `rotate(${s.rot}deg)`,
+              opacity: 0,
+              animation: `biseriaSnow ${s.dur}ms ease-in ${s.delay}ms forwards`,
+              '--bsnEndY': (s.endY - s.startY) + 'px',
+            }}>{s.char}</div>
+          ))}
+          <style>{`
+            @keyframes biseriaShockwave {
+              0%   { opacity: 0; transform: scale(0.15); }
+              30%  { opacity: 1; transform: scale(0.7); }
+              100% { opacity: 0; transform: scale(1.4); }
+            }
+            @keyframes biseriaHalo {
+              0%   { opacity: 0; transform: scale(0.6); }
+              35%  { opacity: 0.95; transform: scale(1); }
+              80%  { opacity: 0.7; transform: scale(1.05); }
+              100% { opacity: 0; transform: scale(1.1); }
+            }
+            @keyframes biseriaFog {
+              0%   { opacity: 0; }
+              35%  { opacity: 1; }
+              80%  { opacity: 0.9; }
+              100% { opacity: 0.7; }
+            }
+            @keyframes biseriaSlab {
+              0%   { opacity: 0; transform: translate(0, 0) rotate(var(--bsRot)) scale(1.1); }
+              25%  { opacity: 1; }
+              100% { opacity: 1; transform: translate(var(--bsEndX), var(--bsEndY)) rotate(var(--bsRot)) scale(1); }
+            }
+            @keyframes biseriaSlam {
+              0%   { opacity: 0; transform: scale(0.2); }
+              25%  { opacity: 1; transform: scale(1.4); }
+              100% { opacity: 0; transform: scale(2.4); }
+            }
+            @keyframes biseriaShard {
+              0%   { opacity: 0; transform: translate(0,0) rotate(0deg) scale(0.4); }
+              25%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--bshDx), var(--bshDy)) rotate(360deg) scale(1.1); }
+            }
+            @keyframes biseriaSnow {
+              0%   { opacity: 0; transform: translateY(0) rotate(0deg); }
+              15%  { opacity: 1; }
+              85%  { opacity: 1; }
+              100% { opacity: 0; transform: translateY(var(--bsnEndY)) rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── Divine Gift of Forgetting ─────────────────────────────
+  //  A burst of 3-5 white question marks pops up above an
+  //  affected hero, jittering and slowly rising before fading
+  //  out. Used when a hero loses one or more abilities — the
+  //  hero is "forgetting" what they knew. Layers a brief soft
+  //  white glow halo to anchor the burst on the hero card.
+  forgetting_question_mark: (() => {
+    return function ForgettingQuestionMarkEffect({ x, y }) {
+      const marks = useMemo(() => Array.from({ length: 4 + Math.floor(Math.random() * 2) }, () => ({
+        startX: -28 + Math.random() * 56,
+        startY: -10 + Math.random() * 20,
+        riseY: -50 - Math.random() * 40,
+        driftX: -20 + Math.random() * 40,
+        size: 26 + Math.random() * 12,
+        rotStart: -25 + Math.random() * 50,
+        rotEnd: -45 + Math.random() * 90,
+        delay: Math.random() * 420,
+        dur: 900 + Math.random() * 500,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y - 30, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Soft halo to anchor the burst on the hero */}
+          <div style={{
+            position: 'absolute', left: -45, top: -45,
+            width: 90, height: 90, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.55) 0%, rgba(220,220,255,0.25) 50%, transparent 80%)',
+            filter: 'blur(4px)',
+            opacity: 0,
+            animation: 'forgettingHalo 800ms ease-out 0ms forwards',
+          }} />
+          {marks.map((m, i) => (
+            <div key={'fqm' + i} style={{
+              position: 'absolute', left: m.startX, top: m.startY,
+              fontSize: m.size, fontWeight: 'bold', color: '#ffffff',
+              textShadow: '0 0 8px rgba(255,255,255,0.95), 0 0 16px rgba(180,180,255,0.7), 0 2px 4px rgba(0,0,0,0.8)',
+              transform: `rotate(${m.rotStart}deg)`,
+              opacity: 0,
+              fontFamily: 'serif',
+              animation: `forgettingMark ${m.dur}ms ease-out ${m.delay}ms forwards`,
+              '--fqmDx': m.driftX + 'px',
+              '--fqmDy': m.riseY + 'px',
+              '--fqmRotEnd': m.rotEnd + 'deg',
+            }}>?</div>
+          ))}
+          <style>{`
+            @keyframes forgettingHalo {
+              0%   { opacity: 0; transform: scale(0.5); }
+              30%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.3); }
+            }
+            @keyframes forgettingMark {
+              0%   { opacity: 0; transform: translate(0, 0) rotate(var(--fqmRotEnd)) scale(0.4); }
+              20%  { opacity: 1; transform: translate(calc(var(--fqmDx) * 0.3), calc(var(--fqmDy) * 0.2)) scale(1.15) rotate(0deg); }
+              60%  { opacity: 1; transform: translate(calc(var(--fqmDx) * 0.7), calc(var(--fqmDy) * 0.65)) scale(1) rotate(var(--fqmRotEnd)); }
+              100% { opacity: 0; transform: translate(var(--fqmDx), var(--fqmDy)) scale(0.85) rotate(var(--fqmRotEnd)); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── Divine Gift of the Deepsea — replacement summon ───────
+  //  A black-water whirlpool spins around the newly placed
+  //  Creature: 6 dark concentric rings rotate inward, a
+  //  swirling spiral of inky drops orbits clockwise, and a
+  //  cloud of bubbles rises from below the slot. The whole
+  //  thing settles after ~1.4s, leaving the Creature in
+  //  place. Distinct from the existing `whirlpool` (light-
+  //  blue water) so the deep-ocean reads at a glance.
+  deepsea_summon_whirlpool: (() => {
+    return function DeepseaSummonWhirlpoolEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      const rings = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
+        radius: 90 - i * 10,
+        delay: i * 70,
+        dur: 1300 - i * 60,
+        opacity: 0.85 - i * 0.08,
+        width: 5 - i * 0.4,
+      })), []);
+      // Inky orbiting drops — spiral inward as the whirlpool tightens.
+      const drops = useMemo(() => Array.from({ length: 28 }, (_, i) => ({
+        angle: (i / 28) * 360 + Math.random() * 12,
+        startDist: 95 + Math.random() * 25,
+        delay: Math.random() * 380,
+        dur: 1000 + Math.random() * 320,
+        size: 6 + Math.random() * 9,
+      })), []);
+      // Bubbles — rise from BELOW the target up past it.
+      const bubbles = useMemo(() => Array.from({ length: 16 }, () => ({
+        startX: -cw / 2 + Math.random() * cw,
+        startY: ch * 0.6 + Math.random() * 30,
+        endY: -ch * 1.2 - Math.random() * 60,
+        size: 6 + Math.random() * 14,
+        delay: 200 + Math.random() * 600,
+        dur: 900 + Math.random() * 500,
+        wobble: -16 + Math.random() * 32,
+      })), [cw, ch]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Dark ink halo behind the whirlpool — sells the depth */}
+          <div style={{
+            position: 'absolute', left: -cw, top: -ch,
+            width: cw * 2, height: ch * 2, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(8,12,30,0.7) 0%, rgba(15,20,45,0.45) 45%, rgba(20,30,60,0.2) 75%, transparent 100%)',
+            filter: 'blur(6px)',
+            opacity: 0,
+            animation: 'deepseaInk 1500ms ease-in-out 0ms both',
+          }} />
+          {/* Concentric black-water rings rotating inward */}
+          {rings.map((r, i) => (
+            <div key={'dsr' + i} style={{
+              position: 'absolute', left: -r.radius, top: -r.radius,
+              width: r.radius * 2, height: r.radius * 2,
+              border: `${r.width}px solid rgba(15,20,38,${r.opacity})`,
+              borderRadius: '50%',
+              boxShadow: `0 0 ${10 + i * 3}px rgba(8,15,35,${r.opacity * 0.85}), inset 0 0 ${8 + i * 2}px rgba(25,35,70,${r.opacity * 0.6})`,
+              opacity: 0,
+              animation: `deepseaSpin ${r.dur}ms ease-in ${r.delay}ms both`,
+            }} />
+          ))}
+          {/* Inky orbiting drops spiralling toward the center */}
+          {drops.map((d, i) => {
+            const rad = (d.angle * Math.PI) / 180;
+            const startX = Math.cos(rad) * d.startDist;
+            const startY = Math.sin(rad) * d.startDist;
+            return (
+              <span key={'dsd' + i} style={{
+                position: 'absolute', width: d.size, height: d.size, borderRadius: '50%',
+                background: 'radial-gradient(circle at 35% 30%, rgba(50,60,90,0.95) 0%, rgba(15,20,40,0.95) 60%, rgba(5,8,20,1) 100%)',
+                boxShadow: '0 0 6px rgba(20,30,55,0.85), inset 0 0 4px rgba(80,90,130,0.5)',
+                left: startX - d.size / 2,
+                top:  startY - d.size / 2,
+                opacity: 0,
+                animation: `deepseaSpiral ${d.dur}ms ease-in ${d.delay}ms both`,
+                '--dswX': `${-startX * 0.95}px`,
+                '--dswY': `${-startY * 0.95}px`,
+              }} />
+            );
+          })}
+          {/* Bubbles rising from below the target */}
+          {bubbles.map((b, i) => (
+            <span key={'dsb' + i} style={{
+              position: 'absolute', left: b.startX, top: b.startY,
+              width: b.size, height: b.size, borderRadius: '50%',
+              background: 'radial-gradient(circle at 30% 30%, rgba(220,235,250,0.85) 0%, rgba(150,180,220,0.55) 40%, rgba(60,90,130,0.35) 80%, rgba(15,25,50,0.4) 100%)',
+              boxShadow: '0 0 6px rgba(120,160,200,0.6), inset 0 0 4px rgba(255,255,255,0.5)',
+              border: '1px solid rgba(200,220,240,0.4)',
+              opacity: 0,
+              animation: `deepseaBubble ${b.dur}ms ease-out ${b.delay}ms both`,
+              '--dsbDy': `${b.endY - b.startY}px`,
+              '--dsbWobble': `${b.wobble}px`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes deepseaInk {
+              0%   { opacity: 0; transform: scale(0.5); }
+              30%  { opacity: 1; transform: scale(1); }
+              80%  { opacity: 0.9; transform: scale(1.05); }
+              100% { opacity: 0; transform: scale(1.1); }
+            }
+            @keyframes deepseaSpin {
+              0%   { opacity: 0; transform: rotate(0deg) scale(1.6); }
+              25%  { opacity: 1; transform: rotate(220deg) scale(1.05); }
+              60%  { opacity: 0.9; transform: rotate(540deg) scale(0.6); }
+              100% { opacity: 0; transform: rotate(1080deg) scale(0.04); }
+            }
+            @keyframes deepseaSpiral {
+              0%   { opacity: 0; transform: translate(0,0) scale(1); }
+              15%  { opacity: 0.95; }
+              50%  { opacity: 0.9; transform: translate(calc(var(--dswX) * 0.45), calc(var(--dswY) * 0.45)) scale(0.85); }
+              100% { opacity: 0; transform: translate(var(--dswX), var(--dswY)) scale(0.06); }
+            }
+            @keyframes deepseaBubble {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              20%  { opacity: 1; transform: translate(calc(var(--dsbWobble) * 0.4), calc(var(--dsbDy) * 0.2)) scale(1); }
+              60%  { opacity: 0.9; transform: translate(var(--dsbWobble), calc(var(--dsbDy) * 0.6)) scale(1.05); }
+              100% { opacity: 0; transform: translate(calc(var(--dsbWobble) * 0.5), var(--dsbDy)) scale(0.7); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── Divine Gift of Skill — blessing burst ─────────────────
+  //  A radiant academia / scholar-themed cascade centered on
+  //  the chosen Hero. Two expanding gold-and-violet rings, a
+  //  big rotating mortarboard glyph, an aura column lifting up
+  //  the card, scrolling glyph runes (📜🪶🔯) orbiting the
+  //  hero, a confetti-like burst of star + book sparkles
+  //  bursting outward, and a final settling pulse. ~1.6s
+  //  total runtime.
+  blessed_skill_burst: (() => {
+    return function BlessedSkillBurstEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      // 2 large concentric rings expanding outward
+      const rings = useMemo(() => Array.from({ length: 2 }, (_, i) => ({
+        size: 90 + i * 40,
+        delay: i * 100,
+        dur: 1100 + i * 150,
+      })), []);
+      // Orbital glyphs around the hero — books, scrolls, runes
+      const orbitalGlyphs = ['📜', '🪶', '✦', '✧', '⚛', '🔯', '★', '✶'];
+      const orbitals = useMemo(() => orbitalGlyphs.map((g, i) => ({
+        glyph: g,
+        angle: (i / orbitalGlyphs.length) * Math.PI * 2,
+        radius: 75 + Math.random() * 18,
+        delay: 60 + i * 55,
+        dur: 1500 + Math.random() * 300,
+      })), []);
+      // Star + sparkle confetti bursting outward
+      const sparkles = useMemo(() => Array.from({ length: 32 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 75 + Math.random() * 90;
+        return {
+          dx: Math.cos(angle) * dist,
+          dy: Math.sin(angle) * dist,
+          glyph: ['✦', '✧', '⋆', '·', '★', '✩'][Math.floor(Math.random() * 6)],
+          size: 10 + Math.random() * 16,
+          delay: 100 + Math.random() * 400,
+          dur: 800 + Math.random() * 500,
+          color: ['#ffd84a', '#ffe88c', '#e8c8ff', '#fff5b8', '#c8a8ff', '#ffffff'][Math.floor(Math.random() * 6)],
+          rot: Math.random() * 720 - 360,
+        };
+      }), []);
+      // Rising aura motes — golden sparks lifting up from the bottom of the card
+      const aura = useMemo(() => Array.from({ length: 14 }, () => ({
+        startX: -cw / 2 + Math.random() * cw,
+        riseY: -ch * 1.0 - Math.random() * 30,
+        size: 6 + Math.random() * 10,
+        delay: 50 + Math.random() * 600,
+        dur: 1100 + Math.random() * 400,
+        color: ['#ffd060', '#ffe8a0', '#fff2c8', '#ffc848'][Math.floor(Math.random() * 4)],
+      })), [cw, ch]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Warm gold-violet halo bathes the hero */}
+          <div style={{
+            position: 'absolute', left: -cw, top: -ch,
+            width: cw * 2, height: ch * 2, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,228,140,0.85) 0%, rgba(220,180,255,0.55) 35%, rgba(180,130,240,0.3) 65%, transparent 95%)',
+            filter: 'blur(4px)',
+            mixBlendMode: 'screen',
+            opacity: 0,
+            animation: 'blessedHalo 1500ms ease-out 0ms both',
+          }} />
+          {/* Vertical aura column behind the card — beam of gold light from below to above */}
+          <div style={{
+            position: 'absolute', left: -cw * 0.45, top: -ch * 1.1,
+            width: cw * 0.9, height: ch * 2.2,
+            background: 'linear-gradient(to top, rgba(255,200,80,0) 0%, rgba(255,225,140,0.5) 35%, rgba(255,235,180,0.7) 60%, rgba(255,240,200,0.4) 85%, transparent 100%)',
+            filter: 'blur(3px)',
+            opacity: 0,
+            animation: 'blessedColumn 1500ms ease-out 100ms both',
+          }} />
+          {/* Concentric expanding gold rings */}
+          {rings.map((r, i) => (
+            <div key={'bsr' + i} style={{
+              position: 'absolute', left: -r.size, top: -r.size,
+              width: r.size * 2, height: r.size * 2, borderRadius: '50%',
+              border: '4px solid rgba(255,210,90,0.95)',
+              boxShadow: '0 0 20px rgba(255,210,90,0.85), inset 0 0 14px rgba(255,235,160,0.6)',
+              opacity: 0, transform: 'scale(0.3)',
+              animation: `blessedRing ${r.dur}ms ease-out ${r.delay}ms both`,
+            }} />
+          ))}
+          {/* Big rotating mortarboard / scholar emoji at the center */}
+          <div style={{
+            position: 'absolute', left: -50, top: -55,
+            fontSize: 100, lineHeight: 1,
+            filter: 'drop-shadow(0 0 18px rgba(255,210,90,1)) drop-shadow(0 0 36px rgba(220,170,255,0.85))',
+            opacity: 0, transform: 'rotate(-30deg) scale(0.4)',
+            animation: 'blessedGlyph 1400ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms both',
+          }}>🎓</div>
+          {/* Orbital scholar glyphs */}
+          {orbitals.map((o, i) => {
+            const ox = Math.cos(o.angle) * o.radius;
+            const oy = Math.sin(o.angle) * o.radius;
+            return (
+              <div key={'bso' + i} style={{
+                position: 'absolute', left: ox - 14, top: oy - 14,
+                fontSize: 26,
+                color: '#fff8d8',
+                textShadow: '0 0 8px rgba(255,210,90,0.95), 0 0 16px rgba(220,170,255,0.7)',
+                opacity: 0,
+                animation: `blessedOrbital ${o.dur}ms ease-in-out ${o.delay}ms both`,
+                '--bsoStartX': '0px',
+                '--bsoStartY': '0px',
+                '--bsoEndX': (-ox * 0.2) + 'px',
+                '--bsoEndY': (-oy * 0.2) + 'px',
+              }}>{o.glyph}</div>
+            );
+          })}
+          {/* Sparkle confetti bursting outward */}
+          {sparkles.map((s, i) => (
+            <div key={'bss' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: s.size,
+              color: s.color,
+              textShadow: `0 0 6px ${s.color}, 0 0 12px rgba(255,220,140,0.7)`,
+              opacity: 0, transform: 'translate(0,0) scale(0.3)',
+              animation: `blessedSparkle ${s.dur}ms ease-out ${s.delay}ms both`,
+              '--bsDx': s.dx + 'px',
+              '--bsDy': s.dy + 'px',
+              '--bsRot': s.rot + 'deg',
+            }}>{s.glyph}</div>
+          ))}
+          {/* Rising gold motes from below the card */}
+          {aura.map((a, i) => (
+            <div key={'bsa' + i} style={{
+              position: 'absolute', left: a.startX - a.size / 2,
+              top: ch * 0.5 + 10,
+              width: a.size, height: a.size, borderRadius: '50%',
+              background: a.color,
+              boxShadow: `0 0 10px ${a.color}, 0 0 20px rgba(255,220,140,0.7)`,
+              opacity: 0,
+              animation: `blessedAura ${a.dur}ms ease-out ${a.delay}ms both`,
+              '--bsaRise': a.riseY + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes blessedHalo {
+              0%   { opacity: 0; transform: scale(0.4); }
+              25%  { opacity: 1; transform: scale(1); }
+              80%  { opacity: 0.85; transform: scale(1.08); }
+              100% { opacity: 0; transform: scale(1.15); }
+            }
+            @keyframes blessedColumn {
+              0%   { opacity: 0; transform: scaleY(0.3); }
+              25%  { opacity: 1; transform: scaleY(1.1); }
+              70%  { opacity: 0.85; transform: scaleY(1); }
+              100% { opacity: 0; transform: scaleY(0.95); }
+            }
+            @keyframes blessedRing {
+              0%   { opacity: 0; transform: scale(0.3); }
+              25%  { opacity: 1; transform: scale(0.85); }
+              100% { opacity: 0; transform: scale(2.4); }
+            }
+            @keyframes blessedGlyph {
+              0%   { opacity: 0; transform: rotate(-30deg) scale(0.4); }
+              35%  { opacity: 1; transform: rotate(15deg) scale(1.25); }
+              65%  { opacity: 1; transform: rotate(-5deg) scale(1); }
+              100% { opacity: 0; transform: rotate(8deg) scale(0.85); }
+            }
+            @keyframes blessedOrbital {
+              0%   { opacity: 0; transform: translate(var(--bsoStartX), var(--bsoStartY)) scale(0.4) rotate(0deg); }
+              30%  { opacity: 1; transform: translate(var(--bsoStartX), var(--bsoStartY)) scale(1.15) rotate(180deg); }
+              80%  { opacity: 0.9; transform: translate(calc(var(--bsoEndX) * 0.8), calc(var(--bsoEndY) * 0.8)) scale(1) rotate(360deg); }
+              100% { opacity: 0; transform: translate(var(--bsoEndX), var(--bsoEndY)) scale(0.7) rotate(420deg); }
+            }
+            @keyframes blessedSparkle {
+              0%   { opacity: 0; transform: translate(0,0) scale(0.3) rotate(0deg); }
+              25%  { opacity: 1; transform: translate(calc(var(--bsDx) * 0.3), calc(var(--bsDy) * 0.3)) scale(1.1) rotate(calc(var(--bsRot) * 0.3)); }
+              80%  { opacity: 1; transform: translate(calc(var(--bsDx) * 0.85), calc(var(--bsDy) * 0.85)) scale(0.9) rotate(calc(var(--bsRot) * 0.85)); }
+              100% { opacity: 0; transform: translate(var(--bsDx), var(--bsDy)) scale(0.5) rotate(var(--bsRot)); }
+            }
+            @keyframes blessedAura {
+              0%   { opacity: 0; transform: translateY(0) scale(0.5); }
+              20%  { opacity: 1; transform: translateY(calc(var(--bsaRise) * 0.2)) scale(1.1); }
+              80%  { opacity: 0.9; transform: translateY(calc(var(--bsaRise) * 0.85)) scale(1); }
+              100% { opacity: 0; transform: translateY(var(--bsaRise)) scale(0.4); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
   // ── Petrify (Medusa's Curse) ──────────────────────────────
   //  Target gains a grey stone overlay with a subtle speckle/
   //  noise texture and a brief sickly-green flash at the onset.
@@ -9470,6 +10051,128 @@ function StatusSelectPrompt({ ep, onRespond }) {
   );
 }
 
+// Render the side-deck "card just appeared in hand" sparkle/shine
+// overlay over a hand-card DOM node. Called from the me-side and
+// opp-side hand-grew watchers AFTER React has committed the new hand
+// entry, so the target element exists at query time. Keyframes are
+// already injected by the `side_deck_appear` handler.
+function playSideDeckAppearOverlay(targetEl) {
+  if (!targetEl) return;
+  // Skip the entire DOM-spawning + animation work when the user has
+  // disabled animations.
+  if (window._playAnimations === false) return;
+  const rect = targetEl.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+
+  // Idempotent keyframes injection — guarantees they're present even
+  // if the event handler that normally injects them ran in a stale
+  // context (HMR, fast reload, etc.).
+  if (!document.getElementById('side-deck-appear-keyframes')) {
+    const style = document.createElement('style');
+    style.id = 'side-deck-appear-keyframes';
+    style.textContent = `
+      @keyframes sdaShineSweep {
+        0%   { opacity: 0; transform: translateX(-120%) skewX(-25deg); }
+        25%  { opacity: 1; }
+        100% { opacity: 0; transform: translateX(220%) skewX(-25deg); }
+      }
+      @keyframes sdaCardGlow {
+        0%   { box-shadow: 0 0 0 0 rgba(255,235,140,0); filter: brightness(1); }
+        25%  { box-shadow: 0 0 28px 6px rgba(255,225,140,0.95), 0 0 48px 14px rgba(220,180,255,0.7); filter: brightness(1.3); }
+        70%  { box-shadow: 0 0 22px 4px rgba(255,225,140,0.7); filter: brightness(1.1); }
+        100% { box-shadow: 0 0 0 0 rgba(255,225,140,0); filter: brightness(1); }
+      }
+      @keyframes sdaSparkle {
+        0%   { opacity: 0; transform: translate(0,0) scale(0.3) rotate(0deg); }
+        20%  { opacity: 1; transform: translate(calc(var(--sdaDx) * 0.25), calc(var(--sdaDy) * 0.25)) scale(1.1) rotate(60deg); }
+        70%  { opacity: 1; transform: translate(calc(var(--sdaDx) * 0.8), calc(var(--sdaDy) * 0.8)) scale(0.95) rotate(280deg); }
+        100% { opacity: 0; transform: translate(var(--sdaDx), var(--sdaDy)) scale(0.5) rotate(420deg); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed; left: ${rect.left}px; top: ${rect.top}px;
+    width: ${rect.width}px; height: ${rect.height}px;
+    pointer-events: none; z-index: 10100; overflow: visible;
+  `;
+
+  // Diagonal shine sweep clipped to card bounds + pulsing card glow.
+  const shineWrap = document.createElement('div');
+  shineWrap.style.cssText = `
+    position: absolute; inset: 0; overflow: hidden; border-radius: 4px;
+    animation: sdaCardGlow 1300ms ease-out 0ms both;
+  `;
+  const shine = document.createElement('div');
+  shine.style.cssText = `
+    position: absolute; top: -20%; left: 0;
+    width: 50%; height: 140%;
+    background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,250,220,0.85) 45%, rgba(255,255,255,0.95) 50%, rgba(255,235,180,0.85) 55%, rgba(255,255,255,0) 100%);
+    mix-blend-mode: screen;
+    animation: sdaShineSweep 900ms ease-out 100ms both;
+  `;
+  shineWrap.appendChild(shine);
+  overlay.appendChild(shineWrap);
+
+  // Sparkle particles bursting outward from card center.
+  const cx = rect.width / 2;
+  const cy = rect.height / 2;
+  const particles = ['✦', '✧', '✨', '⋆', '·', '★'];
+  const colors    = ['#fff5dc', '#ffd84a', '#e8c8ff', '#fff2c8', '#ffffff', '#c8a8ff'];
+  for (let i = 0; i < 18; i++) {
+    const sparkle = document.createElement('div');
+    const angle = Math.random() * Math.PI * 2;
+    const dist  = 30 + Math.random() * 70;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist;
+    const size  = 12 + Math.random() * 14;
+    const dur   = 800 + Math.random() * 500;
+    const delay = Math.random() * 350;
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    sparkle.textContent = particles[Math.floor(Math.random() * particles.length)];
+    sparkle.style.cssText = `
+      position: absolute; left: ${cx}px; top: ${cy}px;
+      font-size: ${size}px; color: ${color};
+      text-shadow: 0 0 6px ${color}, 0 0 12px rgba(255,220,140,0.8);
+      opacity: 0; transform: translate(0,0) scale(0.3) rotate(0deg);
+      --sdaDx: ${dx}px; --sdaDy: ${dy}px;
+      animation: sdaSparkle ${dur}ms ease-out ${delay}ms both;
+    `;
+    overlay.appendChild(sparkle);
+  }
+
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.remove(), 1500);
+}
+
+// Schedule the side-deck appear overlay against a CSS selector, with
+// a short polling chain to handle React's batched commit timing —
+// the local `hand` state's setState queues a follow-up render that
+// hasn't necessarily landed by the next paint, so a single rAF can
+// race ahead of the new slot's DOM insertion. We retry up to ~150ms
+// (8 frames at 60Hz) checking that `nodes.length > slotBaseIdx + n - 1`,
+// which is the cheapest "the new slots have rendered" predicate.
+function schedulePlaySideDeckAppear(selector, slotBaseIdx, count) {
+  const required = slotBaseIdx + count;
+  let attempts = 0;
+  const tryFire = () => {
+    const nodes = document.querySelectorAll(selector);
+    if (nodes.length >= required) {
+      for (let i = 0; i < count; i++) {
+        playSideDeckAppearOverlay(nodes[slotBaseIdx + i]);
+      }
+      return;
+    }
+    if (attempts++ < 8) requestAnimationFrame(tryFire);
+  };
+  // First attempt after the immediate React flush — setTimeout(0) +
+  // rAF gives the local-hand re-render space to commit before the
+  // first poll, so most calls succeed on the first try.
+  setTimeout(() => requestAnimationFrame(tryFire), 0);
+}
+
 function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck }) {
   const { user, setUser, notify } = useContext(AppContext);
   const isSpectator = gameState.isSpectator || false;
@@ -9485,6 +10188,73 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const oppDisconnected = opp.disconnected || false;
   const meDisconnected = me.disconnected || false;
   const myRematchSent = !isSpectator && (gameState.rematchRequests || []).includes(user.id);
+
+  // ── Play Animations toggle ──
+  // When the user has unchecked "Play Animations" in their profile,
+  // every battle animation, transition, particle effect and sweep is
+  // skipped to keep the game snappy on low-power machines. The toggle
+  // is a single global CSS rule (animation: none / transition: none)
+  // injected on `<html>` while this player is in a battle, plus a
+  // window flag the heaviest socket-driven overlays consult to skip
+  // their DOM work entirely. The CSS rule alone neuters the long-tail
+  // (status overlays, foil shimmer, drag previews, card flights), so
+  // the manual JS guards only need to cover the few screen-wide
+  // particle bombs that would otherwise spawn 30–90 sparkle DOM
+  // nodes for nothing.
+  const playAnimations = user?.play_animations == null ? true : !!user.play_animations;
+  useEffect(() => {
+    window._playAnimations = playAnimations;
+    if (playAnimations) {
+      document.documentElement.classList.remove('no-animations');
+    } else {
+      document.documentElement.classList.add('no-animations');
+      // Inject the kill-everything stylesheet once. The `:root.no-animations`
+      // descendant selectors override any inline `animation: ...` /
+      // `transition: ...` declarations via `!important`. Browsers still
+      // process zero-duration animation/transition entries, but they
+      // don't paint and don't drive the compositor — that's the cheap
+      // path we want.
+      if (!document.getElementById('no-animations-stylesheet')) {
+        const style = document.createElement('style');
+        style.id = 'no-animations-stylesheet';
+        // Card-movement animations (A → B) are EXEMPT from the kill
+        // rule — the user explicitly wants those to keep playing even
+        // with animations disabled. The exempt classes are:
+        //   • `.draw-anim-card`     — deck/discard/opp-hand → hand
+        //   • `.discard-anim-card`  — hand/board → discard/deleted/deck
+        //   • `.transfer-anim-card` — generic React-rendered transfer
+        //   • `.hand-to-board-fly`  — hand → support/hero attach
+        //   • `.card-flight`        — universal opt-in for DOM-appended
+        //                             pile-transfer flights and similar
+        //                             that don't already wear one of
+        //                             the React-rendered classes above
+        // Everything else (status overlays, foil shimmer, particle
+        // bursts, screen-wide effects, drag previews, transitions on
+        // arbitrary UI) gets neutered.
+        style.textContent = `
+          :root.no-animations *:not(.draw-anim-card):not(.discard-anim-card):not(.transfer-anim-card):not(.hand-to-board-fly):not(.card-flight),
+          :root.no-animations *:not(.draw-anim-card):not(.discard-anim-card):not(.transfer-anim-card):not(.hand-to-board-fly):not(.card-flight)::before,
+          :root.no-animations *:not(.draw-anim-card):not(.discard-anim-card):not(.transfer-anim-card):not(.hand-to-board-fly):not(.card-flight)::after {
+            animation: none !important;
+            animation-duration: 0s !important;
+            animation-delay: 0s !important;
+            animation-iteration-count: 1 !important;
+            transition: none !important;
+            transition-duration: 0s !important;
+            transition-delay: 0s !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+    return () => {
+      // Always clear on unmount so the menu / profile / deck builder
+      // get their normal animations back when the player leaves the
+      // battle, regardless of the active setting.
+      document.documentElement.classList.remove('no-animations');
+      window._playAnimations = true;
+    };
+  }, [playAnimations]);
 
   // ── Tutorial outro: show textbox before victory screen ──
   const [tutorialOutroPending, setTutorialOutroPending] = useState(false);
@@ -9742,6 +10512,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (delta > 0 && pileTransferToHandPendingMeRef.current > 0) {
         const consumed = Math.min(delta, pileTransferToHandPendingMeRef.current);
         pileTransferToHandPendingMeRef.current -= consumed;
+        // Drain any matching side-deck appearances and play the
+        // shine + sparkle overlay on the corresponding new hand cards.
+        // The local `hand` setState above queues another render; we
+        // need to wait for THAT render to commit before querying the
+        // DOM, otherwise we'd grab nodes from the previous hand.
+        // setTimeout(0) — and a follow-up rAF — pushes the query past
+        // React's flush + paint reliably. A short fallback delay
+        // ensures the new card has actually been laid out by the time
+        // we measure its bounds.
+        const sdaCount = Math.min(consumed, sideDeckAppearMeRef.current.length);
+        if (sdaCount > 0) {
+          sideDeckAppearMeRef.current.splice(0, sdaCount);
+          const slotBaseIdx = prevLen + (consumed - sdaCount);
+          // Player's own hand renders cards inside `.hand-slot`
+          // wrappers (face-up, draggable). The opponent's hand renders
+          // `.hand-card` directly. Selectors differ per side.
+          // React's local-`hand` setState above queues a follow-up
+          // render — poll briefly for the target slot to appear so
+          // the overlay reliably anchors after the commit.
+          schedulePlaySideDeckAppear(
+            '.game-hand-me .game-hand-cards .hand-slot',
+            slotBaseIdx, sdaCount,
+          );
+        }
         autoStart += consumed;
         if (autoStart >= newHand.length) {
           prevHandLenRef.current = newHand.length;
@@ -9871,7 +10665,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // suppression slot per new hand card and skip the deck auto-anim.
     const oppDelta = newCount - prevCount;
     if (oppDelta > 0 && pileTransferToHandPendingOppRef.current > 0) {
-      pileTransferToHandPendingOppRef.current = Math.max(0, pileTransferToHandPendingOppRef.current - oppDelta);
+      const consumed = Math.min(oppDelta, pileTransferToHandPendingOppRef.current);
+      pileTransferToHandPendingOppRef.current = Math.max(0, pileTransferToHandPendingOppRef.current - consumed);
+      // Drain matching side-deck appearances and overlay sparkles on
+      // the corresponding new opp hand cards. setTimeout(30) +
+      // rAF defers the DOM query past React's flush so the freshly
+      // appended hand-card nodes are laid out by query time.
+      const sdaCount = Math.min(consumed, sideDeckAppearOppRef.current.length);
+      if (sdaCount > 0) {
+        sideDeckAppearOppRef.current.splice(0, sdaCount);
+        const slotBaseIdx = prevCount + (consumed - sdaCount);
+        schedulePlaySideDeckAppear(
+          '.game-hand-opp .game-hand-cards .hand-card',
+          slotBaseIdx, sdaCount,
+        );
+      }
       prevOppHandCountRef.current = newCount;
       return;
     }
@@ -10793,7 +11601,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const canHeroReceiveAbility = (playerData, heroIdx, abilityName, opts = {}) => {
     const hero = playerData.heroes[heroIdx];
     if (!hero || !hero.name || hero.hp <= 0) return false;
-    if (!opts.skipAbilityGiven && (playerData.abilityGivenThisTurn || [])[heroIdx]) return false;
+    // Standard slot is consumed once per hero per turn. Divine Gift of
+    // Skill grants up to N bonus attachments — surfaced to the client as
+    // `hero.buffs.blessed_skill.remaining`. The server-side gate
+    // (server.js doPlayAbility) honors this same fallback, so the client
+    // must mirror it or the player can't drag more abilities onto the
+    // hero even though the play would succeed.
+    const blessedRemaining = (hero?.buffs?.blessed_skill?.remaining) || 0;
+    if (!opts.skipAbilityGiven
+        && (playerData.abilityGivenThisTurn || [])[heroIdx]
+        && blessedRemaining <= 0) return false;
 
     // Ascended Hero restriction (Smugness, etc.)
     if ((gameState.ascendedOnlyAbilities || []).includes(abilityName)) {
@@ -10858,6 +11675,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const hero = playerData.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.bound) return false;
+    // Divine Gift of Skill lock — the support slot drag-preview uses
+    // this strict client-side check (separate from `heroPlayableCards`,
+    // which the server already filters). Without this, empty support
+    // zones still light up under a Skill-locked hero and a ghost copy
+    // of the dragged Creature renders, even though the play would be
+    // refused. The buff's `locked` field is kept in sync server-side
+    // (server.js doPlayAbility recomputes on every attach).
+    if (hero.buffs?.blessed_skill?.locked) return false;
     // Apply board-wide level reductions from `reduceCardLevel` hooks (Elven
     // Forager, …) so the highlight agrees with `heroMeetsLevelReq`. Only
     // meaningful for the own player — the charmed-summon path calls this
@@ -11049,8 +11874,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (activePrompt && activePrompt.ownerIdx === myIdx
         && !['forceDiscard','forceDiscardCancellable','pickHandCard','handPick','abilityAttach','heroAction'].includes(activePrompt.type)) return;
 
-    // Block activation of the specific resolving card (spam-click prevention) — but NOT force-discard (handled above)
-    if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return;
+    // Block ALL hand activations while ANY card or chain is mid-resolution.
+    // Without this, the player can drag a second card onto the board during
+    // the resolving card's animation window (e.g. Nerdy Cheese still
+    // animating → Slippery Fridge dropped onto a hero), which leaves a
+    // ghost copy of the original card in their hand and can trigger
+    // duplicate effect activations. Reaction-card chaining isn't blocked:
+    // chain prompts arrive as `effectPrompt` of type `confirm` /
+    // `cardGallery`, which the check above already routes through the
+    // prompt's own UI, not the hand mouseDown path. Hand-interaction
+    // prompts (forceDiscard, pickHandCard, etc.) were handled in their
+    // own branches earlier and never reach this gate.
+    const anyResolving = !!me.resolvingCard
+      || !!opp?.resolvingCard
+      || (gameState._spellResolutionDepth || 0) > 0
+      || !!reactionChain;
+    if (anyResolving) return;
 
     if (e.cancelable) e.preventDefault();
     const card = CARDS_BY_NAME[cardName];
@@ -12189,6 +13028,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // branches that early-return when > 0.
   const pileTransferToHandPendingMeRef  = useRef(0);
   const pileTransferToHandPendingOppRef = useRef(0);
+  // Side-deck-to-hand sparkle queue. `onSideDeckAppear` fires BEFORE
+  // the state sync arrives, so we can't query the DOM yet — record the
+  // card name here and drain when the hand-grew watcher runs (it runs
+  // AFTER React commits the new hand state). Per-side queue so we can
+  // attribute correctly even if both players ever pull from side decks
+  // in the same tick.
+  const sideDeckAppearMeRef  = useRef([]);
+  const sideDeckAppearOppRef = useRef([]);
   // Deck→discard handshake: tracks card names that the server has
   // already animated from the deck to the discard / deleted pile via
   // `deck_to_discard_animation`. The pile-growth auto-detector would
@@ -12391,6 +13238,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => setBurnTickingHeroes([]), 1500);
     };
     const onZoneAnim = ({ type, owner, heroIdx, zoneSlot, zoneType, permId, ...rest }) => {
+      // The big chokepoint for per-card battle animations (Fireball,
+      // Heal, Burning Finger, Frozen, every status apply, every spell
+      // strike, every divine-gift overlay routed through play_zone_
+      // animation). When the user has disabled animations, skip the
+      // ENTIRE rendering side here — including the SFX-for-anim cue,
+      // since it's gated on the visual.
+      if (window._playAnimations === false) return;
       if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(type);
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       let sel;
@@ -13156,6 +14010,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Falling card body — uses card image when available, large scale
       const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
       const cardEl = document.createElement('div');
+      cardEl.className = 'card-flight'; // exempt from no-animations kill rule
       const cardW = Math.max(90, tr.width * 1.15);
       const cardH = cardW * 1.4;
       cardEl.style.cssText = [
@@ -14523,6 +15378,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('smug_coin_save', onSmugCoinSave);
     const onDivineRainStart = ({ turn }) => {
+      if (window._playAnimations === false) return;
       // Remove any existing rain overlay
       const existing = document.getElementById('divine-rain-overlay');
       if (existing) existing.remove();
@@ -14591,6 +15447,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('divine_rain_start', onDivineRainStart);
     const onMoeBomb = () => {
+      if (window._playAnimations === false) return;
       if (window.playSFX) window.playSFX('heavy_impact', { category: 'effect' });
       // Inject keyframes once
       if (!document.getElementById('moe-bomb-keyframes')) {
@@ -14742,6 +15599,407 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => container.remove(), 5000);
     };
     socket.on('moe_bomb_animation', onMoeBomb);
+    const onDivineMagicBurst = () => {
+      if (window._playAnimations === false) return;
+      if (window.playSFX) window.playSFX('elem_holy', { category: 'effect' });
+      if (!document.getElementById('divine-magic-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'divine-magic-keyframes';
+        style.textContent = `
+          @keyframes divineMagicHalo {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+            20%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            70%  { opacity: 0.85; transform: translate(-50%, -50%) scale(1.4); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(2.2); }
+          }
+          @keyframes divineMagicShockwave {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+            15%  { opacity: 0.85; }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(2.6); }
+          }
+          @keyframes divineMagicGlyph {
+            0%   { opacity: 0; transform: translate(-50%, -50%) rotate(0deg) scale(0.4); }
+            25%  { opacity: 0.95; }
+            100% { opacity: 0; transform: translate(-50%, -50%) rotate(540deg) scale(2.4); }
+          }
+          @keyframes divineMagicSparkle {
+            0%   { opacity: 0; transform: translate(0,0) scale(0.3) rotate(0deg); }
+            15%  { opacity: 1; transform: translate(calc(var(--dmgDx) * 0.2), calc(var(--dmgDy) * 0.2)) scale(1.2) rotate(60deg); }
+            70%  { opacity: 1; transform: translate(calc(var(--dmgDx) * 0.85), calc(var(--dmgDy) * 0.85)) scale(0.9) rotate(360deg); }
+            100% { opacity: 0; transform: translate(var(--dmgDx), var(--dmgDy)) scale(0.5) rotate(720deg); }
+          }
+          @keyframes divineMagicRune {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); filter: blur(8px); }
+            20%  { opacity: 0.9; transform: translate(-50%, -50%) scale(1.05); filter: blur(0px); }
+            80%  { opacity: 0.7; transform: translate(-50%, -50%) scale(1.1); filter: blur(0px); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.4); filter: blur(6px); }
+          }
+          @keyframes divineMagicStreak {
+            0%   { opacity: 0; transform: translate(-50%, -50%) rotate(var(--dmgRot)) translateY(0) scaleY(0); }
+            25%  { opacity: 1; transform: translate(-50%, -50%) rotate(var(--dmgRot)) translateY(0) scaleY(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--dmgRot)) translateY(-200vh) scaleY(1); }
+          }
+          @keyframes divineMagicVignette {
+            0%   { opacity: 0; }
+            25%  { opacity: 1; }
+            100% { opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      const overlay = document.createElement('div');
+      overlay.id = 'divine-magic-overlay';
+      overlay.style.cssText = `
+        position:fixed; top:0; left:0; width:100vw; height:100vh;
+        z-index:9700; pointer-events:none; overflow:hidden;
+      `;
+
+      // Deep purple-blue vignette — frames the screen.
+      // `both` fill-mode makes the 0% keyframe (opacity:0) apply BEFORE
+      // the animation starts (and END state persist after) — without it,
+      // browsers render the element at its CSS defaults during any
+      // animation-delay window and elements with non-default transforms
+      // briefly flash in their un-transformed position. That's what
+      // caused the big ✦ glyph (100ms delay, font-size 320px, no
+      // initial translate) to render off-center for the first frame.
+      const vignette = document.createElement('div');
+      vignette.style.cssText = `
+        position:absolute; inset:0; opacity:0;
+        background: radial-gradient(ellipse at center, transparent 30%, rgba(80,40,150,0.35) 70%, rgba(40,20,90,0.65) 100%);
+        animation: divineMagicVignette 2200ms ease-out both;
+      `;
+      overlay.appendChild(vignette);
+
+      // Concentric expanding shockwave rings (3 layered).
+      for (let i = 0; i < 3; i++) {
+        const ring = document.createElement('div');
+        const size = 240 + i * 120;
+        ring.style.cssText = `
+          position:absolute; top:50%; left:50%;
+          width:${size}px; height:${size}px; border-radius:50%;
+          border: 3px solid rgba(200,170,255,0.85);
+          box-shadow: 0 0 32px rgba(180,140,255,0.8), inset 0 0 24px rgba(220,190,255,0.5);
+          opacity:0; transform: translate(-50%, -50%) scale(0);
+          animation: divineMagicShockwave ${1200 + i * 200}ms ease-out ${i * 120}ms both;
+        `;
+        overlay.appendChild(ring);
+      }
+
+      // Central radiant halo.
+      const halo = document.createElement('div');
+      halo.style.cssText = `
+        position:absolute; top:50%; left:50%;
+        width:480px; height:480px; border-radius:50%;
+        background: radial-gradient(circle, rgba(255,245,220,0.95) 0%, rgba(220,190,255,0.7) 30%, rgba(170,130,240,0.4) 60%, transparent 90%);
+        filter: blur(2px);
+        mix-blend-mode: screen;
+        opacity:0; transform: translate(-50%, -50%) scale(0.2);
+        animation: divineMagicHalo 1600ms ease-out both;
+      `;
+      overlay.appendChild(halo);
+
+      // Arcane glyph — large rotating star at the center. Inline initial
+      // transform locks the centering before the animation starts so the
+      // 100ms delay can't show a flash at top-left=(50%,50%).
+      const glyph = document.createElement('div');
+      glyph.textContent = '✦';
+      glyph.style.cssText = `
+        position:absolute; top:50%; left:50%;
+        font-size: 320px; line-height: 1;
+        color: rgba(255,250,230,0.95);
+        text-shadow: 0 0 40px rgba(220,190,255,1), 0 0 80px rgba(180,140,255,0.85), 0 0 120px rgba(140,90,220,0.6);
+        opacity:0; transform: translate(-50%, -50%) rotate(0deg) scale(0.4);
+        animation: divineMagicGlyph 1400ms ease-out 100ms both;
+      `;
+      overlay.appendChild(glyph);
+
+      // Mystic rune ring text — circles the center, orbital.
+      const runes = ['✧', '✦', '★', '✶', '✷', '✸', '✹', '✺'];
+      for (let i = 0; i < runes.length; i++) {
+        const angle = (i / runes.length) * Math.PI * 2;
+        const r = 180;
+        const x = Math.cos(angle) * r;
+        const y = Math.sin(angle) * r;
+        const rune = document.createElement('div');
+        rune.textContent = runes[i];
+        rune.style.cssText = `
+          position:absolute; top:50%; left:50%;
+          margin-left:${x}px; margin-top:${y}px;
+          font-size: 36px;
+          color: rgba(240,220,255,1);
+          text-shadow: 0 0 12px rgba(200,170,255,1), 0 0 24px rgba(160,110,230,0.8);
+          opacity:0; transform: translate(-50%, -50%) scale(0.3);
+          animation: divineMagicRune 1800ms ease-in-out ${300 + i * 60}ms both;
+        `;
+        overlay.appendChild(rune);
+      }
+
+      // Vertical magic streaks — long beams shooting up.
+      for (let i = 0; i < 12; i++) {
+        const streak = document.createElement('div');
+        const xPct = (i / 12) * 100 + (Math.random() - 0.5) * 6;
+        const rot = -25 + Math.random() * 50;
+        const dur = 900 + Math.random() * 500;
+        const delay = 100 + Math.random() * 400;
+        streak.style.cssText = `
+          position:absolute; top:100%; left:${xPct}%;
+          width: 4px; height: 60vh;
+          background: linear-gradient(to top, rgba(200,170,255,0) 0%, rgba(220,190,255,0.85) 30%, rgba(255,240,220,0.95) 70%, rgba(255,255,255,0) 100%);
+          box-shadow: 0 0 12px rgba(200,170,255,0.9);
+          transform-origin: 50% 100%;
+          opacity:0; transform: translate(-50%, -50%) rotate(${rot}deg) translateY(0) scaleY(0);
+          --dmgRot: ${rot}deg;
+          animation: divineMagicStreak ${dur}ms ease-out ${delay}ms both;
+        `;
+        overlay.appendChild(streak);
+      }
+
+      // Sparkle particles — burst out from center across the whole screen.
+      const sparkleCount = 90;
+      const particles = ['✦', '✧', '✨', '⋆', '·', '◆', '◇'];
+      for (let i = 0; i < sparkleCount; i++) {
+        const sparkle = document.createElement('div');
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 200 + Math.random() * 600;
+        const dx = Math.cos(angle) * dist;
+        const dy = Math.sin(angle) * dist;
+        const size = 12 + Math.random() * 22;
+        const dur = 900 + Math.random() * 700;
+        const delay = Math.random() * 500;
+        const hue = ['#fff5dc','#e8d8ff','#c8b0ff','#f5e8b8','#d8c0ff','#fff'][Math.floor(Math.random() * 6)];
+        sparkle.textContent = particles[Math.floor(Math.random() * particles.length)];
+        sparkle.style.cssText = `
+          position:absolute; top:50%; left:50%;
+          font-size:${size}px;
+          color:${hue};
+          text-shadow: 0 0 8px ${hue}, 0 0 16px rgba(180,140,255,0.7);
+          opacity:0; transform: translate(0,0) scale(0.3) rotate(0deg);
+          --dmgDx:${dx}px; --dmgDy:${dy}px;
+          animation: divineMagicSparkle ${dur}ms ease-out ${delay}ms both;
+        `;
+        overlay.appendChild(sparkle);
+      }
+
+      document.body.appendChild(overlay);
+      // Cleanup after the longest layered timing finishes (~2.6s).
+      setTimeout(() => overlay.remove(), 2700);
+    };
+    socket.on('divine_magic_burst', onDivineMagicBurst);
+
+    // Divine Gift of Time activation — screen-wide clock rewinding
+    // counterclockwise. Layered: a deep blue vignette frames the screen,
+    // a giant clock face appears at center with hour/minute/second hands
+    // spinning backwards, expanding cyan rings radiate out, and a few
+    // "time fragment" sparkles pulse around the dial.
+    const onDivineTimeRewind = () => {
+      if (window._playAnimations === false) return;
+      if (window.playSFX) window.playSFX('elem_holy', { category: 'effect', opts: { rate: 0.7 } });
+      if (!document.getElementById('divine-time-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'divine-time-keyframes';
+        style.textContent = `
+          @keyframes dtVignette {
+            0%   { opacity: 0; }
+            25%  { opacity: 1; }
+            100% { opacity: 0; }
+          }
+          @keyframes dtFaceFadeIn {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+            25%  { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+            70%  { opacity: 0.95; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); }
+          }
+          @keyframes dtRingExpand {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            25%  { opacity: 0.9; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(2.4); }
+          }
+          /* Clock hands rewind: rotate negative through several full turns,
+             ease-out so the spin slows as time "settles back". */
+          @keyframes dtHourBack {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(-720deg); }
+          }
+          @keyframes dtMinuteBack {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(-1440deg); }
+          }
+          @keyframes dtSecondBack {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(-2880deg); }
+          }
+          @keyframes dtFragment {
+            0%   { opacity: 0; transform: translate(0,0) scale(0.4) rotate(0deg); }
+            20%  { opacity: 1; transform: translate(calc(var(--dtfDx) * 0.25), calc(var(--dtfDy) * 0.25)) scale(1.1) rotate(60deg); }
+            70%  { opacity: 0.95; transform: translate(calc(var(--dtfDx) * 0.85), calc(var(--dtfDy) * 0.85)) scale(0.9) rotate(280deg); }
+            100% { opacity: 0; transform: translate(var(--dtfDx), var(--dtfDy)) scale(0.5) rotate(420deg); }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      const overlay = document.createElement('div');
+      overlay.id = 'divine-time-overlay';
+      overlay.style.cssText = `
+        position:fixed; top:0; left:0; width:100vw; height:100vh;
+        z-index:9700; pointer-events:none; overflow:hidden;
+      `;
+
+      // Cool-blue vignette frames the screen.
+      const vignette = document.createElement('div');
+      vignette.style.cssText = `
+        position:absolute; inset:0; opacity:0;
+        background: radial-gradient(ellipse at center, transparent 30%, rgba(40,80,160,0.35) 70%, rgba(20,40,90,0.65) 100%);
+        animation: dtVignette 2200ms ease-out both;
+      `;
+      overlay.appendChild(vignette);
+
+      // Concentric expanding cyan rings — "time ripples".
+      for (let i = 0; i < 3; i++) {
+        const ring = document.createElement('div');
+        const size = 260 + i * 120;
+        ring.style.cssText = `
+          position:absolute; top:50%; left:50%;
+          width:${size}px; height:${size}px; border-radius:50%;
+          border: 3px solid rgba(140,210,255,0.85);
+          box-shadow: 0 0 32px rgba(120,200,255,0.85), inset 0 0 24px rgba(180,230,255,0.5);
+          opacity:0; transform: translate(-50%, -50%) scale(0.5);
+          animation: dtRingExpand ${1300 + i * 180}ms ease-out ${i * 120}ms both;
+        `;
+        overlay.appendChild(ring);
+      }
+
+      // Clock face — large circle with tick marks, numerals, and three
+      // backwards-spinning hands. Built as an SVG so the geometry stays
+      // crisp at any size.
+      const clockSize = 380;
+      const cx = clockSize / 2;
+      const cy = clockSize / 2;
+      const clockSvgNS = 'http://www.w3.org/2000/svg';
+      const clockWrap = document.createElement('div');
+      clockWrap.style.cssText = `
+        position:absolute; top:50%; left:50%;
+        width:${clockSize}px; height:${clockSize}px;
+        opacity:0; transform: translate(-50%, -50%) scale(0.4);
+        animation: dtFaceFadeIn 1900ms ease-out 100ms both;
+        filter: drop-shadow(0 0 20px rgba(140,210,255,0.85)) drop-shadow(0 0 40px rgba(180,230,255,0.5));
+      `;
+      const svg = document.createElementNS(clockSvgNS, 'svg');
+      svg.setAttribute('viewBox', `0 0 ${clockSize} ${clockSize}`);
+      svg.setAttribute('width', clockSize);
+      svg.setAttribute('height', clockSize);
+      // Outer rim
+      const rim = document.createElementNS(clockSvgNS, 'circle');
+      rim.setAttribute('cx', cx); rim.setAttribute('cy', cy);
+      rim.setAttribute('r', clockSize * 0.46);
+      rim.setAttribute('fill', 'rgba(220,240,255,0.92)');
+      rim.setAttribute('stroke', 'rgba(80,140,210,0.9)');
+      rim.setAttribute('stroke-width', '8');
+      svg.appendChild(rim);
+      // Inner face
+      const face = document.createElementNS(clockSvgNS, 'circle');
+      face.setAttribute('cx', cx); face.setAttribute('cy', cy);
+      face.setAttribute('r', clockSize * 0.43);
+      face.setAttribute('fill', 'rgba(245,250,255,0.95)');
+      face.setAttribute('stroke', 'rgba(120,180,230,0.6)');
+      face.setAttribute('stroke-width', '2');
+      svg.appendChild(face);
+      // Tick marks (12)
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2 - Math.PI / 2;
+        const isHour = i % 3 === 0;
+        const r1 = clockSize * (isHour ? 0.36 : 0.39);
+        const r2 = clockSize * 0.42;
+        const x1 = cx + Math.cos(angle) * r1;
+        const y1 = cy + Math.sin(angle) * r1;
+        const x2 = cx + Math.cos(angle) * r2;
+        const y2 = cy + Math.sin(angle) * r2;
+        const tick = document.createElementNS(clockSvgNS, 'line');
+        tick.setAttribute('x1', x1); tick.setAttribute('y1', y1);
+        tick.setAttribute('x2', x2); tick.setAttribute('y2', y2);
+        tick.setAttribute('stroke', 'rgba(40,80,140,0.95)');
+        tick.setAttribute('stroke-width', isHour ? '5' : '2');
+        tick.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(tick);
+      }
+      // Hour numerals (12, 3, 6, 9 only — keeps the dial clean at scale)
+      const numerals = [{ n: 'XII', x: cx,                        y: cy - clockSize * 0.30 },
+                        { n: 'III', x: cx + clockSize * 0.30,     y: cy + 6 },
+                        { n: 'VI',  x: cx,                        y: cy + clockSize * 0.34 },
+                        { n: 'IX',  x: cx - clockSize * 0.30,     y: cy + 6 }];
+      for (const n of numerals) {
+        const t = document.createElementNS(clockSvgNS, 'text');
+        t.setAttribute('x', n.x); t.setAttribute('y', n.y);
+        t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('dominant-baseline', 'middle');
+        t.setAttribute('fill', 'rgba(40,80,140,0.95)');
+        t.setAttribute('font-family', 'serif');
+        t.setAttribute('font-weight', 'bold');
+        t.setAttribute('font-size', '28');
+        t.textContent = n.n;
+        svg.appendChild(t);
+      }
+      // Hands — group transformed around clock center, animated with
+      // negative rotation so they sweep counterclockwise.
+      const makeHand = (length, width, color, animName, durMs) => {
+        const g = document.createElementNS(clockSvgNS, 'g');
+        g.setAttribute('transform-origin', `${cx} ${cy}`);
+        g.style.transformOrigin = `${cx}px ${cy}px`;
+        g.style.animation = `${animName} ${durMs}ms cubic-bezier(0.15, 0.7, 0.3, 1) 200ms both`;
+        const line = document.createElementNS(clockSvgNS, 'line');
+        line.setAttribute('x1', cx); line.setAttribute('y1', cy);
+        line.setAttribute('x2', cx); line.setAttribute('y2', cy - length);
+        line.setAttribute('stroke', color);
+        line.setAttribute('stroke-width', width);
+        line.setAttribute('stroke-linecap', 'round');
+        g.appendChild(line);
+        return g;
+      };
+      svg.appendChild(makeHand(clockSize * 0.28, 8, 'rgba(20,40,90,0.95)', 'dtHourBack',   1900));
+      svg.appendChild(makeHand(clockSize * 0.36, 6, 'rgba(20,40,90,0.95)', 'dtMinuteBack', 1900));
+      svg.appendChild(makeHand(clockSize * 0.40, 3, 'rgba(180,40,40,0.95)', 'dtSecondBack', 1900));
+      // Center pin
+      const pin = document.createElementNS(clockSvgNS, 'circle');
+      pin.setAttribute('cx', cx); pin.setAttribute('cy', cy);
+      pin.setAttribute('r', 8);
+      pin.setAttribute('fill', 'rgba(20,40,90,0.95)');
+      pin.setAttribute('stroke', 'rgba(180,220,255,0.9)');
+      pin.setAttribute('stroke-width', '2');
+      svg.appendChild(pin);
+      clockWrap.appendChild(svg);
+      overlay.appendChild(clockWrap);
+
+      // Time-fragment sparkles around the clock — small clock/hourglass
+      // glyphs drifting outward.
+      const fragmentChars = ['🕰', '⌛', '✦', '✧', '⋆', '·', '⏳', '⏱'];
+      for (let i = 0; i < 24; i++) {
+        const sparkle = document.createElement('div');
+        const angle = Math.random() * Math.PI * 2;
+        const dist  = 220 + Math.random() * 280;
+        const dx = Math.cos(angle) * dist;
+        const dy = Math.sin(angle) * dist;
+        const size  = 18 + Math.random() * 18;
+        const dur   = 1100 + Math.random() * 600;
+        const delay = 100 + Math.random() * 600;
+        sparkle.textContent = fragmentChars[Math.floor(Math.random() * fragmentChars.length)];
+        sparkle.style.cssText = `
+          position:absolute; top:50%; left:50%;
+          font-size:${size}px;
+          color: rgba(220,240,255,0.95);
+          text-shadow: 0 0 8px rgba(140,210,255,0.95), 0 0 16px rgba(120,200,255,0.7);
+          opacity:0; transform: translate(0,0) scale(0.4) rotate(0deg);
+          --dtfDx:${dx}px; --dtfDy:${dy}px;
+          animation: dtFragment ${dur}ms ease-out ${delay}ms both;
+        `;
+        overlay.appendChild(sparkle);
+      }
+
+      document.body.appendChild(overlay);
+      setTimeout(() => overlay.remove(), 2300);
+    };
+    socket.on('divine_time_rewind', onDivineTimeRewind);
+
     const onDiscardToDeck = ({ owner, cardNames }) => {
       const isMe = owner === myIdx;
       const discardSel = isMe ? '[data-my-discard]' : '[data-opp-discard]';
@@ -14776,6 +16034,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       for (let i = 0; i < cardNames.length; i++) {
         const card = document.createElement('div');
+        card.className = 'card-flight'; // exempt from no-animations kill rule
         const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardNames[i]) : null;
         const delay = i * 200;
         card.style.cssText = `
@@ -14954,6 +16213,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
 
       const card = document.createElement('div');
+      // `card-flight` opts the element out of the no-animations CSS
+      // kill rule — card movements always play regardless of the user
+      // setting per the player's explicit request.
+      card.className = 'card-flight';
       const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
       const isToHand = (to === 'hand');
       const isToSupport = (to === 'support');
@@ -15008,6 +16271,63 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => card.remove(), durationMs + 100);
     };
     socket.on('play_pile_transfer', onPileTransfer);
+
+    // Side-deck-to-hand appear: the card materialises in the receiver's
+    // hand without a flight animation. Suppresses the auto-draw watcher
+    // (no source pile shrunk, so the fallback would otherwise animate
+    // a phantom flight from opp's hand area), then plays a shine sweep
+    // and sparkle particles on the new hand card. The opponent's
+    // dismissable face-up reveal modal is opened from server-side via
+    // `promptGeneric(... type: 'deckSearchReveal' ...)`.
+    //
+    // Timing: this event fires BEFORE the state sync arrives, so the
+    // new hand card is not yet in the DOM. We just queue the cardName
+    // into `sideDeckAppearMeRef` / `Opp` here; the actual sparkle
+    // overlay is rendered from inside the hand-grew watchers (which
+    // run AFTER React commits the new hand entry).
+    const onSideDeckAppear = ({ cardName, playerIdx }) => {
+      const isMe = playerIdx === myIdx;
+      // Bump the same suppression counter `play_pile_transfer` uses,
+      // so the hand-grew watcher consumes one slot and skips its own
+      // animation when the upcoming sync arrives.
+      if (isMe) {
+        pileTransferToHandPendingMeRef.current  += 1;
+        sideDeckAppearMeRef.current.push(cardName);
+      } else {
+        pileTransferToHandPendingOppRef.current += 1;
+        sideDeckAppearOppRef.current.push(cardName);
+      }
+
+      if (window.playSFX) window.playSFX('reveal', { dedupe: 80 });
+
+      // Inject keyframes once.
+      if (!document.getElementById('side-deck-appear-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'side-deck-appear-keyframes';
+        style.textContent = `
+          @keyframes sdaShineSweep {
+            0%   { opacity: 0; transform: translateX(-120%) skewX(-25deg); }
+            25%  { opacity: 1; }
+            100% { opacity: 0; transform: translateX(220%) skewX(-25deg); }
+          }
+          @keyframes sdaCardGlow {
+            0%   { box-shadow: 0 0 0 0 rgba(255,235,140,0); filter: brightness(1); }
+            25%  { box-shadow: 0 0 28px 6px rgba(255,225,140,0.95), 0 0 48px 14px rgba(220,180,255,0.7); filter: brightness(1.3); }
+            70%  { box-shadow: 0 0 22px 4px rgba(255,225,140,0.7); filter: brightness(1.1); }
+            100% { box-shadow: 0 0 0 0 rgba(255,225,140,0); filter: brightness(1); }
+          }
+          @keyframes sdaSparkle {
+            0%   { opacity: 0; transform: translate(0,0) scale(0.3) rotate(0deg); }
+            20%  { opacity: 1; transform: translate(calc(var(--sdaDx) * 0.25), calc(var(--sdaDy) * 0.25)) scale(1.1) rotate(60deg); }
+            70%  { opacity: 1; transform: translate(calc(var(--sdaDx) * 0.8), calc(var(--sdaDy) * 0.8)) scale(0.95) rotate(280deg); }
+            100% { opacity: 0; transform: translate(var(--sdaDx), var(--sdaDy)) scale(0.5) rotate(420deg); }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    };
+    socket.on('side_deck_appear', onSideDeckAppear);
+
     const onDeckToDiscard = ({ owner, cardNames, deleteMode, holdDuration }) => {
       const isMe    = owner === myIdx;
       // Pre-register the milled names so the pile-growth auto-detector
@@ -15050,6 +16370,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       for (let i = 0; i < cardNames.length; i++) {
         const card    = document.createElement('div');
+        card.className = 'card-flight'; // exempt from no-animations kill rule
         const imgUrl  = window.cardImageUrl ? window.cardImageUrl(cardNames[i]) : null;
         const delay   = i * 200;
         const holdMs  = holdDuration || 0;
@@ -15157,6 +16478,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const travelMs = 700;
       for (let i = 0; i < cardNames.length; i++) {
         const card = document.createElement('div');
+        card.className = 'card-flight'; // exempt from no-animations kill rule
         const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardNames[i]) : null;
         const delay = i * 160; // stagger so a 5-card delete reads as a wave
         card.style.cssText = [
@@ -15237,6 +16559,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const travelMs = 700;
       for (let i = 0; i < cardNames.length; i++) {
         const card = document.createElement('div');
+        card.className = 'card-flight'; // exempt from no-animations kill rule
         const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardNames[i]) : null;
         const delay = i * 160;
         card.style.cssText = [
@@ -15308,6 +16631,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       for (let i = 0; i < count; i++) {
         const card   = document.createElement('div');
+        card.className = 'card-flight'; // exempt from no-animations kill rule
         const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
         const delay  = i * 300;
         card.style.cssText = [
@@ -15582,6 +16906,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const dy = targetY - sr.top;
 
           const flyEl = document.createElement('div');
+          flyEl.className = 'card-flight'; // exempt from no-animations kill rule
           flyEl.style.cssText = `position:fixed;left:${sr.left}px;top:${sr.top}px;width:${sr.width}px;height:${sr.height}px;z-index:10200;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 15px rgba(255,150,50,.8);animation:handStealFly ${dur}ms ease-in-out ${i * 100}ms forwards;--steal-dx:${dx}px;--steal-dy:${dy}px;`;
           const imgUrl = name ? window.cardImageUrl(name) : null;
           if (imgUrl) {
@@ -15835,8 +17160,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('smug_coin_save', onSmugCoinSave);
       socket.off('divine_rain_start', onDivineRainStart);
       socket.off('moe_bomb_animation', onMoeBomb);
+      socket.off('divine_magic_burst', onDivineMagicBurst);
+      socket.off('divine_time_rewind', onDivineTimeRewind);
       socket.off('discard_to_deck_animation', onDiscardToDeck);
       socket.off('play_pile_transfer', onPileTransfer);
+      socket.off('side_deck_appear', onSideDeckAppear);
       socket.off('deck_to_discard_animation', onDeckToDiscard);
       socket.off('discard_to_deleted_animation', onDiscardToDeleted);
       socket.off('deleted_to_discard_animation', onDeletedToDiscard);
@@ -15930,6 +17258,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   /** Play a visual animation at a DOM element's position. */
   const playAnimation = (type, selector, options = {}) => {
+    // Hard short-circuit when animations are disabled. The global CSS
+    // rule already neuters every keyframe / transition, but skipping
+    // the React state push here avoids the per-particle render cost
+    // entirely — measurable when many simultaneous animations queue up.
+    if (window._playAnimations === false) return;
     const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
     if (!el) return;
     const r = el.getBoundingClientRect();

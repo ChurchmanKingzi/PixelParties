@@ -144,6 +144,12 @@ async function initDatabase() {
   try { await db.execute('ALTER TABLE users ADD COLUMN sc INTEGER DEFAULT 0'); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN board TEXT DEFAULT NULL"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN hide_tutorial INTEGER DEFAULT 0"); } catch {}
+  try { await db.execute("ALTER TABLE users ADD COLUMN play_animations INTEGER DEFAULT 1"); } catch {}
+  // Ranked-games counter — incremented when a ranked SET (Bo1/Bo3/Bo5)
+  // finishes. Used to filter the leaderboard to "actually competed"
+  // players so fresh accounts at the default 1000 ELO don't pollute the
+  // top of the list.
+  try { await db.execute("ALTER TABLE users ADD COLUMN ranked_games INTEGER DEFAULT 0"); } catch {}
   // Tracks which sample deck (starter or structure) the user has pinned as
   // their default. Null when the default is a custom deck from `decks`.
   try { await db.execute("ALTER TABLE users ADD COLUMN default_sample_deck_id TEXT DEFAULT NULL"); } catch {}
@@ -354,7 +360,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, defaultSampleDeckId: u.default_sample_deck_id || null };
+  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), defaultSampleDeckId: u.default_sample_deck_id || null };
 }
 
 // ===== PROFILE ROUTES =====
@@ -373,6 +379,16 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
 app.put('/api/profile/hide-tutorial', authMiddleware, async (req, res) => {
   const hide = req.body.hide_tutorial ? 1 : 0;
   await db.run('UPDATE users SET hide_tutorial = ? WHERE id = ?', [hide, req.user.userId]);
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
+  res.json({ user: sanitizeUser(user) });
+});
+
+// Toggle play_animations preference. When 0, the battle client skips
+// every animation / transition / particle effect to keep the game
+// snappy on low-power machines.
+app.put('/api/profile/play-animations', authMiddleware, async (req, res) => {
+  const play = req.body.play_animations ? 1 : 0;
+  await db.run('UPDATE users SET play_animations = ? WHERE id = ?', [play, req.user.userId]);
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ user: sanitizeUser(user) });
 });
@@ -606,6 +622,36 @@ app.post('/api/game/result', authMiddleware, async (req, res) => {
 
   const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
   res.json({ success: true, user: sanitizeUser(user) });
+});
+
+// ===== LEADERBOARD =====
+// Returns up to the top 10 ranked players ordered by ELO. A player counts
+// as "ranked" once they've finished at least one ranked set (Bo1/Bo3/Bo5)
+// — fresh accounts sitting on the default 1000 ELO are filtered out so
+// the board reflects actual competitive standing. Public endpoint: no
+// auth required, since it appears on the multiplayer lobby screen
+// before / regardless of whether the viewer is signed in. Backfill for
+// pre-migration accounts: the column defaults to 0 for existing rows,
+// so any account that played ranked before the migration won't appear
+// until they finish another ranked set — acceptable trade-off vs the
+// alternative of showing every default-1000 account.
+app.get('/api/leaderboard', async (req, res) => {
+  try {
+    const rows = await db.all(
+      'SELECT username, elo, color FROM users WHERE ranked_games > 0 ORDER BY elo DESC, username ASC LIMIT 10'
+    );
+    res.json({
+      players: rows.map((r, i) => ({
+        rank: i + 1,
+        username: r.username,
+        elo: r.elo,
+        color: r.color || '#00f0ff',
+      })),
+    });
+  } catch (err) {
+    console.error('[leaderboard] error:', err.message);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
 });
 
 // ===== HERO STATS =====
@@ -1842,6 +1888,14 @@ function sendGameState(room, playerIdx, extra) {
       return [...names];
     })(),
     awaitingFirstChoice: gs.awaitingFirstChoice || false,
+    // Surfaced so the client can lock the hand whenever a card / chain
+    // is mid-resolution. Engine increments on every spell/attack/artifact
+    // resolution AND every chain link; decrements when the link finishes.
+    // The client uses this together with each player's `resolvingCard`
+    // marker to block hand drag/drop during animation windows where no
+    // prompt is yet active. Tested via the Nerdy-Cheese-then-Slippery-
+    // Fridge ghost-card race.
+    _spellResolutionDepth: gs._spellResolutionDepth || 0,
     terrorCount: gs.activePlayer != null ? (gs._terrorTracking?.[gs.activePlayer] || []).length : 0,
     terrorThreshold: room.engine ? (() => {
       let threshold = Infinity;
@@ -2318,9 +2372,14 @@ async function endGame(room, winnerIdx, reason) {
     const expectedW = 1 / (1 + Math.pow(10, (lElo - wElo) / 400));
     const newWElo = Math.round(wElo + K * (1 - expectedW));
     const newLElo = Math.max(0, Math.round(lElo + K * (0 - (1 - expectedW))));
-    await db.run('UPDATE users SET elo = ? WHERE id = ?', [newWElo, winner.userId]);
-    await db.run('UPDATE users SET elo = ? WHERE id = ?', [newLElo, loser.userId]);
+    await db.run('UPDATE users SET elo = ?, ranked_games = ranked_games + 1 WHERE id = ?', [newWElo, winner.userId]);
+    await db.run('UPDATE users SET elo = ?, ranked_games = ranked_games + 1 WHERE id = ?', [newLElo, loser.userId]);
     eloChanges = [{ username: winner.username, oldElo: wElo, newElo: newWElo }, { username: loser.username, oldElo: lElo, newElo: newLElo }];
+    // Tell every connected client (lobby browsers, players in other rooms,
+    // spectators) that the leaderboard standings just changed so their
+    // UI re-fetches. Without this the leaderboard stays stale until the
+    // 60s poll fires or the user manually navigates away and back.
+    io.emit('leaderboard_updated');
   }
 
   // Always track wins/losses and hero stats per round
@@ -2739,7 +2798,11 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot 
 
   const hero = ps.heroes[heroIdx];
   if (!hero || !hero.name || hero.hp <= 0) return false;
-  if (ps.abilityGivenThisTurn[heroIdx]) return false;
+  // Divine Gift of Skill grants up to 4 extra ability attachments to the
+  // chosen hero this turn. Standard slot is consumed first; bonuses fill
+  // additional plays beyond it.
+  const bonusAvailable = (ps._bonusAbilityAttachments?.[heroIdx] || 0) > 0;
+  if (ps.abilityGivenThisTurn[heroIdx] && !bonusAvailable) return false;
 
   const abZones = ps.abilityZones[heroIdx] || [[], [], []];
   const script = loadCardEffect(cardName);
@@ -2782,7 +2845,28 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot 
   ps.abilityZones[heroIdx] = abZones;
   ps.hand.splice(handIndex, 1);
   if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
-  ps.abilityGivenThisTurn[heroIdx] = true;
+  // Consume the standard slot first; if it's already used, spend a bonus
+  // attachment from Divine Gift of Skill instead. Track which slot was
+  // consumed so a negation refund can return it cleanly.
+  let _consumedBonusSlot = false;
+  if (!ps.abilityGivenThisTurn[heroIdx]) {
+    ps.abilityGivenThisTurn[heroIdx] = true;
+  } else if ((ps._bonusAbilityAttachments?.[heroIdx] || 0) > 0) {
+    ps._bonusAbilityAttachments[heroIdx]--;
+    _consumedBonusSlot = true;
+  }
+
+  // Sync the visible Blessed buff: decrement remaining when a bonus slot
+  // was just used and recompute the lock flag (a freshly-attached Magic
+  // Arts ability bumps the hero past the Skill threshold and clears the
+  // lock — the tooltip should reflect that immediately). Drop the buff
+  // when no bonus slots remain.
+  if (hero.buffs?.blessed_skill) {
+    const blessed = hero.buffs.blessed_skill;
+    if (_consumedBonusSlot) blessed.remaining = Math.max(0, blessed.remaining - 1);
+    blessed.locked = room.engine.isHeroSkillLocked(pi, heroIdx);
+    if (blessed.remaining <= 0) delete hero.buffs.blessed_skill;
+  }
 
   const finalZone = abZones.findIndex(z => (z || []).includes(cardName));
   const inst = room.engine._trackCard(cardName, pi, 'ability', heroIdx, Math.max(0, finalZone));
@@ -2805,7 +2889,27 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot 
       // the ORIGINAL owner's pile when negated.
       const negatedAbilityOwner = room.engine._consumeHandCardOrigin(pi, cardName);
       gs.players[negatedAbilityOwner].discardPile.push(cardName);
-      ps.abilityGivenThisTurn[heroIdx] = false;
+      // Refund whichever slot was consumed (regular vs Skill bonus).
+      if (_consumedBonusSlot) {
+        if (!ps._bonusAbilityAttachments) ps._bonusAbilityAttachments = {};
+        ps._bonusAbilityAttachments[heroIdx] = (ps._bonusAbilityAttachments[heroIdx] || 0) + 1;
+        // Restore the Blessed buff: re-add the slot to the visible
+        // counter, and re-create the buff entry if it was deleted when
+        // remaining hit 0 mid-resolve.
+        if (!hero.buffs) hero.buffs = {};
+        if (!hero.buffs.blessed_skill) {
+          hero.buffs.blessed_skill = { remaining: 0, locked: false, source: 'Divine Gift of Skill' };
+        }
+        hero.buffs.blessed_skill.remaining++;
+        hero.buffs.blessed_skill.locked = room.engine.isHeroSkillLocked(pi, heroIdx);
+      } else {
+        ps.abilityGivenThisTurn[heroIdx] = false;
+        // The regular slot was the consumer — Magic Arts level may have
+        // dropped back below 1, so re-evaluate the lock flag.
+        if (hero.buffs?.blessed_skill) {
+          hero.buffs.blessed_skill.locked = room.engine.isHeroSkillLocked(pi, heroIdx);
+        }
+      }
       room.engine.log('ability_negated', { card: cardName, player: ps.username });
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
@@ -4111,6 +4215,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
   if (charmedOwner == null && borrowedFromOwner == null && gs.players[pi].comboLockHeroIdx != null && gs.players[pi].comboLockHeroIdx !== heroIdx) return false;
   // One-turn action lock (Treasure Hunter's Backpack, etc.)
   if (hero._actionLockedTurn === gs.turn) return false;
+  // Divine Gift of Skill lock — chosen hero can't act unless they have
+  // Magic Arts >= 1. Action-cost ability activations are Actions.
+  if (room.engine.isHeroSkillLocked(heroOwner, heroIdx)) return false;
 
   const abilitySlot = ps.abilityZones?.[heroIdx]?.[zoneIdx];
   if (!abilitySlot || abilitySlot.length === 0) return false;
@@ -4464,6 +4571,8 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     // aren't "Actions"); action-cost activations DO consume an Action,
     // so the lock applies.
     if (isActionCost && hero._actionLockedTurn === gs.turn) return false;
+    // Divine Gift of Skill lock — action-cost hero effects are Actions.
+    if (isActionCost && room.engine.isHeroSkillLocked(heroOwner, heroIdx)) return false;
     let consumedAdditionalHeroInst = null;
     let actionCounterIncrementedHere = false;
     let bonusMainActionsConsumedHereHE = false;
@@ -5287,10 +5396,15 @@ async function setupGameState(room) {
     });
     const mainDeck = shuffle(deck?.mainDeck||[]);
     const potionDeck = shuffle(deck?.potionDeck||[]);
+    // Side Deck snapshot at game start. The pre-game side-deck phase has
+    // already finalized swaps (room._currentDecks reflects post-swap state),
+    // so the remaining names are the truly out-of-game pool. Effects like
+    // Divine Gift of Edge consume names directly from this list.
+    const sideDeck = (room._currentDecks?.[idx]?.sideDeck || []).slice();
     playerStates.push({ userId:p.userId, username:p.username, socketId:p.socketId,
       color:usr?.color||'#00f0ff', avatar:usr?.avatar||null, cardback:usr?.cardback||null, board:usr?.board||null,
       heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
-      hand:[], mainDeck, potionDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
+      hand:[], mainDeck, potionDeck, sideDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
       abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0],
       damageLocked:false, itemLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
       permanents:[], _oncePerGameUsed: new Set(), _resolvingCard: null, deckSkins: deck?.skins || {} });
@@ -6514,6 +6628,7 @@ io.on('connection', (socket) => {
         hand: [...(hand || [])],
         mainDeck: [...(pz.mainDeck || [])],
         potionDeck: [...(pz.potionDeck || [])],
+        sideDeck: [...(pz.sideDeck || [])],
         discardPile: [...(pz.discardPile || [])],
         deletedPile: [...(pz.deletedPile || [])],
         disconnected: false, left: false,

@@ -234,6 +234,7 @@ module.exports = attachSteamEngine({
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'creature',
+        baseDamage: DISCHARGE_DAMAGE,
         title: CARD_NAME,
         description: `Hurl a fireball dealing ${DISCHARGE_DAMAGE} damage to any target.`,
         confirmLabel: `🔥 Fireball! (${DISCHARGE_DAMAGE})`,

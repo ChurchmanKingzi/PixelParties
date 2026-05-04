@@ -107,6 +107,7 @@ module.exports = {
         side:        'any',
         types:       ['hero', 'creature'],
         damageType:  'attack',
+        baseDamage:  SLASH_DMG,
         title:       CARD_NAME,
         description: `Deal ${SLASH_DMG} damage to a target.`,
         confirmLabel: `⚔️ Slash! (${SLASH_DMG})`,

@@ -53,6 +53,8 @@
 const {
   canSummonSoulShard, markSoulShardSummoned,
   SOUL_SHARD_PILE_FUEL,
+  soulShardEffectActivates_FromNecromancy,
+  markSoulShardEffectFired,
 } = require('./_soul-shards-shared');
 const { hasCardType } = require('./_hooks');
 
@@ -63,6 +65,10 @@ module.exports = {
   bypassNecromancyNegation: true,
   canSummon: canSummonSoulShard,
   cpuMeta: { pileFuel: SOUL_SHARD_PILE_FUEL },
+  // Sandy Blob gate — Sah's mimic effect only runs when summoned by
+  // Necromancy specifically (stricter than the other Shards' from-
+  // discard gate; Sah uses the `_summonedByNecromancy` flag).
+  summonEffectActivates: soulShardEffectActivates_FromNecromancy,
 
   hooks: {
     onPlay: async (ctx) => {
@@ -112,6 +118,12 @@ module.exports = {
       inst.counters = inst.counters || {};
       inst.counters._effectOverride = chosenName;
 
+      // Effect fully committed (mimic bound) — Sandy Blob marker.
+      // The subsequent re-fire of onPlay for the mimicked Creature
+      // runs against Sah's own inst; if the mimicked Creature's
+      // onPlay sets its OWN marker that's fine — Sandy Blob would
+      // already have fired off Sah's marker by then.
+      markSoulShardEffectFired(ctx);
       engine.log('soul_shard_sah_mimic', {
         player: ps.username, mimicking: chosenName,
       });

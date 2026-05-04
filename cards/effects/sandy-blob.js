@@ -84,6 +84,33 @@ module.exports = {
       const hasOnSummon = !!(enteringScript?.hooks?.onPlay)
         || typeof enteringScript?.beforeSummon === 'function';
       if (!hasOnSummon) return;
+      // Conditional on-summon gate. Cards whose on-summon effect runs
+      // ONLY under specific entry conditions (Soul Shards' "summoned
+      // from discard", Sah's "summoned by Necromancy", etc.) export
+      // a `summonEffectActivates(ctx)` predicate. The hook ctx
+      // already carries the same `_summonedFromDiscard` /
+      // `_summonedByNecromancy` flags the entering creature's onPlay
+      // would receive (engine propagates `hookExtras` to both
+      // onPlay and onCardEnterZone), so the predicate sees the
+      // identical state.
+      //
+      // Two-stage check:
+      //   1. PREDICATE — entry conditions met? Skip immediately if no.
+      //      (Catches the most common case: a Soul Shard summoned from
+      //      hand, where the predicate returns false.)
+      //   2. MARKER — even when entry conditions are met, the onPlay
+      //      may bail mid-flow (gallery cancelled, no eligible cards,
+      //      etc.). Conditional creatures stamp
+      //      `inst.counters._summonEffectFiredTurn = gs.turn` ONLY at
+      //      the END of their successful path. If the marker isn't
+      //      set this turn, the effect ran but didn't actually
+      //      commit — Sandy Blob skips.
+      if (typeof enteringScript?.summonEffectActivates === 'function') {
+        try {
+          if (!enteringScript.summonEffectActivates(ctx)) return;
+        } catch { /* defensive — assume activated on predicate throw */ }
+        if (entering.counters?._summonEffectFiredTurn !== gs.turn) return;
+      }
       // If the entering Creature is negated / nulled at the moment its
       // on-summon would fire (Necromancy stamps `negated` BEFORE firing
       // onCardEnterZone for exactly this reason), the on-summon effect
@@ -123,6 +150,7 @@ module.exports = {
         side: 'enemy',
         types: ['hero', 'creature'],
         damageType: 'creature',
+        baseDamage: DISCHARGE_DAMAGE,
         title: CARD_NAME,
         description: `${entering.name}'s on-summon effect just activated. Choose an opponent target to hit with a sand tornado for ${DISCHARGE_DAMAGE} damage, or cancel. (${remaining} use${remaining === 1 ? '' : 's'} left this turn)`,
         confirmLabel: `🌪️ Sand Tornado! (${DISCHARGE_DAMAGE})`,

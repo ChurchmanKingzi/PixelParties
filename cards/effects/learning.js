@@ -202,12 +202,24 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   if (!ok) return false;
   if (ps.hand.lastIndexOf(cardName) < 0) return false;
 
-  // The helper tracked an instance for us — find it so we can untrack
-  // on the negate / placed paths cleanly.
-  const handInst = engine.cardInstances.find(c =>
-    c.zone === 'hand' && c.owner === pi && c.name === cardName
-    && (c.heroIdx === -1 || c.heroIdx == null)
-  );
+  // The helper tracked an instance for us — find the LATEST tracked
+  // copy (cardInstances appends, so iterate in reverse to grab the
+  // freshly added one even if the player already held a same-name copy).
+  let handInst = null;
+  for (let i = engine.cardInstances.length - 1; i >= 0; i--) {
+    const c = engine.cardInstances[i];
+    if (c.zone === 'hand' && c.owner === pi && c.name === cardName) {
+      handInst = c;
+      break;
+    }
+  }
+  // Anchor the searched copy to the casting hero. `actionAddCardFromDeckToHand`
+  // tracks with `heroIdx = -1`, but spells that read `ctx.cardHeroIdx` in
+  // their `onPlay` (Burning Finger, etc.) need the casting hero's index —
+  // matching how `doPlaySpell` tracks normal hand-played spells.
+  // Without this, those spells short-circuit on `ps.heroes[-1] = undefined`
+  // and silently fizzle while still costing Wisdom.
+  if (handInst) handInst.heroIdx = heroIdx;
 
   // ── Flash on Learning's slot before resolution. ──
   engine._broadcastEvent('ability_activated', {
@@ -228,7 +240,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   const paySearchedWisdom = async () => {
     if (wisdomCost <= 0) return;
     const eligibleIndices = wisdomPayableIndices(ps, triggeringName);
-    gs._learningCasting = true;
+    gs._learningCasting = pi;
     try {
       await engine.actionPromptForceDiscard(pi, wisdomCost, {
         title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
@@ -255,7 +267,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   // physically in hand here (mirrors doPlaySpell). The hand-tracked
   // instance from Step 1 is the synth instance the hooks operate on. ──
   gs._immediateActionContext = true;
-  gs._learningCasting = true;
+  gs._learningCasting = pi;
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
   const hadPriorLog = gs._spellDamageLog !== undefined;
   if (!hadPriorLog) gs._spellDamageLog = [];
@@ -358,8 +370,9 @@ module.exports = {
 
       // Re-entry guard — Learning's own cast machinery sets this so
       // the inner spell's afterSpellResolved can't re-trigger Learning
-      // mid-resolution.
-      if (gs._learningCasting) return;
+      // mid-resolution. The flag is the caster's player index (0 is
+      // valid), so use `!= null` not truthy.
+      if (gs._learningCasting != null) return;
 
       const sd = ctx.spellCardData;
       if (!sd || sd.cardType !== 'Spell') return;
@@ -384,6 +397,15 @@ module.exports = {
 
       const eligible = getEligibleDeckSpells(engine, ps, pi, heroIdx, level, triggeringName, sd);
       if (eligible.length === 0) return;
+
+      // Claim HOPT BEFORE the prompt — when Learning is stacked in this
+      // slot, every copy is its own listener and would otherwise re-prompt
+      // after the player cancelled the first gallery (claiming HOPT only
+      // on confirm meant "cancel" had to be pressed once per stack copy).
+      // Claiming up-front means a cancel is final for the slot this turn,
+      // matching the player's intuition that one cancel = one decline.
+      if (!gs.hoptUsed) gs.hoptUsed = {};
+      gs.hoptUsed[hoptKey] = gs.turn;
 
       // Confirm prompt — single confirm if 1 eligible, gallery if 2+.
       let pickedName = null;
@@ -427,10 +449,6 @@ module.exports = {
       const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cd);
       const effHand = effectiveHandSize(engine, ps, pi, heroIdx, triggeringName, sd);
       if (wisdomCost > 0 && effHand < wisdomCost) return;
-
-      // Claim HOPT now that the player has committed.
-      if (!gs.hoptUsed) gs.hoptUsed = {};
-      gs.hoptUsed[hoptKey] = gs.turn;
 
       await castLearningSpell(engine, pi, heroIdx, hero, pickedName, abilityZoneSlot, triggeringName);
     },

@@ -576,6 +576,13 @@ const ZONE_ANIM_SFX = {
   // Lightning — covered by dedicated qinglong/red_lightning_rain socket events
   // Ice
   cold_coffin_encase:      { name: 'elem_ice' },
+  biseria_ice_engulf:      { name: 'elem_ice' },
+  // Divine Gift of Forgetting — confused question marks above heroes
+  forgetting_question_mark: { name: 'elem_dark', opts: { rate: 1.4 } },
+  // Divine Gift of the Deepsea — black-water whirlpool around the new Creature
+  deepsea_summon_whirlpool: { name: 'elem_water', opts: { rate: 0.7 } },
+  // Divine Gift of Skill — gold-and-violet scholar burst on the blessed Hero
+  blessed_skill_burst:    { name: 'elem_holy' },
   // Acid / poison (poison has its own sound per user)
   acid_splash:             { name: 'elem_acid' },
   plague_smoke:            { name: 'poison' },
@@ -1748,7 +1755,12 @@ function BuffColumn({ buffs, cardName }) {
   // Tooltip values may be a string OR a function (data) → string. Function
   // form is for buffs whose tooltip needs to read the buff's per-instance
   // data — Guardian Beast Niu's stacking damage bonus is the first user.
-  const BUFF_ICONS = { cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' } };
+  const BUFF_ICONS = { blessed_skill: { icon: '🎓', tooltip: (data) => {
+    const remaining = (data && typeof data === 'object' && Number.isFinite(data.remaining)) ? data.remaining : 0;
+    let txt = `Blessed: This Hero can have up to ${remaining} more additional Abilities attached to it this turn!`;
+    if (data?.locked) txt += ' But it cannot act this turn.';
+    return txt;
+  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' } };
   // medusa_petrified is surfaced through the Stunned status badge (as the
   // "Petrified" variant), so don't also render it as a separate buff icon —
   // that would double-represent the same effect. null_zone_negated is the
@@ -1842,8 +1854,18 @@ function CardTooltipContent({ card, children, imageUrl }) {
         </div>
         {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
         <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
-          {card.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {card.hp}</span>}
-          {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {card.atk}</span>}
+          {/* HP — prefer live `_liveHp / _liveMaxHp` (set by BoardCard
+              on battle hovers) over the cards.json base value. Format
+              as "current / max" when both are available. */}
+          {(card._liveHp != null || card.hp != null) && (() => {
+            const cur = card._liveHp != null ? card._liveHp : card.hp;
+            const max = card._liveMaxHp != null ? card._liveMaxHp : null;
+            return <span style={{ color: '#ff6666' }}>♥ HP {cur}{max != null ? ` / ${max}` : ''}</span>;
+          })()}
+          {/* ATK — prefer live `_liveAtk` over base. */}
+          {(card._liveAtk != null || card.atk != null) && (
+            <span style={{ color: '#ffaa44' }}>⚔ ATK {card._liveAtk != null ? card._liveAtk : card.atk}</span>
+          )}
           {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {card.cost}</span>}
           {card.level != null && <span>Lv{card.level}</span>}
         </div>

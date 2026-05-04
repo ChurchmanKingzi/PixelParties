@@ -464,6 +464,11 @@ function ProfileScreen() {
 
   // Tutorial visibility toggle
   const [hideTutorial, setHideTutorial] = useState(!!user.hide_tutorial);
+  // Play Animations toggle. The flag is stored as 0/1 on the user
+  // record, with `null`/missing treated as enabled. The battle client
+  // reads this on game start and gates every animation + transition
+  // when off.
+  const [playAnimations, setPlayAnimations] = useState(user.play_animations == null ? true : !!user.play_animations);
 
   // Dirty tracking — compare against original user values
   const isDirty = color !== (user.color || '#00f0ff')
@@ -639,6 +644,15 @@ function ProfileScreen() {
       const data = await api('/profile/hide-tutorial', { method: 'PUT', body: JSON.stringify({ hide_tutorial: newVal }) });
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); setHideTutorial(!newVal); }
+  };
+
+  const togglePlayAnimations = async () => {
+    const newVal = !playAnimations;
+    setPlayAnimations(newVal);
+    try {
+      const data = await api('/profile/play-animations', { method: 'PUT', body: JSON.stringify({ play_animations: newVal }) });
+      setUser(data.user);
+    } catch (e) { notify(e.message, 'error'); setPlayAnimations(!newVal); }
   };
 
   // Build card image URL for deck wall
@@ -1025,7 +1039,7 @@ function ProfileScreen() {
           {/* Settings */}
           <div className="profile-section profile-section-wide">
             <div className="profile-section-label">SETTINGS</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 12, color: 'var(--text)' }}>
                 <div
                   onClick={toggleTutorial}
@@ -1043,6 +1057,25 @@ function ProfileScreen() {
                 <span onClick={toggleTutorial}>Hide Tutorial from Main Menu</span>
               </label>
               <span style={{ fontSize: 9, color: 'var(--text2)' }}>Toggle off to show the tutorial button again</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 12, color: 'var(--text)' }}>
+                <div
+                  onClick={togglePlayAnimations}
+                  style={{
+                    width: 40, height: 22, borderRadius: 11, background: playAnimations ? 'var(--accent)' : 'var(--bg4)',
+                    position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0
+                  }}
+                >
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                    position: 'absolute', top: 2, left: playAnimations ? 20 : 2,
+                    transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.4)'
+                  }} />
+                </div>
+                <span onClick={togglePlayAnimations}>Play Animations</span>
+              </label>
+              <span style={{ fontSize: 9, color: 'var(--text2)' }}>Disable to skip battle animations — faster gameplay on low-power devices</span>
             </div>
           </div>
 

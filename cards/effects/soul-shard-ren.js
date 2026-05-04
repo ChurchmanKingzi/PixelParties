@@ -18,6 +18,8 @@
 const {
   canSummonSoulShard, markSoulShardSummoned,
   SOUL_SHARD_PILE_FUEL,
+  soulShardEffectActivates_FromDiscard,
+  markSoulShardEffectFired,
 } = require('./_soul-shards-shared');
 
 const CARD_NAME = 'Soul Shard Ren';
@@ -27,6 +29,8 @@ module.exports = {
   bypassNecromancyNegation: true,
   canSummon: canSummonSoulShard,
   cpuMeta: { pileFuel: SOUL_SHARD_PILE_FUEL },
+  // Sandy Blob gate — effect only runs when summoned from discard.
+  summonEffectActivates: soulShardEffectActivates_FromDiscard,
 
   /**
    * CPU prompt response for Ren's two prompts:
@@ -196,6 +200,8 @@ module.exports = {
           cancellable: false,
         });
       }
+      // Effect fully committed — Sandy Blob marker.
+      markSoulShardEffectFired(ctx);
       engine.sync();
     },
   },

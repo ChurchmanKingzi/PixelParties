@@ -44,6 +44,7 @@ module.exports = {
         types: ['hero', 'creature'],
         max: maxTargets,
         min: 1,
+        baseDamage: 100,
         title: 'Pyroblast',
         description: `Select up to ${maxTargets} target${maxTargets > 1 ? 's' : ''} to deal 100 damage each.`,
         confirmLabel: '🔥 Pyroblast!',

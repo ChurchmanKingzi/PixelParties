@@ -159,6 +159,7 @@ module.exports = {
       side: 'any',
       types: ['hero', 'creature'],
       damageType: 'other',
+      baseDamage: damage,
       title: CARD_NAME,
       description: `Deal ${damage} damage (50 × ${count} Creatures in discard) to any target.`,
       confirmLabel: `🔥 Burn! (${damage})`,

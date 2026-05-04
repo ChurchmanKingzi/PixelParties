@@ -377,6 +377,7 @@ module.exports = {
       types: ['hero', 'creature'],
       min: 1,
       max: heads,
+      baseDamage: HOPT_DAMAGE,
       title: CARD_NAME,
       description: `Choose up to ${heads} different target${heads > 1 ? 's' : ''}. Deal ${HOPT_DAMAGE} damage to each.`,
       confirmLabel: `🐲 Strike! (${HOPT_DAMAGE} ×N)`,

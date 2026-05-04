@@ -27,6 +27,8 @@
 const {
   canSummonSoulShard, markSoulShardSummoned,
   SOUL_SHARD_PILE_FUEL,
+  soulShardEffectActivates_FromDiscard,
+  markSoulShardEffectFired,
 } = require('./_soul-shards-shared');
 const { hasCardType } = require('./_hooks');
 
@@ -62,6 +64,8 @@ module.exports = {
   bypassNecromancyNegation: true,
   canSummon: canSummonSoulShard,
   cpuMeta: { pileFuel: SOUL_SHARD_PILE_FUEL },
+  // Sandy Blob gate — effect only runs when summoned from discard.
+  summonEffectActivates: soulShardEffectActivates_FromDiscard,
 
   hooks: {
     onPlay: async (ctx) => {
@@ -169,6 +173,8 @@ module.exports = {
         _skipReactionCheck: true,
       });
 
+      // Effect fully committed — Sandy Blob marker.
+      markSoulShardEffectFired(ctx);
       engine.log('soul_shard_khet_revive', {
         player: ps.username, revived: chosenName,
         heroIdx: chosenHost.heroIdx, zoneSlot: placeRes.actualSlot,
