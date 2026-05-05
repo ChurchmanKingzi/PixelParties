@@ -309,24 +309,21 @@ module.exports = {
     engine.sync();
 
     // ── Step 7: Staggered 💥 explosion animation on the equipped zone ──
-    const animSlots = [
-      { delay: 0,   type: 'explosion' },
-      { delay: 200, type: 'explosion' },
-      { delay: 450, type: 'explosion' },
-      { delay: 700, type: 'explosion' },
-    ];
-    for (const a of animSlots) {
-      setTimeout(() => {
-        engine._broadcastEvent('play_zone_animation', {
-          type: a.type,
-          owner: pi,
-          heroIdx: destHeroIdx,
-          zoneSlot: destSlot,
-        });
-      }, a.delay);
-    }
-
-    await engine._delay(1400); // Wait for all explosions to finish
+    // Awaited rather than scheduled via setTimeout so the broadcasts
+    // can't leak past an MCTS rollout boundary (see Treasure Hunter's
+    // Backpack for the full rationale — same pattern, same bug class).
+    const broadcastExplosion = () => engine._broadcastEvent('play_zone_animation', {
+      type: 'explosion', owner: pi,
+      heroIdx: destHeroIdx, zoneSlot: destSlot,
+    });
+    broadcastExplosion();
+    await engine._delay(200);
+    broadcastExplosion();
+    await engine._delay(250);
+    broadcastExplosion();
+    await engine._delay(250);
+    broadcastExplosion();
+    await engine._delay(700);
 
     // ── Step 8: Fire entry hooks for the equipped card ──
     await engine.runHooks('onPlay', {

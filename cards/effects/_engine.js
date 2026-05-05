@@ -1477,6 +1477,17 @@ class GameEngine {
     const toPs   = this.gs.players[toPlayerIdx];
     if (!fromPs || !toPs || !cardName) return null;
 
+    // Discard-out lock: only fires when the discard's OWNER is recovering
+    // from their OWN pile. Opponent reach-ins (Xiong, Boomerang) are
+    // intentionally exempt — the staff text says "you cannot move cards
+    // out of YOUR discard pile", not "cards cannot leave your discard".
+    if (fromOwnerIdx === toPlayerIdx
+        && fromPs._discardLockedTurn === this.gs.turn
+        && !opts._bypassDiscardLock) {
+      this.log('discard_to_hand_blocked', { player: fromPs.username, card: cardName, reason: 'discard_locked' });
+      return null;
+    }
+
     const dIdx = fromPs.discardPile.indexOf(cardName);
     if (dIdx < 0) return null;
     fromPs.discardPile.splice(dIdx, 1);
@@ -9351,6 +9362,16 @@ class GameEngine {
     const ps = this.gs.players[pi];
     if (!ps || !Array.isArray(cardNames) || cardNames.length === 0) return [];
 
+    // Discard-out lock (Staff of the Teleporter / Staff of Uncontrollable
+    // Destruction): the player cannot move cards OUT of their own discard
+    // pile for the rest of the turn. `_discardLockedTurn === gs.turn` is
+    // the canonical flag — auto-expires on turn change so no cleanup
+    // needed. Mirrors the `handLocked` short-circuit in actionDrawCards.
+    if (ps._discardLockedTurn === this.gs.turn && !opts._bypassDiscardLock) {
+      this.log('recycle_blocked', { player: ps.username, reason: 'discard_locked' });
+      return [];
+    }
+
     const available = [...(ps.discardPile || [])];
     const toRecycle = [];
     for (const name of cardNames) {
@@ -9491,6 +9512,15 @@ class GameEngine {
       if (idx < 0) return null;
       ps.hand.splice(idx, 1);
     } else if (source === 'discard') {
+      // Discard-out lock — same gate as actionRecycleCards /
+      // addCardFromDiscardToHand. Block placements that yank the
+      // creature out of the locked player's own discard pile.
+      if (ps._discardLockedTurn === gs.turn && !opts._bypassDiscardLock) {
+        this.log('placement_blocked', {
+          card: cardName, by: opts.sourceName || 'Placement', reason: 'discard_locked',
+        });
+        return null;
+      }
       const idx = opts.sourceIdx != null ? opts.sourceIdx : (ps.discardPile || []).indexOf(cardName);
       if (idx < 0) return null;
       ps.discardPile.splice(idx, 1);

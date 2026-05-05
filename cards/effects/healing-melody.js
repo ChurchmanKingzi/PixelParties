@@ -79,17 +79,16 @@ module.exports = {
       }
 
       // ── Phase 1: Music notes on ALL friendly targets (staggered) ──
-      let delay = 0;
+      // Awaited rather than scheduled via setTimeout so the broadcasts
+      // can't leak past an MCTS rollout boundary (see Treasure Hunter's
+      // Backpack for the full rationale — same pattern, same bug class).
       for (const t of allTargets) {
-        setTimeout(() => {
-          engine._broadcastEvent('play_zone_animation', {
-            type: 'music_notes', owner: t.ownerIdx, heroIdx: t.heroIdx, zoneSlot: t.zoneSlot,
-          });
-        }, delay);
-        delay += 120;
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'music_notes', owner: t.ownerIdx, heroIdx: t.heroIdx, zoneSlot: t.zoneSlot,
+        });
+        await engine._delay(120);
       }
-
-      await engine._delay(delay + 600);
+      await engine._delay(600);
 
       // ── Phase 2: Heal sparkles on all targets ──
       for (const t of allTargets) {

@@ -100,7 +100,17 @@
       "Bash(grep -n \"handLocked:.*ps\\\\|handLocked: gs\\\\|ps\\\\\\\\.handLocked\\\\|gs.players.*handLocked\" \"C:/Pixel Parties WEB/PixelPartiesWeb/server.js\")",
       "Bash(awk -F: '$2+0 > 5390 && $2+0 < 5900')",
       "Bash(awk 'NR>=5390 && NR<=5900 && /cardDB/' \"C:/Pixel Parties WEB/PixelPartiesWeb/cards/effects/_cpu.js\")",
-      "Bash(awk *)"
+      "Bash(awk *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(type\\(d\\)\\); print\\(list\\(d.keys\\(\\)\\)[:5] if isinstance\\(d, dict\\) else d[:2]\\)\")",
+      "Bash(sqlite3 data/pixel-parties.db \".schema\")",
+      "Bash(powershell -Command \"Select-String -Path 'cards/effects/_cpu.js' -Pattern 'runCpuTurn|_cpuDriver' -Context 5,5 | head -50\")",
+      "Bash(powershell -Command \"Select-String -Path 'cards/effects/_cpu.js' -Pattern 'mctsRunOneRollout|mctsPickFromOptions|mctsEvaluateSpell' | wc -l\")",
+      "Bash(powershell -Command \"Select-String -Path 'cards/effects/_engine.js' -Pattern 'promptDamageTarget' -Context 8,8 | head -100\")",
+      "Bash(powershell -Command \"Select-String -Path 'cards/effects/_engine.js' -Pattern 'afterHeal|beforeHeroEffect' -Context 3,3 | head -80\")",
+      "Bash(powershell -Command \"Select-String -Path 'cards/effects/_cpu.js' -Pattern 'function recordDamageDealt|const recordDamageDealt' -Context 15,15 | head -100\")",
+      "Bash(powershell -Command \"Select-String -Path 'cards/effects/_engine.js' -Pattern 'monitorPlayerReactions|_checkPreDamage|_checkAfterDamage' -Context 3,3 | head -60\")",
+      "Bash(powershell -Command \"Select-String -Path 'cards/effects/_cpu.js' -Pattern 'cpuPickTargets|cpuResponse|getValidTargets' | head -30\")",
+      "Bash(powershell -Command \"Select-String -Path 'cards/effects/_engine.js' -Pattern 'function _findHeroOwner|_findHeroOwner.*=' -Context 8,8\")"
     ]
   }
 }

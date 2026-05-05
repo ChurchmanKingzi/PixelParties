@@ -9793,6 +9793,19 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
   // new invocation.
   useEffect(() => { setSelected([]); }, [ep.cards]);
 
+  // Optional name-filter input. Opt-in via `ep.searchable` — used by
+  // pickers that draw from very large pools (Crestina's "any card from
+  // outside the game"). Filtering only changes which entries RENDER;
+  // selections live by `cards`-array index, so they survive a filter
+  // change unchanged.
+  const [search, setSearch] = useState('');
+  useEffect(() => { setSearch(''); }, [ep.cards]);
+  const searchLower = search.trim().toLowerCase();
+  const matchesSearch = (entry) => {
+    if (!ep.searchable || !searchLower) return true;
+    return (entry?.name || '').toLowerCase().includes(searchLower);
+  };
+
   const totalCost = maxBudget != null
     ? selected.reduce((sum, idx) => sum + (cards[idx]?.[costKey] || 0), 0)
     : 0;
@@ -9931,11 +9944,34 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
             </span>
           )}
         </div>
+        {ep.searchable && (
+          <div style={{ marginBottom: 10, flexShrink: 0 }}>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={ep.searchPlaceholder || 'Filter by name…'}
+              autoFocus
+              style={{
+                width: '100%',
+                padding: '6px 10px',
+                fontSize: 12,
+                background: 'rgba(0,0,0,.4)',
+                border: '1px solid rgba(255,255,255,.15)',
+                borderRadius: 4,
+                color: 'var(--text)',
+                boxSizing: 'border-box',
+                outline: 'none',
+              }}
+            />
+          </div>
+        )}
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           <div className="deck-viewer-grid">
             {cards.map((entry, i) => {
               const card = CARDS_BY_NAME[entry.name];
               if (!card) return null;
+              if (!matchesSearch(entry)) return null;
               const isSel = selected.includes(i);
               const entryCost = entry[costKey] || 0;
               const wouldExceedBudget = maxBudget != null && !isSel && totalCost + entryCost > maxBudget;

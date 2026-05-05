@@ -159,9 +159,19 @@ module.exports = {
       // (player, hero) pair as the listener — if Friendship-A's
       // additional action fired Heal on Hero-A and Friendship-B is
       // also on the board, only Friendship-A draws.
+      //
+      // Stack-instance gate (`provider.id !== ctx.card.id`): at Lv2/3
+      // multiple Friendship copies are stacked in the same ability
+      // slot — every copy is a separate cardInstance and runHooks
+      // dispatches `afterSpellResolved` to ALL of them. Without this
+      // ID match, each stacked Friendship would draw its full quota
+      // (Lv3 → 3 listeners × 3 cards = 9 instead of 3). Only the
+      // single instance whose additionalActionAvail token was
+      // consumed draws.
       const provider = ctx.viaAdditionalProvider;
       if (!provider || provider.name !== 'Friendship') return;
       if (provider.owner !== pi || provider.heroIdx !== heroIdx) return;
+      if (provider.id !== ctx.card?.id) return;
 
       // Sanity: the spell must still be a Support Magic Spell. The
       // additional-action filter already enforces this at play time,

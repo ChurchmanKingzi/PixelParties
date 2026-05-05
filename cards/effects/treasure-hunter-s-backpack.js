@@ -197,20 +197,29 @@ module.exports = {
     engine.sync();
 
     // ── Step 4: explosion-y animation on the equipped slot ──
-    const animSlots = [
-      { delay: 0,   type: 'explosion' },
-      { delay: 220, type: 'gold_sparkle' },
-      { delay: 480, type: 'explosion' },
-    ];
-    for (const a of animSlots) {
-      setTimeout(() => {
-        engine._broadcastEvent('play_zone_animation', {
-          type: a.type, owner: pi,
-          heroIdx: destHeroIdx, zoneSlot: destSlot,
-        });
-      }, a.delay);
-    }
-    await engine._delay(900);
+    // Sequenced via awaits rather than fire-and-forget setTimeouts so the
+    // broadcasts CAN'T leak past an MCTS rollout boundary. `engine._delay`
+    // is a no-op while `_fastMode` is true, so rollouts skip the waits
+    // entirely; the broadcast itself is also gated on `_fastMode` inside
+    // `_broadcastEvent`. With setTimeouts, the timers were scheduled
+    // during a rollout and fired AFTER the rollout ended (with `_fastMode`
+    // back to false), causing the captured `destHeroIdx` / `destSlot`
+    // from imagined rollouts to paint explosions on real client zones.
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'explosion', owner: pi,
+      heroIdx: destHeroIdx, zoneSlot: destSlot,
+    });
+    await engine._delay(220);
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'gold_sparkle', owner: pi,
+      heroIdx: destHeroIdx, zoneSlot: destSlot,
+    });
+    await engine._delay(260);
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'explosion', owner: pi,
+      heroIdx: destHeroIdx, zoneSlot: destSlot,
+    });
+    await engine._delay(420);
 
     // ── Step 5: fire entry hooks for the just-equipped card ──
     await engine.runHooks('onPlay', {
