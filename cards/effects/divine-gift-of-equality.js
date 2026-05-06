@@ -150,6 +150,22 @@ module.exports = {
       if (secondT.type === 'hero') {
         const tgtHero = gs.players[secondT.owner]?.heroes?.[secondT.heroIdx];
         if (!tgtHero || tgtHero.hp <= 0) { gs._spellCancelled = true; return; }
+        // Resistance gate. The halving is a non-damage HP mutation
+        // (it's not routed through actionDealDamage), so neither the
+        // damage path nor `actionHealHero`'s `beforeHeroEffect` gate
+        // would catch it. Fire the hook explicitly; on cancel, no
+        // leftover → no revive (the cost is still consumed, matching
+        // every other "Resistance absorbed your effect" outcome).
+        const halveCtx = {
+          playerIdx: secondT.owner, heroIdx: secondT.heroIdx, hero: tgtHero,
+          effectType: 'halve', cancelled: false, _skipReactionCheck: true,
+        };
+        await engine.runHooks('beforeHeroEffect', halveCtx);
+        if (halveCtx.cancelled) {
+          engine.log('divine_gift_equality_blocked', { target: tgtHero.name, reason: 'resistance' });
+          engine.sync();
+          return;
+        }
         leftover = Math.ceil(tgtHero.hp / 2);
         engine._broadcastEvent('play_zone_animation', {
           type: 'gold_sparkle', owner: secondT.owner, heroIdx: secondT.heroIdx, zoneSlot: -1,

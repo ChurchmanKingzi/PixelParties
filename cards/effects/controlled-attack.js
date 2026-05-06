@@ -35,6 +35,27 @@ module.exports = {
       const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (!tgtHero) return;
 
+      // ── beforeHeroEffect gate ──
+      // Resistance (and any future "block first non-damaging effect"
+      // ability) listens on this hook and calls `ctx.cancel()`. Without
+      // the gate, the `controlledBy` mutation lands instantly and
+      // bypasses every defensive Ability — same shape the engine already
+      // uses for healing (line ~4234) and buffs (line ~7006). Cancelled
+      // → silently fizzle; the gold cost was paid by the caller path.
+      const effectCtx = {
+        playerIdx: target.owner, heroIdx: target.heroIdx, hero: tgtHero,
+        effectType: 'control', cancelled: false, _skipReactionCheck: true,
+      };
+      await engine.runHooks('beforeHeroEffect', effectCtx);
+      if (effectCtx.cancelled) {
+        engine.log('controlled_attack_blocked', {
+          player: gs.players[pi]?.username,
+          target: tgtHero.name,
+        });
+        engine.sync();
+        return;
+      }
+
       // Apply controlled status
       tgtHero.controlledBy = pi;
 

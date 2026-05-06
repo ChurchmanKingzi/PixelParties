@@ -110,7 +110,14 @@
       "Bash(powershell -Command \"Select-String -Path 'cards/effects/_cpu.js' -Pattern 'function recordDamageDealt|const recordDamageDealt' -Context 15,15 | head -100\")",
       "Bash(powershell -Command \"Select-String -Path 'cards/effects/_engine.js' -Pattern 'monitorPlayerReactions|_checkPreDamage|_checkAfterDamage' -Context 3,3 | head -60\")",
       "Bash(powershell -Command \"Select-String -Path 'cards/effects/_cpu.js' -Pattern 'cpuPickTargets|cpuResponse|getValidTargets' | head -30\")",
-      "Bash(powershell -Command \"Select-String -Path 'cards/effects/_engine.js' -Pattern 'function _findHeroOwner|_findHeroOwner.*=' -Context 8,8\")"
+      "Bash(powershell -Command \"Select-String -Path 'cards/effects/_engine.js' -Pattern 'function _findHeroOwner|_findHeroOwner.*=' -Context 8,8\")",
+      "Bash(grep -n \"\\\\\"Zira\\\\\\\\|Rebelliokai, Courtly\\\\\\\\|Rebelliokai, Terror\\\\\\\\|\\\\\"Crestina\\\\\"\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\data\\\\cards.json\")",
+      "Bash(grep -n \"search.trim\\\\|setSearch\\\\|\\\\\\\\bsearch\\\\\\\\b\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\public\\\\app-puzzle.jsx\")",
+      "Bash(findstr /I molinda)",
+      "Bash(git *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\" -Filter \"*.js\")",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(Sort-Object)"
     ]
   }
 }

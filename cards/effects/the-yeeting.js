@@ -14,6 +14,121 @@ module.exports = {
   isTargetingArtifact: true,
   deferBroadcast: true,
 
+  // ── CPU board-target picker (MCTS-driven) ──────────────────────────
+  // The default brain scores ability targets at 0 and falls back to a
+  // random pick — observed real-game outcome: Yeeting-removed an enemy
+  // Spell School the player wasn't even going to use. Routing the
+  // second prompt (board-target picker) through MCTS lets the rollout
+  // surface the actually-impactful removal: the per-candidate apply
+  // simulates the destroy + plays out the rest of the turn, and the
+  // evaluator captures all of "deck has 8 copies of this Ability =
+  // very needed", "removing Support Magic 2 with no Lv2+ Support
+  // Spell in deck = wasted", and "highest-level version is more
+  // valuable" naturally — no hardcoded heuristic to maintain.
+  //
+  // The first prompt (pick which OWN Hero yeets) only has own-hero
+  // targets; we defer to the default brain there (returning undefined
+  // synchronously is critical — see Barker's note for the
+  // Promise-coercion wrapper bug that would otherwise auto-decline
+  // the unrelated prompts).
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'target') return undefined;
+    const { validTargets, config } = payload || {};
+    if (!Array.isArray(validTargets) || validTargets.length === 0) return undefined;
+
+    // Distinguish the two prompts by content: the OWN-hero picker has
+    // only `type === 'hero'` entries on the controller's side; the
+    // board-target picker mixes equips / abilities / permanents / areas.
+    const hasNonHero = validTargets.some(t => t.type && t.type !== 'hero');
+    if (!hasNonHero) return undefined;
+
+    // Inside an outer rollout — defer (no nested MCTS).
+    if (engine._inMctsSim || engine._mctsKilledThisTurn) return undefined;
+
+    const cpuIdx = engine._cpuPlayerIdx;
+    if (cpuIdx < 0) return undefined;
+
+    let mctsPick;
+    try { ({ mctsPickFromOptions: mctsPick } = require('./_cpu')); }
+    catch { mctsPick = null; }
+    if (typeof mctsPick !== 'function') return undefined;
+
+    // Pre-filter to viable opponent-side candidates. Self-targeting
+    // own equips/abilities almost never scores positively (it just
+    // discards our own value), and immune cards can't be destroyed.
+    const viable = validTargets.filter(t => {
+      if (t.owner === cpuIdx) return false;
+      if (t._cardInstance?.counters?.immovable) return false;
+      return true;
+    });
+    // Nothing useful to hit on the enemy side — let the default brain
+    // decline (cancellable) or fall back.
+    if (viable.length === 0) return undefined;
+    if (viable.length === 1) return [viable[0].id];
+
+    return (async () => {
+      // Resolve a target back to its current cardInstance by ID pattern.
+      // The id encodes everything we need; doing this each rollout
+      // tolerates snapshot/restore mutations to the inst array.
+      const findInst = (eng, target) => {
+        const id = target.id || '';
+        // equip-{owner}-{heroIdx}-{slotIdx}
+        let m = id.match(/^equip-(\d+)-(\d+)-(\d+)$/);
+        if (m) {
+          const o = +m[1], h = +m[2], s = +m[3];
+          return eng.cardInstances.find(c =>
+            c.zone === 'support' && c.owner === o && c.heroIdx === h && c.zoneSlot === s);
+        }
+        // ability-{owner}-{heroIdx}-{slotIdx}
+        m = id.match(/^ability-(\d+)-(\d+)-(\d+)$/);
+        if (m) {
+          const o = +m[1], h = +m[2], s = +m[3];
+          return eng.cardInstances.find(c =>
+            c.zone === 'ability' && c.owner === o && c.heroIdx === h && c.zoneSlot === s);
+        }
+        // perm-{owner}-{permId}
+        m = id.match(/^perm-(\d+)-(.+)$/);
+        if (m) {
+          const o = +m[1], pid = m[2];
+          return eng.cardInstances.find(c =>
+            c.zone === 'permanent' && c.owner === o
+            && (String(c.counters?.permId) === pid || String(c.id) === pid));
+        }
+        // area-{owner}
+        m = id.match(/^area-(\d+)$/);
+        if (m) {
+          const o = +m[1];
+          return eng.cardInstances.find(c => c.zone === 'area' && c.owner === o);
+        }
+        // surprise: equip-{owner}-{heroIdx}-surprise
+        m = id.match(/^equip-(\d+)-(\d+)-surprise$/);
+        if (m) {
+          const o = +m[1], h = +m[2];
+          return eng.cardInstances.find(c =>
+            c.zone === 'surprise' && c.owner === o && c.heroIdx === h);
+        }
+        return null;
+      };
+
+      const apply = async (eng, target) => {
+        const inst = findInst(eng, target);
+        if (!inst) return false;
+        // The 150 self-damage to the chosen yeeter is constant across
+        // every candidate (the yeeter was picked by the prior prompt),
+        // so it cancels out of the ranking — skip simulating it.
+        const src = { name: 'The Yeeting (sim)', owner: cpuIdx };
+        try { await eng.actionDestroyCard(src, inst); } catch {}
+        return true;
+      };
+
+      let best = null;
+      try { best = await mctsPick(engine, viable, apply); }
+      catch { best = null; }
+      if (!best) return undefined;
+      return [best.id];
+    })();
+  },
+
   canActivate(gs, pi) {
     const hoptKey = `the-yeeting:${pi}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;

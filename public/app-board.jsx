@@ -147,6 +147,19 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
   );
 }
 
+// Briefly tints a board-zone red to signal that the hero/creature in
+// that slot just took damage. Restarts the animation if the same slot
+// is hit twice in quick succession (e.g. multi-hit attacks).
+function flashDamageOnZone(selector) {
+  const el = document.querySelector(selector);
+  if (!el) return;
+  el.classList.remove('damage-flashing');
+  // Force reflow so the animation restarts when the class is re-added.
+  void el.offsetWidth;
+  el.classList.add('damage-flashing');
+  setTimeout(() => el.classList.remove('damage-flashing'), 500);
+}
+
 // Floating damage number that finds its target hero and animates above it
 function DamageNumber({ amount, ownerLabel, heroIdx }) {
   const [pos, setPos] = useState(null);
@@ -11314,7 +11327,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const getCardDimmed = (cardName, handIdx) => {
     if (gameState.awaitingFirstChoice) return false; // Let player see hand clearly
     if (gameState.mulliganPending) return false; // Let player see hand during mulligan
-    if (gameState.potionTargeting) return true; // All cards dimmed during targeting
+    if (gameState.potionTargeting) {
+      // Generic hand-target picker (Rocky Slime, etc.) — when the
+      // active prompt's `validTargets` lists a `type: 'hand'` entry for
+      // this hand index, the card is clickable instead of dimmed.
+      const pt = gameState.potionTargeting;
+      if (pt.ownerIdx === myIdx && Number.isInteger(handIdx)) {
+        const isHandTarget = (pt.validTargets || []).some(
+          t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === handIdx
+        );
+        if (isHandTarget) return false;
+      }
+      return true; // All other cards dimmed during targeting.
+    }
 
     // The specific resolving card instance is always dimmed (non-interactive)
     if (handIdx != null && resolvingHandIndex >= 0 && resolvingHandIndex === handIdx) return true;
@@ -11431,7 +11456,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // every Artifact in hand greys out for the duration. Server
         // enforces the same gate; this is purely visual.
         if (me.artifactLocked) return true;
-        if ((me.gold || 0) < (card.cost || 0)) return true;
+        // Effective cost includes the per-hand-index Play Money discount.
+        // Without it, a card discounted to within affordability would
+        // still appear dimmed; without the floor at 0 a deeply-stacked
+        // discount on a low-cost card could even read as positive
+        // affordability, which the server already caps but the UI hint
+        // should match.
+        {
+          const handReduction = (me.handCostReductions || {})[handIdx] || 0;
+          const effCost = Math.max(0, (card.cost || 0) - handReduction);
+          if ((me.gold || 0) < effCost) return true;
+        }
         // Once-per-game artifacts (Smug Coin, etc.)
         if ((me.oncePerGameUsed || []).includes(cardName)) return true;
         // Gray out Equip artifacts if no hero has a free base support zone
@@ -11725,7 +11760,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // with `me` too, so the opponent's side does not need its own delta.
     const rawLevel = card.level || 0;
     const reduction = (playerData === me ? (gameState.cardLevelReductions || {})[card.name] : 0) || 0;
-    const level = Math.max(0, rawLevel - reduction);
+    let level = Math.max(0, rawLevel - reduction);
+    // Per-instance hand-card level offsets (Rocky Slime). Mirror of the
+    // server's `heroMeetsLevelReq` permissive aggregate: pick the
+    // lowest applicable offset for any matching copy currently in
+    // hand. Without this, the support-zone drop highlight would
+    // refuse a level-reduced creature even though the server happily
+    // accepts the play — the card lights the hero header but not the
+    // slots, and the drop silently fizzles.
+    if (playerData === me && card.name) {
+      const offsets = me.handLevelOffsets || {};
+      const handArr = me.hand || [];
+      let bestOffset = 0;
+      for (const k of Object.keys(offsets)) {
+        if (handArr[+k] !== card.name) continue;
+        const v = offsets[k] || 0;
+        if (v < bestOffset) bestOffset = v;
+      }
+      if (bestOffset < 0) level = Math.max(0, level + bestOffset);
+    }
     if (level <= 0 && !card.spellSchool1) return true;
     // Negated heroes contribute no abilities for level-req purposes — only
     // Lv0 creatures without a school requirement can still land on them.
@@ -11822,6 +11875,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const cardName = hand[idx];
     const dimmed = getCardDimmed(cardName, idx);
 
+    // Generic hand-target click (Rocky Slime, etc.) — if the active
+    // potion-targeting prompt lists a `type: 'hand'` entry for this
+    // hand slot, route the click through `togglePotionTarget` so it
+    // shares the same auto-confirm / max-total / cancellable plumbing
+    // as board target clicks.
+    if (gameState.potionTargeting?.ownerIdx === myIdx) {
+      const handTarget = (gameState.potionTargeting.validTargets || []).find(
+        t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === idx
+      );
+      if (handTarget) {
+        if (e.cancelable) e.preventDefault();
+        togglePotionTarget(handTarget.id);
+        return;
+      }
+    }
+
     // Force Discard mode — any card in hand can be discarded EXCEPT the specific resolving card
     const forceDiscardActive = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt.ownerIdx === myIdx;
     if (forceDiscardActive) {
@@ -11903,6 +11972,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       return;
     }
 
+    // Click-toggle: if the user clicks the SAME ability card that opened
+    // the attach pick, dismiss the highlight (mirrors Escape's behavior).
+    if (abilityAttachPick && abilityAttachPick.handIndex === idx) {
+      if (e.cancelable) e.preventDefault();
+      if (abilityAttachPick.source === 'effectPrompt' && abilityAttachPick.cancellable !== false) {
+        socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
+      }
+      setAbilityAttachPick(null);
+      return;
+    }
     // Block hand play while any dialog/submenu is open
     if (showSurrender || showEndTurnConfirm || spellHeroPick || abilityAttachPick || summonOrRevealPick) return;
     if (gameState.surprisePending) return; // Lock hand during surprise prompts for both players
@@ -11947,7 +12026,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const isEquipPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Artifact'
       && (['equipment','creature'].includes((card.subtype || '').toLowerCase().trim())
           || (card.subtype || '').toLowerCase().split('/').some(t => t.trim() === 'creature'))
-      && (me.gold || 0) >= (card.cost || 0);
+      && (me.gold || 0) >= Math.max(0, (card.cost || 0) - ((me.handCostReductions || {})[idx] || 0));
     // "Artifact-activatable" is click-to-use (potions / Wheels-style). It
     // excludes Equipment AND Artifact-Creatures — both of those are drag-
     // to-hero plays instead. Reaction-subtype Artifacts (Invisibility
@@ -13130,6 +13209,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [oppTargetHighlight, setOppTargetHighlight] = useState([]); // Target IDs highlighted on opponent's screen
   const [burnTickingHeroes, setBurnTickingHeroes] = useState([]); // Hero keys ('pi-hi') currently showing burn escalation
   const [abilityFlash, setAbilityFlash] = useState(null); // { owner, heroIdx, zoneIdx } — flashing ability zone
+  const [abilityBlockFlash, setAbilityBlockFlash] = useState(null); // { owner, heroIdx, zoneIdx } — white block flash (Resistance absorbing an effect)
   const [levelChanges, setLevelChanges] = useState([]); // [{id, delta, owner, heroIdx, zoneSlot}]
   const deckSearchPendingRef = useRef([]); // Card names queued before sync triggers opp draw anim
   const [reactionChain, setReactionChain] = useState(null); // [{id, cardName, owner, cardType, isInitialCard, negated, status}]
@@ -13248,6 +13328,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const dmgEntry = { id: Date.now() + Math.random(), amount: damage, ownerLabel, heroIdx };
         setDamageNumbers(prev => [...prev, dmgEntry]);
         setTimeout(() => setDamageNumbers(prev => prev.filter(e => e.id !== dmgEntry.id)), 1800);
+        flashDamageOnZone(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       }
       if (heal && heal > 0) {
         const healEntry = { id: Date.now() + Math.random(), amount: heal, ownerLabel, heroIdx };
@@ -13526,6 +13607,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('level_change', onLevelChange);
     socket.on('ability_activated', onAbilityActivated);
     socket.on('play_beam_animation', onBeamAnimation);
+    // White flash on the ability zone whose hook just absorbed an
+    // effect (Resistance, etc.). Same payload shape as ability_activated
+    // — owner / heroIdx / zoneIdx pinpoint the slot.
+    const onAbilityBlockFlash = ({ owner, heroIdx, zoneIdx }) => {
+      if (window.playSFX) window.playSFX('ui_cancel', { dedupe: 800, volume: 0.5 });
+      setAbilityBlockFlash({ owner, heroIdx, zoneIdx });
+      setTimeout(() => setAbilityBlockFlash(null), 1800);
+    };
+    socket.on('ability_block_flash', onAbilityBlockFlash);
     const onHeroAscension = ({ owner, heroIdx, oldHero, newHero }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
@@ -17156,7 +17246,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange);
       socket.off('deepsea_spores_activated', onDeepseaSporesActivated);
       socket.off('nomu_draw', onNomuDraw);
-      socket.off('ability_activated', onAbilityActivated); socket.off('play_beam_animation', onBeamAnimation);
+      socket.off('ability_activated', onAbilityActivated); socket.off('ability_block_flash', onAbilityBlockFlash); socket.off('play_beam_animation', onBeamAnimation);
       socket.off('hero_ascension', onHeroAscension);
       socket.off('willy_leprechaun', onWillyLeprechaun);
       socket.off('alleria_spider_redirect', onAlleriaSpiderRedirect);
@@ -17506,7 +17596,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
-  }, [showSurrender, showEndTurnConfirm, cancelEndTurn, spellHeroPick, pendingBouncePick, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation, gameState.mulliganPending, mulliganDecided, gameState.result, isSpectator]);
+  }, [showSurrender, showEndTurnConfirm, cancelEndTurn, spellHeroPick, abilityAttachPick, summonOrRevealPick, pendingBouncePick, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation, gameState.mulliganPending, mulliganDecided, gameState.result, isSpectator]);
 
   // Enter/Space confirms active confirmation dialogs and prompts
   useEffect(() => {
@@ -17737,7 +17827,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (manualHpSuppressRef.current[key]) continue;
           const dmg = prev.hp - cur.hp;
           const [, hiStr] = key.split('-');
-          newDmgNums.push({ id: Date.now() + Math.random(), amount: dmg, ownerLabel: cur.owner, heroIdx: parseInt(hiStr) });
+          const heroIdx = parseInt(hiStr);
+          newDmgNums.push({ id: Date.now() + Math.random(), amount: dmg, ownerLabel: cur.owner, heroIdx });
+          flashDamageOnZone(`[data-hero-zone][data-hero-owner="${cur.owner}"][data-hero-idx="${heroIdx}"]`);
         }
       }
       if (newDmgNums.length > 0) {
@@ -17808,13 +17900,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (cur.hp < prev.hp) {
           const [ownerStr, heroIdxStr, slotStr] = key.split('-');
           const ownerIdx = parseInt(ownerStr);
+          const ownerLabel = ownerIdx === myIdx ? 'me' : 'opp';
+          const heroIdx = parseInt(heroIdxStr);
+          const zoneSlot = parseInt(slotStr);
           newCreatureDmg.push({
             id: Date.now() + Math.random(),
             amount: prev.hp - cur.hp,
-            ownerLabel: ownerIdx === myIdx ? 'me' : 'opp',
-            heroIdx: parseInt(heroIdxStr),
-            zoneSlot: parseInt(slotStr),
+            ownerLabel,
+            heroIdx,
+            zoneSlot,
           });
+          flashDamageOnZone(`[data-support-zone="1"][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
         }
       }
       // Detect lethal damage: creature existed last frame but is now gone (destroyed)
@@ -19091,6 +19187,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isHeroActionActivatable = heroActionPromptAbilities.some(a => a.heroIdx === i && a.zoneIdx === z);
                 const canActivate = isActivatable || isHeroActionActivatable || isFreeActivatable;
                 const isFlashing = abilityFlash && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z;
+                const isBlocking = abilityBlockFlash && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z;
                 // Friendship highlight: ability has an available additional action with eligible hand cards
                 const isFriendshipActive = !isOpp && cards.includes('Friendship') && (gameState.additionalActions || []).some(aa =>
                   aa.typeId.startsWith('friendship_support') && aa.eligibleHandCards.length > 0 && aa.providers.some(p => p.heroIdx === i)
@@ -19122,7 +19219,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     } : (isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined);
                 return (
                   <div key={z}
-                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (attachPickZoneValid ? ' attach-pick-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isValidPotionTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '')}
+                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (attachPickZoneValid ? ' attach-pick-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isValidPotionTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '') + (isBlocking ? ' zone-ability-blocked' : '')}
                     data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel} data-card-name={cards[0] || ''}
                     onClick={onAbilityClick}
                     onMouseEnter={() => {
@@ -19433,6 +19530,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       <>
                         <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} />
                         {cc?.buffs ? <BuffColumn buffs={cc.buffs} cardName={cards[cards.length-1]} /> : null}
+                        {cc?.balance > 0 ? (
+                          <div className="head-counter-badge"
+                            onMouseEnter={e => showGameTooltip(e, `Balance Counters: ${cc.balance}. Charm of Balance lets you draw this many cards once per turn.`)}
+                            onMouseLeave={hideGameTooltip}
+                            style={{ background: 'linear-gradient(135deg, #f6d36b, #b07a14)', borderColor: '#7a4f08', color: '#3a2200' }}
+                          >
+                            <span className="head-counter-icon">⚖️</span>
+                            <span className="head-counter-num">×{cc.balance}</span>
+                          </div>
+                        ) : null}
                       </>
                     ) : (
                     <>
@@ -19514,7 +19621,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         {(() => { const curHp = cc?.currentHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; return <BoardCard cardName={cards[cards.length-1]} hp={curHp} maxHp={mHp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />; })()}
                       </div>
                     )}
-                    {(() => { const lvl = cc?.level; return lvl ? <div className="creature-level">Lv{lvl}</div> : null; })()}
+                    {(() => {
+                      // `cc.level` is the DELTA from base (engine's
+                      // `actionChangeLevel` accumulates here). Show the
+                      // effective level — base + delta — so a Field
+                      // Cannon (base 3) reduced by 1 reads "Lv2" not
+                      // "Lv-1", and a Lv0 slime that's gained 2 levels
+                      // still reads "Lv2" (0 + 2). Badge appears only
+                      // when the delta is non-zero, i.e. the level has
+                      // been modified from base.
+                      const delta = cc?.level;
+                      if (!delta) return null;
+                      const topName = cards[cards.length - 1];
+                      const baseLvl = CARDS_BY_NAME[topName]?.level || 0;
+                      return <div className="creature-level">Lv{baseLvl + delta}</div>;
+                    })()}
                     {cc?.headCounter > 0 ? (
                       <div className="head-counter-badge"
                         onMouseEnter={e => showGameTooltip(e, `Head Counters: ${cc.headCounter}. This Creature can hit up to ${cc.headCounter} different targets with its Hydra strike.`)}
@@ -19542,6 +19663,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       >
                         <span className="head-counter-icon">🌌</span>
                         <span className="head-counter-num">×{cc.changeCounter}</span>
+                      </div>
+                    ) : null}
+                    {cc?.balance > 0 ? (
+                      <div className="head-counter-badge"
+                        onMouseEnter={e => showGameTooltip(e, `Balance Counters: ${cc.balance}. Charm of Balance lets you draw this many cards once per turn.`)}
+                        onMouseLeave={hideGameTooltip}
+                        style={{ background: 'linear-gradient(135deg, #f6d36b, #b07a14)', borderColor: '#7a4f08', color: '#3a2200' }}
+                      >
+                        <span className="head-counter-icon">⚖️</span>
+                        <span className="head-counter-num">×{cc.balance}</span>
                       </div>
                     ) : null}
                     {(() => { return cc?.additionalActionAvail ? <div className="additional-action-icon"
@@ -20083,15 +20214,54 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // that option is live). Revealed copies render semi-
                 // transparent via `hand-card-revealed`.
                 const isRevealed = revealedHandIdxSet.has(item.origIdx);
+                // Generic hand-target highlight: when the active
+                // potion-targeting prompt lists a `type: 'hand'` entry
+                // for this hand index (Rocky Slime + future cards),
+                // reuse the standard `hand-pick-eligible` outline so
+                // the player gets the same "click me" feedback they
+                // see in handPick / pickHandCard modes.
+                const isPotionHandTarget = !!(gameState.potionTargeting?.ownerIdx === myIdx
+                  && (gameState.potionTargeting.validTargets || []).some(
+                    t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === item.origIdx
+                  ));
+                // Per-instance hand-card level offset (Rocky Slime). The
+                // server pushes `me.handLevelOffsets` (only for own
+                // player); when an entry exists for this hand slot
+                // we render the resulting effective level on top of
+                // the card — same `creature-level` badge slimes use
+                // when their level is changed on the board.
+                const handLevelOffset = (me.handLevelOffsets || {})[item.origIdx] || 0;
+                const handCardData = CARDS_BY_NAME[item.card];
+                const handEffectiveLevel = handLevelOffset !== 0 && handCardData?.level != null
+                  ? (handCardData.level + handLevelOffset)
+                  : null;
+                // Per-instance Artifact cost reduction (Play Money). Mirrors
+                // the Rocky-Slime level-offset surface: server pushes
+                // `me.handCostReductions` only for the owner; when an
+                // entry exists for this hand slot AND the card has a base
+                // cost, we render a discounted-cost badge over the card.
+                // Floor at 0 — the rule explicitly caps cost there.
+                const handCostReduction = (me.handCostReductions || {})[item.origIdx] || 0;
+                const handEffectiveCost = handCostReduction > 0 && handCardData?.cost != null
+                  ? Math.max(0, handCardData.cost - handCostReduction)
+                  : null;
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '')}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTarget ? ' hand-pick-eligible' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '')}
                     style={(isDrawAnim || isPendingPlay || isStealHidden || bounceReturnHidden.has(`${myIdx}-${item.origIdx}`)) ? { visibility: 'hidden' } : undefined}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
                     onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
                     <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} />
+                    {handEffectiveLevel != null && <div className="creature-level">Lv{handEffectiveLevel}</div>}
+                    {handEffectiveCost != null && (
+                      <div className="hand-cost-override"
+                        onMouseEnter={e => showGameTooltip(e, `Cost reduced by ${handCostReduction} this turn (was ${handCardData.cost}).`)}
+                        onMouseLeave={hideGameTooltip}>
+                        ◆{handEffectiveCost}
+                      </div>
+                    )}
                     {isHandLockBlocked && <div className="hand-lock-indicator">⦸</div>}
                   </div>
                 );

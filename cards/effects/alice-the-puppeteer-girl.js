@@ -8,6 +8,29 @@
 //  Animation: red laser beam from Alice to target.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
+/**
+ * True iff `inst` counts toward Alice's damage multiplier:
+ *   • Lives in a support zone.
+ *   • Is an actual Creature (not an Equipment Artifact / Token-only card).
+ *   • Is currently CONTROLLED by `pi` — temporary steals flip
+ *     `inst.controller` to the stealer while leaving `inst.owner` on
+ *     the original side, so a steal-ridden creature on the opponent's
+ *     board mustn't count for Alice. Permanent steals already update
+ *     both fields.
+ *   • Was NOT summoned this turn (`turnPlayed !== currentTurn`).
+ */
+function _qualifies(inst, pi, currentTurn, cardDB) {
+  if (inst.zone !== 'support') return false;
+  if ((inst.controller ?? inst.owner) !== pi) return false;
+  if (inst.stolenBy != null) return false;
+  if (inst.turnPlayed === currentTurn) return false;
+  const cd = cardDB[inst.name];
+  if (!cd || !hasCardType(cd, 'Creature')) return false;
+  return true;
+}
+
 module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
@@ -17,9 +40,10 @@ module.exports = {
   supportYield(ctx) {
     const { engine, pi } = ctx;
     const currentTurn = engine.gs.turn || 0;
+    const cardDB = engine._getCardDB();
     let count = 0;
     for (const inst of engine.cardInstances) {
-      if (inst.owner === pi && inst.zone === 'support' && inst.turnPlayed !== currentTurn) count++;
+      if (_qualifies(inst, pi, currentTurn, cardDB)) count++;
     }
     return { damagePerTurn: 50 * count };
   },
@@ -32,12 +56,9 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const currentTurn = engine.gs.turn || 0;
+    const cardDB = engine._getCardDB();
 
-    return engine.cardInstances.some(inst =>
-      inst.owner === pi &&
-      inst.zone === 'support' &&
-      inst.turnPlayed !== currentTurn
-    );
+    return engine.cardInstances.some(inst => _qualifies(inst, pi, currentTurn, cardDB));
   },
 
   /**
@@ -50,12 +71,12 @@ module.exports = {
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
     const currentTurn = engine.gs.turn || 0;
+    const cardDB = engine._getCardDB();
 
-    // Count qualifying creatures (not summoned this turn)
+    // Count qualifying creatures (not summoned this turn, not stolen,
+    // actual Creatures — not Equipment).
     const qualifyingCreatures = engine.cardInstances.filter(inst =>
-      inst.owner === pi &&
-      inst.zone === 'support' &&
-      inst.turnPlayed !== currentTurn
+      _qualifies(inst, pi, currentTurn, cardDB)
     );
     const creatureCount = qualifyingCreatures.length;
     if (creatureCount === 0) return false; // Shouldn't happen (canActivate guards this)

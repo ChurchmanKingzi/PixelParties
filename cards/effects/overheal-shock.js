@@ -175,6 +175,25 @@ module.exports = {
         return;
       }
 
+      // ── Resistance gate ──
+      // The full effect (zone placement + healReversed status) targets
+      // an opponent hero, so it counts as a non-damaging effect that
+      // Resistance can absorb. Fire `beforeHeroEffect` before any
+      // mutation; on cancel, leave `_spellPlacedOnBoard` unset so the
+      // server's standard discard path handles the spell normally.
+      // The direct `targetHero.statuses.healReversed = …` assignment
+      // below bypasses `addHeroStatus` and therefore Resistance's
+      // `onStatusApplied` listener — this gate is the only safety net.
+      const effectCtx = {
+        playerIdx: oi, heroIdx: targetHeroIdx, hero: targetHero,
+        effectType: 'attach', cancelled: false, _skipReactionCheck: true,
+      };
+      await engine.runHooks('beforeHeroEffect', effectCtx);
+      if (effectCtx.cancelled) {
+        engine.log('equip_blocked', { card: 'Overheal Shock', target: targetHero.name, reason: 'resistance' });
+        return;
+      }
+
       // ── Place card in opponent's Support Zone ──
       if (!ops.supportZones[targetHeroIdx]) ops.supportZones[targetHeroIdx] = [[], [], []];
       if (!ops.supportZones[targetHeroIdx][targetSlot]) ops.supportZones[targetHeroIdx][targetSlot] = [];

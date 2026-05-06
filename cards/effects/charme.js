@@ -328,6 +328,26 @@ async function _activateLv3(engine, gs, pi, heroIdx, hero, oi, ops) {
     return true; // HOPT consumed but fizzled
   }
 
+  // ── Resistance gate ──
+  // Resistance listens on `beforeHeroEffect` and cancels the FIRST
+  // non-damage effect each turn. Without this gate, the `charmedBy`
+  // mutation would land directly and bypass Resistance entirely (the
+  // `charmed` status set below would be cleaned up by Resistance's
+  // onStatusApplied listener, but the `charmedBy` flag itself would
+  // stick — leaving the hero half-charmed).
+  const effectCtx = {
+    playerIdx: oi, heroIdx: sel.heroIdx, hero: targetHero,
+    effectType: 'charm', cancelled: false, _skipReactionCheck: true,
+  };
+  await engine.runHooks('beforeHeroEffect', effectCtx);
+  if (effectCtx.cancelled) {
+    engine.log('charme_blocked', {
+      player: gs.players[pi].username, target: targetHero.name,
+    });
+    engine.sync();
+    return true; // HOPT consumed but blocked
+  }
+
   // ── Take control ──
   targetHero.charmedBy = pi;
   targetHero.charmedFromOwner = oi;

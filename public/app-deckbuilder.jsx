@@ -419,10 +419,19 @@ function DeckBuilder() {
     const card = CARDS_BY_NAME[cardName];
     if (!card || card.cardType !== 'Hero') return false;
     const heroes = [...(currentDeck.heroes || [{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null }])].map(h => ({ ...h }));
-    // Check if this hero is already in the deck
-    if (heroes.some(h => h && h.hero === cardName)) return false;
     let slot = targetSlot != null ? targetSlot : heroes.findIndex(h => !h || !h.hero);
     if (slot < 0 || slot > 2) return false;
+    // Defer per-name copy limits (including the multi-team exception
+    // for Peter Röll) to the shared canAddCard helper. When the drop
+    // target is an OCCUPIED slot, probe against a deck where that slot
+    // is cleared — that's how "drop a Hero on a pre-existing one to
+    // replace it" stays consistent with the legality rules (no
+    // duplicates, etc.) without forcing the player to manually remove
+    // the old Hero first.
+    const probeDeck = heroes[slot]?.hero
+      ? { ...currentDeck, heroes: heroes.map((h, i) => i === slot ? { hero: null, ability1: null, ability2: null } : h) }
+      : currentDeck;
+    if (!canAddCard(probeDeck, cardName, 'hero')) return false;
     const replacedHero = heroes[slot]?.hero;
     heroes[slot] = { hero: cardName, ability1: card.startingAbility1 || null, ability2: card.startingAbility2 || null };
     // Nicolas removal cleanup: if replacing Nicolas with another hero, move potions out of main deck
@@ -469,7 +478,12 @@ function DeckBuilder() {
       updateSections({ main: next.mainDeck, potion: next.potionDeck, side: next.sideDeck });
     } else if (section === 'hero') {
       const heroes = [...(currentDeck.heroes || [])];
-      const slot = heroes.findIndex(h => h && h.hero === cardName);
+      // Prefer the explicit slot index when provided so multi-team
+      // duplicates (Peter Röll) can be removed individually instead of
+      // findIndex always picking the leftmost copy.
+      const slot = (typeof index === 'number' && heroes[index]?.hero === cardName)
+        ? index
+        : heroes.findIndex(h => h && h.hero === cardName);
       if (slot >= 0) heroes[slot] = { hero: null, ability1: null, ability2: null };
       // Nicolas removal: move main deck Potions back to potion deck
       if (cardName === 'Nicolas, the Hidden Alchemist') {
@@ -717,7 +731,15 @@ function DeckBuilder() {
     if (fromSection === 'main') { const idx = fromIndex != null ? fromIndex : tempDeck.mainDeck.indexOf(cardName); if (idx >= 0) tempDeck.mainDeck.splice(idx, 1); }
     else if (fromSection === 'potion') { const idx = fromIndex != null ? fromIndex : tempDeck.potionDeck.indexOf(cardName); if (idx >= 0) tempDeck.potionDeck.splice(idx, 1); }
     else if (fromSection === 'side') { const idx = fromIndex != null ? fromIndex : tempDeck.sideDeck.indexOf(cardName); if (idx >= 0) tempDeck.sideDeck.splice(idx, 1); }
-    else if (fromSection === 'hero') { const s = tempDeck.heroes.findIndex(h => h && h.hero === cardName); if (s >= 0) tempDeck.heroes[s] = { hero: null, ability1: null, ability2: null }; }
+    else if (fromSection === 'hero') {
+      // Prefer the explicit drag-source index so multi-team duplicates
+      // (Peter Röll) can be moved out of a specific slot rather than
+      // findIndex always picking the leftmost copy.
+      const s = (typeof fromIndex === 'number' && tempDeck.heroes[fromIndex]?.hero === cardName)
+        ? fromIndex
+        : tempDeck.heroes.findIndex(h => h && h.hero === cardName);
+      if (s >= 0) tempDeck.heroes[s] = { hero: null, ability1: null, ability2: null };
+    }
 
     // Nicolas removal cleanup: move main deck Potions to potion deck
     if (fromSection === 'hero' && targetSection !== 'hero' && cardName === 'Nicolas, the Hidden Alchemist') {
@@ -734,10 +756,17 @@ function DeckBuilder() {
     }
 
     if (targetSection === 'hero') {
-      if (!canAddCard(tempDeck, cardName, 'hero')) return;
       const card = CARDS_BY_NAME[cardName];
       const slot = targetSlot != null ? targetSlot : tempDeck.heroes.findIndex(h => !h || !h.hero);
-      if (slot < 0) return;
+      if (slot < 0 || slot > 2) return;
+      // Probe canAddCard against a deck where the target slot is empty,
+      // so dropping on an occupied slot replaces the existing Hero
+      // (subject to per-name copy limits and the rest of the deck
+      // legality rules).
+      const probeDeck = tempDeck.heroes[slot]?.hero
+        ? { ...tempDeck, heroes: tempDeck.heroes.map((h, i) => i === slot ? { hero: null, ability1: null, ability2: null } : h) }
+        : tempDeck;
+      if (!canAddCard(probeDeck, cardName, 'hero')) return;
       tempDeck.heroes[slot] = { hero: cardName, ability1: card?.startingAbility1 || null, ability2: card?.startingAbility2 || null };
     } else {
       if (!canAddCard(tempDeck, cardName, targetSection)) return;
@@ -1256,13 +1285,13 @@ function DeckBuilder() {
                         <div className="db-hero-card" data-touch-drag="1"
                           onMouseDown={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}
                           onTouchStart={(e) => onDeckCardMouseDown(e, 'hero', i, h.hero)}
-                          onContextMenu={(e) => { e.preventDefault(); removeFrom(h.hero, 'hero'); }}>
+                          onContextMenu={(e) => { e.preventDefault(); removeFrom(h.hero, 'hero', i); }}>
                           <CardMini card={CARDS_BY_NAME[h.hero]}
                             onClick={(e) => showCoverMenu(h.hero, e, 'hero')}
                             isCover={h.hero === currentDeck?.coverCard} skins={currentDeck?.skins} />
                           <button style={{ position: 'absolute', top: -5, right: -5, background: 'var(--danger)', color: '#fff',
                             border: 'none', width: 18, height: 18, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
-                            onClick={() => removeFrom(h.hero, 'hero')}>✕</button>
+                            onClick={() => removeFrom(h.hero, 'hero', i)}>✕</button>
                         </div>
                       ) : (
                         <div className="db-hero-card">

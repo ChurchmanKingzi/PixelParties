@@ -1692,13 +1692,14 @@ function sendGameState(room, playerIdx, extra) {
           seenIdx.add(idx);
           result.push({ index: idx, name: ps.hand[idx] });
         };
-        // Per-index reveals (Luna Kiai): exact copy was revealed for
-        // the rest of THIS turn.
+        // Per-hand-index reveals via the engine's
+        // `registerHandIndexedField` registry (Luna Kiai's per-turn
+        // `_revealedHandIndices`, Bamboo Shield's permanent
+        // `_permanentlyRevealedHandIndices`). The splice interceptor
+        // and `reorder_hand` remap keep these maps consistent with
+        // the physical copy across every hand mutation.
         const indexMap = ps._revealedHandIndices || {};
         for (const kStr of Object.keys(indexMap)) pushReveal(+kStr);
-        // Permanent per-index reveals (legacy hook — currently unused
-        // by any card; Bamboo Shield switched to instance-flagged
-        // reveals, see below).
         const permaMap = ps._permanentlyRevealedHandIndices || {};
         for (const kStr of Object.keys(permaMap)) pushReveal(+kStr);
         // Per-instance reveals (Luna Kiai per-turn via `_revealedThisTurn`,
@@ -1794,6 +1795,18 @@ function sendGameState(room, playerIdx, extra) {
         return [...blocked];
       })() : [],
       neverPlayableCards: pi === playerIdx ? ps.hand.filter(cn => loadCardEffect(cn)?.neverPlayable) : [],
+      // Per-instance hand-card level offsets (Rocky Slime). Owner-only —
+      // the opponent shouldn't see which copies are reduced. Maps
+      // hand-index → numeric offset (currently always negative). The
+      // client renders an effective-level badge on each tagged hand
+      // card via `me.handLevelOffsets`.
+      handLevelOffsets: pi === playerIdx ? { ...(ps._handLevelOffsets || {}) } : {},
+      // Per-instance Artifact cost reductions (Play Money). Owner-only:
+      // the opponent shouldn't see which copies are discounted. The
+      // client renders an effective-cost badge on each tagged hand
+      // card, and the play-from-hand path uses the same map to compute
+      // what the owner actually pays.
+      handCostReductions: pi === playerIdx ? { ...(ps._handCostReductions || {}) } : {},
       supportSpellLocked: ps.supportSpellLocked || false,
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       heroesActedThisTurn: ps.heroesActedThisTurn || [],
@@ -2052,8 +2065,11 @@ function sendGameState(room, playerIdx, extra) {
           if (k >= 0 && k < handLen) out.add(k);
         }
       };
-      // Per-turn reveals (Luna Kiai) AND legacy permanent index
-      // reveals are both surfaced here with the same styling.
+      // Per-hand-index reveals via the engine's
+      // `registerHandIndexedField` registry (Luna Kiai per-turn,
+      // Bamboo Shield permanent). Both surfaced here with the same
+      // styling — the client renders revealed hand cards semi-
+      // transparent regardless of which field flagged them.
       collect(myPs._revealedHandIndices);
       collect(myPs._permanentlyRevealedHandIndices);
       // Per-instance reveals (Luna Kiai per-turn via `_revealedThisTurn`,
@@ -2264,6 +2280,8 @@ function sendSpectatorGameState(room) {
       creationLockedNames: [],
       handLockBlockedCards: [],
       neverPlayableCards: [],
+      handLevelOffsets: {},
+      handCostReductions: {},
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       heroesActedThisTurn: ps.heroesActedThisTurn || [],
     })),
@@ -2943,7 +2961,11 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   if (!cardData || cardData.cardType !== 'Artifact') return false;
 
   const rawCost = cardData.cost || 0;
-  const costReduction = ps._nextArtifactCostReduction || 0;
+  // Player-wide next-artifact discount (Shu'Chaku) AND per-hand-index
+  // discounts (Play Money) both stack, capped at 0.
+  const playerReduction = ps._nextArtifactCostReduction || 0;
+  const handReduction = ps._handCostReductions?.[handIndex] || 0;
+  const costReduction = playerReduction + handReduction;
   const cost = Math.max(0, rawCost - costReduction);
   if ((ps.gold || 0) < cost) return false;
 
@@ -4973,7 +4995,15 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
 
   const hi = getResolvingHandIndex(ps);
   ps._resolvingCard = null;
-  if (hi >= 0) {
+  // Magic Gems' "discard another card to keep this in hand" rule —
+  // mirrors the same flag in doUseArtifactEffect. Skip the splice +
+  // discard pass entirely so the card stays pinned at its hand index.
+  // Negated and Potion cards never qualify (the keep-in-hand cost was
+  // tied to playing an Artifact normally, and a negated card pays
+  // gold but doesn't resolve, so no recycle).
+  const keepInHand = !chainResult.negated && cardType === 'Artifact'
+    && chainResult.resolveResult?.keepInHand === true;
+  if (hi >= 0 && !keepInHand) {
     ps.hand.splice(hi, 1);
     if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
     // Foreign-origin cards (Magic Lamp gifts etc.) discard / delete
@@ -4991,6 +5021,10 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     } else {
       pilePs.discardPile.push(potionName);
     }
+  } else if (hi >= 0 && keepInHand) {
+    // Card stays in hand — still counts as a played-from-hand card
+    // so per-turn play counters track it.
+    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
   } else {
     if (!chainResult.negated && cardType === 'Potion') checkPotionLock(ps, gs, pi);
   }
@@ -5204,7 +5238,11 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
   if ((cardData.subtype || '').toLowerCase() === 'equipment') return false;
 
   const rawCost = cardData.cost || 0;
-  const costReduction = ps._nextArtifactCostReduction || 0;
+  // Same stacked discount as the equip path: Shu'Chaku's next-artifact
+  // reduction + Play Money's per-hand-index reduction, capped at 0.
+  const playerReduction = ps._nextArtifactCostReduction || 0;
+  const handReduction = ps._handCostReductions?.[handIndex] || 0;
+  const costReduction = playerReduction + handReduction;
   const cost = Math.max(0, rawCost - costReduction);
   if ((ps.gold || 0) < cost) return false;
 
@@ -5290,11 +5328,24 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
     const currentIdx = getResolvingHandIndex(ps);
     ps._resolvingCard = null;
     if (currentIdx >= 0) {
-      ps.hand.splice(currentIdx, 1);
-      if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
-      if (chainResult.negated) ps.discardPile.push(cardName);
-      else if (script.deleteOnUse) ps.deletedPile.push(cardName);
-      else ps.discardPile.push(cardName);
+      // `keepInHand` (Magic Gems' "discard another card to keep this in
+      // hand" rule) skips the standard splice + discard disposition: the
+      // card stays at its current hand index and the disposition is a
+      // no-op for the play. The pay-for-keep cost was already paid by
+      // the script's resolve before it returned the flag, so the play
+      // is still counted against `cardsPlayedFromHand` (the player
+      // committed to playing the card; the rule just lets them recycle
+      // it). Negated cards always go to discard regardless.
+      const keepInHand = !chainResult.negated && chainResult.resolveResult?.keepInHand === true;
+      if (keepInHand) {
+        if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+      } else {
+        ps.hand.splice(currentIdx, 1);
+        if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+        if (chainResult.negated) ps.discardPile.push(cardName);
+        else if (script.deleteOnUse) ps.deletedPile.push(cardName);
+        else ps.discardPile.push(cardName);
+      }
     }
   } catch (err) {
     console.error('[Engine] doUseArtifactEffect error:', err.message);
@@ -5771,21 +5822,32 @@ io.on('connection', (socket) => {
       }
       if (ok) validMap = indexMap;
     }
-    // Per-copy reveal state (Luna Kiai per-turn, Bamboo Shield
-    // permanent) is keyed by hand index. With a valid indexMap we can
-    // remap old→new positions so reveals follow their physical copy.
-    // Without one, we fall back to clearing.
-    const remap = (oldMap) => {
+    // Per-copy hand-indexed state (Luna Kiai's per-turn reveal flags,
+    // Bamboo Shield's permanent reveals, Rocky Slime's level offsets,
+    // and any future card-feature that registers via the engine's
+    // `_handIndexedFields` registry) gets remapped through the
+    // indexMap so each entry follows its physical copy. Both boolean
+    // and numeric value-types are preserved by copying through. With
+    // no permutation provided, we drop the maps rather than risk
+    // misattributing entries — the alternative would silently bind
+    // state to the wrong physical copy.
+    const remapValueMap = (oldMap) => {
+      if (!oldMap) return oldMap;
+      if (!validMap) return {}; // Drop on no-permutation; safer than misattribution.
       const out = {};
-      if (oldMap && validMap) {
-        for (let newIdx = 0; newIdx < hand.length; newIdx++) {
-          if (oldMap[validMap[newIdx]]) out[newIdx] = true;
-        }
+      for (let newIdx = 0; newIdx < hand.length; newIdx++) {
+        const v = oldMap[validMap[newIdx]];
+        if (v != null && v !== 0 && v !== false) out[newIdx] = v;
       }
       return out;
     };
-    ps._revealedHandIndices = remap(ps._revealedHandIndices);
-    ps._permanentlyRevealedHandIndices = remap(ps._permanentlyRevealedHandIndices);
+    if (room.engine?._handIndexedFields) {
+      for (const [fieldName] of room.engine._handIndexedFields) {
+        if (ps[fieldName] != null) {
+          ps[fieldName] = remapValueMap(ps[fieldName]);
+        }
+      }
+    }
     ps.hand = hand;
     // Array reassignment wiped the splice interceptor — re-install.
     if (room.engine) room.engine._installHandRevealInterceptor(pi);
@@ -6851,6 +6913,13 @@ io.on('connection', (socket) => {
             // puzzle JSON without needing a translation here.
             if (typeof cs.changeCounter === 'number' && cs.changeCounter > 0) {
               inst.counters.changeCounter = cs.changeCounter;
+            }
+            // Charm of Balance — authored in the puzzle editor.
+            // Stamped onto `inst.counters.balance`, which the board
+            // badge renders directly and the once-per-turn draw uses
+            // as the draw count.
+            if (typeof cs.balance === 'number' && cs.balance > 0) {
+              inst.counters.balance = cs.balance;
             }
             // Sleeping Beauty's linked-hero slot — authored in the puzzle
             // editor. The link is per-SLOT (matches in-game behavior:

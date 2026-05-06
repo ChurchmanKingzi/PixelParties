@@ -432,6 +432,82 @@ class GameEngine {
     // legit-long hooks like Bill's game-start equip flow that issue many
     // fast sync() calls while the CPU resolves nested prompts.
     this._hookProgressTick = 0;
+
+    // ── Per-hand-index field registry ─────────────────────────────────
+    // Generic facility for "this card-feature wants to attach state to a
+    // SPECIFIC slot in a player's hand and have it auto-survive splices,
+    // reorders, and (optionally) carry over to the new instance when the
+    // tagged hand card is summoned." Each registered field is a map on
+    // `ps.<fieldName>` keyed by handIndex; the splice interceptor and
+    // server.js's `reorder_hand` handler iterate this registry rather
+    // than hard-coding each field. Pre-registers the three current
+    // consumers below; new card features add one entry here (no
+    // edits to the interceptor or reorder_hand needed).
+    this._handIndexedFields = new Map();
+    this._registerBuiltinHandIndexedFields();
+  }
+
+  /**
+   * Register a per-hand-index field. Generic — covers Luna Kiai's reveal
+   * flags, Bamboo Shield's permanent reveals, Rocky Slime's level
+   * offsets, and any future card that attaches per-slot hand state.
+   *
+   * @param {string} name - Property on `ps` that holds the map (e.g.
+   *   '_revealedHandIndices'). Map shape is `{ handIdx: value }`. Card
+   *   scripts create the map lazily on first write.
+   * @param {object} [opts]
+   * @param {'boolean'|'value'} [opts.kind='value'] - Informational. Maps
+   *   storing `true` flags (reveals) vs. real values (level offsets).
+   * @param {(ctx: { engine, inst, value, cardName, handIdx }) => void}
+   *   [opts.onCardSummonedFromHand] - Callback fired by
+   *   `safePlaceInSupport` when the splice that pulled the card from
+   *   hand has captured a non-trivial value at that index AND the card
+   *   immediately lands in a Support Zone with a matching cardName.
+   *   Lets a field carry its hand-side state onto the new board
+   *   instance (Rocky Slime stamps `inst.counters.level`).
+   */
+  registerHandIndexedField(name, opts = {}) {
+    if (!name) return;
+    this._handIndexedFields.set(name, {
+      name,
+      kind: opts.kind === 'boolean' ? 'boolean' : 'value',
+      onCardSummonedFromHand: typeof opts.onCardSummonedFromHand === 'function'
+        ? opts.onCardSummonedFromHand
+        : null,
+    });
+  }
+
+  /**
+   * Register the engine's built-in per-hand-index fields. Called from
+   * the constructor; idempotent (Map.set replaces the prior entry, so
+   * tests/restores re-running it are safe). Callers outside the engine
+   * — e.g. self-play harness — can register additional fields after
+   * this without touching engine code.
+   */
+  _registerBuiltinHandIndexedFields() {
+    // Luna Kiai's per-turn reveal flags (cleared at turn start).
+    this.registerHandIndexedField('_revealedHandIndices', { kind: 'boolean' });
+    // Bamboo Shield's permanent reveal flags (survive turn boundaries).
+    this.registerHandIndexedField('_permanentlyRevealedHandIndices', { kind: 'boolean' });
+    // Rocky Slime's per-instance level reductions. The captured offset
+    // is consumed by safePlaceInSupport when the same card lands on
+    // the board — `inst.counters.level` keeps the reduction post-summon
+    // until the instance hits the discard pile.
+    this.registerHandIndexedField('_handLevelOffsets', {
+      kind: 'value',
+      onCardSummonedFromHand: ({ inst, value }) => {
+        if (!inst || !value) return;
+        if (!inst.counters) inst.counters = {};
+        inst.counters.level = (inst.counters.level || 0) + value;
+      },
+    });
+    // Play Money's per-instance per-turn Artifact cost reductions.
+    // Cumulative — multiple Play Moneys can stack. No
+    // `onCardSummonedFromHand` callback: cost only matters in hand, so
+    // the splice that removes the card from hand also drops the entry.
+    // Cleared at turn start by the per-turn cleanup block alongside
+    // Luna Kiai's `_revealedHandIndices`.
+    this.registerHandIndexedField('_handCostReductions', { kind: 'value' });
   }
 
   // ═══════════════════════════════════════════
@@ -919,6 +995,14 @@ class GameEngine {
     // this.gs retains its original identity. Make sure room.gameState
     // still points at the same object (it always has, but belt-and-braces).
     if (this.room) this.room.gameState = this.gs;
+    // The structured-cloned `ps.hand` arrays don't carry the splice
+    // interceptor's defineProperty overrides — re-install per player
+    // so post-restore live splices keep rebasing every registered
+    // per-hand-index field. Idempotent (interceptor checks
+    // `_hasRevealInterceptor`).
+    for (let i = 0; i < (this.gs.players || []).length; i++) {
+      this._installHandRevealInterceptor(i);
+    }
     // Re-attach `_deferredSurprises` (entries contain Jumpscare's function
     // closure, which can't survive cloning). Fresh shallow copy so a
     // later simulation that mutates the live array can't retroactively
@@ -1033,6 +1117,19 @@ class GameEngine {
         const result = script.cpuResponse(this, 'generic', promptData);
         if (result !== undefined) return result;
       }
+    }
+
+    // ── Puzzle mode: opponent ALWAYS activates Surprises when offered ──
+    // The default below declines every cancellable prompt, which silently
+    // skipped opponent Surprise triggers in puzzles. The Surprise window
+    // confirms have shape { type: 'confirm', title: surpriseCardName, ... }
+    // — we detect them by looking up the title and checking `isSurprise`
+    // on the script. Live PvP / regular CPU games are unaffected (their
+    // CPU brain wrapper at _cpu.js handles its own logic before reaching
+    // this default).
+    if (this.isPuzzle && promptData.type === 'confirm' && cardName) {
+      const script = loadCardEffect(cardName);
+      if (script?.isSurprise) return true;
     }
 
     // ── Default: cancellable → decline, mandatory → auto-resolve ──
@@ -1307,32 +1404,36 @@ class GameEngine {
   }
 
   /**
-   * Monkey-patch `ps.hand.splice` so that `ps._revealedHandIndices`
-   * AND `ps._permanentlyRevealedHandIndices` stay consistent across
-   * hand mutations. Covers every caller that already does
-   * `ps.hand.splice(i, 1)` — no refactor needed.
+   * Monkey-patch `ps.hand.splice` so that every registered per-hand-index
+   * field on `ps` stays consistent across hand mutations. Covers every
+   * caller that already does `ps.hand.splice(i, 1)` — no refactor needed.
    *
-   * Rules applied to each revealed index k when splicing (start, delCount,
-   * ...items):
+   * Rebase rules applied to each indexed entry k when splicing
+   * (start, delCount, ...items):
    *   • k < start                       → unchanged
    *   • k in [start, start+delCount)    → dropped (the card was removed)
    *   • k >= start + delCount           → shifted by (items.length − delCount)
    *
    * `push` doesn't affect existing indices, so no patch is needed.
-   * Hand reassignment (`ps.hand = newArray` via reorder_hand) wipes the
-   * override; callers must re-invoke this method after assignment.
+   * Hand reassignment (`ps.hand = newArray` via reorder_hand or
+   * `restore()`) drops the override; this method is idempotent and
+   * gets re-invoked from both call sites.
    *
-   * Two maps with identical rebase logic but distinct lifetimes:
-   *   • `_revealedHandIndices` — per-turn reveals (Luna Kiai). Cleared
-   *     at turn start by the per-turn cleanup pass.
-   *   • `_permanentlyRevealedHandIndices` — permanent reveals (Bamboo
-   *     Shield). Survives turn boundaries; only wiped if the revealed
-   *     copy is spliced out of hand (i.e. played, discarded, deleted).
+   * The fields the interceptor touches are read from
+   * `this._handIndexedFields` (registered via `registerHandIndexedField`).
+   * Adding a new field is a one-line registration — no edits here.
+   *
+   * Hand-to-support carry-over: fields that declare an
+   * `onCardSummonedFromHand` callback have the value at the topmost
+   * dropped index captured pre-rebase into a per-field pending slot
+   * on `ps._handIndexedFieldPending`. `safePlaceInSupport` consumes
+   * those slots when a matching cardName lands on the board.
    */
   _installHandRevealInterceptor(pi) {
     const ps = this.gs.players?.[pi];
     if (!ps?.hand) return;
     if (ps.hand._hasRevealInterceptor) return;
+    const engine = this;
     const origSplice = Array.prototype.splice;
     const rebase = (oldMap, start, delCount, items, result) => {
       if (!oldMap || Object.keys(oldMap).length === 0) return oldMap;
@@ -1350,12 +1451,36 @@ class GameEngine {
     Object.defineProperty(ps.hand, 'splice', {
       configurable: true, writable: true, enumerable: false,
       value: function(start, delCount, ...items) {
-        const result = origSplice.call(this, start, delCount, ...items);
-        if (ps._revealedHandIndices) {
-          ps._revealedHandIndices = rebase(ps._revealedHandIndices, start, delCount, items, result);
+        // ── Capture pre-rebase values for fields that carry over to a
+        // freshly-summoned support instance. Cleared (overwritten) on
+        // every splice so a stale capture from an earlier discard can't
+        // bleed into a later unrelated summon.
+        delete ps._handIndexedFieldPending;
+        if ((delCount ?? 0) > 0) {
+          for (const [fieldName, fieldDef] of engine._handIndexedFields) {
+            if (!fieldDef.onCardSummonedFromHand) continue;
+            const map = ps[fieldName];
+            if (!map) continue;
+            for (let i = 0; i < (delCount ?? 0); i++) {
+              const idx = start + i;
+              const v = map[idx];
+              // Truthy check: `0` and `false` count as "no entry to carry".
+              if (v != null && v !== 0 && v !== false) {
+                if (!ps._handIndexedFieldPending) ps._handIndexedFieldPending = {};
+                ps._handIndexedFieldPending[fieldName] = {
+                  cardName: this[idx], value: v, handIdx: idx,
+                };
+                break; // First non-trivial entry in the removed range wins.
+              }
+            }
+          }
         }
-        if (ps._permanentlyRevealedHandIndices) {
-          ps._permanentlyRevealedHandIndices = rebase(ps._permanentlyRevealedHandIndices, start, delCount, items, result);
+        const result = origSplice.call(this, start, delCount, ...items);
+        // Rebase every registered field's map on `ps`.
+        for (const [fieldName] of engine._handIndexedFields) {
+          if (ps[fieldName]) {
+            ps[fieldName] = rebase(ps[fieldName], start, delCount, items, result);
+          }
         }
         return result;
       },
@@ -2632,6 +2757,24 @@ class GameEngine {
           for (const [ownerStr, group] of Object.entries(byOwner)) {
             const owner = parseInt(ownerStr);
             if (owner === pi) continue; // Own heroes — untargetable doesn't block self-targeting
+            // Chuck (and any future Hero with `ignoresOppUntargetable: true`)
+            // forces every Hero on its side to be a valid target for the
+            // opponent, ignoring `untargetable` protections on its allies.
+            // We probe each living Hero's script for the flag — short-circuit
+            // on first match. Skip frozen / stunned / negated / mummified
+            // Heroes: their hero-zone effects are silenced (mirrors the hook
+            // filter at ~line 1744), so a stunned Chuck doesn't suppress
+            // his teammates' protections.
+            let chuckActive = false;
+            for (const h of (gs.players[owner]?.heroes || [])) {
+              if (!h?.name || h.hp <= 0) continue;
+              if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.negated) continue;
+              const hi = (gs.players[owner].heroes || []).indexOf(h);
+              if (hi >= 0 && engine._isHeroMummified?.(owner, hi)) continue;
+              const sc = loadCardEffect(h.name);
+              if (sc?.ignoresOppUntargetable) { chuckActive = true; break; }
+            }
+            if (chuckActive) continue;
             const targetable = group.filter(t => !gs.players[t.owner]?.heroes?.[t.heroIdx]?.statuses?.untargetable);
             if (targetable.length > 0) {
               // Has non-untargetable heroes — mark untargetable ones for removal
@@ -2793,7 +2936,7 @@ class GameEngine {
           if (!gs._surpriseCheckedHeroes) gs._surpriseCheckedHeroes = new Set();
           gs._surpriseCheckedHeroes.add(`${selected.owner}-${selected.heroIdx}`);
           const surpriseResult = await engine._checkSurpriseWindow(
-            [selected], cardInstance
+            [selected], cardInstance, { damageType: config.damageType }
           );
           if (surpriseResult?.effectNegated) {
             // Effect fully negated by surprise — don't set _spellCancelled (spell is consumed)
@@ -3040,7 +3183,7 @@ class GameEngine {
         if (!config._skipSurpriseCheck) {
           const heroTargets = result.filter(t => t.type === 'hero');
           if (heroTargets.length > 0) {
-            const surpriseResult = await engine._checkSurpriseWindow(heroTargets, cardInstance);
+            const surpriseResult = await engine._checkSurpriseWindow(heroTargets, cardInstance, { damageType: config.damageType });
             if (surpriseResult?.effectNegated) {
               gs._spellNegatedByEffect = true;
               // Clear damage log entries for negated targets
@@ -3534,7 +3677,7 @@ class GameEngine {
                  heroIdx: source.heroIdx, zone: source.zone || 'hand' };
           const surpriseResult = await this._checkSurpriseWindow(
             [{ type: 'hero', owner: tgtOwner, heroIdx: tgtHeroIdx, cardName: target.name }],
-            syntheticSource
+            syntheticSource, { damageType: type }
           );
           if (surpriseResult?.effectNegated) {
             return { dealt: 0, cancelled: true, surpriseNegated: true };
@@ -5601,6 +5744,36 @@ class GameEngine {
     if (!ps.supportZones[heroIdx][actualSlot]) ps.supportZones[heroIdx][actualSlot] = [];
     ps.supportZones[heroIdx][actualSlot] = [cardName];
     const inst = this._trackCard(cardName, playerIdx, 'support', heroIdx, actualSlot);
+    // Drain pending hand-indexed-field captures for this cardName. The
+    // splice interceptor stamped these onto `ps._handIndexedFieldPending`
+    // RIGHT BEFORE rebase dropped the matching hand entry. Each
+    // registered field with an `onCardSummonedFromHand` callback gets
+    // a one-shot opportunity to apply state to the new support instance
+    // (Rocky Slime stamps `inst.counters.level` so the reduction
+    // survives turn-start +1 and only dies when the inst goes to
+    // discard). Keyed on cardName so an unrelated intervening summon
+    // can't claim a capture meant for a different card.
+    if (ps._handIndexedFieldPending) {
+      for (const [fieldName, fieldDef] of this._handIndexedFields) {
+        if (!fieldDef.onCardSummonedFromHand) continue;
+        const pending = ps._handIndexedFieldPending[fieldName];
+        if (!pending || pending.cardName !== cardName) continue;
+        try {
+          fieldDef.onCardSummonedFromHand({
+            engine: this, inst,
+            value: pending.value,
+            cardName,
+            handIdx: pending.handIdx,
+          });
+        } catch (err) {
+          console.error(`[handIndexedField:${fieldName}] onCardSummonedFromHand threw:`, err.message);
+        }
+        delete ps._handIndexedFieldPending[fieldName];
+      }
+      if (Object.keys(ps._handIndexedFieldPending).length === 0) {
+        delete ps._handIndexedFieldPending;
+      }
+    }
     // Track creature summons this turn
     const cardDB = this._getCardDB();
     const cd = cardDB[cardName];
@@ -8499,6 +8672,10 @@ class GameEngine {
         delete ps._creationLockedNames;
         delete ps._revealedCardCounts;
         delete ps._revealedHandIndices;
+        // Play Money's per-instance Artifact cost reductions — "for the
+        // rest of the turn" the effect was played, so they expire at
+        // the next turn start (whoever's turn it is).
+        delete ps._handCostReductions;
         delete ps._magicLevelReductions;
         delete ps._bonusAbilityAttachments;
         // Drop the visible Divine Gift of Skill "Blessed" buff icon
@@ -11232,33 +11409,28 @@ class GameEngine {
 
       // Activate: remove from hand, deduct gold, mark once-per-game.
       //
-      // Per-instance discount alignment: when `dynamicCost` charged a
+      // Per-copy discount alignment: when `dynamicCost` charged a
       // reduced cost (cost < baseCost), the discount comes from a
-      // SPECIFIC copy's flag (Bamboo Shield's `_permanentlyRevealed`
-      // counter). Card text reads "make ITS cost become 8" — so the
-      // copy consumed should be the discounted one, not whichever
-      // matching name happens to sit at hand index 0. Without this,
-      // the player gets the cost-8 charge AND keeps their revealed
-      // copy in hand, which both contradicts the card and lets the
-      // discount apply forever to un-revealed siblings drawn later.
-      // When no discount is applied (or the script doesn't expose
-      // a per-instance flag), fall back to the legacy first-position
-      // consume.
-      let consumedInst = null;
-      if (cost < baseCost) {
-        consumedInst = this.cardInstances.find(c =>
-          c.owner === targetOwner && c.zone === 'hand'
-          && c.name === cardName
-          && c.counters?._permanentlyRevealed
-        ) || null;
+      // SPECIFIC copy in hand (Bamboo Shield's index-keyed entry in
+      // `ps._permanentlyRevealedHandIndices`). Card text reads "make
+      // ITS cost become 8" — so the copy consumed should be the
+      // discounted one, not whichever matching name happens to sit
+      // at hand index 0. Without this, the player would get the
+      // cost-8 charge AND keep their revealed copy in hand, both
+      // contradicting the card and letting the discount apply forever
+      // to un-revealed siblings drawn later.
+      let actualIdx = -1;
+      if (cost < baseCost && ps._permanentlyRevealedHandIndices) {
+        for (const kStr of Object.keys(ps._permanentlyRevealedHandIndices)) {
+          const k = +kStr;
+          if (ps.hand[k] === cardName) { actualIdx = k; break; }
+        }
       }
-      if (!consumedInst) {
-        consumedInst = this.cardInstances.find(c =>
-          c.owner === targetOwner && c.zone === 'hand' && c.name === cardName
-        ) || null;
-      }
-      const actualIdx = ps.hand.indexOf(cardName);
+      if (actualIdx < 0) actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
+      // Untrack the matching inst at this hand index (computed BEFORE
+      // splice, since splice would shift the rank-by-name mapping).
+      const consumedInst = this._findHandInstanceAt(targetOwner, actualIdx);
       ps.hand.splice(actualIdx, 1);
       if (consumedInst) this._untrackCard(consumedInst.id);
       if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
@@ -12073,10 +12245,28 @@ class GameEngine {
   }
 
   /**
+   * @param {Array} targetedHeroes - hero targets the source card is hitting
+   * @param {object} sourceCard - the source card / synthetic source
+   * @param {object} [opts] - { damageType?: string } — caller can mark
+   *   the trigger as a damage type so equipment that grants "skip
+   *   surprises on attack" (Phalanx Pike) can suppress the entire
+   *   window when the source hero is so-equipped.
    * @returns {object|null} { effectNegated: boolean } or null
    */
-  async _checkSurpriseWindow(targetedHeroes, sourceCard) {
+  async _checkSurpriseWindow(targetedHeroes, sourceCard, opts = {}) {
     if (!targetedHeroes || targetedHeroes.length === 0) return null;
+
+    // Phalanx Pike: equipped hero's Attacks do not trigger Surprises.
+    // Gated on damageType === 'attack' so the same hero's Spells, Hero
+    // effects, Creature activations etc. still open the window normally.
+    if (opts.damageType === 'attack' && sourceCard) {
+      const srcOwner = sourceCard.controller ?? sourceCard.owner ?? -1;
+      const srcHeroIdx = sourceCard.heroIdx ?? -1;
+      if (srcOwner >= 0 && srcHeroIdx >= 0) {
+        const srcHero = this.gs.players[srcOwner]?.heroes?.[srcHeroIdx];
+        if (srcHero?._skipAttackSurprises) return null;
+      }
+    }
     // NOTE: we deliberately do NOT bail out on `_inSurpriseResolution` here.
     // That flag goes up whenever ANY surprise is mid-resolution, which used
     // to block e.g. Spider Avalanche from firing on the attacker when a
@@ -13409,7 +13599,16 @@ class GameEngine {
         // destination there.
         if (!link.isInitialCard) {
           const linkScript = loadCardEffect(link.cardName);
-          if (!linkScript?.skipPostResolveDiscard) {
+          // `gs._spellPlacedOnBoard` lets a hook fired during this
+          // link's resolve (e.g. Card Game Player Inya turning the
+          // reaction into a Fantasy Buddy Token in her support zone)
+          // suppress the standard chain-discard the same way it
+          // suppresses the post-resolve discard for initial spell
+          // casts in doPlaySpell. Per-link consumption: clear after
+          // the check so the next link is unaffected.
+          const spellPlaced = this.gs._spellPlacedOnBoard === true;
+          if (spellPlaced) delete this.gs._spellPlacedOnBoard;
+          if (!linkScript?.skipPostResolveDiscard && !spellPlaced) {
             await this._delay(250);
             const ps = this.gs.players[link.owner];
             if (ps) ps.discardPile.push(link.cardName);
@@ -14024,6 +14223,41 @@ class GameEngine {
       seen++;
     }
     return null;
+  }
+
+  /**
+   * Inverse of `_findHandInstanceAt`: given a hand-zone CardInstance,
+   * return the hand position it currently occupies. Mirrors the same
+   * rank-by-name FIFO mapping the server's reveal-snapshot uses.
+   *
+   * Used by per-hand-index card features (e.g. Bamboo Shield) that
+   * receive an inst in their hook context but need to write into a
+   * handIndex-keyed map registered via `registerHandIndexedField`.
+   *
+   * Returns -1 if the inst isn't currently a hand instance or the
+   * mapping can't resolve (e.g. tracked-inst/hand-card mismatch).
+   */
+  _findHandIndexForInst(inst) {
+    if (!inst || inst.zone !== 'hand') return -1;
+    const ps = this.gs.players[inst.owner];
+    if (!ps?.hand) return -1;
+    // Rank of this inst among same-name hand insts, in tracking order.
+    let rank = 0;
+    for (const c of this.cardInstances) {
+      if (c.id === inst.id) break;
+      if (c.zone !== 'hand') continue;
+      if (c.owner !== inst.owner) continue;
+      if (c.name !== inst.name) continue;
+      rank++;
+    }
+    // Find the rank-th occurrence of inst.name in the hand.
+    let seen = 0;
+    for (let i = 0; i < ps.hand.length; i++) {
+      if (ps.hand[i] !== inst.name) continue;
+      if (seen === rank) return i;
+      seen++;
+    }
+    return -1;
   }
 
   /**
@@ -15356,6 +15590,29 @@ class GameEngine {
     if (hero.levelOverrideCards && cardData.name && hero.levelOverrideCards[cardData.name] != null) {
       rawLevel = hero.levelOverrideCards[cardData.name];
     }
+    // Per-instance hand-card level offsets (Rocky Slime). The map lives
+    // at `ps._handLevelOffsets[handIdx]` — keyed by the SPECIFIC hand
+    // slot, so different copies of the same card can hold different
+    // offsets. Survives hand-splice via the same rebase interceptor
+    // Luna Kiai's reveal map uses (`_installHandRevealInterceptor`).
+    // For the per-NAME level-req gate here we adopt the most-reduced
+    // copy of `cardData.name` in hand — i.e. "if any copy is summon-
+    // eligible from this hero, the gate passes". The play handler
+    // resolves the specific copy at splice time so a less-reduced
+    // copy can't actually slip through against a too-low hero.
+    const ps_lvr = this.gs.players[playerIdx];
+    const handArr_lvr = ps_lvr?.hand;
+    const offMap_lvr = ps_lvr?._handLevelOffsets;
+    if (cardData.name && handArr_lvr && offMap_lvr) {
+      let bestOffset = 0;
+      for (const k of Object.keys(offMap_lvr)) {
+        const idx = +k;
+        if (handArr_lvr[idx] !== cardData.name) continue;
+        const v = offMap_lvr[k] || 0;
+        if (v < bestOffset) bestOffset = v;
+      }
+      if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
+    }
     if (rawLevel <= 0 && !cardData.spellSchool1) return true;
 
     // Test the level requirement against each candidate ability-zone
@@ -15633,6 +15890,21 @@ class GameEngine {
     if (hero.levelOverrideCards && cardData.name && hero.levelOverrideCards[cardData.name] != null) {
       rawLevel = hero.levelOverrideCards[cardData.name];
     }
+    // Mirror of heroMeetsLevelReq's per-index hand offset (Rocky Slime).
+    // Reduced spells need less Wisdom coverage just like they need less
+    // school level — same effective rawLevel input.
+    const handArr_w = ps?.hand;
+    const offMap_w  = ps?._handLevelOffsets;
+    if (cardData.name && handArr_w && offMap_w) {
+      let bestOffset = 0;
+      for (const k of Object.keys(offMap_w)) {
+        const idx = +k;
+        if (handArr_w[idx] !== cardData.name) continue;
+        const v = offMap_w[k] || 0;
+        if (v < bestOffset) bestOffset = v;
+      }
+      if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
+    }
     if (rawLevel <= 0 && !cardData.spellSchool1) return 0;
 
     // For Lizbeth-style borrowers, walk each candidate ability-zone set
@@ -15864,12 +16136,22 @@ class GameEngine {
     this.sync();
   }
 
-  async removeHeroStatus(playerIdx, heroIdx, statusName) {
+  async removeHeroStatus(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero || !hero.name || !hero.statuses?.[statusName]) return;
-    if (hero.statuses[statusName]?.unhealable) return;
+    // `unhealable` (Venom Infusion Lv3) blocks removal by healing /
+    // cleansing AFTER the status has stuck — but NOT removal by
+    // protection effects (Resistance, future ward-style absorbs)
+    // that fire on the apply edge to model "this status was never
+    // really inflicted". Such callers pass `bypassUnhealable: true`
+    // and the block is skipped.
+    if (!opts.bypassUnhealable && hero.statuses[statusName]?.unhealable) return;
     // Stinky Stables: poison can't be removed while the Area is in play.
-    if (statusName === 'poisoned' && this._isPoisonHealLocked()) {
+    // Same protection-effect carve-out applies — Stinky Stables stops
+    // a heal/cleanse from saving a poisoned target, but a Resistance
+    // intercept that absorbs the poison before it ticks once isn't a
+    // heal.
+    if (statusName === 'poisoned' && !opts.bypassUnhealable && this._isPoisonHealLocked()) {
       this.log('poison_remove_blocked', { target: hero.name, reason: 'Stinky Stables' });
       return;
     }
@@ -16171,7 +16453,7 @@ class GameEngine {
       }));
       // Mark as AoE so surprises like Jumpscare can distinguish from single-target
       if (cardInst) cardInst._isAoeCheck = true;
-      const surpriseResult = await this._checkSurpriseWindow(aoeTargets, cardInst);
+      const surpriseResult = await this._checkSurpriseWindow(aoeTargets, cardInst, { damageType });
       if (cardInst) delete cardInst._isAoeCheck;
       if (surpriseResult?.effectNegated) {
         return { heroes: [], creatures: [], wasSingleTarget: false, cancelled: true };

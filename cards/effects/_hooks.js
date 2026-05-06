@@ -138,15 +138,27 @@ const ZONES = {
 //  Categorizes status effects for cards like Beer.
 //  Add new statuses here to auto-integrate.
 // ═══════════════════════════════════════════
+// Per-status optional metadata used by hero passives that need to
+// categorise statuses generically (Karian's split-immunity is the
+// reference consumer):
+//   • paralysisLike — silences the bearer's actions / abilities until
+//     it expires (frozen, stunned). Cards that "act despite paralysis"
+//     filter on this flag instead of name-checking each status.
+//   • dealsTickDamage + damageSourceName — the status applies a
+//     periodic damage tick whose engine `actionDealDamage` source is
+//     `{ name: damageSourceName }`. Cards that intercept "damage from
+//     a negative status" (Karian's heal redirect, future similar
+//     mirrors) read the source-name set without hard-coding 'Burn' /
+//     'Poison'.
 const STATUS_EFFECTS = {
-  frozen:  { negative: true, cleansable: true,  label: 'Frozen',  icon: '❄️', immuneKey: 'freeze_immune' },
-  stunned: { negative: true, cleansable: true,  label: 'Stunned', icon: '💫', immuneKey: 'stun_immune' },
+  frozen:  { negative: true, cleansable: true,  label: 'Frozen',  icon: '❄️', immuneKey: 'freeze_immune', paralysisLike: true },
+  stunned: { negative: true, cleansable: true,  label: 'Stunned', icon: '💫', immuneKey: 'stun_immune', paralysisLike: true },
   // `negated` is applied by effects like Dark Gear / Diplomacy / Necromancy
   // that take control of or silence a creature. It's NOT cleanseable —
   // Juice / Beer / Cure etc. should not undo the opponent's negation.
   negated: { negative: true, cleansable: false, label: 'Negated', icon: '⚡', immuneKey: 'negate_immune' },
-  burned:  { negative: true, cleansable: true,  label: 'Burned',  icon: '🔥', immuneKey: 'burn_immune' },
-  poisoned:{ negative: true, cleansable: true,  label: 'Poisoned', icon: '☠️', immuneKey: 'poison_immune' },
+  burned:  { negative: true, cleansable: true,  label: 'Burned',  icon: '🔥', immuneKey: 'burn_immune', dealsTickDamage: true, damageSourceName: 'Burn' },
+  poisoned:{ negative: true, cleansable: true,  label: 'Poisoned', icon: '☠️', immuneKey: 'poison_immune', dealsTickDamage: true, damageSourceName: 'Poison' },
   // `nulled` is used by permanent silence effects (Null Zone, Shadow etc).
   // Same rationale as `negated` — shouldn't be cleanseable.
   nulled:  { negative: true, cleansable: false, label: 'Nulled',  icon: '🔇', immuneKey: 'null_immune' },
@@ -170,6 +182,25 @@ function getNegativeStatuses() {
  *  the target — undoing those would break intended card balance. */
 function getCleansableStatuses() {
   return Object.entries(STATUS_EFFECTS).filter(([, v]) => v.negative && v.cleansable !== false).map(([k]) => k);
+}
+
+/** Negative statuses whose "silences the hero" gate fires. Karian's
+ *  pretend-paralysed flow filters on this rather than name-checking
+ *  frozen / stunned, so a future paralysis-like status only needs
+ *  `paralysisLike: true` in its STATUS_EFFECTS entry to opt in. */
+function getParalysisStatuses() {
+  return Object.entries(STATUS_EFFECTS).filter(([, v]) => v.negative && v.paralysisLike).map(([k]) => k);
+}
+
+/** Engine `actionDealDamage` source-name strings for every status that
+ *  ticks damage. Cards intercepting "damage from a negative status"
+ *  (Karian's redirect-to-heal) consume this set so adding a new
+ *  damaging status only requires `dealsTickDamage: true` +
+ *  `damageSourceName: '<EngineSourceName>'` in STATUS_EFFECTS. */
+function getStatusDamageSourceNames() {
+  return Object.entries(STATUS_EFFECTS)
+    .filter(([, v]) => v.negative && v.dealsTickDamage && v.damageSourceName)
+    .map(([, v]) => v.damageSourceName);
 }
 
 // ═══════════════════════════════════════════
@@ -261,7 +292,8 @@ function isCreatureNegated(inst) {
 
 module.exports = {
   SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES,
-  STATUS_EFFECTS, getNegativeStatuses, getCleansableStatuses, BUFF_EFFECTS,
+  STATUS_EFFECTS, getNegativeStatuses, getCleansableStatuses,
+  getParalysisStatuses, getStatusDamageSourceNames, BUFF_EFFECTS,
   hasCardType, isArtifactCreature, hasNumericCreatureLevel, isCreatureNegated,
   POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,
 };

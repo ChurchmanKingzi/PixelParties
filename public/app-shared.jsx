@@ -1079,6 +1079,13 @@ function hasSacredJewelArtifactBonus(deck) {
   return countInDeck(deck, SACRED_JEWEL) >= 4;
 }
 
+// Heroes whose card text explicitly allows multiple copies in the team
+// slot ("You may play any number of copies of this Hero as part of your
+// Starting Heroes"). They also get an unlimited global cap, with the
+// per-section caps in canAddCard (team: 3 slots, main: 4, side: 4) doing
+// the actual limiting.
+const MULTI_TEAM_HEROES = new Set(['Peter Röll, the Protagonist']);
+
 // Effective per-card max across sections. Centralizes the default-4
 // logic and the Sacred Jewel exception so callers (canAddCard, auto-trim
 // on Sacred Jewel removal, etc.) all agree.
@@ -1091,8 +1098,9 @@ function getCardMax(deck, cardName) {
   // deck (for Goff-style attach mechanics where a Creature pulls a
   // Hero from main deck or hand). Per-section caps are enforced
   // separately in canAddCard so the team slot stays at 1 even
-  // though the global cap is 5.
-  if (ct === 'Hero') return 5;
+  // though the global cap is 5. Multi-team heroes (Peter Röll) get
+  // Infinity here — the per-section caps cover their actual limits.
+  if (ct === 'Hero') return MULTI_TEAM_HEROES.has(cardName) ? Infinity : 5;
   if (ct === 'Potion') return 2;
   if (ct === 'Ability') return Infinity;
   if (ct === 'Artifact' && hasSacredJewelArtifactBonus(deck)) return 5;
@@ -1144,10 +1152,14 @@ function canAddCard(deck, cardName, section) {
   if (section === 'hero') {
     if (ct !== 'Hero') return false;
     if (!(deck.heroes || []).some(h => !h || !h.hero)) return false;
-    // Team slot: only ONE copy of each Hero may be in the team,
-    // regardless of how many copies sit in main/side deck.
-    const inTeam = (deck.heroes || []).filter(h => h?.hero === cardName).length;
-    if (inTeam >= 1) return false;
+    // Team slot: only ONE copy of each Hero may be in the team — except
+    // for Heroes whose text allows multiple copies (Peter Röll). Those
+    // are still gated by the 3 available team slots (the .some check
+    // above) but skip the per-name uniqueness check.
+    if (!MULTI_TEAM_HEROES.has(cardName)) {
+      const inTeam = (deck.heroes || []).filter(h => h?.hero === cardName).length;
+      if (inTeam >= 1) return false;
+    }
     if (countInDeck(deck, cardName) >= effMax) return false;
     return true;
   }

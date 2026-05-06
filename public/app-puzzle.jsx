@@ -198,7 +198,16 @@ function PuzzleCreator() {
   const [meDebuffs, setMeDebuffs]   = useState(saved?.meDebuffs   || []);
   const [oppDebuffs, setOppDebuffs] = useState(saved?.oppDebuffs  || []);
   const [debuffMenuOpen, setDebuffMenuOpen] = useState(null); // 'me' | 'opp' | null
-  const [search, setSearch] = useState('');
+  // Same shape as the Deck Builder's `filters` state (see app-deckbuilder.jsx
+  // line ~110). The puzzle gallery's filter sidebar consumes this directly.
+  // Kept independent from the deck builder's state so they don't share a
+  // mutable global between the two screens. The sidebar's `name` field is
+  // the only name-search surface — there's no separate quick-search input.
+  const [puzzleFilters, setPuzzleFilters] = useState({
+    name: '', effect: '', cardType: '', subtype: '', archetype: '',
+    sa1: '', sa2: '', ss1: '', ss2: '',
+    level: '', cost: '', hp: '', atk: '',
+  });
   const [validated, setValidated] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [editHp, setEditHp] = useState('');
@@ -552,11 +561,24 @@ function PuzzleCreator() {
   }, []);
 
   const searchResults = useMemo(() => {
-    const all = window.AVAILABLE_CARDS || [];
-    if (!search.trim()) return all;
-    const q = search.toLowerCase();
-    return all.filter(c => c.name.toLowerCase().includes(q));
-  }, [search]);
+    let result = window.AVAILABLE_CARDS || [];
+    // Sidebar filter set — mirrors the deck builder's filter pipeline.
+    const f = puzzleFilters;
+    if (f.name) result = result.filter(c => c.name.toLowerCase().includes(f.name.toLowerCase()));
+    if (f.effect) result = result.filter(c => c.effect && c.effect.toLowerCase().includes(f.effect.toLowerCase()));
+    if (f.cardType) result = result.filter(c => c.cardType === f.cardType);
+    if (f.subtype) result = result.filter(c => c.subtype === f.subtype);
+    if (f.archetype) result = result.filter(c => c.archetype === f.archetype);
+    if (f.sa1) result = result.filter(c => c.startingAbility1 === f.sa1 || c.startingAbility2 === f.sa1);
+    if (f.sa2) result = result.filter(c => c.startingAbility1 === f.sa2 || c.startingAbility2 === f.sa2);
+    if (f.ss1) result = result.filter(c => c.spellSchool1 === f.ss1 || c.spellSchool2 === f.ss1);
+    if (f.ss2) result = result.filter(c => c.spellSchool1 === f.ss2 || c.spellSchool2 === f.ss2);
+    if (f.level !== '') result = result.filter(c => c.level != null && c.level === parseInt(f.level));
+    if (f.cost !== '') result = result.filter(c => c.cost != null && c.cost === parseInt(f.cost));
+    if (f.hp !== '') result = result.filter(c => c.hp != null && c.hp === parseInt(f.hp));
+    if (f.atk !== '') result = result.filter(c => c.atk != null && c.atk === parseInt(f.atk));
+    return result;
+  }, [puzzleFilters]);
 
   const invalidate = useCallback(() => setValidated(false), []);
   // Invalidate whenever hands change (covers add, remove, reorder, drag-drop)
@@ -802,6 +824,41 @@ function PuzzleCreator() {
     hideTooltip(); // dismiss tooltip during drag
     e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', '');
   }, []);
+  /**
+   * Override the native HTML5 drag image with a fixed-size card preview.
+   * Without this, the browser auto-generates the drag ghost from the
+   * source element — and since gallery cards are now 3-per-row (~115px
+   * wide) but in-hand / on-board cards are 48–60px, the ghost was much
+   * larger than the destination slot. Sized to match `.pz-touch-drag-
+   * ghost` (60×84) so the desktop ghost is visually consistent with
+   * the existing mobile-touch ghost.
+   *
+   * Implementation: builds a transient absolutely-positioned <div>
+   * with a card image, attaches it to body (off-viewport so it doesn't
+   * flicker), calls `setDragImage`, then schedules removal on next
+   * tick — by which point the browser has already cached the image.
+   */
+  const setDragGhost = useCallback((e, cardName) => {
+    if (!e?.dataTransfer?.setDragImage) return;
+    const ghost = document.createElement('div');
+    ghost.style.cssText = 'position:absolute;top:-1000px;left:-1000px;width:60px;height:84px;border:2px solid var(--accent,#0ff);border-radius:4px;background:var(--bg3,#222);overflow:hidden;';
+    const url = cardImageUrl(cardName);
+    if (url) {
+      const img = document.createElement('img');
+      img.src = url;
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+      img.draggable = false;
+      ghost.appendChild(img);
+    } else {
+      ghost.textContent = cardName;
+      ghost.style.color = '#fff';
+      ghost.style.fontSize = '8px';
+      ghost.style.padding = '4px';
+    }
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 30, 42);
+    setTimeout(() => { try { document.body.removeChild(ghost); } catch {} }, 0);
+  }, []);
   const onDragEnd = useCallback(() => { setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null; }, []);
   // Silently clear a zone (no return to hand — used when moving between zones)
   const clearZone = useCallback((zt, si, hi, slot) => {
@@ -958,6 +1015,12 @@ function PuzzleCreator() {
   // are puzzle-saved under `_creatureStatuses[hi-slot].changeCounter`).
   // Null when the open editor target isn't one of these cards.
   const [editChangeCounter, setEditChangeCounter] = useState(null);
+  // For Charm of Balance: number of Balance Counters this Equipment starts
+  // the puzzle with. Saved under `_creatureStatuses[hi-slot].balance` and
+  // applied server-side as `inst.counters.balance` (alongside headCounter
+  // and changeCounter). Null for non-Charm targets so the editor section
+  // stays hidden.
+  const [editBalanceCounter, setEditBalanceCounter] = useState(null);
   // Cards whose puzzle starting state can include Change Counters.
   // Hardcoded here because the script-side `cpuMeta.counterConsumer`
   // flag isn't reachable from the client; mirrors the convention used
@@ -1016,6 +1079,11 @@ function PuzzleCreator() {
       // Creatures so the editor section stays hidden.
       setEditChangeCounter(COUNTER_CONSUMER_CREATURES.has(c?.name)
         ? (cs.changeCounter || 0)
+        : null);
+      // Charm of Balance: hydrate Balance Counters from the saved state.
+      // Null for non-Charm targets so the editor section stays hidden.
+      setEditBalanceCounter(c?.name === 'Charm of Balance'
+        ? (cs.balance || 0)
         : null);
     }
   }, [players, getCard]);
@@ -1110,11 +1178,17 @@ function PuzzleCreator() {
       if (editChangeCounter != null && editChangeCounter > 0) {
         merged.changeCounter = editChangeCounter;
       }
+      // Charm of Balance: persist starting Balance Counters. Server
+      // applies as `inst.counters.balance`.
+      delete merged.balance;
+      if (editBalanceCounter != null && editBalanceCounter > 0) {
+        merged.balance = editBalanceCounter;
+      }
       p._creatureStatuses[hi + '-' + slot] = merged;
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, updatePlayer, getCard]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editBalanceCounter, updatePlayer, getCard]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -1621,8 +1695,92 @@ function PuzzleCreator() {
       <div className="pz-layout">
         {/* ── Card Search Panel ── */}
         <div className="pz-search-panel">
-          <input className="input" style={{ width: '100%', fontSize: 13, padding: '8px 12px' }}
-            placeholder="Search cards..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          {/* ── Filter sidebar (mirrors the deck builder's filter set) ── */}
+          <div className="pz-filter-sidebar">
+            <div className="orbit-font" style={{ fontSize: 10, color: 'var(--text2)', fontWeight: 700, letterSpacing: 1 }}>
+              FILTERS
+            </div>
+            <input className="db-filter-input" placeholder="Search name..."
+              value={puzzleFilters.name}
+              onChange={e => setPuzzleFilters(p => ({ ...p, name: e.target.value }))} />
+            <input className="db-filter-input" placeholder="Search effect text..."
+              value={puzzleFilters.effect}
+              onChange={e => setPuzzleFilters(p => ({ ...p, effect: e.target.value }))} />
+            <select className="db-filter-select"
+              value={puzzleFilters.cardType}
+              onChange={e => setPuzzleFilters(p => ({ ...p, cardType: e.target.value }))}>
+              <option value="">All Types</option>
+              {(window.CARD_TYPES || []).map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select className="db-filter-select"
+              value={puzzleFilters.subtype}
+              onChange={e => setPuzzleFilters(p => ({ ...p, subtype: e.target.value }))}>
+              <option value="">All Subtypes</option>
+              {(window.SUBTYPES || []).map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select className="db-filter-select"
+              value={puzzleFilters.archetype}
+              onChange={e => setPuzzleFilters(p => ({ ...p, archetype: e.target.value }))}>
+              <option value="">All Archetypes</option>
+              {(window.ARCHETYPES || []).map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select className="db-filter-select"
+              value={puzzleFilters.ss1}
+              onChange={e => setPuzzleFilters(p => ({ ...p, ss1: e.target.value }))}>
+              <option value="">Spell School 1</option>
+              {(window.SPELL_SCHOOLS || []).map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select className="db-filter-select"
+              value={puzzleFilters.ss2}
+              onChange={e => setPuzzleFilters(p => ({ ...p, ss2: e.target.value }))}>
+              <option value="">Spell School 2</option>
+              {(window.SPELL_SCHOOLS || []).map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select className="db-filter-select"
+              value={puzzleFilters.sa1}
+              onChange={e => setPuzzleFilters(p => ({ ...p, sa1: e.target.value }))}>
+              <option value="">Starting Ability 1</option>
+              {(window.STARTING_ABILITIES || []).map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select className="db-filter-select"
+              value={puzzleFilters.sa2}
+              onChange={e => setPuzzleFilters(p => ({ ...p, sa2: e.target.value }))}>
+              <option value="">Starting Ability 2</option>
+              {(window.STARTING_ABILITIES || []).map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
+              <input className="db-filter-input" type="number" placeholder="Level"
+                value={puzzleFilters.level}
+                onChange={e => setPuzzleFilters(p => ({ ...p, level: e.target.value }))} />
+              <input className="db-filter-input" type="number" placeholder="Cost"
+                value={puzzleFilters.cost}
+                onChange={e => setPuzzleFilters(p => ({ ...p, cost: e.target.value }))} />
+              <input className="db-filter-input" type="number" placeholder="HP"
+                value={puzzleFilters.hp}
+                onChange={e => setPuzzleFilters(p => ({ ...p, hp: e.target.value }))} />
+              <input className="db-filter-input" type="number" placeholder="ATK"
+                value={puzzleFilters.atk}
+                onChange={e => setPuzzleFilters(p => ({ ...p, atk: e.target.value }))} />
+            </div>
+            {(() => {
+              const anyActive = Object.values(puzzleFilters).some(v => v !== '');
+              return (
+                <button className="btn"
+                  style={{ width: '100%', padding: 4, fontSize: 10, marginTop: 4 }}
+                  disabled={!anyActive}
+                  onClick={() => setPuzzleFilters({
+                    name: '', effect: '', cardType: '', subtype: '', archetype: '',
+                    sa1: '', sa2: '', ss1: '', ss2: '',
+                    level: '', cost: '', hp: '', atk: '',
+                  })}>
+                  CLEAR FILTERS
+                </button>
+              );
+            })()}
+          </div>
+          {/* ── Gallery column (scrollable card grid; name search lives in
+                the sidebar's Name filter input). ── */}
+          <div className="pz-gallery-column">
           <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
             <div className="pz-search-results" ref={searchResultsRef} style={{
               ...(dragCardName ? { overflowY: 'hidden' } : {}),
@@ -1636,7 +1794,7 @@ function PuzzleCreator() {
                   onTouchStart={(e) => touchDragStart(c.name, null, null, null, e)}
                   onTouchMove={touchDragMove}
                   onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); addToHand(c); if (window.playSFX) window.playSFX('draw'); setMobileSelected(null); } }}
-                  draggable={!isTouchDevice} onDragStart={(e) => onDragStart(e, c.name, null, null)} onDragEnd={onDragEnd}
+                  draggable={!isTouchDevice} onDragStart={(e) => { setDragGhost(e, c.name); onDragStart(e, c.name, null, null); }} onDragEnd={onDragEnd}
                   onMouseEnter={() => showTooltip(c, 'right')} onMouseLeave={hideTooltip}
                   title={c.name + ' (' + c.cardType + (c.subtype ? ' / ' + c.subtype : '') + ')'}>
                   {img ? <img src={img} className="pz-search-card-img" draggable={false} /> : (
@@ -1648,8 +1806,8 @@ function PuzzleCreator() {
                 </div>
               );
             })}
-            {search.trim() && searchResults.length === 0 && (
-              <div style={{ color: 'var(--text2)', fontSize: 12, textAlign: 'center', padding: 20 }}>No cards found</div>
+            {searchResults.length === 0 && Object.values(puzzleFilters).some(v => v !== '') && (
+              <div style={{ color: 'var(--text2)', fontSize: 12, textAlign: 'center', padding: 20, gridColumn: '1 / -1' }}>No cards found</div>
             )}
           </div>
           {/* ── Custom touch-draggable scrollbar (mobile) ── */}
@@ -1662,6 +1820,7 @@ function PuzzleCreator() {
                 onTouchEnd={scrollThumbTouchEnd} />
             </div>
           )}
+          </div>
           </div>
         </div>
 
@@ -1942,6 +2101,42 @@ function PuzzleCreator() {
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
                   Caps the number of different targets Hydra's once-per-turn strike can hit.
+                </div>
+              </div>
+            )}
+            {/* Charm of Balance Balance Counter editor — visible only when
+                the edit target is a Charm of Balance equip. Stamps `balance`
+                into `_creatureStatuses[hi-slot]`, which the server's puzzle
+                loader applies as `inst.counters.balance` so the badge AND
+                the once-per-turn draw start at the authored value. */}
+            {editBalanceCounter != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  ⚖️ Balance Counters
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    disabled={(editBalanceCounter || 0) <= 0}
+                    onClick={() => setEditBalanceCounter(Math.max(0, (editBalanceCounter || 0) - 1))}>
+                    −
+                  </button>
+                  <input className="input" type="number" min={0}
+                    value={editBalanceCounter ?? 0}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10);
+                      setEditBalanceCounter(Number.isFinite(n) && n >= 0 ? n : 0);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
+                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#f6d36b' }} />
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    onClick={() => setEditBalanceCounter((editBalanceCounter || 0) + 1)}>
+                    +
+                  </button>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                  Number of cards Charm of Balance lets the player draw on activation.
                 </div>
               </div>
             )}

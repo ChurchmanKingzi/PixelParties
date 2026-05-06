@@ -2269,6 +2269,34 @@ body {
   100% { transform: scale(1.4); opacity: 0; border-color: rgba(255,200,50,0); }
 }
 
+/* Ability BLOCK flash — same shape as activation flash, but pure white
+   so the player can tell at a glance that an effect was just absorbed
+   (Resistance, etc.) rather than activated. */
+.zone-ability-blocked {
+  border-color: #fff !important;
+  box-shadow: 0 0 30px rgba(255,255,255,1), 0 0 60px rgba(220,235,255,.7), 0 0 90px rgba(180,210,255,.4), inset 0 0 20px rgba(255,255,255,.6) !important;
+  animation: abilityBlockFlash 0.4s ease-out 3 !important;
+  z-index: 20 !important;
+}
+.zone-ability-blocked::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 6px;
+  border: 3px solid rgba(255,255,255,.95);
+  animation: abilityBlockRing 0.6s ease-out 2;
+  pointer-events: none;
+}
+@keyframes abilityBlockFlash {
+  0% { background: rgba(255,255,255,.7); transform: scale(1.15); }
+  50% { background: rgba(240,248,255,.4); transform: scale(1.05); }
+  100% { background: transparent; transform: scale(1); }
+}
+@keyframes abilityBlockRing {
+  0% { transform: scale(0.8); opacity: 1; border-color: #fff; }
+  100% { transform: scale(1.4); opacity: 0; border-color: rgba(255,255,255,0); }
+}
+
 /* Deck viewer modal */
 .deck-viewer-modal {
   max-width: 520px;
@@ -2290,14 +2318,14 @@ body {
 }
 .first-choice-panel {
   position: fixed;
-  top: 50%;
+  top: 52.5%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 9600;
   background: var(--bg2);
   border: 2px solid var(--accent);
   box-shadow: 0 8px 40px rgba(0,0,0,.7), 0 0 20px rgba(0,240,255,.15);
-  padding: 24px 40px;
+  padding: 12px 24px;
   text-align: center;
 }
 
@@ -2321,6 +2349,24 @@ body {
 .damage-number.heal-number {
   color: #33dd55;
   text-shadow: 0 0 8px rgba(50,220,80,.7), 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
+
+/* Red flash overlay when a hero or creature takes damage. Uses an
+   absolutely positioned ::after so we don't perturb the existing
+   board-zone background, border, or any inner card layout. */
+@keyframes damageFlashRed {
+  0%   { opacity: 0; }
+  15%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+.board-zone.damage-flashing::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: rgba(255, 40, 40, 0.55);
+  pointer-events: none;
+  z-index: 30;
+  animation: damageFlashRed 0.45s ease-out forwards;
 }
 
 /* Gold gain numbers */
@@ -2875,6 +2921,29 @@ body {
   text-shadow: 0 0 4px #000, 1px 1px 0 #000, -1px -1px 0 #000;
   z-index: 4;
   pointer-events: none;
+  line-height: 1;
+}
+
+/* Per-instance Artifact cost-override badge (Play Money). Top-left of
+   the card, blue-tinted to match the gold-cost diamond used in
+   tooltips. Auto-pointer so the hover-tooltip explains the discount. */
+.hand-cost-override {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  padding: 2px 5px;
+  background: rgba(20, 30, 60, 0.92);
+  border: 1px solid #44aaff;
+  border-radius: 4px;
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  font-size: calc(10px * var(--board-scale));
+  font-weight: bold;
+  color: #88ddff;
+  text-shadow: 0 0 4px #000, 1px 1px 0 #000;
+  box-shadow: 0 0 6px rgba(68, 170, 255, 0.55);
+  z-index: 5;
+  pointer-events: auto;
+  cursor: help;
   line-height: 1;
 }
 
@@ -7049,6 +7118,28 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   background: var(--bg2);
   border-right: 1px solid var(--bg4);
   display: flex;
+  flex-direction: row;
+  padding: 0;
+  gap: 0;
+}
+/* Left filter sidebar — same control set as the deck builder. Fixed
+   width chosen to give the side-by-side filter inputs (Lv / Cost,
+   HP / ATK) breathing room without eating too much gallery width. */
+.pz-filter-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--bg4);
+  padding: 8px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+/* Gallery column — search input on top, scrollable card grid below. */
+.pz-gallery-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
   padding: 8px;
   gap: 6px;
@@ -7057,10 +7148,16 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   flex: 1;
   height: 100%;
   overflow-y: auto;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  /* `grid-auto-rows: max-content` is the key: without it, the grid
+     stretches its rows to fill the panel's height, collapsing each
+     card into a tall but invisible band that visually overlaps with
+     the next row's card images. With max-content, each row sizes
+     itself to the card's aspect-ratio-derived height. */
+  grid-auto-rows: max-content;
   gap: 5px;
-  align-content: flex-start;
+  align-content: start;
   scrollbar-width: auto;
   scrollbar-color: rgba(255,255,255,.25) rgba(255,255,255,.05);
 }
@@ -7096,15 +7193,14 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   background: var(--accent);
 }
 .pz-search-card {
-  width: 68px;
-  height: 95px;
+  width: 100%;
+  aspect-ratio: 5 / 7;
   border: 1px solid var(--bg4);
   border-radius: 3px;
   overflow: hidden;
   cursor: pointer;
   transition: border-color .15s, transform .1s;
   position: relative;
-  flex-shrink: 0;
 }
 .pz-search-card:hover {
   border-color: var(--accent);

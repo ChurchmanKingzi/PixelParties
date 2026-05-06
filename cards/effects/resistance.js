@@ -51,11 +51,13 @@ module.exports = {
       const hero = gs.players[pi]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
-      // Compute level
+      // Compute level + slot
       const abZones = gs.players[pi]?.abilityZones?.[heroIdx] || [];
       let level = 0;
-      for (const slot of abZones) {
-        if ((slot || []).length > 0 && slot[0] === CARD_NAME) { level = slot.length; break; }
+      let zoneSlot = -1;
+      for (let z = 0; z < abZones.length; z++) {
+        const slot = abZones[z] || [];
+        if (slot.length > 0 && slot[0] === CARD_NAME) { level = slot.length; zoneSlot = z; break; }
       }
       if (level === 0) return;
 
@@ -75,8 +77,12 @@ module.exports = {
         hero: hero.name, effectType: ctx.effectType,
         level, blocksUsed: used + 1,
       });
-      engine._broadcastEvent('play_zone_animation', { type: 'gold_sparkle', owner: pi, heroIdx, zoneSlot: -1 });
-      engine._broadcastEvent('play_zone_animation', { type: 'gold_sparkle', owner: pi, heroIdx, zoneSlot: -1 });
+      // White flash on Resistance's ability slot — visible to both
+      // players, makes "an effect was just absorbed" obvious without
+      // hunting through the log.
+      if (zoneSlot >= 0) {
+        engine._broadcastEvent('ability_block_flash', { owner: pi, heroIdx, zoneIdx: zoneSlot });
+      }
       engine.sync();
     },
 
@@ -101,9 +107,12 @@ module.exports = {
       // Compute level from the ability zone slot
       const abZones = gs.players[pi]?.abilityZones?.[heroIdx] || [];
       let level = 0;
-      for (const slot of abZones) {
-        if ((slot || []).length > 0 && slot[0] === CARD_NAME) {
+      let zoneSlot = -1;
+      for (let z = 0; z < abZones.length; z++) {
+        const slot = abZones[z] || [];
+        if (slot.length > 0 && slot[0] === CARD_NAME) {
           level = slot.length;
+          zoneSlot = z;
           break;
         }
       }
@@ -117,8 +126,12 @@ module.exports = {
 
       if (used >= maxBlocks) return;
 
-      // Remove the status — it is now blocked
-      await engine.removeHeroStatus(pi, heroIdx, statusName);
+      // Remove the status — it is now blocked. `bypassUnhealable`
+      // makes Resistance correctly absorb Venom Infusion Lv3's
+      // unhealable Poison: Venom's "unhealable" prevents the Poison
+      // from being HEALED off later, but it doesn't bar a protection
+      // effect firing in the same apply window.
+      await engine.removeHeroStatus(pi, heroIdx, statusName, { bypassUnhealable: true });
       gs._resistanceBlocks[key] = used + 1;
 
       engine.log('resistance_block', {
@@ -127,13 +140,12 @@ module.exports = {
         level, blocksUsed: used + 1,
       });
 
-      // Gold sparkle on the hero zone as visual feedback
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'gold_sparkle', owner: pi, heroIdx, zoneSlot: -1,
-      });
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'gold_sparkle', owner: pi, heroIdx, zoneSlot: -1,
-      });
+      // White flash on Resistance's ability slot — clearer "this got
+      // absorbed by Resistance" signal than the previous gold sparkle
+      // on the hero zone (which read like an activation, not a block).
+      if (zoneSlot >= 0) {
+        engine._broadcastEvent('ability_block_flash', { owner: pi, heroIdx, zoneIdx: zoneSlot });
+      }
       engine.sync();
     },
   },

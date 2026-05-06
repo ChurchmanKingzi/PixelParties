@@ -25,22 +25,24 @@
 //      "block the damage" from "block the entire
 //      attack".
 //    • Cost discount: revealing a copy stamps
-//      `_permanentlyRevealed = true` on its
-//      CardInstance counters. The instance flag
-//      survives every hand mutation (splice,
-//      drag-reorder, mid-game inserts) because
-//      it lives on the instance itself, not on
-//      a position-keyed side map — fixes the
+//      `ps._permanentlyRevealedHandIndices[handIdx]
+//      = true` — the SAME generic per-hand-index
+//      registry Rocky Slime's level offset and
+//      Luna Kiai's per-turn reveal use. The
+//      registry's splice interceptor and
+//      `reorder_hand` remap automatically keep
+//      the entry pinned to the physical copy
+//      across hand mutations (drag-reorder,
+//      splice from mid-hand, etc.) — fixes the
 //      old index-bound bug where reordering the
 //      Shield in hand silently transferred the
-//      discount/visual-reveal onto another card.
-//      The instance is auto-untracked when the
-//      copy leaves hand (played, discarded,
-//      deleted), so the flag — and therefore
-//      the discount — evaporates with it. A
-//      freshly drawn un-revealed copy correctly
-//      costs 20 again, matching the "this card"
-//      wording.
+//      discount onto another card. When the
+//      revealed copy is eventually played /
+//      discarded / deleted, the splice rebase
+//      drops its entry — and therefore the
+//      discount — automatically. A freshly drawn
+//      un-revealed copy correctly costs 20 again,
+//      matching the "this card" wording.
 //    • 1-per-turn: HOPT key keyed by player.
 //      Claimed when the resolver actually runs,
 //      so a declined prompt does NOT consume the
@@ -50,6 +52,16 @@
 const CARD_NAME = 'Bamboo Shield';
 const BASE_COST = 20;
 const REVEALED_COST = 8;
+
+/** True iff `ps` has at least one Bamboo Shield in hand at a revealed index. */
+function hasRevealedCopy(ps) {
+  const map = ps?._permanentlyRevealedHandIndices;
+  if (!map) return false;
+  for (const kStr of Object.keys(map)) {
+    if ((ps.hand || [])[+kStr] === CARD_NAME) return true;
+  }
+  return false;
+}
 
 module.exports = {
   isPreDamageReaction: true,
@@ -64,24 +76,11 @@ module.exports = {
   /**
    * Cost gate read by both `_checkPreDamageHandReactions` and the
    * chain-reaction window. Drops the price to 8 iff the player has
-   * at least one currently-revealed Bamboo Shield in hand. We walk
-   * `engine.cardInstances` for tracked Bamboo Shields owned by this
-   * player in zone='hand' with the per-instance `_permanentlyRevealed`
-   * flag — the flag follows the instance, so reordering or mid-hand
-   * splicing no longer transfers the reveal onto another card. The
-   * flag goes away with the instance when the copy is spliced out,
-   * so the discount auto-reverts as soon as no revealed copy remains.
+   * at least one currently-revealed Bamboo Shield in hand.
    */
-  dynamicCost(gs, playerIdx, engine) {
-    if (!engine) return BASE_COST;
-    for (const inst of engine.cardInstances || []) {
-      if (inst.owner !== playerIdx) continue;
-      if (inst.zone !== 'hand') continue;
-      if (inst.name !== CARD_NAME) continue;
-      if (!inst.counters?._permanentlyRevealed) continue;
-      return REVEALED_COST;
-    }
-    return BASE_COST;
+  dynamicCost(gs, playerIdx /* , engine */) {
+    const ps = gs?.players?.[playerIdx];
+    return hasRevealedCopy(ps) ? REVEALED_COST : BASE_COST;
   },
 
   /**
@@ -120,13 +119,13 @@ module.exports = {
     /**
      * When a Bamboo Shield is recovered into our hand, prompt the
      * controller: permanently reveal THIS copy to lock the cost
-     * discount? The reveal flag lives on the CardInstance itself
-     * (`counters._permanentlyRevealed`), so it follows the physical
-     * copy through hand reorders, mid-hand inserts, and any other
-     * mutation — no index bookkeeping required. When the revealed
-     * copy is eventually played / discarded / deleted, its instance
-     * is untracked and the flag (along with the cost discount)
-     * disappears with it.
+     * discount? The reveal entry lives in the engine's generic
+     * `_permanentlyRevealedHandIndices` map — keyed by the resolved
+     * handIndex of the just-arrived inst, so the splice interceptor
+     * and `reorder_hand` remap follow the physical copy through any
+     * hand mutation. When the revealed copy is eventually played /
+     * discarded / deleted, the rebase drops its entry and the
+     * discount disappears with it.
      */
     onCardAddedFromDiscardToHand: async (ctx) => {
       // Only react to OUR own copy entering OUR hand.
@@ -135,15 +134,17 @@ module.exports = {
       // Filter to the freshly-recovered instance — without this, every
       // existing Bamboo Shield in hand would also fire the prompt.
       if (ctx.addedCard?.id !== ctx.card.id) return;
-      // Already revealed (e.g. instance was recovered, revealed, and
-      // somehow re-entered the same hook path) — no re-prompt.
-      if (ctx.card.counters?._permanentlyRevealed) return;
 
       const engine = ctx._engine;
       const gs     = engine.gs;
       const pi     = ctx.cardOwner;
       const ps     = gs.players[pi];
       if (!ps) return;
+
+      // Resolve this inst's current hand index. Already-revealed → bail.
+      const handIdx = engine._findHandIndexForInst(ctx.card);
+      if (handIdx < 0) return;
+      if (ps._permanentlyRevealedHandIndices?.[handIdx]) return;
 
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -156,18 +157,13 @@ module.exports = {
       });
       if (!confirmed) return;
 
-      // Defensive: only stamp if the instance is still in this player's
-      // hand — between the prompt opening and now, hand-mutating effects
-      // could have moved it elsewhere (none currently do, but cheap to
-      // check). Stamping on a non-hand instance would do nothing useful.
-      if (ctx.card.zone !== 'hand') return;
+      // Re-resolve handIndex post-prompt — async windows can shift hand
+      // state. Bail if the inst left hand mid-prompt.
+      const handIdxNow = engine._findHandIndexForInst(ctx.card);
+      if (handIdxNow < 0) return;
 
-      // Per-instance reveal flag. `_bambooRevealed` is kept as an
-      // alias so per-copy bamboo-only logic (existing or future) still
-      // reads true; `_permanentlyRevealed` is the generic surface that
-      // the server's reveal-broadcast layer scans for.
-      ctx.card.counters._permanentlyRevealed = true;
-      ctx.card.counters._bambooRevealed = true;
+      if (!ps._permanentlyRevealedHandIndices) ps._permanentlyRevealedHandIndices = {};
+      ps._permanentlyRevealedHandIndices[handIdxNow] = true;
 
       // Mirror the Luna Kiai pattern — broadcast the card reveal so
       // both players see the moment the copy flips face-up.
