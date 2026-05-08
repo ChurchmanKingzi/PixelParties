@@ -33,6 +33,8 @@ const CARD_NAME = 'Guardian Beast She';
 const MAX_DELETE = 3;
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
   creatureEffect: true,
 

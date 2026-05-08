@@ -310,6 +310,8 @@ function isFirstActionThisTurn(engine, playerIdx) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   /**
    * Dynamic `inherentAction` — Main Phase plays self-provide as an
    * additional Action when no Action (incl. additionals / inherents /

@@ -508,6 +508,26 @@ class GameEngine {
     // Cleared at turn start by the per-turn cleanup block alongside
     // Luna Kiai's `_revealedHandIndices`.
     this.registerHandIndexedField('_handCostReductions', { kind: 'value' });
+    // Transient sibling of `_handLevelOffsets`. Same lookup semantics
+    // (negative numbers reduce level), but DELIBERATELY no
+    // `onCardSummonedFromHand` callback — the offset is purely an
+    // in-hand-only modifier and disappears the moment the card leaves
+    // the hand (splice rebase via the engine's hand interceptor drops
+    // the entry; nothing carries onto the new support instance). Used
+    // by Sparkfly Queen's "as if their levels were reduced by 3"
+    // rebate, which only applies while the tutored card is in hand.
+    // Rocky Slime's persistent counterpart stays on `_handLevelOffsets`.
+    this.registerHandIndexedField('_handLevelOffsetsTransient', { kind: 'value' });
+    // Sparkfly Queen's per-hand-index hero filter. Sibling map to
+    // `_handLevelOffsets` / `_handLevelOffsetsTransient` — when set,
+    // the offset at the same index applies ONLY when the asking hero
+    // matches `heroIdx`. Lets the Queen's "the corresponding Hero may
+    // use [these cards] as if their levels were reduced by 3" clause
+    // pin the rebate to the Queen's host hero, leaving every other
+    // hero's level requirement intact. Rebases in lockstep with the
+    // offsets because all three are registered hand-indexed fields,
+    // so a splice that shifts hand indices keeps them aligned.
+    this.registerHandIndexedField('_handLevelOffsetHeroFilter', { kind: 'value' });
   }
 
   // ═══════════════════════════════════════════
@@ -3698,6 +3718,15 @@ class GameEngine {
     await this.runHooks(HOOKS.BEFORE_DAMAGE, hookCtx);
     if (hookCtx.cancelled) return { dealt: 0, cancelled: true };
 
+    // Elixir of Strength rider — primed +100 unstoppable damage on the
+    // buffed Hero's next single-target Attack hit. Fires on the first
+    // 'attack' damage instance from the source hero, then consumes the
+    // buff. The buff stays on multi-target attacks long enough to
+    // boost only the first hit; the user accepted this approximation
+    // since strictly "only fire if the attack hits exactly 1 target"
+    // would require deferring the boost past AFTER_SPELL_RESOLVED.
+    this._applyEmpoweredStrikeIfApplicable(hookCtx);
+
     // Armed-arrow attack modifiers (flat damage bumps and hard-zero from
     // Hydra Blood). Runs AFTER beforeDamage hooks so Sacred Hammer / any
     // future card-level beforeDamage-boost composes correctly, and
@@ -3896,6 +3925,13 @@ class GameEngine {
     this.log('damage', { source: source?.name, target: this._heroLabel(target), amount: actualAmount, damageType: type });
     await this.runHooks(HOOKS.AFTER_DAMAGE, { source, target, amount: actualAmount, realDealt, type, sourceHeroIdx: source?.heroIdx ?? -1 });
 
+    // ── Elixir of Cold rider ──
+    // When the source Hero carries the `cold_strike` buff and the
+    // damage is an Attack or Spell, freeze the just-hit target for 1
+    // turn. Out-of-band damage types (status ticks, recoil, true-damage
+    // 'other') don't trigger the freeze per the card text.
+    await this._applyColdStrikeFreezeIfApplicable(source, target, type, realDealt);
+
     // Armed-arrow post-hit riders (Burn, Poison, gold-per-damage, …).
     // Runs once per target hit; armed arrows are NOT popped here so they
     // keep firing on every remaining target of a multi-target Attack.
@@ -4068,6 +4104,9 @@ class GameEngine {
         sourceHeroIdx: source?.heroIdx ?? -1,
         _skipReactionCheck: opts._skipReactionCheck,
       });
+
+      // Elixir of Cold rider — same as actionDealDamage.
+      await this._applyColdStrikeFreezeIfApplicable(source, target, type, dealt);
 
       // Track dealt-damage for SC / opponent tracking (mirrors actionDealDamage).
       if (dealt > 0 && sourceOwner >= 0) {
@@ -4257,7 +4296,19 @@ class GameEngine {
       this.log('heal', { source: source?.name, target: this._heroLabel(target), amount, overheal: target.hp > maxHp });
     } else {
       // If already above maxHp (overhealed), do nothing
-      if (target.hp >= maxHp) return;
+      if (target.hp >= maxHp) {
+        // Visual feedback: surface a green "0" above the target so the
+        // player sees the heal landed but produced no HP gain — same
+        // role the red "0" damage floater plays for absorbed hits.
+        // Locate target identity for the broadcast (already searched
+        // for above; reuse those indices when found).
+        if (targetPi >= 0 && targetHi >= 0) {
+          this._broadcastEvent('play_heal_zero', {
+            owner: targetPi, heroIdx: targetHi, zoneSlot: -1,
+          });
+        }
+        return;
+      }
       const healed = Math.min(amount, maxHp - target.hp);
       target.hp = Math.min(maxHp, target.hp + amount);
       this.log('heal', { source: source?.name, target: this._heroLabel(target), amount: healed });
@@ -4313,7 +4364,16 @@ class GameEngine {
       this.log('heal_creature', { source: source?.name, target: target.name, amount, overheal: target.counters.currentHp > baseHp });
     } else {
       // If already above baseHp (overhealed), do nothing
-      if (currentHp >= baseHp) return;
+      if (currentHp >= baseHp) {
+        // Mirror of the hero-side branch: emit a zero-heal floater so
+        // healing-for-0 reads the same way absorbed-damage does.
+        this._broadcastEvent('play_heal_zero', {
+          owner: target.owner,
+          heroIdx: target.heroIdx,
+          zoneSlot: target.zoneSlot,
+        });
+        return;
+      }
       const healed = Math.min(amount, baseHp - currentHp);
       target.counters.currentHp = Math.min(baseHp, currentHp + amount);
       this.log('heal_creature', { source: source?.name, target: target.name, amount: healed });
@@ -4989,7 +5049,10 @@ class GameEngine {
   async actionDestroyCard(source, targetCard, opts = {}) {
     if (!targetCard) return;
     if (targetCard.counters?.immovable) return; // Cannot be destroyed or removed
-    if (targetCard.counters?._cardinalImmune) return; // Cardinal Beast immunity
+    if (targetCard.counters?._cardinalImmune) return; // Cardinal Beast immunity (source-blind)
+    // Sparkfly Attendant gift: blocks destroys from the opponent only.
+    // Own-side sacrifices etc. still resolve.
+    if (this.isOppEffectImmuneFrom(targetCard, source)) return;
     if (targetCard.counters?._damageDestroyImmune) {
       // Generic "fully damage- and destroy-immune" flag (Time Bomblebee
       // while charged with Bomb Counters). Mirror of the same check in
@@ -5073,6 +5136,12 @@ class GameEngine {
     // Immovable cards cannot leave their zone
     if (cardInstance.counters?.immovable && toZone !== cardInstance.zone) return;
     if (cardInstance.counters?._cardinalImmune && toZone !== cardInstance.zone) return; // Cardinal Beast immunity
+    // `_oppEffectImmune` (Sparkfly Attendant gift) is source-AWARE and
+    // therefore checked at call sites that pass source — actionDestroyCard,
+    // actionNegateCreature, the damage batch (via `_oppDamageImmune`) and
+    // canApplyCreatureStatus. actionMoveCard takes no source arg, so we
+    // can't distinguish own-side bounces (which must pass through) from
+    // opp displaces here; the immunity is lenient at this site.
     const fromZone = cardInstance.zone;
     const fromHeroIdx = cardInstance.heroIdx;
 
@@ -5122,6 +5191,21 @@ class GameEngine {
     if (cardInstance._returnToHand && toZone === ZONES.DISCARD) {
       delete cardInstance._returnToHand;
       toZone    = ZONES.HAND;
+      toHeroIdx = -1;
+      toSlot    = -1;
+    }
+    // Generic discard→deleted redirect — Vacarn (Skeleton hero text:
+    // "Creatures in this Hero's Support Zones that are defeated are
+    // deleted") and any future card with similar semantics. Set
+    // `_redirectToDeleted = true` on the leaving instance from inside
+    // an `onCardLeaveZone` hook; this block flips the destination
+    // before the card lands. Only intercepts discard-bound moves —
+    // cards already heading to deleted (Cosmic Manipulation etc.) or
+    // staying on the board (return-to-hand, bounce-place) are
+    // unaffected.
+    if (cardInstance._redirectToDeleted && toZone === ZONES.DISCARD) {
+      delete cardInstance._redirectToDeleted;
+      toZone    = ZONES.DELETED;
       toHeroIdx = -1;
       toSlot    = -1;
     }
@@ -5220,6 +5304,21 @@ class GameEngine {
         owner, cardName: cardInstance.name, from: 'support', to: 'hand',
         fromHeroIdx: cardInstance.heroIdx, fromSlotIdx: cardInstance.zoneSlot,
         toHandIdx: handForOwner.length,
+      });
+    }
+
+    // Generic area→discard transfer animation. Mirror of the
+    // support→hand block above. Covers any path that destroys an Area
+    // via actionDestroyCard (Hammer Skeleton, future card text). The
+    // canonical removeArea() helper fires its own pile-transfer
+    // broadcast — that helper does NOT funnel through actionMoveCard,
+    // so the two paths can't double-fire. Without this block, Areas
+    // hit by destroy-style effects vanished without a flight visual.
+    if (fromZone === ZONES.AREA && toZone === ZONES.DISCARD) {
+      this._broadcastEvent('play_pile_transfer', {
+        owner: cardInstance.owner,
+        cardName: cardInstance.name,
+        from: 'area', to: 'discard',
       });
     }
 
@@ -6505,9 +6604,18 @@ class GameEngine {
         let rescuedFromDelete = false;
         let resolvedCardName = null;
         let resolvedInst = null;
+        // Capture the source hand index — needed for the broadcast
+        // below so the client's `play_pile_transfer` handler can
+        // resolve the correct hand-slot DOM element instead of
+        // falling back to the gallery container's center (which
+        // produced "card flies from middle of the hand" visuals).
+        let resolvedHandIdx = -1;
 
         if (!result || result.cardName == null) {
-          // Safety fallback: auto-pop
+          // Safety fallback: auto-pop the LAST hand slot. Index of the
+          // popped slot (pre-pop) = post-pop length, captured BEFORE
+          // the pop mutation.
+          resolvedHandIdx = ps.hand.length - 1;
           const cardName = ps.hand.pop();
           if (cardName) {
             resolvedCardName = cardName;
@@ -6529,11 +6637,14 @@ class GameEngine {
         } else {
           const handIdx = result.handIndex;
           if (handIdx != null && handIdx >= 0 && handIdx < ps.hand.length && ps.hand[handIdx] === result.cardName) {
+            resolvedHandIdx = handIdx;
             ps.hand.splice(handIdx, 1);
           } else {
             const fallbackIdx = ps.hand.indexOf(result.cardName);
-            if (fallbackIdx >= 0) ps.hand.splice(fallbackIdx, 1);
-            else continue;
+            if (fallbackIdx >= 0) {
+              resolvedHandIdx = fallbackIdx;
+              ps.hand.splice(fallbackIdx, 1);
+            } else continue;
           }
           resolvedCardName = result.cardName;
           resolvedInst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: result.cardName })[0] || null;
@@ -6559,19 +6670,52 @@ class GameEngine {
             (this.gs._batchDiscardCountByPlayer[playerIdx] || 0) + 1;
         }
 
-        // Optional flight animation per discarded card. Used by
-        // Champion, the Stormbringer's "your opponent must discard"
-        // step so the opponent's discards mirror the windstorm flight
-        // the activator's own hand cards take. The broadcast goes out
-        // BEFORE the sync() below — the client captures the source
-        // hand-slot rect at broadcast-receipt time, before React
-        // processes the upcoming state update that shrinks the hand.
-        if (actuallyDiscarded && opts.flightStyle && resolvedCardName) {
+        // Per-card hand→pile flight broadcast. Always fires (used to
+        // be opt-in via opts.flightStyle). The diff-based hand→discard
+        // detector on the client can silently no-op when the engine's
+        // discard-push is followed quickly by another action that
+        // splices the SAME pile (e.g. Skeleton Necromancer pushes a
+        // forced-discard then immediately yanks the chosen Skeleton
+        // off the pile, leaving the discard size at +1 / −1 net zero).
+        // Multiple syncs land in one React batch on the client, the
+        // pile reads as "unchanged length", and the diff skips the
+        // animation. Broadcasting an explicit pile-transfer here makes
+        // the fly-out independent of the diff entirely.
+        //
+        // The client's `onPileTransfer` handler tracks each broadcast
+        // in a per-side pending list; the diff suppresses any
+        // matching hand-removed cardName so the broadcast and the
+        // diff don't double-animate when both fire (the common case
+        // where pile growth IS visible). Pending entries auto-clear
+        // after a short timeout so a stale entry can't trap a later
+        // genuine discard of the same card name.
+        //
+        // `flightStyle` (Champion the Stormbringer's "windstorm" path
+        // for opp-discard mirrors) still passes through as a payload
+        // field; without it the client uses the default flight
+        // animation. The broadcast goes out BEFORE the sync() below —
+        // the client captures the source hand-slot rect at
+        // broadcast-receipt time, before React processes the upcoming
+        // state update that shrinks the hand.
+        if (actuallyDiscarded && resolvedCardName) {
           this._broadcastEvent('play_pile_transfer', {
             owner:       playerIdx,
             cardName:    resolvedCardName,
             from:        'hand',
             to:          deleteMode ? 'deleted' : 'discard',
+            // `fromHandIdx` lets the client locate the EXACT hand slot
+            // the card lived in (resolved via the
+            // `[data-hand-idx="..."]` attribute on each .hand-slot)
+            // and start the flight from that rect. Without it, the
+            // pile-transfer handler falls back to the
+            // `.game-hand-me` / `.game-hand-opp` container's bounding
+            // rect, which is the middle of the entire hand row —
+            // producing the "every discard flies out from the middle
+            // of the hand" artifact. Sent as the pre-splice index
+            // since the broadcast goes out BEFORE this.sync(): the
+            // client's React tree still has the slot rendered when
+            // the handler runs.
+            fromHandIdx: resolvedHandIdx,
             flightStyle: opts.flightStyle,
           });
         }
@@ -7044,7 +7188,11 @@ class GameEngine {
   async actionAddCreatureBuff(inst, buffName, opts = {}) {
     if (!inst || inst.zone !== ZONES.SUPPORT) return false;
     if (inst.faceDown) return false; // Face-down surprises cannot be buffed
-    if (inst.counters?._cardinalImmune) return false; // Cardinal Beast immunity
+    if (inst.counters?._cardinalImmune) return false; // Cardinal Beast immunity (source-blind by design)
+    // No `_oppEffectImmune` check here — the buff path takes no source
+    // argument, so we can't distinguish own-side beneficial buffs (which
+    // must reach an Attendant-protected Queen normally) from opp-applied
+    // negative buffs. Lenient default keeps own-side buffs working.
     if (!opts.ignoreGateShield && this._isGateShielded(inst.controller ?? inst.owner)) return false; // Defending the Gate
     if (!inst.counters.buffs) inst.counters.buffs = {};
     const buffDef = BUFF_EFFECTS[buffName] || {};
@@ -7090,7 +7238,9 @@ class GameEngine {
     // Wings sets _cardinalImmune, whose check here would otherwise prevent
     // the buff from ever coming back off).
     if (!opts.forceClear) {
-      if (inst.counters?._cardinalImmune) return; // Cardinal Beast immunity
+      if (inst.counters?._cardinalImmune) return; // Cardinal Beast immunity (source-blind)
+      // `_oppEffectImmune` is source-aware; this call site has no source
+      // arg, so a lenient default lets own-side cleanses through.
       if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner)) return; // Defending the Gate
     }
     const buffData = inst.counters.buffs[buffName];
@@ -7147,10 +7297,33 @@ class GameEngine {
         if (buffData.expiresAtTurn !== currentTurn || buffData.expiresForPlayer !== activePlayer) continue;
         if (filterEarly === true && !buffData.expiresBeforeStatusDamage) continue;
         if (filterEarly === false && buffData.expiresBeforeStatusDamage) continue;
+        // Snapshot the post-cleanse-immunity flag BEFORE the buff is
+        // removed (the data goes away with the splice).
+        const grantsCcImmune = !!buffData.grantsCcImmuneOnExpire;
         // Forward expiresForceClear so buffs that ALSO granted the immunity
         // (e.g. Golden Wings setting _cardinalImmune) can strip themselves
         // cleanly on expiry.
         await this.actionRemoveCreatureBuff(inst, buffName, { forceClear: !!buffData.expiresForceClear });
+        // Stamp creature-side post-cleanse immunity (mirror of hero
+        // `immune` granted at processStatusExpiry's END phase).
+        // `cc_immune` blocks the CC creature-statuses (frozen / stunned
+        // / negated) for the rest of the OPPOSING side's current turn
+        // — i.e. the player who TARGETED this creature can't re-CC it
+        // on the same turn the previous CC just wore off. The follow-up
+        // buff clears `cc_immune` at the start of the bearer's
+        // controller's next turn (parity with hero `immune`'s
+        // start-of-turn cleanup).
+        if (grantsCcImmune && inst.zone === ZONES.SUPPORT) {
+          inst.counters.cc_immune = 1;
+          if (!inst.counters.buffs) inst.counters.buffs = {};
+          const ctrl = inst.controller ?? inst.owner;
+          inst.counters.buffs.cc_immune_post = {
+            expiresAtTurn: currentTurn + 1,
+            expiresForPlayer: ctrl,
+            clearCountersOnExpire: ['cc_immune'],
+            source: 'cc_immune',
+          };
+        }
         expired = true;
       }
     }
@@ -7234,6 +7407,10 @@ class GameEngine {
     // Necromancy, Diplomacy, Null Zone, etc. The name-list fallback
     // covers pre-placed beasts whose onPlay never fired.
     if (inst.counters?._cardinalImmune) return;
+    // Sparkfly Attendant gift: opp-applied negations only — own-side
+    // self-negations (test scaffolding, future "negate your own
+    // creature" cards) still work.
+    if (this.isOppEffectImmuneFrom(inst, source)) return;
     const { CARDINAL_NAMES } = require('./_cardinal-shared');
     if (CARDINAL_NAMES.includes(inst.name)) return;
     const statusKey = opts.statusKey || 'negated';
@@ -7245,6 +7422,13 @@ class GameEngine {
       expiresForPlayer: opts.expiresForPlayer,
       clearCountersOnExpire: [statusKey],
       source,
+      // Mirror hero post-cleanse immunity: when this buff expires
+      // naturally (start of expiresForPlayer's turn), the creature
+      // gains `cc_immune` for one turn so the same source effect
+      // (and other CC effects: frozen/stunned/negated) can't be
+      // re-applied immediately. Mirrors what hero `bound` /
+      // `negated` natural-expiry already does via `addHeroStatus`.
+      grantsCcImmuneOnExpire: true,
       ...(opts.removeAnim ? { removeAnim: opts.removeAnim } : {}),
     };
     this.log('creature_negated', { creature: inst.name, source, buffKey, statusKey });
@@ -7309,6 +7493,16 @@ class GameEngine {
     // creatures appear in the picker; this helper stays as the
     // authoritative "would the status actually stick" gate.
     if (this.isOmniImmune(inst)) return false;
+    // Source-aware opp-effect immunity (Sparkfly Attendant gift, etc.):
+    // status applications from the opp fizzle, own-side ones land.
+    if (this.isOppEffectImmuneFrom(inst, source)) return false;
+    // Post-cleanse CC immunity — set automatically when a creature's
+    // negation buff naturally expires (Skeleton Death Knight, the
+    // canonical Necromancy negation, etc.). Blocks the CC bucket
+    // (frozen / stunned / negated) for one turn. Mirrors hero
+    // `immune` blocking CC_STATUSES.
+    const CC_IMMUNE_BUCKET = ['frozen', 'stunned', 'negated'];
+    if (inst.counters.cc_immune && CC_IMMUNE_BUCKET.includes(statusName)) return false;
     const immuneKey = statusName + '_immune';
     if (inst.counters[immuneKey]) return false;
     // Monia-style creature protection (synchronous check via _moniaShieldActive)
@@ -7325,10 +7519,10 @@ class GameEngine {
    *     never fired and therefore never stamped the counter (puzzle
    *     setup, game-start support zones)
    *
-   * Used as the application-time gate inside the engine's status /
-   * damage / destroy / move helpers, and by card scripts that
-   * conditionally apply effects to creatures (Arcane Lamp, etc.) so
-   * the effect fizzles cleanly without breaking the targeting flow.
+   * NOTE: this helper is source-BLIND. Source-aware opp-only flags
+   * (`_oppEffectImmune` for Sparkfly Attendant) are checked separately
+   * at each engine site via `isOppEffectImmuneFrom(inst, source)`,
+   * NOT here, because they only apply to opp-applied effects.
    */
   isOmniImmune(inst) {
     if (!inst) return false;
@@ -7337,6 +7531,41 @@ class GameEngine {
     const { CARDINAL_NAMES } = require('./_cardinal-shared');
     if (CARDINAL_NAMES.includes(inst.name)) return true;
     return false;
+  }
+
+  /**
+   * Source-aware opp-effect immunity. Returns true iff the target
+   * carries `_oppEffectImmune` AND the effect is being applied by
+   * the OPPOSING player. Friendly cards/effects pass through.
+   *
+   * Used by Sparkfly Attendant's gift ("unaffected by your opponent's
+   * cards and effects, except damage") and the live aura ("unaffected
+   * by your opponent's cards and effects" — paired with
+   * `_oppDamageImmune` for the damage half).
+   *
+   * Lenient when source is missing or unowned: most engine call sites
+   * that lack a source originate from internal/own-side bookkeeping
+   * (auto-cleanses, splice rebases) and shouldn't be blocked.
+   */
+  isOppEffectImmuneFrom(inst, source) {
+    if (!inst?.counters?._oppEffectImmune) return false;
+    const sourceOwner = source?.owner ?? source?.controller;
+    if (sourceOwner == null) return false;
+    const targetController = inst.controller ?? inst.owner;
+    return sourceOwner !== targetController;
+  }
+
+  /**
+   * Source-aware opp-damage immunity. Sibling of `isOppEffectImmuneFrom`
+   * gated to the damage batch. Sparkfly Attendant's LIVE aura sets
+   * this so opp damage on protected Queens fizzles too; the inherited
+   * gift does NOT, matching its "except damage" clause.
+   */
+  isOppDamageImmuneFrom(inst, sourceOwner) {
+    if (!inst?.counters?._oppDamageImmune) return false;
+    if (sourceOwner == null) return false;
+    const targetController = inst.controller ?? inst.owner;
+    return sourceOwner !== targetController;
   }
 
   /**
@@ -7645,6 +7874,14 @@ class GameEngine {
           }
           if (!ok) continue;
         }
+        // Blinded heroes can't play targeting Spells / Attacks. Mirrors
+        // the play-time gate in validateActionPlay; when set, the client
+        // grays this card out under the affected hero so its hand
+        // preview matches what the server will accept.
+        if (hero.statuses?.blinded && (cd.cardType === 'Spell' || cd.cardType === 'Attack')) {
+          const s = loadCardEffect(cd.name);
+          if (s?.requiresTarget === true) continue;
+        }
         // Generic per-player Spell lock (Eraser Beam / any future "only Spell
         // this turn" card). Blocks further Spell plays once the lock is set;
         // cleared in the turn-start reset path alongside other per-turn flags.
@@ -7937,6 +8174,16 @@ class GameEngine {
         }
       }
       if (!bypass) return null;
+    }
+
+    // Blinded heroes can't play Attacks or Spells whose script declares
+    // `requiresTarget: true`. AoE-only cards (no requiresTarget flag)
+    // are still legal — that's the whole point of the status. Mirror in
+    // `getHeroPlayableCards` keeps the client gray-out aligned with this
+    // server-side gate.
+    if (hero.statuses?.blinded && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')) {
+      const cardScript = loadCardEffect(cardData.name);
+      if (cardScript?.requiresTarget === true) return null;
     }
 
     // Divine Gift of Skill lock — the chosen hero can't perform Actions
@@ -8377,7 +8624,7 @@ class GameEngine {
       heroIndicesByCard,
       activatableAbilities,
       title: config.title || 'Immediate Action',
-      description: config.description || 'Use an action with any Hero!',
+      description: config.description || 'Use an Action with any Hero!',
       cancellable: config.cancellable !== undefined ? config.cancellable : false,
     });
 
@@ -9974,6 +10221,14 @@ class GameEngine {
         minRequired: spec.minCount,
         minSumMaxHp: spec.minMaxHp || undefined,
         minSumLevel: spec.minSumLevel || undefined,
+        // Sacrifice-flavor red highlight on every eligible target. All
+        // engine-driven sacrifice prompts route through this helper, so
+        // setting it here covers the whole codebase: Sacrifice to
+        // Divinity, Hive's Crown's targeting fallback, Dragon Pilot's
+        // tribute, Dark Deepsea God's combined-level tribute, etc.
+        // Override per-spec via `spec.redSelect = false` if some future
+        // card needs a different colour.
+        redSelect: spec.redSelect !== false,
       });
       // Explicit cancel → resolveEffectPrompt returns null. Abort the
       // summon cleanly so the caller can refund the action / return the
@@ -10331,6 +10586,14 @@ class GameEngine {
           // the Confirm-button step. Used by direct-click pickers
           // (Singing's Creature borrow, Charme Lv1's Ability borrow).
           autoConfirm: config.autoConfirm === true,
+          // Visual flavors: greenSelect repaints the SELECTED-target
+          // highlight green (Beer's beneficial pick). redSelect repaints
+          // the VALID-target highlight a brighter red and amps the
+          // pulse, marking eligible targets for sacrifice-style picks
+          // (Occultism). Mutually exclusive in practice — pass at most
+          // one. Both ride the same gs.potionTargeting.config envelope.
+          greenSelect: config.greenSelect === true,
+          redSelect: config.redSelect === true,
         },
       };
       this.sync();
@@ -12532,6 +12795,98 @@ class GameEngine {
     return !!(set && set.has(`${playerIdx}-${heroIdx}`));
   }
 
+  /**
+   * Elixir of Cold rider — runs after every damage instance. If the
+   * source is a Hero carrying the `cold_strike` buff and the damage
+   * type is an Attack or Spell, freeze the just-hit target for 1 turn.
+   * Status / recoil / "other" damage doesn't trigger the freeze.
+   *
+   * Hero targets: 1-tick standard freeze (no `frozenUnhealable`, so
+   * Juice / Beer / Cure can clear it).
+   * Creature targets: counters.frozen = 1 with frozenDuration = 1, so
+   * the existing end-of-turn tick path expires it normally.
+   */
+  async _applyColdStrikeFreezeIfApplicable(source, target, type, realDealt) {
+    if (!source || !target) return;
+    if (!realDealt || realDealt <= 0) return;
+    const srcOwner = source.owner ?? source.controller;
+    const srcHi = source.heroIdx;
+    if (typeof srcOwner !== 'number' || typeof srcHi !== 'number' || srcHi < 0) return;
+    const srcHero = this.gs.players[srcOwner]?.heroes?.[srcHi];
+    if (!srcHero?.buffs?.cold_strike) return;
+    // Recognise Attack and Spell damage. The damage-type tag isn't
+    // standardised across cards (Spells use `<school>_spell` strings,
+    // Attacks use `'attack'`), so we cross-reference the source card's
+    // declared cardType when the type tag isn't 'attack'.
+    let isAttackOrSpell = type === 'attack';
+    if (!isAttackOrSpell && source.name) {
+      const cardDB = this._getCardDB();
+      const sourceCard = cardDB[source.name];
+      const ct = sourceCard?.cardType;
+      if (ct === 'Spell' || ct === 'Attack') isAttackOrSpell = true;
+    }
+    if (!isAttackOrSpell) return;
+
+    if (target.maxHp !== undefined && target.statuses !== undefined) {
+      // Hero target — locate owner / heroIdx via reference search.
+      const tgtOwner = this._findHeroOwner(target);
+      if (tgtOwner < 0) return;
+      const tgtHi = this.gs.players[tgtOwner].heroes.indexOf(target);
+      if (tgtHi < 0 || target.hp <= 0) return;
+      await this.addHeroStatus(tgtOwner, tgtHi, 'frozen', {
+        duration: 1,
+        appliedBy: srcOwner,
+        source: 'Elixir of Cold',
+      });
+    } else if (target.zone === 'support') {
+      // Creature target.
+      if (!this.canApplyCreatureStatus(target, 'frozen')) return;
+      if (!target.counters) target.counters = {};
+      target.counters.frozen = 1;
+      target.counters.frozenAppliedBy = srcOwner;
+      target.counters.frozenDuration = 1;
+      this.log('freeze_applied', { target: target.name, by: 'Elixir of Cold' });
+    }
+  }
+
+  /**
+   * Elixir of Strength rider — runs at BEFORE_DAMAGE for hero damage and
+   * mirrored for creature damage entries. If the source is a Hero
+   * carrying the `empowered_strike` buff and the damage is an Attack:
+   *   • Add 100 to amount.
+   *   • Set cannotBeReduced + cannotBeNegated so the whole hit ignores
+   *     Cloudy / shields / Anti Magic / etc.
+   *   • Strip the buff so it only fires once.
+   *
+   * Mutates the passed hookCtx-shape object directly (works for both
+   * the hero-damage hookCtx and the creature-damage proxy).
+   */
+  _applyEmpoweredStrikeIfApplicable(hookCtx) {
+    if (!hookCtx) return;
+    if (hookCtx.type !== 'attack') return;
+    const source = hookCtx.source;
+    const srcOwner = source?.owner ?? source?.controller;
+    const srcHi = source?.heroIdx;
+    if (typeof srcOwner !== 'number' || typeof srcHi !== 'number' || srcHi < 0) return;
+    const srcHero = this.gs.players[srcOwner]?.heroes?.[srcHi];
+    if (!srcHero?.buffs?.empowered_strike) return;
+
+    hookCtx.amount = (hookCtx.amount || 0) + 100;
+    hookCtx.cannotBeReduced = true;
+    hookCtx.cannotBeNegated = true;
+
+    // Consume the buff. Done synchronously to avoid double-firing on
+    // multi-target attack splits — the second damage instance won't
+    // see the buff. actionRemoveBuff is async; doing the inline delete
+    // is safe because the buff has no removeAnim wired and no hook
+    // listens for empowered_strike removal.
+    delete srcHero.buffs.empowered_strike;
+    this.log('empowered_strike_fired', {
+      hero: srcHero.name,
+      target: hookCtx.target?.name,
+    });
+  }
+
   /** True if a hero object is shielded. Convenience overload for targets passed by reference. */
   _isAmeShieldedHeroObj(hero) {
     if (!hero) return false;
@@ -14297,6 +14652,8 @@ class GameEngine {
         const abilityName = slot[0]; // Base ability name (wildcard abilities stack on top)
         const script = loadCardEffect(abilityName);
         if (!script?.actionCost) continue;
+        // Blinded silences targeting ability activations on the host hero.
+        if (hero.statuses?.blinded && script.requiresTarget === true) continue;
 
         // Check HOPT
         const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
@@ -14335,6 +14692,7 @@ class GameEngine {
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
           if (!script?.actionCost) continue;
+          if (hero.statuses?.blinded && script.requiresTarget === true) continue;
 
           const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
           if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
@@ -14364,6 +14722,7 @@ class GameEngine {
           const abilityName = slot[0];
           const script = loadCardEffect(abilityName);
           if (!script?.actionCost) continue;
+          if (hero.statuses?.blinded && script.requiresTarget === true) continue;
 
           const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
           if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
@@ -14542,6 +14901,10 @@ class GameEngine {
 
       const script = loadCardEffect(hero.name);
       if (!script?.heroEffect) continue;
+      // Blinded silences hero effects whose script declares they need a
+      // target. The hero stays alive and can still take normal Actions
+      // — only the targeted activation is hidden (no glow, no button).
+      if (hero.statuses?.blinded && script.requiresTarget === true) continue;
 
       // Phase eligibility:
       //   • heroEffectActionCost heroes — Action Phase OR Main Phase
@@ -14593,6 +14956,8 @@ class GameEngine {
         if (!inst.counters?.treatAsEquip) continue;
         const equipScript = loadCardEffect(inst.name);
         if (!equipScript?.heroEffect) continue;
+        // Equipped Artifacts are explicitly NOT blocked by Blinded —
+        // the artifact does the targeting independently of its host.
 
         const hoptKey = `hero-effect:${inst.name}:${playerIdx}:${hi}`;
         if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
@@ -14626,6 +14991,7 @@ class GameEngine {
 
         const script = loadCardEffect(hero.name);
         if (!script?.heroEffect) continue;
+        if (hero.statuses?.blinded && script.requiresTarget === true) continue;
 
         const hoptKey = `hero-effect:${hero.name}:${playerIdx}:${hi}`;
         if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
@@ -14658,6 +15024,7 @@ class GameEngine {
 
         const script = loadCardEffect(hero.name);
         if (!script?.heroEffect) continue;
+        if (hero.statuses?.blinded && script.requiresTarget === true) continue;
 
         const hoptKey = `hero-effect:${hero.name}:${playerIdx}:${hi}`;
         if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
@@ -14737,6 +15104,11 @@ class GameEngine {
           const effectName = inst.counters?._effectOverride || creatureName;
           const script = loadCardEffect(effectName);
           if (!script?.creatureEffect) continue;
+          // Blinded silences targeting creature effects. Either the
+          // creature itself is blinded (a future card may apply that)
+          // or its host hero is blinded — under "as if the Creature had
+          // no such targeting effect", we hide both cases.
+          if (script.requiresTarget === true && (inst.counters?.blinded || hero.statuses?.blinded)) continue;
 
           // Phase gate: free creature effects are Main-Phase-only;
           // action-cost creatures are Action Phase or Main Phase with
@@ -15076,6 +15448,9 @@ class GameEngine {
         const abilityName = slot[0];
         const script = loadCardEffect(abilityName);
         if (!script?.freeActivation) continue;
+        // Blinded silences targeting free-activation abilities — they
+        // disappear from the activatables list (no glow / button).
+        if (hero.statuses?.blinded && script.requiresTarget === true) continue;
 
         // HOPT by ability NAME — blocks all copies for this player
         const hoptKey = `free-ability:${abilityName}:${playerIdx}`;
@@ -15603,14 +15978,25 @@ class GameEngine {
     const ps_lvr = this.gs.players[playerIdx];
     const handArr_lvr = ps_lvr?.hand;
     const offMap_lvr = ps_lvr?._handLevelOffsets;
-    if (cardData.name && handArr_lvr && offMap_lvr) {
+    const transMap_lvr = ps_lvr?._handLevelOffsetsTransient;
+    const filterMap_lvr = ps_lvr?._handLevelOffsetHeroFilter;
+    if (cardData.name && handArr_lvr && (offMap_lvr || transMap_lvr)) {
       let bestOffset = 0;
-      for (const k of Object.keys(offMap_lvr)) {
-        const idx = +k;
-        if (handArr_lvr[idx] !== cardData.name) continue;
-        const v = offMap_lvr[k] || 0;
-        if (v < bestOffset) bestOffset = v;
-      }
+      // Helper closure: scan one map, picking the lowest (most-negative)
+      // offset across hand entries matching cardData.name. Hero filter
+      // is honored consistently for both maps.
+      const scan = (map) => {
+        if (!map) return;
+        for (const k of Object.keys(map)) {
+          const idx = +k;
+          if (handArr_lvr[idx] !== cardData.name) continue;
+          if (filterMap_lvr && filterMap_lvr[k] != null && filterMap_lvr[k] !== heroIdx) continue;
+          const v = map[k] || 0;
+          if (v < bestOffset) bestOffset = v;
+        }
+      };
+      scan(offMap_lvr);
+      scan(transMap_lvr);
       if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
     }
     if (rawLevel <= 0 && !cardData.spellSchool1) return true;
@@ -15761,7 +16147,11 @@ class GameEngine {
       const script = loadCardEffect(inst.name);
       if (typeof script?.reduceCardLevel !== 'function') continue;
       try {
-        const r = Number(script.reduceCardLevel(cardData, this, playerIdx)) || 0;
+        // Pass the contributing instance as a 4th arg so per-zone /
+        // per-instance restrictions are possible. Cards that don't
+        // need it (Elven Forager etc.) ignore the extra arg —
+        // backwards-compatible.
+        const r = Number(script.reduceCardLevel(cardData, this, playerIdx, inst)) || 0;
         if (r > 0) total += r;
       } catch { /* card threw — ignore, no reduction */ }
     }
@@ -15890,19 +16280,30 @@ class GameEngine {
     if (hero.levelOverrideCards && cardData.name && hero.levelOverrideCards[cardData.name] != null) {
       rawLevel = hero.levelOverrideCards[cardData.name];
     }
-    // Mirror of heroMeetsLevelReq's per-index hand offset (Rocky Slime).
-    // Reduced spells need less Wisdom coverage just like they need less
-    // school level — same effective rawLevel input.
+    // Mirror of heroMeetsLevelReq's per-index hand offset (Rocky Slime
+    // + Sparkfly Queen's transient rebate). Reduced spells need less
+    // Wisdom coverage just like they need less school level — same
+    // effective rawLevel input. The hero filter (Sparkfly Queen)
+    // applies here too: an offset reserved for a specific host hero
+    // shouldn't reduce another hero's Wisdom cost.
     const handArr_w = ps?.hand;
     const offMap_w  = ps?._handLevelOffsets;
-    if (cardData.name && handArr_w && offMap_w) {
+    const transMap_w = ps?._handLevelOffsetsTransient;
+    const filterMap_w = ps?._handLevelOffsetHeroFilter;
+    if (cardData.name && handArr_w && (offMap_w || transMap_w)) {
       let bestOffset = 0;
-      for (const k of Object.keys(offMap_w)) {
-        const idx = +k;
-        if (handArr_w[idx] !== cardData.name) continue;
-        const v = offMap_w[k] || 0;
-        if (v < bestOffset) bestOffset = v;
-      }
+      const scan = (map) => {
+        if (!map) return;
+        for (const k of Object.keys(map)) {
+          const idx = +k;
+          if (handArr_w[idx] !== cardData.name) continue;
+          if (filterMap_w && filterMap_w[k] != null && filterMap_w[k] !== heroIdx) continue;
+          const v = map[k] || 0;
+          if (v < bestOffset) bestOffset = v;
+        }
+      };
+      scan(offMap_w);
+      scan(transMap_w);
       if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
     }
     if (rawLevel <= 0 && !cardData.spellSchool1) return 0;
@@ -16083,7 +16484,13 @@ class GameEngine {
 
     // Regular Immune (post-CC) only blocks CC effects: frozen, stunned, negated
     // Can be bypassed via opts.bypassImmune (Tiger Kick 3rd attack, etc.)
-    const CC_STATUSES = ['frozen', 'stunned', 'negated'];
+    // CC statuses that get blanket-blocked while the bearer carries
+    // post-cleanse `immune`. Adding `bound` here means a hero whose
+    // bound naturally expired at end-of-turn (Skeleton Death Knight,
+    // Forbidden Zone) can't be re-bound on the very next turn —
+    // matching the "natural-cleanse-grants-immunity" pattern that
+    // already covers frozen / stunned / negated.
+    const CC_STATUSES = ['frozen', 'stunned', 'negated', 'bound'];
 
     // Universal negative status immunity (Divine Gift of Coolness, etc.)
     if (statusDef?.negative && hero.buffs?.negative_status_immune) {
@@ -16215,6 +16622,23 @@ class GameEngine {
             this.log('status_tick', { target: hero.name, status: 'bound', remaining: bd.duration });
           } else {
             await this.removeHeroStatus(ap, hi, 'bound');
+            clearedCC = true;
+          }
+        }
+        // Blinded — same multi-track expiry as `bound`. Smoke Vial uses
+        // explicit expiresAtTurn (caster's next end-of-turn); future
+        // cards applying Blinded with a `duration: N` get the standard
+        // multi-tick treatment; default (no duration / no expiresAtTurn)
+        // expires at the bearer's controller's end-of-turn.
+        if (hero.statuses.blinded) {
+          const bl = hero.statuses.blinded;
+          if (bl.expiresAtTurn != null) {
+            // Explicit-expiry blinded — leave it for _processBuffExpiry.
+          } else if (bl.duration > 1) {
+            bl.duration--;
+            this.log('status_tick', { target: hero.name, status: 'blinded', remaining: bl.duration });
+          } else {
+            await this.removeHeroStatus(ap, hi, 'blinded');
             clearedCC = true;
           }
         }
@@ -16607,6 +17031,14 @@ class GameEngine {
       } else if (inst?.counters?._stealImmortal) {
         // Temporarily stolen (Deepsea Succubus): cannot take damage while stolen.
         e._immuneCreature = true;
+      } else if (this.isOppDamageImmuneFrom(inst, e.sourceOwner)) {
+        // Source-aware opp-damage immunity (Sparkfly Attendant LIVE
+        // aura). Only fizzles damage coming FROM THE OPPONENT — friendly
+        // self-damage (Cluster's blast on own creatures, etc.) still
+        // lands. The inherited gift uses `_oppEffectImmune` only and
+        // therefore is NOT covered by this check, matching its "except
+        // damage" clause.
+        e._immuneCreature = true;
       }
     }
 
@@ -16655,6 +17087,19 @@ class GameEngine {
         applyArrowsBeforeDamage(this, e.source, e.inst, proxy);
         e.amount = proxy.amount;
       }
+    }
+
+    // Elixir of Strength rider — same policy as the hero-damage path.
+    // Iterates entries and runs the empowered_strike consume on each
+    // attack damage from a buffed source hero. Only the first matching
+    // entry actually gets the boost (helper consumes the buff).
+    for (const e of entries) {
+      if (e.cancelled || e._immuneCreature) continue;
+      const proxy = { source: e.source, target: e.inst, type: e.type, amount: e.amount };
+      this._applyEmpoweredStrikeIfApplicable(proxy);
+      e.amount = proxy.amount;
+      if (proxy.cannotBeReduced) e.cannotBeReduced = true;
+      if (proxy.cannotBeNegated) e.cannotBeNegated = true;
     }
 
     // Defending the Gate: check if any entries would hit an opponent's support zones
@@ -16891,6 +17336,9 @@ class GameEngine {
         const { applyArrowsAfterDamage } = require('./_arrows-shared');
         await applyArrowsAfterDamage(this, e.source, e.inst, e.realDealt, e.amount, e.type);
       }
+
+      // Elixir of Cold rider (creature target). Mirror of hero path.
+      await this._applyColdStrikeFreezeIfApplicable(e.source, e.inst, e.type, e.realDealt);
 
       // ── SC tracking: creature overkill ──
       if (this.gs._scTracking && e.sourceOwner >= 0 && e.sourceOwner < 2) {

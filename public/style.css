@@ -1968,6 +1968,29 @@ body {
   filter: drop-shadow(0 0 20px rgba(255,80,0,.9)) drop-shadow(0 0 40px rgba(255,40,0,.6));
   animation: projectilePulse 100ms ease-in-out infinite alternate;
 }
+/* Arrow-shaft projectile (Skeleton Archer, future bow cards). The
+   wrapping `.projectile-rotation-wrap` already applies the static
+   src→tgt rotation, so this class only carries the visual styling
+   for the SVG arrow itself. NO transforms here — adding any would
+   compose with the wrapper and double-rotate. */
+.projectile-arrow-shaft {
+  display: inline-block;
+  filter: drop-shadow(0 0 4px rgba(0,0,0,.6));
+}
+/* Rotation wrapper used by EVERY projectile (emoji + SVG alike). Sits
+   between `.projectile-anim` (which carries the translate-along-path
+   keyframe) and the actual visual element (which may itself carry a
+   pulse-scale keyframe — e.g. `.projectile-emoji`). Pulling the
+   rotation onto its own element keeps it from being clobbered by the
+   pulse keyframe's `transform: scale(...)` (CSS transforms don't
+   compose across animations on the same element). Phoenix, fireballs,
+   arrows — anything with a clear "front" — naturally point at the
+   target throughout the flight. */
+.projectile-rotation-wrap {
+  display: inline-block;
+  transform-origin: 50% 50%;
+  transform: rotate(var(--projAngle, 0deg));
+}
 .projectile-flame-trail {
   position: absolute;
   inset: -20px;
@@ -2193,6 +2216,40 @@ body {
   0%   { opacity: 0; transform: translate(0, 0); }
   20%  { opacity: 1; }
   100% { opacity: 0; transform: translate(-6px, var(--scDropY)); }
+}
+
+/* Crescent reap — Skeleton Reaper's signature curved blade-arc cut.
+   Path uses pathLength="1" so dashoffset 1→0 is a normalized "draw"
+   regardless of the actual SVG path length (which scales with target
+   size + lethal flag). Two variants: a quick light cut for non-lethal
+   hits, and a slow heavy lethal cut tuned to feel weighty. */
+@keyframes crescentReapNormal {
+  0%   { stroke-dashoffset: 1; opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 0.95; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes crescentReapLethal {
+  0%   { stroke-dashoffset: 1; opacity: 0; }
+  18%  { opacity: 1; }
+  72%  { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+/* Aura that swells beneath a lethal cut — black-violet gloom with a
+   crimson core tint. Fades through scale to leave a lingering wash
+   right when the blade vanishes. */
+@keyframes crescentReapAura {
+  0%   { opacity: 0; transform: scale(0.5); }
+  35%  { opacity: 0.95; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.45); }
+}
+/* Skull rising through the aura on a lethal cut. Floats up + slight
+   sway, fades out as the cut completes. */
+@keyframes crescentReapSkull {
+  0%   { opacity: 0; transform: translate(0, 28px) rotate(-12deg) scale(0.8); }
+  30%  { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  70%  { opacity: 1; transform: translate(0, -10px) rotate(8deg) scale(1.05); }
+  100% { opacity: 0; transform: translate(0, -36px) rotate(14deg) scale(1.1); }
 }
 
 /* Spooky ghost float — Deepsea Poltergeister artifact-destroy signature.
@@ -2922,6 +2979,17 @@ body {
   z-index: 4;
   pointer-events: none;
   line-height: 1;
+}
+/* Hero-filtered level reduction (Sparkfly Queen's "corresponding Hero
+   only" rebate). Dark green to distinguish from the default
+   light-blue badge, which represents a reduction available to ANY of
+   your Heroes. Re-enables pointer events so the hover-tooltip can
+   explain which Hero unlocks the reduced level. */
+.creature-level.creature-level-hero-filtered {
+  color: #1f7a3a;
+  text-shadow: 0 0 4px #000, 1px 1px 0 #000, -1px -1px 0 #000, 0 0 6px rgba(40,200,90,.5);
+  pointer-events: auto;
+  cursor: help;
 }
 
 /* Per-instance Artifact cost-override badge (Play Money). Top-left of
@@ -4161,6 +4229,54 @@ body {
   100% { transform: translate(calc(var(--startX) * -1), calc(var(--startY) * -1)) scale(0.3); opacity: 0; }
 }
 
+/* Black flame strike — Skeleton Demon's signature attack. Same
+   structural animation as flame_strike (radial converge + central
+   flash) but with a dark-purple/black palette and a per-broadcast
+   `--bfScale` CSS variable that scales the flash size with damage. */
+.anim-black-flame-flash {
+  position: absolute;
+  width: calc(80px * var(--bfScale, 1));
+  height: calc(80px * var(--bfScale, 1));
+  left: calc(-40px * var(--bfScale, 1));
+  top: calc(-40px * var(--bfScale, 1));
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(40,0,60,.9) 0%,
+    rgba(20,0,30,.55) 40%,
+    rgba(60,0,80,.25) 70%,
+    transparent 80%);
+  animation: animBlackFlameFlash .65s ease-out forwards;
+  animation-delay: 220ms;
+  opacity: 0;
+}
+@keyframes animBlackFlameFlash {
+  0% { transform: scale(0.3); opacity: 1; }
+  50% { transform: scale(1.5); opacity: .85; }
+  100% { transform: scale(2.3); opacity: 0; }
+}
+/* `brightness(0)` flattens the emoji's color channels to pure black
+   while preserving alpha — turning 🔥 into a flame-shaped silhouette.
+   The dual drop-shadows then layer a deep-violet outer glow + a
+   tighter inner haze so the black flames read as menacing rather
+   than just "dead pixels". */
+.anim-black-flame-shard {
+  position: absolute;
+  font-size: var(--size);
+  filter:
+    brightness(0)
+    drop-shadow(0 0 7px rgba(80,0,120,.95))
+    drop-shadow(0 0 14px rgba(30,0,55,.75));
+  animation: animBlackFlameShard ease-in forwards;
+  opacity: 0;
+  left: var(--startX);
+  top: var(--startY);
+}
+@keyframes animBlackFlameShard {
+  0% { transform: translate(0, 0) scale(1.3); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(calc(var(--startX) * -1), calc(var(--startY) * -1)) scale(0.25); opacity: 0; }
+}
+
 /* Wind swirl animation — gentle spiral around target */
 .anim-wind-flash {
   position: absolute;
@@ -4357,6 +4473,63 @@ body {
 @keyframes beerPulse {
   0%, 100% { box-shadow: 0 0 20px rgba(50,220,80,.9), 0 0 40px rgba(30,200,50,.5), inset 0 0 12px rgba(50,220,80,.4); }
   50% { box-shadow: 0 0 30px rgba(50,220,80,1), 0 0 55px rgba(30,200,50,.7), inset 0 0 18px rgba(50,220,80,.6); }
+}
+
+/* Sacrifice targeting — bright red eligible-target highlight (Occultism).
+   Default valid-target highlight is yellow/orange; sacrifice flavor flips
+   it to a deeper, faster-pulsing red so the player can immediately see
+   which Creatures are about to die. Layered ON TOP of `.potion-target-valid`
+   via the `.sacrifice-targeting` board wrapper (added when the prompt
+   config carries `redSelect: true`). */
+.sacrifice-targeting .potion-target-valid {
+  box-shadow:
+    0 0 24px rgba(255,60,60,.95),
+    0 0 48px rgba(255,30,30,.65),
+    inset 0 0 14px rgba(255,80,80,.45) !important;
+  border-color: #ff4444 !important;
+  border-width: 2px !important;
+  animation: sacrificeTargetPulse .7s ease-in-out infinite !important;
+}
+@keyframes sacrificeTargetPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 24px rgba(255,60,60,.95),
+      0 0 48px rgba(255,30,30,.65),
+      inset 0 0 14px rgba(255,80,80,.45);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow:
+      0 0 38px rgba(255,90,90,1),
+      0 0 75px rgba(255,30,30,.85),
+      inset 0 0 22px rgba(255,120,120,.65);
+    transform: scale(1.04);
+  }
+}
+.sacrifice-targeting .potion-target-selected {
+  box-shadow:
+    0 0 32px rgba(255,30,30,1),
+    0 0 60px rgba(180,0,0,.75),
+    inset 0 0 18px rgba(255,60,60,.7) !important;
+  border-color: #ff1111 !important;
+  border-width: 3px !important;
+  animation: sacrificeSelectedPulse .55s ease-in-out infinite !important;
+}
+@keyframes sacrificeSelectedPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 32px rgba(255,30,30,1),
+      0 0 60px rgba(180,0,0,.75),
+      inset 0 0 18px rgba(255,60,60,.7);
+    transform: scale(1.05);
+  }
+  50% {
+    box-shadow:
+      0 0 48px rgba(255,80,80,1),
+      0 0 90px rgba(220,0,0,.95),
+      inset 0 0 28px rgba(255,100,100,.9);
+    transform: scale(1.10);
+  }
 }
 
 /* Summon effect glow */
@@ -5297,6 +5470,25 @@ body:has(.reaction-chain-overlay) .board-tooltip {
 .status-badge:nth-child(3) { animation-delay: .1s; }
 .status-badge:nth-child(4) { animation-delay: .15s; }
 .status-badge:nth-child(5) { animation-delay: .2s; }
+/* Blinded: eye glyph + a diagonal red slash overlay so the icon reads as
+   "crossed-out eye" without depending on a Unicode glyph that mixes
+   poorly across platforms. The ::after line uses a CSS rotation so the
+   line scales naturally with --board-scale. */
+.status-badge.status-blinded::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 1.2px),
+    rgba(255,255,255,.95) calc(50% - 1.2px),
+    rgba(255,80,80,1) 50%,
+    rgba(255,255,255,.95) calc(50% + 1.2px),
+    transparent calc(50% + 1.2px)
+  );
+  border-radius: 50%;
+}
 @keyframes statusBadgePop {
   from { transform: scale(0); opacity: 0; }
   to { transform: scale(1); opacity: 1; }

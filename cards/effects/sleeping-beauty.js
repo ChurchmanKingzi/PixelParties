@@ -59,6 +59,8 @@ function _findHeroInst(engine, owner, heroIdx) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
 
   hooks: {

@@ -1021,6 +1021,14 @@ function PuzzleCreator() {
   // and changeCounter). Null for non-Charm targets so the editor section
   // stays hidden.
   const [editBalanceCounter, setEditBalanceCounter] = useState(null);
+  // For Sparkfly Queen: which sacrifice gifts (Architect / Attendant /
+  // Worker) the Queen carries. Gifts are normally granted by Hive's Crown
+  // when sacrificing a Sparkfly Creature; in puzzle mode the author can
+  // pre-stamp any combination directly. Saved under
+  // `_creatureStatuses[hi-slot]._sparkflyGiftFlags` and applied
+  // server-side via `grantInheritedAbility` from `_sparkfly-shared`. Null
+  // when the open editor target isn't a Sparkfly Queen.
+  const [editSparkflyGifts, setEditSparkflyGifts] = useState(null);
   // Cards whose puzzle starting state can include Change Counters.
   // Hardcoded here because the script-side `cpuMeta.counterConsumer`
   // flag isn't reachable from the client; mirrors the convention used
@@ -1036,7 +1044,18 @@ function PuzzleCreator() {
       const h = p.heroes[hi]; if (!h) return;
       setEditTarget({ si, zt, hi, slot });
       setEditHp(String(h.hp)); setEditMaxHp(String(h.maxHp)); setEditAtk(String(h.atk));
-      setEditStatuses({ ...(h.statuses || {}) });
+      // Hydrate statuses, collapsing Death Knight's Bound-with-source
+      // into the cosmetic `silenced` toggle so the editor doesn't
+      // surface both rows for the same effect.
+      const heroStatuses = { ...(h.statuses || {}) };
+      const dkBound = heroStatuses.bound;
+      const isDkBound = dkBound && (typeof dkBound === 'object')
+        && dkBound.source === 'Skeleton Death Knight';
+      if (isDkBound) {
+        delete heroStatuses.bound;
+        heroStatuses.silenced = true;
+      }
+      setEditStatuses(heroStatuses);
       setEditBuffs({ ...(h.buffs || {}) });
       // Argos starts the puzzle with N Change Counters — hydrate the
       // counter input from the saved hero state. Null for non-Argos
@@ -1056,6 +1075,14 @@ function PuzzleCreator() {
       // did `merged = { ...editStatuses }` without clearing the legacy
       // key, so unchecking every buff couldn't actually remove them.
       const { buffs: _csBuffs, ...csWithoutBuffs } = cs;
+      // Collapse Death Knight's negated+_dkSilenced pairing into the
+      // cosmetic `silenced` toggle. Mirrors the hero-side hydration:
+      // we don't want both rows lit up for the same effect.
+      if (csWithoutBuffs.negated && csWithoutBuffs._dkSilenced) {
+        delete csWithoutBuffs.negated;
+        delete csWithoutBuffs._dkSilenced;
+        csWithoutBuffs.silenced = true;
+      }
       setEditStatuses(csWithoutBuffs);
       setEditBuffs({ ...(cs.buffs || {}) });
       // Biomancy Token: Potion in a support zone — carries a `biomancyLevel`
@@ -1085,6 +1112,16 @@ function PuzzleCreator() {
       setEditBalanceCounter(c?.name === 'Charm of Balance'
         ? (cs.balance || 0)
         : null);
+      // Sparkfly Queen: hydrate the gift checklist from the saved
+      // `_sparkflyGiftFlags`. Null for other Creatures so the editor
+      // section stays hidden.
+      setEditSparkflyGifts(c?.name === 'Sparkfly Queen'
+        ? {
+            architect: !!cs._sparkflyGiftFlags?.architect,
+            attendant: !!cs._sparkflyGiftFlags?.attendant,
+            worker:    !!cs._sparkflyGiftFlags?.worker,
+          }
+        : null);
     }
   }, [players, getCard]);
 
@@ -1100,7 +1137,17 @@ function PuzzleCreator() {
           p.heroes[hi].statuses = {};
           p.heroes[hi].buffs = undefined;
         } else {
-          p.heroes[hi].statuses = { ...editStatuses };
+          // Expand Death Knight's `silenced` cosmetic toggle into the
+          // underlying primitive: Bound with `source: "Skeleton Death
+          // Knight"`. The status badge keys on that source to render
+          // the Silenced badge in-game; the engine's natural-expiry
+          // pipeline handles the rest unchanged.
+          const heroStatusOut = { ...editStatuses };
+          if (heroStatusOut.silenced) {
+            delete heroStatusOut.silenced;
+            heroStatusOut.bound = { source: 'Skeleton Death Knight' };
+          }
+          p.heroes[hi].statuses = heroStatusOut;
           p.heroes[hi].buffs = Object.keys(editBuffs).length > 0 ? { ...editBuffs } : undefined;
         }
         // Argos: persist Change Counters as `_changeCounters` on the
@@ -1149,6 +1196,16 @@ function PuzzleCreator() {
         // source of truth for buffs, so an empty editBuffs means the
         // saved state must not have any `buffs` key.
         delete merged.buffs;
+        // Expand Death Knight's `silenced` cosmetic toggle into the
+        // underlying primitives: `negated` (functional negation) +
+        // `_dkSilenced` (cosmetic marker StatusBadges keys on for the
+        // Silenced badge). Server-side puzzle loader propagates both
+        // onto inst.counters at game start.
+        if (merged.silenced) {
+          delete merged.silenced;
+          merged.negated = true;
+          merged._dkSilenced = true;
+        }
         if (Object.keys(editBuffs).length > 0) merged.buffs = { ...editBuffs };
       }
       // Dream-Landers attach: persist `attachedHero` only if set so the
@@ -1184,11 +1241,23 @@ function PuzzleCreator() {
       if (editBalanceCounter != null && editBalanceCounter > 0) {
         merged.balance = editBalanceCounter;
       }
+      // Sparkfly Queen: persist the gift checklist. Server reads
+      // `_sparkflyGiftFlags` and runs the same `grantInheritedAbility`
+      // path Hive's Crown uses, so the buffs / inherited-effect text /
+      // Attendant immunity all line up identically with a live game.
+      delete merged._sparkflyGiftFlags;
+      if (editSparkflyGifts && (editSparkflyGifts.architect || editSparkflyGifts.attendant || editSparkflyGifts.worker)) {
+        merged._sparkflyGiftFlags = {
+          architect: !!editSparkflyGifts.architect,
+          attendant: !!editSparkflyGifts.attendant,
+          worker:    !!editSparkflyGifts.worker,
+        };
+      }
       p._creatureStatuses[hi + '-' + slot] = merged;
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editBalanceCounter, updatePlayer, getCard]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editBalanceCounter, editSparkflyGifts, updatePlayer, getCard]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -1289,31 +1358,57 @@ function PuzzleCreator() {
 
   // ── Status effect and buff constants ──
   const STATUS_LIST = [
-    { key: 'frozen', label: '❄️ Frozen', color: '#66ccff' },
-    { key: 'stunned', label: '⚡ Stunned', color: '#ffdd44' },
-    { key: 'burned', label: '🔥 Burned', color: '#ff6633' },
-    { key: 'poisoned', label: '☠️ Poisoned', color: '#aa44ff', stacks: true },
-    { key: 'negated', label: '🚫 Negated', color: '#888' },
-    { key: 'bound', label: '⛓️ Bound', color: '#9988aa' },
-    { key: 'shielded', label: '🛡️ Shielded', color: '#44ddff' },
-    { key: 'immune', label: '✨ Immune', color: '#ffdd88' },
-    { key: 'healReversed', label: '💔 Heal Reversed', color: '#ff4488' },
-    { key: 'untargetable', label: '👻 Untargetable', color: '#aaaacc' },
+    { key: 'frozen', label: '❄️ Frozen', color: '#66ccff',
+      tooltip: 'Frozen: cannot act and has its effects and Abilities negated. Wears off at the end of its owner\'s turn.' },
+    { key: 'stunned', label: '⚡ Stunned', color: '#ffdd44',
+      tooltip: 'Stunned: cannot act and has its effects and Abilities negated. Wears off at the end of its owner\'s turn.' },
+    { key: 'burned', label: '🔥 Burned', color: '#ff6633',
+      tooltip: 'Burned: takes 60 damage at the start of each of its owner\'s turns. Permanent until cleansed or healed.' },
+    { key: 'poisoned', label: '☠️ Poisoned', color: '#aa44ff', stacks: true,
+      tooltip: 'Poisoned: takes 30 damage per stack at the start of each of its owner\'s turns. Permanent until cleansed or healed.' },
+    { key: 'negated', label: '🚫 Negated', color: '#888',
+      tooltip: 'Negated: has its effects negated. Heroes also lose their attached Abilities. Wears off at the end of its owner\'s turn.' },
+    { key: 'bound', label: '⛓️ Bound', color: '#9988aa',
+      tooltip: 'Bound: cannot perform Actions. Wears off at the end of its owner\'s turn.' },
+    // Skeleton Death Knight's cosmetic skin of Bound (heroes) /
+    // Negated (creatures). Saved by transforming the toggle into the
+    // underlying primitives — `bound` with `source: 'Skeleton Death
+    // Knight'` for heroes, `negated: 1` + `_dkSilenced: 1` for
+    // creatures — so the engine's existing expiry / cleanse logic
+    // handles it without per-card hacks. Hydrated by detecting those
+    // markers on click and lighting up this toggle instead of the
+    // underlying primitive.
+    { key: 'silenced', label: '🤐 Silenced', color: '#1f8a44',
+      tooltip: 'Silenced: Heroes cannot perform Actions; Creatures have their effects negated. Skeleton Death Knight\'s effect.' },
+    { key: 'shielded', label: '🛡️ Shielded', color: '#44ddff',
+      tooltip: 'Shielded: immune to ALL status effects (first-turn protection variant).' },
+    { key: 'immune', label: '✨ Immune', color: '#ffdd88',
+      tooltip: 'Immune: cannot have CC statuses (Frozen / Stunned / Negated / Bound) re-applied. Wears off at the start of its owner\'s next turn.' },
+    { key: 'healReversed', label: '💔 Heal Reversed', color: '#ff4488',
+      tooltip: 'Heal Reversed: any healing this target would receive deals damage instead.' },
+    { key: 'untargetable', label: '👻 Untargetable', color: '#aaaacc',
+      tooltip: 'Untargetable: cannot be chosen as a target by Attacks, Spells, or Creature effects.' },
   ];
   const BUFF_LIST = [
-    { key: 'cloudy', label: '☁️ Cloudy', color: '#88bbdd' },
-    { key: 'freeze_immune', label: '🔥 Freeze Immune', color: '#ff8844' },
-    { key: 'submerged', label: '🌊 Submerged', color: '#4488ff', scope: 'oppHero' },
-    { key: 'negative_status_immune', label: '😎 Status Immune', color: '#44ff88' },
+    { key: 'cloudy', label: '☁️ Cloudy', color: '#88bbdd',
+      tooltip: 'Cloudy: takes half damage from all sources.' },
+    { key: 'freeze_immune', label: '🔥 Freeze Immune', color: '#ff8844',
+      tooltip: 'Freeze Immune: cannot be Frozen.' },
+    { key: 'submerged', label: '🌊 Submerged', color: '#4488ff', scope: 'oppHero',
+      tooltip: 'Submerged: unaffected by all cards and effects while other possible targets exist on this side.' },
+    { key: 'negative_status_immune', label: '😎 Status Immune', color: '#44ff88',
+      tooltip: 'Negative Status Immune: cannot have any negative status effect applied.' },
     // Taunt: the opponent must target this Hero/Creature with Attacks,
     // Spells, and Creature effects if possible. Multiple Taunters on a
     // side = opponent picks any. Applies to Heroes AND Creatures.
-    { key: 'forcesTargeting', label: '🎯 Taunt', color: '#ff5060' },
+    { key: 'forcesTargeting', label: '🎯 Taunt', color: '#ff5060',
+      tooltip: 'Taunt: the opponent MUST target this with Attacks / Spells / Creature effects when possible. Multiple Taunters → opponent picks one.' },
     // Equip-Artifact-only buff: Anti Magic Enchantment. The scope tag below
     // flips rendering so this buff ONLY shows up when editing an Equipment
     // Artifact, and for that zone type ONLY this buff is offered (all
     // creature/hero statuses + buffs are hidden).
-    { key: 'anti_magic_enchanted', label: '🛡️ Anti Magic Enchantment', color: '#ffaa33', scope: 'equip' },
+    { key: 'anti_magic_enchanted', label: '🛡️ Anti Magic Enchantment', color: '#ffaa33', scope: 'equip',
+      tooltip: 'Anti Magic Enchantment: once per turn, the controlling player may negate a Spell that hits the equipped Hero.' },
   ];
 
   // ── Column layout for island zone alignment across all rows (matching existing board) ──
@@ -1449,8 +1544,17 @@ function PuzzleCreator() {
                 {(p.surpriseZones[hi]||[]).length > 0 ? (() => {
                   const sName = p.surpriseZones[hi][0];
                   const usable = isSurpriseUsable(p, hi, sName);
+                  // Dim style applies to BOTH sides when the Surprise's
+                  // ability-school requirements aren't met by the
+                  // controlling Hero — was originally me-only because
+                  // the opp Surprise had no tooltip and showed only a
+                  // cardback (so the dim cue was invisible anyway).
+                  // Now that opp Surprises reveal their identity on
+                  // hover via `revealTooltipWhenFaceDown`, the dim
+                  // signal is meaningful for both sides too.
                   return <BoardCard cardName={sName} faceDown={isOpp}
-                    style={!usable && !isOpp ? { opacity: 0.45, filter: 'grayscale(0.7)' } : undefined} />;
+                    revealTooltipWhenFaceDown={isOpp}
+                    style={!usable ? { opacity: 0.45, filter: 'grayscale(0.7)' } : undefined} />;
                 })() : <div className="board-zone-empty">Surp</div>}
               </div>
               {maxRight > 0 && Array.from({ length: maxRight }).map((_, s) => <div key={'rp'+s} className="board-zone-spacer" />)}
@@ -1782,8 +1886,13 @@ function PuzzleCreator() {
                 the sidebar's Name filter input). ── */}
           <div className="pz-gallery-column">
           <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+            {/* Don't toggle overflowY during drag: hiding the native
+                18px scrollbar reflows the `repeat(3, 1fr)` grid and
+                visibly scales every card up for the duration of the
+                drag. The gallery is already a scroll container — HTML5
+                drag doesn't auto-scroll arbitrary children, only the
+                window edges, so leaving overflow as `auto` is safe. */}
             <div className="pz-search-results" ref={searchResultsRef} style={{
-              ...(dragCardName ? { overflowY: 'hidden' } : {}),
               ...(isTouchDevice ? { scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } : {}),
             }}>
             {searchResults.map((c, i) => {
@@ -1825,7 +1934,15 @@ function PuzzleCreator() {
         </div>
 
         {/* ── Board ── */}
-        <div className="pz-board-wrap" ref={boardWrapRef} style={{ overflowY: dragCardName ? 'hidden' : undefined }}>
+        {/* Don't toggle overflowY during drag — same reason as the
+            gallery: hiding the native scrollbar reclaims its ~18 px
+            of width into the content box, and because the battlefield
+            inside is centered, that visibly shifts it to the right
+            for the duration of the drag. HTML5 DnD doesn't auto-scroll
+            arbitrary scroll containers, only the window, so leaving
+            overflow as the default doesn't reintroduce any unwanted
+            scrolling during drag. */}
+        <div className="pz-board-wrap" ref={boardWrapRef}>
           {/* ── Opponent Hand (always revealed, behind tooltips) ── */}
           <div className="pz-hand pz-hand-opp" style={{ position: 'relative', zIndex: 1, marginBottom: 'calc(4px * var(--board-scale))' }}
             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('oppHand'); }}
@@ -2216,6 +2333,47 @@ function PuzzleCreator() {
                 </div>
               );
             })()}
+            {/* Sparkfly Queen gift checklist — visible only when the
+                edit target is a Sparkfly Queen. Each toggle stamps the
+                corresponding gift on the Queen at puzzle-start, exactly
+                as if a Hive's Crown sacrifice had granted it: BuffColumn
+                icon, _inheritedEffects entry, and (for Attendant) the
+                generic absolute-immunity counter all match a live game. */}
+            {!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard?.name === 'Sparkfly Queen' && editSparkflyGifts && (() => {
+              const GIFTS = [
+                { id: 'architect', icon: '📐', label: "Architect's Gift",
+                  text: 'Once per turn: draw cards until your hand size matches the opponent\'s.' },
+                { id: 'attendant', icon: '🪶', label: "Attendant's Gift",
+                  text: "Unaffected by your opponent's cards and effects, except damage." },
+                { id: 'worker', icon: '🪲', label: "Worker's Gift",
+                  text: 'Once per turn: opponent picks any non-Hero card on their side of the board → your hand.' },
+              ];
+              return (
+                <div style={{ marginBottom: 14 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                    👑 Sacrifice Gifts
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                    {GIFTS.map(g => {
+                      const active = !!editSparkflyGifts[g.id];
+                      return (
+                        <button key={g.id}
+                          className={'btn ' + (active ? 'btn-success' : '')}
+                          style={{ width: '100%', padding: '8px 12px', fontSize: 12, textAlign: 'left',
+                            borderColor: active ? '#44dd66' : 'var(--bg4)' }}
+                          onClick={() => setEditSparkflyGifts({ ...editSparkflyGifts, [g.id]: !active })}>
+                          <div style={{ fontWeight: 700 }}>{(active ? '✅ ' : '○ ') + g.icon + ' ' + g.label}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.85, marginTop: 2 }}>{g.text}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                    Pick any combination — Hive's Crown normally grants exactly one gift per Queen, but the puzzle author can stack all three.
+                  </div>
+                </div>
+              );
+            })()}
             {!isBiomancyTokenEdit && (
             <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
               <label style={{ flex: 1 }}>
@@ -2254,6 +2412,16 @@ function PuzzleCreator() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                 {STATUS_LIST.map(st => {
                   const active = !!editStatuses[st.key];
+                  // Cursor-anchored hover tooltip — describes what the
+                  // status does in-game so the puzzle author doesn't
+                  // have to remember every status key. onMouseMove
+                  // re-fires the tooltip-position event so the box
+                  // tracks the cursor; onMouseLeave clears.
+                  const tipHandlers = st.tooltip ? {
+                    onMouseEnter: (e) => window.showCursorTooltip?.(e, st.tooltip),
+                    onMouseMove:  (e) => window.showCursorTooltip?.(e, st.tooltip),
+                    onMouseLeave: () => window.hideGameTooltip?.(),
+                  } : {};
                   return (
                     <div key={st.key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <button className="btn" style={{
@@ -2261,7 +2429,7 @@ function PuzzleCreator() {
                         borderColor: active ? st.color : 'var(--bg4)',
                         color: active ? st.color : 'var(--text2)',
                         background: active ? st.color + '18' : 'transparent',
-                      }} onClick={() => setEditStatuses(prev => {
+                      }} {...tipHandlers} onClick={() => setEditStatuses(prev => {
                         const next = { ...prev };
                         if (st.stacks) { next[st.key] = active ? undefined : { stacks: 1 }; }
                         else { next[st.key] = active ? undefined : true; }
@@ -2304,13 +2472,21 @@ function PuzzleCreator() {
                   return true;
                 }).map(bf => {
                   const active = !!editBuffs[bf.key];
+                  // Same cursor-anchored hover tooltip as the status
+                  // toggles above — explains what each buff actually
+                  // does so the author doesn't have to remember.
+                  const tipHandlers = bf.tooltip ? {
+                    onMouseEnter: (e) => window.showCursorTooltip?.(e, bf.tooltip),
+                    onMouseMove:  (e) => window.showCursorTooltip?.(e, bf.tooltip),
+                    onMouseLeave: () => window.hideGameTooltip?.(),
+                  } : {};
                   return (
                     <button key={bf.key} className="btn" style={{
                       padding: '3px 8px', fontSize: 10,
                       borderColor: active ? bf.color : 'var(--bg4)',
                       color: active ? bf.color : 'var(--text2)',
                       background: active ? bf.color + '18' : 'transparent',
-                    }} onClick={() => setEditBuffs(prev => {
+                    }} {...tipHandlers} onClick={() => setEditBuffs(prev => {
                       const next = { ...prev };
                       if (active) delete next[bf.key]; else next[bf.key] = true;
                       return next;

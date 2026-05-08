@@ -6,6 +6,8 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Turn-1 shielded opponent makes every bolt fizzle (opponent picks the
   // targets and they're all immune). The CPU has no `getValidTargets` to
   // reason about, so flag it explicitly here.

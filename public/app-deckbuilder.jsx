@@ -5,7 +5,7 @@
 const { useState, useEffect, useRef, useCallback, useMemo, useContext, useLayoutEffect } = React;
 const { api, socket, AppContext, CardMini, FoilOverlay, useFoilBands, cardImageUrl, skinImageUrl,
         isDeckLegal, countInDeck, hasNicolasHero, canAddCard, trimOverLimitCopies, typeColor, typeClass,
-        sortDeckCards, shuffleArray } = window;
+        sortDeckCards, shuffleArray, isCubeDeck, CUBE_SIZE } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, CARD_TYPES, SUBTYPES,
         SPELL_SCHOOLS, STARTING_ABILITIES, ARCHETYPES, SKINS_DB } = window;
 let _persistedUnsaved = {};
@@ -531,10 +531,12 @@ function DeckBuilder() {
   const autoAdd = useCallback((cardName) => {
     const card = CARDS_BY_NAME[cardName];
     if (!card) return;
+    // Cube Draft: every legal card lands in the single main pool.
+    if (isCubeDeck(currentDeck)) { addCardTo(cardName, 'main'); return; }
     if (card.cardType === 'Hero') addCardTo(cardName, 'hero');
     else if (card.cardType === 'Potion') addCardTo(cardName, 'potion');
     else addCardTo(cardName, 'main');
-  }, [addCardTo]);
+  }, [addCardTo, currentDeck]);
 
   // Cover card management — auto-saves immediately (cover only, not rest of deck)
   const setCoverCard = useCallback(async (cardName) => {
@@ -670,6 +672,11 @@ function DeckBuilder() {
     const card = CARDS_BY_NAME[cardName];
     if (!card || !currentDeck) return;
     const items = [];
+    if (isCubeDeck(currentDeck)) {
+      items.push({ label: 'Add to Cube', icon: '🧊', color: '#9ad8ff', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
+      setCtxMenu({ x: e.clientX, y: e.clientY, items });
+      return;
+    }
     if (card.cardType === 'Hero') {
       items.push({ label: 'Add to Heroes', icon: '👑', color: '#ffd700', disabled: !canAddCard(currentDeck, cardName, 'hero'), action: () => addCardTo(cardName, 'hero') });
       // Heroes are also legal in the Main Deck (Goff-style attach
@@ -815,9 +822,15 @@ function DeckBuilder() {
     </div>
   );
 
+  const isCube = isCubeDeck(currentDeck);
+
   // Filter cards
   const filteredCards = useMemo(() => {
     let result = AVAILABLE_CARDS;
+    // Cubes accept any card except non-Performance Abilities (Performance
+    // is the only Ability that's draftable; the rest are tied to specific
+    // Heroes and meaningless in a draft pool).
+    if (isCube) result = result.filter(c => c.cardType !== 'Ability' || c.name === 'Performance');
     const f = filters;
     if (f.name) result = result.filter(c => c.name.toLowerCase().includes(f.name.toLowerCase()));
     if (f.effect) result = result.filter(c => c.effect && c.effect.toLowerCase().includes(f.effect.toLowerCase()));
@@ -833,7 +846,7 @@ function DeckBuilder() {
     if (f.hp !== '') result = result.filter(c => c.hp != null && c.hp === parseInt(f.hp));
     if (f.atk !== '') result = result.filter(c => c.atk != null && c.atk === parseInt(f.atk));
     return result;
-  }, [filters]);
+  }, [filters, isCube]);
 
   const pageCount = Math.ceil(filteredCards.length / 20);
   const pageCards = filteredCards.slice(cardPage * 20, (cardPage + 1) * 20);
@@ -945,6 +958,31 @@ function DeckBuilder() {
       }
     }
     return null;
+  };
+
+  // Cube Draft display: stack copies into a single slot with a count
+  // badge instead of one slot per card. Visible-slot count =
+  // uniqueStacks + (CUBE_SIZE - totalCards), so each duplicate copy
+  // beyond the first consumes one trailing free slot.
+  const buildCubeDisplay = (cards) => {
+    const stacks = [];
+    const seen = new Map();
+    for (let i = 0; i < cards.length; i++) {
+      const name = cards[i];
+      const existing = seen.get(name);
+      if (existing != null) {
+        stacks[existing].count++;
+      } else {
+        seen.set(name, stacks.length);
+        stacks.push({ card: name, origIdx: i, count: 1, isStack: true, isGap: false, isEmpty: false });
+      }
+    }
+    const total = cards.length;
+    const empties = Math.max(0, CUBE_SIZE - total);
+    for (let i = 0; i < empties; i++) {
+      stacks.push({ card: null, origIdx: -1, count: 0, isStack: false, isGap: false, isEmpty: true });
+    }
+    return stacks;
   };
 
   // Compute display array for a section — always returns exactly `capacity` items
@@ -1155,8 +1193,8 @@ function DeckBuilder() {
         <button className="btn btn-accent2" style={{ padding: '4px 10px', fontSize: 9 }} onClick={saveAs}>SAVE AS</button>
         <button className="btn btn-danger" style={{ padding: '4px 10px', fontSize: 9 }} onClick={deleteDeck} disabled={decks.length <= 1 || isSampleMode}>🗑 DELETE</button>
         <button className="btn btn-success" style={{ padding: '4px 10px', fontSize: 9 }} onClick={setDefault}
-          disabled={!validation.legal || currentDeck?.isDefault}
-          title={!validation.legal ? validation.reasons.join(', ') : currentDeck?.isDefault ? 'Already default' : isSampleMode ? 'Will save sample deck and set as default' : 'Set as default deck'}>
+          disabled={!validation.legal || currentDeck?.isDefault || isCube}
+          title={isCube ? 'Cubes cannot be used as a default play deck' : !validation.legal ? validation.reasons.join(', ') : currentDeck?.isDefault ? 'Already default' : isSampleMode ? 'Will save sample deck and set as default' : 'Set as default deck'}>
           {currentDeck?.isDefault ? '★ DEFAULT' : '☆ SET DEFAULT'}
         </button>
         <div style={{ width: 1, height: 20, background: 'var(--bg4)', margin: '0 4px' }} />
@@ -1173,6 +1211,8 @@ function DeckBuilder() {
           <div className="orbit-font" style={{ padding: 8, fontSize: 10, color: 'var(--text2)', fontWeight: 700 }}>YOUR DECKS</div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {decks.map((d, i) => {
+              if (isCubeDeck(d)) return null;
+              if (d.mode === 'drafted') return null;
               const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
               return (
                 <div key={d.id} role="button" className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); }}>
@@ -1182,6 +1222,55 @@ function DeckBuilder() {
                 </div>
               );
             })}
+            {(() => {
+              const cubeEntries = decks.map((d, i) => ({ d, i })).filter(e => isCubeDeck(e.d));
+              if (cubeEntries.length === 0) return null;
+              return (
+                <>
+                  <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
+                    <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, flex: 1 }}>CUBES</span>
+                  </div>
+                  {cubeEntries.map(({ d, i }) => {
+                    const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
+                    return (
+                      <div key={d.id} role="button" className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); }}>
+                        <span style={{ color: '#9ad8ff', fontSize: 10 }}>🧊</span>
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
+                        <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
+            {(() => {
+              const draftedEntries = decks
+                .map((d, i) => ({ d, i }))
+                .filter(e => e.d.mode === 'drafted');
+              if (draftedEntries.length === 0) return null;
+              return (
+                <>
+                  <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
+                    <span style={{ fontSize: 9, color: '#ffd700', fontWeight: 700, flex: 1 }}>🏆 DRAFTED DECKS</span>
+                  </div>
+                  {draftedEntries.map(({ d, i }) => {
+                    const hasChanges = unsaved[d.id];
+                    const meta = d.cubeDraftMeta || {};
+                    const tip = meta.cubeName
+                      ? `Drafted from "${meta.cubeName}"${meta.draftedAt ? ` on ${new Date(meta.draftedAt).toLocaleDateString()}` : ''}`
+                      : 'Cube-drafted deck';
+                    return (
+                      <div key={d.id} role="button" title={tip}
+                        className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')}
+                        onClick={() => { setActiveIdx(i); setSampleActive(-1); }}>
+                        <span style={{ color: '#ffd700', fontSize: 10 }}>🏆</span>
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
             {sampleDecks.length > 0 && (() => {
               // Split sample decks into Structure (owned shop decks) and
               // Starter (always-free) categories. Each section gets its
@@ -1230,9 +1319,18 @@ function DeckBuilder() {
               );
             })()}
           </div>
-          <button className="btn" style={{ margin: 8, padding: 6, fontSize: 10 }} onClick={async () => {
+          <button className="btn" style={{ margin: '8px 8px 4px', padding: 6, fontSize: 10 }} onClick={async () => {
             try { const data = await api('/decks', { method: 'POST', body: JSON.stringify({ name: 'Deck ' + (decks.length + 1) }) }); setDecks([...decks, data.deck]); setActiveIdx(decks.length); } catch (e) { notify(e.message, 'error'); }
           }}>+ NEW DECK</button>
+          <button className="btn" style={{ margin: '0 8px 8px', padding: 6, fontSize: 10 }} onClick={async () => {
+            try {
+              const cubeNumber = decks.filter(d => isCubeDeck(d)).length + 1;
+              const data = await api('/decks', { method: 'POST', body: JSON.stringify({ name: 'Cube ' + cubeNumber, mode: 'cube' }) });
+              setDecks([...decks, data.deck]);
+              setActiveIdx(decks.length);
+              setSampleActive(-1);
+            } catch (e) { notify(e.message, 'error'); }
+          }}>+ NEW CUBE</button>
         </div>
 
         {/* ── CENTER: ALL DECK SECTIONS ── */}
@@ -1260,6 +1358,65 @@ function DeckBuilder() {
           {/* Scrollable deck body */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
 
+            {isCube && (
+              <DropSection sectionId="main"
+                onDrop={(d) => { if (d?.cardName) addCardTo(d.cardName, 'main'); }}
+                onDragPos={onGalleryDragPos} className="deck-section">
+                <SecHeader sec="main" color="#9ad8ff" icon="🧊" label="CUBE"
+                  count={(currentDeck?.mainDeck||[]).length} max={CUBE_SIZE}
+                  extra={<TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('main')}>↕</TipBtn>} />
+                <div className="deck-section-body" data-deck-section="main">
+                  {buildCubeDisplay(currentDeck?.mainDeck || []).map((item, idx) => {
+                    if (item.isEmpty) return <div key={'cube-empty-'+idx} className="deck-drag-slot deck-empty-slot"><div className="card-slot" style={{ width: '100%', height: '100%', fontSize: 9 }} /></div>;
+                    const card = CARDS_BY_NAME[item.card]; if (!card) return null;
+                    const isDragging = deckDrag && deckDrag.section === 'main' && deckDrag.fromIdx === item.origIdx;
+                    const cubeStackClick = (e) => {
+                      const isCover = currentDeck?.coverCard === item.card;
+                      const hasSkins = SKINS_DB[item.card] && SKINS_DB[item.card].length > 0;
+                      const menuItems = [
+                        isCover
+                          ? { label: 'Remove as cover card', icon: '✕', color: 'var(--danger)', action: () => setCoverCard('') }
+                          : { label: 'Make this the cover card', icon: '⭐', color: '#ffd700', action: () => setCoverCard(item.card) },
+                      ];
+                      if (hasSkins) {
+                        const availOpts = ownedSkins ? SKINS_DB[item.card].filter(s => ownedSkins.has(s)) : SKINS_DB[item.card];
+                        if (availOpts.length > 0) {
+                          menuItems.push({ label: 'Select skin', icon: '🎨', color: 'var(--accent)', action: () => setSkinGallery({ cardName: item.card, options: availOpts }) });
+                        }
+                      }
+                      menuItems.push({ label: 'Remove 1 copy', icon: '🗑', color: 'var(--danger)', action: () => removeFrom(item.card, 'main', item.origIdx) });
+                      if (item.count > 1) {
+                        menuItems.push({ label: 'Remove all ' + item.count + ' copies', icon: '🗑', color: 'var(--danger)', action: () => {
+                          const filtered = (currentDeck?.mainDeck || []).filter(n => n !== item.card);
+                          updateSections({ main: filtered });
+                          if (window.playSFX) window.playSFX('discard');
+                        } });
+                      }
+                      setCtxMenu({ x: e.clientX, y: e.clientY, items: menuItems });
+                    };
+                    return <div key={'cube-'+item.card} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')} data-touch-drag="1"
+                      onMouseDown={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}
+                      onTouchStart={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}
+                      onContextMenu={(e) => { e.preventDefault(); removeFrom(item.card, 'main', item.origIdx); }}
+                      style={{ position: 'relative' }}>
+                      <CardMini card={card} onClick={cubeStackClick} isCover={item.card === currentDeck?.coverCard} skins={currentDeck?.skins} />
+                      {item.count > 1 && (
+                        <div style={{
+                          position: 'absolute', bottom: 2, right: 2,
+                          background: 'rgba(0,0,0,.85)', color: '#fff',
+                          border: '1px solid #9ad8ff', borderRadius: 4,
+                          padding: '1px 5px', fontSize: 11, fontWeight: 700,
+                          fontFamily: "'Rajdhani', sans-serif", lineHeight: 1.2,
+                          pointerEvents: 'none', zIndex: 2
+                        }}>×{item.count}</div>
+                      )}
+                    </div>;
+                  })}
+                </div>
+              </DropSection>
+            )}
+
+            {!isCube && <>
             {/* ── HEROES ── */}
             <DropSection sectionId="hero" onDrop={(d, mx, my) => {
               const dt = findDropTarget(mx, my, null, -1);
@@ -1376,6 +1533,7 @@ function DeckBuilder() {
                 })}
               </div>
             </DropSection>
+            </>}
 
           </div>
         </div>

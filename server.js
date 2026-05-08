@@ -141,6 +141,20 @@ async function initDatabase() {
   try { await db.execute('ALTER TABLE users ADD COLUMN losses INTEGER DEFAULT 0'); } catch {}
   try { await db.execute("ALTER TABLE decks ADD COLUMN cover_card TEXT DEFAULT ''"); } catch {}
   try { await db.execute("ALTER TABLE decks ADD COLUMN skins TEXT DEFAULT '{}'"); } catch {}
+  // Cube Draft mode: a deck row with mode='cube' is a 512-card cube list
+  // (single section, no heroes / potions / side). Default 'standard' keeps
+  // every existing row unchanged.
+  try { await db.execute("ALTER TABLE decks ADD COLUMN mode TEXT DEFAULT 'standard'"); } catch {}
+  // Separate ELO bucket for Cube Draft tournaments. Constructed games
+  // continue to use the original `elo` column; cube-draft tournament
+  // results route to `elo_cube` so the two formats don't bleed into
+  // each other's leaderboards.
+  try { await db.execute("ALTER TABLE users ADD COLUMN elo_cube INTEGER DEFAULT 1000"); } catch {}
+  // Drafted-deck metadata. JSON blob: { cubeName, draftedAt, roomId }.
+  // Marks decks saved at the end of a Cube Draft run so the deck list
+  // can group them under a "Drafted Decks" header. Standard decks
+  // leave this NULL.
+  try { await db.execute("ALTER TABLE decks ADD COLUMN cube_draft_meta TEXT DEFAULT NULL"); } catch {}
   try { await db.execute('ALTER TABLE users ADD COLUMN sc INTEGER DEFAULT 0'); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN board TEXT DEFAULT NULL"); } catch {}
   try { await db.execute("ALTER TABLE users ADD COLUMN hide_tutorial INTEGER DEFAULT 0"); } catch {}
@@ -360,7 +374,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), defaultSampleDeckId: u.default_sample_deck_id || null };
+  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), defaultSampleDeckId: u.default_sample_deck_id || null };
 }
 
 // ===== PROFILE ROUTES =====
@@ -469,6 +483,7 @@ app.get('/api/profile/export', authMiddleware, async (req, res) => {
   const payload = {
     username: user.username,
     elo: user.elo,
+    eloCube: user.elo_cube == null ? 1000 : user.elo_cube,
     color: user.color,
     bio: user.bio || '',
     wins: user.wins || 0,
@@ -702,9 +717,10 @@ app.get('/api/decks', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/decks', authMiddleware, async (req, res) => {
-  const { name } = req.body;
+  const { name, mode } = req.body;
   const id = uuidv4();
-  await db.run('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)', [id, req.user.userId, name || 'New Deck']);
+  const deckMode = mode === 'cube' ? 'cube' : 'standard';
+  await db.run('INSERT INTO decks (id, user_id, name, mode) VALUES (?, ?, ?, ?)', [id, req.user.userId, name || 'New Deck', deckMode]);
   const deck = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [id, req.user.userId]);
   res.json({ deck: parseDeck(deck) });
 });
@@ -825,10 +841,10 @@ app.post('/api/decks/:id/saveas', authMiddleware, async (req, res) => {
 
     const newId = uuidv4();
     await db.run(
-      'INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, cover_card, skins, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, unixepoch(), unixepoch())',
+      'INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, cover_card, skins, mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, unixepoch(), unixepoch())',
       [newId, req.user.userId, name || original.name + ' (Copy)',
        original.main_deck, original.heroes, original.potion_deck, original.side_deck,
-       original.cover_card || '', original.skins || '{}']
+       original.cover_card || '', original.skins || '{}', original.mode || 'standard']
     );
 
     const newDeck = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [newId, req.user.userId]);
@@ -1282,6 +1298,8 @@ app.get('/api/profile/standard-sleeves', (req, res) => {
 function parseDeck(row) {
   let skins = {};
   try { skins = JSON.parse(row.skins || '{}'); } catch {}
+  let cubeDraftMeta = null;
+  try { cubeDraftMeta = row.cube_draft_meta ? JSON.parse(row.cube_draft_meta) : null; } catch {}
   return {
     id: row.id,
     name: row.name,
@@ -1292,6 +1310,8 @@ function parseDeck(row) {
     isDefault: !!row.is_default,
     coverCard: row.cover_card || '',
     skins,
+    mode: row.mode || 'standard',
+    cubeDraftMeta,
   };
 }
 
@@ -1795,12 +1815,46 @@ function sendGameState(room, playerIdx, extra) {
         return [...blocked];
       })() : [],
       neverPlayableCards: pi === playerIdx ? ps.hand.filter(cn => loadCardEffect(cn)?.neverPlayable) : [],
-      // Per-instance hand-card level offsets (Rocky Slime). Owner-only —
+      // Per-instance hand-card level offsets (Rocky Slime, persistent
+      // — carries onto the summoned support instance). Owner-only:
       // the opponent shouldn't see which copies are reduced. Maps
-      // hand-index → numeric offset (currently always negative). The
-      // client renders an effective-level badge on each tagged hand
-      // card via `me.handLevelOffsets`.
+      // hand-index → numeric offset (currently always negative).
       handLevelOffsets: pi === playerIdx ? { ...(ps._handLevelOffsets || {}) } : {},
+      // Transient sibling (Sparkfly Queen's "as if levels were reduced
+      // by 3" rebate). Same hand-index keying; the offset evaporates
+      // when the card leaves the hand.
+      handLevelOffsetsTransient: pi === playerIdx ? { ...(ps._handLevelOffsetsTransient || {}) } : {},
+      // Per-hand-index hero filter (Sparkfly Queen). When an entry
+      // exists for a slot, the corresponding offset only applies to
+      // the named hero; the client repaints that slot's level badge
+      // dark green to mark the limitation.
+      handLevelOffsetHeroFilter: pi === playerIdx ? { ...(ps._handLevelOffsetHeroFilter || {}) } : {},
+      // Dynamic-reduction sibling — populated by the same client-side
+      // badge logic that already merges `handLevelOffsets` /
+      // `handLevelOffsetsTransient`. Sources level reductions from
+      // cards that compute their own offset on the fly via the
+      // `reduceCardLevel` hook (The Bonegrinder counting Skeletons in
+      // discard, plus any future card with similar text), instead of
+      // stamping a stored offset onto a specific hand slot. Computed
+      // here per sendGameState so the badge stays in sync with the
+      // engine's actual gate-check (`_applyCardLevelReductions`) — no
+      // separate client-side reproduction of every reduceCardLevel
+      // implementation needed. Owner-only: the opponent doesn't see
+      // hand contents, so the map is irrelevant to them.
+      handLevelOffsetsDynamic: pi === playerIdx ? (() => {
+        const out = {};
+        if (!room.engine) return out;
+        const cardDB = getCardDB();
+        for (let i = 0; i < (ps.hand || []).length; i++) {
+          const cd = cardDB[ps.hand[i]];
+          if (!cd || !cd.level) continue;
+          let reduced;
+          try { reduced = room.engine._applyCardLevelReductions(cd, cd.level, pi); }
+          catch { continue; }
+          if (reduced < cd.level) out[i] = reduced - cd.level; // negative offset
+        }
+        return out;
+      })() : {},
       // Per-instance Artifact cost reductions (Play Money). Owner-only:
       // the opponent shouldn't see which copies are discounted. The
       // client renders an effective-cost badge on each tagged hand
@@ -2281,6 +2335,9 @@ function sendSpectatorGameState(room) {
       handLockBlockedCards: [],
       neverPlayableCards: [],
       handLevelOffsets: {},
+      handLevelOffsetsTransient: {},
+      handLevelOffsetHeroFilter: {},
+      handLevelOffsetsDynamic: {},
       handCostReductions: {},
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       heroesActedThisTurn: ps.heroesActedThisTurn || [],
@@ -2426,7 +2483,7 @@ async function endGame(room, winnerIdx, reason) {
     const userId = gs.players[i]?.userId;
     const sid = gs.players[i]?.socketId;
     if (userId && sid) {
-      const updated = await db.get('SELECT wins, losses, elo, sc FROM users WHERE id = ?', [userId]);
+      const updated = await db.get('SELECT wins, losses, elo, elo_cube, sc FROM users WHERE id = ?', [userId]);
       if (updated) io.to(sid).emit('user_stats_updated', updated);
     }
   }
@@ -2494,6 +2551,25 @@ async function endGame(room, winnerIdx, reason) {
         await advanceToNextGame(room, loserIdx);
       }
     }, 2000);
+  }
+
+  // ── Cube tournament hook ──
+  // If this room is a child of a cube-draft tournament parent, report
+  // the completed match result up so the bracket can advance. We delay
+  // a few seconds so the result panel has time to display before the
+  // child room is torn down.
+  if (setOver && room.parentCubeRoomId) {
+    const parent = rooms.get(room.parentCubeRoomId);
+    if (parent?.cubeDraft?.bracket) {
+      const round = parent.cubeDraft.bracket.rounds[room.parentCubeRoundIdx];
+      const match = round?.find(m => m.matchIdx === room.parentCubeMatchIdx);
+      if (match) {
+        const winnerSeat = winnerIdx === 0 ? match.p1Seat : match.p2Seat;
+        setTimeout(() => {
+          cubeMatchEnd(parent, match, winnerSeat, io).catch(err => console.error('[cubeMatchEnd]', err.message));
+        }, 4000);
+      }
+    }
   }
 }
 
@@ -2715,7 +2791,7 @@ function endCpuBattle(room, winnerIdx, reason) {
           rewards: [{ id: 'cpu_win', title: 'CPU Battle Victory', amount: CPU_WIN_SC }],
           total: CPU_WIN_SC,
         });
-        const updated = await db.get('SELECT wins, losses, elo, sc FROM users WHERE id = ?', [userId]);
+        const updated = await db.get('SELECT wins, losses, elo, elo_cube, sc FROM users WHERE id = ?', [userId]);
         if (updated && sid) io.to(sid).emit('user_stats_updated', updated);
       } catch (err) {
         console.error('[CPU battle] SC award error:', err.message);
@@ -5130,7 +5206,7 @@ async function doUsePotion(room, pi, { cardName, handIndex }) {
 
   const script = loadCardEffect(cardName);
   if (!script?.isPotion) return false;
-  if (script.canActivate && !script.canActivate(gs, pi)) return false;
+  if (script.canActivate && !script.canActivate(gs, pi, room.engine)) return false;
   if (script.blockedByHandLock && ps.handLocked) return false;
 
   // Targeted Potions enter targeting mode; the CPU defers them until 2i (the
@@ -5138,9 +5214,15 @@ async function doUsePotion(room, pi, { cardName, handIndex }) {
   // supports them for the human socket path.
   if (script.getValidTargets && script.targetingConfig) {
     const validTargets = script.getValidTargets(gs, pi, room.engine);
+    // targetingConfig may be a function (per-call computation) or a
+    // static object — normalize so the client always receives a plain
+    // config object.
+    const cfg = typeof script.targetingConfig === 'function'
+      ? script.targetingConfig(gs, pi)
+      : script.targetingConfig;
     gs.potionTargeting = {
       potionName: cardName, handIndex, ownerIdx: pi,
-      cardType: 'Potion', validTargets, config: script.targetingConfig,
+      cardType: 'Potion', validTargets, config: cfg,
     };
     for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
@@ -5354,6 +5436,1174 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
   return true;
 }
 
+// ═══════════════════════════════════════════
+//  CUBE DRAFT ENGINE
+//  ─────────────────
+//  Server-authoritative draft state machine. The flow:
+//    1. cubeDraftStart()    — load cube, shuffle into 32 packs of 16,
+//                             open round 0 (8 packs to 8 seats), start
+//                             pick-window timer.
+//    2. cubeDraftMakePick() — apply a single human pick. When all 8
+//                             pending picks are filled, advance.
+//    3. cubeDraftAdvance()  — collapse pending picks into pools, pass
+//                             packs (snake direction), bump pickInRound.
+//                             At end-of-round (16 picks), open next 8
+//                             packs. After 4 rounds, finalizeDraft()
+//                             flips phase → 'building' for M3.
+//    4. Bots auto-pick on a short randomized delay; humans use a
+//       per-pack time bank that ticks down only during open windows.
+//    5. Disconnected humans suspend the draft; (re)connect or vote-kick
+//       to a bot replacement resumes it. Vote-kicked = treated as a
+//       loss for cube ELO purposes (handled in M5).
+// ═══════════════════════════════════════════
+
+const CUBE_PACK_SIZE = 16;
+const CUBE_PACKS_PER_ROUND = 8;
+const CUBE_ROUNDS = 4;
+const CUBE_SEATS = 8;
+const BOT_PICK_DELAY_MIN_MS = 250;
+const BOT_PICK_DELAY_MAX_MS = 900;
+
+function cubeShuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Effective remaining-pack-budget for a seat, accounting for time
+ *  already elapsed in the open pick window. Returns ms; clamps to 0. */
+function cubeDraftSeatRemainingMs(draft, seatIdx) {
+  if (!draft) return 0;
+  const baseRemaining = draft.timerRemaining[seatIdx] || 0;
+  const pickedAt = draft.pickedAtMs[seatIdx];
+  if (pickedAt != null) {
+    return Math.max(0, baseRemaining - (pickedAt - draft.pickWindowStartedAt));
+  }
+  return Math.max(0, baseRemaining - (Date.now() - draft.pickWindowStartedAt));
+}
+
+async function cubeDraftStart(room, db, parseDeck, io) {
+  const cd = room.cubeDraft;
+  if (!cd) return;
+
+  // Load the host's cube. The cube was validated at create_room time;
+  // we re-load here in case the host edited the cube between creation
+  // and start (rare but possible). 512 cards is the strict requirement.
+  let cube;
+  try {
+    const deckRow = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [cd.cubeId, cd.cubeOwnerId]);
+    if (!deckRow) throw new Error('Cube row missing');
+    cube = parseDeck(deckRow);
+  } catch (err) {
+    console.error('[cubeDraftStart] failed to load cube:', err.message);
+    cd.phase = 'lobby';
+    io.to('room:' + room.id).emit('room_update', sanitizeRoom(room));
+    return;
+  }
+  const cubeCards = cube.mainDeck || [];
+  if (cubeCards.length !== 512 || cube.mode !== 'cube') {
+    console.error('[cubeDraftStart] cube no longer legal:', cubeCards.length, cube.mode);
+    cd.phase = 'lobby';
+    io.to('room:' + room.id).emit('room_update', sanitizeRoom(room));
+    return;
+  }
+
+  // Shuffle cube into 32 packs of 16. Each cube card appears exactly once.
+  const shuffled = cubeShuffle(cubeCards);
+  const packs = [];
+  for (let i = 0; i < CUBE_PACKS_PER_ROUND * CUBE_ROUNDS; i++) {
+    packs.push(shuffled.slice(i * CUBE_PACK_SIZE, (i + 1) * CUBE_PACK_SIZE));
+  }
+  // Cache the original (unshuffled) cube card list — used by
+  // cubeDraftFinalize for the "0 heroes drafted" auto-assign rule
+  // (need the cube contents to know which heroes are NOT in the cube).
+  cd.cubeCards = [...cubeCards];
+
+  // Random ring order (0..7 → seat indices). The host stays at seat 0
+  // physically but the ring position can be anywhere — this only
+  // governs which-seat-passes-to-which during the snake.
+  const seatOrder = cubeShuffle([0, 1, 2, 3, 4, 5, 6, 7]);
+
+  cd.draftState = {
+    seatOrder,                                                        // ring pos → seat idx
+    packs,                                                            // 32 starting packs
+    round: 0,                                                         // 0..3
+    pickInRound: 0,                                                   // 0..15
+    direction: 'left',                                                // 'left' | 'right'
+    currentPacks: new Array(CUBE_SEATS).fill(null).map(() => []),     // per seat
+    pendingPicks: new Array(CUBE_SEATS).fill(null),                   // per seat: card | null
+    pools: new Array(CUBE_SEATS).fill(null).map(() => []),            // per seat
+    timerRemaining: new Array(CUBE_SEATS).fill(0),                    // per seat: ms
+    pickedAtMs: new Array(CUBE_SEATS).fill(null),                     // per seat: ms when they picked
+    pickWindowStartedAt: 0,
+    timeoutHandle: null,
+    botTimeouts: [],                                                  // active bot setTimeout handles
+    suspended: false,
+    suspendReason: null,
+    voteKick: null, // { targetSeat, votes: { [voterSeat]: true } } when active
+  };
+
+  cubeDraftOpenRound(room, 0, io);
+  cubeDraftBroadcast(room, io);
+  cubeDraftScheduleBotPicks(room, db, parseDeck, io);
+  cubeDraftScheduleTimeout(room, db, parseDeck, io);
+}
+
+function cubeDraftOpenRound(room, round, io) {
+  const cd = room.cubeDraft;
+  const draft = cd.draftState;
+  draft.round = round;
+  draft.pickInRound = 0;
+  draft.direction = round % 2 === 0 ? 'left' : 'right';
+  draft.pendingPicks = new Array(CUBE_SEATS).fill(null);
+  draft.pickedAtMs = new Array(CUBE_SEATS).fill(null);
+
+  // Each ring position gets one of the 8 packs for this round. The
+  // physical seat that owns ring position i is seatOrder[i] — that
+  // seat receives packs[round*8 + i].
+  for (let ringPos = 0; ringPos < CUBE_SEATS; ringPos++) {
+    const seatIdx = draft.seatOrder[ringPos];
+    draft.currentPacks[seatIdx] = [...draft.packs[round * CUBE_PACKS_PER_ROUND + ringPos]];
+  }
+
+  // Reset per-seat budget at the start of each round. Per the spec:
+  // "players start with a per-pack time budget" — round = pack opening.
+  for (let seatIdx = 0; seatIdx < CUBE_SEATS; seatIdx++) {
+    draft.timerRemaining[seatIdx] = (cd.packTimerSec || 60) * 1000;
+  }
+  draft.pickWindowStartedAt = Date.now();
+}
+
+function cubeDraftPlayerView(room, seatIdx) {
+  const cd = room.cubeDraft;
+  const draft = cd.draftState;
+  if (!draft) return null;
+  return {
+    phase: cd.phase,
+    seatIdx,
+    seatOrder: draft.seatOrder,
+    players: room.players.map(p => ({ username: p.username, isBot: !!p.isBot })),
+    round: draft.round,
+    pickInRound: draft.pickInRound,
+    totalPicks: CUBE_ROUNDS * CUBE_PACK_SIZE,
+    totalRounds: CUBE_ROUNDS,
+    direction: draft.direction,
+    myPack: draft.currentPacks[seatIdx] || [],
+    myPool: draft.pools[seatIdx] || [],
+    myPicked: draft.pendingPicks[seatIdx] != null,
+    seatPicked: draft.pendingPicks.map(p => p != null),
+    packTimerSec: cd.packTimerSec,
+    pickTimerSec: cd.pickTimerSec,
+    timerDisabled: !!cd.timerDisabled,
+    remainingMs: cd.timerDisabled ? null : cubeDraftSeatRemainingMs(draft, seatIdx),
+    suspended: !!draft.suspended,
+    suspendReason: draft.suspendReason,
+    voteKick: draft.voteKick ? {
+      targetSeat: draft.voteKick.targetSeat,
+      targetUsername: room.players[draft.voteKick.targetSeat]?.username,
+      votes: Object.keys(draft.voteKick.votes).length,
+      needed: draft.voteKick.needed,
+    } : null,
+  };
+}
+
+function cubeDraftSpectatorView(room) {
+  const cd = room.cubeDraft;
+  const draft = cd.draftState;
+  if (!draft) return null;
+  // Spectators see structural state — round, pick number, suspend status —
+  // but NEVER pack contents or anyone's pool. Per spec rule #4: "spectators
+  // should only see the games themselves, NOT what cards get drafted, to
+  // avoid them telling hidden info to participants".
+  return {
+    phase: cd.phase,
+    isSpectator: true,
+    seatOrder: draft.seatOrder,
+    players: room.players.map(p => ({ username: p.username, isBot: !!p.isBot })),
+    round: draft.round,
+    pickInRound: draft.pickInRound,
+    totalPicks: CUBE_ROUNDS * CUBE_PACK_SIZE,
+    totalRounds: CUBE_ROUNDS,
+    direction: draft.direction,
+    seatPicked: draft.pendingPicks.map(p => p != null),
+    suspended: !!draft.suspended,
+  };
+}
+
+function cubeDraftBroadcast(room, io) {
+  const cd = room.cubeDraft;
+  if (!cd?.draftState) return;
+  for (let seatIdx = 0; seatIdx < room.players.length; seatIdx++) {
+    const p = room.players[seatIdx];
+    if (p.isBot || !p.socketId) continue;
+    io.to(p.socketId).emit('cube_draft_state', cubeDraftPlayerView(room, seatIdx));
+  }
+  for (const spec of room.spectators) {
+    if (spec.socketId) io.to(spec.socketId).emit('cube_draft_state', cubeDraftSpectatorView(room));
+  }
+}
+
+function cubeDraftScheduleBotPicks(room, db, parseDeck, io) {
+  const cd = room.cubeDraft;
+  const draft = cd.draftState;
+  if (!draft || draft.suspended) return;
+  // Cancel previous bot pick timers — they get re-scheduled per pick window.
+  for (const h of (draft.botTimeouts || [])) clearTimeout(h);
+  draft.botTimeouts = [];
+  for (let seatIdx = 0; seatIdx < CUBE_SEATS; seatIdx++) {
+    if (!room.players[seatIdx]?.isBot) continue;
+    if (draft.pendingPicks[seatIdx] != null) continue;
+    const pack = draft.currentPacks[seatIdx];
+    if (!pack || pack.length === 0) continue;
+    // Bot picks pure-randomly per the spec — value is intentionally not
+    // tied to type/level/cost so humans can't "read" the bot's tendencies.
+    const card = pack[Math.floor(Math.random() * pack.length)];
+    const delay = BOT_PICK_DELAY_MIN_MS + Math.floor(Math.random() * (BOT_PICK_DELAY_MAX_MS - BOT_PICK_DELAY_MIN_MS));
+    const handle = setTimeout(() => {
+      cubeDraftHandlePick(room, seatIdx, card, db, parseDeck, io, { fromBot: true });
+    }, delay);
+    draft.botTimeouts.push(handle);
+  }
+}
+
+function cubeDraftScheduleTimeout(room, db, parseDeck, io) {
+  const cd = room.cubeDraft;
+  const draft = cd.draftState;
+  if (!draft || draft.suspended) return;
+  // Host opted to disable the timer — never auto-pick humans on timeout.
+  // (Bots still pick on their own short delay; see scheduleBotPicks.)
+  if (cd.timerDisabled) {
+    if (draft.timeoutHandle) { clearTimeout(draft.timeoutHandle); draft.timeoutHandle = null; }
+    return;
+  }
+  if (draft.timeoutHandle) clearTimeout(draft.timeoutHandle);
+  // Find the soonest-expiring human seat that hasn't picked yet.
+  let minMs = Infinity;
+  for (let seatIdx = 0; seatIdx < CUBE_SEATS; seatIdx++) {
+    if (room.players[seatIdx]?.isBot) continue;
+    if (draft.pendingPicks[seatIdx] != null) continue;
+    const remaining = cubeDraftSeatRemainingMs(draft, seatIdx);
+    if (remaining < minMs) minMs = remaining;
+  }
+  if (!Number.isFinite(minMs)) return;
+  // Add a small grace buffer so we don't no-op-fire repeatedly on
+  // floating-point boundary cases.
+  draft.timeoutHandle = setTimeout(() => {
+    cubeDraftHandleTimeout(room, db, parseDeck, io);
+  }, Math.max(0, minMs) + 25);
+}
+
+function cubeDraftHandleTimeout(room, db, parseDeck, io) {
+  const cd = room.cubeDraft;
+  const draft = cd.draftState;
+  if (!draft || draft.suspended) return;
+  let anyPickedThisCall = false;
+  for (let seatIdx = 0; seatIdx < CUBE_SEATS; seatIdx++) {
+    if (room.players[seatIdx]?.isBot) continue;
+    if (draft.pendingPicks[seatIdx] != null) continue;
+    const remaining = cubeDraftSeatRemainingMs(draft, seatIdx);
+    if (remaining <= 0) {
+      const pack = draft.currentPacks[seatIdx];
+      if (pack && pack.length > 0) {
+        const card = pack[Math.floor(Math.random() * pack.length)];
+        draft.pendingPicks[seatIdx] = card;
+        draft.pickedAtMs[seatIdx] = Date.now();
+        anyPickedThisCall = true;
+      }
+    }
+  }
+  if (anyPickedThisCall) {
+    cubeDraftCheckAdvance(room, db, parseDeck, io);
+  } else {
+    cubeDraftScheduleTimeout(room, db, parseDeck, io);
+  }
+}
+
+function cubeDraftHandlePick(room, seatIdx, cardName, db, parseDeck, io, opts = {}) {
+  const cd = room.cubeDraft;
+  const draft = cd?.draftState;
+  if (!draft || draft.suspended) return;
+  if (seatIdx < 0 || seatIdx >= CUBE_SEATS) return;
+  const seatPlayer = room.players[seatIdx];
+  if (!seatPlayer) return;
+  // Bot picks come in via cubeDraftScheduleBotPicks. Reject anything else
+  // claiming to pick on a bot's behalf.
+  if (seatPlayer.isBot && !opts.fromBot) return;
+  if (draft.pendingPicks[seatIdx] != null) return; // already picked
+  const pack = draft.currentPacks[seatIdx];
+  if (!pack || !pack.includes(cardName)) return;
+  draft.pendingPicks[seatIdx] = cardName;
+  draft.pickedAtMs[seatIdx] = Date.now();
+  cubeDraftCheckAdvance(room, db, parseDeck, io);
+}
+
+function cubeDraftCheckAdvance(room, db, parseDeck, io) {
+  const cd = room.cubeDraft;
+  const draft = cd.draftState;
+  if (draft.pendingPicks.some(p => p == null)) {
+    cubeDraftBroadcast(room, io);
+    cubeDraftScheduleTimeout(room, db, parseDeck, io);
+    return;
+  }
+  cubeDraftAdvance(room, db, parseDeck, io);
+}
+
+function cubeDraftAdvance(room, db, parseDeck, io) {
+  const cd = room.cubeDraft;
+  const draft = cd.draftState;
+
+  // Cancel pending timers — we're rolling to the next pick window.
+  if (draft.timeoutHandle) { clearTimeout(draft.timeoutHandle); draft.timeoutHandle = null; }
+  for (const h of (draft.botTimeouts || [])) clearTimeout(h);
+  draft.botTimeouts = [];
+
+  // Apply each pick: remove from pack, add to pool (humans only).
+  // Bots discard their picks per spec — they remove a card from the pack
+  // but never "keep" it; the card is destroyed for the round. This is
+  // why `room.spectators`-side and the pool table only ever grow for
+  // human seats. Time-based timeout deductions also happen here.
+  const elapsed = Date.now() - draft.pickWindowStartedAt;
+  for (let seatIdx = 0; seatIdx < CUBE_SEATS; seatIdx++) {
+    const card = draft.pendingPicks[seatIdx];
+    const pack = draft.currentPacks[seatIdx];
+    if (card && pack) {
+      const idx = pack.indexOf(card);
+      if (idx >= 0) pack.splice(idx, 1);
+      if (!room.players[seatIdx].isBot) draft.pools[seatIdx].push(card);
+    }
+    // Deduct elapsed-since-window-start from the seat's pack budget.
+    // Picks made earlier in the window deduct based on their own
+    // pickedAtMs; otherwise we use the full window length.
+    const pickedAt = draft.pickedAtMs[seatIdx];
+    const burned = pickedAt != null ? (pickedAt - draft.pickWindowStartedAt) : elapsed;
+    draft.timerRemaining[seatIdx] = Math.max(0, draft.timerRemaining[seatIdx] - burned);
+    // Per-pick bonus, awarded after the deduction.
+    draft.timerRemaining[seatIdx] += (cd.pickTimerSec || 0) * 1000;
+  }
+
+  // Pass packs along the snake direction. Pack at ring position i
+  // moves to ring position (i±1) % 8 depending on direction.
+  const newPacks = new Array(CUBE_SEATS).fill(null).map(() => []);
+  for (let ringPos = 0; ringPos < CUBE_SEATS; ringPos++) {
+    const fromSeat = draft.seatOrder[ringPos];
+    const toRingPos = draft.direction === 'left'
+      ? (ringPos + 1) % CUBE_SEATS
+      : (ringPos - 1 + CUBE_SEATS) % CUBE_SEATS;
+    const toSeat = draft.seatOrder[toRingPos];
+    newPacks[toSeat] = draft.currentPacks[fromSeat];
+  }
+  draft.currentPacks = newPacks;
+
+  draft.pickInRound++;
+  draft.pendingPicks = new Array(CUBE_SEATS).fill(null);
+  draft.pickedAtMs = new Array(CUBE_SEATS).fill(null);
+  draft.pickWindowStartedAt = Date.now();
+
+  if (draft.pickInRound >= CUBE_PACK_SIZE) {
+    // Round done. Open next round if any.
+    const nextRound = draft.round + 1;
+    if (nextRound >= CUBE_ROUNDS) {
+      cubeDraftFinalize(room, io);
+      return;
+    }
+    cubeDraftOpenRound(room, nextRound, io);
+  }
+
+  cubeDraftBroadcast(room, io);
+  cubeDraftScheduleBotPicks(room, db, parseDeck, io);
+  cubeDraftScheduleTimeout(room, db, parseDeck, io);
+}
+
+function cubeDraftFinalize(room, io) {
+  const cd = room.cubeDraft;
+  const draft = cd.draftState;
+  if (draft.timeoutHandle) clearTimeout(draft.timeoutHandle);
+  for (const h of (draft.botTimeouts || [])) clearTimeout(h);
+  draft.timeoutHandle = null;
+  draft.botTimeouts = [];
+
+  // ── Hero assignment rule ──
+  // Per spec: "If a player drafted NO Heroes, they get one random Hero
+  // that is NOT in the cube list assigned to them, if possible. If no
+  // such Hero exists, use a random Hero from within the Cube list
+  // instead." Bots are skipped (they don't build decks).
+  const cardDB = getCardDB();
+  const cubeCardSet = new Set(cd.cubeCards || []);
+  const allHeroNames = Object.keys(cardDB).filter(n => cardDB[n]?.cardType === 'Hero');
+  const nonCubeHeroes = allHeroNames.filter(n => !cubeCardSet.has(n));
+  const cubeHeroes = allHeroNames.filter(n => cubeCardSet.has(n));
+  cd.assignedHeroes = {}; // seatIdx → heroName (read by build screen + final standings)
+
+  for (let seatIdx = 0; seatIdx < CUBE_SEATS; seatIdx++) {
+    const player = room.players[seatIdx];
+    if (!player || player.isBot) continue;
+    const pool = draft.pools[seatIdx];
+    const hasHero = pool.some(name => cardDB[name]?.cardType === 'Hero');
+    if (!hasHero) {
+      const source = nonCubeHeroes.length > 0 ? nonCubeHeroes : cubeHeroes;
+      if (source.length === 0) continue; // no heroes anywhere — give up
+      const assigned = source[Math.floor(Math.random() * source.length)];
+      pool.push(assigned);
+      cd.assignedHeroes[seatIdx] = assigned;
+      console.log(`[cube_draft] seat ${seatIdx} (${player.username}) drafted 0 heroes — assigned ${assigned}`);
+    }
+  }
+
+  cd.phase = 'building';
+  // Persist drafted pools to the room so the deck-builder phase (M3)
+  // can read them. Bots end up with empty pools — they're skipped in
+  // the deck-build round and the tournament bracket too.
+  cd.draftedPools = draft.pools.map((pool, seatIdx) => ({
+    seatIdx,
+    username: room.players[seatIdx]?.username || `Seat ${seatIdx}`,
+    isBot: !!room.players[seatIdx]?.isBot,
+    pool,
+  }));
+  // Initialize the build-phase "ready" tracker. Each human seat must
+  // submit a deck before the room can advance to the tournament phase.
+  cd.builtDecks = {}; // seatIdx → { name, heroes, mainDeck, sideDeck }
+  cd.readySeats = {}; // seatIdx → true once that seat clicks Ready
+  cubeDraftBroadcast(room, io);
+  cubeBuildBroadcast(room, io);
+  io.to('room:' + room.id).emit('room_update', sanitizeRoom(room));
+  console.log(`[cube_draft] room ${room.id} draft complete — entering build phase`);
+}
+
+function cubeDraftSuspend(room, reason, io) {
+  const cd = room.cubeDraft;
+  const draft = cd?.draftState;
+  if (!draft) return;
+  draft.suspended = true;
+  draft.suspendReason = reason;
+  if (draft.timeoutHandle) { clearTimeout(draft.timeoutHandle); draft.timeoutHandle = null; }
+  for (const h of (draft.botTimeouts || [])) clearTimeout(h);
+  draft.botTimeouts = [];
+  // Snapshot pickWindowStartedAt as the resume-point — when we unfreeze,
+  // we'll shift pickWindowStartedAt by the suspended duration so the
+  // remaining-budget calc resumes where it left off.
+  draft.suspendedAt = Date.now();
+  cubeDraftBroadcast(room, io);
+}
+
+function cubeDraftResume(room, db, parseDeck, io) {
+  const cd = room.cubeDraft;
+  const draft = cd?.draftState;
+  if (!draft || !draft.suspended) return;
+  const suspendDur = Date.now() - (draft.suspendedAt || Date.now());
+  draft.pickWindowStartedAt += suspendDur;
+  for (let seatIdx = 0; seatIdx < CUBE_SEATS; seatIdx++) {
+    if (draft.pickedAtMs[seatIdx] != null) draft.pickedAtMs[seatIdx] += suspendDur;
+  }
+  draft.suspended = false;
+  draft.suspendReason = null;
+  draft.suspendedAt = null;
+  cubeDraftBroadcast(room, io);
+  cubeDraftScheduleBotPicks(room, db, parseDeck, io);
+  cubeDraftScheduleTimeout(room, db, parseDeck, io);
+}
+
+// ═══════════════════════════════════════════
+//  CUBE DRAFT — BUILD PHASE
+// ═══════════════════════════════════════════
+
+function cubeBuildBroadcast(room, io) {
+  const cd = room.cubeDraft;
+  if (!cd || cd.phase !== 'building') return;
+  const humanCount = room.players.filter(p => !p.isBot).length;
+  const readyCount = Object.keys(cd.readySeats || {}).filter(k => cd.readySeats[k]).length;
+  const humanSeats = room.players.map((p, i) => ({
+    seatIdx: i,
+    username: p.username,
+    isBot: !!p.isBot,
+    ready: !!cd.readySeats?.[i],
+  }));
+
+  for (let seatIdx = 0; seatIdx < room.players.length; seatIdx++) {
+    const p = room.players[seatIdx];
+    if (p.isBot || !p.socketId) continue;
+    const pool = cd.draftedPools?.[seatIdx]?.pool || [];
+    io.to(p.socketId).emit('cube_build_state', {
+      phase: cd.phase,
+      seatIdx,
+      pool,
+      assignedHero: cd.assignedHeroes?.[seatIdx] || null,
+      cubeName: cd.cubeName,
+      submittedDeck: cd.builtDecks?.[seatIdx] || null,
+      ready: !!cd.readySeats?.[seatIdx],
+      autoFilled: !!cd.autoFilledSeats?.[seatIdx],
+      readyCount,
+      humanCount,
+      humanSeats,
+      buildTimerEndsAt: cd.buildTimerEndsAt || null,
+      buildTimerTotalMs: CUBE_BUILD_TIMER_MS,
+    });
+  }
+  for (const spec of room.spectators) {
+    if (!spec.socketId) continue;
+    io.to(spec.socketId).emit('cube_build_state', {
+      phase: cd.phase,
+      isSpectator: true,
+      cubeName: cd.cubeName,
+      readyCount,
+      humanCount,
+      humanSeats,
+      buildTimerEndsAt: cd.buildTimerEndsAt || null,
+      buildTimerTotalMs: CUBE_BUILD_TIMER_MS,
+    });
+  }
+}
+
+/** Validate a player-submitted deck against their drafted pool.
+ *  Returns { ok: true } or { ok: false, reason }. Rules:
+ *   • Hero count must equal min(3, heroesInPool). The "fewer than 3 if
+ *     drafted fewer than 3" carve-out is enforced via this min.
+ *   • Each Hero / non-Performance Ability / other card consumed by the
+ *     deck must be available either in the pool (counted) or via the
+ *     infinite-Ability allowance.
+ *   • mainDeck size must equal 60 (standard cap). potionDeck stays
+ *     0/5-15 (re-using existing rules). sideDeck up to 15.
+ */
+function validateDraftedDeck(deck, pool, cardDB) {
+  if (!deck || typeof deck !== 'object') return { ok: false, reason: 'No deck' };
+  const heroes = Array.isArray(deck.heroes) ? deck.heroes : [];
+  const mainDeck = Array.isArray(deck.mainDeck) ? deck.mainDeck : [];
+  const potionDeck = Array.isArray(deck.potionDeck) ? deck.potionDeck : [];
+  const sideDeck = Array.isArray(deck.sideDeck) ? deck.sideDeck : [];
+
+  // Pool counts (every drafted card available by name, plus any
+  // assigned hero pushed in by cubeDraftFinalize).
+  const poolCounts = {};
+  for (const name of pool) poolCounts[name] = (poolCounts[name] || 0) + 1;
+
+  // Heroes-in-pool = heroes drafted (incl. assigned).
+  const heroesInPool = pool.filter(n => cardDB[n]?.cardType === 'Hero').length;
+  const requiredHeroes = Math.min(3, heroesInPool);
+  const filledHeroes = heroes.filter(h => h && h.hero).length;
+  if (filledHeroes !== requiredHeroes) {
+    return { ok: false, reason: `Need ${requiredHeroes} hero${requiredHeroes === 1 ? '' : 'es'} (you have ${filledHeroes})` };
+  }
+
+  // Main deck size — keep standard 60.
+  if (mainDeck.length !== 60) {
+    return { ok: false, reason: `Main deck must be exactly 60 cards (currently ${mainDeck.length})` };
+  }
+
+  // Tally usage against the pool.
+  const used = {};
+  for (const h of heroes) {
+    if (h?.hero) used[h.hero] = (used[h.hero] || 0) + 1;
+  }
+  for (const n of mainDeck) used[n] = (used[n] || 0) + 1;
+  for (const n of potionDeck) used[n] = (used[n] || 0) + 1;
+  for (const n of sideDeck) used[n] = (used[n] || 0) + 1;
+
+  for (const [name, count] of Object.entries(used)) {
+    const cd = cardDB[name];
+    if (!cd) return { ok: false, reason: `Unknown card "${name}"` };
+    // Non-Performance Abilities are infinite (drafted pool isn't required).
+    if (cd.cardType === 'Ability' && name !== 'Performance') continue;
+    const available = poolCounts[name] || 0;
+    if (count > available) {
+      return { ok: false, reason: `Not enough "${name}" in pool (have ${available}, used ${count})` };
+    }
+  }
+
+  // Ability abilities under each hero must be the correct ability slots
+  // for that hero (matching its startingAbility1 / 2). Enforced loosely —
+  // if the player overrides them with valid abilities, accept; the
+  // engine's deck-builder normally fills the slots automatically.
+  // Skipped here for simplicity.
+
+  return { ok: true };
+}
+
+/** Transitions from the build phase to the tournament phase. */
+function cubeStartTournament(room, io) {
+  const cd = room.cubeDraft;
+  if (!cd) return;
+  cd.phase = 'tournament';
+  cubeTournamentBuild(room, io);
+}
+
+// ═══════════════════════════════════════════
+//  CUBE DRAFT — TOURNAMENT
+// ═══════════════════════════════════════════
+
+const CUBE_ELO_RANDOM_GAP = 50; // see spec: random within ±50 ELO gap
+
+function cubeNextPowerOf2(n) {
+  if (n < 2) return 2;
+  let p = 1;
+  while (p < n) p *= 2;
+  return p;
+}
+
+/** Bracket builder. Seeds by Cube ELO if game is ranked; otherwise
+ *  random. Within ±50 ELO of each other, players are shuffled (no
+ *  seed advantage). Byes are placed at RANDOM positions even on
+ *  seeded brackets — per spec, top seeds shouldn't always inherit
+ *  byes. Returns { matches, bracketSize, positions, allRoundMatches }. */
+async function cubeBuildSeededBracket(room) {
+  const cd = room.cubeDraft;
+  const isRanked = room.type === 'ranked';
+  const humanSeats = room.players
+    .map((p, i) => ({ seat: i, player: p }))
+    .filter(e => !e.player.isBot && cd.builtDecks?.[e.seat]);
+
+  let seedList;
+  if (isRanked) {
+    // Fetch cube ELO for each human seat.
+    const elos = {};
+    for (const e of humanSeats) {
+      try {
+        const u = await db.get('SELECT elo_cube FROM users WHERE id = ?', [e.player.userId]);
+        elos[e.seat] = u?.elo_cube ?? 1000;
+      } catch { elos[e.seat] = 1000; }
+    }
+    // Sort by elo desc.
+    seedList = [...humanSeats].sort((a, b) => (elos[b.seat] || 1000) - (elos[a.seat] || 1000));
+    // Within ±50 ELO clusters, shuffle. Walk seedList, group consecutive
+    // entries whose elo gap to the leader is ≤ 50, shuffle each group.
+    const grouped = [];
+    let i = 0;
+    while (i < seedList.length) {
+      const leadElo = elos[seedList[i].seat];
+      let j = i;
+      while (j < seedList.length && Math.abs(elos[seedList[j].seat] - leadElo) <= CUBE_ELO_RANDOM_GAP) j++;
+      const group = seedList.slice(i, j);
+      cubeShuffleInPlace(group);
+      grouped.push(...group);
+      i = j;
+    }
+    seedList = grouped;
+  } else {
+    seedList = cubeShuffle(humanSeats);
+  }
+
+  const N = seedList.length;
+  const bracketSize = cubeNextPowerOf2(N);
+  const numByes = bracketSize - N;
+
+  // Random bye placement: pick random positions out of bracketSize.
+  const allSlotIdxs = Array.from({ length: bracketSize }, (_, i) => i);
+  cubeShuffleInPlace(allSlotIdxs);
+  const byeSlots = new Set(allSlotIdxs.slice(0, numByes));
+  // Remaining positions in ascending order — seeded players fill them
+  // in seed-list order so the bracket itself preserves seeding around
+  // the random bye holes.
+  const playerSlots = allSlotIdxs.slice(numByes).sort((a, b) => a - b);
+
+  const positions = new Array(bracketSize).fill(null);
+  for (let i = 0; i < seedList.length; i++) {
+    positions[playerSlots[i]] = seedList[i].seat;
+  }
+
+  // Round 0 matches: pair positions [0,1], [2,3], etc.
+  const matches = [];
+  for (let i = 0; i < bracketSize; i += 2) {
+    const a = positions[i], b = positions[i + 1];
+    matches.push({
+      matchIdx: i / 2,
+      p1Seat: a, // null = bye
+      p2Seat: b,
+      winnerSeat: null,
+      loserSeat: null,
+      childRoomId: null,
+      bo: cd.prelimsBo,
+      // Auto-resolve byes: if either side is null, the other advances.
+      resolved: a == null || b == null,
+    });
+    // Pre-resolve byes
+    if (a == null && b != null) matches[matches.length - 1].winnerSeat = b;
+    if (b == null && a != null) matches[matches.length - 1].winnerSeat = a;
+  }
+
+  return {
+    bracketSize,
+    positions,
+    rounds: [matches],
+    currentRoundIdx: 0,
+  };
+}
+
+function cubeShuffleInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+async function cubeTournamentBuild(room, io) {
+  const cd = room.cubeDraft;
+  if (!cd) return;
+  const bracket = await cubeBuildSeededBracket(room);
+  cd.bracket = bracket;
+  // Standings: seat → final placement (1=winner, 2=runner-up, etc.).
+  // Filled in as players are eliminated.
+  cd.standings = {};
+  cubeTournamentBroadcast(room, io);
+  // Auto-advance any rounds that resolved entirely via byes (rare —
+  // typically only relevant if exactly 1 human registers, but we never
+  // start with <2 so it's defensive).
+  await cubeTournamentAdvanceIfReady(room, io);
+  cubeTournamentStartCurrentRound(room, io);
+}
+
+function cubeTournamentBroadcast(room, io) {
+  const cd = room.cubeDraft;
+  if (!cd?.bracket) return;
+  const view = {
+    phase: cd.phase,
+    cubeName: cd.cubeName,
+    flow: cd.flow,
+    prelimsBo: cd.prelimsBo,
+    finaleBo: cd.finaleBo,
+    bracketSize: cd.bracket.bracketSize,
+    rounds: cd.bracket.rounds.map(round => round.map(m => ({
+      matchIdx: m.matchIdx,
+      p1Seat: m.p1Seat,
+      p2Seat: m.p2Seat,
+      p1Username: m.p1Seat != null ? room.players[m.p1Seat]?.username : null,
+      p2Username: m.p2Seat != null ? room.players[m.p2Seat]?.username : null,
+      winnerSeat: m.winnerSeat,
+      childRoomId: m.childRoomId,
+      bo: m.bo,
+      resolved: m.resolved,
+      live: !!m.childRoomId && rooms.get(m.childRoomId)?.status === 'playing',
+    }))),
+    currentRoundIdx: cd.bracket.currentRoundIdx,
+    standings: cd.standings || {},
+    players: room.players.map(p => ({ username: p.username, isBot: !!p.isBot })),
+    complete: !!cd.tournamentComplete,
+    finalStandings: cd.finalStandings || null,
+  };
+  // Per-recipient: include the active child room they should be
+  // playing/spectating, if any. Players in their match's child room
+  // play; everyone else gets a list of active child rooms they can
+  // tab between as spectators.
+  const allMembers = [...room.players, ...room.spectators];
+  for (const member of allMembers) {
+    if (!member.socketId) continue;
+    const seatIdx = room.players.indexOf(member);
+    const myActiveMatch = seatIdx >= 0
+      ? cd.bracket.rounds[cd.bracket.currentRoundIdx]?.find(m =>
+          (m.p1Seat === seatIdx || m.p2Seat === seatIdx) && m.childRoomId && !m.resolved)
+      : null;
+    const activeChildRooms = (cd.bracket.rounds[cd.bracket.currentRoundIdx] || [])
+      .filter(m => m.childRoomId && !m.resolved)
+      .map(m => ({
+        matchIdx: m.matchIdx,
+        childRoomId: m.childRoomId,
+        p1Username: m.p1Seat != null ? room.players[m.p1Seat]?.username : null,
+        p2Username: m.p2Seat != null ? room.players[m.p2Seat]?.username : null,
+      }));
+    io.to(member.socketId).emit('cube_tournament_state', {
+      ...view,
+      mySeat: seatIdx,
+      myActiveChildRoomId: myActiveMatch?.childRoomId || null,
+      activeChildRooms,
+      isSpectator: seatIdx < 0,
+    });
+  }
+}
+
+function cubeTournamentStartCurrentRound(room, io) {
+  const cd = room.cubeDraft;
+  if (!cd?.bracket) return;
+  const round = cd.bracket.rounds[cd.bracket.currentRoundIdx];
+  if (!round) return;
+  // Match length: prelimsBo for non-final rounds, finaleBo for the final round.
+  const isFinalRound = cd.bracket.currentRoundIdx === Math.log2(cd.bracket.bracketSize) - 1;
+  const bo = isFinalRound ? cd.finaleBo : cd.prelimsBo;
+  for (const m of round) m.bo = bo;
+
+  if (cd.flow === 'consecutive') {
+    // Find the first unresolved match without a child room and start it.
+    const next = round.find(m => !m.resolved && !m.childRoomId);
+    if (next) cubeStartMatch(room, next, io);
+  } else {
+    // Simultaneous: start every unresolved match that doesn't have one.
+    for (const m of round) {
+      if (!m.resolved && !m.childRoomId) cubeStartMatch(room, m, io);
+    }
+  }
+  cubeTournamentBroadcast(room, io);
+}
+
+async function cubeStartMatch(room, match, io) {
+  const cd = room.cubeDraft;
+  if (match.resolved || match.childRoomId) return;
+  if (match.p1Seat == null || match.p2Seat == null) {
+    // Pure bye — already auto-resolved at bracket build. Defensive.
+    match.resolved = true;
+    if (match.p1Seat != null) match.winnerSeat = match.p1Seat;
+    if (match.p2Seat != null) match.winnerSeat = match.p2Seat;
+    return;
+  }
+
+  const p1 = room.players[match.p1Seat];
+  const p2 = room.players[match.p2Seat];
+  if (!p1 || !p2) return;
+
+  // Each seat's saved drafted-deck row was created by cubeSaveDraftedDeck;
+  // we re-find it by user_id + cube_draft_meta.roomId so we don't have
+  // to thread the new deck ID through state. Match decks are read here
+  // and snapshotted onto the child room — exactly the same way the
+  // standard 1v1 deck-from-id flow works.
+  const findDraftedDeckId = async (userId) => {
+    const rows = await db.all('SELECT id, cube_draft_meta FROM decks WHERE user_id = ? AND mode = ? ORDER BY created_at DESC', [userId, 'drafted']);
+    for (const r of rows) {
+      try {
+        const meta = JSON.parse(r.cube_draft_meta || '{}');
+        if (meta.roomId === room.id) return r.id;
+      } catch {}
+    }
+    return rows[0]?.id || null; // fallback: most recent drafted deck
+  };
+  const p1DeckId = await findDraftedDeckId(p1.userId);
+  const p2DeckId = await findDraftedDeckId(p2.userId);
+
+  // Spawn a child room running the standard 2-player engine.
+  const childRoomId = uuidv4().substring(0, 8);
+  const childRoom = {
+    id: childRoomId,
+    host: p1.username,
+    hostId: p1.userId,
+    type: room.type, // ranked / unranked carries through
+    format: match.bo,
+    winsNeeded: Math.ceil(match.bo / 2),
+    setScore: [0, 0],
+    playerPw: null,
+    specPw: null,
+    maxPlayers: 2,
+    players: [
+      { username: p1.username, userId: p1.userId, socketId: p1.socketId, deckId: p1DeckId, isBot: false },
+      { username: p2.username, userId: p2.userId, socketId: p2.socketId, deckId: p2DeckId, isBot: false },
+    ],
+    spectators: [],
+    status: 'waiting',
+    created: Date.now(),
+    gameState: null,
+    chatHistory: [],
+    privateChatHistory: {},
+    // Back-pointer so endGame can route results to the parent.
+    parentCubeRoomId: room.id,
+    parentCubeMatchIdx: match.matchIdx,
+    parentCubeRoundIdx: cd.bracket.currentRoundIdx,
+  };
+  rooms.set(childRoomId, childRoom);
+  match.childRoomId = childRoomId;
+
+  // Move both players into the child room socket-wise. They keep
+  // membership in the parent room too — `socket.join` is additive.
+  // We deliberately do NOT emit `room_joined` for the child here:
+  // the tournament screen's embedded GameBoard renders off `gameState`
+  // (delivered via the standard sendGameState path) while the parent
+  // room stays as the active `lobby` context for the bracket UI.
+  for (const player of [p1, p2]) {
+    if (player.socketId) {
+      const sock = io.sockets.sockets.get(player.socketId);
+      if (sock) sock.join('room:' + childRoomId);
+      // Track the child room ID on the player so the client knows which
+      // game it's in.
+      io.to(player.socketId).emit('cube_match_assigned', {
+        parentRoomId: room.id,
+        childRoomId,
+        opponent: player.username === p1.username ? p2.username : p1.username,
+        bo: match.bo,
+      });
+    }
+  }
+
+  // Kick off the standard game engine.
+  const activePlayer = Math.random() < 0.5 ? 0 : 1;
+  try {
+    await setupGameState(childRoom);
+    await startGameEngine(childRoom, childRoomId, activePlayer);
+  } catch (err) {
+    console.error('[cubeStartMatch] engine error:', err.message);
+    // Fallback: give the win to p1 so the bracket can advance.
+    await cubeMatchEnd(room, match, match.p1Seat, io);
+    return;
+  }
+
+  console.log(`[cube_tournament] room ${room.id} round ${cd.bracket.currentRoundIdx} match ${match.matchIdx} started in child ${childRoomId}: ${p1.username} vs ${p2.username} (Bo${match.bo})`);
+  cubeTournamentBroadcast(room, io);
+}
+
+async function cubeMatchEnd(room, match, winnerSeat, io) {
+  const cd = room.cubeDraft;
+  if (!cd?.bracket) return;
+  if (match.resolved) return;
+  match.winnerSeat = winnerSeat;
+  match.loserSeat = winnerSeat === match.p1Seat ? match.p2Seat : match.p1Seat;
+  match.resolved = true;
+  // Tear down the child room. Notify all subscribers first so their
+  // GameBoard clears, then socket.leave them out of the child's room
+  // channel and drop the room from the registry.
+  if (match.childRoomId) {
+    const childRoom = rooms.get(match.childRoomId);
+    if (childRoom) {
+      io.to('room:' + match.childRoomId).emit('cube_match_ended', {
+        parentRoomId: room.id,
+        childRoomId: match.childRoomId,
+        winnerSeat,
+        winnerUsername: winnerSeat != null ? room.players[winnerSeat]?.username : null,
+      });
+      for (const member of [...childRoom.players, ...childRoom.spectators]) {
+        if (!member.socketId) continue;
+        const sock = io.sockets.sockets.get(member.socketId);
+        if (sock) sock.leave('room:' + match.childRoomId);
+      }
+      rooms.delete(match.childRoomId);
+    }
+  }
+  // Eliminated player gets a placement (filled in reverse — losers in
+  // round X share the same placement bucket, e.g. 5-8 in round-of-16).
+  const round = cd.bracket.rounds[cd.bracket.currentRoundIdx];
+  const eliminatedThisRound = round.filter(m => m.resolved && m.loserSeat != null).map(m => m.loserSeat);
+  // Placement = 1 + bracketSize - (number of round-end survivors)
+  // For final round, placement = 2 (runner-up).
+  // Simpler: assign placement = 2^(rounds - currentRoundIdx) + 1.
+  const totalRounds = Math.log2(cd.bracket.bracketSize);
+  const isFinalRound = cd.bracket.currentRoundIdx === totalRounds - 1;
+  if (match.loserSeat != null) {
+    cd.standings[match.loserSeat] = isFinalRound ? 2 : Math.pow(2, totalRounds - cd.bracket.currentRoundIdx) + 1;
+  }
+
+  cubeTournamentBroadcast(room, io);
+  await cubeTournamentAdvanceIfReady(room, io);
+
+  // Consecutive flow: when one match ends, start the next in the round.
+  if (cd.flow === 'consecutive' && cd.phase === 'tournament') {
+    const r = cd.bracket.rounds[cd.bracket.currentRoundIdx];
+    const next = r?.find(m => !m.resolved && !m.childRoomId);
+    if (next) cubeStartMatch(room, next, io);
+  }
+}
+
+async function cubeTournamentAdvanceIfReady(room, io) {
+  const cd = room.cubeDraft;
+  if (!cd?.bracket) return;
+  const round = cd.bracket.rounds[cd.bracket.currentRoundIdx];
+  if (!round) return;
+  if (round.some(m => !m.resolved)) return; // not done yet
+
+  // Round done. Build next round from winners — paired sequentially.
+  const winners = round.map(m => m.winnerSeat);
+  if (winners.length === 1) {
+    // Tournament complete.
+    cd.standings[winners[0]] = 1; // 1st place
+    cd.tournamentComplete = true;
+    cubeFinalizeTournament(room, io);
+    return;
+  }
+  const nextRoundMatches = [];
+  for (let i = 0; i < winners.length; i += 2) {
+    const a = winners[i], b = winners[i + 1];
+    nextRoundMatches.push({
+      matchIdx: i / 2,
+      p1Seat: a, p2Seat: b,
+      winnerSeat: null, loserSeat: null,
+      childRoomId: null,
+      bo: cd.prelimsBo, // reset by cubeTournamentStartCurrentRound based on round index
+      resolved: a == null || b == null,
+    });
+    if (a == null && b != null) nextRoundMatches[nextRoundMatches.length - 1].winnerSeat = b;
+    if (b == null && a != null) nextRoundMatches[nextRoundMatches.length - 1].winnerSeat = a;
+  }
+  cd.bracket.rounds.push(nextRoundMatches);
+  cd.bracket.currentRoundIdx++;
+  cubeTournamentStartCurrentRound(room, io);
+}
+
+async function cubeFinalizeTournament(room, io) {
+  const cd = room.cubeDraft;
+  // Build final standings list ordered by placement asc (1st, 2nd, ...).
+  // Includes everyone who built a deck (humans only).
+  const standings = [];
+  const humansBuilt = room.players
+    .map((p, i) => ({ seat: i, player: p }))
+    .filter(e => !e.player.isBot && cd.builtDecks?.[e.seat]);
+  for (const e of humansBuilt) {
+    standings.push({
+      seat: e.seat,
+      username: e.player.username,
+      placement: cd.standings[e.seat] || 99,
+      heroes: (cd.builtDecks[e.seat]?.heroes || []).filter(h => h?.hero).map(h => h.hero),
+    });
+  }
+  standings.sort((a, b) => a.placement - b.placement);
+  cd.finalStandings = standings;
+
+  // SC + ELO payouts.
+  const humanCount = humansBuilt.length;
+  const isRanked = room.type === 'ranked';
+  for (const s of standings) {
+    const player = room.players[s.seat];
+    let scAward = 0;
+    if (s.placement === 1) scAward = 5 * humanCount;
+    else if (s.placement === 2 && humanCount >= 3) scAward = 2 * humanCount;
+    if (scAward > 0) {
+      try {
+        await db.run('UPDATE users SET sc = sc + ? WHERE id = ?', [scAward, player.userId]);
+        if (player.socketId) io.to(player.socketId).emit('cube_sc_award', { amount: scAward, placement: s.placement });
+      } catch (err) { console.error('[cubeFinalize] SC error:', err.message); }
+    }
+    // Cube ELO update (ranked only): simple K-factor based on placement.
+    // Higher placement = bigger gain; lowest = biggest loss.
+    if (isRanked) {
+      // Placement 1 → +K, 2 → +K/2, etc. Last → -K.
+      const K = 24;
+      const norm = (humanCount - s.placement) / Math.max(1, humanCount - 1); // 1.0 for 1st, 0.0 for last
+      let delta = Math.round(K * (norm - 0.5) * 2); // -K..+K range
+      // Vote-kicked players take a flat -K loss regardless of placement.
+      if (player.cubeKickLoss) delta = -K;
+      try {
+        await db.run('UPDATE users SET elo_cube = MAX(0, elo_cube + ?) WHERE id = ?', [delta, player.userId]);
+        if (player.socketId) io.to(player.socketId).emit('cube_elo_update', { delta, placement: s.placement });
+      } catch (err) { console.error('[cubeFinalize] ELO error:', err.message); }
+    }
+  }
+  cubeTournamentBroadcast(room, io);
+  console.log(`[cube_tournament] room ${room.id} complete — winner ${standings[0]?.username}`);
+}
+
+/** Auto-build a legal-ish deck from a player's drafted pool. Used by
+ *  the build-phase 5-minute auto-ready timer. Picks min(3, heroes-in-
+ *  pool) random heroes, then fills 60 main-deck slots with random
+ *  drafted cards respecting standard copy limits + the no-Potions-
+ *  without-Nicolas rule. Falls back to free non-Performance abilities
+ *  if the drafted pool runs out. */
+function cubeAutoBuildDeck(pool, cardDB, deckName) {
+  const heroes = [
+    { hero: null, ability1: null, ability2: null },
+    { hero: null, ability1: null, ability2: null },
+    { hero: null, ability1: null, ability2: null },
+  ];
+  const heroNames = pool.filter(n => cardDB[n]?.cardType === 'Hero');
+  const reqHeroes = Math.min(3, heroNames.length);
+  const shuffledHeroes = cubeShuffle(heroNames);
+  const usedHeroNames = new Set();
+  let placed = 0;
+  for (const name of shuffledHeroes) {
+    if (placed >= reqHeroes) break;
+    if (usedHeroNames.has(name)) continue;
+    usedHeroNames.add(name);
+    const cd = cardDB[name];
+    heroes[placed] = {
+      hero: name,
+      ability1: cd?.startingAbility1 || null,
+      ability2: cd?.startingAbility2 || null,
+    };
+    placed++;
+  }
+
+  const hasNicolas = heroes.some(h => h.hero === 'Nicolas, the Hidden Alchemist');
+
+  // Pool counts net of heroes-in-slots.
+  const counts = {};
+  for (const n of pool) counts[n] = (counts[n] || 0) + 1;
+  for (const h of heroes) {
+    if (h.hero) counts[h.hero] = (counts[h.hero] || 0) - 1;
+  }
+  const remaining = [];
+  for (const [name, c] of Object.entries(counts)) {
+    for (let i = 0; i < c; i++) remaining.push(name);
+  }
+  cubeShuffleInPlace(remaining);
+
+  const mainDeck = [];
+  const usedMain = {};
+  for (const name of remaining) {
+    if (mainDeck.length >= 60) break;
+    const cd = cardDB[name];
+    if (!cd) continue;
+    if (cd.cardType === 'Token') continue;
+    if (cd.cardType === 'Potion' && !hasNicolas) continue; // no Nicolas → no main-deck Potions
+    // Effective copy limit (mirrors getCardMax in app-shared.jsx, simplified).
+    let limit;
+    if (cd.maxCopies != null) limit = cd.maxCopies;
+    else if (cd.cardType === 'Hero') limit = 4;
+    else if (cd.cardType === 'Potion') limit = 2;
+    else if (cd.cardType === 'Ability') limit = Infinity;
+    else limit = 4;
+    if ((usedMain[name] || 0) >= limit) continue;
+    mainDeck.push(name);
+    usedMain[name] = (usedMain[name] || 0) + 1;
+  }
+
+  // Top up with free non-Performance abilities (infinite supply).
+  if (mainDeck.length < 60) {
+    const freeAbilities = Object.keys(cardDB).filter(n =>
+      cardDB[n].cardType === 'Ability' && n !== 'Performance'
+    );
+    if (freeAbilities.length > 0) {
+      while (mainDeck.length < 60) {
+        mainDeck.push(freeAbilities[Math.floor(Math.random() * freeAbilities.length)]);
+      }
+    }
+  }
+
+  return { name: deckName, heroes, mainDeck, potionDeck: [], sideDeck: [] };
+}
+
+const CUBE_BUILD_TIMER_MS = 5 * 60 * 1000; // 5 minutes once the first player Readies
+
+/** Auto-fill any non-ready human seats with a random legal deck and
+ *  flip them to Ready. Called when the build-phase timer expires. */
+async function cubeBuildAutoFillNonReady(room, io) {
+  const cd = room.cubeDraft;
+  if (!cd || cd.phase !== 'building') return;
+  const cardDB = getCardDB();
+  cd.buildTimerHandle = null;
+  let anyAutoFilled = false;
+  for (let seatIdx = 0; seatIdx < room.players.length; seatIdx++) {
+    const p = room.players[seatIdx];
+    if (!p || p.isBot) continue;
+    if (cd.readySeats?.[seatIdx]) continue;
+    const pool = cd.draftedPools?.[seatIdx]?.pool || [];
+    const deckName = `${p.username}'s ${cd.cubeName} Draft (auto)`;
+    const deck = cubeAutoBuildDeck(pool, cardDB, deckName);
+    try {
+      await cubeSaveDraftedDeck(p.userId, deck, cd.cubeName, room.id);
+    } catch (err) {
+      console.error('[cubeBuildAutoFillNonReady] save error:', err.message);
+      continue;
+    }
+    cd.builtDecks[seatIdx] = deck;
+    cd.readySeats[seatIdx] = true;
+    cd.autoFilledSeats = cd.autoFilledSeats || {};
+    cd.autoFilledSeats[seatIdx] = true;
+    anyAutoFilled = true;
+    console.log(`[cube_build] auto-filled deck for seat ${seatIdx} (${p.username})`);
+  }
+  cubeBuildBroadcast(room, io);
+  // Advance to tournament now that everyone has a deck.
+  if (anyAutoFilled || room.players.every((p, i) => p.isBot || cd.readySeats[i])) {
+    cubeStartTournament(room, io);
+  }
+}
+
+/** Save a finalized cube-drafted deck to the player's deck list. */
+async function cubeSaveDraftedDeck(userId, deck, cubeName, roomId) {
+  const newId = uuidv4();
+  const meta = JSON.stringify({ cubeName, draftedAt: new Date().toISOString(), roomId });
+  await db.run(
+    "INSERT INTO decks (id, user_id, name, main_deck, heroes, potion_deck, side_deck, is_default, cover_card, skins, mode, cube_draft_meta, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, '', '{}', 'drafted', ?, unixepoch(), unixepoch())",
+    [newId, userId, deck.name || `Drafted Deck`,
+     JSON.stringify(deck.mainDeck || []),
+     JSON.stringify(deck.heroes || []),
+     JSON.stringify(deck.potionDeck || []),
+     JSON.stringify(deck.sideDeck || []),
+     meta]
+  );
+  return newId;
+}
+
 /** Set up fresh game state: decks, hands, heroes — but don't start the engine or turns. */
 async function setupGameState(room) {
   const cardsByName = getCardDB();
@@ -5550,16 +6800,76 @@ io.on('connection', (socket) => {
 
   socket.on('get_rooms', () => socket.emit('rooms', getRoomList()));
 
-  socket.on('create_room', ({ type, playerPw, specPw, deckId, format }) => {
+  socket.on('create_room', async ({ type, playerPw, specPw, deckId, format, cubeDraft }) => {
     if (!currentUser) return;
     const fmt = [1, 3, 5].includes(format) ? format : 1;
     const roomId = uuidv4().substring(0, 8);
-    const room = { id: roomId, host: currentUser.username, hostId: currentUser.userId,
-      type: type||'unranked', format: fmt, winsNeeded: Math.ceil(fmt / 2), setScore: [0, 0],
-      playerPw: playerPw||null, specPw: specPw||null,
-      players: [{ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: deckId||null }],
-      spectators: [], status: 'waiting', created: Date.now(), gameState: null,
-      chatHistory: [], privateChatHistory: {} };
+
+    // Cube Draft branch: 8-seat room, host's cube is the source pool, no
+    // per-player deck yet (decks are built post-draft). The host is
+    // required to own the cube at creation; joiners draft from it.
+    let cubeDraftConfig = null;
+    if (cubeDraft && cubeDraft.cubeId) {
+      try {
+        const deckRow = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [cubeDraft.cubeId, currentUser.userId]);
+        if (!deckRow) return socket.emit('join_error', 'Cube not found in your deck list.');
+        const cube = parseDeck(deckRow);
+        if (cube.mode !== 'cube') return socket.emit('join_error', 'Selected deck is not a Cube.');
+        const mainSize = (cube.mainDeck || []).length;
+        // Match isDeckLegal's CUBE_SIZE (512) — the cube must be exactly
+        // 512 cards so the draft can split into 32 packs of 16.
+        if (mainSize !== 512) return socket.emit('join_error', `Cube must hold exactly 512 cards (currently ${mainSize}).`);
+        cubeDraftConfig = {
+          cubeId: cube.id,
+          cubeName: cube.name,
+          cubeOwnerId: currentUser.userId,
+          // Cube cards aren't sent to non-host clients while the room is
+          // open; they're only baked into pack lists when the draft starts.
+          packTimerSec: Math.max(15, Math.min(600, parseInt(cubeDraft.packTimerSec, 10) || 60)),
+          pickTimerSec: Math.max(0, Math.min(60, parseInt(cubeDraft.pickTimerSec, 10) || 5)),
+          // When true, the server skips all auto-pick timeout scheduling —
+          // drafters can take as long as they want. Bots still pick on
+          // their normal short delay so the draft doesn't stall on them.
+          timerDisabled: !!cubeDraft.timerDisabled,
+          prelimsBo: [1, 3, 5].includes(cubeDraft.prelimsBo) ? cubeDraft.prelimsBo : 1,
+          finaleBo: [1, 3, 5].includes(cubeDraft.finaleBo) ? cubeDraft.finaleBo : 3,
+          flow: cubeDraft.flow === 'consecutive' ? 'consecutive' : 'simultaneous',
+          // Lifecycle phase for the cube run as a whole. `lobby` until
+          // the host hits Start; then `drafting`, `building`, `tournament`,
+          // `complete`. Mirrors room.status but lives at the cube layer.
+          phase: 'lobby',
+        };
+      } catch (err) {
+        console.error('[create_room cubeDraft]', err.message);
+        return socket.emit('join_error', 'Failed to load Cube.');
+      }
+    }
+
+    const isCubeDraft = !!cubeDraftConfig;
+    const room = {
+      id: roomId,
+      host: currentUser.username,
+      hostId: currentUser.userId,
+      type: type || 'unranked',
+      format: isCubeDraft ? (cubeDraftConfig.prelimsBo) : fmt,
+      // For cube draft, `winsNeeded` and `setScore` apply per individual
+      // tournament match, not to the room. They get reset per match in M4.
+      winsNeeded: isCubeDraft ? Math.ceil(cubeDraftConfig.prelimsBo / 2) : Math.ceil(fmt / 2),
+      setScore: [0, 0],
+      playerPw: playerPw || null,
+      specPw: specPw || null,
+      // Cube Draft rooms: capacity is 8 (vs the standard 2). Empty seats
+      // get filled with bots at start. The host is always at seat 0.
+      maxPlayers: isCubeDraft ? 8 : 2,
+      players: [{ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: isCubeDraft ? null : (deckId || null), isBot: false }],
+      spectators: [],
+      status: 'waiting',
+      created: Date.now(),
+      gameState: null,
+      chatHistory: [],
+      privateChatHistory: {},
+      cubeDraft: cubeDraftConfig,
+    };
     rooms.set(roomId, room);
     socket.join('room:' + roomId);
     socket.emit('room_joined', sanitizeRoom(room, currentUser.username));
@@ -5573,8 +6883,30 @@ io.on('connection', (socket) => {
     const isPlayer = room.players.some(p => p.username === currentUser.username);
     const isSpec = room.spectators.some(s => s.username === currentUser.username);
     if (isPlayer || isSpec) {
+      // Update the player's socketId so subsequent emits land on the
+      // fresh socket. Critical for cube-draft reconnect (see disconnect
+      // handler — we null out socketId on drop so this branch can
+      // detect the seat). Mirrors the existing spec-side behaviour.
+      if (isPlayer) {
+        const playerEntry = room.players.find(p => p.username === currentUser.username);
+        if (playerEntry) playerEntry.socketId = socket.id;
+      }
       socket.join('room:' + roomId);
       socket.emit('room_joined', sanitizeRoom(room, currentUser.username));
+      // Cube Draft: if the draft was suspended waiting on this seat
+      // and ALL human seats now have a live socketId, resume.
+      if (room.cubeDraft?.draftState?.suspended && isPlayer) {
+        const allHumansBack = room.players.every(p => p.isBot || p.socketId);
+        if (allHumansBack) cubeDraftResume(room, db, parseDeck, io);
+        else cubeDraftBroadcast(room, io); // re-emit so the rejoiner sees current state
+      }
+      // Cube Draft: re-send the appropriate phase-specific state to the
+      // rejoiner so the client can render the right screen.
+      if (room.cubeDraft) {
+        if (room.cubeDraft.phase === 'drafting') cubeDraftBroadcast(room, io);
+        else if (room.cubeDraft.phase === 'building') cubeBuildBroadcast(room, io);
+        else if (room.cubeDraft.phase === 'tournament') cubeTournamentBroadcast(room, io);
+      }
       // If spectator re-joins during a game, send them the current game state
       if (isSpec && room.status === 'playing' && room.gameState) {
         // Update the spectator's socketId (they may have reconnected)
@@ -5603,12 +6935,18 @@ io.on('connection', (socket) => {
       if (room.specPw && password !== room.specPw) return socket.emit('join_error', 'Wrong spectator password');
       room.spectators.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, color: currentUser.color || '#888', avatar: currentUser.avatar || null });
     } else {
-      if (room.players.length >= 2) {
+      // Cube Draft rooms seat up to 8 humans (`room.maxPlayers`); standard
+      // rooms cap at 2. Joiners past the cap fall through to spectator.
+      const maxSeats = room.maxPlayers || 2;
+      if (room.players.length >= maxSeats) {
         if (room.specPw && password !== room.specPw) return socket.emit('join_error', 'Game full');
         room.spectators.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, color: currentUser.color || '#888', avatar: currentUser.avatar || null });
       } else {
         if (room.playerPw && password !== room.playerPw) return socket.emit('join_error', 'Wrong password');
-        room.players.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: deckId||null });
+        // Cube Draft players don't bring their own deck — they draft
+        // one from the host's cube, so deckId is intentionally null.
+        const isCubeDraftRoom = !!room.cubeDraft;
+        room.players.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: isCubeDraftRoom ? null : (deckId || null), isBot: false });
         const hs = room.players[0]?.socketId;
         if (hs) io.to(hs).emit('player_joined', { username: currentUser.username });
       }
@@ -5635,10 +6973,15 @@ io.on('connection', (socket) => {
   socket.on('swap_to_player', ({ roomId, deckId }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId); if (!room) return;
-    if (room.players.length >= 2) return socket.emit('join_error', 'No player slot');
+    const cap = room.maxPlayers || 2;
+    if (room.players.length >= cap) return socket.emit('join_error', 'No player slot');
     if (room.status === 'playing') return socket.emit('join_error', 'Game in progress');
+    // Cube Draft rooms must still be in the lobby phase to accept new
+    // seat joiners. Once drafting starts, the seat list is locked.
+    if (room.cubeDraft && room.cubeDraft.phase !== 'lobby') return socket.emit('join_error', 'Draft already started');
     room.spectators = room.spectators.filter(s => s.username !== currentUser.username);
-    room.players.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: deckId||null });
+    const isCubeDraftRoom = !!room.cubeDraft;
+    room.players.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, deckId: isCubeDraftRoom ? null : (deckId || null), isBot: false });
     const hs = room.players[0]?.socketId;
     if (hs) io.to(hs).emit('player_joined', { username: currentUser.username });
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
@@ -5658,9 +7001,243 @@ io.on('connection', (socket) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room || room.hostId !== currentUser.userId || room.players.length < 2) return;
+    if (room.cubeDraft) return; // Cube Draft rooms use start_cube_draft
     const activePlayer = Math.random() < 0.5 ? 0 : 1;
     await setupGameState(room);
     await startGameEngine(room, roomId, activePlayer);
+  });
+
+  // Host-only kickoff for a Cube Draft. Fills empty seats with bots,
+  // flips phase to 'drafting', and (in M2) generates packs and assigns
+  // them out. For M1 the handler stops at the seat-fill + phase change
+  // so the lobby UI can be smoke-tested end-to-end before the actual
+  // drafting engine lands.
+  socket.on('start_cube_draft', async ({ roomId }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room || !room.cubeDraft) return;
+    if (room.hostId !== currentUser.userId) return;
+    if (room.cubeDraft.phase !== 'lobby') return;
+    if (room.players.length < 2) return socket.emit('join_error', 'Need at least one challenger.');
+
+    const cap = room.maxPlayers || 8;
+    const humanCount = room.players.filter(p => !p.isBot).length;
+    // Fill remaining seats with bots. Bot identities are deterministic
+    // for the run (Bot 1, Bot 2, …) — the first M2 implementation picks
+    // randomly from each pack passed to them, no further state needed.
+    let botIdx = 1;
+    while (room.players.length < cap) {
+      const botName = `Bot ${botIdx}`;
+      // Skip any bot name that collides with a human in the room
+      // (extremely unlikely but possible). Keep incrementing until clear.
+      if (room.players.some(p => p.username === botName)) { botIdx++; continue; }
+      room.players.push({
+        username: botName,
+        userId: `bot:${roomId}:${botIdx}`,
+        socketId: null,
+        deckId: null,
+        isBot: true,
+      });
+      botIdx++;
+    }
+
+    room.cubeDraft.phase = 'drafting';
+    room.cubeDraft.humanCount = humanCount;
+    room.status = 'playing';
+    io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
+    io.emit('rooms', getRoomList());
+    console.log(`[cube_draft] room ${roomId} starting draft — ${humanCount} humans + ${cap - humanCount} bots`);
+    // Kick off the actual draft engine (loads cube, builds packs, opens
+    // round 1, starts bot pick + timeout schedulers).
+    await cubeDraftStart(room, db, parseDeck, io);
+  });
+
+  socket.on('cube_draft_pick', ({ roomId, cardName }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room || !room.cubeDraft || !room.cubeDraft.draftState) return;
+    if (room.cubeDraft.phase !== 'drafting') return;
+    const seatIdx = room.players.findIndex(p => p.userId === currentUser.userId);
+    if (seatIdx < 0) return;
+    cubeDraftHandlePick(room, seatIdx, cardName, db, parseDeck, io);
+  });
+
+  // Surrender the WHOLE tournament match (not just the current game in
+  // a Bo3/5 set). The opponent wins immediately; the bracket advances;
+  // the surrendering player keeps their parent-room membership and
+  // becomes a spectator like any other eliminated player.
+  socket.on('cube_surrender_match', ({ parentRoomId, childRoomId }) => {
+    if (!currentUser) return;
+    const parent = rooms.get(parentRoomId);
+    if (!parent?.cubeDraft?.bracket) return;
+    if (parent.cubeDraft.phase !== 'tournament') return;
+    const child = rooms.get(childRoomId);
+    if (!child || child.parentCubeRoomId !== parentRoomId) return;
+
+    const myParentSeat = parent.players.findIndex(p => p.userId === currentUser.userId);
+    if (myParentSeat < 0) return;
+
+    const round = parent.cubeDraft.bracket.rounds[parent.cubeDraft.bracket.currentRoundIdx];
+    const match = round?.find(m => m.childRoomId === childRoomId);
+    if (!match || match.resolved) return;
+    if (match.p1Seat !== myParentSeat && match.p2Seat !== myParentSeat) return;
+
+    const winnerSeat = match.p1Seat === myParentSeat ? match.p2Seat : match.p1Seat;
+    console.log(`[cube_tournament] ${currentUser.username} surrendered match ${childRoomId} → ${parent.players[winnerSeat]?.username} wins`);
+    cubeMatchEnd(parent, match, winnerSeat, io).catch(err =>
+      console.error('[cube_surrender_match]', err.message));
+  });
+
+  // Cross-game spectator switcher. The client tells the server which
+  // child match they want to spectate; the server moves them between
+  // child-room sockets. They keep parent-room membership throughout.
+  socket.on('cube_spectate_match', ({ parentRoomId, childRoomId }) => {
+    if (!currentUser) return;
+    const parent = rooms.get(parentRoomId);
+    if (!parent || parent.cubeDraft?.phase !== 'tournament') return;
+    const target = childRoomId ? rooms.get(childRoomId) : null;
+    if (childRoomId && (!target || target.parentCubeRoomId !== parentRoomId)) return;
+
+    // Leave any current child rooms the user is in.
+    for (const [rid, r] of rooms) {
+      if (r.parentCubeRoomId !== parentRoomId) continue;
+      if (rid === childRoomId) continue;
+      const playerInChild = r.players.some(p => p.userId === currentUser.userId);
+      if (playerInChild) continue; // never auto-leave a match they're playing
+      const specInChild = r.spectators.some(s => s.userId === currentUser.userId);
+      if (specInChild) {
+        r.spectators = r.spectators.filter(s => s.userId !== currentUser.userId);
+        socket.leave('room:' + rid);
+      } else {
+        socket.leave('room:' + rid);
+      }
+    }
+
+    // Join the requested child as spectator (if specified and not already
+    // a player in it).
+    if (target) {
+      const isPlayer = target.players.some(p => p.userId === currentUser.userId);
+      if (!isPlayer) {
+        const isSpec = target.spectators.some(s => s.userId === currentUser.userId);
+        if (!isSpec) {
+          target.spectators.push({
+            username: currentUser.username, userId: currentUser.userId,
+            socketId: socket.id, color: currentUser.color || '#888',
+            avatar: currentUser.avatar || null,
+          });
+        }
+      }
+      socket.join('room:' + childRoomId);
+      // Push the current state of that match so the spectator's UI
+      // mounts the GameBoard.
+      socket.emit('room_joined', sanitizeRoom(target, currentUser.username));
+      if (target.gameState) {
+        sendSpectatorGameState(target);
+      }
+    } else {
+      // No target → just leave any spectator membership; client returns
+      // to bracket view.
+      socket.emit('cube_spectate_left');
+    }
+  });
+
+  // Player submits their built deck during the build phase. Validates
+  // against their drafted pool, persists to their deck list under the
+  // "Drafted Decks" category, and marks the seat as Ready. When all
+  // human seats are Ready, advances to the tournament phase (M4).
+  socket.on('cube_draft_ready', async ({ roomId, deck }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room || !room.cubeDraft || room.cubeDraft.phase !== 'building') return;
+    const seatIdx = room.players.findIndex(p => p.userId === currentUser.userId);
+    if (seatIdx < 0 || room.players[seatIdx].isBot) return;
+    if (room.cubeDraft.readySeats[seatIdx]) return; // already ready
+
+    const pool = room.cubeDraft.draftedPools?.[seatIdx]?.pool || [];
+    const v = validateDraftedDeck(deck, pool, getCardDB());
+    if (!v.ok) return socket.emit('join_error', 'Deck invalid: ' + v.reason);
+
+    // Save the deck to the user's deck list under "Drafted Decks".
+    try {
+      const newDeckId = await cubeSaveDraftedDeck(
+        currentUser.userId, deck, room.cubeDraft.cubeName, roomId
+      );
+      console.log(`[cube_draft] seat ${seatIdx} (${currentUser.username}) saved drafted deck ${newDeckId}`);
+    } catch (err) {
+      console.error('[cube_draft_ready] save error:', err.message);
+      return socket.emit('join_error', 'Failed to save drafted deck.');
+    }
+
+    room.cubeDraft.builtDecks[seatIdx] = deck;
+    room.cubeDraft.readySeats[seatIdx] = true;
+
+    // Start the 5-minute auto-ready countdown on the FIRST player's
+    // Ready submission. Stragglers get their decks auto-completed when
+    // the timer expires (`cubeBuildAutoFillNonReady`).
+    if (room.cubeDraft.buildTimerEndsAt == null) {
+      room.cubeDraft.buildTimerEndsAt = Date.now() + CUBE_BUILD_TIMER_MS;
+      room.cubeDraft.buildTimerHandle = setTimeout(() => {
+        cubeBuildAutoFillNonReady(room, io).catch(err =>
+          console.error('[cubeBuildAutoFillNonReady]', err.message));
+      }, CUBE_BUILD_TIMER_MS);
+      console.log(`[cube_build] room ${roomId} build timer started — 5 min`);
+    }
+
+    cubeBuildBroadcast(room, io);
+
+    // All humans ready → start the tournament phase immediately and
+    // cancel the auto-fill timer.
+    const allReady = room.players.every((p, i) => p.isBot || room.cubeDraft.readySeats[i]);
+    if (allReady) {
+      if (room.cubeDraft.buildTimerHandle) {
+        clearTimeout(room.cubeDraft.buildTimerHandle);
+        room.cubeDraft.buildTimerHandle = null;
+      }
+      cubeStartTournament(room, io);
+    }
+  });
+
+  // Vote-kick a suspended cube-draft seat. Fires when a human player
+  // has been disconnected long enough that the rest of the table wants
+  // to resume with a bot in their place. Majority of the remaining
+  // online humans is the threshold — once met, the seat is converted
+  // to a bot, the draft resumes, and the kicked player is marked for
+  // an ELO loss (consumed in M5's cube-ELO update path).
+  socket.on('cube_draft_vote_kick', ({ roomId, targetSeat }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room || !room.cubeDraft || !room.cubeDraft.draftState) return;
+    if (room.cubeDraft.phase !== 'drafting') return;
+    const draft = room.cubeDraft.draftState;
+    if (!draft.suspended) return;
+    const target = room.players[targetSeat];
+    if (!target || target.isBot || target.socketId) return; // only kick disconnected humans
+    const voterSeat = room.players.findIndex(p => p.userId === currentUser.userId);
+    if (voterSeat < 0 || voterSeat === targetSeat) return;
+    if (room.players[voterSeat].isBot || !room.players[voterSeat].socketId) return;
+
+    const onlineHumans = room.players.filter(p => !p.isBot && p.socketId).length;
+    const needed = Math.ceil(onlineHumans / 2); // simple majority of those still here
+    if (!draft.voteKick || draft.voteKick.targetSeat !== targetSeat) {
+      draft.voteKick = { targetSeat, votes: {}, needed };
+    } else {
+      draft.voteKick.needed = needed;
+    }
+    draft.voteKick.votes[voterSeat] = true;
+
+    if (Object.keys(draft.voteKick.votes).length >= needed) {
+      // Consume vote and convert the seat to a bot.
+      const oldName = target.username;
+      target.username = `Bot (was ${oldName})`;
+      target.isBot = true;
+      target.socketId = null;
+      target.cubeKickLoss = true; // M5 reads this for ELO penalty
+      draft.voteKick = null;
+      cubeDraftResume(room, db, parseDeck, io);
+      io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
+    } else {
+      cubeDraftBroadcast(room, io);
+    }
   });
 
   // ── MULLIGAN ──
@@ -6854,6 +8431,13 @@ io.on('connection', (socket) => {
             if (cs.stunned) inst.counters.stunned = 1;
             if (cs.burned) inst.counters.burned = 1;
             if (cs.negated) inst.counters.negated = 1;
+            // Death Knight's cosmetic Silenced marker — paired with
+            // `cs.negated` by the puzzle editor when the author picks
+            // the Silenced toggle on a Creature. The marker tells
+            // StatusBadges to render the badge as 🤐 Silenced instead
+            // of 🚫 Negated; the functional negation comes from the
+            // standard `negated` counter set above.
+            if (cs._dkSilenced) inst.counters._dkSilenced = 1;
             if (cs.poisoned) { inst.counters.poisoned = 1; inst.counters.poisonStacks = cs.poisoned.stacks || 1; }
             if (cs.buffs) { if (!inst.counters.buffs) inst.counters.buffs = {}; Object.assign(inst.counters.buffs, cs.buffs); }
             // Taunt mirror: when a puzzle creature carries the
@@ -6931,6 +8515,19 @@ io.on('connection', (socket) => {
                 && cs._linkedHeroIdx >= 0 && cs._linkedHeroIdx <= 2) {
               inst.counters._linkedHeroOwner = pi;
               inst.counters._linkedHeroIdx   = cs._linkedHeroIdx;
+            }
+            // Sparkfly Queen's sacrifice gifts — authored in the puzzle
+            // editor as `_sparkflyGiftFlags: {architect?, attendant?,
+            // worker?}`. Run each set flag through the same
+            // `grantInheritedAbility` helper Hive's Crown uses so the
+            // gift bookkeeping (engine logic flags, BuffColumn icons,
+            // inherited-effect tooltip entries, Attendant absolute-
+            // immunity counter) is byte-identical to a live game.
+            if (cs._sparkflyGiftFlags && inst.name === 'Sparkfly Queen') {
+              const { grantInheritedAbility } = require('./cards/effects/_sparkfly-shared');
+              if (cs._sparkflyGiftFlags.architect) grantInheritedAbility(inst, 'Sparkfly Architect');
+              if (cs._sparkflyGiftFlags.attendant) grantInheritedAbility(inst, 'Sparkfly Attendant');
+              if (cs._sparkflyGiftFlags.worker)    grantInheritedAbility(inst, 'Sparkfly Worker');
             }
           }
         }
@@ -8958,6 +10555,20 @@ io.on('connection', (socket) => {
   // Debug: add a card to a player's hand
   socket.on('disconnect', () => {
     if (!currentUser) return;
+    // Cube Draft rooms: when a player's socket goes down mid-draft,
+    // suspend the engine until they reconnect or the table vote-kicks
+    // them. Mark socketId null so reconnect via join_room can pick the
+    // seat back up. Doesn't fire activeGames cleanup since draft phase
+    // doesn't use that registry.
+    for (const room of rooms.values()) {
+      if (!room.cubeDraft || room.cubeDraft.phase !== 'drafting') continue;
+      const seatIdx = room.players.findIndex(p => p.socketId === socket.id && !p.isBot);
+      if (seatIdx < 0) continue;
+      room.players[seatIdx].socketId = null;
+      if (room.cubeDraft.draftState && !room.cubeDraft.draftState.suspended) {
+        cubeDraftSuspend(room, `${room.players[seatIdx].username} disconnected`, io);
+      }
+    }
     const activeRoomId = activeGames.get(currentUser.userId);
     if (activeRoomId) {
       const room = rooms.get(activeRoomId);
@@ -9036,7 +10647,29 @@ function handleLeaveRoom(socket, roomId, user) {
   socket.leave('room:' + roomId);
 
   if (room.hostId === user.userId) {
-    // Host leaves = destroy room. Clean up activeGames for all players.
+    // Cube Draft rooms in the LOBBY phase: promote the next-joined human
+    // to host instead of destroying the room. The cube itself was
+    // captured at create time (cubeDraft.cubeOwnerId points at the
+    // original host's user_id and cube card list is loaded later from
+    // that user's deck row), so the new host doesn't need to own a
+    // legal cube — they just inherit the chair.
+    if (room.cubeDraft && room.cubeDraft.phase === 'lobby') {
+      const remainingHumans = room.players.filter(p => p.userId !== user.userId && !p.isBot);
+      if (remainingHumans.length > 0) {
+        // First-joined remaining human becomes host. `room.players` is
+        // append-ordered by join, so this is the natural successor.
+        room.players = room.players.filter(p => p.userId !== user.userId);
+        const newHost = room.players[0];
+        room.host = newHost.username;
+        room.hostId = newHost.userId;
+        room.spectators = room.spectators.filter(s => s.username !== user.username);
+        io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
+        io.emit('rooms', getRoomList());
+        return;
+      }
+      // No humans left — fall through to room destruction.
+    }
+    // Standard host-leave: destroy the room. Clean up activeGames for all players.
     for (const p of room.players) activeGames.delete(p.userId);
     rooms.delete(roomId);
     io.to('room:' + roomId).emit('room_closed');
@@ -9051,13 +10684,29 @@ function handleLeaveRoom(socket, roomId, user) {
 function getRoomList() {
   return Array.from(rooms.values())
     .filter(r => r.type !== 'puzzle')
+    // Hide cube-tournament child rooms from the public lobby — they're
+    // internal to the tournament and joinable only via the parent room
+    // (cross-game spectator UI).
+    .filter(r => !r.parentCubeRoomId)
     .map(r => ({
       id: r.id, host: r.host, type: r.type, format: r.format || 1,
       hasPlayerPw: !!r.playerPw, hasSpecPw: !!r.specPw,
       playerCount: r.players.length,
+      maxPlayers: r.maxPlayers || 2,
       spectatorCount: r.spectators.length,
       status: r.status, created: r.created,
       players: r.players.map(p => p.username),
+      // Lightweight cube-draft summary for the lobby list — name only,
+      // never the actual cube card list. Enough for the room card to
+      // render "🧊 Cube Draft — <Cube Name>" without leaking the pool.
+      cubeDraft: r.cubeDraft ? {
+        cubeName: r.cubeDraft.cubeName,
+        prelimsBo: r.cubeDraft.prelimsBo,
+        finaleBo: r.cubeDraft.finaleBo,
+        flow: r.cubeDraft.flow,
+        phase: r.cubeDraft.phase,
+        timerDisabled: !!r.cubeDraft.timerDisabled,
+      } : null,
     }));
 }
 
@@ -9065,10 +10714,31 @@ function sanitizeRoom(room, forUser) {
   return {
     id: room.id, host: room.host, type: room.type, format: room.format || 1,
     hasPlayerPw: !!room.playerPw, hasSpecPw: !!room.specPw,
+    maxPlayers: room.maxPlayers || 2,
     players: room.players.map(p => p.username),
+    // Cube Draft rooms expose seat-level metadata so the lobby UI can
+    // show 8 slots, mark bots, and indicate which seat the viewer
+    // occupies. Bot seats won't exist until the host hits Start —
+    // before that, empty seats are simply absent from this list.
+    seats: (room.maxPlayers || 2) > 2
+      ? Array.from({ length: room.maxPlayers || 2 }, (_, i) => {
+          const p = room.players[i];
+          return p ? { username: p.username, isBot: !!p.isBot, isHost: p.username === room.host } : null;
+        })
+      : undefined,
     spectators: room.spectators.map(s => s.username),
     status: room.status, created: room.created,
     isHost: forUser === room.host,
+    cubeDraft: room.cubeDraft ? {
+      cubeName: room.cubeDraft.cubeName,
+      packTimerSec: room.cubeDraft.packTimerSec,
+      pickTimerSec: room.cubeDraft.pickTimerSec,
+      timerDisabled: !!room.cubeDraft.timerDisabled,
+      prelimsBo: room.cubeDraft.prelimsBo,
+      finaleBo: room.cubeDraft.finaleBo,
+      flow: room.cubeDraft.flow,
+      phase: room.cubeDraft.phase,
+    } : null,
   };
 }
 

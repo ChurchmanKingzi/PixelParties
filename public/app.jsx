@@ -7146,12 +7146,14 @@ function GameBoard({ gameState, lobby, onLeave }) {
       }
     };
     socket.on('play_card_transfer', onCardTransfer);
-    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, emoji, duration, trailClass, emojiStyle, projectileClass }) => {
+    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, emoji, duration, trailClass, emojiStyle, projectileClass, projectileShape, noTrail, baseAngle }) => {
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
       const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
       let tgtEl;
-      if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
+      if (targetZoneType === 'surprise') {
+        tgtEl = document.querySelector(`[data-surprise-zone][data-surprise-owner="${tgtLabel}"][data-surprise-hero="${targetHeroIdx}"]`);
+      } else if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
         tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
       } else {
         tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
@@ -7161,13 +7163,21 @@ function GameBoard({ gameState, lobby, onLeave }) {
       const tr = tgtEl.getBoundingClientRect();
       const id = Date.now() + Math.random();
       const dur = duration || 600;
+      const sxPx = sr.left + sr.width / 2;
+      const syPx = sr.top  + sr.height / 2;
+      const txPx = tr.left + tr.width / 2;
+      const tyPx = tr.top  + tr.height / 2;
+      const rawAngle = Math.atan2(tyPx - syPx, txPx - sxPx) * 180 / Math.PI;
       setProjectileAnims(prev => [...prev, {
         id, emoji: emoji || '🐦‍🔥',
         trailClass: trailClass || null,
         emojiStyle: emojiStyle || null,
         projectileClass: projectileClass || null,
-        srcX: sr.left + sr.width / 2, srcY: sr.top + sr.height / 2,
-        tgtX: tr.left + tr.width / 2, tgtY: tr.top + tr.height / 2,
+        projectileShape: projectileShape || null,
+        noTrail: !!noTrail,
+        srcX: sxPx, srcY: syPx,
+        tgtX: txPx, tgtY: tyPx,
+        angle: rawAngle + (typeof baseAngle === 'number' ? baseAngle : 0),
         dur,
       }]);
       setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + 200);
@@ -8041,7 +8051,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
           </div>
         </div>
         {/* Board */}
-        <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '')}>
+        <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '') + (pt?.config?.redSelect ? ' sacrifice-targeting' : '')}>
           <div className="board-util board-util-left">
             <div className="board-util-side">
               <div data-opp-discard="1"><BoardZone type="discard" cards={oppDiscardHidden > 0 ? opp.discardPile.slice(0, -oppDiscardHidden) : opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} /></div>
@@ -8333,16 +8343,35 @@ function GameBoard({ gameState, lobby, onLeave }) {
         </div>
       ))}
 
-      {/* Projectile animations (phoenix cannon, etc.) */}
+      {/* Projectile animations (phoenix cannon, arrow shafts, etc.) */}
       {projectileAnims.map(p => (
         <div key={p.id} className="projectile-anim" style={{
           left: p.srcX, top: p.srcY,
           '--projDx': (p.tgtX - p.srcX) + 'px',
           '--projDy': (p.tgtY - p.srcY) + 'px',
+          '--projAngle': (p.angle != null ? p.angle : 0) + 'deg',
           animationDuration: p.dur + 'ms',
         }}>
-          <span className={p.projectileClass || 'projectile-emoji'} style={p.emojiStyle || {}}>{p.projectileClass ? '' : p.emoji}</span>
-          <div className={p.trailClass || 'projectile-flame-trail'} />
+          <div className="projectile-rotation-wrap">
+            {p.projectileShape === 'arrow' ? (
+              <svg className="projectile-arrow-shaft" viewBox="0 0 100 22"
+                   width="78" height="18" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="0,4 14,11 0,18" fill="#8a8a8a" />
+                <polygon points="9,4 23,11 9,18" fill="#a8a8a8" />
+                <rect x="22" y="9" width="58" height="4" fill="#c8c8c8" />
+                <polygon points="78,2 100,11 78,20" fill="#e8e8e8" />
+                <polygon points="0,4 14,11 0,18" fill="none" stroke="#222" strokeWidth="0.6" />
+                <polygon points="9,4 23,11 9,18" fill="none" stroke="#222" strokeWidth="0.6" />
+                <rect x="22" y="9" width="58" height="4" fill="none" stroke="#222" strokeWidth="0.6" />
+                <polygon points="78,2 100,11 78,20" fill="none" stroke="#222" strokeWidth="0.6" />
+              </svg>
+            ) : (
+              <span className={p.projectileClass || 'projectile-emoji'} style={p.emojiStyle || {}}>
+                {p.projectileClass ? '' : p.emoji}
+              </span>
+            )}
+          </div>
+          {p.noTrail ? null : <div className={p.trailClass || 'projectile-flame-trail'} />}
         </div>
       ))}
 

@@ -26,6 +26,8 @@ const CARD_NAME = 'Elven Archer';
 const DAMAGE    = 50;
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
 
   // Free-summon gate: true iff the player already controls ≥1 Elven.

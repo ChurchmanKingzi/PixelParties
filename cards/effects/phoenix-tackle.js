@@ -15,6 +15,8 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Damage scales with Destruction Magic (100/200/300). Lets the CPU's
   // ability-stacking scoring keep Destruction Magic worth stacking when
   // the deck has Phoenix Tackle even after the cast threshold is met.

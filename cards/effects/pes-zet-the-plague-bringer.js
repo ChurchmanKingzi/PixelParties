@@ -14,6 +14,8 @@
 const { hasCardType } = require('./_hooks');
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
 
   // CPU threat assessment (damage supporter). Pes'zet inflicts 1 Poison

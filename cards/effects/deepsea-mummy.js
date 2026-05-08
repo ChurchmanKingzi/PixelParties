@@ -22,6 +22,8 @@ const {
 const CARD_NAME = 'Deepsea Mummy';
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   inherentAction: inherentActionIfBounceable,
   canBypassLevelReq: canBypassLevelReqIfBounceable,
   canBypassFreeZoneRequirement: canBypassFreeZoneIfBounceable,

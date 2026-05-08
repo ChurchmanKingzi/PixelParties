@@ -77,6 +77,8 @@ function canEnhance(gs, engine, playerIdx, heroIdx) {
 // ─── CARD MODULE ─────────────────────────
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   /**
    * Dynamic inherentAction — returns true only in Main Phase
    * when the casting hero meets the DM3 + first-DM-spell condition.

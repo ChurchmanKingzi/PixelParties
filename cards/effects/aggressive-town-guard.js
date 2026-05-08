@@ -7,6 +7,8 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Inherent additional action ONLY if no creatures have been summoned this turn
   inherentAction: (gs, pi, heroIdx, engine) => {
     const ps = gs.players[pi];

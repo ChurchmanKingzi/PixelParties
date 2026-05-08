@@ -48,6 +48,8 @@ function countOtherCreatures(engine, ownerIdx, exceptInstId) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
 
   creatureEffect: true,

@@ -168,6 +168,8 @@ async function promptAndApply(engine, pi, promptCtxShim) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Narrow reaction trigger: only fires after an opponent's card has picked
   // its targets AND at least one of our Creatures is in that target list.
   // (The engine's generic reaction chain window — isReaction + reactionCondition

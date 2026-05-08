@@ -29,6 +29,8 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // [A] Alt summon gate.
   inherentAction: (gs, pi, _heroIdx, engine) => {
     if (gs.hoptUsed?.[`pet-snake-alt:${pi}`] === gs.turn) return false;

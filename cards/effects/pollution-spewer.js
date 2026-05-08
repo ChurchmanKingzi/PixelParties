@@ -22,6 +22,8 @@
 const CARD_NAME = 'Pollution Spewer';
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // This card lives in the Support Zone but is NOT an equip (it doesn't
   // grant stat bonuses). It functions structurally as a Creature, and its
   // cardType: 'Artifact'/subtype: 'Creature' marks it as a hybrid. The

@@ -75,6 +75,8 @@ function selfCounteringTargetsOnSide(engine, pi) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   isPostSummonHandReaction: true, // Custom flag, see _checkPostSummonHandReactions.
 
   // Trigger only fires when the summon was DIRECT FROM DECK and we

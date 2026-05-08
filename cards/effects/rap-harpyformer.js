@@ -19,6 +19,8 @@ const CARD_NAME    = 'Rap Harpyformer';
 const ABILITY_NAME = 'Decay Magic';
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   inherentAction: harpyformerInherentAction,
 
   // ── On summon: search deck for Decay Magic ────────────────────────────────

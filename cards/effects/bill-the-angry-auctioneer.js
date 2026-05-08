@@ -108,6 +108,16 @@ module.exports = {
       // No eligible equips → effect doesn't fire
       if (eligibleCards.length === 0) return;
 
+      // The opening "YOU GO FIRST/SECOND" announcement plays for ~3.5s
+      // when the first game state arrives at each client. Bill's prompt
+      // is server-driven and otherwise piggybacks on that very first
+      // sync — its modal pops up under the announcement banner and the
+      // texts overlap. Pushing one sync first (so the client mounts the
+      // GameBoard and the announcement starts ticking down), then
+      // waiting for it to clear, lets Bill's prompt land cleanly after.
+      engine.sync();
+      await engine._delay(3800);
+
       // Signal opponent that Bill's effect is resolving
       gs.heroEffectPending = { ownerIdx: pi, heroName: 'Bill, the Angry Auctioneer' };
       engine.sync();

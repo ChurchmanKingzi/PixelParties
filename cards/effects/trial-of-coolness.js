@@ -69,6 +69,8 @@ function _hasEligibleTarget(gs, pi, engine) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   oncePerGame: true,
   oncePerGameKey: ONCE_PER_GAME_KEY,
 

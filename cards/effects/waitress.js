@@ -121,6 +121,8 @@ async function cleanseTargetWithBeerBubbles(engine, target, statusKeys, sourceNa
 // ─── CARD MODULE ─────────────────────────
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
 
   // Inherent additional Action whenever an own Hero has at least

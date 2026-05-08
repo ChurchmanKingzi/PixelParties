@@ -37,6 +37,8 @@ const CARD_NAME = 'Pollution Piranha';
 const BITE_DAMAGE = 50;
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
 
   // Summoning Pollution Piranha is itself an additional Action —

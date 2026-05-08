@@ -149,6 +149,8 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   canBypassLevelReq: () => true,
 
   // DDG's text is "tribute 2+ Creatures NOT summoned this turn (sum-

@@ -2,7 +2,7 @@
 //  PIXEL PARTIES — SCREEN COMPONENTS
 //  AuthScreen, MainMenu, ProfileScreen, ShopScreen
 // ═══════════════════════════════════════════
-const { useState, useEffect, useRef, useCallback, useMemo, useContext } = React;
+const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useContext } = React;
 const { api, socket, AppContext, CardMini, cardImageUrl,
         typeColor, skinImageUrl, CardTooltipContent, isDeckLegal } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, SKINS_DB } = window;
@@ -65,6 +65,45 @@ function AuthScreen() {
 function MainMenu() {
   const { user, setScreen, setUser, notify, setBgmMode } = useContext(AppContext);
   const [puzzleOpen, setPuzzleOpen] = useState(false);
+  // ── Menu top-anchor ──
+  // Out of the box, .screen-center vertically centers the whole menu
+  // (title + buttons + user-info), so when the Puzzle submenu opens
+  // the menu grows in BOTH directions and the top creeps upward. We
+  // measure the collapsed-state top of the menu's first natural child
+  // once on mount, then switch the layout from `justify-content: center`
+  // to `flex-start` with a captured `padding-top` that visually
+  // matches that position. After this anchor is locked in, opening the
+  // submenu only extends the menu DOWNWARD — the title and the rest
+  // of the page sit exactly where they did when the menu was collapsed.
+  const screenRef = useRef(null);
+  const [menuTopPad, setMenuTopPad] = useState(null);
+  useLayoutEffect(() => {
+    if (menuTopPad !== null || !screenRef.current) return;
+    const screenEl = screenRef.current;
+    // Find the first non-absolutely-positioned child — skipping the
+    // logout/volume tray that floats over the corner. That child is
+    // the menu's natural visual top (the title <h1>).
+    const firstFlowChild = Array.from(screenEl.children).find(c => {
+      const pos = getComputedStyle(c).position;
+      return pos !== 'absolute' && pos !== 'fixed';
+    });
+    if (!firstFlowChild) return;
+    const screenRect = screenEl.getBoundingClientRect();
+    const childRect = firstFlowChild.getBoundingClientRect();
+    setMenuTopPad(Math.max(0, childRect.top - screenRect.top));
+  }, [menuTopPad]);
+  // Reset the anchor on viewport resize so a window-size change still
+  // looks centered when collapsed. The next layout effect re-measures
+  // against the new viewport.
+  useEffect(() => {
+    let raf = 0;
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setMenuTopPad(null));
+    };
+    window.addEventListener('resize', onResize);
+    return () => { window.removeEventListener('resize', onResize); cancelAnimationFrame(raf); };
+  }, []);
   const [puzzleBrowserOpen, setPuzzleBrowserOpen] = useState(false);
   const [puzzleList, setPuzzleList] = useState(null); // null = not loaded, [] = empty
   const [puzzleAttemptState, setPuzzleAttemptState] = useState(null);
@@ -284,7 +323,17 @@ function MainMenu() {
   }
 
   return (
-    <div className="screen-center main-menu-screen" style={{ flexDirection: 'column', gap: 20, position: 'relative' }}>
+    <div ref={screenRef}
+         className="screen-center main-menu-screen"
+         style={{
+           flexDirection: 'column',
+           gap: 20,
+           position: 'relative',
+           // Once the collapsed-state top is captured, anchor it via
+           // `padding-top` + `flex-start` so submenu toggles only
+           // grow the menu downward.
+           ...(menuTopPad !== null && { justifyContent: 'flex-start', paddingTop: menuTopPad }),
+         }}>
       <div style={{ position: 'absolute', top: 12, right: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
         <button className="btn menu-logout-btn" style={{ padding: '4px 16px', fontSize: 10 }} onClick={logout}>LOGOUT</button>
         <VolumeControl />
@@ -302,6 +351,11 @@ function MainMenu() {
           <button className="btn btn-big" onClick={() => setScreen('shop')} style={{ fontSize: 16, borderColor: '#ffd700', color: '#ffd700', background: 'rgba(255,215,0,.08)' }}>✦ SHOP</button>
           <button className="btn btn-big btn-success" onClick={() => setScreen('profile')} style={{ fontSize: 16 }}>♛ VIEW PROFILE</button>
           <button className="btn btn-big" onClick={() => setPuzzleOpen(!puzzleOpen)} style={{ fontSize: 16, borderColor: '#ff8800', color: '#ff8800', background: 'rgba(255,136,0,.08)' }}>🧩 PUZZLE MODE {puzzleOpen ? '▲' : '▼'}</button>
+          {/* Submenu is conditionally mounted so the menu stays
+              compact when collapsed. The screen's top is anchored via
+              `menuTopPad` (see useLayoutEffect above), so adding this
+              row only extends the menu downward — title + everything
+              above the submenu stay put. */}
           {puzzleOpen && (
             <div style={{ display: 'flex', gap: 8, marginTop: -4 }}>
               <button className="btn" onClick={() => setPuzzleBrowserOpen(true)} style={{ flex: 1, padding: '10px 0', fontSize: 13, borderColor: '#ff8800', color: '#ff8800', background: 'rgba(255,136,0,.06)' }}>⚡ Attempt</button>

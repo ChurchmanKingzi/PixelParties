@@ -49,8 +49,64 @@ function isSkeletonCreature(cardName, engine /*, inst = null */) {
   return false;
 }
 
+/**
+ * Distinct Skeleton creatures in a player's discard pile.
+ * Returns [{ name, count }] suitable for a `cardGallery` prompt.
+ * Used by Skeleton Necromancer's tutor and Raise the Minions!.
+ */
+function findSkeletonsInDiscard(ps, engine) {
+  if (!ps || !engine) return [];
+  const counts = new Map();
+  for (const name of (ps.discardPile || [])) {
+    if (!isSkeletonCreature(name, engine)) continue;
+    counts.set(name, (counts.get(name) || 0) + 1);
+  }
+  return [...counts.entries()].map(([name, count]) => ({ name, count }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Live Skeleton Creature instances controlled by `playerIdx`. Includes
+ * the "treated as Skeleton" overrides (Loyal Bone Dog) automatically
+ * via `isSkeletonCreature`.
+ */
+function getControlledSkeletons(engine, playerIdx) {
+  const out = [];
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support') continue;
+    if ((inst.controller ?? inst.owner) !== playerIdx) continue;
+    if (!isSkeletonCreature(inst.name, engine)) continue;
+    out.push(inst);
+  }
+  return out;
+}
+
+/**
+ * Free Support Zone descriptors across all of `playerIdx`'s living
+ * Heroes — used by tutors like Skeleton Necromancer ("any Hero you
+ * control") and Raise the Minions! ("free Support Zones of the user").
+ */
+function getFreeSupportZonesAcrossHeroes(engine, playerIdx) {
+  const ps = engine.gs.players[playerIdx];
+  if (!ps) return [];
+  const zones = [];
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    for (let si = 0; si < 3; si++) {
+      if (((ps.supportZones?.[hi] || [])[si] || []).length === 0) {
+        zones.push({ heroIdx: hi, slotIdx: si, label: `${hero.name} — Slot ${si + 1}` });
+      }
+    }
+  }
+  return zones;
+}
+
 module.exports = {
   SKELETON_ARCHETYPE,
   TREATED_AS_SKELETON,
   isSkeletonCreature,
+  findSkeletonsInDiscard,
+  getControlledSkeletons,
+  getFreeSupportZonesAcrossHeroes,
 };

@@ -9,6 +9,8 @@ const CARD_NAME = 'Cannon Tower';
 const DAMAGE    = 150;
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   creatureEffect: true,
 
   canActivateCreatureEffect() { return true; },

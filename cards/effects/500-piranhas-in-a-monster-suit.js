@@ -85,6 +85,8 @@ function _validVictims(engine, pi) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // No Action cost — plays as an inherent additional Action.
   inherentAction: true,
   // Doesn't need a free zone on a hero on OUR side; the placement

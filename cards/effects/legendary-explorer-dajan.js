@@ -258,6 +258,8 @@ async function _runArtifactResolve(engine, pi, cardName, cost, resolveFn) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
   heroEffect: true,
   heroEffectActionCost: true,

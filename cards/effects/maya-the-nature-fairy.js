@@ -19,6 +19,8 @@ const { hasCardType } = require('./_hooks');
 const HP_BOOST = 50;
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
 
   // CPU threat assessment (damage supporter). Maya buffs her team's HP by

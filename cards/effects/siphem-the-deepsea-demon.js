@@ -21,6 +21,8 @@ const { addDeepseaCounters } = require('./_deepsea-shared');
 const CARD_NAME = 'Siphem, the Deepsea Demon';
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
   heroEffect: true,
 

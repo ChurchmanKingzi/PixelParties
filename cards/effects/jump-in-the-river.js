@@ -196,6 +196,8 @@ async function doJumpCascade(engine, pi) {
 // ─── MODULE EXPORTS ──────────────────────
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Fire hooks ONLY from hand zone
   activeIn: ['hand'],
 

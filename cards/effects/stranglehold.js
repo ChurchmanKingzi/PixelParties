@@ -58,6 +58,8 @@ function getFightingLevel(ps, heroIdx) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;

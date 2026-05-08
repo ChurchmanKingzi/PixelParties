@@ -48,6 +48,8 @@ function hostHasWhiteEye(engine, ownerIdx, heroIdx) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Active in 'hand' for self-cast onPlay; in 'support' for the
   // recurring opp-turn-start damage hook.
   activeIn: ['hand', 'support'],

@@ -56,6 +56,8 @@ function hasLowLevelCreatureTarget(gs, engine) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   placesPollutionTokens: true,
 
   // Cannot be cast without at least one free Support Zone for the token,

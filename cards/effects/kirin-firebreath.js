@@ -58,6 +58,8 @@ const STRIKE_DMG   = 50;
 const STRIKE_DELAY = 280; // ms between strikes — readable but snappy
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   spellPlayCondition(gs, pi /*, engine */) {
     const ps = gs.players[pi];
     return (ps?.discardPile || []).indexOf(COST_NAME) >= 0;

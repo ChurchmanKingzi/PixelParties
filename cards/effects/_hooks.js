@@ -168,6 +168,13 @@ const STATUS_EFFECTS = {
   // all keep firing. Distinct from Stunned which silences everything.
   // Cleansable like Stunned.
   bound:   { negative: true, cleansable: true,  label: 'Bound',   icon: '⛓️', immuneKey: 'bound_immune' },
+  // `blinded` (Smoke Vial, future Blinded sources) prevents the bearer
+  // from using Attacks, Spells, or activated effects that need to pick
+  // one or more targets. AoE / area-wide effects keep working — the
+  // engine reads `blocksTargeting: true` plus the card script's
+  // `requiresTarget: true` flag to decide. Cleansable like Stunned.
+  // Status icon is rendered as 👁 with a CSS strikethrough line.
+  blinded: { negative: true, cleansable: true,  label: 'Blinded', icon: '👁️', immuneKey: 'blind_immune', blocksTargeting: true },
   immune:  { negative: false, label: 'Immune',  icon: '🛡️' },
   shielded:{ negative: false, label: 'Shielded', icon: '✨' },
 };
@@ -190,6 +197,14 @@ function getCleansableStatuses() {
  *  `paralysisLike: true` in its STATUS_EFFECTS entry to opt in. */
 function getParalysisStatuses() {
   return Object.entries(STATUS_EFFECTS).filter(([, v]) => v.negative && v.paralysisLike).map(([k]) => k);
+}
+
+/** Negative statuses that block targeted Attacks / Spells / effects.
+ *  Currently just `blinded`, but future "blind-like" statuses can opt
+ *  in with `blocksTargeting: true` and the engine's targeting gates
+ *  will pick them up automatically. */
+function getTargetingBlockingStatuses() {
+  return Object.entries(STATUS_EFFECTS).filter(([, v]) => v.negative && v.blocksTargeting).map(([k]) => k);
 }
 
 /** Engine `actionDealDamage` source-name strings for every status that
@@ -216,6 +231,12 @@ const BUFF_EFFECTS = {
   medusa_petrified: { label: 'Petrified', icon: '🗿', tooltip: 'Takes 0 damage from all sources! (Medusa\'s Curse)', damageMultiplier: 0 },
   golden_wings: { label: 'Golden Wings', icon: '🪽', tooltip: 'Golden Wings: Fully immune to all opponent effects for the rest of this turn.' },
   anti_magic_enchanted: { label: 'Anti Magic Enchantment', icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate the effects of a Spell that hits this Artifact\'s equipped Hero.' },
+  // Elixir of Cold — for the rest of this turn, anything this Hero hits
+  // with an Attack or Spell becomes Frozen for 1 turn.
+  cold_strike: { label: 'Cold Strike', icon: '❄️', tooltip: "This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." },
+  // Elixir of Strength — primed +100 unstoppable damage on the Hero's
+  // next single-target Attack. Persists across turns until consumed.
+  empowered_strike: { label: 'Empowered Strike', icon: '💪', tooltip: "The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 100 and cannot be reduced or negated." },
 };
 
 // ═══════════════════════════════════════════
@@ -293,7 +314,7 @@ function isCreatureNegated(inst) {
 module.exports = {
   SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES,
   STATUS_EFFECTS, getNegativeStatuses, getCleansableStatuses,
-  getParalysisStatuses, getStatusDamageSourceNames, BUFF_EFFECTS,
+  getParalysisStatuses, getTargetingBlockingStatuses, getStatusDamageSourceNames, BUFF_EFFECTS,
   hasCardType, isArtifactCreature, hasNumericCreatureLevel, isCreatureNegated,
   POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,
 };

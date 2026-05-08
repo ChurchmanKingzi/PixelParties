@@ -8,6 +8,8 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Inherent only during Main Phase 1
   inherentAction(gs) {
     return gs.currentPhase === 2; // PHASES.MAIN1

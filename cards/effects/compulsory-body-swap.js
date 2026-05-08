@@ -51,6 +51,8 @@ const CARD_NAME = 'Compulsory Body Swap';
 const ANIM_MS   = 1000;
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hand'],
 
   /**

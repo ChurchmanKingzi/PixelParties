@@ -16,6 +16,8 @@
 const VALID_SCHOOLS = ['Destruction Magic', 'Decay Magic', 'Magic Arts', 'Support Magic'];
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
   creatureEffect: true,
 

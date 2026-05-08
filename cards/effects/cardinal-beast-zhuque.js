@@ -9,6 +9,8 @@
 const { _checkCardinalWin, _setCardinalImmune } = require('./_cardinal-shared');
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   creatureEffect: true,
 
   // Cardinal Beasts are signature win-condition pieces — their once-per-

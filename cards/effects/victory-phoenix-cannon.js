@@ -18,6 +18,8 @@ const path = require('path');
 const { loadCardEffect } = require('./_loader');
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -52,12 +54,17 @@ module.exports = {
       engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
       await engine._delay(200);
 
-      // Fire phoenix projectile
+      // Fire phoenix projectile. The bird emoji's natural orientation
+      // faces LEFT on every major font/emoji set; `baseAngle: 180`
+      // pre-rotates the visual so the beak ends up leading along the
+      // src→tgt vector (which the renderer applies on top of the
+      // base offset).
       engine._broadcastEvent('play_projectile_animation', {
         sourceOwner: pi, sourceHeroIdx: heroIdx,
         targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx,
         targetZoneSlot: tgtZoneSlot,
         emoji: '🐦‍🔥', duration: 500,
+        baseAngle: 180,
       });
       await engine._delay(400);
 

@@ -69,6 +69,8 @@ const LV1_SACRIFICE_SPEC = {
 };
 
 module.exports = attachSteamEngine({
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Cheap gate — true whenever a valid sacrifice subset exists right now.
   // Used by the engine for hand-play gating (`getSummonBlocked`) AND by
   // summon effects (Living Illusion etc.) via `engine.isCreatureSummonable`.

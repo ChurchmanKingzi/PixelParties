@@ -144,6 +144,8 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
 
   // Exposed so Burning Fuse's re-trigger path can find this body via

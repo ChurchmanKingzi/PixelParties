@@ -31,6 +31,8 @@ const CARD_NAME = 'Invader Token';
 const DAMAGE = 50;
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
 
   // Invader Tokens fire their end-of-turn punishment regardless of

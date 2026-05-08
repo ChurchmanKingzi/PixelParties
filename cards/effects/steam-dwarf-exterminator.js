@@ -18,6 +18,8 @@ const DAMAGE_CAP = 200;
 
 module.exports = attachSteamEngine({
   creatureEffect: true,
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
 
   /**
    * Activation gate: creature must exist with current HP > 0. The

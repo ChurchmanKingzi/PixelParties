@@ -17,6 +17,8 @@
 const { loadCardEffect } = require('./_loader');
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['ability'],
   freeActivation: true,
   actionPhaseEligible: true, // Lv1 can also activate during Action Phase to copy action-cost abilities

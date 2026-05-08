@@ -101,6 +101,8 @@ function isBurnTick(source) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hand', 'support'],
 
   spellPlayCondition(gs /* , playerIdx, engine */) {

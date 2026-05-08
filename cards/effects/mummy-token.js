@@ -9,6 +9,8 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
   heroEffect: 'Place a Mummy Token into the free Support Zone of a Hero your opponent controls that has no Mummy Tokens in its Support Zones yet.',
 

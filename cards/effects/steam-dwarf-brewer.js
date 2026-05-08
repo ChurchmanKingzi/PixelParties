@@ -57,6 +57,8 @@ function getBrewTargets(engine, pi, selfInstId) {
 
 module.exports = attachSteamEngine({
   creatureEffect: true,
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;

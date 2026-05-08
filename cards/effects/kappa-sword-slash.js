@@ -61,6 +61,8 @@ const COST_NAME    = 'Rebelliokai Camouflaged Kappa';
 const SLASH_DMG    = 300;
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Listen while in hand so `reduceCardLevel` contributes to
   // heroMeetsLevelReq's level computation. Without this `activeIn`,
   // the engine's instance walk would still consider the inst, but

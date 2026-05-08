@@ -1039,9 +1039,23 @@ function skinImageUrl(skinName) {
 }
 
 // ===== DECK HELPERS =====
+// Cube Draft mode: a Cube is a single 512-card list (no heroes / potion /
+// side sections, no per-name copy cap). Legal iff exactly 512 cards. The
+// number is chosen so the draft can split it into 32 packs of 16 — see
+// the Cube Draft tournament code in server.js.
+const CUBE_SIZE = 512;
+function isCubeDeck(deck) { return !!deck && deck.mode === 'cube'; }
+window.CUBE_SIZE = CUBE_SIZE;
+window.isCubeDeck = isCubeDeck;
+
 function isDeckLegal(deck) {
   if (!deck) return { legal: false, reasons: ['No deck'] };
   const reasons = [];
+  if (isCubeDeck(deck)) {
+    const n = (deck.mainDeck || []).length;
+    if (n !== CUBE_SIZE) reasons.push('Cube needs exactly ' + CUBE_SIZE + ' cards (' + n + '/' + CUBE_SIZE + ')');
+    return { legal: reasons.length === 0, reasons };
+  }
   if ((deck.mainDeck || []).length !== 60) reasons.push('Main deck needs exactly 60 cards (' + (deck.mainDeck||[]).length + '/60)');
   const filledHeroes = (deck.heroes || []).filter(h => h && h.hero);
   if (filledHeroes.length !== 3) reasons.push('Need exactly 3 Heroes (' + filledHeroes.length + '/3)');
@@ -1113,6 +1127,16 @@ function canAddCard(deck, cardName, section) {
   const ct = card.cardType;
   // Token cards cannot be added to any deck
   if (ct === 'Token') return false;
+  // Cube Draft: single 480-card list, no per-name cap, no hero / potion /
+  // side sections. Only the 'main' section is addressable; everything
+  // else is rejected. Abilities other than 'Performance' are not legal
+  // cube cards (filter mirrored in the deck-builder gallery).
+  if (isCubeDeck(deck)) {
+    if (section !== 'main') return false;
+    if (ct === 'Ability' && cardName !== 'Performance') return false;
+    if ((deck.mainDeck || []).length >= CUBE_SIZE) return false;
+    return true;
+  }
   const effMax = getCardMax(deck, cardName);
   if (section === 'main') {
     // Heroes are now legal in main deck up to 4 copies (Goff-style
@@ -1646,6 +1670,19 @@ function showGameTooltip(e, text) {
   window._gameTooltip = { text, x: r.right + 6, y: r.top + r.height / 2 };
   window.dispatchEvent(new Event('gameTooltip'));
 }
+/**
+ * Cursor-anchored variant of showGameTooltip — positions the tooltip
+ * a few pixels off the cursor instead of pinning it to an element's
+ * right edge. Useful in the puzzle editor where toggle buttons sit
+ * tightly packed and an element-anchored tooltip would partially
+ * cover its neighbors. Call from onMouseEnter / onMouseMove with the
+ * native event so the tooltip tracks pointer movement.
+ */
+function showCursorTooltip(e, text) {
+  if (!e || typeof e.clientX !== 'number') return;
+  window._gameTooltip = { text, x: e.clientX + 14, y: e.clientY + 14, atCursor: true };
+  window.dispatchEvent(new Event('gameTooltip'));
+}
 function hideGameTooltip() {
   window._gameTooltip = null;
   window.dispatchEvent(new Event('gameTooltip'));
@@ -1658,8 +1695,12 @@ function GameTooltip() {
     return () => window.removeEventListener('gameTooltip', handler);
   }, []);
   if (!tip) return null;
+  // Element-anchored tips center vertically on the source's right
+  // edge; cursor-anchored tips drop straight at the offset point so
+  // the box appears below-right of the pointer (no Y-translate).
+  const transform = tip.atCursor ? 'none' : 'translateY(-50%)';
   return (
-    <div className="game-tooltip" style={{ position: 'fixed', left: tip.x, top: tip.y, transform: 'translateY(-50%)', zIndex: 10000 }}>
+    <div className="game-tooltip" style={{ position: 'fixed', left: tip.x, top: tip.y, transform, zIndex: 10000, pointerEvents: 'none' }}>
       {tip.text}
     </div>
   );
@@ -1709,9 +1750,42 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
     const isUnhealable = s.poisoned?.unhealable || c.poisonedUnhealable;
     badges.push({ key: 'poisoned', icon: isUnhealable ? '💀' : '☠️', tooltip: `${isUnhealable ? 'Unhealable ' : ''}Poisoned: Takes ${perStack * stacks} damage at the start of each of its owner's turns.${isUnhealable ? ' Cannot be removed.' : ''}`, className: isUnhealable ? 'status-unhealable' : '' });
   }
-  if (s.negated || c.negated) badges.push({ key: 'negated', icon: '🚫', tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.') + dur(s.negated || c.negated) });
+  if (s.negated || c.negated) {
+    // Skeleton Death Knight applies negated with a `_dkSilenced`
+    // marker — surfaces as a "Silenced" badge variant (zipped-lips
+    // icon) instead of the default Negated. Functionally identical;
+    // purely a flavor reskin that matches the card's printed text.
+    if (c._dkSilenced) {
+      badges.push({
+        key: 'negated', icon: '🤐',
+        tooltip: 'Silenced: Has its effects negated.' + dur(c.negated),
+      });
+    } else {
+      badges.push({ key: 'negated', icon: '🚫', tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.') + dur(s.negated || c.negated) });
+    }
+  }
   if (s.nulled || c.nulled) badges.push({ key: 'nulled', icon: '🔇', tooltip: (isHero ? 'Nulled: Cannot cast Spells.' : 'Nulled: Has its effects negated.') + dur(s.nulled || c.nulled) });
-  if (s.bound) badges.push({ key: 'bound', icon: '⛓️', tooltip: 'Bound: Cannot perform Actions.' + dur(s.bound) });
+  if (s.bound) {
+    // Skeleton Death Knight tags bound with `source = "Skeleton Death
+    // Knight"`; render the badge as the "Silenced" variant in that
+    // case. Functionally identical to bound — same can-not-act effect
+    // — just a flavor reskin matching the card's printed text.
+    if (s.bound?.source === 'Skeleton Death Knight') {
+      badges.push({
+        key: 'bound', icon: '🤐',
+        tooltip: 'Silenced: Cannot perform Actions.' + dur(s.bound),
+      });
+    } else {
+      badges.push({ key: 'bound', icon: '⛓️', tooltip: 'Bound: Cannot perform Actions.' + dur(s.bound) });
+    }
+  }
+  if (s.blinded || c.blinded) {
+    const bl = s.blinded || c.blinded;
+    badges.push({
+      key: 'blinded', icon: '👁️', className: 'status-blinded',
+      tooltip: 'Blinded: Cannot use Attacks, Spells, or activated effects that need to pick a target. Full AoE effects still work.' + dur(bl),
+    });
+  }
   if (s.immune) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
   if (s.shielded) badges.push({ key: 'shielded', icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + durStart(s.shielded) });
   if (s.untargetable) badges.push({ key: 'untargetable', icon: '🦋', tooltip: 'Untargetable: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen.' });
@@ -1772,7 +1846,7 @@ function BuffColumn({ buffs, cardName }) {
     let txt = `Blessed: This Hero can have up to ${remaining} more additional Abilities attached to it this turn!`;
     if (data?.locked) txt += ' But it cannot act this turn.';
     return txt;
-  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' } };
+  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 100 and cannot be reduced or negated." }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." } };
   // medusa_petrified is surfaced through the Stunned status badge (as the
   // "Petrified" variant), so don't also render it as a separate buff icon —
   // that would double-represent the same effect. null_zone_negated is the
@@ -1865,6 +1939,23 @@ function CardTooltipContent({ card, children, imageUrl }) {
           {card.cardType}{card.subtype ? ' · ' + card.subtype : ''}{card.archetype ? ' · ' + card.archetype : ''}
         </div>
         {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
+        {/* Inherited effects (Sparkfly Queen's gifts from sacrificed
+            Sparkflies — and any future card that populates
+            `_inheritedEffects` on its instance counters). Rendered as a
+            short labeled list immediately under the base rules text so
+            the player sees ALL of the card's current effects at a
+            glance, not just the printed ones. */}
+        {Array.isArray(card._inheritedEffects) && card._inheritedEffects.length > 0 && (
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(255,255,255,0.2)' }}>
+            <div style={{ fontSize: 12, color: '#ffcc44', fontWeight: 700, marginBottom: 4 }}>Inherited Effects</div>
+            {card._inheritedEffects.map((eff, i) => (
+              <div key={i} style={{ fontSize: 13, marginTop: i === 0 ? 0 : 6, lineHeight: 1.45 }}>
+                <span style={{ color: '#ffcc44', fontWeight: 600 }}>{eff.label}: </span>
+                <span style={{ whiteSpace: 'pre-wrap' }}>{eff.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
           {/* HP — prefer live `_liveHp / _liveMaxHp` (set by BoardCard
               on battle hovers) over the cards.json base value. Format
@@ -2584,6 +2675,7 @@ window.VolumeControl = VolumeControl;
 window.CardTooltipContent = CardTooltipContent;
 window.useCardTooltip = useCardTooltip;
 window.showGameTooltip = showGameTooltip;
+window.showCursorTooltip = showCursorTooltip;
 window.hideGameTooltip = hideGameTooltip;
 window.GameTooltip = GameTooltip;
 window.StatusBadges = StatusBadges;

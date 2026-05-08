@@ -15,6 +15,8 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['ability'],
   ascendedHeroOnly: true,
   // Lizbeth/Smugbeth: auto-mirror disabled because the hook re-walks

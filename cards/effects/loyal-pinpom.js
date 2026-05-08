@@ -32,6 +32,8 @@ const CARD_NAME = 'Loyal Pinpom';
 const HOPT_KEY  = 'loyal_pinpom_chain';
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
 
   hooks: {

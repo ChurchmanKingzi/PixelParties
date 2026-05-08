@@ -9,6 +9,8 @@
 const { _checkCardinalWin, _setCardinalImmune } = require('./_cardinal-shared');
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   creatureEffect: true,
 
   // Always commit the active. See cardinal-beast-zhuque.js for full

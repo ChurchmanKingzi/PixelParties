@@ -59,6 +59,8 @@ function heroCanBeBurned(hero) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // ── [A] Hand-activated reveal + permanent Burn ───────────────────────
   handActivatedEffect: true,
   handActivateLabel: 'Reveal & Burn a Hero',

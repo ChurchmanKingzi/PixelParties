@@ -90,6 +90,8 @@ function buildBurnedTargets(engine) {
 // ─── CARD MODULE ─────────────────────────
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
 
   // Inherent additional Action whenever a Burned target is on the

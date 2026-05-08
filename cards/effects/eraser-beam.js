@@ -43,6 +43,8 @@ const { placePollutionTokens, countFreeZones } = require('./_pollution-shared');
 const CARD_NAME = 'Eraser Beam';
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   placesPollutionTokens: true,
   oncePerGame: true,
   oncePerGameKey: 'eraserBeam',

@@ -19,6 +19,8 @@ const CARD_NAME = 'Guardian Beast Ji';
 const DELETE_COST = 3;
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
   creatureEffect: true,
 

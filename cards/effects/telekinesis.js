@@ -12,6 +12,8 @@ const { loadCardEffect } = require('./_loader');
 const { ZONES } = require('./_hooks');
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hand'],
 
   // Additional Action if the hero has Magic Arts level 1+

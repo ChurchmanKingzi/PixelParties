@@ -76,6 +76,8 @@ function getRestoreCandidates(ps, cardDB, engine, pi) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   placesPollutionTokens: true,
 
   // Gerrymander redirect — pick `restore` (Creature) instead of

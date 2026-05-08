@@ -17,6 +17,8 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   includesHealing: true,
   // Heal scales with the caster's Support Magic level (150/200/300).
   // The CPU's ability-stacking scoring reads `cpuMeta.scalesWithSchool`

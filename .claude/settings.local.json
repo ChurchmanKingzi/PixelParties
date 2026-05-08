@@ -117,7 +117,15 @@
       "Bash(git *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\" -Filter \"*.js\")",
       "Bash(Select-Object -ExpandProperty Name)",
-      "Bash(Sort-Object)"
+      "Bash(Sort-Object)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist /FI \"PID eq 27692\")",
+      "PowerShell(Get-CimInstance *)",
+      "Bash(grep -n \"^  sync\\\\b\\\\|sync\\(\\)\\\\s*{$\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\\\\_engine.js\")",
+      "Bash(findstr /i \"queen summon mass-multiplication divine-gift-of-coolness divine-gift-of-skill weird-doll soul-shard\")",
+      "Bash(grep -iE \"fighting|necromancy|destruction-magic|biomancy\\\\.js$|trapping\")"
     ]
   }
 }

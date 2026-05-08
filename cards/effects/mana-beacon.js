@@ -42,6 +42,8 @@ const { loadCardEffect } = require('./_loader');
 const CARD_NAME = 'Mana Beacon';
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;

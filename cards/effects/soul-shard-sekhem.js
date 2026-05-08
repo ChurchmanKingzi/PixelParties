@@ -27,6 +27,8 @@ const CARD_NAME = 'Soul Shard Sekhem';
 const DAMAGE_PER_SHARD = 50;
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
   bypassNecromancyNegation: true,
   canSummon: canSummonSoulShard,

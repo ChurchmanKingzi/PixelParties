@@ -19,6 +19,8 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // CPU target override. Pick an opponent Hero that does NOT already
   // carry an Overheal Shock (stacking has no extra value). Tiebreak by
   // current HP descending — more HP = more damage-return per future heal.

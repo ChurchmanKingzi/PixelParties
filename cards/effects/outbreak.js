@@ -52,6 +52,8 @@ function heroHasAnyNegativeStatus(hero) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   /**
    * Per-hero gate: this Hero must currently have at least 1 negative
    * status to be eligible. Used both client-side (dim the card if no

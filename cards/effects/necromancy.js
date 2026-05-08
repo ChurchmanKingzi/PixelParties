@@ -262,14 +262,35 @@ module.exports = {
     // discard-trigger onPlay, defeating the whole archetype. The flag
     // is checked via the loaded card script so the immunity is purely
     // archetype-driven, not per-summon-source.
+    //
+    // Vacarn, the Dark Goblin Necromancer ALSO bypasses both the
+    // negation and the summoning-sickness gate, but ONLY for Skeleton
+    // Creatures he himself revives. Detected here by checking the
+    // host hero's name and the summoned card's Skeleton-tribal status
+    // (which `_skeleton-shared.isSkeletonCreature` already handles
+    // including the "treated as Skeleton" overrides).
     const summonedScript = require('./_loader').loadCardEffect(creatureName);
     const skipNegate = summonedScript?.bypassNecromancyNegation === true;
-    if (!skipNegate) {
+    const hostHero = ps.heroes?.[heroIdx];
+    let vacarnBypass = false;
+    if (hostHero?.name === 'Vacarn, the Dark Goblin Necromancer' && hostHero.hp > 0) {
+      const { isSkeletonCreature } = require('./_skeleton-shared');
+      if (isSkeletonCreature(creatureName, engine)) vacarnBypass = true;
+    }
+    if (!skipNegate && !vacarnBypass) {
       // Current turn = gs.turn (pi's turn), next pi turn = gs.turn + 2
       engine.actionNegateCreature(inst, 'Necromancy', {
         expiresAtTurn: gs.turn + 2,
         expiresForPlayer: pi,
       });
+    }
+    if (vacarnBypass) {
+      // Lift summoning sickness so the Skeleton can fire its active
+      // effect this turn ("may use their active effects the turn
+      // they're summoned"). Engine-side creature-effect HOPT gate
+      // checks `inst.turnPlayed === currentTurn`; setting it to the
+      // previous turn lets the gate read the creature as not-fresh.
+      inst.turnPlayed = (gs.turn || 0) - 1;
     }
 
     engine.log('necromancy', {

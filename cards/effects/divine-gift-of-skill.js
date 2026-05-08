@@ -43,6 +43,8 @@ function getOwnLivingHeroTargets(gs, pi) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   inherentAction: true,
   oncePerGame: true,
   oncePerGameKey: 'divineGift',

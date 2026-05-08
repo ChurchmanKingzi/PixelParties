@@ -80,6 +80,8 @@ function _isImmuneToSource(hero, type) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
   // Engine flag (consumed in promptDamageTarget's `untargetable` filter):
   // forces opp's targeting to ignore `untargetable` protections on

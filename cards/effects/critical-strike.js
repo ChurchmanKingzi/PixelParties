@@ -14,6 +14,8 @@ const CARD_NAME = 'Critical Strike';
 const ATK_MULT = 2;
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;

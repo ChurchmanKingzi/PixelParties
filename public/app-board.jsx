@@ -27,7 +27,7 @@ function setBoardTooltip(card) {
   window._boardTooltipSetter?.(card);
 }
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, revealTooltipWhenFaceDown }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
@@ -38,15 +38,32 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   // `_liveMaxHp` / `_liveAtk` so the hover preview shows
   // `currentHp / maxHp` and current ATK instead of the base card-DB
   // values. CardTooltipContent prefers `_live*` over `card.*`.
-  const tooltipBase = tooltipCardOverride || card;
+  // `inheritedEffects` (an array of `{label, text}`) is mirrored from
+  // the engine's per-instance `_inheritedEffects` counter for cards that
+  // pick up rules text from another card (Sparkfly Queen carrying the
+  // gift of a sacrificed Sparkfly via Hive's Crown today; any future
+  // card that populates the same counter benefits for free).
+  //
+  // `revealTooltipWhenFaceDown` is an explicit puzzle-creator opt-in:
+  // the card stays visually a cardback but its identity is exposed via
+  // the hover tooltip. Live battle never sets this (would leak hidden
+  // info). Used today by the Puzzle Creator's opp-side Surprise zones
+  // so the author can inspect what they've placed without flipping it.
+  const tooltipCardData = (faceDown && revealTooltipWhenFaceDown)
+    ? CARDS_BY_NAME[cardName]
+    : card;
+  const tooltipBase = tooltipCardOverride || tooltipCardData;
   const tooltipTarget = (() => {
     if (!tooltipBase) return null;
-    if (hp == null && maxHp == null && atk == null) return tooltipBase;
+    if (hp == null && maxHp == null && atk == null && (!inheritedEffects || inheritedEffects.length === 0)) return tooltipBase;
     return {
       ...tooltipBase,
       _liveHp:    hp    != null ? hp    : tooltipBase._liveHp,
       _liveMaxHp: maxHp != null ? maxHp : tooltipBase._liveMaxHp,
       _liveAtk:   atk   != null ? atk   : tooltipBase._liveAtk,
+      _inheritedEffects: (inheritedEffects && inheritedEffects.length > 0)
+        ? inheritedEffects
+        : tooltipBase._inheritedEffects,
     };
   })();
 
@@ -68,15 +85,15 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   return (
     <div className={'board-card' + (faceDown ? ' face-down' : '') + (flipped ? ' flipped' : '') + (foilClass ? ' ' + foilClass : '')}
       style={style}
-      onMouseEnter={() => !noTooltip && !faceDown && tooltipTarget && setBoardTooltip(tooltipTarget)}
+      onMouseEnter={() => !noTooltip && (revealTooltipWhenFaceDown || !faceDown) && tooltipTarget && setBoardTooltip(tooltipTarget)}
       onMouseLeave={() => setBoardTooltip(null)}
       onTouchStart={() => {
-        if (noTooltip || faceDown || !card) return;
+        if (noTooltip || (faceDown && !revealTooltipWhenFaceDown) || !tooltipTarget) return;
         window._longPressFired = false;
         window._longPressTimer = setTimeout(() => {
           window._longPressFired = true;
-          setTapTooltip(card.name);
-          setBoardTooltip(tooltipTarget || card);
+          setTapTooltip(tooltipTarget.name);
+          setBoardTooltip(tooltipTarget);
         }, window.LONG_PRESS_MS || 400);
       }}>
       {isFoil && foilMeta.current && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} foilType={foilType} />}
@@ -191,9 +208,37 @@ function HealNumber({ amount, ownerLabel, heroIdx }) {
   }, [ownerLabel, heroIdx]);
 
   if (!pos) return null;
+  // Heal-for-0 (full-HP target, or Nao's overheal blocked because the
+  // target is already > maxHp) → plain "0", no plus sign. Mirrors the
+  // CreatureDamageNumber's "0 damage absorbed" rendering.
+  const label = amount > 0 ? `+${amount}` : '0';
   return (
     <div className="damage-number heal-number" style={{ left: pos.x, top: pos.y }}>
-      +{amount}
+      {label}
+    </div>
+  );
+}
+
+// Floating heal number for creatures — same role as CreatureDamageNumber
+// but for the heal direction. Used today only for the 0-heal feedback
+// broadcast by `play_heal_zero` (Skeleton Healer / Heal targeting a
+// full-HP creature, etc.); positive creature heals are not surfaced as
+// floating numbers (matching prior behavior — only damage was).
+function CreatureHealNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const el = document.querySelector(`[data-support-zone="1"][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
+    }
+  }, [ownerLabel, heroIdx, zoneSlot]);
+
+  if (!pos) return null;
+  const label = amount > 0 ? `+${amount}` : '0';
+  return (
+    <div className="damage-number heal-number" style={{ left: pos.x, top: pos.y }}>
+      {label}
     </div>
   );
 }
@@ -667,6 +712,63 @@ function NegatedOverlay() {
 }
 
 // Flame strike — fire converging from all directions onto target
+// Skeleton Demon's signature attack — black flames engulfing the
+// target. Reuses flame_strike's radial-converge structure but with a
+// dark-purple palette (CSS filter `brightness(0)` blackens the emoji
+// silhouette and the drop-shadow filters paint the violet outer
+// glow). `intensity` scales count + size + reach with the damage
+// multiplier (50 dmg → intensity 1, 100 dmg → 2, 150 dmg → 3, …).
+// Capped at 5 so absurd-multiplier hits still render legibly.
+function BlackFlameStrikeEffect({ x, y, intensity = 1 }) {
+  const k = Math.min(Math.max(intensity || 1, 1), 5);
+  const flameCount = 14 + Math.round(k * 7);
+  const sparkCount = 10 + Math.round(k * 4);
+  const sizeMult   = 0.85 + k * 0.22;   // 1.07 → 1.95
+  const reach      = 50 + k * 16;       // 66   → 130
+  const flames = useMemo(() => Array.from({ length: flameCount }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 30 + Math.random() * reach;
+    return {
+      startX: Math.cos(angle) * dist,
+      startY: Math.sin(angle) * dist,
+      size: (10 + Math.random() * 14) * sizeMult,
+      delay: Math.random() * 220,
+      dur: 240 + Math.random() * 200,
+      char: ['🔥','🔥','🔥','▲','✦'][Math.floor(Math.random() * 5)],
+    };
+  }), []);
+  const sparks = useMemo(() => Array.from({ length: sparkCount }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = (15 + Math.random() * 30) * sizeMult;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 5 * sizeMult,
+      // Deep-violet / black-purple shrapnel — matches the central
+      // flash's palette so all colored bits stay in the same family.
+      color: ['#1a0028','#2a0040','#3d0050','#440066','#1f0033'][Math.floor(Math.random() * 5)],
+      delay: 320 + Math.random() * 160,
+      dur: 320 + Math.random() * 260,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-black-flame-flash" style={{ '--bfScale': sizeMult }} />
+      {flames.map((f, i) => (
+        <div key={'bfl'+i} className="anim-black-flame-shard" style={{
+          '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
+          animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
+        }}>{f.char}</div>
+      ))}
+      {sparks.map((s, i) => (
+        <div key={'bfs'+i} className="anim-explosion-particle" style={{
+          '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+          '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
 function FlameStrikeEffect({ x, y }) {
   const flames = useMemo(() => Array.from({ length: 18 }, () => {
     const angle = Math.random() * Math.PI * 2;
@@ -1693,6 +1795,86 @@ function AcidRainOverlay() {
     </div>
   );
 }
+
+// The Bonegrinder — a thick litter of bones and skulls covering the
+// battlefield while the Spell occupies an Area Zone. Rendered as a
+// single large overlay with ~120 randomly-placed bones plus ~40
+// skulls. Pinned via `inset: 0` so it covers the whole game-board
+// container; pointer-events disabled so it never blocks clicks on
+// cards / zones below.
+//
+// Performance notes (after the user reported a noticeable lag on
+// cast):
+//   • Static positioning ONLY — no per-element animation. 160
+//     simultaneous CSS animation timelines added a measurable
+//     compositor cost during the initial paint. Visual loss is
+//     small; the random rotations + opacities still sell "chaotic
+//     bone field."
+//   • Wrapped in React.memo so the overlay tree only mounts once.
+//     Without this, every gameState sync forced a re-walk of all 160
+//     children even though their props never change.
+//   • Random scatter is pre-computed via `useMemo([])` so the same
+//     positions persist across the component's lifetime — picking
+//     up Bonegrinder mid-game and replaying doesn't reshuffle.
+const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
+  // Bone scatter — fully random rotations + wide size range so the
+  // pile reads as chaotic. Position is independent x/y random so
+  // bones land in zone gaps as well as empty corners.
+  const bones = useMemo(() => Array.from({ length: 120 }, () => ({
+    left: Math.random() * 100,
+    top:  Math.random() * 100,
+    size: 18 + Math.random() * 30,
+    rot:  (Math.random() * 360) | 0,
+    opacity: 0.55 + Math.random() * 0.4,
+  })), []);
+  // Skulls are slightly bigger on average — rarer and more
+  // attention-grabbing — and stay close to upright (±25°).
+  const skulls = useMemo(() => Array.from({ length: 40 }, () => ({
+    left: Math.random() * 100,
+    top:  Math.random() * 100,
+    size: 22 + Math.random() * 22,
+    rot:  (Math.random() * 50 - 25) | 0,
+    opacity: 0.7 + Math.random() * 0.3,
+  })), []);
+  return (
+    <div className="bonegrinder-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      // zIndex -1 paints this layer BENEATH the board's in-flow
+      // content (player sides, area / support / hero / ability /
+      // surprise zones, cards). The parent `.board-center` sets
+      // `isolation: isolate` so this negative z-index stays confined
+      // to the board container — bones don't leak behind the page
+      // background. Net result: the litter coats the battlefield
+      // floor under everything, never on top of cards or buttons.
+      zIndex: -1,
+      overflow: 'hidden',
+      // Faint warm-bone wash behind the litter — sells "boneyard"
+      // without darkening the underlying board.
+      background: 'radial-gradient(ellipse at center, rgba(60,40,20,0.10) 0%, rgba(30,20,10,0.18) 100%)',
+    }}>
+      {bones.map((b, i) => (
+        <span key={'b'+i} style={{
+          position: 'absolute',
+          left: b.left + '%', top: b.top + '%',
+          fontSize: b.size + 'px',
+          opacity: b.opacity,
+          transform: `translate(-50%, -50%) rotate(${b.rot}deg)`,
+          textShadow: '0 1px 2px rgba(0,0,0,0.7)',
+        }}>🦴</span>
+      ))}
+      {skulls.map((s, i) => (
+        <span key={'s'+i} style={{
+          position: 'absolute',
+          left: s.left + '%', top: s.top + '%',
+          fontSize: s.size + 'px',
+          opacity: s.opacity,
+          transform: `translate(-50%, -50%) rotate(${s.rot}deg)`,
+          textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+        }}>💀</span>
+      ))}
+    </div>
+  );
+});
 
 // Stinky Stables — enormous face-less dung piles pinned to the LEFT/RIGHT
 // margins of the battlefield (zones live in the central ~80%). Unicode has
@@ -3071,6 +3253,7 @@ const ANIM_REGISTRY = {
   spider_avalanche: SpiderAvalancheEffect,
   electric_strike: ElectricStrikeEffect,
   flame_strike: FlameStrikeEffect,
+  black_flame_strike: BlackFlameStrikeEffect,
   venom_fog: VenomFogEffect,
   poisoned_well: PoisonedWellEffect,
   // ── Bomblebee archetype (7 explosion variants) ─────────────────────
@@ -4733,6 +4916,105 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // Crescent reap — Skeleton Reaper's curved blade-arc strike. Used
+  // for both non-lethal and lethal hits via the `lethal` prop:
+  //   • Non-lethal → small, pale-blue blade with a quick draw.
+  //   • Lethal     → 3× larger, near-black outer with a crimson inner,
+  //                  paired with a swelling violet-black aura and a
+  //                  rising skull. Tuned to feel weighty and final.
+  // Path uses SVG `pathLength="1"` so the keyframes' `stroke-dashoffset:
+  // 1 → 0` is a normalized draw regardless of the actual arc length.
+  crescent_reap: (() => {
+    return function CrescentReapEffect({ x, y, w, h, lethal }) {
+      const baseW = Math.max(w || 80, 80);
+      const baseH = Math.max(h || 110, 110);
+      // Lethal scales the cut dramatically (3× linear) — it should
+      // engulf the slot and read as "this is over."
+      const scale = lethal ? 3.0 : 1.0;
+      const arcW = baseW * 1.7 * scale;
+      const arcH = baseH * 1.0 * scale;
+      const strokeW = lethal ? 24 : 6;
+      // Crescent path — quadratic Bezier from lower-left, peaking
+      // above center, ending lower-right. Forms the bow shape of
+      // a horizontal scythe strike. Negative control-Y pulls the
+      // peak above the path's drawing area.
+      const path = `M ${arcW * 0.05} ${arcH * 0.78} Q ${arcW * 0.5} ${-arcH * 0.18}, ${arcW * 0.95} ${arcH * 0.78}`;
+      const outerStroke = lethal ? '#0a0008' : '#dde6ff';
+      const innerStroke = lethal ? 'rgba(220,30,40,0.92)' : 'rgba(255,255,255,0.95)';
+      const animKey = lethal ? 'crescentReapLethal' : 'crescentReapNormal';
+      const animDur = lethal ? 850 : 420;
+      const blade = lethal
+        ? 'drop-shadow(0 0 24px rgba(180,15,30,0.95)) drop-shadow(0 0 48px rgba(60,0,15,0.85))'
+        : 'drop-shadow(0 0 8px rgba(180,210,255,0.9))';
+      return (
+        <div style={{
+          position: 'fixed', left: x, top: y,
+          pointerEvents: 'none', zIndex: 10100,
+        }}>
+          <svg width={arcW} height={arcH}
+            style={{
+              position: 'absolute',
+              left: -arcW * 0.5, top: -arcH * 0.4,
+              overflow: 'visible',
+            }}>
+            {/* Outer dark blade outline (or pale-blue for non-lethal). */}
+            <path d={path}
+              pathLength="1"
+              stroke={outerStroke}
+              strokeWidth={strokeW}
+              strokeLinecap="round"
+              fill="none"
+              style={{
+                filter: blade,
+                strokeDasharray: 1,
+                strokeDashoffset: 1,
+                animation: `${animKey} ${animDur}ms cubic-bezier(0.2, 0.85, 0.35, 1) forwards`,
+              }}
+            />
+            {/* Inner highlight — pale-white core for non-lethal,
+                blood-red core for lethal. Slight delay so it reads as
+                a follow-through edge. */}
+            <path d={path}
+              pathLength="1"
+              stroke={innerStroke}
+              strokeWidth={strokeW * 0.35}
+              strokeLinecap="round"
+              fill="none"
+              style={{
+                strokeDasharray: 1,
+                strokeDashoffset: 1,
+                animation: `${animKey} ${animDur}ms cubic-bezier(0.2, 0.85, 0.35, 1) ${Math.round(animDur * 0.12)}ms forwards`,
+              }}
+            />
+          </svg>
+          {lethal && (
+            <>
+              {/* Black-violet gloom swelling beneath the cut. */}
+              <div style={{
+                position: 'absolute',
+                width: arcW * 0.85, height: arcH * 0.55,
+                left: -arcW * 0.42, top: -arcH * 0.05,
+                borderRadius: '50%',
+                background: 'radial-gradient(ellipse, rgba(50,5,30,0.85) 0%, rgba(20,0,12,0.55) 45%, transparent 80%)',
+                animation: 'crescentReapAura 1100ms ease-out 180ms forwards',
+                opacity: 0,
+              }} />
+              {/* Big skull rising through the gloom — drives home the
+                  finality of the lethal hit. */}
+              <div style={{
+                position: 'absolute', left: -38, top: -arcH * 0.3,
+                fontSize: 76,
+                animation: 'crescentReapSkull 1200ms ease-out 280ms forwards',
+                opacity: 0,
+                filter: 'drop-shadow(0 0 14px rgba(180,20,40,0.85)) drop-shadow(0 0 28px rgba(60,0,15,0.7))',
+              }}>💀</div>
+            </>
+          )}
+        </div>
+      );
+    };
+  })(),
+
   // Spooky ghost — Deepsea Poltergeister's artifact-destroy signature.
   // A wobbling 👻 floats up through the Artifact slot with a violet haze
   // and a handful of wisps spiraling out. Tuned to ~1200ms so the ghost
@@ -9473,6 +9755,455 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ── Elixir of Cold (apply) ─────────────────────────────────
+  // Ice-blue aura swirling around the buffed Hero with a few rising
+  // snowflakes — signals "this Hero is now cold-charged".
+  cold_strike_apply: (() => {
+    return function ColdStrikeApplyEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      const flakes = useMemo(() => Array.from({ length: 14 }, () => ({
+        startAngle: Math.random() * Math.PI * 2,
+        startDist: 30 + Math.random() * 25,
+        rise: -(20 + Math.random() * 50),
+        drift: (Math.random() - 0.5) * 30,
+        size: 12 + Math.random() * 12,
+        delay: Math.random() * 280,
+        dur: 700 + Math.random() * 350,
+        char: ['❄','❅','❆','✦'][Math.floor(Math.random() * 4)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Soft blue aura halo */}
+          <div style={{
+            position: 'absolute',
+            left: -cw * 0.55, top: -ch * 0.55,
+            width: cw * 1.1, height: ch * 1.1, borderRadius: 12,
+            background: 'radial-gradient(ellipse at center, rgba(140,210,255,0.55) 0%, rgba(80,170,240,0.35) 50%, rgba(40,130,220,0) 90%)',
+            filter: 'blur(5px)',
+            opacity: 0,
+            animation: 'coldStrikeAura 950ms ease-out forwards',
+          }} />
+          {/* Inner ring pulse */}
+          <div style={{
+            position: 'absolute', left: 0, top: 0,
+            width: 8, height: 8, marginLeft: -4, marginTop: -4,
+            borderRadius: '50%',
+            border: '3px solid rgba(180,230,255,.85)',
+            boxShadow: '0 0 14px rgba(120,200,255,.7)',
+            opacity: 0,
+            animation: 'coldStrikeRing 800ms ease-out forwards',
+          }} />
+          {flakes.map((f, i) => {
+            const sx = Math.cos(f.startAngle) * f.startDist;
+            const sy = Math.sin(f.startAngle) * f.startDist * 0.7;
+            return (
+              <div key={'csf'+i} style={{
+                position: 'absolute', left: sx, top: sy,
+                fontSize: f.size, color: '#dff2ff',
+                filter: 'drop-shadow(0 0 5px rgba(120,200,255,.85))',
+                opacity: 0,
+                animation: `coldStrikeFlake ${f.dur}ms ease-out ${f.delay}ms forwards`,
+                '--csdx': f.drift + 'px',
+                '--csdy': f.rise + 'px',
+              }}>{f.char}</div>
+            );
+          })}
+          <style>{`
+            @keyframes coldStrikeAura {
+              0%   { opacity: 0; transform: scale(0.7); }
+              35%  { opacity: 0.95; transform: scale(1.0); }
+              100% { opacity: 0; transform: scale(1.15); }
+            }
+            @keyframes coldStrikeRing {
+              0%   { width: 6px; height: 6px; margin-left: -3px; margin-top: -3px; opacity: 0.9; }
+              100% { width: ${cw * 1.2}px; height: ${cw * 1.2}px; margin-left: ${-cw * 0.6}px; margin-top: ${-cw * 0.6}px; opacity: 0; }
+            }
+            @keyframes coldStrikeFlake {
+              0%   { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.5); }
+              25%  { opacity: 1; transform: translate(calc(var(--csdx) * 0.3), calc(var(--csdy) * 0.25)) rotate(45deg) scale(1); }
+              100% { opacity: 0; transform: translate(var(--csdx), var(--csdy)) rotate(180deg) scale(0.6); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Elixir of Strength (apply) ─────────────────────────────
+  // Orange / gold ember aura with rising sparks. Signals "this Hero
+  // is primed with empowered_strike for their next single-target hit".
+  empowered_strike_apply: (() => {
+    return function EmpoweredStrikeApplyEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      const sparks = useMemo(() => Array.from({ length: 16 }, () => ({
+        startAngle: Math.random() * Math.PI * 2,
+        startDist: 22 + Math.random() * 30,
+        rise: -(28 + Math.random() * 55),
+        drift: (Math.random() - 0.5) * 35,
+        size: 10 + Math.random() * 12,
+        delay: Math.random() * 260,
+        dur: 650 + Math.random() * 300,
+        char: ['✦', '✧', '★', '✺', '⬢'][Math.floor(Math.random() * 5)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Warm orange aura halo */}
+          <div style={{
+            position: 'absolute',
+            left: -cw * 0.55, top: -ch * 0.55,
+            width: cw * 1.1, height: ch * 1.1, borderRadius: 12,
+            background: 'radial-gradient(ellipse at center, rgba(255,180,60,0.6) 0%, rgba(255,130,30,0.4) 50%, rgba(220,90,20,0) 90%)',
+            filter: 'blur(5px)',
+            opacity: 0,
+            animation: 'empoweredStrikeAura 950ms ease-out forwards',
+          }} />
+          {/* Punchy expanding ring */}
+          <div style={{
+            position: 'absolute', left: 0, top: 0,
+            width: 8, height: 8, marginLeft: -4, marginTop: -4,
+            borderRadius: '50%',
+            border: '3px solid rgba(255,200,90,.9)',
+            boxShadow: '0 0 14px rgba(255,160,40,.8)',
+            opacity: 0,
+            animation: 'empoweredStrikeRing 800ms ease-out forwards',
+          }} />
+          {/* Fist glyph centered, briefly */}
+          <div style={{
+            position: 'absolute', left: 0, top: 0,
+            fontSize: 30, marginLeft: -15, marginTop: -18,
+            filter: 'drop-shadow(0 0 8px rgba(255,180,60,.95))',
+            opacity: 0,
+            animation: 'empoweredStrikeFist 700ms ease-out 120ms forwards',
+          }}>💪</div>
+          {sparks.map((s, i) => {
+            const sx = Math.cos(s.startAngle) * s.startDist;
+            const sy = Math.sin(s.startAngle) * s.startDist * 0.6;
+            return (
+              <div key={'esp'+i} style={{
+                position: 'absolute', left: sx, top: sy,
+                fontSize: s.size, color: '#ffd07a',
+                filter: 'drop-shadow(0 0 5px rgba(255,140,40,.9))',
+                opacity: 0,
+                animation: `empoweredStrikeSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
+                '--esdx': s.drift + 'px',
+                '--esdy': s.rise + 'px',
+              }}>{s.char}</div>
+            );
+          })}
+          <style>{`
+            @keyframes empoweredStrikeAura {
+              0%   { opacity: 0; transform: scale(0.7); }
+              30%  { opacity: 0.95; transform: scale(1.0); }
+              100% { opacity: 0; transform: scale(1.18); }
+            }
+            @keyframes empoweredStrikeRing {
+              0%   { width: 6px; height: 6px; margin-left: -3px; margin-top: -3px; opacity: 0.95; }
+              100% { width: ${cw * 1.25}px; height: ${cw * 1.25}px; margin-left: ${-cw * 0.625}px; margin-top: ${-cw * 0.625}px; opacity: 0; }
+            }
+            @keyframes empoweredStrikeFist {
+              0%   { opacity: 0; transform: scale(0.5); }
+              40%  { opacity: 1; transform: scale(1.25); }
+              100% { opacity: 0; transform: scale(1.0); }
+            }
+            @keyframes empoweredStrikeSpark {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              25%  { opacity: 1; transform: translate(calc(var(--esdx) * 0.3), calc(var(--esdy) * 0.25)) scale(1); }
+              100% { opacity: 0; transform: translate(var(--esdx), var(--esdy)) scale(0.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Smoke Vial ───────────────────────────────────────────
+  // Thick gray smoke clouds rolling in over a Hero. Fires once per
+  // affected hero (incl. dead / immune ones — visual is independent of
+  // the Blinded status itself, which is gated by the engine). A few
+  // overlapping puffs swell and drift, leaving a soft afterhaze.
+  smoke_vial: (() => {
+    return function SmokeVialEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      const puffs = useMemo(() => Array.from({ length: 9 }, (_, i) => {
+        // First two puffs centered for instant coverage; the rest drift.
+        const centered = i < 2;
+        return {
+          x: centered ? -cw * 0.05 + (Math.random() - 0.5) * 12 : -cw * 0.45 + Math.random() * cw * 0.9,
+          y: centered ? -ch * 0.05 + (Math.random() - 0.5) * 14 : -ch * 0.45 + Math.random() * ch * 0.9,
+          size: (centered ? 1.0 : 0.65) * (cw * 0.7 + Math.random() * cw * 0.25),
+          delay: i * 55 + Math.random() * 40,
+          dur: 900 + Math.random() * 250,
+          drift: (Math.random() - 0.5) * 18,
+          rise: -(8 + Math.random() * 18),
+          shade: 60 + Math.floor(Math.random() * 25),
+        };
+      }), [cw, ch]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Pre-haze: a soft gray film that pulses in immediately so
+              the hero looks "obscured" before the puffs land. */}
+          <div style={{
+            position: 'absolute',
+            left: -cw * 0.55, top: -ch * 0.55,
+            width: cw * 1.1, height: ch * 1.1, borderRadius: 8,
+            background: 'radial-gradient(ellipse at center, rgba(75,75,80,0.55) 0%, rgba(55,55,60,0.35) 55%, rgba(40,40,45,0.0) 100%)',
+            filter: 'blur(6px)',
+            opacity: 0,
+            animation: 'smokeVialHaze 1100ms ease-out forwards',
+          }} />
+          {puffs.map((p, i) => (
+            <div key={'sv' + i} style={{
+              position: 'absolute',
+              left: p.x, top: p.y,
+              width: p.size, height: p.size,
+              marginLeft: -p.size / 2, marginTop: -p.size / 2,
+              borderRadius: '50%',
+              background: `radial-gradient(circle, rgba(${p.shade},${p.shade},${p.shade + 5},0.85) 0%, rgba(${p.shade - 15},${p.shade - 15},${p.shade - 10},0.55) 50%, rgba(30,30,35,0) 78%)`,
+              filter: 'blur(3px)',
+              opacity: 0,
+              transform: 'scale(0.5)',
+              animation: `smokeVialPuff ${p.dur}ms ease-out ${p.delay}ms forwards`,
+              '--svdx': p.drift + 'px',
+              '--svdy': p.rise + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes smokeVialHaze {
+              0%   { opacity: 0; }
+              25%  { opacity: 0.95; }
+              80%  { opacity: 0.6; }
+              100% { opacity: 0; }
+            }
+            @keyframes smokeVialPuff {
+              0%   { opacity: 0; transform: scale(0.4) translate(0, 0); }
+              30%  { opacity: 0.95; transform: scale(1.05) translate(0, 0); }
+              70%  { opacity: 0.85; transform: scale(1.2) translate(calc(var(--svdx) * 0.6), calc(var(--svdy) * 0.6)); }
+              100% { opacity: 0; transform: scale(1.35) translate(var(--svdx), var(--svdy)); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // Skeleton Death Knight "Silence" effect — a single thick
+  // dark-green diagonal slash sweeping across the target. The cut
+  // animates from the upper-left corner toward the lower-right with
+  // a brief flash, then fades. Used by both branches of Death
+  // Knight's effect (hero bound + creature negated alike).
+  silence_cut: (function () {
+    return function SilenceCutEffect({ x, y, w, h }) {
+      // The slash spans the whole zone — sized off the target's bounds.
+      const len = Math.max(w || 80, h || 110) * 1.4;
+      return (
+        <div style={{
+          position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
+          // Local origin = target center.
+        }}>
+          {/* The cutting blade — a thin green stripe rotated 45°. */}
+          <div style={{
+            position: 'absolute',
+            left: -len / 2, top: -3,
+            width: len + 'px', height: 6 + 'px',
+            background: 'linear-gradient(to right, transparent 0%, rgba(40,200,90,0.95) 20%, rgba(80,255,120,1) 50%, rgba(40,200,90,0.95) 80%, transparent 100%)',
+            transform: 'rotate(45deg)',
+            transformOrigin: '50% 50%',
+            boxShadow: '0 0 14px rgba(40,200,90,0.85), 0 0 28px rgba(20,140,60,0.6)',
+            opacity: 0,
+            animation: 'silence-cut-blade 480ms ease-out forwards',
+          }} />
+          {/* A second, thinner blade that lags slightly to read as a
+              "double-edge" follow-through. */}
+          <div style={{
+            position: 'absolute',
+            left: -len / 2, top: -1,
+            width: len + 'px', height: 2 + 'px',
+            background: 'linear-gradient(to right, transparent 0%, rgba(180,255,200,1) 50%, transparent 100%)',
+            transform: 'rotate(45deg)',
+            transformOrigin: '50% 50%',
+            opacity: 0,
+            animation: 'silence-cut-glint 380ms ease-out 60ms forwards',
+          }} />
+          {/* Dark-green energy puff that lingers after the cut. */}
+          <div style={{
+            position: 'absolute',
+            width: 70, height: 70, left: -35, top: -35,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(40,200,90,0.5) 0%, rgba(20,100,50,0.3) 40%, transparent 75%)',
+            opacity: 0,
+            animation: 'silence-cut-puff 700ms ease-out 80ms forwards',
+          }} />
+          <style>{`
+            @keyframes silence-cut-blade {
+              0%   { opacity: 0; transform: rotate(45deg) scaleX(0); }
+              30%  { opacity: 1; transform: rotate(45deg) scaleX(1); }
+              80%  { opacity: 0.8; transform: rotate(45deg) scaleX(1); }
+              100% { opacity: 0; transform: rotate(45deg) scaleX(1); }
+            }
+            @keyframes silence-cut-glint {
+              0%   { opacity: 0; transform: rotate(45deg) scaleX(0) translateY(0); }
+              50%  { opacity: 1; transform: rotate(45deg) scaleX(1) translateY(0); }
+              100% { opacity: 0; transform: rotate(45deg) scaleX(1) translateY(2px); }
+            }
+            @keyframes silence-cut-puff {
+              0%   { opacity: 0; transform: scale(0.5); }
+              40%  { opacity: 1; transform: scale(1.05); }
+              100% { opacity: 0; transform: scale(1.4); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // Burning Skeleton's burn-application slash — visually identical
+  // structure to silence_cut (45° diagonal cut + glint + lingering
+  // puff) but recolored to red so it reads as "wound that ignites"
+  // rather than the dark-green Silenced cut. Followed by a separate
+  // flame_strike broadcast for the actual fire effect.
+  red_cut: (function () {
+    return function RedCutEffect({ x, y, w, h }) {
+      const len = Math.max(w || 80, h || 110) * 1.4;
+      return (
+        <div style={{
+          position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100,
+        }}>
+          {/* Main blade — bright red. */}
+          <div style={{
+            position: 'absolute',
+            left: -len / 2, top: -3,
+            width: len + 'px', height: 6 + 'px',
+            background: 'linear-gradient(to right, transparent 0%, rgba(220,40,40,0.95) 20%, rgba(255,80,80,1) 50%, rgba(220,40,40,0.95) 80%, transparent 100%)',
+            transform: 'rotate(45deg)',
+            transformOrigin: '50% 50%',
+            boxShadow: '0 0 14px rgba(220,40,40,0.85), 0 0 28px rgba(140,20,20,0.6)',
+            opacity: 0,
+            animation: 'red-cut-blade 480ms ease-out forwards',
+          }} />
+          {/* Inner glint — pale-pink core for the highlight. */}
+          <div style={{
+            position: 'absolute',
+            left: -len / 2, top: -1,
+            width: len + 'px', height: 2 + 'px',
+            background: 'linear-gradient(to right, transparent 0%, rgba(255,200,200,1) 50%, transparent 100%)',
+            transform: 'rotate(45deg)',
+            transformOrigin: '50% 50%',
+            opacity: 0,
+            animation: 'red-cut-glint 380ms ease-out 60ms forwards',
+          }} />
+          {/* Crimson puff lingering after the cut. */}
+          <div style={{
+            position: 'absolute',
+            width: 70, height: 70, left: -35, top: -35,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(220,40,40,0.5) 0%, rgba(120,20,20,0.3) 40%, transparent 75%)',
+            opacity: 0,
+            animation: 'red-cut-puff 700ms ease-out 80ms forwards',
+          }} />
+          <style>{`
+            @keyframes red-cut-blade {
+              0%   { opacity: 0; transform: rotate(45deg) scaleX(0); }
+              30%  { opacity: 1; transform: rotate(45deg) scaleX(1); }
+              80%  { opacity: 0.8; transform: rotate(45deg) scaleX(1); }
+              100% { opacity: 0; transform: rotate(45deg) scaleX(1); }
+            }
+            @keyframes red-cut-glint {
+              0%   { opacity: 0; transform: rotate(45deg) scaleX(0) translateY(0); }
+              50%  { opacity: 1; transform: rotate(45deg) scaleX(1) translateY(0); }
+              100% { opacity: 0; transform: rotate(45deg) scaleX(1) translateY(2px); }
+            }
+            @keyframes red-cut-puff {
+              0%   { opacity: 0; transform: scale(0.5); }
+              40%  { opacity: 1; transform: scale(1.05); }
+              100% { opacity: 0; transform: scale(1.4); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // Skeleton Archer's arrow-impact effect: a small spray of bright
+  // white sparkles bursting outward, layered with a few red blood
+  // droplets so the impact reads as "the arrow drew blood." Used by
+  // both the damage-target branch AND the face-down-Surprise destroy
+  // branch (the Surprise treats the impact as a "snipe" hit).
+  arrow_impact: (function () {
+    return function ArrowImpactEffect({ x, y }) {
+      const sparkles = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+        angle: (i / 14) * Math.PI * 2 + Math.random() * 0.3,
+        dist: 22 + Math.random() * 18,
+        size: 2 + Math.random() * 3,
+        delay: Math.random() * 90,
+      })), []);
+      const blood = useMemo(() => Array.from({ length: 6 }, () => ({
+        angle: Math.random() * Math.PI * 2,
+        dist: 14 + Math.random() * 22,
+        size: 4 + Math.random() * 4,
+        delay: Math.random() * 60,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Bright impact flash core */}
+          <div style={{
+            position: 'absolute', width: 30, height: 30, left: -15, top: -15,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,220,0.9) 0%, rgba(255,200,120,0.5) 50%, transparent 80%)',
+            opacity: 0,
+            animation: 'arrow-impact-core 380ms ease-out forwards',
+          }} />
+          {/* Sparkles spraying outward */}
+          {sparkles.map((s, i) => (
+            <div key={'sp' + i} style={{
+              position: 'absolute', left: -s.size / 2, top: -s.size / 2,
+              width: s.size + 'px', height: s.size + 'px',
+              borderRadius: '50%',
+              background: '#fffbe0',
+              boxShadow: '0 0 6px #ffe080, 0 0 12px rgba(255,220,140,0.7)',
+              opacity: 0,
+              animation: `arrow-impact-sparkle 600ms ease-out ${s.delay}ms forwards`,
+              '--aix': Math.cos(s.angle) * s.dist + 'px',
+              '--aiy': Math.sin(s.angle) * s.dist + 'px',
+            }} />
+          ))}
+          {/* Blood droplets — slightly larger, deep-red, fall with a
+              bit of gravity so the splatter feels grounded. */}
+          {blood.map((b, i) => (
+            <div key={'bl' + i} style={{
+              position: 'absolute', left: -b.size / 2, top: -b.size / 2,
+              width: b.size + 'px', height: b.size + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, #c41a1a 0%, #7a0000 80%)',
+              boxShadow: '0 0 4px rgba(180,0,0,0.7)',
+              opacity: 0,
+              animation: `arrow-impact-blood 720ms cubic-bezier(.2,.5,.4,1) ${b.delay}ms forwards`,
+              '--bdx': Math.cos(b.angle) * b.dist + 'px',
+              '--bdy': Math.sin(b.angle) * b.dist + 'px',
+              '--bgy': (Math.sin(b.angle) * b.dist + 14) + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes arrow-impact-core {
+              0%   { opacity: 0; transform: scale(0.4); }
+              30%  { opacity: 1; transform: scale(1.2); }
+              100% { opacity: 0; transform: scale(1.6); }
+            }
+            @keyframes arrow-impact-sparkle {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.3); }
+              25%  { opacity: 1; transform: translate(calc(var(--aix) * 0.4), calc(var(--aiy) * 0.4)) scale(1); }
+              100% { opacity: 0; transform: translate(var(--aix), var(--aiy)) scale(0.5); }
+            }
+            @keyframes arrow-impact-blood {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.5); }
+              25%  { opacity: 1; transform: translate(calc(var(--bdx) * 0.5), calc(var(--bdy) * 0.5)) scale(1.1); }
+              100% { opacity: 0; transform: translate(var(--bdx), var(--bgy)) scale(0.8); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
 };
 
 function IceEncaseEffect({ x, y }) {
@@ -10222,7 +10953,7 @@ function schedulePlaySideDeckAppear(selector, slotBaseIdx, count) {
   setTimeout(() => requestAnimationFrame(tryFire), 0);
 }
 
-function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck }) {
+function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck, cubeMatchInfo }) {
   const { user, setUser, notify } = useContext(AppContext);
   const isSpectator = gameState.isSpectator || false;
   const myIdx = gameState.myIndex;
@@ -10876,7 +11607,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (!target) return [];
     const anims = [];
     for (const cardName of entries) {
-      const positions = boardRects[cardName];
+      let positions = boardRects[cardName];
+      // Fallback for opp face-down Surprise destroys: the opp's view
+      // captured the surprise zone's rect under the placeholder name
+      // '?' (server.js sendGameState swaps the real name out for
+      // hidden cards). When the surprise gets destroyed, the REAL
+      // card name flows into the discard pile — the direct lookup
+      // misses, so we fall back to a `?` rect. This makes the
+      // standard board→discard fly-out work for hidden surprises
+      // exactly like it does for face-up cards.
+      if ((!positions || positions.length === 0) && boardRects['?']?.length > 0) {
+        positions = boardRects['?'];
+      }
       if (!positions || positions.length === 0) continue;
       const sr = positions.shift();
       anims.push({ id: Date.now() + Math.random(), cardName, startX: sr.left, startY: sr.top, endX: target.x, endY: target.y, dest });
@@ -10939,6 +11681,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const newDiscardEntries = discardGrew ? [...me.discardPile.slice(prevDiscardLen)] : [];
         const newDeletedEntries = deletedGrew ? [...me.deletedPile.slice(prevDeletedLen)] : [];
         const newAnims = [];
+
+        // Pre-consume entries already covered by an explicit hand→pile
+        // broadcast (count-based-detection version — same rationale as
+        // the opp-side block).
+        {
+          const handPending = handToPilePendingMeRef.current;
+          for (let i = newDiscardEntries.length - 1; i >= 0; i--) {
+            const idx = handPending.discard.findIndex(e => e.cardName === newDiscardEntries[i]);
+            if (idx >= 0) {
+              handPending.discard.splice(idx, 1);
+              newDiscardEntries.splice(i, 1);
+            }
+          }
+          for (let i = newDeletedEntries.length - 1; i >= 0; i--) {
+            const idx = handPending.deleted.findIndex(e => e.cardName === newDeletedEntries[i]);
+            if (idx >= 0) {
+              handPending.deleted.splice(idx, 1);
+              newDeletedEntries.splice(i, 1);
+            }
+          }
+        }
 
         // 1. Match against hand removals (hand count decreased)
         if (newCount < prevCount) {
@@ -11044,27 +11807,59 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     }
 
+    // Build the hand-removed list FIRST (independent of pile growth)
+    // so we can suppress entries already covered by an explicit
+    // play_pile_transfer broadcast even when the pile size appears
+    // unchanged across this sync. The forced-discard-then-yank
+    // pattern (Skeleton Necromancer) batches a +1/−1 sequence into a
+    // single render where discardGrew is false — without this
+    // pre-pass the broadcast's pending entry would just sit until
+    // its timeout and the diff never gets a chance to consume it.
+    let removedFromHand = [];
+    if (newHand.length < prevHand.length) {
+      // Sequential subsequence match: newHand is a subsequence of
+      // prevHand (splice preserves relative order), so a forward scan
+      // correctly identifies which exact positions were removed —
+      // even for duplicates.
+      let ni = 0;
+      for (let i = 0; i < prevHand.length; i++) {
+        if (ni < newHand.length && prevHand[i] === newHand[ni]) ni++;
+        else removedFromHand.push({ cardName: prevHand[i], handIdx: i });
+      }
+    }
+
+    // Suppress any hand-removed cards already covered by an explicit
+    // hand → pile broadcast. Consume the matching pending entry so a
+    // later genuine discard of the same card (post auto-clear timeout)
+    // still animates correctly.
+    {
+      const handPending = handToPilePendingMeRef.current;
+      for (let ri = removedFromHand.length - 1; ri >= 0; ri--) {
+        const r = removedFromHand[ri];
+        const pdIdx = handPending.discard.findIndex(e => e.cardName === r.cardName);
+        if (pdIdx >= 0) {
+          handPending.discard.splice(pdIdx, 1);
+          removedFromHand.splice(ri, 1);
+          continue;
+        }
+        const peIdx = handPending.deleted.findIndex(e => e.cardName === r.cardName);
+        if (peIdx >= 0) {
+          handPending.deleted.splice(peIdx, 1);
+          removedFromHand.splice(ri, 1);
+        }
+      }
+    }
+
     if (discardGrew || deletedGrew) {
       const newDiscardEntries = discardGrew ? [...me.discardPile.slice(prevDiscardLen)] : [];
       const newDeletedEntries = deletedGrew ? [...me.deletedPile.slice(prevDeletedLen)] : [];
       const newAnims = [];
 
-      // 1. Match against hand removals
-      if (newHand.length < prevHand.length) {
-        // Sequential subsequence match: newHand is a subsequence of prevHand
-        // (splice preserves relative order), so a forward scan correctly
-        // identifies which exact positions were removed — even for duplicates.
-        const removed = [];
-        let ni = 0;
-        for (let i = 0; i < prevHand.length; i++) {
-          if (ni < newHand.length && prevHand[i] === newHand[ni]) {
-            ni++;
-          } else {
-            removed.push({ cardName: prevHand[i], handIdx: i });
-          }
-        }
+      // 1. Match against hand removals (those NOT already suppressed
+      // above by a pile-transfer broadcast).
+      if (removedFromHand.length > 0) {
         const storedRects = myHandRectsRef.current;
-        for (const r of removed) {
+        for (const r of removedFromHand) {
           const sr = storedRects[r.handIdx];
           if (!sr) continue;
           let idx = newDiscardEntries.indexOf(r.cardName);
@@ -11079,6 +11874,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             newDeletedEntries.splice(idx, 1);
             const t = getPileCenter('[data-my-deleted]');
             if (t) newAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'deleted' });
+          }
+        }
+      }
+      // Also drop any pile entries that match a broadcast-covered
+      // card name (covers the case where pile DID grow — the
+      // hand-side animation was already played by the pile-transfer
+      // handler, so the diff shouldn't append a board fly-out for
+      // the same name).
+      {
+        const handPending = handToPilePendingMeRef.current;
+        for (let i = newDiscardEntries.length - 1; i >= 0; i--) {
+          const idx = handPending.discard.findIndex(e => e.cardName === newDiscardEntries[i]);
+          if (idx >= 0) {
+            handPending.discard.splice(idx, 1);
+            newDiscardEntries.splice(i, 1);
+          }
+        }
+        for (let i = newDeletedEntries.length - 1; i >= 0; i--) {
+          const idx = handPending.deleted.findIndex(e => e.cardName === newDeletedEntries[i]);
+          if (idx >= 0) {
+            handPending.deleted.splice(idx, 1);
+            newDeletedEntries.splice(i, 1);
           }
         }
       }
@@ -11192,6 +12009,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const newDiscardEntries = discardGrew ? [...opp.discardPile.slice(prevDiscardLen)] : [];
       const newDeletedEntries = deletedGrew ? [...opp.deletedPile.slice(prevDeletedLen)] : [];
       const newAnims = [];
+
+      // Pre-consume entries already covered by an explicit hand→pile
+      // broadcast so the count-based match below doesn't double-fire.
+      // See the me-side equivalent for the full rationale.
+      {
+        const handPendingOpp = handToPilePendingOppRef.current;
+        for (let i = newDiscardEntries.length - 1; i >= 0; i--) {
+          const idx = handPendingOpp.discard.findIndex(e => e.cardName === newDiscardEntries[i]);
+          if (idx >= 0) {
+            handPendingOpp.discard.splice(idx, 1);
+            newDiscardEntries.splice(i, 1);
+          }
+        }
+        for (let i = newDeletedEntries.length - 1; i >= 0; i--) {
+          const idx = handPendingOpp.deleted.findIndex(e => e.cardName === newDeletedEntries[i]);
+          if (idx >= 0) {
+            handPendingOpp.deleted.splice(idx, 1);
+            newDeletedEntries.splice(i, 1);
+          }
+        }
+      }
 
       // 1. Match against hand removals (hand count decreased)
       if (newCount < prevCount) {
@@ -11761,22 +12599,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const rawLevel = card.level || 0;
     const reduction = (playerData === me ? (gameState.cardLevelReductions || {})[card.name] : 0) || 0;
     let level = Math.max(0, rawLevel - reduction);
-    // Per-instance hand-card level offsets (Rocky Slime). Mirror of the
-    // server's `heroMeetsLevelReq` permissive aggregate: pick the
-    // lowest applicable offset for any matching copy currently in
-    // hand. Without this, the support-zone drop highlight would
-    // refuse a level-reduced creature even though the server happily
-    // accepts the play — the card lights the hero header but not the
-    // slots, and the drop silently fizzles.
+    // Per-instance hand-card level offsets (Rocky Slime + Sparkfly
+    // Queen's transient rebate). Mirror of the server's
+    // `heroMeetsLevelReq` permissive aggregate: pick the lowest
+    // applicable offset for any matching copy currently in hand. Both
+    // the persistent and the transient maps contribute, AND the
+    // hero-filter map narrows the transient rebate to its bound hero
+    // — so dragging a Queen-tutored Creature onto a non-host Hero
+    // correctly evaluates at full level.
     if (playerData === me && card.name) {
-      const offsets = me.handLevelOffsets || {};
+      const offsets    = me.handLevelOffsets || {};
+      const transient  = me.handLevelOffsetsTransient || {};
+      const filter     = me.handLevelOffsetHeroFilter || {};
       const handArr = me.hand || [];
       let bestOffset = 0;
-      for (const k of Object.keys(offsets)) {
-        if (handArr[+k] !== card.name) continue;
-        const v = offsets[k] || 0;
-        if (v < bestOffset) bestOffset = v;
-      }
+      const scan = (map) => {
+        for (const k of Object.keys(map)) {
+          if (handArr[+k] !== card.name) continue;
+          if (filter[k] != null && filter[k] !== heroIdx) continue;
+          const v = map[k] || 0;
+          if (v < bestOffset) bestOffset = v;
+        }
+      };
+      scan(offsets);
+      scan(transient);
       if (bestOffset < 0) level = Math.max(0, level + bestOffset);
     }
     if (level <= 0 && !card.spellSchool1) return true;
@@ -13160,6 +14006,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // BEFORE falling through to the board-match path.
   const deckToDiscardPendingMeRef  = useRef({ discard: [], deleted: [] });
   const deckToDiscardPendingOppRef = useRef({ discard: [], deleted: [] });
+  // Hand → pile fly-out broadcasts (engine-driven). When
+  // `actionPromptForceDiscard` (and any future hand-shrinking effect
+  // that broadcasts its own flight) emits a `play_pile_transfer` from
+  // hand → discard / deleted, we register the cardName here so the
+  // diff-based fly-out detector below can SUPPRESS its own animation
+  // for that same card. Without this, both the broadcast and the
+  // diff would fire, double-animating one card.
+  //
+  // The diff also no-ops entirely when discardPile.length stays
+  // numerically the same across syncs (e.g. forced-discard pushes a
+  // card on, then a follow-up effect splices a different card off,
+  // leaving net zero growth that React batches into a single render).
+  // The broadcast covers that case because it fires per-card,
+  // independent of the post-batch pile size.
+  //
+  // Each entry is { cardName, expiresAt }; a setTimeout auto-clears
+  // it ~700 ms after registration so a stale entry can't trap a
+  // later real discard of the same name.
+  const handToPilePendingMeRef  = useRef({ discard: [], deleted: [] });
+  const handToPilePendingOppRef = useRef({ discard: [], deleted: [] });
   const stealExpectedOppCountRef = useRef(-1); // opp hand count when stealHiddenOpp was set
   const stealExpectedMeCountRef = useRef(-1); // my hand count when stealHiddenMe was set
   const [stealHighlightMe, setStealHighlightMe] = useState(new Set()); // hand indices highlighted by opponent's blind pick selection
@@ -15304,7 +16170,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('play_card_transfer', onCardTransfer);
-    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, emoji, duration, trailClass, emojiStyle, projectileClass }) => {
+    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, emoji, duration, trailClass, emojiStyle, projectileClass, projectileShape, noTrail, baseAngle }) => {
       if (window.playSFX) window.playSFX('projectile', { category: 'effect' });
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
@@ -15312,7 +16178,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ? document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`)
         : document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
       let tgtEl;
-      if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
+      if (targetZoneType === 'surprise') {
+        // Skeleton Archer's "snipe a face-down Surprise" path. The
+        // surprise zone sits next to the support row and has its own
+        // data-attribute namespace. heroIdx scopes WHICH surprise
+        // zone (one per hero column).
+        tgtEl = document.querySelector(`[data-surprise-zone][data-surprise-owner="${tgtLabel}"][data-surprise-hero="${targetHeroIdx}"]`);
+      } else if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
         tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
       } else {
         tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
@@ -15322,13 +16194,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const tr = tgtEl.getBoundingClientRect();
       const id = Date.now() + Math.random();
       const dur = duration || 600;
+      const sxPx = sr.left + sr.width / 2;
+      const syPx = sr.top  + sr.height / 2;
+      const txPx = tr.left + tr.width / 2;
+      const tyPx = tr.top  + tr.height / 2;
+      // Angle in degrees from src → tgt. CSS `rotate(0deg)` points
+      // right; 0° here means a horizontal east-bound projectile, so
+      // any projectile whose visual natively faces RIGHT (the SVG
+      // arrow) lines up with no extra adjustment. Emojis whose
+      // natural orientation isn't east (the phoenix bird emoji
+      // commonly faces left) opt in via the broadcast's `baseAngle`
+      // field (a constant offset added here). For a left-facing
+      // phoenix, `baseAngle: 180` flips its natural orientation to
+      // east so the rest of the rotation math is unchanged.
+      const rawAngleDeg = Math.atan2(tyPx - syPx, txPx - sxPx) * 180 / Math.PI;
+      const angleDeg = rawAngleDeg + (typeof baseAngle === 'number' ? baseAngle : 0);
       setProjectileAnims(prev => [...prev, {
         id, emoji: emoji || '🐦‍🔥',
         trailClass: trailClass || null,
         emojiStyle: emojiStyle || null,
         projectileClass: projectileClass || null,
-        srcX: sr.left + sr.width / 2, srcY: sr.top + sr.height / 2,
-        tgtX: tr.left + tr.width / 2, tgtY: tr.top + tr.height / 2,
+        projectileShape: projectileShape || null,
+        noTrail: !!noTrail,
+        srcX: sxPx, srcY: syPx,
+        tgtX: txPx, tgtY: tyPx,
+        angle: angleDeg,
         dur,
       }]);
       setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + 200);
@@ -16192,25 +17082,55 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Generic pile-to-pile flying card animation. Used for moves the
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
-    const onPileTransfer = ({ owner, cardName, from, to, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, flightStyle }) => {
-      const isMe = owner === myIdx;
-      const ownerLabel = isMe ? 'me' : 'opp';
-      // Pre-register the upcoming hand arrival so the hand-count auto-
-      // animation effect(s) suppress their own draw anim. Without this,
-      // the client would overlay a spurious "flew from deck / opp hand"
-      // animation on top of the authoritative pile-transfer flight.
+    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, flightStyle }) => {
+      // Backward-compatible: when only `owner` is supplied the source AND
+      // destination both belong to that player (Mass Multiplication's
+      // discard→deleted, the Deepsea bounce-place hand-swap, etc.). Cross-
+      // player flights (Sparkfly Queen pulling from opp deck → my hand,
+      // Sparkfly Worker stealing a board card from opp side → my hand)
+      // pass `fromOwner` and `toOwner` separately so the source element
+      // is looked up on one side and the destination on the other.
+      const srcOwner = fromOwner != null ? fromOwner : owner;
+      const tgtOwner = toOwner   != null ? toOwner   : owner;
+      const srcIsMe  = srcOwner === myIdx;
+      const tgtIsMe  = tgtOwner === myIdx;
+      // Pre-register the upcoming hand arrival on the RECEIVER's side so
+      // the hand-count auto-animation effect(s) suppress their own draw
+      // anim. Without this, the client would overlay a spurious "flew
+      // from deck / opp hand" animation on top of the authoritative
+      // pile-transfer flight.
       if (to === 'hand') {
-        if (isMe) pileTransferToHandPendingMeRef.current  += 1;
-        else      pileTransferToHandPendingOppRef.current += 1;
+        if (tgtIsMe) pileTransferToHandPendingMeRef.current  += 1;
+        else         pileTransferToHandPendingOppRef.current += 1;
       }
-      // Resolve `pile` + locator extras to a DOM element. Tries the most
-      // specific selector first and falls back on a generic container
-      // when the specific target may not exist yet (e.g. a hand slot
-      // that's about to be added on the next React render).
-      const elementFor = (pile, extras = {}) => {
+      // Pre-register hand → pile transfers so the diff-based hand
+      // fly-out detector below suppresses its duplicate animation.
+      // See the ref-decl block (handToPilePendingMeRef) for the full
+      // rationale. The auto-clear setTimeout guards against stale
+      // entries when the pile doesn't actually grow (forced-discard
+      // followed by a same-tick splice — the net-zero case the
+      // engine-side broadcast was added specifically to cover).
+      if (from === 'hand' && (to === 'discard' || to === 'deleted') && cardName) {
+        const ref = srcIsMe ? handToPilePendingMeRef : handToPilePendingOppRef;
+        const bucket = ref.current[to];
+        const entry = { cardName };
+        bucket.push(entry);
+        setTimeout(() => {
+          const idx = bucket.indexOf(entry);
+          if (idx >= 0) bucket.splice(idx, 1);
+        }, 700);
+      }
+      // Resolve `pile` + locator extras to a DOM element on the side
+      // requested by `isMe`. Tries the most specific selector first and
+      // falls back on a generic container when the specific target may
+      // not exist yet (e.g. a hand slot that's about to be added on the
+      // next React render).
+      const elementFor = (pile, isMe, extras = {}) => {
+        const ownerLabel = isMe ? 'me' : 'opp';
         if (pile === 'discard') return document.querySelector(isMe ? '[data-my-discard]' : '[data-opp-discard]');
         if (pile === 'deleted') return document.querySelector(isMe ? '[data-my-deleted]' : '[data-opp-deleted]');
         if (pile === 'deck')    return document.querySelector(isMe ? '[data-my-deck]'    : '[data-opp-deck]');
+        if (pile === 'potionDeck') return document.querySelector(isMe ? '[data-my-potion-deck]' : '[data-opp-potion-deck]');
         if (pile === 'area')    return document.querySelector(`[data-area-zone][data-area-owner="${ownerLabel}"]`);
         if (pile === 'support' && extras.heroIdx != null && extras.slotIdx != null) {
           return document.querySelector(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${extras.heroIdx}"][data-support-slot="${extras.slotIdx}"]`);
@@ -16240,14 +17160,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
         return null;
       };
-      const srcEl = elementFor(from, { heroIdx: fromHeroIdx, slotIdx: fromSlotIdx, handIdx: fromHandIdx, permId: fromPermId });
-      const tgtEl = elementFor(to,   { handIdx: toHandIdx, heroIdx: toHeroIdx, slotIdx: toSlotIdx });
+      const srcEl = elementFor(from, srcIsMe, { heroIdx: fromHeroIdx, slotIdx: fromSlotIdx, handIdx: fromHandIdx, permId: fromPermId });
+      const tgtEl = elementFor(to,   tgtIsMe, { handIdx: toHandIdx, heroIdx: toHeroIdx, slotIdx: toSlotIdx });
       if (!srcEl || !tgtEl) return;
 
       // Hide the landing hand slot until the flying card arrives so both
-      // copies aren't simultaneously visible. Keyed by `${owner}-${idx}`.
+      // copies aren't simultaneously visible. Keyed by `${tgtOwner}-${idx}`.
       if (to === 'hand' && toHandIdx != null) {
-        const hideKey = `${owner}-${toHandIdx}`;
+        const hideKey = `${tgtOwner}-${toHandIdx}`;
         setBounceReturnHidden(prev => {
           const next = new Set(prev);
           next.add(hideKey);
@@ -16269,7 +17189,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // is what makes the Deepsea swap visually CROSS — old flies to
       // hand while new flies to support at the same time.
       if (to === 'support' && toHeroIdx != null && toSlotIdx != null) {
-        const hideKey = `${owner}-${toHeroIdx}-${toSlotIdx}`;
+        const hideKey = `${tgtOwner}-${toHeroIdx}-${toSlotIdx}`;
         setBounceOutgoingHidden(prev => {
           const next = new Set(prev);
           next.add(hideKey);
@@ -17146,6 +18066,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('play_heal_beam', onHealBeam);
+    // Server-driven 0-heal feedback. Fired from the engine's heal
+    // helpers when the target was already at / above max HP (so the
+    // diff-based detector below would never see it). Routes hero
+    // targets (zoneSlot < 0) through `setHealNumbers` and creature
+    // targets through `setCreatureHealNumbers`. Either path renders
+    // the entry as plain "0" via the components' amount-aware label.
+    const onHealZero = ({ owner, heroIdx, zoneSlot }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const id = Date.now() + Math.random();
+      const entry = { id, amount: 0, ownerLabel, heroIdx, zoneSlot };
+      if (zoneSlot == null || zoneSlot < 0) {
+        setHealNumbers(prev => [...prev, entry]);
+        setTimeout(() => setHealNumbers(prev => prev.filter(e => e.id !== id)), 1800);
+      } else {
+        setCreatureHealNumbers(prev => [...prev, entry]);
+        setTimeout(() => setCreatureHealNumbers(prev => prev.filter(e => e.id !== id)), 1800);
+      }
+    };
+    socket.on('play_heal_zero', onHealZero);
     const onGuardianAngel = ({ owner, heroIdx }) => {
       const label = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${label}"][data-hero-idx="${heroIdx}"]`);
@@ -17302,6 +18241,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_cloak_vanish', onCloakVanish);
       socket.off('play_skull_burst', onSkullBurst);
       socket.off('play_heal_beam', onHealBeam);
+      socket.off('play_heal_zero', onHealZero);
       socket.off('play_guardian_angel', onGuardianAngel);
       socket.off('hero_announcement', onHeroAnnouncement);
       socket.off('dark_deepsea_god_manifest', onDDGManifest);
@@ -17487,6 +18427,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const handleSurrender = () => {
     showTextBox(null);
     setShowSurrender(false);
+    // In a cube tournament match, surrender ends the WHOLE match (not
+    // just the current Bo-game). The server's `cube_surrender_match`
+    // handler routes through cubeMatchEnd directly so the player skips
+    // the standard auto-advance-to-next-game path. They keep parent-
+    // room (cube) membership and become a tournament spectator.
+    if (cubeMatchInfo) {
+      socket.emit('cube_surrender_match', {
+        parentRoomId: cubeMatchInfo.parentRoomId,
+        childRoomId: cubeMatchInfo.childRoomId,
+      });
+      return;
+    }
     socket.emit('leave_game', { roomId: gameState.roomId });
     // Don't call onLeave — server will send updated game state with result
   };
@@ -17793,6 +18745,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [damageNumbers, setDamageNumbers] = useState([]);
   const [healNumbers, setHealNumbers] = useState([]);
   const [creatureDamageNumbers, setCreatureDamageNumbers] = useState([]);
+  // Server-driven 0-heal feedback. Diff-based detection can't see "heal
+  // landed but produced no HP gain" since the HP is identical pre/post,
+  // so the engine broadcasts `play_heal_zero` from the overheal-blocked
+  // path and we feed it into a separate creature-heal slot here.
+  const [creatureHealNumbers, setCreatureHealNumbers] = useState([]);
   const [goldGains, setGoldGains] = useState([]);
   const [goldLosses, setGoldLosses] = useState([]);
   const prevHpRef = useRef(null);
@@ -18846,6 +19803,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const isUntargetable = hero?.statuses?.untargetable;
           const isSirenLinked = !!hero?.statuses?.sirenLinked;
           const isBound = !!hero?.statuses?.bound;
+          const isBlinded = !!hero?.statuses?.blinded;
           // Check if this hero has an active hero effect
           const heroEffectEntry = (gameState.activeHeroEffects || []).find(e => e.heroIdx === i && ((!isOpp && !e.charmedOwner) || (isOpp && e.charmedOwner === pi)));
           const isHeroEffectActive = !!heroEffectEntry;
@@ -18944,7 +19902,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
                 {hero?.name && isHealReversed && <HealReversedOverlay />}
-                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isSirenLinked || isBound || hero._extraLife) && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
+                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isSirenLinked || isBound || isBlinded || hero._extraLife) && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
                 {hero?.name && (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Mummy Token')) && (
@@ -19614,7 +20572,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                             tooltipCardOverride={tooltipOverride}
                           />;
                         }
-                        return <BoardCard cardName={cards[0]} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={creatureStyle} tooltipCardOverride={tooltipOverride} />;
+                        return <BoardCard cardName={cards[0]} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={creatureStyle} tooltipCardOverride={tooltipOverride} inheritedEffects={cc?._inheritedEffects} />;
                       })()
                     ) : (
                       <div className="board-stack">
@@ -19718,6 +20676,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={handleLeave}>
             ✕ LEAVE
           </button>
+        ) : cubeMatchInfo && !result ? (
+          // Cube tournament match — surrender ends the WHOLE match (Bo-set
+          // included), not just the current game. Player keeps parent-room
+          // membership and becomes a spectator like other eliminated players.
+          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }}
+            onClick={() => setShowSurrender(true)} title="Forfeit this match — you stay in the cube as a spectator">
+            🏳 SURRENDER MATCH
+          </button>
         ) : (
           <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => result ? handleLeave() : setShowSurrender(true)}>
             {result ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
@@ -19795,7 +20761,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
         </div>
         {/* Board */}
-        <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '')}>
+        <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '') + (pt?.config?.redSelect ? ' sacrifice-targeting' : '')}>
           {/* ── Generic Player Debuff Warnings (top of battlefield) ── */}
           {(() => {
             const debuffs = [];
@@ -19920,8 +20886,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           })()}
 
           <div className="board-center-spacer" />
-          <div className="board-center" ref={boardCenterRef} style={{ position: 'relative' }}>
+          <div className="board-center" ref={boardCenterRef} style={{ position: 'relative', isolation: 'isolate' }}>
             {(((gameState.areaZones?.[0] || []).includes('Acid Rain')) || ((gameState.areaZones?.[1] || []).includes('Acid Rain'))) && <AcidRainOverlay />}
+            {(((gameState.areaZones?.[0] || []).includes('The Bonegrinder')) || ((gameState.areaZones?.[1] || []).includes('The Bonegrinder'))) && <BonegrinderOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Deepsea Castle')) || ((gameState.areaZones?.[1] || []).includes('Deepsea Castle'))) && <DeepseaCastleOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Slippery Ice')) || ((gameState.areaZones?.[1] || []).includes('Slippery Ice'))) && <SlipperyIceOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('The Cosmic Depths')) || ((gameState.areaZones?.[1] || []).includes('The Cosmic Depths'))) && <CosmicDepthsOverlay />}
@@ -20117,8 +21084,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 : <div className="board-card" data-opp-deck="1"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
               <BoardZone type="potion" label="Potions" faceDown style={oppBoardZone('potion')}>
-                {opp.potionDeckCount > 0 ? <div className="board-card face-down"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>
-                : <div className="board-card"><div className="deck-empty-label">0</div></div>}
+                {opp.potionDeckCount > 0 ? <div className="board-card face-down" data-opp-potion-deck="1"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.potionDeckCount}</div></div>
+                : <div className="board-card" data-opp-potion-deck="1"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
               <div className="board-util-spacer" />
             </div>
@@ -20224,17 +21191,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   && (gameState.potionTargeting.validTargets || []).some(
                     t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === item.origIdx
                   ));
-                // Per-instance hand-card level offset (Rocky Slime). The
-                // server pushes `me.handLevelOffsets` (only for own
-                // player); when an entry exists for this hand slot
-                // we render the resulting effective level on top of
-                // the card — same `creature-level` badge slimes use
-                // when their level is changed on the board.
-                const handLevelOffset = (me.handLevelOffsets || {})[item.origIdx] || 0;
+                // Per-instance hand-card level offsets. Merge three maps:
+                //   • `handLevelOffsets`           — Rocky Slime style,
+                //     persistent (carries onto the summoned creature).
+                //   • `handLevelOffsetsTransient`  — Sparkfly Queen's
+                //     in-hand-only rebate; evaporates on splice.
+                //   • `handLevelOffsetsDynamic`    — server-computed
+                //     output of `_applyCardLevelReductions` for cards
+                //     with a `reduceCardLevel` hook (The Bonegrinder
+                //     counting Skeletons in discard, etc.). Recomputed
+                //     each sendGameState; nothing is stored on the
+                //     player state.
+                // Lowest (most-negative) wins, matching the server's
+                // `heroMeetsLevelReq` aggregate. The hero-filter map
+                // tells us whether the rebate is restricted to one
+                // specific Hero (Queen's "corresponding Hero") so the
+                // badge can flag that limitation in dark green —
+                // distinguishing it from global reductions which stay
+                // in the default light blue.
+                const persistent = (me.handLevelOffsets || {})[item.origIdx] || 0;
+                const transient  = (me.handLevelOffsetsTransient || {})[item.origIdx] || 0;
+                const dynamic    = (me.handLevelOffsetsDynamic || {})[item.origIdx] || 0;
+                const handLevelOffset = Math.min(persistent, transient, dynamic, 0);
                 const handCardData = CARDS_BY_NAME[item.card];
                 const handEffectiveLevel = handLevelOffset !== 0 && handCardData?.level != null
                   ? (handCardData.level + handLevelOffset)
                   : null;
+                const handLevelHostHeroIdx = (me.handLevelOffsetHeroFilter || {})[item.origIdx];
+                const handLevelIsHeroFiltered = handLevelHostHeroIdx != null;
                 // Per-instance Artifact cost reduction (Play Money). Mirrors
                 // the Rocky-Slime level-offset surface: server pushes
                 // `me.handCostReductions` only for the owner; when an
@@ -20254,7 +21238,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
                     onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
                     <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} />
-                    {handEffectiveLevel != null && <div className="creature-level">Lv{handEffectiveLevel}</div>}
+                    {handEffectiveLevel != null && (
+                      <div
+                        className={'creature-level' + (handLevelIsHeroFiltered ? ' creature-level-hero-filtered' : '')}
+                        onMouseEnter={handLevelIsHeroFiltered
+                          ? (e) => showGameTooltip(e, `Reduced level only applies when ${me.heroes?.[handLevelHostHeroIdx]?.name || 'the corresponding Hero'} plays this card.`)
+                          : undefined}
+                        onMouseLeave={handLevelIsHeroFiltered ? hideGameTooltip : undefined}>
+                        Lv{handEffectiveLevel}
+                      </div>
+                    )}
                     {handEffectiveCost != null && (
                       <div className="hand-cost-override"
                         onMouseEnter={e => showGameTooltip(e, `Cost reduced by ${handCostReduction} this turn (was ${handCardData.cost}).`)}
@@ -20330,6 +21323,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ))}
       {creatureDamageNumbers.map(d => (
         <CreatureDamageNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} zoneSlot={d.zoneSlot} />
+      ))}
+      {creatureHealNumbers.map(d => (
+        <CreatureHealNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} zoneSlot={d.zoneSlot} />
       ))}
 
       {/* Gold gain numbers */}
@@ -20411,16 +21407,46 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </div>
       ))}
 
-      {/* Projectile animations (phoenix cannon, etc.) */}
+      {/* Projectile animations (phoenix cannon, arrow shafts, etc.) */}
       {projectileAnims.map(p => (
         <div key={p.id} className="projectile-anim" style={{
           left: p.srcX, top: p.srcY,
           '--projDx': (p.tgtX - p.srcX) + 'px',
           '--projDy': (p.tgtY - p.srcY) + 'px',
+          '--projAngle': (p.angle != null ? p.angle : 0) + 'deg',
           animationDuration: p.dur + 'ms',
         }}>
-          <span className={p.projectileClass || 'projectile-emoji'} style={p.emojiStyle || {}}>{p.projectileClass ? '' : p.emoji}</span>
-          <div className={p.trailClass || 'projectile-flame-trail'} />
+          {/* Static rotation wrapper — points the projectile at the
+              target. Lives between `.projectile-anim` (which animates
+              the translation along the flight path) and the visual
+              element (which may have its own pulse animation). Both
+              the SVG arrow AND emoji projectiles like the phoenix
+              ride this rotation, so any projectile with a clear
+              "front" leads with that front for the whole flight. */}
+          <div className="projectile-rotation-wrap">
+            {p.projectileShape === 'arrow' ? (
+              <svg className="projectile-arrow-shaft" viewBox="0 0 100 22"
+                   width="78" height="18" xmlns="http://www.w3.org/2000/svg">
+                {/* Filled fletching at the tail (the ⪼ end). */}
+                <polygon points="0,4 14,11 0,18" fill="#8a8a8a" />
+                <polygon points="9,4 23,11 9,18" fill="#a8a8a8" />
+                {/* Solid shaft. */}
+                <rect x="22" y="9" width="58" height="4" fill="#c8c8c8" />
+                {/* Arrowhead (the ➢ tip). */}
+                <polygon points="78,2 100,11 78,20" fill="#e8e8e8" />
+                {/* Outline strokes for board-background contrast. */}
+                <polygon points="0,4 14,11 0,18" fill="none" stroke="#222" strokeWidth="0.6" />
+                <polygon points="9,4 23,11 9,18" fill="none" stroke="#222" strokeWidth="0.6" />
+                <rect x="22" y="9" width="58" height="4" fill="none" stroke="#222" strokeWidth="0.6" />
+                <polygon points="78,2 100,11 78,20" fill="none" stroke="#222" strokeWidth="0.6" />
+              </svg>
+            ) : (
+              <span className={p.projectileClass || 'projectile-emoji'} style={p.emojiStyle || {}}>
+                {p.projectileClass ? '' : p.emoji}
+              </span>
+            )}
+          </div>
+          {p.noTrail ? null : <div className={p.trailClass || 'projectile-flame-trail'} />}
         </div>
       ))}
 

@@ -60,6 +60,8 @@ function _snapshotHp(gs, target) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   /**
    * Level-requirement bypass — the attacker's Thieving Ability makes
    * this Attack behave as Lv0 for the Spell School gate. Any copy of

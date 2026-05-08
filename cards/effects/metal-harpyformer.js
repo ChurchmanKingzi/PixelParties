@@ -16,6 +16,8 @@ const CARD_NAME    = 'Metal Harpyformer';
 const ABILITY_NAME = 'Fighting';
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   inherentAction: harpyformerInherentAction,
 
   // ── On summon: search deck for Fighting ───────────────────────────────────

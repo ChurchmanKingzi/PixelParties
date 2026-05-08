@@ -4,11 +4,978 @@
 // ═══════════════════════════════════════════
 const { useState, useEffect, useRef, useCallback, useContext } = React;
 const { api, socket, AppContext, Notification, CardMini, loadCardDB,
-        isDeckLegal, emitSocket } = window;
-const { AuthScreen, MainMenu, ProfileScreen, ShopScreen, RulesScreen, PuzzleCreator } = window;
+        isDeckLegal, isCubeDeck, emitSocket } = window;
+const { AuthScreen, MainMenu, ProfileScreen, ShopScreen, RulesScreen, PuzzleCreator, VolumeControl } = window;
 const { DeckBuilder } = window;
 const { GameBoard } = window;
 let _pendingGameState = null;
+
+// ═══════════════════════════════════════════
+//  CUBE DRAFT — DRAFTING SCREEN
+//  Renders the live drafting UI: 16-card pack centered, drafted pool
+//  bottom strip with name filter and drag-reorder, hover tooltip on
+//  the right, player ring + direction arrows + per-seat timer top-left,
+//  pack/pick counters top-center. Pickled cards are committed to the
+//  server via `cube_draft_pick`; once your pick lands the pack grays
+//  out and you wait for the rest of the table.
+// ═══════════════════════════════════════════
+function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
+  const [hoveredCard, setHoveredCard] = useState(null);
+  const [filter, setFilter] = useState('');
+  const [poolOrder, setPoolOrder] = useState([]); // local custom ordering
+  const [dragSrc, setDragSrc] = useState(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
+  // Mirror server-pushed pool into local custom-ordered list. New cards
+  // append; removed cards (shouldn't happen during draft, but defensive)
+  // drop out. Drag-reorder mutates this list only.
+  useEffect(() => {
+    const incoming = draft?.myPool || [];
+    setPoolOrder(prev => {
+      const prevSet = new Set(prev.map((_, i) => i));
+      // Build new order by counts: each card name has N copies in
+      // incoming. Walk prev and keep entries whose card+occurrence
+      // still exists in incoming, then append new ones.
+      const remainingCounts = {};
+      for (const c of incoming) remainingCounts[c] = (remainingCounts[c] || 0) + 1;
+      const next = [];
+      for (const c of prev) {
+        if ((remainingCounts[c] || 0) > 0) {
+          next.push(c);
+          remainingCounts[c]--;
+        }
+      }
+      // Append new cards (in incoming order) that weren't in prev.
+      for (const c of incoming) {
+        if ((remainingCounts[c] || 0) > 0) {
+          next.push(c);
+          remainingCounts[c]--;
+        }
+      }
+      return next;
+    });
+  }, [draft?.myPool?.length]);
+
+  // Live-tick the displayed timer locally so the budget visibly counts
+  // down between server broadcasts (which only fire on pick windows).
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!draft || draft.suspended || draft.myPicked) return;
+    const t = setInterval(() => setTick(x => x + 1), 250);
+    return () => clearInterval(t);
+  }, [draft?.suspended, draft?.myPicked, draft?.round, draft?.pickInRound]);
+
+  if (!draft) {
+    return (
+      <div className="screen-full">
+        <div className="top-bar">
+          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+          <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT</h2>
+          <VolumeControl />
+        </div>
+        <div className="screen-center" style={{ flexDirection: 'column', gap: 12 }}>
+          <div className="orbit-font" style={{ color: 'var(--accent)', animation: 'pulse 1.5s infinite' }}>Opening packs…</div>
+        </div>
+      </div>
+    );
+  }
+  if (draft.isSpectator) {
+    return (
+      <div className="screen-full">
+        <div className="top-bar">
+          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+          <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT — SPECTATING</h2>
+          <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>Pack {draft.round + 1}/{draft.totalRounds} · Pick {draft.pickInRound + 1}/{draft.totalPicks}</span>
+          <VolumeControl />
+        </div>
+        <div className="screen-center" style={{ flexDirection: 'column', gap: 16 }}>
+          <div style={{ fontSize: 48 }}>🧊</div>
+          <div className="orbit-font" style={{ color: 'var(--text2)', textAlign: 'center', maxWidth: 480, lineHeight: 1.5 }}>
+            Drafting in progress. Spectators don't see the cards being picked — that would leak hidden info to participants. The match will become spectatable once decks are built.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const canPick = !draft.myPicked && !draft.suspended && draft.myPack.length > 0;
+  const totalRemainingMs = (draft.remainingMs || 0) - (draft.myPicked || draft.suspended ? 0 : (tick * 0)); // tick is just to re-render
+  // Actual countdown: server gave us remainingMs at the time of last
+  // broadcast. We don't have a precise client-side anchor for the window
+  // start, so we just tick down from that snapshot. This drifts slightly
+  // but the next server broadcast (every pick) re-syncs.
+  const startedAt = useRef(Date.now());
+  useEffect(() => { startedAt.current = Date.now(); }, [draft?.round, draft?.pickInRound, draft?.suspended]);
+  const elapsedClient = (draft.myPicked || draft.suspended) ? 0 : (Date.now() - startedAt.current);
+  const displayRemainingMs = Math.max(0, (draft.remainingMs || 0) - elapsedClient);
+  const m = Math.floor(displayRemainingMs / 60000);
+  const s = Math.floor((displayRemainingMs % 60000) / 1000);
+  const timerStr = m + ':' + String(s).padStart(2, '0');
+  const timerWarn = displayRemainingMs <= 10_000;
+
+  // Filter pool by name search.
+  const visiblePool = poolOrder
+    .map((c, i) => ({ name: c, idx: i }))
+    .filter(e => !filter || e.name.toLowerCase().includes(filter.toLowerCase()));
+
+  const reorderPool = (fromIdx, toIdx) => {
+    if (fromIdx === toIdx || toIdx < 0) return;
+    setPoolOrder(prev => {
+      const arr = [...prev];
+      const [moved] = arr.splice(fromIdx, 1);
+      arr.splice(toIdx > fromIdx ? toIdx - 1 : toIdx, 0, moved);
+      return arr;
+    });
+  };
+
+  // Player ring shown top-left. Always rooted at "me" so the local seat
+  // is at index 0; subsequent entries follow the snake direction so the
+  // arrow column reads naturally.
+  const seatOrder = draft.seatOrder || [];
+  const myRingPos = seatOrder.indexOf(draft.seatIdx);
+  const ringSize = seatOrder.length;
+  const ringList = [];
+  if (myRingPos >= 0) {
+    for (let i = 0; i < ringSize; i++) {
+      const ringPos = draft.direction === 'left'
+        ? (myRingPos + i) % ringSize
+        : (myRingPos - i + ringSize) % ringSize;
+      const seatIdx = seatOrder[ringPos];
+      const player = draft.players[seatIdx];
+      ringList.push({ ringPos, seatIdx, username: player?.username || `Seat ${seatIdx}`, isBot: !!player?.isBot, isMe: seatIdx === draft.seatIdx, picked: draft.seatPicked[seatIdx] });
+    }
+  }
+
+  return (
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%)' }}>
+      {/* TOP BAR */}
+      <div className="top-bar">
+        <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+        <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT</h2>
+        <div style={{ flex: 1 }} />
+        <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff', fontSize: 13, padding: '5px 14px', fontWeight: 700 }}>
+          Pack {draft.round + 1}/{draft.totalRounds} · Pick {draft.pickInRound + 1}/{draft.totalPicks}
+        </span>
+        {draft.timerDisabled ? (
+          <span className="badge" style={{ background: 'rgba(0,240,255,.08)', color: 'var(--text2)', fontSize: 12, padding: '5px 14px', fontWeight: 600 }}>
+            ⏱ Untimed
+          </span>
+        ) : (
+          <span className="badge" style={{
+            background: timerWarn ? 'rgba(255,80,80,.18)' : 'rgba(0,240,255,.10)',
+            color: timerWarn ? '#ff6666' : 'var(--accent)',
+            fontSize: 13, padding: '5px 14px', fontWeight: 700,
+            animation: timerWarn ? 'pulse 1s infinite' : undefined,
+          }}>
+            ⏱ {timerStr}
+          </span>
+        )}
+        <VolumeControl />
+      </div>
+
+      {/* SUSPENDED BANNER */}
+      {draft.suspended && (() => {
+        // Identify which seat is the candidate for kick — first online
+        // human seat with no socketId, found by name absence in seatPicked
+        // table is unreliable; the server names the seat in suspendReason.
+        // Use seatOrder + players to find it.
+        const downSeats = [];
+        for (let i = 0; i < draft.players.length; i++) {
+          const p = draft.players[i];
+          if (!p.isBot && draft.seatPicked && !p.online && i !== draft.seatIdx) downSeats.push(i);
+        }
+        // Fallback: any seat that's the kick target.
+        const kickTarget = draft.voteKick?.targetSeat;
+        return (
+          <div style={{ background: 'rgba(255,170,0,.15)', border: '1px solid #ffaa33', padding: '8px 16px', textAlign: 'center', color: '#ffcc44', fontWeight: 600 }}>
+            ⏸ Draft suspended — {draft.suspendReason || 'a player has disconnected'}.
+            {draft.voteKick ? (
+              <>
+                <span style={{ marginLeft: 12 }}>
+                  Vote-kick {draft.voteKick.targetUsername}: {draft.voteKick.votes}/{draft.voteKick.needed}
+                </span>
+                <button className="btn btn-danger" style={{ marginLeft: 12, padding: '2px 12px', fontSize: 11 }}
+                  onClick={() => socket.emit('cube_draft_vote_kick', { roomId: lobby.id, targetSeat: draft.voteKick.targetSeat })}>
+                  Vote-kick
+                </button>
+              </>
+            ) : (
+              // Allow any drafter to initiate a vote against the disconnected seat.
+              // The server figures out who that seat is from suspendReason, so
+              // we attempt the call against any non-bot seat that isn't us — the
+              // server validates which seat is actually offline.
+              draft.players.map((p, i) => (
+                !p.isBot && i !== draft.seatIdx ? (
+                  <button key={i} className="btn" style={{ marginLeft: 6, padding: '2px 10px', fontSize: 10 }}
+                    onClick={() => socket.emit('cube_draft_vote_kick', { roomId: lobby.id, targetSeat: i })}>
+                    Vote-kick {p.username}
+                  </button>
+                ) : null
+              ))
+            )}
+          </div>
+        );
+      })()}
+
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* LEFT — player ring */}
+        <div style={{ width: 200, padding: 12, borderRight: '1px solid var(--bg4)', background: 'var(--bg)', overflowY: 'auto' }}>
+          <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8, fontWeight: 700, letterSpacing: 1 }}>
+            DRAFT RING ({draft.direction === 'left' ? '↓ pass' : '↑ pass'})
+          </div>
+          {ringList.map((r, i) => (
+            <React.Fragment key={r.seatIdx}>
+              <div style={{
+                padding: '8px 10px',
+                background: r.isMe ? 'rgba(0,240,255,.10)' : 'transparent',
+                borderLeft: r.isMe ? '3px solid var(--accent)' : '3px solid transparent',
+                marginBottom: 2,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <div style={{ fontSize: 14 }}>
+                  {r.isBot ? '🤖' : (r.isMe ? '🧑' : '⚔️')}
+                </div>
+                <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, fontWeight: r.isMe ? 700 : 500, color: r.isMe ? 'var(--accent)' : 'var(--text)' }}>
+                  {r.username}
+                </div>
+                <div style={{ fontSize: 14 }} title={r.picked ? 'Picked' : 'Thinking…'}>
+                  {r.picked ? '✓' : '⋯'}
+                </div>
+              </div>
+              {i < ringList.length - 1 && (
+                <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--text2)', padding: '0 0 1px' }}>
+                  {draft.direction === 'left' ? '↓' : '↑'}
+                </div>
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* CENTER — pack */}
+        <div style={{ flex: 1, padding: '16px 20px', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <div className="orbit-font" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10, textAlign: 'center', fontWeight: 600 }}>
+            {draft.myPicked ? 'WAITING FOR OTHER DRAFTERS…' : 'PICK A CARD FROM THIS PACK'}
+          </div>
+          <div style={{
+            flex: 1, display: 'grid',
+            gridTemplateColumns: 'repeat(8, 1fr)',
+            gridAutoRows: '1fr',
+            gap: 6, padding: 4,
+            opacity: draft.myPicked ? 0.45 : 1,
+            transition: 'opacity .25s',
+            alignContent: 'center',
+            maxHeight: '100%',
+          }}>
+            {draft.myPack.map((cardName, idx) => (
+              <div key={idx} style={{
+                position: 'relative', cursor: canPick ? 'pointer' : 'default',
+                aspectRatio: '5 / 7', minHeight: 0,
+              }}
+                onClick={() => {
+                  if (!canPick) return;
+                  socket.emit('cube_draft_pick', { roomId: lobby.id, cardName });
+                }}
+                onMouseEnter={() => setHoveredCard(cardName)}
+                onMouseLeave={() => setHoveredCard(null)}>
+                <CardMini card={window.CARDS_BY_NAME?.[cardName]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* RIGHT — tooltip preview */}
+        <div style={{ width: 240, padding: 12, borderLeft: '1px solid var(--bg4)', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+          <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8, fontWeight: 700, letterSpacing: 1 }}>
+            CARD PREVIEW
+          </div>
+          {hoveredCard && window.CARDS_BY_NAME?.[hoveredCard] ? (
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              <div style={{ width: '100%', aspectRatio: '5 / 7', marginBottom: 8 }}>
+                <CardMini card={window.CARDS_BY_NAME[hoveredCard]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.4 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>{hoveredCard}</div>
+                <div style={{ color: 'var(--text2)', marginBottom: 6 }}>
+                  {window.CARDS_BY_NAME[hoveredCard].cardType}
+                  {window.CARDS_BY_NAME[hoveredCard].subtype && ` · ${window.CARDS_BY_NAME[hoveredCard].subtype}`}
+                </div>
+                <div style={{ whiteSpace: 'pre-wrap', fontSize: 10 }}>
+                  {window.CARDS_BY_NAME[hoveredCard].effect || ''}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ flex: 1, color: 'var(--text2)', fontSize: 11, textAlign: 'center', padding: '20px 0', fontStyle: 'italic' }}>
+              Hover any card to preview.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* BOTTOM — drafted pool */}
+      <div style={{ borderTop: '1px solid var(--bg4)', background: 'var(--bg2)', padding: '8px 12px', maxHeight: '32%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <span className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 700, letterSpacing: 1 }}>
+            DRAFTED ({poolOrder.length}/64)
+          </span>
+          <input className="input" placeholder="🔍 Filter by name..." value={filter} onChange={e => setFilter(e.target.value)}
+            style={{ flex: 1, maxWidth: 280, fontSize: 11, padding: '4px 8px' }} />
+          <span style={{ fontSize: 10, color: 'var(--text2)' }}>{filter ? `${visiblePool.length} match${visiblePool.length === 1 ? '' : 'es'}` : 'Drag to reorder'}</span>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 4 }}>
+            {visiblePool.map(({ name, idx }) => (
+              <div key={idx + '-' + name}
+                draggable
+                onDragStart={e => { setDragSrc(idx); e.dataTransfer.effectAllowed = 'move'; }}
+                onDragOver={e => { e.preventDefault(); setDragOverIdx(idx); }}
+                onDrop={e => { e.preventDefault(); if (dragSrc != null) reorderPool(dragSrc, idx); setDragSrc(null); setDragOverIdx(null); }}
+                onDragEnd={() => { setDragSrc(null); setDragOverIdx(null); }}
+                onMouseEnter={() => setHoveredCard(name)}
+                onMouseLeave={() => setHoveredCard(null)}
+                style={{
+                  aspectRatio: '5 / 7', cursor: 'grab',
+                  border: dragOverIdx === idx ? '2px solid var(--accent)' : '2px solid transparent',
+                  borderRadius: 4, transition: 'border-color .1s',
+                }}>
+                <CardMini card={window.CARDS_BY_NAME?.[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+              </div>
+            ))}
+            {poolOrder.length === 0 && (
+              <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 16, color: 'var(--text2)', fontSize: 11, fontStyle: 'italic' }}>
+                No cards drafted yet.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+//  CUBE DRAFT — DECK BUILDING SCREEN
+//  Restricted deck builder for the post-draft phase. Right-side gallery
+//  shows ONLY drafted cards (with copy counts) plus all non-Performance
+//  Abilities at infinite quantity. Hero rule: deck must contain exactly
+//  min(3, heroesInPool) heroes — relaxed for players with sparse hero
+//  draws. Click cards to add (auto-routed to hero / main slots), click
+//  to remove. Player names the deck and clicks Ready when done.
+// ═══════════════════════════════════════════
+function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
+  const cardDB = window.CARDS_BY_NAME || {};
+  const allCards = window.AVAILABLE_CARDS || [];
+
+  // 5-minute auto-ready timer — server starts it on the first Ready,
+  // pushes the absolute end timestamp via cube_build_state. Re-render
+  // every 250ms while it's active so the countdown ticks visibly.
+  const [, setBuildTick] = useState(0);
+  useEffect(() => {
+    if (!build?.buildTimerEndsAt) return;
+    const t = setInterval(() => setBuildTick(x => x + 1), 250);
+    return () => clearInterval(t);
+  }, [build?.buildTimerEndsAt]);
+  const buildTimerMsLeft = build?.buildTimerEndsAt
+    ? Math.max(0, build.buildTimerEndsAt - Date.now())
+    : null;
+
+  // Pool counts (incl. assigned hero, which the server pushed into pool).
+  const poolCounts = useMemo(() => {
+    const c = {};
+    for (const n of (build?.pool || [])) c[n] = (c[n] || 0) + 1;
+    return c;
+  }, [build?.pool]);
+
+  const heroesInPool = useMemo(() =>
+    (build?.pool || []).filter(n => cardDB[n]?.cardType === 'Hero').length,
+    [build?.pool, cardDB]
+  );
+  const requiredHeroes = Math.min(3, heroesInPool);
+
+  // Deck state — independent of pool changes (server only pushes pool once).
+  const [deckName, setDeckName] = useState('');
+  const [heroes, setHeroes] = useState([null, null, null]); // each: { hero, ability1, ability2 } | null
+  const [mainDeck, setMainDeck] = useState([]);
+  const [filter, setFilter] = useState('');
+  const [hovered, setHovered] = useState(null);
+
+  // One-time bootstrap: seed deck name and auto-fill hero slots from
+  // the drafted heroes (so the player isn't staring at empty slots).
+  const bootstrappedRef = useRef(false);
+  useEffect(() => {
+    if (bootstrappedRef.current || !build?.pool) return;
+    bootstrappedRef.current = true;
+    setDeckName(`${user?.username || 'Drafter'}'s ${build.cubeName || 'Cube'} Draft`);
+    const heroesFromPool = (build.pool || []).filter(n => cardDB[n]?.cardType === 'Hero');
+    const slots = [null, null, null];
+    for (let i = 0; i < Math.min(3, heroesFromPool.length); i++) {
+      const cd = cardDB[heroesFromPool[i]];
+      slots[i] = {
+        hero: heroesFromPool[i],
+        ability1: cd?.startingAbility1 || null,
+        ability2: cd?.startingAbility2 || null,
+      };
+    }
+    setHeroes(slots);
+  }, [build?.pool]);
+
+  // Used counts across heroes + main deck.
+  const usedCounts = useMemo(() => {
+    const c = {};
+    for (const h of heroes) if (h?.hero) c[h.hero] = (c[h.hero] || 0) + 1;
+    for (const n of mainDeck) c[n] = (c[n] || 0) + 1;
+    return c;
+  }, [heroes, mainDeck]);
+
+  const isFreeAbility = (name) => cardDB[name]?.cardType === 'Ability' && name !== 'Performance';
+
+  const remainingFor = (name) => {
+    if (isFreeAbility(name)) return Infinity;
+    return (poolCounts[name] || 0) - (usedCounts[name] || 0);
+  };
+
+  // Available list = pool unique names + free abilities. Sorted by type
+  // then name. Filtered by name search.
+  const availableList = useMemo(() => {
+    const list = [];
+    const seen = new Set();
+    for (const name of Object.keys(poolCounts)) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      list.push({ name, count: poolCounts[name], free: false });
+    }
+    for (const c of allCards) {
+      if (c.cardType !== 'Ability' || c.name === 'Performance') continue;
+      if (seen.has(c.name)) continue;
+      seen.add(c.name);
+      list.push({ name: c.name, count: Infinity, free: true });
+    }
+    list.sort((a, b) => {
+      const ca = cardDB[a.name], cb = cardDB[b.name];
+      const orderA = ca?.cardType === 'Hero' ? 0 : ca?.cardType === 'Creature' ? 1 : ca?.cardType === 'Spell' ? 2 : ca?.cardType === 'Attack' ? 3 : ca?.cardType === 'Artifact' ? 4 : ca?.cardType === 'Ability' ? 5 : ca?.cardType === 'Potion' ? 6 : 7;
+      const orderB = cb?.cardType === 'Hero' ? 0 : cb?.cardType === 'Creature' ? 1 : cb?.cardType === 'Spell' ? 2 : cb?.cardType === 'Attack' ? 3 : cb?.cardType === 'Artifact' ? 4 : cb?.cardType === 'Ability' ? 5 : cb?.cardType === 'Potion' ? 6 : 7;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
+    return list;
+  }, [poolCounts, allCards, cardDB]);
+
+  const visibleList = filter
+    ? availableList.filter(e => e.name.toLowerCase().includes(filter.toLowerCase()))
+    : availableList;
+
+  const addToHero = (name) => {
+    if (cardDB[name]?.cardType !== 'Hero') return;
+    if (remainingFor(name) <= 0) return;
+    setHeroes(prev => {
+      const slots = [...prev];
+      const empty = slots.findIndex(s => !s?.hero);
+      if (empty < 0) return prev;
+      const cd = cardDB[name];
+      slots[empty] = { hero: name, ability1: cd?.startingAbility1 || null, ability2: cd?.startingAbility2 || null };
+      return slots;
+    });
+  };
+
+  const addToMain = (name) => {
+    if (mainDeck.length >= 60) return;
+    if (remainingFor(name) <= 0) return;
+    setMainDeck(prev => [...prev, name]);
+  };
+
+  const removeHero = (slotIdx) => {
+    setHeroes(prev => prev.map((s, i) => i === slotIdx ? null : s));
+  };
+
+  const removeMain = (idx) => {
+    setMainDeck(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const onCardClick = (name) => {
+    const ct = cardDB[name]?.cardType;
+    if (ct === 'Hero') {
+      // Prefer hero slot if any open and not yet at requiredHeroes; else main.
+      const filled = heroes.filter(h => h?.hero).length;
+      if (filled < requiredHeroes) addToHero(name);
+      else addToMain(name);
+    } else {
+      addToMain(name);
+    }
+  };
+
+  const filledHeroes = heroes.filter(h => h?.hero).length;
+  const heroOk = filledHeroes === requiredHeroes;
+  const mainOk = mainDeck.length === 60;
+  const deckLegal = heroOk && mainOk && deckName.trim().length > 0;
+  const deckProblems = [];
+  if (!heroOk) deckProblems.push(`Need ${requiredHeroes} hero${requiredHeroes === 1 ? '' : 'es'} (have ${filledHeroes})`);
+  if (!mainOk) deckProblems.push(`Main deck must be 60 cards (have ${mainDeck.length})`);
+  if (!deckName.trim()) deckProblems.push('Deck needs a name');
+
+  const submitReady = () => {
+    if (!deckLegal) { notify('Deck not ready: ' + deckProblems.join(', '), 'error'); return; }
+    socket.emit('cube_draft_ready', {
+      roomId: lobby.id,
+      deck: {
+        name: deckName.trim(),
+        heroes,
+        mainDeck,
+        potionDeck: [],
+        sideDeck: [],
+      },
+    });
+  };
+
+  if (!build) {
+    return (
+      <div className="screen-full">
+        <div className="top-bar">
+          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+          <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 BUILD YOUR DECK</h2>
+          <VolumeControl />
+        </div>
+        <div className="screen-center"><div className="orbit-font" style={{ color: 'var(--accent)', animation: 'pulse 1.5s infinite' }}>Loading drafted pool…</div></div>
+      </div>
+    );
+  }
+  if (build.isSpectator) {
+    return (
+      <div className="screen-full">
+        <div className="top-bar">
+          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+          <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 DRAFT — DECK BUILDING</h2>
+          <VolumeControl />
+        </div>
+        <div className="screen-center" style={{ flexDirection: 'column', gap: 16 }}>
+          <div style={{ fontSize: 48 }}>🃏</div>
+          <div style={{ color: 'var(--text2)', textAlign: 'center', maxWidth: 480 }}>
+            Drafters are building their decks. Tournament begins once everyone is ready.
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--accent)' }}>{build.readyCount}/{build.humanCount} ready</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (build.ready) {
+    return (
+      <div className="screen-full">
+        <div className="top-bar">
+          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+          <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 BUILD YOUR DECK</h2>
+          <VolumeControl />
+        </div>
+        <div className="screen-center" style={{ flexDirection: 'column', gap: 16 }}>
+          <div style={{ fontSize: 48 }}>✓</div>
+          <div className="orbit-font" style={{ color: 'var(--success)', fontSize: 16 }}>Deck submitted!</div>
+          <div style={{ color: 'var(--text2)' }}>Waiting for other drafters... ({build.readyCount}/{build.humanCount})</div>
+          <div style={{ marginTop: 12 }}>
+            {build.humanSeats?.filter(s => !s.isBot).map(s => (
+              <span key={s.seatIdx} style={{ marginRight: 12, fontSize: 11, color: s.ready ? 'var(--success)' : 'var(--text2)' }}>
+                {s.ready ? '✓' : '⋯'} {s.username}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="screen-full">
+      <div className="top-bar">
+        <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+        <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 BUILD YOUR DECK</h2>
+        <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>{build.cubeName}</span>
+        <input className="input" placeholder="Deck name…" value={deckName} onChange={e => setDeckName(e.target.value)}
+          style={{ width: 240, fontSize: 12, padding: '4px 8px' }} />
+        <div style={{ flex: 1 }} />
+        {!deckLegal && (
+          <div style={{ fontSize: 10, color: 'var(--danger)', maxWidth: 360, textAlign: 'right' }}>
+            {deckProblems.join(' · ')}
+          </div>
+        )}
+        <button className="btn btn-success" disabled={!deckLegal} onClick={submitReady}
+          style={{ padding: '6px 18px', fontWeight: 700 }}>
+          ✓ READY
+        </button>
+        <VolumeControl />
+      </div>
+
+      {build.assignedHero && (
+        <div style={{ background: 'rgba(255,170,0,.12)', borderBottom: '1px solid #ffaa33', padding: '6px 16px', fontSize: 11, textAlign: 'center', color: '#ffcc44' }}>
+          🎲 You drafted no Heroes. The system assigned <strong>{build.assignedHero}</strong> to you.
+        </div>
+      )}
+      {buildTimerMsLeft != null && (() => {
+        const m = Math.floor(buildTimerMsLeft / 60000);
+        const s = Math.floor((buildTimerMsLeft % 60000) / 1000);
+        const warn = buildTimerMsLeft <= 60_000;
+        return (
+          <div style={{
+            background: warn ? 'rgba(255,80,80,.16)' : 'rgba(0,240,255,.10)',
+            borderBottom: '1px solid ' + (warn ? '#ff6666' : 'var(--accent)'),
+            padding: '6px 16px', fontSize: 12, textAlign: 'center',
+            color: warn ? '#ff8888' : 'var(--accent)',
+            fontWeight: 700, letterSpacing: 1,
+            animation: warn ? 'pulse 1s infinite' : undefined,
+          }}>
+            ⏱ {m}:{String(s).padStart(2, '0')} — non-ready decks will be auto-completed when this timer expires.
+          </div>
+        );
+      })()}
+
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* LEFT — Deck under construction */}
+        <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>
+            HEROES ({filledHeroes}/{requiredHeroes})
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
+            {heroes.map((h, i) => (
+              <div key={i} style={{
+                aspectRatio: '5 / 7',
+                border: h?.hero ? '2px solid var(--accent)' : '2px dashed var(--bg4)',
+                borderRadius: 4, position: 'relative',
+                cursor: h?.hero ? 'pointer' : 'default',
+                opacity: i >= requiredHeroes ? .35 : 1,
+              }}
+                onClick={() => h?.hero && removeHero(i)}
+                onMouseEnter={() => h?.hero && setHovered(h.hero)}
+                onMouseLeave={() => setHovered(null)}>
+                {h?.hero ? (
+                  <CardMini card={cardDB[h.hero]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: 'var(--text2)', fontSize: 11 }}>
+                    Hero {i + 1}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>
+            MAIN DECK ({mainDeck.length}/60)
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--bg4)', borderRadius: 4, padding: 4 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 4 }}>
+              {mainDeck.map((name, i) => (
+                <div key={i + '-' + name}
+                  style={{ aspectRatio: '5 / 7', cursor: 'pointer' }}
+                  onClick={() => removeMain(i)}
+                  onMouseEnter={() => setHovered(name)}
+                  onMouseLeave={() => setHovered(null)}
+                  title="Click to remove">
+                  <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                </div>
+              ))}
+              {/* Pad to 60 with empty slots */}
+              {Array.from({ length: Math.max(0, 60 - mainDeck.length) }).map((_, i) => (
+                <div key={'empty-' + i} style={{
+                  aspectRatio: '5 / 7',
+                  border: '2px dashed var(--bg4)', borderRadius: 4,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 9, color: 'var(--text2)', opacity: .4,
+                }}>{mainDeck.length + i + 1}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* MIDDLE — Tooltip preview */}
+        <div style={{ width: 220, padding: 12, borderLeft: '1px solid var(--bg4)', borderRight: '1px solid var(--bg4)', background: 'var(--bg)' }}>
+          <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8, fontWeight: 700, letterSpacing: 1 }}>
+            CARD PREVIEW
+          </div>
+          {hovered && cardDB[hovered] ? (
+            <>
+              <div style={{ width: '100%', aspectRatio: '5 / 7', marginBottom: 8 }}>
+                <CardMini card={cardDB[hovered]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text)' }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>{hovered}</div>
+                <div style={{ color: 'var(--text2)', marginBottom: 6 }}>
+                  {cardDB[hovered].cardType}{cardDB[hovered].subtype && ` · ${cardDB[hovered].subtype}`}
+                </div>
+                <div style={{ whiteSpace: 'pre-wrap', fontSize: 10, lineHeight: 1.4 }}>
+                  {cardDB[hovered].effect || ''}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ color: 'var(--text2)', fontSize: 11, textAlign: 'center', padding: '20px 0', fontStyle: 'italic' }}>
+              Hover any card to preview.
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT — Available cards (drafted pool + free abilities) */}
+        <div style={{ width: 360, padding: 12, background: 'var(--bg2)', display: 'flex', flexDirection: 'column' }}>
+          <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>
+            AVAILABLE CARDS
+          </div>
+          <input className="input" placeholder="🔍 Filter by name..." value={filter} onChange={e => setFilter(e.target.value)}
+            style={{ marginBottom: 8, fontSize: 11, padding: '4px 8px' }} />
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+              {visibleList.map(({ name, count, free }) => {
+                const remaining = remainingFor(name);
+                const dimmed = remaining <= 0;
+                return (
+                  <div key={name}
+                    onClick={() => !dimmed && onCardClick(name)}
+                    onMouseEnter={() => setHovered(name)}
+                    onMouseLeave={() => setHovered(null)}
+                    style={{
+                      aspectRatio: '5 / 7',
+                      cursor: dimmed ? 'not-allowed' : 'pointer',
+                      filter: dimmed ? 'grayscale(.8) brightness(.6)' : 'none',
+                      position: 'relative',
+                    }}>
+                    <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                    <div style={{
+                      position: 'absolute', bottom: 2, right: 2,
+                      background: free ? 'rgba(154,216,255,.85)' : 'rgba(0,0,0,.85)',
+                      color: free ? '#001a33' : '#fff',
+                      borderRadius: 4, padding: '1px 5px',
+                      fontSize: 10, fontWeight: 700, lineHeight: 1.2,
+                      pointerEvents: 'none',
+                    }}>
+                      {free ? '∞' : `${remaining}/${count}`}
+                    </div>
+                  </div>
+                );
+              })}
+              {visibleList.length === 0 && (
+                <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 16, color: 'var(--text2)', fontSize: 11, fontStyle: 'italic' }}>
+                  No cards match.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+//  CUBE DRAFT — TOURNAMENT SCREEN
+//  Bracket + cross-game spectator tabs + winner celebration. The
+//  embedded GameBoard takes over rendering when `gameState` is non-null
+//  (the player is in their match OR spectating one). Without an active
+//  game, this screen shows the bracket and a row of spectator buttons.
+// ═══════════════════════════════════════════
+function CubeDraftTournamentScreen({ lobby, tournament, gameState, leaveRoom, notify, user }) {
+  if (!tournament) {
+    return (
+      <div className="screen-full">
+        <div className="top-bar">
+          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+          <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE TOURNAMENT</h2>
+          <VolumeControl />
+        </div>
+        <div className="screen-center"><div className="orbit-font" style={{ color: 'var(--accent)', animation: 'pulse 1.5s infinite' }}>Building bracket…</div></div>
+      </div>
+    );
+  }
+
+  // Tournament complete → final standings panel.
+  if (tournament.complete && tournament.finalStandings) {
+    return <CubeDraftFinalStandings lobby={lobby} tournament={tournament} leaveRoom={leaveRoom} />;
+  }
+
+  const mySeat = tournament.mySeat;
+  const isPlayer = mySeat >= 0;
+  const myActiveChildRoomId = tournament.myActiveChildRoomId;
+
+  return (
+    <div className="screen-full">
+      <div className="top-bar">
+        <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+        <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE TOURNAMENT</h2>
+        <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>{tournament.cubeName}</span>
+        <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text)' }}>
+          Round {tournament.currentRoundIdx + 1}/{Math.log2(tournament.bracketSize)}
+        </span>
+        <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text)' }}>
+          Bo{tournament.currentRoundIdx === Math.log2(tournament.bracketSize) - 1 ? tournament.finaleBo : tournament.prelimsBo}
+        </span>
+        <div style={{ flex: 1 }} />
+        <span className="badge" style={{ background: tournament.flow === 'simultaneous' ? 'rgba(0,240,255,.10)' : 'rgba(255,170,0,.10)', color: tournament.flow === 'simultaneous' ? 'var(--accent)' : '#ffaa33' }}>
+          {tournament.flow === 'simultaneous' ? 'SIMULTANEOUS' : 'CONSECUTIVE'}
+        </span>
+        <VolumeControl />
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 16 }}>
+        {/* BRACKET DIAGRAM */}
+        <CubeDraftBracket tournament={tournament} mySeat={mySeat} />
+
+        {/* PLAYER STATUS / SPECTATE TABS */}
+        <div style={{ marginTop: 16, padding: 12, background: 'var(--bg2)', borderRadius: 8 }}>
+          {myActiveChildRoomId ? (
+            <div style={{ textAlign: 'center', color: 'var(--accent)' }}>
+              ⚔️ Your match is active — waiting to load…
+            </div>
+          ) : isPlayer ? (
+            <div style={{ textAlign: 'center', color: 'var(--text2)' }}>
+              {tournament.standings[mySeat] ? (
+                <>You finished at placement <strong style={{ color: 'var(--accent)' }}>#{tournament.standings[mySeat]}</strong>. Watch the rest of the bracket below.</>
+              ) : (
+                'Waiting for next round to be set up…'
+              )}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', color: 'var(--text2)' }}>Spectating cube tournament.</div>
+          )}
+
+          {/* Active match spectator tabs */}
+          {(tournament.activeChildRooms || []).length > 0 && (
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+              {tournament.activeChildRooms.map(m => (
+                <button key={m.childRoomId} className="btn"
+                  style={{ fontSize: 11, padding: '4px 12px',
+                    background: myActiveChildRoomId === m.childRoomId ? 'var(--accent)' : 'var(--bg3)',
+                    color: myActiveChildRoomId === m.childRoomId ? '#000' : 'var(--text)',
+                  }}
+                  disabled={myActiveChildRoomId === m.childRoomId}
+                  onClick={() => socket.emit('cube_spectate_match', { parentRoomId: lobby.id, childRoomId: m.childRoomId })}>
+                  👁 {m.p1Username || '?'} vs {m.p2Username || '?'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CubeDraftBracket({ tournament, mySeat }) {
+  // Render the bracket as a column of rounds. Each round is a vertical
+  // stack of matches. Lines/connectors between rounds are simplified —
+  // we just stack the matches with arrows in the column gutters.
+  const totalRounds = Math.log2(tournament.bracketSize);
+  return (
+    <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'stretch', minWidth: 'fit-content', height: '100%' }}>
+        {Array.from({ length: totalRounds }).map((_, ri) => {
+          const round = tournament.rounds[ri] || [];
+          const label = ri === totalRounds - 1 ? 'FINALE' : (ri === totalRounds - 2 ? 'SEMIS' : `ROUND ${ri + 1}`);
+          return (
+            <div key={ri} style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column' }}>
+              <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 700, letterSpacing: 1, textAlign: 'center', marginBottom: 8 }}>
+                {label}
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around', gap: 8 }}>
+                {round.map(m => (
+                  <CubeDraftMatchCard key={m.matchIdx} match={m} mySeat={mySeat} currentRound={tournament.currentRoundIdx === ri} />
+                ))}
+                {round.length === 0 && (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text2)', fontSize: 11 }}>
+                    Pending…
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CubeDraftMatchCard({ match, mySeat, currentRound }) {
+  const isMine = match.p1Seat === mySeat || match.p2Seat === mySeat;
+  const live = match.live;
+  const winnerSlot = match.winnerSeat == null ? null : (match.winnerSeat === match.p1Seat ? 'p1' : 'p2');
+  const slot = (label, seat, name, isWinner) => (
+    <div style={{
+      padding: '6px 10px',
+      background: isWinner ? 'rgba(51,255,136,.10)' : (seat === mySeat ? 'rgba(0,240,255,.08)' : 'transparent'),
+      borderLeft: '3px solid ' + (isWinner ? 'var(--success)' : (seat === mySeat ? 'var(--accent)' : 'var(--bg4)')),
+      fontSize: 12,
+      color: isWinner ? 'var(--success)' : (seat === mySeat ? 'var(--accent)' : 'var(--text)'),
+      fontWeight: isWinner || seat === mySeat ? 700 : 500,
+    }}>
+      {name || (seat == null ? '— bye —' : 'TBD')}
+    </div>
+  );
+  return (
+    <div style={{
+      border: '1px solid ' + (isMine ? 'var(--accent)' : (live ? 'var(--accent3)' : 'var(--bg4)')),
+      borderRadius: 6,
+      background: 'var(--bg2)',
+      overflow: 'hidden',
+      position: 'relative',
+    }}>
+      {live && (
+        <div style={{ position: 'absolute', top: 4, right: 6, fontSize: 9, color: 'var(--accent3)', fontWeight: 700, animation: 'pulse 1.2s infinite' }}>
+          LIVE
+        </div>
+      )}
+      {slot('p1', match.p1Seat, match.p1Username, winnerSlot === 'p1')}
+      <div style={{ height: 1, background: 'var(--bg4)' }} />
+      {slot('p2', match.p2Seat, match.p2Username, winnerSlot === 'p2')}
+      <div style={{ fontSize: 9, color: 'var(--text2)', textAlign: 'center', padding: '2px 0', background: 'var(--bg)' }}>
+        Bo{match.bo || '?'}
+      </div>
+    </div>
+  );
+}
+
+function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
+  const standings = tournament.finalStandings || [];
+  const winner = standings.find(s => s.placement === 1);
+  return (
+    <div className="screen-full" style={{ background: 'radial-gradient(ellipse at center, rgba(255,215,0,.12) 0%, var(--bg) 70%)' }}>
+      <div className="top-bar">
+        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>← LEAVE</button>
+        <h2 className="orbit-font" style={{ fontSize: 14, color: '#ffd700' }}>🏆 TOURNAMENT COMPLETE</h2>
+        <VolumeControl />
+      </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', overflow: 'auto', padding: 32 }}>
+        {winner && (
+          <div style={{ textAlign: 'center', marginBottom: 32, animation: 'pulse 2s infinite' }}>
+            <div style={{ fontSize: 80, marginBottom: 8 }}>🏆</div>
+            <div className="orbit-font" style={{ fontSize: 28, color: '#ffd700', fontWeight: 800, marginBottom: 6 }}>
+              {winner.username}
+            </div>
+            <div className="orbit-font" style={{ fontSize: 14, color: 'var(--text)' }}>
+              CHAMPION OF {tournament.cubeName}
+            </div>
+          </div>
+        )}
+        <div className="panel" style={{ width: '100%', maxWidth: 720, padding: 20 }}>
+          <div className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 16, textAlign: 'center', fontWeight: 700, letterSpacing: 1 }}>
+            FINAL STANDINGS
+          </div>
+          {standings.map((s, i) => (
+            <div key={s.seat} style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '10px 12px',
+              background: i === 0 ? 'rgba(255,215,0,.08)' : (i === 1 ? 'rgba(170,170,170,.08)' : (i === 2 ? 'rgba(205,127,50,.08)' : 'transparent')),
+              borderLeft: '4px solid ' + (i === 0 ? '#ffd700' : i === 1 ? '#aaaaaa' : i === 2 ? '#cd7f32' : 'var(--bg4)'),
+              marginBottom: 4, borderRadius: 4,
+            }}>
+              <div style={{ fontSize: 24, width: 40, textAlign: 'center', fontWeight: 800, color: i === 0 ? '#ffd700' : i === 1 ? '#cccccc' : i === 2 ? '#cd7f32' : 'var(--text2)' }}>
+                #{s.placement}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{s.username}</div>
+                {s.heroes.length > 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
+                    Heroes: {s.heroes.join(' · ')}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PlayScreen() {
   const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
@@ -19,12 +986,41 @@ function PlayScreen() {
   const [creating, setCreating] = useState(false);
   const [gameType, setGameType] = useState('unranked');
   const [gameFormat, setGameFormat] = useState(1);
+  // Cube Draft mode — entire form swaps when this is 'draft'. Cube
+  // selection, per-pack and per-card timers, separate Prelims / Finale
+  // Bo lengths, and a simultaneous-vs-consecutive game-flow toggle live
+  // alongside the standard Ranked/Unranked split.
+  const [gameMode, setGameMode] = useState('constructed'); // 'constructed' | 'draft'
+  const [draftCubeId, setDraftCubeId] = useState('');
+  const [draftPackTimerSec, setDraftPackTimerSec] = useState(60);
+  const [draftPickTimerSec, setDraftPickTimerSec] = useState(5);
+  const [draftTimerDisabled, setDraftTimerDisabled] = useState(false);
+  const [draftPrelimsBo, setDraftPrelimsBo] = useState(1);
+  const [draftFinaleBo, setDraftFinaleBo] = useState(3);
+  const [draftFlow, setDraftFlow] = useState('simultaneous'); // 'simultaneous' | 'consecutive'
   const [playerPw, setPlayerPw] = useState('');
   const [specPw, setSpecPw] = useState('');
   const [joinPw, setJoinPw] = useState('');
   const [joinTarget, setJoinTarget] = useState(null);
   const [lobby, setLobby] = useState(null);
   const [playerJoined, setPlayerJoined] = useState(null);
+  // Cube Draft live state — populated by `cube_draft_state` socket
+  // events (one per pick window). Cleared when the user leaves the
+  // room or the draft completes (phase → 'building'). Exists alongside
+  // `lobby` since the room shell stays the same; only the inner phase
+  // changes.
+  const [cubeDraftState, setCubeDraftState] = useState(null);
+  // Build-phase per-player state (drafted pool, assigned hero, ready
+  // count). Server emits `cube_build_state` on phase transition and on
+  // every Ready submission.
+  const [cubeBuildState, setCubeBuildState] = useState(null);
+  // Tournament-phase state (bracket, current round, active matches).
+  const [cubeTournamentStateLocal, setCubeTournamentStateLocal] = useState(null);
+  // Active cube tournament match — `{ parentRoomId, childRoomId, opponent, bo }`.
+  // Set when the server's `cube_match_assigned` event fires; cleared
+  // when the match ends. Drives the "Surrender Match" button in the
+  // GameBoard.
+  const [cubeMatchInfo, setCubeMatchInfo] = useState(null);
   // Top-10 ranked players, fetched once on mount and refreshed every 60s.
   // The endpoint filters out players with 0 ranked games so the list
   // reflects actual competition rather than 1000-ELO defaults.
@@ -111,11 +1107,34 @@ function PlayScreen() {
     const onRooms = (r) => setRooms(r);
     const onRoomJoined = (r) => setLobby(r);
     const onRoomUpdate = (r) => setLobby(prev => prev ? r : null);
-    const onRoomClosed = () => { setLobby(null); setGameState(null); notify('Room was closed by host', 'error'); };
+    const onRoomClosed = () => { setLobby(null); setGameState(null); setCubeDraftState(null); notify('Room was closed by host', 'error'); };
     const onJoinError = (msg) => notify(msg, 'error');
     const onPlayerJoined = (data) => setPlayerJoined(data.username);
     const onGameStarted = (r) => { setLobby(r); if (window.playSFX) window.playSFX('match_found'); };
     const onGameState = (state) => { setGameState(state); };
+    const onCubeDraftState = (state) => { setCubeDraftState(state); };
+    const onCubeBuildState = (state) => { setCubeBuildState(state); };
+    const onCubeTournamentState = (state) => { setCubeTournamentStateLocal(state); };
+    const onCubeMatchAssigned = (data) => {
+      // Match started for this player. Server has already joined them
+      // to the child room socket-wise; the next `game_state` event will
+      // populate the GameBoard. We don't change `lobby` (it stays as
+      // the parent), so on match-end the bracket UI is one step away.
+      setCubeMatchInfo(data);
+      if (window.playSFX) window.playSFX('match_found');
+    };
+    const onCubeMatchEnded = () => {
+      // Child room torn down. Clear the game-state so the tournament
+      // bracket re-renders. The next cube_tournament_state broadcast
+      // (already inflight from cubeMatchEnd) will refresh placements.
+      setGameState(null);
+      setCubeMatchInfo(null);
+    };
+    const onCubeSpectateLeft = () => {
+      // Spectator stopped watching a child match. Clear gameState so
+      // we fall back to the bracket view.
+      setGameState(null);
+    };
 
     socket.on('rooms', onRooms);
     socket.on('room_joined', onRoomJoined);
@@ -125,6 +1144,12 @@ function PlayScreen() {
     socket.on('player_joined', onPlayerJoined);
     socket.on('game_started', onGameStarted);
     socket.on('game_state', onGameState);
+    socket.on('cube_draft_state', onCubeDraftState);
+    socket.on('cube_build_state', onCubeBuildState);
+    socket.on('cube_tournament_state', onCubeTournamentState);
+    socket.on('cube_match_assigned', onCubeMatchAssigned);
+    socket.on('cube_match_ended', onCubeMatchEnded);
+    socket.on('cube_spectate_left', onCubeSpectateLeft);
 
     const poll = setInterval(() => socket.emit('get_rooms'), 4000);
 
@@ -137,13 +1162,57 @@ function PlayScreen() {
       socket.off('player_joined', onPlayerJoined);
       socket.off('game_started', onGameStarted);
       socket.off('game_state', onGameState);
+      socket.off('cube_draft_state', onCubeDraftState);
+      socket.off('cube_build_state', onCubeBuildState);
+      socket.off('cube_tournament_state', onCubeTournamentState);
+      socket.off('cube_match_assigned', onCubeMatchAssigned);
+      socket.off('cube_match_ended', onCubeMatchEnded);
+      socket.off('cube_spectate_left', onCubeSpectateLeft);
       clearInterval(poll);
     };
   }, []);
 
   const currentDeckObj = decks.find(d => d.id === selectedDeck) || sampleDecks.find(d => d.id === selectedDeck);
 
+  // Legal Cubes the host owns (mode === 'cube' and exactly CUBE_SIZE cards).
+  // Used by the Cube Draft creator UI; see also the join flow which only
+  // requires the HOST to have a legal cube — joiners draft from the host's.
+  const legalCubes = decks.filter(d => isCubeDeck(d) && isDeckLegal(d).legal);
+
+  // Bootstrap the cube dropdown when the modal opens — pick the first
+  // legal cube so an empty selection isn't silently submitted. Cleared
+  // when the dialog closes.
+  useEffect(() => {
+    if (creating && gameMode === 'draft' && !draftCubeId && legalCubes.length > 0) {
+      setDraftCubeId(legalCubes[0].id);
+    }
+  }, [creating, gameMode, legalCubes, draftCubeId]);
+
   const createGame = () => {
+    if (gameMode === 'draft') {
+      if (legalCubes.length === 0) { notify('You need a legal Cube (512 cards) to host a Cube Draft.', 'error'); return; }
+      if (!draftCubeId) { notify('Pick a Cube to draft from.', 'error'); return; }
+      const cube = legalCubes.find(c => c.id === draftCubeId);
+      if (!cube) { notify('Selected Cube is not available.', 'error'); return; }
+      const packT = Math.max(15, Math.min(600, parseInt(draftPackTimerSec, 10) || 60));
+      const pickT = Math.max(0, Math.min(60, parseInt(draftPickTimerSec, 10) || 5));
+      socket.emit('create_room', {
+        type: gameType, format: 1, // format unused for draft itself; per-match Bo lives in cubeDraft.*
+        playerPw: playerPw || null, specPw: specPw || null,
+        cubeDraft: {
+          cubeId: draftCubeId,
+          packTimerSec: packT,
+          pickTimerSec: pickT,
+          timerDisabled: !!draftTimerDisabled,
+          prelimsBo: draftPrelimsBo,
+          finaleBo: draftFinaleBo,
+          flow: draftFlow,
+        },
+      });
+      setCreating(false);
+      setPlayerPw(''); setSpecPw('');
+      return;
+    }
     if (!currentDeckObj) { notify('Select a deck first', 'error'); return; }
     const v = isDeckLegal(currentDeckObj);
     if (!v.legal) { notify('Deck not legal: ' + v.reasons.join(', '), 'error'); return; }
@@ -168,6 +1237,10 @@ function PlayScreen() {
     if (lobby) socket.emit('leave_room', { roomId: lobby.id });
     setLobby(null);
     setGameState(null);
+    setCubeDraftState(null);
+    setCubeBuildState(null);
+    setCubeTournamentStateLocal(null);
+    setCubeMatchInfo(null);
   };
 
   // Intercept Escape: close lobby/game/create-modal/join-modal, or return to menu from room list
@@ -188,7 +1261,140 @@ function PlayScreen() {
 
   // === GAME BOARD VIEW ===
   if (gameState) {
-    return <GameBoard gameState={gameState} lobby={lobby} onLeave={leaveRoom} decks={decks} sampleDecks={sampleDecks} selectedDeck={selectedDeck} setSelectedDeck={setSelectedDeck} />;
+    return <GameBoard gameState={gameState} lobby={lobby} onLeave={leaveRoom} decks={decks} sampleDecks={sampleDecks} selectedDeck={selectedDeck} setSelectedDeck={setSelectedDeck} cubeMatchInfo={cubeMatchInfo} />;
+  }
+
+  // === CUBE DRAFT — DRAFTING PHASE ===
+  if (lobby && lobby.cubeDraft && lobby.cubeDraft.phase === 'drafting') {
+    return <CubeDraftScreen lobby={lobby} draft={cubeDraftState} leaveRoom={leaveRoom} notify={notify} />;
+  }
+
+  // === CUBE DRAFT — DECK BUILDING PHASE ===
+  if (lobby && lobby.cubeDraft && lobby.cubeDraft.phase === 'building') {
+    return <CubeDraftBuildScreen lobby={lobby} build={cubeBuildState} leaveRoom={leaveRoom} notify={notify} user={user} />;
+  }
+
+  // === CUBE DRAFT — TOURNAMENT PHASE ===
+  if (lobby && lobby.cubeDraft && lobby.cubeDraft.phase === 'tournament') {
+    return <CubeDraftTournamentScreen lobby={lobby} tournament={cubeTournamentStateLocal} gameState={gameState} leaveRoom={leaveRoom} notify={notify} user={user} />;
+  }
+
+  // === CUBE DRAFT LOBBY VIEW ===
+  // 8-seat layout, distinct from the 2-player lobby below. Shown for any
+  // room whose `cubeDraft` config is non-null AND whose phase is 'lobby'.
+  // Once the host starts the draft (phase → 'drafting') the room renders
+  // the drafting UI instead — see the cube-draft phase branches below.
+  if (lobby && lobby.cubeDraft && lobby.cubeDraft.phase === 'lobby') {
+    const isHost = lobby.host === user.username;
+    const seats = lobby.seats || [];
+    const filledSeats = seats.filter(s => s).length;
+    const canStart = filledSeats >= 2;
+    return (
+      <div className="screen-full">
+        <div className="top-bar">
+          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>
+            {isHost ? 'CLOSE ROOM' : 'LEAVE'}
+          </button>
+          <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT LOBBY</h2>
+          <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>
+            {lobby.cubeDraft.cubeName}
+          </span>
+          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+            {lobby.type.toUpperCase()}
+          </span>
+          <VolumeControl />
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }} className="animate-in">
+          <div className="panel" style={{ width: 720, maxWidth: '92%' }}>
+            <div className="orbit-font" style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, textAlign: 'center' }}>
+              {canStart ? (isHost ? '⚔️ Ready to draft — start when you like.' : '⏳ Waiting for host to start...') : '⏳ Waiting for at least one challenger...'}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+              {Array.from({ length: 8 }).map((_, i) => {
+                const seat = seats[i] || null;
+                const occupied = !!seat;
+                return (
+                  <div key={i} style={{
+                    border: '2px solid ' + (occupied ? (seat.isHost ? 'var(--accent)' : 'var(--accent2)') : 'var(--bg4)'),
+                    borderStyle: occupied ? 'solid' : 'dashed',
+                    borderRadius: 8,
+                    padding: '12px 8px',
+                    background: occupied ? 'rgba(0,240,255,.04)' : 'transparent',
+                    textAlign: 'center',
+                    opacity: occupied ? 1 : .5,
+                  }}>
+                    <div style={{ fontSize: 22, marginBottom: 6 }}>
+                      {occupied ? (seat.isHost ? '👑' : (seat.isBot ? '🤖' : '⚔️')) : `${i + 1}`}
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: occupied ? (seat.isHost ? 'var(--accent)' : 'var(--accent2)') : 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {occupied ? seat.username : 'Open Seat'}
+                    </div>
+                    <div style={{ fontSize: 9, color: 'var(--text2)', marginTop: 2 }}>
+                      {occupied ? (seat.isHost ? 'HOST' : seat.isBot ? 'BOT' : 'PLAYER') : ' '}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ background: 'var(--bg2)', borderRadius: 4, padding: '8px 12px', marginBottom: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11, color: 'var(--text2)' }}>
+              {lobby.cubeDraft.timerDisabled ? (
+                <div style={{ gridColumn: '1/3' }}>⏱ Draft timer: <strong style={{ color: 'var(--accent)' }}>Disabled</strong> — drafters take as long as they want.</div>
+              ) : (
+                <>
+                  <div>⏱ Time per Pack: <strong style={{ color: 'var(--text)' }}>{lobby.cubeDraft.packTimerSec}s</strong></div>
+                  <div>➕ Bonus per Pick: <strong style={{ color: 'var(--text)' }}>{lobby.cubeDraft.pickTimerSec}s</strong></div>
+                </>
+              )}
+              <div>🎮 Prelims: <strong style={{ color: 'var(--text)' }}>Bo{lobby.cubeDraft.prelimsBo}</strong></div>
+              <div>🏆 Finale: <strong style={{ color: 'var(--text)' }}>Bo{lobby.cubeDraft.finaleBo}</strong></div>
+              <div style={{ gridColumn: '1/3' }}>🔁 Match flow: <strong style={{ color: 'var(--text)' }}>{lobby.cubeDraft.flow === 'consecutive' ? 'Consecutive (one game at a time)' : 'Simultaneous (parallel games)'}</strong></div>
+            </div>
+
+            {(lobby.spectators || []).length > 0 && (
+              <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 12, textAlign: 'center' }}>
+                👁 Spectators: {lobby.spectators.join(', ')}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              {isHost && (
+                <button className={'btn btn-success btn-big' + (canStart ? ' glow-border' : '')}
+                  disabled={!canStart}
+                  title={canStart ? '' : 'Need at least one challenger to start.'}
+                  onClick={() => socket.emit('start_cube_draft', { roomId: lobby.id })}>
+                  🎮 START DRAFT ({filledSeats}/8 — {Math.max(0, 8 - filledSeats)} bots will fill)
+                </button>
+              )}
+              {!isHost && lobby.players.includes(user.username) && (
+                <button className="btn" style={{ fontSize: 10 }}
+                  onClick={() => socket.emit('swap_to_spectator', { roomId: lobby.id })}>
+                  SWITCH TO SPECTATOR
+                </button>
+              )}
+              {!isHost && !lobby.players.includes(user.username) && (lobby.spectators || []).includes(user.username) && filledSeats < 8 && (
+                <button className="btn btn-accent2" style={{ fontSize: 10 }}
+                  onClick={() => socket.emit('swap_to_player', { roomId: lobby.id, deckId: null })}>
+                  ⚔ JOIN SEAT
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        {playerJoined && (
+          <div className="modal-overlay" onClick={() => setPlayerJoined(null)}>
+            <div className="modal animate-in" onClick={e => e.stopPropagation()} style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>⚔️</div>
+              <div className="orbit-font" style={{ fontSize: 16, marginBottom: 8 }}>
+                <span style={{ color: 'var(--accent2)' }}>{playerJoined}</span> has joined!
+              </div>
+              <button className="btn" onClick={() => setPlayerJoined(null)}>OK</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   }
 
   // === LOBBY VIEW ===
@@ -281,8 +1487,12 @@ function PlayScreen() {
   }
 
   // === ROOM BROWSER ===
-  const openRooms = rooms.filter(r => r.status === 'waiting' && r.playerCount < 2);
-  const activeRooms = rooms.filter(r => r.status === 'playing' || r.playerCount >= 2);
+  // Open = still seating players. Cube Draft rooms use maxPlayers=8;
+  // standard 1v1 rooms use 2. Lobby phase for a Cube Draft is ALWAYS
+  // "still seating" until the host hits Start, so the maxPlayers gate
+  // is the right cut-off — it stays in the open list until that moment.
+  const openRooms = rooms.filter(r => r.status === 'waiting' && r.playerCount < (r.maxPlayers || 2));
+  const activeRooms = rooms.filter(r => r.status === 'playing' || r.playerCount >= (r.maxPlayers || 2));
 
   return (
     <div className="screen-full">
@@ -312,7 +1522,7 @@ function PlayScreen() {
                 }
               } catch {}
             }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--accent)', color: 'var(--text)' }}>
-            {decks.map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}{d.isDefault ? ' ★' : ''}</option>)}
+            {decks.filter(d => !isCubeDeck(d) && d.mode !== 'drafted').map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}{d.isDefault ? ' ★' : ''}</option>)}
             {sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
             {sampleDecks.filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}{user?.defaultSampleDeckId === d.id ? ' ★' : ''}</option>)}
           </select>
@@ -329,23 +1539,32 @@ function PlayScreen() {
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
             {openRooms.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, padding: 20 }}>No open games. Create one!</div>}
-            {openRooms.map(r => (
-              <div key={r.id} className="room-card" onClick={() => joinRoom(r, false)}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700 }}>{r.host}</span>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.1)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,255,255,.2)', letterSpacing: 1 }}>Bo{r.format}</span>}
-                    <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(255,170,0,.18)' : 'rgba(0,240,255,.15)', color: r.type === 'ranked' ? '#ffbb33' : '#00f0ff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: r.type === 'ranked' ? '1px solid rgba(255,170,0,.35)' : '1px solid rgba(0,240,255,.3)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                      {r.type}
+            {openRooms.map(r => {
+              const cap = r.maxPlayers || 2;
+              const isDraft = !!r.cubeDraft;
+              return (
+                <div key={r.id} className="room-card" onClick={() => joinRoom(r, false)}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700 }}>
+                      {isDraft && <span style={{ color: '#9ad8ff', marginRight: 4 }}>🧊</span>}
+                      {r.host}
                     </span>
-                    {r.format <= 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text2)', fontSize: 11, padding: '3px 10px' }}>Bo1</span>}
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {isDraft && <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(154,216,255,.3)', letterSpacing: 1 }}>CUBE DRAFT</span>}
+                      {!isDraft && r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.1)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '3px 10px', border: '1px solid rgba(255,255,255,.2)', letterSpacing: 1 }}>Bo{r.format}</span>}
+                      <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(255,170,0,.18)' : 'rgba(0,240,255,.15)', color: r.type === 'ranked' ? '#ffbb33' : '#00f0ff', fontSize: 11, fontWeight: 800, padding: '3px 10px', border: r.type === 'ranked' ? '1px solid rgba(255,170,0,.35)' : '1px solid rgba(0,240,255,.3)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                        {r.type}
+                      </span>
+                      {!isDraft && r.format <= 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text2)', fontSize: 11, padding: '3px 10px' }}>Bo1</span>}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2 }}>
+                    {r.hasPlayerPw ? '🔒 Password' : '🔓 Open'} · {r.playerCount}/{cap} players
+                    {isDraft && r.cubeDraft && <span style={{ marginLeft: 8 }}>· Cube: <span style={{ color: '#9ad8ff' }}>{r.cubeDraft.cubeName}</span> · Bo{r.cubeDraft.prelimsBo} prelims / Bo{r.cubeDraft.finaleBo} finale</span>}
                   </div>
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2 }}>
-                  {r.hasPlayerPw ? '🔒 Password' : '🔓 Open'} · {r.playerCount}/2 players
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -422,9 +1641,24 @@ function PlayScreen() {
       {/* Create Game Modal */}
       {creating && (
         <div className="modal-overlay" onClick={() => setCreating(false)}>
-          <div className="modal animate-in" onClick={e => e.stopPropagation()}>
+          {/* Fixed width + min-height locked to the wider Draft layout so
+              the modal doesn't reflow / hop when the user toggles between
+              Constructed and Draft. Constructed mode just leaves extra
+              blank space at the bottom rather than collapsing upward. */}
+          <div className="modal animate-in" onClick={e => e.stopPropagation()}
+            style={{ width: 460, minWidth: 460, maxWidth: 460, minHeight: 640 }}>
             <h3 className="orbit-font" style={{ marginBottom: 16, color: 'var(--accent)' }}>CREATE GAME</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Game Mode</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className={'btn' + (gameMode === 'constructed' ? ' glow-border' : '')} onClick={() => setGameMode('constructed')} style={{ flex: 1 }}>CONSTRUCTED</button>
+                  <button className={'btn' + (gameMode === 'draft' ? ' glow-border' : '')} onClick={() => setGameMode('draft')} style={{ flex: 1 }}
+                    title={legalCubes.length === 0 ? 'You need a legal Cube (512 cards) to host a Cube Draft.' : 'Cube Draft tournament'}>
+                    🧊 DRAFT
+                  </button>
+                </div>
+              </div>
               <div>
                 <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Game Type</div>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -432,14 +1666,80 @@ function PlayScreen() {
                   <button className={'btn btn-accent2' + (gameType === 'ranked' ? ' glow-border' : '')} onClick={() => setGameType('ranked')} style={{ flex: 1 }}>RANKED</button>
                 </div>
               </div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Format</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className={'btn' + (gameFormat === 1 ? ' btn-format-active' : '')} onClick={() => setGameFormat(1)} style={{ flex: 1 }}>Bo1</button>
-                  <button className={'btn' + (gameFormat === 3 ? ' btn-format-active' : '')} onClick={() => setGameFormat(3)} style={{ flex: 1 }}>Bo3</button>
-                  <button className={'btn' + (gameFormat === 5 ? ' btn-format-active' : '')} onClick={() => setGameFormat(5)} style={{ flex: 1 }}>Bo5</button>
+              {gameMode === 'constructed' && (
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Format</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className={'btn' + (gameFormat === 1 ? ' btn-format-active' : '')} onClick={() => setGameFormat(1)} style={{ flex: 1 }}>Bo1</button>
+                    <button className={'btn' + (gameFormat === 3 ? ' btn-format-active' : '')} onClick={() => setGameFormat(3)} style={{ flex: 1 }}>Bo3</button>
+                    <button className={'btn' + (gameFormat === 5 ? ' btn-format-active' : '')} onClick={() => setGameFormat(5)} style={{ flex: 1 }}>Bo5</button>
+                  </div>
                 </div>
-              </div>
+              )}
+              {gameMode === 'draft' && (
+                <>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Cube</div>
+                    {legalCubes.length === 0 ? (
+                      <div style={{ fontSize: 11, color: 'var(--danger)', padding: '6px 8px', border: '1px solid var(--danger)', borderRadius: 4, background: 'rgba(255,80,80,.06)' }}>
+                        You have no legal Cube (exactly 512 cards). Build one in the Deck Editor before hosting a draft.
+                      </div>
+                    ) : (
+                      <select className="input" value={draftCubeId} onChange={e => setDraftCubeId(e.target.value)} style={{ width: '100%' }}>
+                        {legalCubes.map(c => <option key={c.id} value={c.id}>🧊 {c.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, color: draftTimerDisabled ? 'var(--bg4)' : 'var(--text2)', marginBottom: 4 }}>Time per Pack (s)</div>
+                      <input className="input" type="number" min={15} max={600} value={draftPackTimerSec}
+                        onChange={e => setDraftPackTimerSec(e.target.value)} disabled={draftTimerDisabled}
+                        title="Per-pack time bank — picks pull from this." />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, color: draftTimerDisabled ? 'var(--bg4)' : 'var(--text2)', marginBottom: 4 }}>Bonus Time per Pick (s)</div>
+                      <input className="input" type="number" min={0} max={60} value={draftPickTimerSec}
+                        onChange={e => setDraftPickTimerSec(e.target.value)} disabled={draftTimerDisabled}
+                        title="Extra seconds added to the pack budget for each pick." />
+                    </div>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 11, color: 'var(--text2)' }}
+                    title="Drafters take as long as they want; no auto-pick on timeout.">
+                    <input type="checkbox" checked={draftTimerDisabled} onChange={e => setDraftTimerDisabled(e.target.checked)} />
+                    Disable draft timer entirely
+                  </label>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Prelims length</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className={'btn' + (draftPrelimsBo === 1 ? ' btn-format-active' : '')} onClick={() => setDraftPrelimsBo(1)} style={{ flex: 1 }}>Bo1</button>
+                      <button className={'btn' + (draftPrelimsBo === 3 ? ' btn-format-active' : '')} onClick={() => setDraftPrelimsBo(3)} style={{ flex: 1 }}>Bo3</button>
+                      <button className={'btn' + (draftPrelimsBo === 5 ? ' btn-format-active' : '')} onClick={() => setDraftPrelimsBo(5)} style={{ flex: 1 }}>Bo5</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Finale length</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className={'btn' + (draftFinaleBo === 1 ? ' btn-format-active' : '')} onClick={() => setDraftFinaleBo(1)} style={{ flex: 1 }}>Bo1</button>
+                      <button className={'btn' + (draftFinaleBo === 3 ? ' btn-format-active' : '')} onClick={() => setDraftFinaleBo(3)} style={{ flex: 1 }}>Bo3</button>
+                      <button className={'btn' + (draftFinaleBo === 5 ? ' btn-format-active' : '')} onClick={() => setDraftFinaleBo(5)} style={{ flex: 1 }}>Bo5</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Match flow</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className={'btn' + (draftFlow === 'simultaneous' ? ' glow-border' : '')} onClick={() => setDraftFlow('simultaneous')} style={{ flex: 1 }}
+                        title="All round-X games run in parallel. Players can tab between active games to spectate.">
+                        SIMULTANEOUS
+                      </button>
+                      <button className={'btn' + (draftFlow === 'consecutive' ? ' glow-border' : '')} onClick={() => setDraftFlow('consecutive')} style={{ flex: 1 }}
+                        title="Round-X games play one after another. Idle players spectate the live game.">
+                        CONSECUTIVE
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
               <div>
                 <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Player Password (optional)</div>
                 <input className="input" type="text" autoComplete="off" data-1p-ignore placeholder="Leave empty for open game" value={playerPw} onChange={e => setPlayerPw(e.target.value)} />
@@ -450,7 +1750,8 @@ function PlayScreen() {
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn" style={{ flex: 1 }} onClick={() => setCreating(false)}>CANCEL</button>
-                <button className="btn btn-success" style={{ flex: 1 }} onClick={createGame}>CREATE</button>
+                <button className="btn btn-success" style={{ flex: 1 }} onClick={createGame}
+                  disabled={gameMode === 'draft' && legalCubes.length === 0}>CREATE</button>
               </div>
             </div>
           </div>

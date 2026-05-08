@@ -18,6 +18,8 @@ const CARD_NAME    = 'Ballad Harpyformer';
 const ABILITY_NAME = 'Support Magic';
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   inherentAction: harpyformerInherentAction,
 
   // ── On summon: search deck for Support Magic ──────────────────────────────

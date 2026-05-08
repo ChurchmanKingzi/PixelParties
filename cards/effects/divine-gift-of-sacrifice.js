@@ -209,6 +209,8 @@ function cpuHeroValue(engine, ownerIdx, heroIdx) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Inherent additional Action — played during own Main Phase at Sorcery speed.
   inherentAction: true,
   oncePerGame: true,

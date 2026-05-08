@@ -243,6 +243,8 @@ function _getAllSingableCreatures(engine, gs, pi, heroIdx, level) {
 }
 
 module.exports = {
+  requiresTarget: true,
+  // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['ability'],
   freeActivation: true,
   // Singing only fires during a Main Phase. Borrowing a creature's
