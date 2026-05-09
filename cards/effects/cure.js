@@ -15,13 +15,13 @@
 //  Animation: green healing sparkle on target.
 // ═══════════════════════════════════════════
 
-const { STATUS_EFFECTS, getNegativeStatuses } = require('./_hooks');
+const { STATUS_EFFECTS, getCleansableStatuses } = require('./_hooks');
 
 /**
  * Find all valid targets: heroes/creatures with 1+ negative status.
  */
 function getValidTargets(gs, engine, excludeHeroKey) {
-  const negKeys = getNegativeStatuses();
+  const negKeys = getCleansableStatuses();
   const targets = [];
   for (let pi = 0; pi < 2; pi++) {
     const ps = gs.players[pi];
@@ -73,7 +73,7 @@ function getValidTargets(gs, engine, excludeHeroKey) {
  * Core cleanse + heal logic used by both proactive and reaction paths.
  */
 async function doCure(engine, pi, target, casterHeroIdx) {
-  const negKeys = getNegativeStatuses();
+  const negKeys = getCleansableStatuses();
   let removed = 0;
 
   // Build the heal source. When a `casterHeroIdx` is provided
@@ -159,7 +159,7 @@ module.exports = {
 
   spellPlayCondition(gs, pi) {
     // Proactive: need at least 1 valid target (no engine access here, optimistic check)
-    const negKeys = getNegativeStatuses();
+    const negKeys = getCleansableStatuses();
     for (let phi = 0; phi < 2; phi++) {
       const ps = gs.players[phi];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

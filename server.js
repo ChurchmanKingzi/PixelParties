@@ -1877,9 +1877,17 @@ function sendGameState(room, playerIdx, extra) {
         for (const cn of ps.hand) {
           const scr = loadCardEffect(cn);
           if (!scr?.blockedByHandLock) continue;
-          // Abilities can still be placed in hand — only block on board
           const cd = handCardDB[cn];
+          // Abilities can still be placed in hand — only block on board.
           if (cd?.cardType === 'Ability') continue;
+          // Creatures stay summon-eligible under hand-lock. Their
+          // draw-only activated effect (e.g. Skeleton Mage's draw 2 /
+          // discard 1) is gated separately via
+          // `canActivateCreatureEffect`. The Creature itself still has
+          // body/HP/triggers/buff potential beyond the draw, so the
+          // hand-lock should not gate the summon. Mirrors the
+          // server-side `validateActionPlay` exemption for Creatures.
+          if (cd?.cardType === 'Creature') continue;
           blocked.add(cn);
         }
         return [...blocked];

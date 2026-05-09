@@ -347,6 +347,7 @@ module.exports = {
     engine.actionNegateCreature(inst, CARD_NAME, {
       expiresAtTurn: gs.turn + 1,
       expiresForPlayer: activator === 0 ? 1 : 0,
+      selfInflicted: true,
     });
 
     // Fire onCardEnterZone (without `_onlyCard`) so OTHER cards can

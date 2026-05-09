@@ -252,6 +252,175 @@ module.exports = {
       });
     },
 
+    /**
+     * Hand → discard reactive draw. Inventing, Magenta's discard
+     * cost, forced discards, and any other hand-discard path push
+     * the card directly into `ps.discardPile` and fire `onDiscard`
+     * AFTER the splice — by the time we see the event the card is
+     * already in the discard pile, so the redirect happens
+     * post-hoc: pop the card back off the discard pile, push it
+     * onto the deleted pile, draw 1. The card text scopes to
+     * "Skeleton Creature would be sent to your discard pile",
+     * which covers ANY source zone, not just support.
+     *
+     * Per-turn cap and hand-lock guard match the support-side
+     * path. Same `_redirectToDeleted` flag isn't usable here —
+     * the discarder splice doesn't consult the inst (often there
+     * isn't even a tracked inst for hand cards), so we mutate the
+     * pile arrays ourselves.
+     */
+    onDiscard: async (ctx) => {
+      const engine = ctx._engine;
+      const myController = ctx.cardController ?? ctx.cardOwner;
+      // Only react when the discard happened on the SAME side as
+      // this Bonegrinder. Cross-player discards (a future opp-
+      // induced discard) don't qualify.
+      if (ctx.playerIdx !== myController) return;
+      const cardName = ctx.cardName || ctx.discardedCardName;
+      if (!cardName) return;
+      if (!isSkeletonCreature(cardName, engine)) return;
+
+      // The support-side `onCardLeaveZone` handler runs FIRST for
+      // support → discard transitions and uses `_redirectToDeleted`
+      // to flip the destination before this `onDiscard` would fire
+      // for that path (engine fires onCardLeaveZone before onDiscard
+      // in the discard pipeline). To avoid double-handling, we skip
+      // when `ctx._fromSupport` is set — the support path owns the
+      // animation + redirect for board-creature deaths. Hand-driven
+      // discards (Inventing, Magenta, force-discard) explicitly tag
+      // `_fromHand: true` and don't carry `_fromSupport`, so they
+      // route here.
+      if (ctx._fromSupport) return;
+
+      // Verify the card is actually still in the discard pile (a
+      // chained reaction could have pulled it back out — Bamboo
+      // Shield reveal etc.). If something else already moved it,
+      // there's nothing to redirect.
+      const ps = engine.gs.players[myController];
+      if (!ps) return;
+      const discardIdx = ps.discardPile?.lastIndexOf(cardName);
+      if (discardIdx == null || discardIdx < 0) return;
+
+      // Per-turn cap on this Bonegrinder instance.
+      const inst = ctx.card;
+      const turn = engine.gs.turn || 0;
+      if (!inst.counters._bonegrinderDrawsTurn || inst.counters._bonegrinderDrawsTurn !== turn) {
+        inst.counters._bonegrinderDrawsTurn = turn;
+        inst.counters._bonegrinderDrawsCount = 0;
+      }
+      if ((inst.counters._bonegrinderDrawsCount || 0) >= MAX_DRAWS_PER_TURN) return;
+
+      // Hand-lock makes the draw worthless — silently skip.
+      if (ps.handLocked) return;
+
+      const confirmed = await engine.promptGeneric(myController, {
+        type: 'confirm',
+        title: CARD_NAME,
+        message: `${cardName} just hit your discard pile. Delete it instead and draw 1 card?`,
+        showCard: CARD_NAME,
+        confirmLabel: '🦴 Grind!',
+        cancelLabel: 'Leave in discard',
+        cancellable: true,
+      });
+      if (!confirmed) return;
+
+      // Re-verify position (a parallel reaction during the prompt
+      // could have shifted the pile).
+      const finalIdx = ps.discardPile.lastIndexOf(cardName);
+      if (finalIdx < 0) return;
+
+      ps.discardPile.splice(finalIdx, 1);
+      if (!ps.deletedPile) ps.deletedPile = [];
+      ps.deletedPile.push(cardName);
+      engine._broadcastEvent('play_pile_transfer', {
+        owner: myController, cardName, from: 'discard', to: 'deleted',
+      });
+
+      inst.counters._bonegrinderDrawsCount = (inst.counters._bonegrinderDrawsCount || 0) + 1;
+      await engine.actionDrawCards(myController, 1, { source: CARD_NAME });
+      engine.log('bonegrinder_draw', {
+        player: ps.username,
+        deletedSkeleton: cardName,
+        usedThisTurn: inst.counters._bonegrinderDrawsCount,
+      });
+      engine.sync();
+    },
+
+    /**
+     * Mill (deck → discard) reactive draw. `actionMillCards` pushes
+     * milled cards directly into `ps.discardPile` and fires `onMill`
+     * with `milledCards: string[]`. Walk the array, prompt per
+     * Skeleton, and redirect each confirmed one from discard →
+     * deleted pile. Per-turn cap is shared with the other two
+     * paths (one Bonegrinder = max 5 grinds/turn across hand,
+     * support, and deck sources combined).
+     *
+     * Skips `deleteMode` mills — those went straight to deletedPile,
+     * never visited discardPile, so the trigger condition ("would be
+     * sent to your discard pile") doesn't apply.
+     */
+    onMill: async (ctx) => {
+      if (ctx.deleteMode) return;
+      const engine = ctx._engine;
+      const myController = ctx.cardController ?? ctx.cardOwner;
+      if (ctx.playerIdx !== myController) return;
+
+      const milled = Array.isArray(ctx.milledCards) ? ctx.milledCards : [];
+      if (milled.length === 0) return;
+
+      const inst = ctx.card;
+      const turn = engine.gs.turn || 0;
+      if (!inst.counters._bonegrinderDrawsTurn || inst.counters._bonegrinderDrawsTurn !== turn) {
+        inst.counters._bonegrinderDrawsTurn = turn;
+        inst.counters._bonegrinderDrawsCount = 0;
+      }
+
+      const ps = engine.gs.players[myController];
+      if (!ps) return;
+
+      for (const cardName of milled) {
+        if ((inst.counters._bonegrinderDrawsCount || 0) >= MAX_DRAWS_PER_TURN) break;
+        if (!isSkeletonCreature(cardName, engine)) continue;
+        // Card might have been pulled out of discard already by a
+        // chained mill effect (e.g., self-delete redirect runs
+        // after onMill via Phase B/C). Skip if it's no longer
+        // sitting in discardPile.
+        const idx = ps.discardPile?.lastIndexOf(cardName);
+        if (idx == null || idx < 0) continue;
+        if (ps.handLocked) continue;
+
+        const confirmed = await engine.promptGeneric(myController, {
+          type: 'confirm',
+          title: CARD_NAME,
+          message: `${cardName} was just milled to your discard pile. Delete it instead and draw 1 card?`,
+          showCard: CARD_NAME,
+          confirmLabel: '🦴 Grind!',
+          cancelLabel: 'Leave in discard',
+          cancellable: true,
+        });
+        if (!confirmed) continue;
+
+        const finalIdx = ps.discardPile.lastIndexOf(cardName);
+        if (finalIdx < 0) continue;
+
+        ps.discardPile.splice(finalIdx, 1);
+        if (!ps.deletedPile) ps.deletedPile = [];
+        ps.deletedPile.push(cardName);
+        engine._broadcastEvent('play_pile_transfer', {
+          owner: myController, cardName, from: 'discard', to: 'deleted',
+        });
+
+        inst.counters._bonegrinderDrawsCount = (inst.counters._bonegrinderDrawsCount || 0) + 1;
+        await engine.actionDrawCards(myController, 1, { source: CARD_NAME });
+        engine.log('bonegrinder_draw', {
+          player: ps.username,
+          deletedSkeleton: cardName,
+          usedThisTurn: inst.counters._bonegrinderDrawsCount,
+        });
+        engine.sync();
+      }
+    },
+
     /** Reset per-turn counters at start of own turn. */
     onTurnStart: (ctx) => {
       const inst = ctx.card;

@@ -14,33 +14,37 @@ module.exports = {
   isTargetingArtifact: true,
   deferBroadcast: true,
 
-  // ── CPU board-target picker (MCTS-driven) ──────────────────────────
+  // ── CPU prompt routing (BOTH prompts MCTS-driven) ──────────────────
   // The default brain scores ability targets at 0 and falls back to a
-  // random pick — observed real-game outcome: Yeeting-removed an enemy
-  // Spell School the player wasn't even going to use. Routing the
-  // second prompt (board-target picker) through MCTS lets the rollout
-  // surface the actually-impactful removal: the per-candidate apply
-  // simulates the destroy + plays out the rest of the turn, and the
-  // evaluator captures all of "deck has 8 copies of this Ability =
-  // very needed", "removing Support Magic 2 with no Lv2+ Support
-  // Spell in deck = wasted", and "highest-level version is more
-  // valuable" naturally — no hardcoded heuristic to maintain.
+  // random pick — and worse, it picked the CPU's main-carry Hero as
+  // the "yeeter" (the 150-damage payer) just to remove an unimportant
+  // card, killing its own win condition. Both prompts are now routed
+  // through MCTS:
   //
-  // The first prompt (pick which OWN Hero yeets) only has own-hero
-  // targets; we defer to the default brain there (returning undefined
-  // synchronously is critical — see Barker's note for the
-  // Promise-coercion wrapper bug that would otherwise auto-decline
-  // the unrelated prompts).
+  //   1. Hero picker (which OWN Hero takes 150 self-damage). For each
+  //      candidate Hero the rollout deals 150 artifact damage and
+  //      plays out the rest of the turn — heroes whose loss tanks the
+  //      evaluator (carries, key-passive Heroes, undamaged frontliners)
+  //      score badly, leaving expendable / high-HP Heroes as the
+  //      surviving picks. The board target the SECOND prompt picks is
+  //      identical across hero candidates so it cancels out of the
+  //      ranking — skip simulating the destroy here.
+  //
+  //   2. Board target picker (which non-Hero card to destroy). The
+  //      per-candidate apply simulates the destroy + plays out the
+  //      rest of the turn, and the evaluator captures all of "deck has
+  //      8 copies of this Ability = very needed", "removing Support
+  //      Magic 2 with no Lv2+ Support Spell in deck = wasted", and
+  //      "highest-level version is more valuable" naturally — no
+  //      hardcoded heuristic to maintain.
+  //
+  // Both branches share the nested-MCTS guard (`_inMctsSim` /
+  // `_mctsKilledThisTurn`) and lazy-load `mctsPickFromOptions` to
+  // avoid circular imports.
   cpuResponse(engine, kind, payload) {
     if (kind !== 'target') return undefined;
     const { validTargets, config } = payload || {};
     if (!Array.isArray(validTargets) || validTargets.length === 0) return undefined;
-
-    // Distinguish the two prompts by content: the OWN-hero picker has
-    // only `type === 'hero'` entries on the controller's side; the
-    // board-target picker mixes equips / abilities / permanents / areas.
-    const hasNonHero = validTargets.some(t => t.type && t.type !== 'hero');
-    if (!hasNonHero) return undefined;
 
     // Inside an outer rollout — defer (no nested MCTS).
     if (engine._inMctsSim || engine._mctsKilledThisTurn) return undefined;
@@ -52,6 +56,48 @@ module.exports = {
     try { ({ mctsPickFromOptions: mctsPick } = require('./_cpu')); }
     catch { mctsPick = null; }
     if (typeof mctsPick !== 'function') return undefined;
+
+    // Distinguish the two prompts by content: the OWN-hero picker has
+    // only `type === 'hero'` entries on the controller's side; the
+    // board-target picker mixes equips / abilities / permanents / areas.
+    const hasNonHero = validTargets.some(t => t.type && t.type !== 'hero');
+
+    // ── Prompt 1: hero picker ────────────────────────────────────────
+    if (!hasNonHero) {
+      // Only consider our own living Heroes (defensive — getValidTargets
+      // already restricts this, but the prompt response is auth-side
+      // so re-filter).
+      const heroOpts = validTargets.filter(t =>
+        t.type === 'hero' && t.owner === cpuIdx,
+      );
+      if (heroOpts.length === 0) return undefined;
+      if (heroOpts.length === 1) return [heroOpts[0].id];
+
+      return (async () => {
+        const applyHero = async (eng, target) => {
+          const m = (target.id || '').match(/^hero-(\d+)-(\d+)$/);
+          if (!m) return false;
+          const o = +m[1], hi = +m[2];
+          const hero = eng.gs.players[o]?.heroes?.[hi];
+          if (!hero?.name || hero.hp <= 0) return false;
+          // Simulate ONLY the 150 self-damage. The chosen board target
+          // is the same across all hero candidates (resolved by the
+          // next prompt), so its destroy-value cancels out of the
+          // ranking. What remains is each candidate's post-damage
+          // value — a carry that dies here makes the rest-of-turn
+          // rollout score terribly, naturally steering the pick to
+          // an expendable Hero.
+          const src = { name: 'The Yeeting (sim)', owner: cpuIdx, heroIdx: hi };
+          try { await eng.actionDealDamage(src, hero, 150, 'artifact'); } catch {}
+          return true;
+        };
+        let best = null;
+        try { best = await mctsPick(engine, heroOpts, applyHero); }
+        catch { best = null; }
+        if (!best) return undefined;
+        return [best.id];
+      })();
+    }
 
     // Pre-filter to viable opponent-side candidates. Self-targeting
     // own equips/abilities almost never scores positively (it just

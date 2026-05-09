@@ -193,6 +193,7 @@ module.exports = {
       engine.actionNegateCreature(placed.inst, CARD_NAME, {
         expiresAtTurn,
         expiresForPlayer: pi,
+        selfInflicted: true,
       });
 
       // Reveal to opponent.

@@ -2899,8 +2899,24 @@ function installCpuBrain(engine) {
     }
 
     // ── Fast-mode non-CPU: auto-respond (prevents hangs in rollouts) ──
+    // Default model of opp behaviour: passive — cancellable prompts get
+    // declined (Anti-Magic, Shield of Life, Cure-style reactions stay
+    // dormant), mandatory prompts get the CPU picker's default. That
+    // model UNDERPRICES reactive damage triggers like Skeleton Demon
+    // ("when opp draws, you MAY deal 50 × cards"): the rollout wrongly
+    // saw the prompt as cancellable, declined, and the CPU concluded
+    // drawing was free even when it would have actually eaten 250+
+    // damage from a 5-card mulligan. A rational opp ALWAYS takes a
+    // free damage opportunity, so route damage-target prompts
+    // (`config.baseDamage > 0`) through the CPU picker even when
+    // cancellable — it picks the highest-value enemy target and the
+    // damage lands during the rollout, so the evaluator sees the real
+    // post-state. Generic principle, not a Demon-specific heuristic:
+    // any future "opp may deal damage on your draw / search / play"
+    // card opts in just by passing `baseDamage` through its prompt.
     if (engine._fastMode && !engine.isCpuPlayer(playerIdx)) {
-      if (config.cancellable) return [];
+      const isDamageOpportunity = (config.baseDamage || 0) > 0;
+      if (config.cancellable && !isDamageOpportunity) return [];
       return engine._getCpuTargetResponse(validTargets, config, playerIdx);
     }
 

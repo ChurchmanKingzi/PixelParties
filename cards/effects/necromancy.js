@@ -255,6 +255,18 @@ module.exports = {
     // Track card instance
     const inst = engine._trackCard(creatureName, pi, 'support', hi, si);
 
+    // Tick the per-turn summon counter. Other "summon from outside the
+    // board" paths (Raise the Minions, Skeleton Necromancer, Thep, Soul
+    // Shard Khet) all route through `summonCreature` / `actionPlaceCreature
+    // {countAsSummon: true}` which bumps this counter automatically.
+    // Necromancy bypasses both helpers (direct discard-splice + _trackCard
+    // because the negation + summoning-sickness paths need the inst before
+    // hooks fire), so without an explicit bump here the counter stays at 0
+    // and "first-summon-this-turn" gates (Aggressive Town Guard's
+    // inherent additional Action, Harpyformer's same gate, etc.) wrongly
+    // believe no Creature was summoned yet.
+    ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
+
     // Apply negation until start of controller's next turn — UNLESS the
     // summoned Creature opts out via `bypassNecromancyNegation: true`
     // (Soul Shards). Without this opt-out, the standard runHooks
@@ -282,6 +294,7 @@ module.exports = {
       engine.actionNegateCreature(inst, 'Necromancy', {
         expiresAtTurn: gs.turn + 2,
         expiresForPlayer: pi,
+        selfInflicted: true,
       });
     }
     if (vacarnBypass) {

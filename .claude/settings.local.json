@@ -125,7 +125,8 @@
       "PowerShell(Get-CimInstance *)",
       "Bash(grep -n \"^  sync\\\\b\\\\|sync\\(\\)\\\\s*{$\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\\\\_engine.js\")",
       "Bash(findstr /i \"queen summon mass-multiplication divine-gift-of-coolness divine-gift-of-skill weird-doll soul-shard\")",
-      "Bash(grep -iE \"fighting|necromancy|destruction-magic|biomancy\\\\.js$|trapping\")"
+      "Bash(grep -iE \"fighting|necromancy|destruction-magic|biomancy\\\\.js$|trapping\")",
+      "Bash(grep -n \"^[^ ].*\\\\\\(.*\\) {$\\\\| function .*\\) {$\\\\|^  [a-zA-Z_].*\\(.*\\) {$\\\\|^  async [a-zA-Z_].*\\(.*\\) {$\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\\\\_engine.js\")"
     ]
   }
 }

@@ -206,6 +206,7 @@ module.exports = {
         expiresAtTurn: gs.turn + 1,
         expiresForPlayer: oi,
         buffKey: 'soul_shard_ka_negated',
+        selfInflicted: true,
       });
 
       await engine.runHooks('onActionUsed', {

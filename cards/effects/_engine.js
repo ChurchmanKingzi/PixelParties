@@ -7455,6 +7455,14 @@ class GameEngine {
    *   'nulled' for Null Zone so the effect surfaces as the cleansable "Nulled" status
    *   instead of the default "Negated" one.
    * @param {string} [opts.removeAnim] - Animation to play when negation expires
+   * @param {boolean} [opts.selfInflicted] - True for negations the player CHOSE to
+   *   apply to a Creature they themselves are placing / transferring (Necromancy
+   *   summons getting their cost-negation, Dark Gear / Diplomacy stealing with
+   *   negation, Soul Shard Ka / Omikron / Cosmic Depths / Loyal Shepherd self-
+   *   placing with negation as the cost). Suppresses the post-expiry CC
+   *   immunity grant — that immunity exists to protect a player whose Creature
+   *   was JUST forcibly CC'd by an opponent from getting re-locked the next
+   *   turn, which doesn't apply when the negation was your own card's cost.
    */
   actionNegateCreature(inst, source, opts = {}) {
     if (!inst) return;
@@ -7486,7 +7494,16 @@ class GameEngine {
       // (and other CC effects: frozen/stunned/negated) can't be
       // re-applied immediately. Mirrors what hero `bound` /
       // `negated` natural-expiry already does via `addHeroStatus`.
-      grantsCcImmuneOnExpire: true,
+      //
+      // SUPPRESSED for self-inflicted negations (Necromancy, Dark Gear,
+      // Diplomacy, Soul Shard Ka, Omikron, Cosmic Depths, Loyal
+      // Shepherd, …). The protection rule exists to stop opponents
+      // from re-CCing a creature the moment its forced negation lifts
+      // — but when YOU chose to apply the negation as your own card's
+      // cost, granting your creature a free turn of opp-effect immunity
+      // is a side-effect bonus, not the rule's intent. The flag turns
+      // it off; otherwise the existing semantics are preserved.
+      grantsCcImmuneOnExpire: !opts.selfInflicted,
       ...(opts.removeAnim ? { removeAnim: opts.removeAnim } : {}),
     };
     this.log('creature_negated', { creature: inst.name, source, buffKey, statusKey });
@@ -8328,8 +8345,15 @@ class GameEngine {
     // socket plays can't bypass it.
     if (script?.canPlayWithHero && !script.canPlayWithHero(gs, pi, heroIdx, cardData, this)) return null;
 
-    // Generic draw/search lock: cards with blockedByHandLock cannot be played while hand is locked
-    if (script?.blockedByHandLock && ps.handLocked) return null;
+    // Generic draw/search lock: cards with blockedByHandLock cannot be
+    // played while hand is locked. Creatures are exempt — the lock
+    // disables the *draw side* of their effect (handled per-card via
+    // `canActivateCreatureEffect`, e.g. Skeleton Mage's `return
+    // !ps.handLocked`), but the player can still SUMMON the Creature
+    // to the field. A Creature on the board has body/HP/buffs/triggers
+    // beyond its draw effect, and the summon itself is the action; the
+    // activated effect is a separate, already-gated step.
+    if (script?.blockedByHandLock && ps.handLocked && cardData.cardType !== 'Creature') return null;
 
     // Hero-specific card restrictions (e.g. duplicate attack bans)
     const heroScript = loadCardEffect(hero.name);
@@ -10086,6 +10110,18 @@ class GameEngine {
       heroIdx, zoneSlot: slotIdx, negated: !!opts.negateEffects,
     });
 
+    // Discard-summon flags from caller (Raise the Minions, Skeleton
+    // Necromancer, Thep, Soul Shard Khet, etc.) propagate into the
+    // entry hooks so listeners like Skullmael's "no summoning sickness
+    // on Skeletons summoned from discard" aura can fire. Necromancy
+    // bypasses this path entirely and fires hooks directly with the
+    // same flags — keeping these names aligned means both paths drive
+    // the same listeners.
+    const discardSummonExtras = {};
+    if (opts._summonedFromDiscard) discardSummonExtras._summonedFromDiscard = true;
+    if (opts._summonedByNecromancy) discardSummonExtras._summonedByNecromancy = true;
+    if (opts._necromancyLevel != null) discardSummonExtras._necromancyLevel = opts._necromancyLevel;
+
     if (opts.fireHooks !== false && !opts.negateEffects) {
       // `actionPlaceCreature` is by definition a "place" — its caller
       // already chose to skirt the normal-summoning gates. Fire the
@@ -10101,12 +10137,14 @@ class GameEngine {
         _skipReactionCheck: true,
         _bypassDeadHeroFilter: true,
         _isPlacement: true,
+        ...discardSummonExtras,
       });
       await this.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: ZONES.SUPPORT, toHeroIdx: heroIdx,
         _skipReactionCheck: true,
         _bypassDeadHeroFilter: true,
         _isPlacement: true,
+        ...discardSummonExtras,
       });
     } else if (opts.fireHooks !== false && opts.negateEffects) {
       await this.runHooks('onCardEnterZone', {
@@ -10114,6 +10152,7 @@ class GameEngine {
         _skipReactionCheck: true,
         _bypassDeadHeroFilter: true,
         _isPlacement: true,
+        ...discardSummonExtras,
       });
     }
 

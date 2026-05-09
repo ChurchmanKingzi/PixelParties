@@ -6,12 +6,12 @@
 //  additional Action with that Hero.
 // ═══════════════════════════════════════════
 
-const { STATUS_EFFECTS, getNegativeStatuses } = require('./_hooks');
+const { STATUS_EFFECTS, getCleansableStatuses } = require('./_hooks');
 
 /** Get non-this-turn negative statuses on a hero */
 function getEligibleStatuses(hero, currentTurn) {
   if (!hero?.statuses) return [];
-  const negKeys = getNegativeStatuses();
+  const negKeys = getCleansableStatuses();
   return negKeys
     .filter(k => {
       if (!hero.statuses[k]) return false;
@@ -30,7 +30,7 @@ module.exports = {
 
   canActivate(gs, pi) {
     const ps = gs.players[pi];
-    const negKeys = getNegativeStatuses();
+    const negKeys = getCleansableStatuses();
     const currentTurn = gs.turn || 0;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];

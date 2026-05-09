@@ -1983,22 +1983,24 @@ function AcidRainOverlay() {
   );
 }
 
-// The Bonegrinder — a thick litter of bones and skulls covering the
+// The Bonegrinder — a thinned litter of bones and skulls covering the
 // battlefield while the Spell occupies an Area Zone. Rendered as a
-// single large overlay with ~120 randomly-placed bones plus ~40
+// single large overlay with ~40 randomly-placed bones plus ~14
 // skulls. Pinned via `inset: 0` so it covers the whole game-board
 // container; pointer-events disabled so it never blocks clicks on
 // cards / zones below.
 //
-// Performance notes (after the user reported a noticeable lag on
-// cast):
-//   • Static positioning ONLY — no per-element animation. 160
-//     simultaneous CSS animation timelines added a measurable
-//     compositor cost during the initial paint. Visual loss is
-//     small; the random rotations + opacities still sell "chaotic
-//     bone field."
+// Performance notes:
+//   • Counts dialed back from 120/40 → 40/14 after the user reported
+//     the dense version still dragged on perf. Slightly larger size
+//     range compensates for the lower count visually so the field
+//     still reads as a boneyard rather than a sparse scatter.
+//   • Static positioning ONLY — no per-element animation. Simultaneous
+//     CSS animation timelines added a measurable compositor cost
+//     during the initial paint; the random rotations + opacities sell
+//     "chaotic bone field" without them.
 //   • Wrapped in React.memo so the overlay tree only mounts once.
-//     Without this, every gameState sync forced a re-walk of all 160
+//     Without this, every gameState sync forced a re-walk of all the
 //     children even though their props never change.
 //   • Random scatter is pre-computed via `useMemo([])` so the same
 //     positions persist across the component's lifetime — picking
@@ -2007,19 +2009,19 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
   // Bone scatter — fully random rotations + wide size range so the
   // pile reads as chaotic. Position is independent x/y random so
   // bones land in zone gaps as well as empty corners.
-  const bones = useMemo(() => Array.from({ length: 120 }, () => ({
+  const bones = useMemo(() => Array.from({ length: 40 }, () => ({
     left: Math.random() * 100,
     top:  Math.random() * 100,
-    size: 18 + Math.random() * 30,
+    size: 22 + Math.random() * 32,
     rot:  (Math.random() * 360) | 0,
     opacity: 0.55 + Math.random() * 0.4,
   })), []);
   // Skulls are slightly bigger on average — rarer and more
   // attention-grabbing — and stay close to upright (±25°).
-  const skulls = useMemo(() => Array.from({ length: 40 }, () => ({
+  const skulls = useMemo(() => Array.from({ length: 14 }, () => ({
     left: Math.random() * 100,
     top:  Math.random() * 100,
-    size: 22 + Math.random() * 22,
+    size: 26 + Math.random() * 24,
     rot:  (Math.random() * 50 - 25) | 0,
     opacity: 0.7 + Math.random() * 0.3,
   })), []);

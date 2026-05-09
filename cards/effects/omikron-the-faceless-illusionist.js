@@ -112,6 +112,7 @@ module.exports = {
       expiresAtTurn:    gs.turn + 1,
       expiresForPlayer: pi,
       buffKey:          'omikron_negated',
+      selfInflicted:    true,
     });
 
     // Track summon count

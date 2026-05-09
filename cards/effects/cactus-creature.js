@@ -14,7 +14,7 @@
 //  Surprise Zone (re-set).
 // ═══════════════════════════════════════════
 
-const { hasCardType, STATUS_EFFECTS, getNegativeStatuses } = require('./_hooks');
+const { hasCardType, STATUS_EFFECTS, getCleansableStatuses } = require('./_hooks');
 
 module.exports = {
   isSurprise: true,
@@ -78,7 +78,7 @@ module.exports = {
 
     if (sourceInfo.telekinesis) {
       // ── Telekinesis mode: pick a status-afflicted own target, bounce statuses to another ──
-      const negStatuses = getNegativeStatuses();
+      const negStatuses = getCleansableStatuses();
       const ps = gs.players[pi];
 
       // Step 1: find all own targets with negative statuses
@@ -323,7 +323,7 @@ module.exports = {
     const gs = engine.gs;
     const ps = gs.players[ownerIdx];
     if (!ps) return false;
-    const negStatuses = getNegativeStatuses();
+    const negStatuses = getCleansableStatuses();
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;

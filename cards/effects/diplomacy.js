@@ -216,6 +216,7 @@ module.exports = {
     engine.actionNegateCreature(inst, 'Diplomacy', {
       expiresAtTurn: gs.turn + 1,
       expiresForPlayer: pi === 0 ? 1 : 0,
+      selfInflicted: true,
     });
 
     engine.log('diplomacy', {

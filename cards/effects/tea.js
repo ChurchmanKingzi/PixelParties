@@ -6,13 +6,13 @@
 //  Special poison handling: stacks transfer.
 // ═══════════════════════════════════════════
 
-const { STATUS_EFFECTS, getNegativeStatuses } = require('./_hooks');
+const { STATUS_EFFECTS, getCleansableStatuses } = require('./_hooks');
 
 function getTargetStatuses(target, engine) {
   if (target.type === 'hero') {
     const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
     if (!hero?.statuses) return [];
-    return getNegativeStatuses()
+    return getCleansableStatuses()
       .filter(k => hero.statuses[k])
       .map(k => {
         const s = { key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon };
@@ -28,7 +28,7 @@ function getTargetStatuses(target, engine) {
       c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
     );
     if (!inst) return [];
-    return getNegativeStatuses()
+    return getCleansableStatuses()
       .filter(k => inst.counters[k])
       .map(k => {
         const s = { key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon };
@@ -41,7 +41,7 @@ function getTargetStatuses(target, engine) {
 
 function getOwnStatusedTargets(gs, pi, engine) {
   if (!engine) return [];
-  const negKeys = getNegativeStatuses();
+  const negKeys = getCleansableStatuses();
 
   const heroes = engine.getHeroTargets(pi).filter(t => {
     const hero = gs.players[pi].heroes[t.heroIdx];
@@ -131,7 +131,7 @@ module.exports = {
   isTargetingArtifact: true,
 
   canActivate: (gs, pi) => {
-    const negKeys = getNegativeStatuses();
+    const negKeys = getCleansableStatuses();
     const ps = gs.players[pi];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];

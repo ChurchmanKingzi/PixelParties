@@ -1,0 +1,39 @@
+=== PIXEL PARTIES DECK ===
+Name: Structure Deck: Bamboo Warrior
+Cover: Bamboo Staff
+
+== HEROES ==
+Cute Nerd Magenta
+Xiong, the Bamboo Guardian
+Nicolas, the Hidden Alchemist
+
+== MAIN DECK ==
+2x Acid Vial
+3x Bamboo Shield
+4x Bamboo Staff
+4x Critical Strike
+1x Elixir of Immortality
+6x Fighting
+2x Fire Bomb
+3x Glass of Marbles
+2x Golden Ankh
+4x Hammer Throw
+1x Healing Potion
+4x Heavy Hit
+1x Magic Lamp
+4x Metal Harpyformer
+3x Mystery Box
+4x Performance
+4x Quick Attack
+1x Resuscitation Potion
+3x Ska Harpyformer
+2x Tears of Creation
+1x Thieving Strike
+1x Whirlwind Strike
+
+== POTION DECK ==
+2x Elixir of Quickness
+1x Magic Lamp
+2x Magnetic Potion
+
+== SIDE DECK ==
