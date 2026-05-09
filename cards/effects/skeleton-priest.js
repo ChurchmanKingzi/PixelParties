@@ -6,17 +6,21 @@
 //  Magic Spell from your discard pile to have this Creature use that
 //  Spell as an additional Action as if it had Destruction Magic 1.
 //
-//  Implementation: directly fire the chosen spell's `onPlay` hook with
-//  Priest's coordinates as the source. The spell's level requirement
-//  is auto-met (Lv1 spell ≤ Destruction Magic 1) — we don't need to
-//  patch the level-check pipeline because we're invoking onPlay
-//  outside `validateActionPlay`. The cost (delete from discard) is
-//  paid up front; reactions / chains are deliberately skipped because
-//  the spell resolves as a direct mini-effect, mirroring how other
-//  "fire a spell from a creature" archetypes work.
+//  Implementation
+//  ──────────────
+//  • The Priest IS the caster — animations originate from its
+//    Support slot (via `gs._spellCasterOverride`) and any recoil /
+//    self-damage that the spell would deal to its casting hero is
+//    redirected to the Priest's instance.
+//  • The discard-pile delete is the COST, but it is only paid once
+//    the spell actually commits (cancelling out of the spell's
+//    target prompt no longer wastes the spell). Detection uses the
+//    engine's `gs._spellCancelled` flag, which `promptDamageTarget`
+//    and `aoeHit` set on cancel.
+//  • Activation is hidden when no eligible spell exists.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Skeleton Priest';
 
@@ -55,7 +59,9 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const heroIdx = ctx.cardHeroIdx;
+    const priestInst = ctx.card;
+    if (!priestInst) return false;
+    const heroIdx = priestInst.heroIdx;
     const ps = gs.players[pi];
     if (!ps) return false;
 
@@ -66,47 +72,125 @@ module.exports = {
       type: 'cardGallery',
       cards: candidates.map(c => ({ name: c.name, source: 'discard', count: c.count })),
       title: CARD_NAME,
-      description: 'Delete a Lv1-or-lower Normal Destruction Magic Spell from your discard pile to cast it.',
+      description: 'Choose a Lv1-or-lower Normal Destruction Magic Spell from your discard pile to cast.',
       cancellable: true,
     });
     if (!picked || picked.cancelled || !picked.cardName) return false;
     const spellName = picked.cardName;
     if (!candidates.some(c => c.name === spellName)) return false;
 
-    // Verify still in discard, then delete it.
+    // Verify still in discard, but DON'T remove it yet — the cost
+    // is only paid once the cast itself commits (i.e. the player
+    // didn't back out of the spell's target prompt).
     const discardIdx = ps.discardPile.indexOf(spellName);
     if (discardIdx < 0) return false;
-    ps.discardPile.splice(discardIdx, 1);
-    if (!ps.deletedPile) ps.deletedPile = [];
-    ps.deletedPile.push(spellName);
-    engine._broadcastEvent('play_pile_transfer', {
-      owner: pi, cardName: spellName, from: 'discard', to: 'deleted',
-    });
-    engine.log('skeleton_priest_delete', { player: ps.username, spell: spellName });
 
-    // Cast the spell. Track a temporary instance in 'hand' zone so the
-    // spell's onPlay sees a typical-looking ctx; untrack after onPlay
-    // returns so the instance never lingers.
-    const inst = engine._trackCard(spellName, pi, 'hand', heroIdx, -1);
-    inst.turnPlayed = gs.turn || 0;
+    // ── Animation routing: Priest is the caster ──
+    // `_spellCasterOverride` is the same hook Wolflesia uses. The
+    // engine's `_broadcastEvent` rewrites caster-anchored animation
+    // payloads (`sourceOwner` + `sourceHeroIdx` matching the host
+    // hero, no `sourceZoneSlot` set) to inject Priest's slot, so
+    // beams / projectiles / rams originate from Priest's tile.
+    gs._spellCasterOverride = {
+      owner: priestInst.owner,
+      heroIdx: priestInst.heroIdx,
+      zoneSlot: priestInst.zoneSlot,
+    };
+
+    // Track a temporary inst for the spell so its onPlay sees a
+    // typical-shaped ctx. `heroIdx` matches Priest's host hero so
+    // hero-anchored targeting / level lookups still work.
+    const spellInst = engine._trackCard(spellName, pi, 'hand', heroIdx, -1);
+    spellInst.turnPlayed = gs.turn || 0;
+
+    // Build the spell's ctx via the engine helper, then patch the
+    // self-damage / heal helpers so any reference to "the casting
+    // hero" lands on Priest's inst instead. Phoenix Tackle's recoil
+    // is the canonical case: `ctx.dealDamage(hero, recoil, 'other')`
+    // where `hero === ps.heroes[heroIdx]`. We detect that exact
+    // identity match and redirect.
+    const spellCtx = engine._createContext(spellInst, {
+      playedCard: spellInst, cardName: spellName, zone: 'hand',
+      heroIdx,
+      _onlyCard: spellInst, _skipReactionCheck: true,
+      _viaSkeletonPriest: true,
+    });
+    const castingHero = ps.heroes?.[heroIdx] || null;
+    const origDealDamage = spellCtx.dealDamage;
+    const origDealTrueDamage = spellCtx.dealTrueDamage;
+    const origHealHero = spellCtx.healHero;
+    spellCtx.dealDamage = async (target, amount, type) => {
+      if (target && target === castingHero) {
+        return engine.actionDealCreatureDamage(
+          spellInst, priestInst, amount, type || 'other',
+          { sourceOwner: pi, canBeNegated: false },
+        );
+      }
+      return origDealDamage(target, amount, type);
+    };
+    spellCtx.dealTrueDamage = async (target, amount, type, opts) => {
+      if (target && target === castingHero) {
+        return engine.actionDealTrueDamage(
+          spellInst, priestInst, amount,
+          { ...(opts || {}), type: type || 'other' },
+        );
+      }
+      return origDealTrueDamage(target, amount, type, opts);
+    };
+    spellCtx.healHero = async (target, amount) => {
+      if (target && target === castingHero) {
+        return engine.actionHealCreature(spellInst, priestInst, amount);
+      }
+      return origHealHero(target, amount);
+    };
+
+    // Reset the cancel flag so we can detect a fresh cancellation
+    // inside this nested cast. `aoeHit` and `promptDamageTarget`
+    // both set `gs._spellCancelled = true` when their target prompt
+    // bails — the canonical signal for "the player backed out".
+    const prevCancelled = gs._spellCancelled;
+    gs._spellCancelled = false;
+
+    let castError = null;
     try {
-      await engine.runHooks('onPlay', {
-        _onlyCard: inst,
-        playedCard: inst,
-        cardName: spellName,
-        zone: 'hand',
-        heroIdx,
-        // Skip the reaction-chain window — Priest's "use that Spell"
-        // is a mini-resolution, not a full chain-eligible cast.
-        _skipReactionCheck: true,
-        // Tag for any downstream listener that wants to recognize
-        // creature-launched spells.
-        _viaSkeletonPriest: true,
-      });
+      const script = loadCardEffect(spellName);
+      if (typeof script?.hooks?.onPlay === 'function') {
+        await script.hooks.onPlay(spellCtx);
+      }
     } catch (err) {
+      castError = err;
       console.error(`[Skeleton Priest] spell '${spellName}' onPlay threw:`, err.message);
-    } finally {
-      engine._untrackCard(inst.id);
+    }
+
+    const cancelled = gs._spellCancelled === true;
+    // Restore prior flag so we don't leak this cast's signal back
+    // to whatever outer flow invoked us.
+    gs._spellCancelled = prevCancelled;
+    delete gs._spellCasterOverride;
+    engine._untrackCard(spellInst.id);
+
+    // Pay the cost only on commit. Cancellations leave the spell
+    // sitting in discard — the player can try again next turn (or
+    // pick a different spell this turn? no: HOPT applies). If the
+    // cast threw, treat as cancelled too so a buggy spell doesn't
+    // burn the source.
+    if (cancelled || castError) {
+      engine.sync();
+      return false;
+    }
+
+    // Verify still in discard at the original index — a downstream
+    // listener could have shifted the pile, so re-find rather than
+    // trusting the cached index.
+    const finalIdx = ps.discardPile.indexOf(spellName);
+    if (finalIdx >= 0) {
+      ps.discardPile.splice(finalIdx, 1);
+      if (!ps.deletedPile) ps.deletedPile = [];
+      ps.deletedPile.push(spellName);
+      engine._broadcastEvent('play_pile_transfer', {
+        owner: pi, cardName: spellName, from: 'discard', to: 'deleted',
+      });
+      engine.log('skeleton_priest_delete', { player: ps.username, spell: spellName });
     }
 
     engine.log('skeleton_priest_cast', { player: ps.username, spell: spellName });

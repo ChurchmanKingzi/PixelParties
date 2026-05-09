@@ -23,6 +23,93 @@ module.exports = {
   freeActivation: true,
   actionPhaseEligible: true, // Lv1 can also activate during Action Phase to copy action-cost abilities
 
+  /**
+   * CPU brain hook for Charme Lv1's ability picker.
+   *
+   * Bug we're fixing: the CPU would happily borrow an opponent's
+   * lower- or equal-level copy of an Ability the CPU itself already
+   * controls at >= that level. Because every Ability has a hard
+   * once-per-turn slot keyed on `(name, player)` and Charme stamps
+   * the BORROWER's slot on commit, this trade is strictly negative —
+   * the CPU spends its Charme + locks out its own (better-or-equal)
+   * copy + gains a strictly worse effect. Filter those targets out
+   * before the default brain ranks the rest. If nothing legal
+   * remains, decline the activation (Charme rolls back, HOPT is
+   * refunded by the standard cancel path in `_activateLv1`).
+   *
+   * Lv2 doesn't use a target picker, and Lv3's picker shows opp
+   * heroes (no `cardName`-keyed dedup needed) — both fall through
+   * to the default brain via the early-return on the title check.
+   */
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'target') return undefined;
+    const { validTargets, config } = payload || {};
+    if (!Array.isArray(validTargets) || validTargets.length === 0) return undefined;
+    // Only intervene for the Lv1 ability picker.
+    if (!String(config?.title || '').includes('Charme Lv1')) return undefined;
+    // Inside an outer rollout — defer (no nested brain).
+    if (engine._inMctsSim || engine._mctsKilledThisTurn) return undefined;
+    const cpuIdx = engine._cpuPlayerIdx;
+    if (cpuIdx < 0) return undefined;
+
+    // Map: ability name → highest level the CPU currently controls
+    // across all its Heroes' ability zones.
+    const cpuPs = engine.gs.players[cpuIdx];
+    const ownLevels = new Map();
+    for (let hi = 0; hi < (cpuPs.heroes || []).length; hi++) {
+      const h = cpuPs.heroes[hi];
+      if (!h?.name || h.hp <= 0) continue;
+      const zones = cpuPs.abilityZones?.[hi] || [];
+      for (const slot of zones) {
+        if (!slot?.length) continue;
+        const abName = slot[0];
+        const prev = ownLevels.get(abName) || 0;
+        if (slot.length > prev) ownLevels.set(abName, slot.length);
+      }
+    }
+
+    const viable = validTargets.filter(t => {
+      const cardName = t.cardName;
+      if (!cardName) return true;
+      // Borrow level == opp slot length. The target id encodes
+      // `ability-{owner}-{heroIdx}-{slotIdx}` — re-read the slot
+      // off the live state instead of trusting a stale level.
+      const m = (t.id || '').match(/^ability-(\d+)-(\d+)-(\d+)$/);
+      if (!m) return true;
+      const oi = +m[1], hi = +m[2], zi = +m[3];
+      const opSlot = engine.gs.players[oi]?.abilityZones?.[hi]?.[zi] || [];
+      const borrowLv = opSlot.length;
+      const ownLv = ownLevels.get(cardName) || 0;
+      // Borrow only when it strictly upgrades the CPU's access to
+      // this ability. ownLv === 0 (don't have it) → always viable.
+      // ownLv >= borrowLv → strict-loss trade, skip.
+      return ownLv < borrowLv;
+    });
+
+    if (viable.length === 0) return null; // Decline — don't waste Charme.
+    if (viable.length === validTargets.length) return undefined; // Nothing filtered — defer.
+    // Some targets filtered. Defer to the default brain on the
+    // narrowed slate. The brain reads `validTargets` from the prompt
+    // payload, so a mid-stream replacement isn't ideal — easiest
+    // reliable narrow is to commit a single best pick here. Pick
+    // the candidate with the largest `borrowLv - ownLv` swing
+    // (biggest net level upgrade); ties broken arbitrarily by
+    // first-found.
+    let best = null, bestSwing = -Infinity;
+    for (const t of viable) {
+      const m = (t.id || '').match(/^ability-(\d+)-(\d+)-(\d+)$/);
+      if (!m) continue;
+      const oi = +m[1], hi = +m[2], zi = +m[3];
+      const opSlot = engine.gs.players[oi]?.abilityZones?.[hi]?.[zi] || [];
+      const borrowLv = opSlot.length;
+      const ownLv = ownLevels.get(t.cardName) || 0;
+      const swing = borrowLv - ownLv;
+      if (swing > bestSwing) { bestSwing = swing; best = t; }
+    }
+    if (best) return [best.id];
+    return undefined;
+  },
+
   canFreeActivate(ctx, level) {
     const engine = ctx._engine;
     const gs = engine.gs;
@@ -264,23 +351,62 @@ async function _activateLv2(engine, gs, pi, heroIdx, hero, oi, ops) {
   });
 
   let cardName;
+  let stealHandIdx = -1;
   if (result?.cardName) {
     cardName = result.cardName;
-    const handIdx = result.handIndex != null ? result.handIndex : ops.hand.indexOf(cardName);
-    if (handIdx >= 0) ops.hand.splice(handIdx, 1);
-    else { const idx = ops.hand.indexOf(cardName); if (idx >= 0) ops.hand.splice(idx, 1); }
+    stealHandIdx = result.handIndex != null ? result.handIndex : ops.hand.indexOf(cardName);
+    if (stealHandIdx < 0) stealHandIdx = ops.hand.indexOf(cardName);
   } else if (ops.hand.length > 0) {
     // Fallback: take the last card
-    cardName = ops.hand.pop();
+    cardName = ops.hand[ops.hand.length - 1];
+    stealHandIdx = ops.hand.length - 1;
   }
 
-  if (cardName) {
+  if (cardName && stealHandIdx >= 0) {
+    // Broadcast the hand-rip flight FIRST so the client highlights
+    // the source slot, hides it, and animates a face-up clone from
+    // opp's hand into ours BEFORE the state sync arrives. Without
+    // this, the diff-based hand-grew detector lumps the stolen card
+    // together with any chained draws (e.g. Lilly, the Charming
+    // Infiltrator's draw-on-steal trigger) and animates ALL of them
+    // from our own deck pile — the steal visually came from the
+    // wrong place. Pre-registering with `play_hand_steal` flips
+    // `stealInProgressRef` and `stealSkipDrawRef` on the client so
+    // the auto draw-anim skips the stolen card and Lilly's draw
+    // still gets its proper deck-flight.
+    const flightMs = 800;
+    const highlightMs = 250;
+    engine._broadcastEvent('play_hand_steal', {
+      fromPlayer: oi, toPlayer: pi,
+      indices: [stealHandIdx], cardNames: [cardName], count: 1,
+      duration: flightMs, highlightMs,
+    });
+    // Wait long enough for the client's phase-3 cleanup to run
+    // (`highlightMs + flightMs + 200` = 1250 ms) so `stealSkipDrawRef`
+    // is set and `stealInProgressRef` is cleared by the time the
+    // post-mutation sync arrives. A short +120 ms here would race
+    // ahead of phase 3 and Lilly's chained draw would skip the
+    // deck-flight animation. See `actionStealFromHand` for the
+    // canonical buffer in the shared helper.
+    await engine._delay(highlightMs + flightMs + 250);
+
+    // Now apply the state mutation — clone has landed; the sync
+    // that follows just swaps the clone for the real card.
+    ops.hand.splice(stealHandIdx, 1);
     gs.players[pi].hand.push(cardName);
     const charmerSid = gs.players[pi]?.socketId;
     if (charmerSid && engine.io) {
       engine.io.to(charmerSid).emit('card_reveal', { cardName });
     }
     engine.log('charme_steal', { player: gs.players[pi].username, card: cardName, from: ops.username });
+    // Fire the universal "card taken from opponent" hook so passive
+    // listeners (Lilly, the Charming Infiltrator, future similar
+    // heroes) can react. One emit per stolen card — Charme Lv2
+    // takes exactly one, but a future N-card steal would loop and
+    // fire N times.
+    await engine.runHooks('onCardTakenFromOpponent', {
+      takerPi: pi, fromZone: 'hand', cardName,
+    });
   }
 
   engine.sync();

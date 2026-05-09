@@ -24,21 +24,24 @@
 //  them would need an engine extension. They're rare opp interactions
 //  on creatures (most buffs are own-side), so left for future work.
 //
-//  Per-turn cap: hard once-per-controller HOPT under
-//  `gs.hoptUsed['winged-skeleton:<pi>']`.
+//  Per-turn cap: SOFT once-per-turn — each Winged Skeleton instance
+//  has its own per-turn negation slot, stored on
+//  `inst.counters.wingedSkeletonNegate`. Two Winged Skeletons each
+//  get their own activation per the default Creature HOPT semantics.
 // ═══════════════════════════════════════════
 
 const { isSkeletonCreature } = require('./_skeleton-shared');
 
 const CARD_NAME = 'Winged Skeleton';
-const HOPT_PREFIX = 'winged-skeleton';
+const HOPT_KEY = 'wingedSkeletonNegate';
 
-function alreadyUsedThisTurn(gs, controller) {
-  return gs.hoptUsed?.[`${HOPT_PREFIX}:${controller}`] === gs.turn;
+function alreadyUsedThisTurn(gs, inst) {
+  return inst?.counters?.[HOPT_KEY] === gs.turn;
 }
-function stampUsed(gs, controller) {
-  if (!gs.hoptUsed) gs.hoptUsed = {};
-  gs.hoptUsed[`${HOPT_PREFIX}:${controller}`] = gs.turn;
+function stampUsed(gs, inst) {
+  if (!inst) return;
+  if (!inst.counters) inst.counters = {};
+  inst.counters[HOPT_KEY] = gs.turn;
 }
 
 /**
@@ -80,7 +83,8 @@ async function offerNegation(ctx, targetInst, sourceCardName, descriptionVerb) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const myController = ctx.cardController ?? ctx.cardOwner;
-  if (alreadyUsedThisTurn(gs, myController)) return false;
+  // Per-instance soft HOPT — this specific Winged Skeleton's slot.
+  if (alreadyUsedThisTurn(gs, ctx.card)) return false;
 
   const confirmed = await engine.promptGeneric(myController, {
     type: 'confirm',
@@ -94,7 +98,7 @@ async function offerNegation(ctx, targetInst, sourceCardName, descriptionVerb) {
   });
   if (!confirmed) return false;
 
-  stampUsed(gs, myController);
+  stampUsed(gs, ctx.card);
   bounceSkeletonToHand(engine, targetInst);
   engine.log('winged_skeleton_negate', {
     player: gs.players[myController]?.username,

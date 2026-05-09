@@ -64,13 +64,21 @@ window.getPointerXY = getPointerXY;
 
 // ═══════════════════════════════════════════
 //  SOUND EFFECT MANAGER
-//  Preloads all /sounds/*.wav once via Web Audio API, then plays overlapping
-//  copies on demand. Volume is read from window._ppGetVolume at play time so
-//  the slider takes effect immediately. MIDI files (victory/defeat) fall back
-//  to HTMLAudioElement — browsers don't natively decode MIDI, so those will
-//  only play if the browser/OS has MIDI support. Convert to .ogg/.wav for
-//  reliable playback across all browsers.
+//  Preloads all /sounds/*.wav (or *.mp3 — see SFX_EXT_OVERRIDES) once via
+//  Web Audio API, then plays overlapping copies on demand. Volume is read
+//  from window._ppGetVolume at play time so the slider takes effect
+//  immediately. `decodeAudioData` handles both wav and mp3 transparently
+//  by sniffing the byte stream — the per-name extension only affects the
+//  fetch URL.
 // ═══════════════════════════════════════════
+
+// Per-name file-extension overrides. Anything not listed here is loaded
+// from /sounds/{name}.wav. Listed names use their explicit extension —
+// the decode path doesn't care, browsers auto-detect format.
+const SFX_EXT_OVERRIDES = {
+  victory: 'mp3',
+  defeat:  'mp3',
+};
 
 const SFX_NAMES = [
   'ability_activate', 'ascension', 'attack_ram', 'buff', 'burn',
@@ -108,7 +116,8 @@ function _getSfxCtx() {
 // allowed to start" warning on page load.
 function _fetchSfxBytes(name) {
   if (_sfxBytes[name] || _sfxMissing[name]) return;
-  fetch(`/sounds/${name}.wav`)
+  const ext = SFX_EXT_OVERRIDES[name] || 'wav';
+  fetch(`/sounds/${name}.${ext}`)
     .then(r => { if (!r.ok) throw new Error('404'); return r.arrayBuffer(); })
     .then(buf => {
       _sfxBytes[name] = buf;
@@ -200,9 +209,10 @@ function playSFX(name, opts = {}) {
   if (dedupe) _sfxRecentPlays[name] = now;
   const intrinsic = SFX_VOLUME_OVERRIDES[name] != null ? SFX_VOLUME_OVERRIDES[name] : 1;
   const delaySec = opts.delay && opts.delay > 0 ? opts.delay / 1000 : 0;
-  // MIDI branch (victory / defeat). Prefer a decoded .wav buffer if one
-  // exists in /sounds/ — browsers won't decode MIDI natively, so the Audio
-  // element fallback usually fails silently.
+  // Fanfare branch (victory / defeat) — same buffer pipeline as every
+  // other SFX, but with BGM ducking and active-source tracking so the
+  // fanfare can be cut off if the player leaves the result overlay
+  // mid-playback. Source files are .mp3 (see SFX_EXT_OVERRIDES).
   if (name === 'victory' || name === 'defeat') {
     const ctx = _getSfxCtx();
     if (!ctx) return;
@@ -1846,7 +1856,7 @@ function BuffColumn({ buffs, cardName }) {
     let txt = `Blessed: This Hero can have up to ${remaining} more additional Abilities attached to it this turn!`;
     if (data?.locked) txt += ' But it cannot act this turn.';
     return txt;
-  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 100 and cannot be reduced or negated." }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." } };
+  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 100 and cannot be reduced or negated." }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' } };
   // medusa_petrified is surfaced through the Stunned status badge (as the
   // "Petrified" variant), so don't also render it as a separate buff icon —
   // that would double-represent the same effect. null_zone_negated is the
@@ -1972,8 +1982,36 @@ function CardTooltipContent({ card, children, imageUrl }) {
           {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {card.cost}</span>}
           {card.level != null && <span>Lv{card.level}</span>}
         </div>
-        {(card.startingAbility1 || card.startingAbility2) &&
-          <div style={{ fontSize: 14, color: '#ffcc44', marginTop: 6 }}>Abilities: {[card.startingAbility1, card.startingAbility2].filter(Boolean).join(', ')}</div>}
+        {/* Abilities row. When BoardCard threads the LIVE
+            `abilityZones[heroIdx]` shape via `_liveAbilities`, render
+            the current stack — combine repeats of the same name into
+            `<name> N` so a slot like ['Fighting','Fighting'] reads as
+            "Fighting 2" instead of duplicating. Performance copies
+            inherit the base ability's name (zone[0]) for display so
+            ['Fighting','Performance'] also shows as "Fighting 2".
+            Off-board previews (deck list, gallery, card-DB lookups)
+            don't supply `_liveAbilities` and fall back to the static
+            cards.json `startingAbility1/2` line.
+        */}
+        {(() => {
+          const liveZones = Array.isArray(card._liveAbilities) ? card._liveAbilities : null;
+          if (liveZones) {
+            const counts = new Map(); // base-name → stack count
+            for (const slot of liveZones) {
+              if (!Array.isArray(slot) || slot.length === 0) continue;
+              const baseName = slot[0]; // base ability for the slot
+              if (!baseName) continue;
+              counts.set(baseName, (counts.get(baseName) || 0) + slot.length);
+            }
+            if (counts.size === 0) return null;
+            const parts = [...counts.entries()].map(([name, n]) => n > 1 ? `${name} ${n}` : name);
+            return <div style={{ fontSize: 14, color: '#ffcc44', marginTop: 6 }}>Abilities: {parts.join(', ')}</div>;
+          }
+          if (card.startingAbility1 || card.startingAbility2) {
+            return <div style={{ fontSize: 14, color: '#ffcc44', marginTop: 6 }}>Abilities: {[card.startingAbility1, card.startingAbility2].filter(Boolean).join(', ')}</div>;
+          }
+          return null;
+        })()}
         {(card.spellSchool1 || card.spellSchool2) &&
           <div style={{ fontSize: 14, color: '#aa88ff', marginTop: 4 }}>Schools: {[card.spellSchool1, card.spellSchool2].filter(Boolean).join(', ')}</div>}
         {children}

@@ -30,7 +30,9 @@ module.exports = {
     const gs = engine.gs;
     const ps = gs.players[pi];
     if (!ps || (ps.potionDeck || []).length === 0) return { cancelled: true };
-    if (!engine.claimHOPT('alchemic-journal', pi)) return { cancelled: true };
+    // Pre-check HOPT without claiming — claim only after the player
+    // commits a mode so cancelling the picker doesn't burn the slot.
+    if (gs.hoptUsed?.[`alchemic-journal:${pi}`] === gs.turn) return { cancelled: true };
 
     const baseCost = 8;
     const extraGold = (ps.gold || 0) - baseCost;
@@ -55,6 +57,8 @@ module.exports = {
       if (!choice || choice.cancelled) return { cancelled: true };
       mode = choice.optionId || 'draw';
     }
+    // Commit — claim HOPT now.
+    engine.claimHOPT('alchemic-journal', pi);
 
     if (mode === 'choose') {
       // Deduct extra 5 gold

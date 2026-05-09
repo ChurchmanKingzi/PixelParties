@@ -186,7 +186,7 @@ module.exports = {
       confirmClass: 'btn-danger',
       cancellable: true,
       exclusiveTypes: true,
-      maxPerType: { hero: 1, equip: 1, ability: 1, perm: 1, area: 1, surprise: 1 },
+      maxPerType: { hero: 1, equip: 1, ability: 1, perm: 1, area: 1, surprise: 1, coolnessStackTop: 1 },
     });
 
     if (!cardPick || cardPick.length === 0) {
@@ -263,7 +263,21 @@ module.exports = {
     await engine._delay(400);
 
     // ── Destroy the selected card ──
-    await engine.actionDestroyCard(dmgSource, targetInst);
+    if (sel.type === 'coolnessStackTop') {
+      await engine.actionPopCoolnessStackTo(targetInst.owner, 'discard', { source: 'The Yeeting' });
+    } else {
+      // Area protection window — Wowhalla and any future Area card
+      // with `onAreaTargetedByOpponent` gets a chance to negate.
+      if (sel.type === 'area') {
+        const negated = await engine.tryAreaProtection(targetInst, dmgSource, pi);
+        if (negated) {
+          engine.log('yeet_negated_by_area', { card: sel.cardName });
+          engine.sync();
+          return true;
+        }
+      }
+      await engine.actionDestroyCard(dmgSource, targetInst);
+    }
 
     engine.log('the_yeeting', {
       player: ps.username, hero: hero.name,
@@ -350,6 +364,15 @@ function _collectBoardTargets(gs, engine) {
       targets.push({
         id: `equip-${inst.owner}-${inst.heroIdx}-surprise`,
         type: 'equip', owner: inst.owner, heroIdx: inst.heroIdx,
+        cardName: inst.name, _cardInstance: inst,
+      });
+    } else if (inst.zone === 'coolnessStack') {
+      // Only the TOP of each player's Coolness Stack is targetable.
+      const stack = gs.players[inst.owner]?.coolnessStack || [];
+      if (stack.length === 0 || stack[stack.length - 1] !== inst.name) continue;
+      targets.push({
+        id: `coolness-${inst.owner}`,
+        type: 'coolnessStackTop', owner: inst.owner, heroIdx: -1,
         cardName: inst.name, _cardInstance: inst,
       });
     }

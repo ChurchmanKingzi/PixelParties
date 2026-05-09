@@ -155,7 +155,14 @@ module.exports = {
       // Commit the redirect.
       if (!gs.hoptUsed) gs.hoptUsed = {};
       gs.hoptUsed[hoptKey] = gs.turn;
-      ctx.amount -= redirected;
+      // `ctx.amount` is a COPY of `hookCtx.amount` (the engine spreads
+      // hookCtx into ctx, which clones primitives by value). Writing
+      // through `ctx.modifyAmount` is the canonical path — it updates
+      // `hookCtx.amount`, which is what the engine reads after the
+      // hook returns. The previous `ctx.amount -= redirected` only
+      // mutated the local copy, so the original target still took
+      // full damage AND Johanna ate the redirected half on top.
+      ctx.modifyAmount(-redirected);
 
       // Deal the redirected half to Johanna. The recursive damage call
       // re-enters this hook, but target === johannaHero short-circuits

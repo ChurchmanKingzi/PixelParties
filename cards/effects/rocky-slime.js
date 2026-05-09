@@ -53,10 +53,12 @@ module.exports = {
 
   hooks: {
     onPlay: async (ctx) => {
-      if (!ctx.hardOncePerTurn('rocky-slime-summon')) return;
-
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
+      // Pre-check HOPT without claiming — claim only after the player
+      // commits a target so cancelling the picker doesn't burn the
+      // once-per-turn slot.
+      if (engine.gs.hoptUsed?.[`rocky-slime-summon:${pi}`] === engine.gs.turn) return;
       const ps = engine.gs.players[pi];
       if (!ps) return;
       const cardDB = engine._getCardDB();
@@ -127,6 +129,9 @@ module.exports = {
 
       const target = validTargets.find(t => t.id === picked[0]);
       if (!target) return;
+
+      // Commit — claim the HOPT now that the player picked a target.
+      ctx.hardOncePerTurn('rocky-slime-summon');
 
       if (target.type === 'hand') {
         // Validate the hand index still holds the expected card name —

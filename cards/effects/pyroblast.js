@@ -28,8 +28,10 @@ module.exports = {
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
 
-      // HOPT check
-      if (!ctx.hardOncePerTurn('pyroblast')) return;
+      // Pre-check HOPT without claiming — claim only after the
+      // player commits at least one target so cancelling the picker
+      // doesn't burn the once-per-turn slot.
+      if (engine.gs.hoptUsed?.[`pyroblast:${pi}`] === engine.gs.turn) return;
 
       // Count free support zones — this caps the number of targets
       const maxTargets = countFreeZones(gs, pi);
@@ -53,6 +55,9 @@ module.exports = {
       });
 
       if (hitTargets.length === 0) return; // Cancelled
+
+      // Commit — claim HOPT now.
+      ctx.hardOncePerTurn('pyroblast');
 
       // ── Fire animations on all targets simultaneously ──
       for (const target of hitTargets) {

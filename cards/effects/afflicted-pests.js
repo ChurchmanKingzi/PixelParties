@@ -146,6 +146,10 @@ module.exports = {
   // ── Support Zone creature effect: re-set into Surprise Zone ──
   activeIn: ['support'],
   creatureEffect: true,
+  // PACMAN reset — see afflicted-vermin.js for rationale. Force-
+  // commit because the MCTS rollout undervalues the move (no in-turn
+  // impact, value lives on future turns).
+  cpuMeta: { alwaysCommit: true },
 
   canActivateCreatureEffect(ctx) {
     return ctx._engine.canSurpriseCreatureReset(ctx);

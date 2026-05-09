@@ -121,6 +121,21 @@ module.exports = {
     // Match Magic Hammer's timing — the strike lands ~900ms in.
     await engine._delay(900);
 
+    // Area protection window — Wowhalla & any future Area protector
+    // gets a chance to negate before the destroy lands.
+    if (sel.type === 'area') {
+      const negated = await engine.tryAreaProtection(
+        sel._cardInstance,
+        { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
+        pi,
+      );
+      if (negated) {
+        engine.log('hammer_skeleton_negated_by_area', { card: sel.cardName });
+        engine.sync();
+        return true;
+      }
+    }
+
     await engine.actionDestroyCard(
       { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
       sel._cardInstance,

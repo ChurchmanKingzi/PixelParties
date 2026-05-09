@@ -171,6 +171,13 @@ module.exports = {
   // ── Support Zone creature effect: re-set into Surprise Zone ──
   activeIn: ['support'],
   creatureEffect: true,
+  // PACMAN reset: moving back face-down has no measurable in-turn
+  // impact, so the MCTS rollout always scores it as "do nothing" and
+  // refuses to commit. The actual value (re-triggering as a Surprise
+  // when the opponent next summons) is on a future turn the rollout
+  // doesn't simulate. Force-commit so the CPU actually plays the
+  // archetype as designed.
+  cpuMeta: { alwaysCommit: true },
 
   canActivateCreatureEffect(ctx) {
     return ctx._engine.canSurpriseCreatureReset(ctx);

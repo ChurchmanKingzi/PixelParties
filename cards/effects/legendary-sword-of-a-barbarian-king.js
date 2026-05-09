@@ -80,11 +80,16 @@ module.exports = {
       const pi      = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
 
-      // HOPT per sword instance
-      if (!ctx.hardOncePerTurn(`sword-summon:${ctx.card.id}`)) return;
+      // HOPT per sword instance — claimed up-front so a recursive
+      // trigger fired by the chained summon itself can't double-fire.
+      // Refunded on every cancel / no-target path below so the
+      // trigger remains available on later Attacks this turn.
+      const hoptKey = `sword-summon:${ctx.card.id}`;
+      if (!ctx.hardOncePerTurn(hoptKey)) return;
+      const refundHopt = () => { if (gs.hoptUsed) delete gs.hoptUsed[`${hoptKey}:${pi}`]; };
 
       const hero = gs.players[pi]?.heroes?.[heroIdx];
-      if (!hero?.name || hero.hp <= 0) return;
+      if (!hero?.name || hero.hp <= 0) { refundHopt(); return; }
 
       // Register type (idempotent)
       engine.registerAdditionalActionType(ADDITIONAL_TYPE, {
@@ -99,12 +104,12 @@ module.exports = {
         .filter(cn => hasCardType(cardDB[cn], 'Creature'));
 
       if (eligible.length === 0) {
-        // No summonable Creature in hand at the time the Sword triggers
-        // → the free Action is wasted, NOT banked. Without this early
-        // return the additional-action token would persist and let the
-        // player summon a Creature later (e.g. drawn next turn) under
-        // the same Attack's grant — which the Sword's text doesn't
-        // allow. Don't grant the token, don't hold the phase.
+        // No summonable Creature in hand at the time the Sword
+        // triggers → no token granted, HOPT refunded so a later
+        // Attack this turn (after a draw) can still trigger. Token
+        // stays un-granted to keep `additionalActionAvail` from
+        // leaking past the immediate hook.
+        refundHopt();
         engine.log('sword_summon_no_targets', { player: gs.players[pi].username, hero: hero.name });
         engine.sync();
         return;
@@ -136,14 +141,14 @@ module.exports = {
         // action?" bookkeeping is right, then phase advances normally.
         engine.consumeAdditionalAction(pi, ADDITIONAL_TYPE);
       } else {
-        // Cancelled — the player forgoes the free summon. Expire the
-        // token immediately so it can't leak into a later action / next
-        // turn via drag-summon. The previous "hold phase open for a
-        // drag-summon fallback" leaked the token because the engine has
-        // no turn-rollover cleanup for additionalActionAvail counters
-        // and `_preventPhaseAdvance` gets cleared on the next action,
-        // letting the unconsumed token survive indefinitely.
+        // Cancelled — expire the additional-action token so it can't
+        // leak into a later play / next turn via drag-summon (the
+        // engine has no turn-rollover cleanup for
+        // `additionalActionAvail` counters), AND refund the HOPT so
+        // the trigger can fire again on the equipped Hero's next
+        // Attack this turn.
         ctx.expireAdditionalAction();
+        refundHopt();
       }
 
       engine.log('sword_summon_grant', { player: gs.players[pi].username, hero: hero.name });

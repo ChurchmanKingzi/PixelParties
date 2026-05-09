@@ -28,6 +28,14 @@ const HOOKS = {
   ON_DRAW:          'onDraw',
   ON_CARD_ADDED_TO_HAND: 'onCardAddedToHand', // Fires when a card is added to a hand from the deck (tutor effects — Mass Multiplication, etc.). Complements ON_DRAW, which only fires for top-of-deck draws.
   ON_CARD_ADDED_FROM_DISCARD_TO_HAND: 'onCardAddedFromDiscardToHand', // Fires when a card is moved from a discard pile (either player's) into a hand. Distinct from ON_CARD_ADDED_TO_HAND so listeners (Bamboo Staff, Bamboo Shield reveal, …) can react specifically to "recovered from graveyard" without firing on deck-tutors.
+  // Fires whenever a card is taken from the OPPONENT's deck or
+  // hand and added to the taker's hand (Infiltration, Charme Lv2,
+  // future steal effects). One emit PER CARD so listeners that
+  // scale "per stolen card" (Lilly, the Charming Infiltrator) just
+  // count their hook fires. Context: { takerPi, fromZone, cardName }
+  // — fromZone is 'deck' | 'hand' so listeners can discriminate
+  // (e.g. a future card that only triggers on hand-rips).
+  ON_CARD_TAKEN_FROM_OPP: 'onCardTakenFromOpponent',
   BEFORE_PLAY:      'beforePlay',
   ON_PLAY:          'onPlay',
   ON_DISCARD:       'onDiscard',
@@ -131,6 +139,10 @@ const ZONES = {
   DELETED:  'deleted',
   HERO:     'hero',
   PERMANENT:'permanent',
+  // Coolness Stack — face-up player-owned pile created by Wowhalla.
+  // Cards on the Stack can be searched, played from the top, or moved
+  // back to hand by dedicated "Cool" effects.
+  COOLNESS_STACK: 'coolnessStack',
 };
 
 // ═══════════════════════════════════════════
@@ -237,6 +249,13 @@ const BUFF_EFFECTS = {
   // Elixir of Strength — primed +100 unstoppable damage on the Hero's
   // next single-target Attack. Persists across turns until consumed.
   empowered_strike: { label: 'Empowered Strike', icon: '💪', tooltip: "The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 100 and cannot be reduced or negated." },
+  // String of Fine — target takes 0 damage from any source for the
+  // duration of the buff. `damageMultiplier: 0` is read by the
+  // engine's standard buff-multiplier pass on hero & creature damage,
+  // so any damage that goes through `actionDealDamage` is zeroed.
+  // True damage (`actionDealTrueDamage` — Acid Vial, Rockfall, etc.)
+  // bypasses this multiplier by design, matching the card text.
+  damage_immune: { label: 'Damage Immune', icon: '💠', tooltip: 'Takes no damage from any sources.', damageMultiplier: 0 },
 };
 
 // ═══════════════════════════════════════════

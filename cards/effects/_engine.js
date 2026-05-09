@@ -1414,6 +1414,17 @@ class GameEngine {
         this._trackCard(cardName, pi, ZONES.HAND);
       }
 
+      // Coolness Stack — puzzle init may pre-populate ps.coolnessStack
+      // (and `Wowhalla` re-creates it during play, but live games go
+      // through actionPushDeckTopToCoolnessStack which tracks per-push).
+      // Without tracking the puzzle-loaded entries here,
+      // getCoolnessStackTopInst returns null and Stack-top plays
+      // (Modnir/Swellpnir/Bifab/String of Fine/Hipdall/Swagdri) silently
+      // abort because the engine can't build a context for the script.
+      for (const cardName of (ps.coolnessStack || [])) {
+        this._trackCard(cardName, pi, ZONES.COOLNESS_STACK);
+      }
+
       // Install the hand-reveal interceptor so per-index reveal state
       // (Luna Kiai's "this specific copy is revealed") auto-shifts when
       // cards get spliced out of hand. Safe to re-call; it's idempotent.
@@ -1559,6 +1570,7 @@ class GameEngine {
     const pilesToCheck = [
       { key: 'discardPile', zone: ZONES.DISCARD },
       { key: 'deletedPile', zone: ZONES.DELETED },
+      { key: 'coolnessStack', zone: ZONES.COOLNESS_STACK },
     ];
 
     for (let pi = 0; pi < 2; pi++) {
@@ -2176,6 +2188,28 @@ class GameEngine {
       /** Shuffle a player's deck. No-op in puzzle mode. */
       shuffleDeck(playerIdx, deckType) {
         return engine.shuffleDeck(playerIdx, deckType);
+      },
+
+      // ── Coolness Stack ──
+      hasCoolnessStack(playerIdx)            { return engine.hasCoolnessStack(playerIdx); },
+      getCoolnessStackTop(playerIdx)         { return engine.getCoolnessStackTop(playerIdx); },
+      getCoolnessStackTopInst(playerIdx)     { return engine.getCoolnessStackTopInst(playerIdx); },
+      getCoolnessStackSize(playerIdx)        { return engine.getCoolnessStackSize(playerIdx); },
+      coolnessStackContains(playerIdx, name) { return engine.coolnessStackContains(playerIdx, name); },
+      async pushDeckTopToCoolnessStack(playerIdx, opts) {
+        return engine.actionPushDeckTopToCoolnessStack(playerIdx, { source: cardInstance.name, ...(opts || {}) });
+      },
+      async pushHandCardToCoolnessStack(playerIdx, cardName, handIdx, opts) {
+        return engine.actionPushHandCardToCoolnessStack(playerIdx, cardName, handIdx, { source: cardInstance.name, ...(opts || {}) });
+      },
+      async searchAndPushToCoolnessStack(playerIdx, opts) {
+        return engine.actionSearchAndPushToCoolnessStack(playerIdx, { source: cardInstance.name, ...(opts || {}) });
+      },
+      async popCoolnessStackTo(playerIdx, dest, opts) {
+        return engine.actionPopCoolnessStackTo(playerIdx, dest, { source: cardInstance.name, ...(opts || {}) });
+      },
+      async deleteCoolnessStack(playerIdx, opts) {
+        return engine.actionDeleteCoolnessStack(playerIdx, { source: cardInstance.name, ...(opts || {}) });
       },
       /**
        * Safely place a card into a support zone with zone-occupied fallback.
@@ -3741,11 +3775,25 @@ class GameEngine {
     // multipliers below 1 (Cloudy, medusa_petrified, …) must not trim
     // the amount. Multipliers ≥ 1 (any future damage-amplifier buff)
     // still apply because the lock is only a floor, not a freeze.
+    const _amountBeforeBuffMul = hookCtx.amount;
     if (!hookCtx.cannotBeNegated && target?.buffs) {
       for (const [, buffData] of Object.entries(target.buffs)) {
         if (buffData.damageMultiplier != null) {
           if (hookCtx.cannotBeReduced && buffData.damageMultiplier < 1) continue;
           hookCtx.amount = Math.ceil(hookCtx.amount * buffData.damageMultiplier);
+        }
+      }
+    }
+    // If the buff-multiplier pass fully absorbed an incoming hit
+    // (Damage Immune, Petrified, …), surface a red "0" floater so the
+    // player sees the block — the diff-based damage-number detector
+    // wouldn't fire because HP didn't change.
+    if (_amountBeforeBuffMul > 0 && hookCtx.amount === 0 && target?.hp !== undefined) {
+      const _zeroOwner = this._findHeroOwner?.(target);
+      if (typeof _zeroOwner === 'number' && _zeroOwner >= 0) {
+        const _zeroHi = (this.gs.players[_zeroOwner]?.heroes || []).indexOf(target);
+        if (_zeroHi >= 0) {
+          this._broadcastEvent('play_damage_zero', { owner: _zeroOwner, heroIdx: _zeroHi, zoneSlot: -1 });
         }
       }
     }
@@ -3922,7 +3970,17 @@ class GameEngine {
     // attempted damage.
     const realDealt = Math.min(actualAmount, hpBefore);
 
-    this.log('damage', { source: source?.name, target: this._heroLabel(target), amount: actualAmount, damageType: type });
+    // Status-tick damage (Burn / Poison) already logged a dedicated
+    // styled entry (`burn_damage` / `poison_damage`) in
+    // `processBurnDamage` / `processPoisonDamage` BEFORE calling here.
+    // Skip the generic `damage` log for those sources so each tick
+    // produces ONE action-log line, not two. Keyed by source name so
+    // a future damaging status only needs to use a recognized name
+    // (or extend this set) to inherit the suppression.
+    const _isStatusTickSource = source?.name === 'Burn' || source?.name === 'Poison';
+    if (!_isStatusTickSource) {
+      this.log('damage', { source: source?.name, target: this._heroLabel(target), amount: actualAmount, damageType: type });
+    }
     await this.runHooks(HOOKS.AFTER_DAMAGE, { source, target, amount: actualAmount, realDealt, type, sourceHeroIdx: source?.heroIdx ?? -1 });
 
     // ── Elixir of Cold rider ──
@@ -8801,6 +8859,23 @@ class GameEngine {
   async startTurn() {
     this.gs.currentPhase = PHASES.START;
 
+    // ── Clear stale `_preventPhaseAdvance` flag ──
+    // The flag is one-shot: hooks like Giga Steroids, Ghuanjun's combo,
+    // Reiza's grant, Karian's split-immunity, etc. set it in their
+    // post-action handlers, and the per-action handlers in
+    // `doPlaySpell` / `doActivateAbility` consume it (check + delete)
+    // immediately after auto-advance is skipped. But if the setter's
+    // turn ends without another action firing — e.g. Giga Steroids
+    // resolved in Main Phase 2 with `_actionsPlayedThisPhase === 1`,
+    // setting the flag, then the player presses End Turn before any
+    // further action — the flag has no path to be cleared. It then
+    // carries into the opponent's turn and traps THEM in Action Phase
+    // after their first Action (since `doPlaySpell` checks the flag
+    // before clearing it). Wiping it at turn-start makes every player
+    // start with a clean slate; cards that need the flag set THIS turn
+    // re-stamp it from their own hooks on the active turn.
+    delete this.gs._preventPhaseAdvance;
+
     // ── Revert charmed heroes (Charme Lv3) ──
     for (const ps of this.gs.players) {
       if (!ps) continue;
@@ -9017,7 +9092,14 @@ class GameEngine {
   async runPhase(phase) {
     this.gs.currentPhase = phase;
     const phaseName = PHASE_NAMES[phase];
-    this.log('phase_start', { phase: phaseName });
+    // Include the active player's username so the action log can
+    // attribute each phase transition to whose turn it's part of —
+    // useful for spectators replaying a turn timeline. Existing
+    // listeners read `entry.phase`, the new field is purely additive.
+    this.log('phase_start', {
+      phase: phaseName,
+      player: this.gs.players[this.gs.activePlayer]?.username || null,
+    });
     await this.runHooks(HOOKS.ON_PHASE_START, { phase: phaseName, phaseIndex: phase });
     await this._flushSurpriseDrawChecks();
     this.sync();
@@ -9698,7 +9780,15 @@ class GameEngine {
       duration: flightMs, highlightMs,
     });
     const perCardStagger = Math.max(0, (validated.length - 1) * 100);
-    await this._delay(highlightMs + flightMs + perCardStagger + 120);
+    // The client's phase-3 cleanup (clears `stealHiddenMe/Opp`,
+    // sets `stealSkipDrawRef`, clears `stealInProgressRef`) fires
+    // at `highlightMs + (flightMs + perCardStagger + 100) + 100`.
+    // The previous +120 ms buffer was 80 ms SHORT — the state
+    // sync arrived on the client before phase 3 had run, so the
+    // diff handler saw `stealInProgressRef === true`, skipped the
+    // deck-draw branch, and any chained Lilly draw never got its
+    // animation. +250 ms gives a 50 ms margin past phase-3 fire.
+    await this._delay(highlightMs + flightMs + perCardStagger + 250);
 
     const stolen = [];
     for (const idx of [...validated].sort((a, b) => b - a)) {
@@ -9719,6 +9809,20 @@ class GameEngine {
         by: opts.sourceName || 'Hand Steal',
         stolen,
       });
+      // Fire the universal "card taken from opponent" hook ONCE PER
+      // stolen card so passive listeners (Lilly, the Charming
+      // Infiltrator's draw-on-steal, future similar heroes) react
+      // proportionally — a 2-card Loot the Leftovers steal triggers
+      // Lilly twice, a 1-card Thieving Strike triggers her once.
+      // Routing this through the shared helper means every card
+      // that uses the canonical hand-steal path (Thieving Strike,
+      // Loot the Leftovers, any future steal cards) picks the hook
+      // up automatically.
+      for (const cardName of stolen) {
+        await this.runHooks('onCardTakenFromOpponent', {
+          takerPi: pi, fromZone: 'hand', cardName,
+        });
+      }
     }
     this.sync();
     return { stolen, cancelled: false, fizzled: false };
@@ -11463,6 +11567,16 @@ class GameEngine {
 
   async _checkSurpriseOnSummon(summonerIdx, summonedCard) {
     if (this._inSurpriseResolution) return null;
+    // Face-down Surprise Creatures placed onto a support zone (Bakhm
+    // Hosts) go through `onCardEnterZone` with `toZone='support'`,
+    // which dispatches here. That's a SET, not a summon — the card
+    // hasn't been activated yet, so summon-triggered Surprises like
+    // Afflicted Vermin must NOT fire on it. Fix it here so every
+    // caller of this method (current and future) gets the same gate.
+    // The face-up summon path (server's `summon_ushabti` handler)
+    // explicitly clears `inst.faceDown = false` BEFORE calling this,
+    // so legitimate Bakhm-summon flips still trigger correctly.
+    if (summonedCard?.faceDown) return null;
     const summonInfo = { summonerIdx, cardName: summonedCard?.name, cardInstance: summonedCard, heroIdx: summonedCard?.heroIdx };
     const summonerName = this.gs.players[summonerIdx]?.username || 'A player';
     // Summon triggers can fire for EITHER player's surprises
@@ -13735,18 +13849,30 @@ class GameEngine {
         // valid path, but only if the player has enough hand cards
         // to pay the discard cost). Artifacts skip this — they
         // don't have a casting hero.
-        let reactionCasterHeroIdx = -1;
+        //
+        // Collect EVERY eligible casting hero, not just the first.
+        // When 2+ Heroes can legally cast the reaction (e.g. two
+        // healers both able to cast Cure), the player needs to
+        // pick which one — their hero passives differ (Nao
+        // overheals, Beato collects orbs, etc.). The earlier
+        // first-match-wins shortcut silently committed the
+        // leftmost hero without asking.
+        let reactionEligibleHeroIdxs = [];
         let reactionWisdomCost = 0;
         if (cardData?.cardType === 'Spell' || cardData?.cardType === 'Attack') {
           for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
             if (this._canHeroActivateSurprise(pi, heroI, cardName, { spellInHand: true })) {
-              reactionCasterHeroIdx = heroI;
-              break;
+              reactionEligibleHeroIdxs.push(heroI);
             }
           }
-          if (reactionCasterHeroIdx < 0) continue;
+          if (reactionEligibleHeroIdxs.length === 0) continue;
           if (cardData.cardType === 'Spell') {
-            reactionWisdomCost = this.getWisdomDiscardCost(pi, reactionCasterHeroIdx, cardData);
+            // Wisdom cost is hero-specific. Use the first eligible
+            // hero for the COST PROBE — the actual cost will be
+            // recomputed for the picked hero after the player
+            // chooses (see below). The probe value just gates "do
+            // you have enough hand cards to ever afford this".
+            reactionWisdomCost = this.getWisdomDiscardCost(pi, reactionEligibleHeroIdxs[0], cardData);
           }
         }
 
@@ -13755,7 +13881,7 @@ class GameEngine {
         if (!eligibleByName.has(cardName)) {
           eligibleByName.set(cardName, {
             handIdx: hi, cost, script, cardData, cardName,
-            casterHeroIdx: reactionCasterHeroIdx,
+            eligibleHeroIdxs: reactionEligibleHeroIdxs,
             wisdomCost: reactionWisdomCost,
           });
         }
@@ -13806,11 +13932,61 @@ class GameEngine {
       // ── Activate the chosen reaction ──────────────────────────────
       const info = eligibleByName.get(chosenName);
       if (!info) continue;
-      const { cost, script, cardData, casterHeroIdx, wisdomCost } = info;
+      const { cost, script, cardData } = info;
+      const eligibleHeroIdxs = info.eligibleHeroIdxs || [];
+
+      // Hero pick — when 2+ Heroes can legally cast this Spell /
+      // Attack reaction, the choice is meaningful (Nao's overheal,
+      // Beato's orb collection, Andras's draw on attack, …). Prompt
+      // before the cost is paid so cancelling the hero pick rolls
+      // back the whole reaction. Cancellable only when there's a
+      // genuine choice; the single-hero path skips the prompt.
+      let reactionCasterHeroIdx = -1;
+      if (cardData?.cardType === 'Spell' || cardData?.cardType === 'Attack') {
+        if (eligibleHeroIdxs.length === 0) continue;
+        if (eligibleHeroIdxs.length === 1) {
+          reactionCasterHeroIdx = eligibleHeroIdxs[0];
+        } else {
+          const heroTargets = eligibleHeroIdxs.map(hi => {
+            const h = ps.heroes[hi];
+            return {
+              id: `hero-${pi}-${hi}`,
+              type: 'hero',
+              owner: pi,
+              heroIdx: hi,
+              cardName: h?.name || `Hero ${hi + 1}`,
+            };
+          });
+          const heroPick = await this.promptEffectTarget(pi, heroTargets, {
+            title: chosenName,
+            description: `Pick which Hero casts ${chosenName}.`,
+            confirmLabel: '✨ Cast',
+            confirmClass: 'btn-info',
+            cancellable: true,
+            exclusiveTypes: true,
+            maxPerType: { hero: 1 },
+            greenSelect: true,
+          });
+          if (!heroPick || heroPick.length === 0) continue;
+          const sel = heroTargets.find(t => t.id === heroPick[0]);
+          if (!sel) continue;
+          reactionCasterHeroIdx = sel.heroIdx;
+        }
+      }
+
       // Re-lookup hand index (defensive — hand may have shifted between
       // eligibility scan and consumption if a hook ran in between).
       const actualHandIdx = ps.hand.indexOf(chosenName);
       if (actualHandIdx < 0) continue;
+
+      // Recompute Wisdom cost for the actually-picked hero — the
+      // probe in the eligibility scan keyed on the first eligible
+      // hero, which may have a different ability stack than the one
+      // the player chose.
+      let wisdomCost = 0;
+      if (cardData?.cardType === 'Spell' && reactionCasterHeroIdx >= 0) {
+        wisdomCost = this.getWisdomDiscardCost(pi, reactionCasterHeroIdx, cardData);
+      }
 
       if (cost > 0) ps.gold -= cost;
       ps.hand.splice(actualHandIdx, 1);
@@ -13818,11 +13994,6 @@ class GameEngine {
       this.log('reaction_activated', { card: chosenName, player: ps.username, chainPosition: chain.length });
       this._broadcastEvent('card_reveal', { cardName: chosenName });
 
-      // `casterHeroIdx` was computed during eligibility (using
-      // `_canHeroActivateSurprise` with spellInHand=true) so it has
-      // already vetted Wisdom level coverage AND hand-size
-      // affordability. Reuse it for `afterSpellResolved` below.
-      const reactionCasterHeroIdx = casterHeroIdx;
       const engine = this;
       const reactionOwner = pi;
 
@@ -13831,6 +14002,7 @@ class GameEngine {
         cardName: chosenName, owner: pi,
         cardType: cardData?.cardType || 'Unknown',
         casterHeroIdx: reactionCasterHeroIdx,
+        heroIdx: reactionCasterHeroIdx,
         goldCost: cost,
         wisdomCost: wisdomCost || 0,
         isInitialCard: false,
@@ -16564,7 +16736,23 @@ class GameEngine {
     }
     delete hero.statuses[statusName];
     this.log('status_remove', { target: hero.name, status: statusName, owner: playerIdx });
-    await this.runHooks(HOOKS.ON_STATUS_REMOVED, { target: hero, heroOwner: playerIdx, heroIdx, statusName });
+    // Canonical field name is `status`. The two other callers
+    // (`cleanseHeroStatuses`, the legacy expiry path) already use it,
+    // and Johanna's onStatusRemoved listener (and any future listener
+    // following the documented shape) reads `ctx.status`. Without the
+    // rename here, removing Johanna's frozen/stunned/negated via
+    // `actionRemoveStatus` (the status-expiry path at End Phase, all
+    // explicit removals via `ctx.removeStatus`, …) fired the hook
+    // with `statusName` only, so Johanna's filter `ctx.status === ...`
+    // was always undefined → `!['frozen','stunned','negated'].includes(undefined)`
+    // rejected every call and her ally cleanse never ran. `statusName`
+    // is kept as a duplicate alias purely so existing code that read
+    // it doesn't silently break (no callers in the tree today, but
+    // cheap insurance).
+    await this.runHooks(HOOKS.ON_STATUS_REMOVED, {
+      target: hero, heroOwner: playerIdx, heroIdx,
+      status: statusName, statusName,
+    });
   }
 
   /**
@@ -17132,6 +17320,7 @@ class GameEngine {
       // (e.g. Dichotomy of Luna and Tempeste) declared "this entry's
       // damage cannot be reduced further", so any multiplier below 1
       // is a no-op. Multipliers ≥ 1 still apply.
+      const _eAmountBeforeBuffMul = e.amount;
       if (e.canBeNegated !== false && e.inst.counters?.buffs) {
         for (const [, bd] of Object.entries(e.inst.counters.buffs)) {
           if (bd.damageMultiplier != null) {
@@ -17139,6 +17328,15 @@ class GameEngine {
             e.amount = Math.ceil(e.amount * bd.damageMultiplier);
           }
         }
+      }
+      // Fully-absorbed creature hit → red "0" floater so the player
+      // can see the block. Same rationale as the hero path above.
+      if (_eAmountBeforeBuffMul > 0 && e.amount === 0 && e.inst) {
+        this._broadcastEvent('play_damage_zero', {
+          owner: e.inst.controller ?? e.inst.owner,
+          heroIdx: e.inst.heroIdx,
+          zoneSlot: e.inst.zoneSlot,
+        });
       }
       // Niu-Enhanced consumption (Guardian Beast Niu) — same as in the
       // hero damage path, but for Attacks targeting Creatures. Reads
@@ -17370,13 +17568,31 @@ class GameEngine {
         }
         // Cards return to their ORIGINAL owner's discard pile (Tokens go to deleted pile)
         const creatureDiscardPs = this.gs.players[e.inst.originalOwner];
+        let _creatureDest = null;
         if (creatureDiscardPs) {
           const effectiveCd = this.getEffectiveCardData(e.inst);
           if (effectiveCd && hasCardType(effectiveCd, 'Token')) {
             creatureDiscardPs.deletedPile.push(e.inst.name);
+            _creatureDest = 'deleted';
           } else {
             creatureDiscardPs.discardPile.push(e.inst.name);
+            _creatureDest = 'discard';
           }
+          // Broadcast a slot-specific fly-out so the client animates
+          // from THIS specific dying inst's support slot — without it,
+          // the diff-detector's name-keyed rect lookup falls back to
+          // FIFO order and always picks the leftmost copy when
+          // multiple same-named creatures share the board.
+          this._broadcastEvent('play_pile_transfer', {
+            fromOwner: e.inst.controller ?? e.inst.owner,
+            toOwner:   e.inst.originalOwner,
+            cardName:  e.inst.name,
+            from:      'support',
+            to:        _creatureDest,
+            fromHeroIdx: e.inst.heroIdx,
+            fromSlotIdx: e.inst.zoneSlot,
+            _creatureDeath: true,
+          });
         }
         // Attached Hero (Goff/Gon-style) follows the host Creature into
         // the same original-owner's discard pile when the host dies.
@@ -17786,6 +18002,370 @@ class GameEngine {
     ps.islandZoneCount[heroIdx] = Math.max(0, islandCount - removeCount);
   }
 
+  // ─── COOLNESS STACK ──────────────────────
+  // Face-up player-owned pile created by "Wowhalla, the Hall of the Cool".
+  // While Wowhalla is on the board the Stack is non-empty (Wowhalla seeds
+  // it with the top of the deck on ETB and feeds one card every End Phase).
+  // When Wowhalla leaves the board, the entire Stack is deleted.
+  //
+  // Cards on the Stack are:
+  //   • Visible to both players (face-up).
+  //   • Targetable by The Yeeting / Coolness Overcharge via the top entry.
+  //   • Tracked as live CardInstances (zone === 'coolnessStack') so
+  //     listeners with `activeIn: ['coolnessStack']` (Hipdall, Swagdri,
+  //     Wildur, etc.) fire as expected.
+  //
+  // Every push / pop fires the standard onCardLeaveZone / onCardEnterZone
+  // hooks AND broadcasts a `coolness_stack_change` event so the client
+  // can animate the card flying between piles.
+
+  hasCoolnessStack(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    return Array.isArray(ps?.coolnessStack) && ps.coolnessStack.length > 0;
+  }
+
+  getCoolnessStackTop(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps?.coolnessStack?.length) return null;
+    return ps.coolnessStack[ps.coolnessStack.length - 1];
+  }
+
+  getCoolnessStackTopInst(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps?.coolnessStack?.length) return null;
+    const cardName = ps.coolnessStack[ps.coolnessStack.length - 1];
+    const insts = this.findCards({ owner: playerIdx, zone: ZONES.COOLNESS_STACK, name: cardName });
+    return insts[insts.length - 1] || null;
+  }
+
+  getCoolnessStackSize(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    return ps?.coolnessStack?.length || 0;
+  }
+
+  coolnessStackContains(playerIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    return Array.isArray(ps?.coolnessStack) && ps.coolnessStack.includes(cardName);
+  }
+
+  /**
+   * Push the top of a player's deck onto their Coolness Stack.
+   * Used by Wowhalla (ETB + End Phase), Wowkyrie (OPT), and Nornstellar's
+   * death-feed trigger.
+   *
+   * @param {number} playerIdx
+   * @param {object} [opts]
+   * @param {string} [opts.source] - Effect name driving the push (logged).
+   * @param {boolean} [opts.requireStack=false] - If true, no-op when no
+   *   Stack exists. Wowhalla's ETB seeds the empty Stack and skips this.
+   * @returns {string|null} Pushed card name, or null on no-op.
+   */
+  async actionPushDeckTopToCoolnessStack(playerIdx, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return null;
+    if (opts.requireStack && !this.hasCoolnessStack(playerIdx)) return null;
+    if (!ps.mainDeck?.length) return null;
+    const cardName = ps.mainDeck.shift();
+    ps.coolnessStack.push(cardName);
+    const inst = this._trackCard(cardName, playerIdx, ZONES.COOLNESS_STACK);
+    this.log('coolness_stack_push', { player: ps.username, card: cardName, from: 'deck', source: opts.source || null });
+    // Sync FIRST so the client renders the new Stack length (hidden on
+    // arrival via the listener's hidden-counter bump), THEN broadcast
+    // the animation event so the destination DOM anchor exists.
+    this.sync();
+    this._broadcastEvent('coolness_stack_change', { owner: playerIdx, mode: 'push', from: 'deck', card: cardName });
+    await this._delay(450);
+    await this.runHooks(HOOKS.ON_CARD_ENTER_ZONE, {
+      enteringCard: inst, cardName, toZone: ZONES.COOLNESS_STACK, toOwner: playerIdx, fromZone: ZONES.DECK,
+    });
+    return cardName;
+  }
+
+  /**
+   * Move a hand card to the top of the Coolness Stack.
+   * Used by Freshya (OPT), Nornstellar (on-death push).
+   * Requires a Stack to exist.
+   */
+  async actionPushHandCardToCoolnessStack(playerIdx, cardName, handIdx, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !cardName) return false;
+    if (!this.hasCoolnessStack(playerIdx)) return false;
+    let idx = handIdx;
+    if (idx == null || idx < 0 || idx >= ps.hand.length || ps.hand[idx] !== cardName) {
+      idx = ps.hand.indexOf(cardName);
+      if (idx < 0) return false;
+    }
+    // Capture the source hand index BEFORE the splice so the client's
+    // animation can launch from the actual hand-slot rect (not the
+    // hand container's center).
+    const fromHandIdx = idx;
+    ps.hand.splice(idx, 1);
+    ps.coolnessStack.push(cardName);
+    const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0];
+    if (inst) inst.zone = ZONES.COOLNESS_STACK;
+    this.log('coolness_stack_push', { player: ps.username, card: cardName, from: 'hand', source: opts.source || null });
+    this.sync();
+    this._broadcastEvent('coolness_stack_change', {
+      owner: playerIdx, mode: 'push', from: 'hand', card: cardName, fromHandIdx,
+    });
+    await this._delay(450);
+    await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, {
+      card: inst, cardName, fromZone: ZONES.HAND, fromOwner: playerIdx, toZone: ZONES.COOLNESS_STACK,
+    });
+    await this.runHooks(HOOKS.ON_CARD_ENTER_ZONE, {
+      enteringCard: inst, cardName, toZone: ZONES.COOLNESS_STACK, toOwner: playerIdx, fromZone: ZONES.HAND,
+    });
+    return true;
+  }
+
+  /**
+   * Search a player's deck and place the chosen card on top of the
+   * Coolness Stack. Reveals it to the opponent (face-up Stack).
+   * Used by Lolki (OPT), Prophecy of Coolness, Thrysh (deck branch).
+   *
+   * @param {number} playerIdx
+   * @param {object} [opts]
+   * @param {function} [opts.filter] - (cardName) => bool. Restrict the
+   *   gallery to specific cards (e.g., Thrysh's "Artifact playable from
+   *   the top of the Stack").
+   * @param {string} [opts.title]
+   * @param {string} [opts.description]
+   * @param {boolean} [opts.cancellable=true]
+   * @returns {string|null} Chosen card name, or null on cancel / no Stack.
+   */
+  async actionSearchAndPushToCoolnessStack(playerIdx, opts = {}) {
+    if (!this.hasCoolnessStack(playerIdx)) return null;
+    const ps = this.gs.players[playerIdx];
+    if (!ps?.mainDeck?.length) return null;
+    const filter = opts.filter || (() => true);
+    const candidates = ps.mainDeck.filter(filter);
+    if (candidates.length === 0) return null;
+    const seen = new Set();
+    const cards = candidates.filter(n => seen.has(n) ? false : (seen.add(n), true)).map(n => ({ name: n, source: 'deck' }));
+    const choice = await this.promptGeneric(playerIdx, {
+      type: 'cardGallery',
+      cards,
+      title: opts.title || 'Search → Coolness Stack',
+      description: opts.description || 'Choose a card to place on top of your Coolness Stack.',
+      confirmLabel: '✨ Place on Stack',
+      confirmClass: 'btn-info',
+      cancellable: opts.cancellable !== false,
+    });
+    if (!choice?.cardName) return null;
+    const deckIdx = ps.mainDeck.indexOf(choice.cardName);
+    if (deckIdx < 0) return null;
+    ps.mainDeck.splice(deckIdx, 1);
+    // Shuffle deck to preserve hidden information.
+    if (typeof this._shuffleDeck === 'function') this._shuffleDeck(playerIdx);
+    else if (Array.isArray(ps.mainDeck)) {
+      for (let i = ps.mainDeck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [ps.mainDeck[i], ps.mainDeck[j]] = [ps.mainDeck[j], ps.mainDeck[i]];
+      }
+    }
+    ps.coolnessStack.push(choice.cardName);
+    const inst = this._trackCard(choice.cardName, playerIdx, ZONES.COOLNESS_STACK);
+    this.log('coolness_stack_push', { player: ps.username, card: choice.cardName, from: 'deck_search', source: opts.source || null });
+    this.sync();
+    this._broadcastEvent('coolness_stack_change', { owner: playerIdx, mode: 'push', from: 'deck', card: choice.cardName });
+    await this._delay(450);
+    await this.runHooks(HOOKS.ON_CARD_ENTER_ZONE, {
+      enteringCard: inst, cardName: choice.cardName, toZone: ZONES.COOLNESS_STACK, toOwner: playerIdx, fromZone: ZONES.DECK,
+    });
+    return choice.cardName;
+  }
+
+  /**
+   * Pop the top of the Coolness Stack and route it to a destination.
+   *
+   * @param {number} playerIdx
+   * @param {'hand'|'discard'|'delete'|'board'} dest - 'board' returns the
+   *   inst without placing it; the caller (e.g., Glorious Rebirth, the
+   *   summon-from-Stack flow) is responsible for re-tracking it into a
+   *   support zone and firing onPlay/onCardEnterZone for that placement.
+   * @param {object} [opts]
+   * @returns {{cardName: string, inst: object}|null}
+   */
+  async actionPopCoolnessStackTo(playerIdx, dest, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps?.coolnessStack?.length) return null;
+    const cardName = ps.coolnessStack.pop();
+    // Match the rightmost (top) inst — there can be multiple stacked
+    // copies of the same name on the Stack, and the inst we're popping
+    // is the most recently pushed one.
+    const insts = this.findCards({ owner: playerIdx, zone: ZONES.COOLNESS_STACK, name: cardName });
+    const inst = insts[insts.length - 1] || null;
+
+    // 'board' dest is special: the caller (Modnir / Swellpnir / Hipdall
+    // / Swagdri / Glorious Rebirth) drives the placement, the fly
+    // animation, and the timing of when the new state is exposed. We
+    // pop the Stack array, untrack the inst, and broadcast a
+    // `coolness_stack_change` mode='pop' dest='board' event so the
+    // client can decrement the Stack hidden counter SYNCHRONOUSLY
+    // (in the same microtask as the game_state arriving with the
+    // shrunk Stack). Without that immediate decrement, the next-top
+    // card would stay masked until the attach_hero_fly's 700 ms
+    // cleanup, producing a brief flash where the card briefly
+    // disappears just after the summon animation lands.
+    if (dest === 'board') {
+      if (inst) this._untrackCard(inst.id);
+      this._broadcastEvent('coolness_stack_change', {
+        owner: playerIdx, mode: 'pop', card: cardName, dest: 'board',
+      });
+      return { cardName, inst };
+    }
+
+    let toZone = null;
+    if (dest === 'hand') {
+      ps.hand.push(cardName);
+      if (inst) inst.zone = ZONES.HAND;
+      toZone = ZONES.HAND;
+    } else if (dest === 'discard') {
+      ps.discardPile.push(cardName);
+      if (inst) inst.zone = ZONES.DISCARD;
+      toZone = ZONES.DISCARD;
+    } else if (dest === 'delete') {
+      ps.deletedPile.push(cardName);
+      if (inst) inst.zone = ZONES.DELETED;
+      toZone = ZONES.DELETED;
+    }
+
+    this.log('coolness_stack_pop', { player: ps.username, card: cardName, dest, source: opts.source || null });
+    this.sync();
+    this._broadcastEvent('coolness_stack_change', { owner: playerIdx, mode: 'pop', card: cardName, dest });
+    await this._delay(450);
+
+    await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, {
+      card: inst, cardName, fromZone: ZONES.COOLNESS_STACK, fromOwner: playerIdx, toZone,
+    });
+    if (dest === 'discard') {
+      await this.runHooks(HOOKS.ON_DISCARD, {
+        playerIdx, card: inst, cardName, discardedCardName: cardName,
+        discardedInstId: inst?.id ?? null, _fromCoolnessStack: true, source: opts.source || null,
+      });
+    } else if (dest === 'delete') {
+      await this.runHooks(HOOKS.ON_DELETE, {
+        playerIdx, card: inst, cardName, _fromCoolnessStack: true, source: opts.source || null,
+      });
+    }
+    if (toZone) {
+      await this.runHooks(HOOKS.ON_CARD_ENTER_ZONE, {
+        enteringCard: inst, cardName, toZone, toOwner: playerIdx, fromZone: ZONES.COOLNESS_STACK,
+      });
+    }
+    return { cardName, inst };
+  }
+
+  /**
+   * Generalized "Area is being targeted by an opposing effect" gate.
+   * Effects that hit Area cards (The Yeeting, Coolness Overcharge,
+   * Hammer Skeleton, …) MUST call this before destroying / popping
+   * the Area inst. Any tracked card that exports
+   * `onAreaTargetedByOpponent(ctx, info)` and is currently active gets
+   * a chance to negate the targeting by paying its own cost
+   * (Wowhalla: delete the top of its Coolness Stack).
+   *
+   * Returning `{ negated: true }` from any hook short-circuits — the
+   * helper resolves to `true` and the caller skips the destroy.
+   *
+   * @param {object} targetInst - The Area CardInstance being targeted.
+   * @param {object} source - The targeting source. `{ name, owner, heroIdx? }`
+   *   — pass the destroying card's identity here (e.g. the Yeeting's
+   *   hero, Hammer Skeleton's creature inst).
+   * @param {number} sourceOwnerIdx - Player index of the effect's controller.
+   * @returns {Promise<boolean>} true if the targeting was negated.
+   */
+  async tryAreaProtection(targetInst, source, sourceOwnerIdx) {
+    if (!targetInst) return false;
+    const info = { targetInst, source: source || null, sourceOwner: sourceOwnerIdx };
+    // Iterate over a snapshot — hooks can mutate cardInstances (e.g.
+    // by popping a Stack card during the negate cost).
+    for (const inst of [...this.cardInstances]) {
+      if (!inst || inst.zone === 'discard' || inst.zone === 'deleted') continue;
+      const script = loadCardEffect(inst.name);
+      if (typeof script?.onAreaTargetedByOpponent !== 'function') continue;
+      // Respect the script's `activeIn` restriction, just like every
+      // other listener filter in the engine.
+      if (typeof inst.isActiveIn === 'function' && !inst.isActiveIn()) continue;
+      const ctx = this._createContext(inst, { event: 'areaTargetedByOpponent' });
+      let result;
+      try { result = await script.onAreaTargetedByOpponent(ctx, info); }
+      catch (err) { console.error('[onAreaTargetedByOpponent]', inst.name, err.message); continue; }
+      if (result && result.negated) {
+        this.log('area_protection_negate', {
+          target: targetInst.name,
+          protector: inst.name,
+          source: source?.name,
+        });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Resolve the top of a player's Coolness Stack as a "play from
+   * Stack" action. The top card's script must export either
+   *   • `playableFromCoolnessStack: true` + `resolveFromCoolnessStack(ctx)`
+   *   • or `summonableFromCoolnessStack: true` (Creature — invokes
+   *     `resolveFromCoolnessStack(ctx)` if defined, otherwise falls
+   *     back to a generic summon flow).
+   *
+   * Returns the resolve result, or `{ aborted: true, reason }`.
+   */
+  async actionPlayTopOfCoolnessStack(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps?.coolnessStack?.length) return { aborted: true, reason: 'empty_stack' };
+    const cardName = ps.coolnessStack[ps.coolnessStack.length - 1];
+    const script = loadCardEffect(cardName);
+    if (!script) return { aborted: true, reason: 'no_script' };
+    const isPlayable = script.playableFromCoolnessStack === true;
+    const isSummonable = script.summonableFromCoolnessStack === true;
+    if (!isPlayable && !isSummonable) return { aborted: true, reason: 'not_playable_from_stack' };
+    if (typeof script.resolveFromCoolnessStack !== 'function') return { aborted: true, reason: 'no_resolver' };
+    const inst = this.getCoolnessStackTopInst(playerIdx);
+    if (!inst) return { aborted: true, reason: 'no_inst' };
+    const ctx = this._createContext(inst, { event: 'playFromCoolnessStack' });
+    return script.resolveFromCoolnessStack(ctx);
+  }
+
+  /**
+   * Delete every card in the Coolness Stack and route them all to the
+   * deleted pile. Used by Wowhalla on board-leave (the Stack "dies"
+   * with its anchor) and by Yolomungandr's summon trigger.
+   *
+   * Returns the count of cards deleted.
+   */
+  async actionDeleteCoolnessStack(playerIdx, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps?.coolnessStack?.length) return 0;
+    const stack = [...ps.coolnessStack];
+    ps.coolnessStack.length = 0;
+    // Snapshot insts before zone updates (multiple copies of the same
+    // name need distinct insts; pop from the end to match LIFO order).
+    const movedInsts = [];
+    for (const cardName of [...stack].reverse()) {
+      const insts = this.findCards({ owner: playerIdx, zone: ZONES.COOLNESS_STACK, name: cardName });
+      const inst = insts.find(c => !movedInsts.includes(c)) || null;
+      ps.deletedPile.push(cardName);
+      if (inst) inst.zone = ZONES.DELETED;
+      movedInsts.push({ inst, cardName });
+    }
+    this.log('coolness_stack_delete_all', { player: ps.username, count: stack.length, source: opts.source || null });
+    this.sync();
+    this._broadcastEvent('coolness_stack_change', { owner: playerIdx, mode: 'delete_all', cards: stack });
+    await this._delay(450);
+    for (const { inst, cardName } of movedInsts) {
+      await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, {
+        card: inst, cardName, fromZone: ZONES.COOLNESS_STACK, fromOwner: playerIdx, toZone: ZONES.DELETED,
+      });
+      await this.runHooks(HOOKS.ON_DELETE, {
+        playerIdx, card: inst, cardName, _fromCoolnessStack: true, source: opts.source || null,
+      });
+    }
+    return stack.length;
+  }
+
   /**
    * Check if all heroes of either player are dead.
    * If so, the other player wins.
@@ -18084,24 +18664,48 @@ class GameEngine {
     // already queued) can still reach this method. Bail silently rather
     // than crash on `this.room.spectators` access.
     if (!this.room) return;
-    // Wolflesia-style Creature spell-cast: when an active spell is being
-    // cast through a Creature (gs._spellCasterOverride is set by the
-    // server's doPlaySpell), redirect the SOURCE of caster-anchored
-    // animations (`sourceOwner` + `sourceHeroIdx` matching the host
-    // hero) onto the Creature's support slot by injecting
-    // `sourceZoneSlot`. The client's animation positioner reads
-    // `[data-support-zone][...slot=...]` when sourceZoneSlot is set,
-    // which puts the beam / projectile origin on the Creature instead
-    // of the host hero. Target animations (`owner`/`heroIdx`/`zoneSlot`)
-    // are NOT rewritten — those refer to the spell's effect target,
-    // unrelated to the caster.
+    // Wolflesia / Skeleton-Priest-style Creature spell-cast: when an
+    // active spell is being cast THROUGH a Creature
+    // (`gs._spellCasterOverride` is set by `doPlaySpell` /
+    // `skeleton-priest`), redirect caster-anchored animations from
+    // the host hero's zone onto the Creature's support slot. Two
+    // shapes need to be rewritten:
+    //
+    //   1. Source-anchored events (beams, projectiles, rams) carry
+    //      `sourceOwner` + `sourceHeroIdx`. If they match the host
+    //      hero AND no `sourceZoneSlot` is set, inject the Creature's
+    //      slot — the client's positioner picks
+    //      `[data-support-zone][...slot=...]` over the hero zone.
+    //
+    //   2. `play_zone_animation` events used for self-anchored
+    //      particles (Phoenix Tackle's recoil `flame_strike`,
+    //      Butterfly Cloud's caster fizzle, etc.) carry
+    //      `owner`/`heroIdx`/`zoneSlot=-1` (hero zone). When those
+    //      coordinates match the host hero, rewrite `zoneSlot` to
+    //      Priest's slot so the particles render on the Creature's
+    //      tile instead of the host hero's. This catches "self
+    //      target" effects too — that's intentional: the Priest IS
+    //      the caster, so caster-anchored visuals belong on it.
+    //
+    // Other target animations on the caster's coordinates (a target
+    // animation that lands on the host hero because the spell's
+    // OPPONENT picked them) are not affected here because the
+    // override is cleared the moment the cast wrapper finishes; only
+    // events broadcast from inside the spell's resolve get rewritten.
     let outData = data;
     const override = this.gs._spellCasterOverride;
-    if (override && outData
-        && outData.sourceOwner === override.owner
-        && outData.sourceHeroIdx === override.heroIdx
-        && (outData.sourceZoneSlot == null || outData.sourceZoneSlot < 0)) {
-      outData = { ...outData, sourceZoneSlot: override.zoneSlot };
+    if (override && outData) {
+      if (outData.sourceOwner === override.owner
+          && outData.sourceHeroIdx === override.heroIdx
+          && (outData.sourceZoneSlot == null || outData.sourceZoneSlot < 0)) {
+        outData = { ...outData, sourceZoneSlot: override.zoneSlot };
+      }
+      if (event === 'play_zone_animation'
+          && outData.owner === override.owner
+          && outData.heroIdx === override.heroIdx
+          && (outData.zoneSlot == null || outData.zoneSlot < 0)) {
+        outData = { ...outData, zoneSlot: override.zoneSlot };
+      }
     }
     for (let i = 0; i < 2; i++) {
       const sid = this.gs.players[i]?.socketId;

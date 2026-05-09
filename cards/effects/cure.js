@@ -72,9 +72,24 @@ function getValidTargets(gs, engine, excludeHeroKey) {
 /**
  * Core cleanse + heal logic used by both proactive and reaction paths.
  */
-async function doCure(engine, pi, target) {
+async function doCure(engine, pi, target, casterHeroIdx) {
   const negKeys = getNegativeStatuses();
   let removed = 0;
+
+  // Build the heal source. When a `casterHeroIdx` is provided
+  // (reaction-chain path threading the picked-hero idx down from the
+  // engine's reaction window, OR the proactive path passing
+  // `ctx.cardHeroIdx`), the source carries that heroIdx so passive
+  // checks like Nao's overheal — which gate on
+  // `source.heroIdx >= 0` and look up `gs.heroFlags['<owner>-<heroIdx>']`
+  // — can fire correctly. Falls back to a tracked Cure inst (rare —
+  // the spell is being resolved, the inst usually only exists for
+  // the brief window before the discard at the chain's end).
+  const heroIdxForSource = (casterHeroIdx != null && casterHeroIdx >= 0) ? casterHeroIdx : -1;
+  const sourceInst = engine.cardInstances.find(c =>
+    c.owner === pi && c.name === 'Cure'
+  );
+  const healSource = sourceInst || { name: 'Cure', owner: pi, heroIdx: heroIdxForSource };
 
   if (target.type === 'hero') {
     const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
@@ -93,11 +108,7 @@ async function doCure(engine, pi, target) {
     // Heal 100 × removed
     if (removed > 0 && hero.hp > 0) {
       const healAmount = 100 * removed;
-      // Find the source card instance for overheal checking
-      const sourceInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.name === 'Cure'
-      );
-      await engine.actionHealHero(sourceInst || { name: 'Cure', owner: pi, heroIdx: -1 }, hero, healAmount);
+      await engine.actionHealHero(healSource, hero, healAmount);
     }
   } else if (target.type === 'equip') {
     const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -119,10 +130,7 @@ async function doCure(engine, pi, target) {
     // Heal creature 100 × removed
     if (removed > 0) {
       const healAmount = 100 * removed;
-      const sourceInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.name === 'Cure'
-      );
-      await engine.actionHealCreature(sourceInst || { name: 'Cure', owner: pi, heroIdx: -1 }, inst, healAmount);
+      await engine.actionHealCreature(healSource, inst, healAmount);
     }
   }
 
@@ -202,7 +210,7 @@ module.exports = {
       // Ensure card is revealed to opponent (belt-and-suspenders with _pendingCardReveal)
       if (gs._pendingCardReveal) engine._firePendingCardReveal();
 
-      const removed = await doCure(engine, pi, target);
+      const removed = await doCure(engine, pi, target, heroIdx);
       engine.log('cure', { player: gs.players[pi]?.username, target: target.cardName, removed });
     },
   },
@@ -233,7 +241,13 @@ module.exports = {
     const target = targets.find(t => t.id === picked[0]);
     if (!target) return false;
 
-    const removed = await doCure(engine, pi, target);
+    // The reaction-window picked a casting Hero (engine threads it
+    // onto the chain link's `casterHeroIdx`). Pass it down so
+    // `actionHealHero` can credit the Hero's passives — Nao's
+    // overheal in particular gates on
+    // `source.heroIdx >= 0 && gs.heroFlags['<owner>-<heroIdx>'].overhealPassive`.
+    const casterHeroIdx = chain?.[chainIdx]?.casterHeroIdx;
+    const removed = await doCure(engine, pi, target, casterHeroIdx);
     engine.log('cure', { player: engine.gs.players[pi]?.username, target: target.cardName, removed });
     return true;
   },

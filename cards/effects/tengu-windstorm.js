@@ -176,7 +176,13 @@ function _collectBoardTargets(gs, engine) {
  */
 async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sourceName) {
   const gs = engine.gs;
-  const owner = inst.owner;
+  // ORIGINAL owner — not the current controller. A charmed/stolen
+  // card must return to the player who originally owned it (Charme
+  // Lv3 / Deepsea Succubus / similar control-flip effects mutate
+  // `inst.owner` to the new controller, but `inst.originalOwner`
+  // never changes). The death pipeline already routes returning
+  // cards back to `originalOwner`'s pile via the same convention.
+  const owner = inst.originalOwner != null ? inst.originalOwner : inst.owner;
   const ownerPs = gs.players[owner];
   if (!ownerPs) return false;
   const fromZone = inst.zone;
@@ -197,8 +203,15 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
   // here based on `fromZone`. Without these, `elementFor` returns null
   // for ability / surprise / permanent sources and the whole anim
   // bails at the `if (!srcEl || !tgtEl) return;` guard.
+  // Flight needs to differentiate visual source (where the card
+  // physically sits — the CURRENT controller's zone) from the
+  // destination (the ORIGINAL owner's deck). For non-charmed cards
+  // these are the same; for a charmed/stolen card they differ —
+  // without the split, the deck flight would try to land on the
+  // wrong side.
   const flightPayload = {
-    owner,
+    fromOwner:   inst.owner,
+    toOwner:     owner,
     cardName:    inst.name,
     from:        fromZone,
     to:          'deck',
@@ -220,8 +233,11 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
   // "creature disappeared from slot" as lethal damage by default — same
   // signal `actionMoveCard` fires for non-death support→hand bounces).
   if (fromZone === 'support') {
+    // Suppress on the CURRENT-controller side — that's where the
+    // creature physically sits (the source zone of the flight),
+    // independent of which deck it routes back to.
     engine._broadcastEvent('creature_zone_move', {
-      owner, heroIdx: fromHeroIdx, zoneSlot: fromZoneSlot,
+      owner: inst.owner, heroIdx: fromHeroIdx, zoneSlot: fromZoneSlot,
     });
   }
 
@@ -229,7 +245,11 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
     card: inst, leavingCard: inst,
     fromZone, fromHeroIdx,
     fromZoneSlot: fromZoneSlot ?? -1,
-    fromOwner: owner,
+    // `fromOwner` is the side the card LEAVES — that's where it
+    // physically sits, i.e. the current controller. Listeners that
+    // gate on "did MY zone lose a card?" key off this side.
+    fromOwner: inst.owner,
+    toOwner: owner,
     toZone: 'deck',
     _skipReactionCheck: true,
   });
@@ -422,8 +442,11 @@ module.exports = {
       }
       await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME });
 
-      // ── Step 3: top or bottom of controller's deck ──
-      const tgtOwner = targetInst.owner;
+      // ── Step 3: top or bottom of original owner's deck ──
+      // `inst.originalOwner` survives charm/steal flips; `inst.owner`
+      // gets reflowed to the current controller. The card goes back
+      // to whoever originally owned it.
+      const tgtOwner = targetInst.originalOwner != null ? targetInst.originalOwner : targetInst.owner;
       const tgtName  = targetInst.name;
       const ownerLabel = tgtOwner === pi ? 'your' : "the opponent's";
       const placement = await engine.promptGeneric(pi, {

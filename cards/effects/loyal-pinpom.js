@@ -50,7 +50,11 @@ module.exports = {
       if (!ps) return;
 
       // HOPT — name-keyed, shared across all Pinpom copies the player owns.
+      // Claimed up-front so a recursive trigger fired by the chained
+      // summon can't re-fire; refunded on every cancel path below
+      // (matches Loyal Shepherd / Orthos pattern).
       if (!engine.claimHOPT?.(HOPT_KEY, pi)) return;
+      const refundHopt = () => { if (gs.hoptUsed) delete gs.hoptUsed[`${HOPT_KEY}:${pi}`]; };
 
       // ── Eligibility pre-check ──
       // Need at least one Loyal in hand AND at least one free Support
@@ -59,7 +63,7 @@ module.exports = {
       // when there's something to do" UX from the immediate-additional
       // pattern).
       const handLoyals = getLoyalsInHand(ps, engine);
-      if (handLoyals.length === 0) return;
+      if (handLoyals.length === 0) { refundHopt(); return; }
 
       // Find any hero on this side that can host a Lv1 Loyal Summoning-
       // Magic creature. We require Summoning Magic ≥ 1 (Loyals are all
@@ -84,7 +88,7 @@ module.exports = {
         if (!engine.heroMeetsLevelReq(pi, hi, sample)) continue;
         eligibleHeroes.push({ heroIdx: hi, slot: freeSlot, name: hero.name });
       }
-      if (eligibleHeroes.length === 0) return;
+      if (eligibleHeroes.length === 0) { refundHopt(); return; }
 
       // ── Step 1: confirm the chain ──
       const confirmed = await engine.promptGeneric(pi, {
@@ -96,7 +100,7 @@ module.exports = {
         cancelLabel: 'No',
         cancellable: true,
       });
-      if (!confirmed) return;
+      if (!confirmed) { refundHopt(); return; }
 
       // ── Step 2: pick which Loyal ──
       let pickedLoyal;
@@ -113,10 +117,10 @@ module.exports = {
           description: 'Choose a Loyal Creature from your hand to summon.',
           cancellable: true,
         });
-        if (!res || res.cancelled || !res.cardName) return;
+        if (!res || res.cancelled || !res.cardName) { refundHopt(); return; }
         pickedLoyal = res.cardName;
       }
-      if (!isLoyalCreature(pickedLoyal, engine)) return;
+      if (!isLoyalCreature(pickedLoyal, engine)) { refundHopt(); return; }
 
       // ── Step 3: pick destination (hero + slot) ──
       // Re-evaluate eligible heroes against THIS specific card so
@@ -144,7 +148,7 @@ module.exports = {
           }
         }
       }
-      if (dests.length === 0) return;
+      if (dests.length === 0) { refundHopt(); return; }
 
       let destHero, destSlot;
       if (dests.length === 1) {
@@ -159,9 +163,9 @@ module.exports = {
           cancellable: true,
           maxTotal: 1,
         });
-        if (!ids || ids.length === 0) return;
+        if (!ids || ids.length === 0) { refundHopt(); return; }
         const dest = dests.find(d => d.id === ids[0]);
-        if (!dest) return;
+        if (!dest) { refundHopt(); return; }
         destHero = dest.heroIdx;
         destSlot = dest.slotIdx;
       }

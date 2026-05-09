@@ -1894,17 +1894,41 @@ body {
   stroke-dashoffset: 1000;
   animation: beamDraw 0.3s ease-out forwards;
 }
-.beam-impact {
-  animation: beamImpact 0.8s ease-out 0.2s forwards;
+/* Sustained central flash at the impact point. Runs for the full */
+/* beam duration (set via the inline `--beamDur` CSS variable) — */
+/* throbs between bright/dim so the impact never feels static. */
+.beam-flash {
+  filter: drop-shadow(0 0 18px rgba(255,30,30,.95)) drop-shadow(0 0 40px rgba(255,80,80,.65));
+  transform-origin: center;
+  transform-box: fill-box;
+  opacity: 0;
+  animation: beamFlashPulse var(--beamDur, 1500ms) ease-out 0.18s forwards;
+}
+/* Expanding shockwave rings. Three layers with staggered delays + */
+/* end radii (driven by `--beamRingMax`) so the impact reads as a */
+/* continuous shockwave for the entire laser. */
+.beam-shockwave {
+  filter: drop-shadow(0 0 8px rgba(255,80,80,.7));
   opacity: 0;
 }
+.beam-shockwave-1 { animation: beamShockwave var(--beamDur, 1500ms) ease-out 0.18s forwards; }
+.beam-shockwave-2 { animation: beamShockwave var(--beamDur, 1500ms) ease-out calc(var(--beamDur, 1500ms) * 0.28) forwards; }
+.beam-shockwave-3 { animation: beamShockwave var(--beamDur, 1500ms) ease-out calc(var(--beamDur, 1500ms) * 0.55) forwards; }
 @keyframes beamDraw {
   to { stroke-dashoffset: 0; }
 }
-@keyframes beamImpact {
-  0% { opacity: 0; r: 5; }
-  20% { opacity: 1; r: 30; }
-  100% { opacity: 0; r: 50; }
+@keyframes beamFlashPulse {
+  0%   { opacity: 0; transform: scale(0.4); }
+  10%  { opacity: 1;    transform: scale(1.2); }
+  35%  { opacity: 0.95; transform: scale(0.95); }
+  60%  { opacity: 0.9;  transform: scale(1.15); }
+  85%  { opacity: 0.7;  transform: scale(1.0);  }
+  100% { opacity: 0;    transform: scale(1.5);  }
+}
+@keyframes beamShockwave {
+  0%   { opacity: 0;   r: 0; stroke-width: inherit; }
+  6%   { opacity: 0.95; }
+  100% { opacity: 0;   r: var(--beamRingMax, 200px); }
 }
 
 /* Arrow rain animation for Rain of Arrows */
@@ -2024,8 +2048,15 @@ body {
   16% { transform: translate(var(--ramDx), var(--ramDy)) rotate(var(--ramAngle, 0deg)) scale(1.1); opacity: 1; }
   22% { transform: translate(var(--ramDx), var(--ramDy)) rotate(var(--ramAngle, 0deg)) scale(1.05); opacity: 1; }
   30% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
-  90% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
-  100% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0; }
+  /* Hold full opacity until React removes the ram entry — fading
+     from 1→0 inside the keyframe (the previous 90→100 ramp) caused
+     a visible flicker when the placeholder un-mounted: the hero
+     placeholder was still hidden (`isRamming` true), the ram card
+     was fading out in front of it, and only after `setTimeout`
+     fired did the hero re-render. Keeping opacity 1 through the
+     end means the unmount and the hero's re-render happen in the
+     same paint and the swap is invisible. */
+  100% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
 }
 
 /* Gold-steal coin — flies from victim's gold counter to thief's, arcing
@@ -2607,7 +2638,10 @@ body {
 }
 .board-permanents {
   position: absolute;
-  right: 8px;
+  /* Pull the column closer to the playfield — was 8px, but with the */
+  /* Coolness Stack now also living in this column the visual gap to  */
+  /* the rest of the board read as too wide. */
+  right: 26px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -2616,6 +2650,48 @@ body {
 }
 .board-permanents-opp { bottom: 52%; }
 .board-permanents-me { top: 52%; }
+
+/* Coolness Stack slot — sits below the last permanent in the same column. */
+/* Distinct cyan/blue glow vs. the permanents' gold to read at a glance. */
+.board-coolness-slot {
+  position: relative;
+  border: 2px solid rgba(120,210,255,.55);
+  border-radius: 6px;
+  box-shadow: 0 0 12px rgba(120,210,255,.3), inset 0 0 8px rgba(120,210,255,.15);
+  padding: 2px;
+  cursor: pointer;
+  animation: coolnessPulse 3.2s ease-in-out infinite;
+}
+@keyframes coolnessPulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(120,210,255,.3), inset 0 0 8px rgba(120,210,255,.15); }
+  50%      { box-shadow: 0 0 22px rgba(150,225,255,.5), inset 0 0 12px rgba(150,225,255,.2); }
+}
+.board-coolness-slot.potion-target-valid {
+  border-color: rgba(255,80,80,.95) !important;
+  box-shadow: 0 0 16px rgba(255,80,80,.8), inset 0 0 12px rgba(255,80,80,.3) !important;
+}
+.board-coolness-slot.potion-target-selected {
+  border-color: rgba(255,200,80,1) !important;
+  box-shadow: 0 0 18px rgba(255,200,80,.9), inset 0 0 14px rgba(255,200,80,.4) !important;
+}
+/* Top of the Stack is currently playable — a stronger gold pulse to */
+/* draw the eye away from the regular cyan idle state. */
+.board-coolness-slot.coolness-playable {
+  border-color: rgba(255,215,0,.95) !important;
+  animation: coolnessPlayablePulse .9s ease-in-out infinite !important;
+}
+.board-coolness-slot.coolness-playable::after {
+  content: '🆒';
+  position: absolute;
+  top: -10px; right: -8px;
+  font-size: 18px;
+  filter: drop-shadow(0 0 4px rgba(255,215,0,.9));
+  pointer-events: none;
+}
+@keyframes coolnessPlayablePulse {
+  0%,100% { box-shadow: 0 0 16px rgba(255,215,0,.7), inset 0 0 10px rgba(255,215,0,.3); }
+  50%     { box-shadow: 0 0 26px rgba(255,235,80,.9), inset 0 0 14px rgba(255,235,80,.4); }
+}
 .board-permanent-slot {
   position: relative;
   border: 2px solid rgba(255,215,0,.4);
@@ -4691,6 +4767,17 @@ body {
   50%  { opacity: 1;    transform: scale(1.00); }
   72%  { opacity: 1;    transform: scale(1.10); filter: drop-shadow(0 0 55px rgba(255,60,80,1)); }
   100% { opacity: 0;    transform: scale(1.45); filter: drop-shadow(0 0 70px rgba(255,80,100,0.5)); }
+}
+
+/* Yolomungandr boss-summon manifest — same fade-grow-pulse-fade arc as
+   DDG but tinted with the Cool archetype's cyan + brass-gold palette
+   so it reads as the Coolness Stack's apex finisher. */
+@keyframes yolomungandrManifest {
+  0%   { opacity: 0;    transform: scale(0.35); filter: drop-shadow(0 0 40px rgba(120,210,255,0.85)); }
+  20%  { opacity: 0.45; transform: scale(0.65); filter: drop-shadow(0 0 50px rgba(150,225,255,0.95)); }
+  50%  { opacity: 1;    transform: scale(1.00); filter: drop-shadow(0 0 60px rgba(180,235,255,1)) drop-shadow(0 0 24px rgba(255,215,140,0.55)); }
+  72%  { opacity: 1;    transform: scale(1.10); filter: drop-shadow(0 0 70px rgba(180,235,255,1)) drop-shadow(0 0 32px rgba(255,215,140,0.7)); }
+  100% { opacity: 0;    transform: scale(1.45); filter: drop-shadow(0 0 80px rgba(180,235,255,0.5)) drop-shadow(0 0 40px rgba(255,215,140,0.3)); }
 }
 
 /* HP display on board cards */

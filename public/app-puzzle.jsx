@@ -16,6 +16,11 @@ const emptyPlayer = () => ({
   hand: [], gold: 0, permanents: [], islandZoneCount: [0, 0, 0],
   mainDeck: [], potionDeck: [], sideDeck: [],
   discardPile: [], deletedPile: [],
+  // Coolness Stack — only writable while "Wowhalla, the Hall of the
+  // Cool" is in this player's Area zone. The puzzle UI shows / hides
+  // the editor accordingly; the array is dropped to [] when Wowhalla
+  // leaves the Area in the editor.
+  coolnessStack: [],
 });
 
 // Dream-Landers attach pairs. Each Creature listed here can hold the
@@ -180,7 +185,11 @@ function PuzzleCreator() {
   const normalizePlayer = (raw) => {
     const base = emptyPlayer();
     if (!raw) return base;
-    return { ...base, ...raw, sideDeck: Array.isArray(raw.sideDeck) ? raw.sideDeck : [] };
+    return {
+      ...base, ...raw,
+      sideDeck: Array.isArray(raw.sideDeck) ? raw.sideDeck : [],
+      coolnessStack: Array.isArray(raw.coolnessStack) ? raw.coolnessStack : [],
+    };
   };
   const [players, setPlayers] = useState(
     (saved?.players || []).length === 2
@@ -592,7 +601,27 @@ function PuzzleCreator() {
     invalidate();
   }, [invalidate]);
   const updateArea = useCallback((idx, fn) => {
-    setAreaZones(prev => { const next = [...prev]; next[idx] = fn([...prev[idx]]); return next; });
+    setAreaZones(prev => {
+      const next = [...prev];
+      const before = [...prev[idx]];
+      const after = fn([...prev[idx]]);
+      next[idx] = after;
+      // If "Wowhalla, the Hall of the Cool" was just removed from this
+      // player's Area, drop their Coolness Stack — the Stack only
+      // exists while Wowhalla is in play.
+      const hadWowhalla = before.includes('Wowhalla, the Hall of the Cool');
+      const hasWowhalla = after.includes('Wowhalla, the Hall of the Cool');
+      if (hadWowhalla && !hasWowhalla) {
+        setPlayers(ps => {
+          const cp = [...ps];
+          if (cp[idx]?.coolnessStack?.length > 0) {
+            cp[idx] = { ...cp[idx], coolnessStack: [] };
+          }
+          return cp;
+        });
+      }
+      return next;
+    });
     invalidate();
   }, [invalidate]);
 
@@ -1398,6 +1427,10 @@ function PuzzleCreator() {
       tooltip: 'Submerged: unaffected by all cards and effects while other possible targets exist on this side.' },
     { key: 'negative_status_immune', label: '😎 Status Immune', color: '#44ff88',
       tooltip: 'Negative Status Immune: cannot have any negative status effect applied.' },
+    // String of Fine — 0-damage shield until controller's next turn.
+    // True damage (Acid Vial, Rockfall, etc.) bypasses this by design.
+    { key: 'damage_immune', label: '💠 Damage Immune', color: '#88ddff',
+      tooltip: 'Damage Immune: takes no damage from any sources. (Bypassed by unblockable damage like Acid Vial.)' },
     // Taunt: the opponent must target this Hero/Creature with Attacks,
     // Spells, and Creature effects if possible. Multiple Taunters on a
     // side = opponent picks any. Applies to Heroes AND Creatures.
@@ -1440,6 +1473,14 @@ function PuzzleCreator() {
       draggable: !!hasCard && !isTouchDevice,
       onDragStart: (e) => {
         if (hasCard && zoneCardName) {
+          // Override the natural HTML5 drag image with a clean card
+          // ghost — without this, dragging an Area / hero / support
+          // tile picks up a snapshot of the entire battlefield region
+          // around the source element (the zone has no cropping bounds
+          // for the browser's auto-ghost). The hand-side already routes
+          // through `setDragGhost`; mirror it here so every drag source
+          // gets the same 60×84 clean ghost.
+          setDragGhost(e, zoneCardName);
           // Capture entity metadata for board-to-board moves
           if (zt === 'hero' && p.heroes[hi]) {
             dragEntityData.current = { type: 'hero', data: JSON.parse(JSON.stringify(p.heroes[hi])) };
@@ -1558,9 +1599,31 @@ function PuzzleCreator() {
                 })() : <div className="board-zone-empty">Surp</div>}
               </div>
               {maxRight > 0 && Array.from({ length: maxRight }).map((_, s) => <div key={'rp'+s} className="board-zone-spacer" />)}
-              {/* Permanents — inside last hero group, positioned after it so they track island width changes */}
+              {/* Coolness Stack — its OWN column, positioned to the right */}
+              {/* of the rightmost Surprise Zone but to the left of the */}
+              {/* Permanents column. Visible whenever Wowhalla is in this */}
+              {/* player's Area (even if the stack is empty, so the user */}
+              {/* can drag the first card onto it). Extracted from the */}
+              {/* Permanents column so it doesn't push the permanents down. */}
+              {hi === 2 && (areaZones[si] || []).includes('Wowhalla, the Hall of the Cool') && (
+                <div style={{ position: 'absolute', left: '100%', top: 0, marginLeft: 'calc(8px * var(--board-scale))' }}>
+                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(120,210,255,.6)', background: 'rgba(120,210,255,.08)', cursor: (p.coolnessStack || []).length > 0 ? 'pointer' : undefined, position: 'relative', ...(dragOverZone === 'coolness-' + si ? { boxShadow: '0 0 14px rgba(120,210,255,.7)' } : {}) }}
+                    onClick={() => (p.coolnessStack || []).length > 0 && setViewPile({ si, key: 'coolnessStack' })}
+                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('coolness-' + si); }}
+                    onDragLeave={() => setDragOverZone(null)}
+                    onDrop={(e) => handlePileDrop(e, si, 'coolnessStack')}>
+                    {(p.coolnessStack || []).length > 0 ? <>
+                      <BoardCard cardName={p.coolnessStack[p.coolnessStack.length - 1]} />
+                      <div className="board-card-label">{p.coolnessStack.length}</div>
+                    </> : <div className="board-zone-empty" style={{ color: 'rgba(120,210,255,.8)', fontSize: 'calc(8px * var(--board-scale))' }}>Coolness</div>}
+                  </div>
+                </div>
+              )}
+              {/* Permanents — inside last hero group, positioned to the */}
+              {/* right of the Coolness Stack column (or the surprise zone */}
+              {/* if no Stack is present). */}
               {hi === 2 && (
-                <div style={{ position: 'absolute', left: '100%', top: 0, marginLeft: 'calc(8px * var(--board-scale))', display: 'flex', flexDirection: 'column', gap: 'calc(3px * var(--board-scale))' }}>
+                <div style={{ position: 'absolute', left: '100%', top: 0, marginLeft: ((areaZones[si] || []).includes('Wowhalla, the Hall of the Cool') ? 'calc((50px + 16px) * var(--board-scale))' : 'calc(8px * var(--board-scale))'), display: 'flex', flexDirection: 'column', gap: 'calc(3px * var(--board-scale))' }}>
                   {p.permanents.map((pm, i) => (
                     <div key={pm.id} title={pm.name} onContextMenu={(e) => { e.preventDefault(); removeCard(si, 'permanent', 0, i); }}>
                       <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(255,215,0,.5)', background: 'rgba(255,215,0,.08)', cursor: 'pointer' }}>
@@ -2078,7 +2141,7 @@ function PuzzleCreator() {
       {/* ── Pile Viewer Modal ── */}
       {viewPile && (() => {
         const pile = players[viewPile.si][viewPile.key] || [];
-        const labels = { discardPile: 'Discard Pile', deletedPile: 'Deleted Pile', mainDeck: 'Deck', potionDeck: 'Potion Deck', sideDeck: 'Side Deck' };
+        const labels = { discardPile: 'Discard Pile', deletedPile: 'Deleted Pile', mainDeck: 'Deck', potionDeck: 'Potion Deck', sideDeck: 'Side Deck', coolnessStack: 'Coolness Stack' };
         const sideLabel = viewPile.si === 0 ? 'You' : 'Opponent';
         if (pile.length === 0) { setViewPile(null); return null; }
         return (

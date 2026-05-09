@@ -1792,8 +1792,9 @@ function PlayScreen() {
 const _bgmMenu = typeof Audio !== 'undefined' ? new Audio('/music/bgm_menu.mp3') : null;
 const _bgmBattle = typeof Audio !== 'undefined' ? new Audio('/music/bgm_battle.mp3') : null;
 const _bgmPuzzle = typeof Audio !== 'undefined' ? new Audio('/music/bgm_puzzle.mp3') : null;
-const _bgmTracks = { menu: _bgmMenu, battle: _bgmBattle, puzzle: _bgmPuzzle };
-for (const t of [_bgmMenu, _bgmBattle, _bgmPuzzle]) {
+const _bgmShop = typeof Audio !== 'undefined' ? new Audio('/music/bgm_shop.mp3') : null;
+const _bgmTracks = { menu: _bgmMenu, battle: _bgmBattle, puzzle: _bgmPuzzle, shop: _bgmShop };
+for (const t of [_bgmMenu, _bgmBattle, _bgmPuzzle, _bgmShop]) {
   if (t) { t.loop = true; t.volume = 0.4; t.preload = 'auto'; }
 }
 
@@ -1809,31 +1810,69 @@ window._ppSetMusicVolume = (vol) => {
 };
 
 // Temporary ducking for big one-shots (victory / defeat fanfares). Called
-// from the sound manager. phase === 'start' fades the current BGM down to 0
-// over ~400ms; phase === 'end' ramps it back to the slider's target over
-// ~640ms. Multiple start/end pairs cancel each other cleanly.
+// from the sound manager. The fanfare must play uninterrupted, so this
+// FULLY pauses the current BGM (after a brief fade-out) instead of just
+// dropping its volume — the previous fade-only approach left the track
+// running silently, which a subsequent `switchTrack` (e.g. the result
+// overlay closing while the fanfare is still playing) would have
+// crossfaded back in over the fanfare. While ducked, `switchTrack`
+// records the requested target and applies it only after the fanfare
+// ends. Multiple start/end pairs collapse cleanly via `_bgmDuckTrack`
+// and the interval guard.
 let _bgmDuckIntv = null;
+let _bgmDuckTrack = null; // The Audio element paused for the duration of a fanfare
+window._isBgmDucked = () => _bgmDuckTrack != null;
 window._ppDuckBgm = (phase) => {
   if (_bgmDuckIntv) { clearInterval(_bgmDuckIntv); _bgmDuckIntv = null; }
-  const cur = Object.values(_bgmTracks).find(t => t && !t.paused) || null;
-  if (!cur) return;
-  const targetVol = window._ppGetVolume ? window._ppGetVolume() : 0.4;
+
   if (phase === 'start') {
+    // Already ducked (e.g. an overlapping second fanfare) → keep the
+    // existing pause; nothing to do. The first fanfare's `clear` will
+    // call us with 'end' once it finishes; if the overlap actually
+    // outlives that, the next track switch will pick the right BGM.
+    if (_bgmDuckTrack) return;
+    const cur = Object.values(_bgmTracks).find(t => t && !t.paused) || null;
+    if (!cur) return;
+    _bgmDuckTrack = cur;
+
+    // Fast fade-out (~240 ms) so the BGM gets out of the way quickly,
+    // then a hard pause so absolutely no sound from the BGM bleeds
+    // into the fanfare.
     const origVol = cur.volume;
     let step = 0;
-    const total = 10; // 10 × 40ms = 400ms fade-out
+    const total = 8;
     _bgmDuckIntv = setInterval(() => {
       step++;
       cur.volume = Math.max(0, origVol * (1 - step / total));
-      if (step >= total) { clearInterval(_bgmDuckIntv); _bgmDuckIntv = null; }
-    }, 40);
+      if (step >= total) {
+        clearInterval(_bgmDuckIntv);
+        _bgmDuckIntv = null;
+        cur.pause(); // currentTime is preserved — resume picks up cleanly.
+      }
+    }, 30);
   } else {
-    const startVol = cur.volume;
+    const cur = _bgmDuckTrack;
+    _bgmDuckTrack = null;
+    if (!cur) return;
+
+    // Honour any track switch requested DURING the duck — see
+    // switchTrack's pending-target buffer. If a different track is
+    // pending, hand off to the music manager hook instead of resuming
+    // the paused one. Otherwise resume the paused track in place.
+    const targetVol = window._ppGetVolume ? window._ppGetVolume() : 0.4;
+    const pending = window._ppPendingBgmTarget;
+    if (pending && window._ppApplyPendingBgm) {
+      window._ppPendingBgmTarget = null;
+      window._ppApplyPendingBgm(pending);
+      return;
+    }
+    cur.volume = 0;
+    cur.play().catch(() => {});
     let step = 0;
-    const total = 16; // 16 × 40ms = 640ms fade-in
+    const total = 16;
     _bgmDuckIntv = setInterval(() => {
       step++;
-      cur.volume = Math.min(targetVol, startVol + (targetVol - startVol) * (step / total));
+      cur.volume = Math.min(targetVol, targetVol * (step / total));
       if (step >= total) { clearInterval(_bgmDuckIntv); _bgmDuckIntv = null; }
     }, 40);
   }
@@ -1851,6 +1890,17 @@ function MusicManager({ bgmMode }) {
     if (currentTrack.current === target) return;
     const fadeIn = _bgmTracks[target];
     if (!fadeIn) return;
+    // While a fanfare is ducking the BGM (victory / defeat), don't
+    // start ANY background music — the fanfare must play uninterrupted
+    // by definition. Buffer the requested target on a global slot;
+    // `_ppDuckBgm('end')` reads it after the fanfare finishes and
+    // hands back control to apply the deferred switch (see
+    // `_ppApplyPendingBgm` registered below).
+    if (window._isBgmDucked && window._isBgmDucked()) {
+      window._ppPendingBgmTarget = target;
+      currentTrack.current = target; // record intent so a later same-target call still no-ops cleanly
+      return;
+    }
     // Fade out whichever track is currently playing.
     const fadeOut = Object.entries(_bgmTracks).find(([k, t]) => k !== target && t && !t.paused)?.[1] || null;
 
@@ -1937,6 +1987,26 @@ function MusicManager({ bgmMode }) {
     switchTrack(bgmMode || 'menu');
   }, [bgmMode, switchTrack]);
 
+  // Bridge for `_ppDuckBgm('end')` to apply a track switch that was
+  // deferred while the fanfare was playing. Has to be registered
+  // here — `switchTrack` is a hook callback and isn't reachable from
+  // the module-level duck function otherwise. Reset on unmount so a
+  // stale closure can't fire after the manager is gone.
+  useEffect(() => {
+    window._ppApplyPendingBgm = (target) => {
+      // Force the track to actually swap by clearing the
+      // currentTrack ref — switchTrack early-returns when the
+      // requested target equals the recorded current, and the
+      // deferred-switch path stamped that ref before the duck
+      // started.
+      currentTrack.current = null;
+      switchTrack(target || 'menu');
+    };
+    return () => {
+      if (window._ppApplyPendingBgm) window._ppApplyPendingBgm = null;
+    };
+  }, [switchTrack]);
+
   return null; // No visual output
 }
 
@@ -1945,8 +2015,9 @@ function App() {
   const [screen, setScreen] = useState('menu');
   const [loading, setLoading] = useState(true);
   const [notif, setNotif] = useState(null);
-  // bgmMode: 'menu' | 'battle' | 'puzzle'. setInBattle is kept as a
-  // compatibility wrapper so existing callers continue to work.
+  // bgmMode: 'menu' | 'battle' | 'puzzle' | 'shop'. setInBattle is
+  // kept as a compatibility wrapper so existing callers continue to
+  // work.
   const [bgmMode, setBgmMode] = useState('menu');
   const inBattle = bgmMode !== 'menu';
   const setInBattle = useCallback((v) => setBgmMode(v ? 'battle' : 'menu'), []);

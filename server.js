@@ -11,6 +11,40 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { GameEngine } = require('./cards/effects/_engine');
 const { loadCardEffect } = require('./cards/effects/_loader');
+const { BUFF_EFFECTS } = require('./cards/effects/_hooks');
+
+/**
+ * Enrich a puzzle-authored buffs object so each entry carries the
+ * auto-applied fields the engine reads (e.g. `damageMultiplier`).
+ * The puzzle creator stores buffs as bare flags / opt blobs; the
+ * runtime `actionAddBuff` / `actionAddCreatureBuff` paths normally
+ * pull `BUFF_EFFECTS[buffName].damageMultiplier` onto the buff at
+ * apply-time. Without this enrichment, puzzle-loaded `damage_immune`
+ * (and any future multiplier-based buff) carries no multiplier and
+ * the engine's beforeDamage / processCreatureDamageBatch passes see
+ * `damageMultiplier == null` and skip the multiplier — i.e. damage
+ * lands at full strength.
+ */
+function enrichPuzzleBuffs(buffs) {
+  if (!buffs || typeof buffs !== 'object') return buffs;
+  for (const key of Object.keys(buffs)) {
+    // The puzzle creator stores active buffs as bare booleans
+    // (`{ damage_immune: true }`) — coerce to a proper opt object so
+    // `damageMultiplier` etc. can be attached. A primitive value
+    // can't carry properties, so without this step the enrichment
+    // below silently no-ops.
+    let cur = buffs[key];
+    if (cur === null || cur === undefined || typeof cur !== 'object') cur = {};
+    const def = BUFF_EFFECTS[key];
+    if (def) {
+      if (def.damageMultiplier != null && cur.damageMultiplier == null) {
+        cur.damageMultiplier = def.damageMultiplier;
+      }
+    }
+    buffs[key] = cur;
+  }
+  return buffs;
+}
 
 // ===== CONFIG =====
 const PORT = process.env.PORT || 3000;
@@ -280,6 +314,29 @@ function getRandomDefaultAvatar() {
     return '/avatars/' + encodeURIComponent(files[Math.floor(Math.random() * files.length)]);
   } catch { return null; }
 }
+
+/** Pick a random vivid hex color for a brand-new player. The schema's
+ *  static `'#00f0ff'` default made every fresh account share the same
+ *  cyan in lobby lists / chat / hero accents — this hand-tuned palette
+ *  spreads new signups across distinguishable hues that all read
+ *  cleanly on the dark UI. The user can still recolour from Profile. */
+const DEFAULT_PLAYER_COLORS = [
+  '#00f0ff', // cyan (legacy default — keep in the pool)
+  '#ff5060', // crimson
+  '#ffaa33', // amber
+  '#ffd84d', // gold
+  '#88ee44', // lime
+  '#33dd99', // jade
+  '#44aaff', // sky blue
+  '#7766ff', // indigo
+  '#bb66ff', // violet
+  '#ff66cc', // pink
+  '#ff7733', // orange
+  '#66ddcc', // teal
+];
+function getRandomDefaultColor() {
+  return DEFAULT_PLAYER_COLORS[Math.floor(Math.random() * DEFAULT_PLAYER_COLORS.length)];
+}
 // Simple token-based auth using cookies
 const sessions = new Map(); // token -> { userId, username }
 
@@ -306,7 +363,14 @@ app.post('/api/auth/signup', async (req, res) => {
   const id = uuidv4();
   const hash = bcrypt.hashSync(password, 10);
   const defaultAvatar = getRandomDefaultAvatar();
-  await db.run('INSERT INTO users (id, username, password_hash, avatar) VALUES (?, ?, ?, ?)', [id, username.trim(), hash, defaultAvatar]);
+  // Random player colour at signup so fresh accounts don't all share
+  // the schema's cyan default. Avatar + colour are both rolled up
+  // front; the user changes either from Profile whenever they like.
+  const defaultColor = getRandomDefaultColor();
+  await db.run(
+    'INSERT INTO users (id, username, password_hash, avatar, color) VALUES (?, ?, ?, ?, ?)',
+    [id, username.trim(), hash, defaultAvatar, defaultColor],
+  );
 
   // Create default deck
   await db.run('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)', [uuidv4(), id, 'My First Deck']);
@@ -1778,7 +1842,13 @@ function sendGameState(room, playerIdx, extra) {
       potionDeckCards: pi === playerIdx ? ps.potionDeck : [], potionDeckCount: ps.potionDeck.length,
       discardPile: ps.discardPile, deletedPile: ps.deletedPile,
       disconnected: ps.disconnected || false, left: ps.left || false,
-      gold: ps.gold || 0,
+      // Gold display can be temporarily frozen for cost-bypass flows
+      // (Swagdri's free-play of an X-cost Artifact bumps gold by a
+      // headroom buffer so the artifact's internal cost check passes,
+      // then restores). `_goldFreeze` exposes the original value to
+      // the client during that window so the diff-detector doesn't
+      // flash spurious +9999 / -9999 floaters.
+      gold: ps._goldFreeze != null ? ps._goldFreeze : (ps.gold || 0),
       abilityGivenThisTurn: ps.abilityGivenThisTurn || [false,false,false],
       summonLocked: ps.summonLocked || false,
       damageLocked: ps.damageLocked || false,
@@ -1865,6 +1935,18 @@ function sendGameState(room, playerIdx, extra) {
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       heroesActedThisTurn: ps.heroesActedThisTurn || [],
       permanents: ps.permanents || [],
+      coolnessStack: ps.coolnessStack || [],
+      // Whether the top of THIS player's Stack is playable from the
+      // Stack right now. Clients use this flag to highlight the Stack
+      // pile (cyan glow) and route a click into the play-from-Stack
+      // confirm dialog instead of the pile viewer.
+      coolnessStackTopPlayable: (() => {
+        const stack = ps.coolnessStack || [];
+        if (stack.length === 0) return false;
+        const top = stack[stack.length - 1];
+        const scr = loadCardEffect(top);
+        return !!(scr && (scr.playableFromCoolnessStack || scr.summonableFromCoolnessStack));
+      })(),
       oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
       resolvingCard: ps._resolvingCard || null,
       deckSkins: ps.deckSkins || {},
@@ -2298,7 +2380,13 @@ function sendSpectatorGameState(room) {
       potionDeckCards: [], potionDeckCount: ps.potionDeck.length,
       discardPile: ps.discardPile, deletedPile: ps.deletedPile,
       disconnected: ps.disconnected || false, left: ps.left || false,
-      gold: ps.gold || 0,
+      // Gold display can be temporarily frozen for cost-bypass flows
+      // (Swagdri's free-play of an X-cost Artifact bumps gold by a
+      // headroom buffer so the artifact's internal cost check passes,
+      // then restores). `_goldFreeze` exposes the original value to
+      // the client during that window so the diff-detector doesn't
+      // flash spurious +9999 / -9999 floaters.
+      gold: ps._goldFreeze != null ? ps._goldFreeze : (ps.gold || 0),
       abilityGivenThisTurn: ps.abilityGivenThisTurn || [false, false, false],
       summonLocked: ps.summonLocked || false,
       damageLocked: ps.damageLocked || false,
@@ -2320,6 +2408,18 @@ function sendSpectatorGameState(room) {
       onSteroids: ps.onSteroids || false,
       supportSpellLocked: ps.supportSpellLocked || false,
       permanents: ps.permanents || [],
+      coolnessStack: ps.coolnessStack || [],
+      // Whether the top of THIS player's Stack is playable from the
+      // Stack right now. Clients use this flag to highlight the Stack
+      // pile (cyan glow) and route a click into the play-from-Stack
+      // confirm dialog instead of the pile viewer.
+      coolnessStackTopPlayable: (() => {
+        const stack = ps.coolnessStack || [];
+        if (stack.length === 0) return false;
+        const top = stack[stack.length - 1];
+        const scr = loadCardEffect(top);
+        return !!(scr && (scr.playableFromCoolnessStack || scr.summonableFromCoolnessStack));
+      })(),
       oncePerGameUsed: ps._oncePerGameUsed ? [...ps._oncePerGameUsed] : [],
       resolvingCard: ps._resolvingCard || null,
       deckSkins: ps.deckSkins || {},
@@ -3929,7 +4029,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
 
   try {
     const chainResult = await room.engine.executeCardWithChain({
-      cardName: abilityName, owner: pi, cardType: 'Ability', goldCost: 0,
+      cardName: abilityName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0,
       resolve: null, fromBoard: true,
     });
 
@@ -4409,7 +4509,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
     if (!inst) return false;
 
     const chainResult = await room.engine.executeCardWithChain({
-      cardName: abilityName, owner: pi, cardType: 'Ability', goldCost: 0, resolve: null,
+      cardName: abilityName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0, resolve: null,
       fromBoard: true,
     });
 
@@ -5026,11 +5126,35 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     });
   }
 
+  // Pre-broadcast the script's top-level animationType from INSIDE
+  // the wrapped resolve so it lands at the same instant as the
+  // resolve's first effects (damage, death movement, downstream
+  // listener side-effects like Nornstellar pushing the deck top onto
+  // the Coolness Stack). Previously this broadcast happened AFTER
+  // executeCardWithChain returned — so the visible animation queued
+  // up only after every death/state-diff animation had already played
+  // out, leaving the player seeing "creature dies, deck card moves to
+  // Stack ... THEN acid splash". Placing the emit inside the wrapped
+  // resolve means a chain negate is still respected: if the chain
+  // negates the card, the wrapped resolve is never called and no
+  // animation fires.
+  const animationType = script.animationType || 'explosion';
+  const broadcastPotionAnim = (animationType !== 'none') ? () => {
+    for (let i = 0; i < 2; i++) {
+      const sid = gs.players[i]?.socketId;
+      if (sid) io.to(sid).emit('potion_resolved', { destroyedIds: selectedIds, animationType });
+    }
+    sendToSpectators(room, 'potion_resolved', { destroyedIds: selectedIds, animationType });
+  } : null;
+
   let chainResult;
   try {
     chainResult = await room.engine.executeCardWithChain({
       cardName: potionName, owner: pi, cardType, goldCost: goldCost || 0,
-      resolve: script.resolve ? async () => await script.resolve(room.engine, pi, selectedIds, validTargets) : null,
+      resolve: script.resolve ? async () => {
+        if (broadcastPotionAnim) broadcastPotionAnim();
+        return await script.resolve(room.engine, pi, selectedIds, validTargets);
+      } : null,
     });
   } catch (err) {
     console.error('[Engine] doConfirmPotion chain error:', err.message);
@@ -5105,13 +5229,10 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     if (!chainResult.negated && cardType === 'Potion') checkPotionLock(ps, gs, pi);
   }
 
-  if (!chainResult.negated && (script.animationType || 'explosion') !== 'none') {
-    for (let i = 0; i < 2; i++) {
-      const sid = gs.players[i]?.socketId;
-      if (sid) io.to(sid).emit('potion_resolved', { destroyedIds: selectedIds, animationType: script.animationType || 'explosion' });
-    }
-    sendToSpectators(room, 'potion_resolved', { destroyedIds: selectedIds, animationType: script.animationType || 'explosion' });
-  }
+  // The script's top-level animationType is now broadcast at the
+  // start of the wrapped resolve (see the broadcast block before
+  // executeCardWithChain), so it lands simultaneously with the
+  // resolve's first visible effects rather than after them.
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
@@ -6708,7 +6829,7 @@ async function setupGameState(room) {
       hand:[], mainDeck, potionDeck, sideDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
       abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0],
       damageLocked:false, itemLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
-      permanents:[], _oncePerGameUsed: new Set(), _resolvingCard: null, deckSkins: deck?.skins || {} });
+      permanents:[], coolnessStack:[], _oncePerGameUsed: new Set(), _resolvingCard: null, deckSkins: deck?.skins || {} });
   }
   room.gameState = { players:playerStates, areaZones:[[],[]], turn:0, activePlayer:0, currentPhase:0, result:null, rematchRequests:[], awaitingFirstChoice:true,
     _gameStartTime: Date.now(),
@@ -6991,9 +7112,26 @@ io.on('connection', (socket) => {
   socket.on('change_deck', ({ roomId, deckId }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId); if (!room) return;
-    const player = room.players.find(p => p.userId === currentUser.userId);
-    if (!player) return;
+    const playerIdx = room.players.findIndex(p => p.userId === currentUser.userId);
+    if (playerIdx < 0) return;
+    const player = room.players[playerIdx];
+    const prevDeckId = player.deckId;
     player.deckId = deckId || null;
+    // Invalidate the cached deck snapshots when the deck actually
+    // changes. `_currentDecks` / `_originalDecks` are populated by the
+    // first game's `setupGameState` and re-used for side-decking
+    // between games in a set — but the PvP rematch path
+    // (`request_rematch`) reuses the SAME room and calls
+    // `setupGameState` again, which short-circuits on a non-empty
+    // `_currentDecks[idx]` and uses the old deck even after the
+    // player picked a new one in the result-overlay dropdown. Wiping
+    // the slot for the player who actually changed forces the next
+    // setup to re-fetch from `player.deckId`. The opponent's slot
+    // is left intact so their side-decking state is preserved.
+    if (prevDeckId !== player.deckId) {
+      if (room._currentDecks) room._currentDecks[playerIdx] = null;
+      if (room._originalDecks) room._originalDecks[playerIdx] = null;
+    }
     socket.emit('deck_changed', { deckId: player.deckId });
   });
 
@@ -7639,6 +7777,25 @@ io.on('connection', (socket) => {
     doActivatePermanent(room, pi, params).catch(err => console.error('[activate_permanent]', err.message));
   });
 
+  // Play the top of the player's Coolness Stack (Bifab, Modnir,
+  // Swellpnir, String of Fine, Hipdall self-summon, Swagdri self-summon).
+  socket.on('play_from_coolness_stack', (params) => {
+    if (!currentUser) return;
+    const room = rooms.get(params?.roomId);
+    if (!room?.gameState || !room.engine) return;
+    const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+    (async () => {
+      try {
+        await room.engine.actionPlayTopOfCoolnessStack(pi);
+      } catch (err) {
+        console.error('[play_from_coolness_stack]', err.message);
+      }
+      for (let i = 0; i < 2; i++) sendGameState(room, i);
+      sendSpectatorGameState(room);
+    })();
+  });
+
   // Activate a hand card's "handActivatedEffect" without playing it.
   // Luna Kiai's "reveal to Burn" — and any future card with the same shape.
   socket.on('activate_hand_card', (params) => {
@@ -8243,7 +8400,7 @@ io.on('connection', (socket) => {
           name: h.name, hp: h.hp ?? 0, maxHp: h.maxHp ?? h.hp ?? 0,
           atk: h.atk ?? 0, baseAtk: h.baseAtk ?? h.atk ?? 0,
           statuses: normalizePuzzleStatuses(h.statuses),
-          buffs: h.buffs ? JSON.parse(JSON.stringify(h.buffs)) : undefined,
+          buffs: h.buffs ? enrichPuzzleBuffs(JSON.parse(JSON.stringify(h.buffs))) : undefined,
         };
         // Cosmic Depths Change Counters on a Hero (Argos) — authored
         // in the puzzle editor as `h._changeCounters`. The shared
@@ -8278,6 +8435,7 @@ io.on('connection', (socket) => {
         dealtDamageToOpponent: false, potionLocked: false,
         potionsUsedThisTurn: 0,
         permanents: (pz.permanents || []).map(pm => ({ name: pm.name, id: pm.id || ('p' + Date.now() + Math.random()) })),
+        coolnessStack: [...(pz.coolnessStack || [])],
         _oncePerGameUsed: new Set(),
         _resolvingCard: null,
         deckSkins: {},
@@ -8439,7 +8597,15 @@ io.on('connection', (socket) => {
             // standard `negated` counter set above.
             if (cs._dkSilenced) inst.counters._dkSilenced = 1;
             if (cs.poisoned) { inst.counters.poisoned = 1; inst.counters.poisonStacks = cs.poisoned.stacks || 1; }
-            if (cs.buffs) { if (!inst.counters.buffs) inst.counters.buffs = {}; Object.assign(inst.counters.buffs, cs.buffs); }
+            if (cs.buffs) {
+              if (!inst.counters.buffs) inst.counters.buffs = {};
+              Object.assign(inst.counters.buffs, cs.buffs);
+              // Enrich each newly-merged buff with auto-applied fields
+              // (e.g. damageMultiplier) — the puzzle creator only saves
+              // the user-authored opts, not the registry-derived fields
+              // the engine actually reads for damage modifiers.
+              enrichPuzzleBuffs(inst.counters.buffs);
+            }
             // Taunt mirror: when a puzzle creature carries the
             // forcesTargeting buff, set the functional counter the engine
             // filter actually reads. No pi restriction (= any opposing

@@ -151,8 +151,10 @@ module.exports = {
       const drawCount = ctx.amount;
       if (drawCount <= 0) return;
 
-      // HOPT
-      if (!ctx.hardOncePerTurn('intrude_intercept')) return;
+      // Pre-check HOPT without claiming — claim only after the
+      // player commits via Negate or Copy. Cancelling the prompt
+      // shouldn't burn Intrude's once-per-turn slot.
+      if (engine.gs.hoptUsed?.[`intrude_intercept:${intrudeOwner}`] === engine.gs.turn) return;
 
       const deckType = ctx.deckType || 'main';
       const ps = gs.players[intrudeOwner];
@@ -178,9 +180,11 @@ module.exports = {
       });
 
       if (!result || result.cancelled) {
-        // Cancel — do nothing
+        // Cancel — do nothing, HOPT not claimed.
         return;
       }
+      // Commit — claim HOPT now.
+      ctx.hardOncePerTurn('intrude_intercept');
 
       // Stream card image to both players only on actual activation
       engine._broadcastEvent('card_reveal', {

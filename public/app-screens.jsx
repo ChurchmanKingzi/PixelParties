@@ -1296,7 +1296,19 @@ function PurchaseCelebration({ cx, cy, onDone }) {
 }
 
 function ShopScreen() {
-  const { user, setUser, setScreen, notify } = useContext(AppContext);
+  const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
+
+  // Switch to bgm_shop.mp3 while the shop is mounted; restore the
+  // menu track on unmount. Mirror of PlayScreen's gameState-driven
+  // bgmMode effect — keeping the policy local to each screen avoids
+  // a screen-name → mode map in App that has to stay in sync as
+  // screens are added.
+  useEffect(() => {
+    if (!setBgmMode) return;
+    setBgmMode('shop');
+    return () => setBgmMode('menu');
+  }, [setBgmMode]);
+
   const [catalog, setCatalog] = useState(null);
   const [owned, setOwned] = useState({ avatar: [], sleeve: [], board: [], skin: [] });
   const [structureCatalog, setStructureCatalog] = useState(null); // { decks, price, randomPrice, defaultDeckId }

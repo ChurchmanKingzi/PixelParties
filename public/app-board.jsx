@@ -27,7 +27,7 @@ function setBoardTooltip(card) {
   window._boardTooltipSetter?.(card);
 }
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, revealTooltipWhenFaceDown }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, revealTooltipWhenFaceDown, abilities }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
@@ -55,7 +55,8 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   const tooltipBase = tooltipCardOverride || tooltipCardData;
   const tooltipTarget = (() => {
     if (!tooltipBase) return null;
-    if (hp == null && maxHp == null && atk == null && (!inheritedEffects || inheritedEffects.length === 0)) return tooltipBase;
+    const hasLiveAbilities = Array.isArray(abilities) && abilities.length > 0;
+    if (hp == null && maxHp == null && atk == null && (!inheritedEffects || inheritedEffects.length === 0) && !hasLiveAbilities) return tooltipBase;
     return {
       ...tooltipBase,
       _liveHp:    hp    != null ? hp    : tooltipBase._liveHp,
@@ -64,6 +65,14 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
       _inheritedEffects: (inheritedEffects && inheritedEffects.length > 0)
         ? inheritedEffects
         : tooltipBase._inheritedEffects,
+      // `_liveAbilities` is the per-Hero `abilityZones[heroIdx]`
+      // shape — an array of slot arrays, each slot a stack of names
+      // (`['Fighting','Fighting']`, `['Toughness']`, `[]`). The
+      // tooltip dedupes by base name and renders `Fighting 2`
+      // instead of `Fighting, Fighting`. Falls back to the static
+      // cards.json `startingAbility1/2` only for off-board card
+      // previews where the live stack isn't available.
+      _liveAbilities: hasLiveAbilities ? abilities : tooltipBase._liveAbilities,
     };
   })();
 
@@ -189,9 +198,13 @@ function DamageNumber({ amount, ownerLabel, heroIdx }) {
   }, [ownerLabel, heroIdx]);
 
   if (!pos) return null;
+  // Damage absorbed to 0 → render the bare "0" (no minus sign), so
+  // the player sees that the hit was absorbed rather than blocked
+  // entirely. Matches the CreatureDamageNumber and HealNumber forms.
+  const label = amount > 0 ? `-${amount}` : '0';
   return (
     <div className="damage-number" style={{ left: pos.x, top: pos.y }}>
-      -{amount}
+      {label}
     </div>
   );
 }
@@ -1636,6 +1649,180 @@ function GatheringStormOverlay() {
           25%  { opacity: 0.7; }
           40%  { opacity: 1; }
           100% { opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// Wowhalla gears — battlefield-wide ambient background painted while
+// "Wowhalla, the Hall of the Cool" is in either player's Area zone.
+// Large brass-colored gears slowly rotate behind the cards and zones
+// (z-index 1 — above the board skin, beneath every card / hero / zone
+// frame). Counter-rotating directions and varied sizes keep the
+// composition lively without distracting from gameplay.
+function WowhallaGearsOverlay() {
+  const gears = useMemo(() => {
+    // Hand-tuned + filler positions so gears densely populate the
+    // battlefield without all clumping. `cw` is now derived at mount
+    // (see effect below) by 2-colouring the touch-graph so that any
+    // two gears whose outer circles overlap spin in opposite
+    // directions, like meshing teeth on real machinery.
+    return [
+      // Anchors
+      { left: -6,   top: 6,    size: 260, dur: 46, delay: 0 },
+      { left: 78,   top: -8,   size: 320, dur: 58, delay: -10 },
+      { left: 92,   top: 58,   size: 220, dur: 32, delay: -3 },
+      { left: 14,   top: 76,   size: 280, dur: 48, delay: -18 },
+      { left: 40,   top: 22,   size: 180, dur: 28, delay: -7 },
+      { left: 55,   top: 84,   size: 200, dur: 36, delay: -22 },
+      { left: -10,  top: 44,   size: 170, dur: 30, delay: -2 },
+      // Mid-band fillers
+      { left: 22,   top: 38,   size: 130, dur: 24, delay: -12 },
+      { left: 62,   top: 30,   size: 150, dur: 26, delay: -16 },
+      { left: 36,   top: 56,   size: 140, dur: 22, delay: -4 },
+      { left: 72,   top: 50,   size: 130, dur: 20, delay: -9 },
+      { left: 8,    top: 26,   size: 110, dur: 18, delay: -1 },
+      { left: 50,   top: 12,   size: 120, dur: 22, delay: -14 },
+      { left: 84,   top: 36,   size: 140, dur: 24, delay: -8 },
+      { left: 4,    top: 60,   size: 130, dur: 26, delay: -19 },
+      { left: 32,   top: 8,    size: 100, dur: 16, delay: -5 },
+      { left: 66,   top: 70,   size: 160, dur: 30, delay: -11 },
+      { left: 46,   top: 70,   size: 110, dur: 18, delay: -15 },
+      { left: 26,   top: 92,   size: 150, dur: 28, delay: -23 },
+      { left: 76,   top: 92,   size: 130, dur: 22, delay: -6 },
+      { left: 96,   top: 80,   size: 110, dur: 20, delay: -13 },
+      { left: -2,   top: 88,   size: 120, dur: 22, delay: -20 },
+    ];
+  }, []);
+
+  // Touch-graph 2-colouring — touching gears must spin oppositely.
+  // The container's pixel size is needed to convert `left/top` (%) to
+  // actual centres, so we compute the colouring after layout and
+  // re-run on resize. Falls back to all-clockwise pre-measurement.
+  const containerRef = useRef(null);
+  const [spinDirs, setSpinDirs] = useState(() => gears.map(() => true));
+  useLayoutEffect(() => {
+    const recompute = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const w = el.offsetWidth || el.clientWidth;
+      const h = el.offsetHeight || el.clientHeight;
+      if (!w || !h) return;
+      // Project each gear's centre into pixel space. `marginLeft/Top`
+      // is `-size/2`, so the rendered centre is at exactly
+      // `(left% * w, top% * h)`.
+      const cx = gears.map(g => (g.left / 100) * w);
+      const cy = gears.map(g => (g.top  / 100) * h);
+      const r  = gears.map(g => g.size / 2);
+      // Build adjacency: any two gears whose outer circles overlap
+      // (centre distance < sum of radii) are "touching" and need
+      // opposite directions.
+      const adj = gears.map(() => []);
+      for (let i = 0; i < gears.length; i++) {
+        for (let j = i + 1; j < gears.length; j++) {
+          const dx = cx[i] - cx[j];
+          const dy = cy[i] - cy[j];
+          if (Math.hypot(dx, dy) < r[i] + r[j]) {
+            adj[i].push(j); adj[j].push(i);
+          }
+        }
+      }
+      // BFS 2-colouring per connected component. If the graph isn't
+      // bipartite (an odd cycle of touching gears) at least one
+      // adjacent pair will end up same-coloured — that's mechanically
+      // unavoidable, so accept it rather than thrashing.
+      const colour = new Array(gears.length).fill(null);
+      for (let s = 0; s < gears.length; s++) {
+        if (colour[s] !== null) continue;
+        colour[s] = true;
+        const queue = [s];
+        while (queue.length) {
+          const u = queue.shift();
+          for (const v of adj[u]) {
+            if (colour[v] === null) {
+              colour[v] = !colour[u];
+              queue.push(v);
+            }
+          }
+        }
+      }
+      setSpinDirs(colour.map(c => c !== null ? c : true));
+    };
+    recompute();
+    let ro;
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      ro = new ResizeObserver(recompute);
+      ro.observe(containerRef.current);
+    } else {
+      window.addEventListener('resize', recompute);
+    }
+    return () => {
+      if (ro) ro.disconnect();
+      else window.removeEventListener('resize', recompute);
+    };
+  }, [gears]);
+  // SVG gear, drawn once and re-used per instance via a CSS rotation.
+  // Brass palette: outer #b78b3a, inner #d6a64a, highlight #f1cc6e.
+  const gearSvg = `
+    <svg xmlns='http://www.w3.org/2000/svg' viewBox='-100 -100 200 200'>
+      <defs>
+        <radialGradient id='gg' cx='0' cy='0' r='100' gradientUnits='userSpaceOnUse'>
+          <stop offset='0%' stop-color='#f1cc6e'/>
+          <stop offset='55%' stop-color='#c89844'/>
+          <stop offset='100%' stop-color='#7a5a23'/>
+        </radialGradient>
+        <radialGradient id='gh' cx='0' cy='0' r='30' gradientUnits='userSpaceOnUse'>
+          <stop offset='0%' stop-color='#3a2a10'/>
+          <stop offset='100%' stop-color='#0f0a04'/>
+        </radialGradient>
+      </defs>
+      <g>
+        ${Array.from({ length: 12 }).map((_, i) => {
+          const a = (i * 360 / 12);
+          return `<rect x='-9' y='-95' width='18' height='22' rx='3' fill='url(#gg)' transform='rotate(${a})'/>`;
+        }).join('')}
+        <circle cx='0' cy='0' r='78' fill='url(#gg)' stroke='#5b4118' stroke-width='4'/>
+        <circle cx='0' cy='0' r='52' fill='none' stroke='#5b4118' stroke-width='3'/>
+        ${Array.from({ length: 8 }).map((_, i) => {
+          const a = (i * 360 / 8) * Math.PI / 180;
+          const x = Math.cos(a) * 65, y = Math.sin(a) * 65;
+          return `<circle cx='${x.toFixed(1)}' cy='${y.toFixed(1)}' r='7' fill='#5b4118'/>`;
+        }).join('')}
+        <circle cx='0' cy='0' r='22' fill='url(#gh)' stroke='#3a2a10' stroke-width='3'/>
+      </g>
+    </svg>
+  `;
+  const dataUrl = 'data:image/svg+xml;utf8,' + encodeURIComponent(gearSvg);
+  return (
+    <div ref={containerRef} className="wowhalla-gears-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      // No explicit z-index — DOM order keeps the gears beneath every
+      // sibling card / hero / zone frame painted after this overlay.
+      // Setting z-index would otherwise promote the gears above any
+      // sibling that doesn't declare a higher z-index of its own.
+      overflow: 'hidden',
+      // Slight warm tint — barely visible but ties the gears to a brass-lit hall.
+      background: 'radial-gradient(ellipse at 50% 50%, rgba(140,90,40,0.06) 0%, transparent 70%)',
+    }}>
+      {gears.map((g, i) => (
+        <div key={'wg' + i} style={{
+          position: 'absolute',
+          left: g.left + '%', top: g.top + '%',
+          width: g.size + 'px', height: g.size + 'px',
+          marginLeft: -g.size / 2, marginTop: -g.size / 2,
+          backgroundImage: `url("${dataUrl}")`,
+          backgroundSize: 'contain', backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          opacity: 0.42,
+          filter: 'drop-shadow(0 4px 8px rgba(0,0,0,.55))',
+          animation: 'wowhallaGearSpin ' + g.dur + 's linear ' + g.delay + 's infinite ' + (spinDirs[i] ? 'normal' : 'reverse'),
+        }} />
+      ))}
+      <style>{`
+        @keyframes wowhallaGearSpin {
+          0%   { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
       `}</style>
     </div>
@@ -3247,6 +3434,125 @@ const ANIM_REGISTRY = {
   snake_bite: SnakeBiteEffect,
   cannibalism_chomp: CannibalismChompEffect,
   cosmic_summon: CosmicSummonEffect,
+  // Coolness Stack summon — cyan-and-brass burst with a "🆒" pop and
+  // counter-rotating geometric rings. Distinct from a normal hand
+  // summon so the player sees "this Creature came from the Stack".
+  coolness_summon: (function () {
+    return function CoolnessSummonEffect({ x, y }) {
+      const beams = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+        angle: (i / 14) * 360,
+        delay: Math.random() * 100,
+      })), []);
+      const sparkles = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+        angle: (i / 22) * Math.PI * 2 + Math.random() * 0.3,
+        dist: 50 + Math.random() * 45,
+        size: 3 + Math.random() * 5,
+        delay: Math.random() * 250,
+        cyan: Math.random() < 0.5,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10110 }}>
+          {/* Cyan halo */}
+          <div style={{
+            position: 'absolute', width: 130, height: 130, left: -65, top: -65,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(170,235,255,0.85) 0%, rgba(70,180,230,0.55) 45%, transparent 75%)',
+            boxShadow: '0 0 40px rgba(120,210,255,0.85), 0 0 18px rgba(180,235,255,0.7)',
+            opacity: 0,
+            animation: 'coolness-halo 1200ms ease-out forwards',
+          }} />
+          {/* Counter-rotating brass ring (outer) */}
+          <div style={{
+            position: 'absolute', width: 120, height: 120, left: -60, top: -60,
+            borderRadius: '50%',
+            border: '3px solid rgba(255,215,140,0.85)',
+            boxShadow: '0 0 18px rgba(255,200,100,0.8), inset 0 0 12px rgba(255,200,100,0.4)',
+            opacity: 0,
+            animation: 'coolness-ring-cw 1100ms cubic-bezier(.2,.6,.3,1) forwards',
+          }} />
+          {/* Counter-rotating cyan ring (inner) */}
+          <div style={{
+            position: 'absolute', width: 84, height: 84, left: -42, top: -42,
+            borderRadius: '50%',
+            border: '2px solid rgba(140,225,255,0.95)',
+            boxShadow: '0 0 14px rgba(140,225,255,0.75)',
+            opacity: 0,
+            animation: 'coolness-ring-ccw 1100ms cubic-bezier(.2,.6,.3,1) forwards',
+          }} />
+          {/* Radial cyan beams */}
+          {beams.map((b, i) => (
+            <div key={'cb' + i} style={{
+              position: 'absolute', width: 4, height: 80, left: -2, top: -40,
+              background: 'linear-gradient(to top, transparent 0%, rgba(180,235,255,0.95) 50%, rgba(255,255,255,1) 100%)',
+              borderRadius: 2,
+              transformOrigin: '50% 50%',
+              transform: `rotate(${b.angle}deg) translateY(-32px) scaleY(0)`,
+              opacity: 0,
+              animation: `coolness-beam 1000ms ease-out ${b.delay}ms forwards`,
+            }} />
+          ))}
+          {/* Drifting cyan + gold sparkles */}
+          {sparkles.map((s, i) => (
+            <div key={'cs' + i} style={{
+              position: 'absolute', left: -s.size / 2, top: -s.size / 2,
+              width: s.size + 'px', height: s.size + 'px',
+              borderRadius: '50%',
+              background: s.cyan ? '#c8f4ff' : '#ffe6a8',
+              boxShadow: s.cyan
+                ? '0 0 8px #6cdcff, 0 0 16px rgba(120,200,255,0.7)'
+                : '0 0 8px #ffd86a, 0 0 16px rgba(255,200,80,0.7)',
+              opacity: 0,
+              animation: `coolness-sparkle 1300ms ease-out ${s.delay}ms forwards`,
+              '--ccx': Math.cos(s.angle) * s.dist + 'px',
+              '--ccy': Math.sin(s.angle) * s.dist + 'px',
+            }} />
+          ))}
+          {/* "🆒" emoji pop — bursts out, scales up, fades */}
+          <div style={{
+            position: 'absolute', left: -22, top: -22,
+            fontSize: 38,
+            filter: 'drop-shadow(0 0 6px rgba(180,235,255,0.95)) drop-shadow(0 0 14px rgba(120,210,255,0.7))',
+            opacity: 0,
+            animation: 'coolness-emoji 1100ms cubic-bezier(.2,.7,.3,1) 80ms forwards',
+          }}>🆒</div>
+          <style>{`
+            @keyframes coolness-halo {
+              0%   { opacity: 0;    transform: scale(0.5); }
+              30%  { opacity: 1;    transform: scale(1.15); }
+              70%  { opacity: 0.85; transform: scale(1.45); }
+              100% { opacity: 0;    transform: scale(1.65); }
+            }
+            @keyframes coolness-ring-cw {
+              0%   { opacity: 0; transform: scale(0.35) rotate(0deg); }
+              30%  { opacity: 1; transform: scale(1.05) rotate(180deg); }
+              100% { opacity: 0; transform: scale(1.55) rotate(420deg); }
+            }
+            @keyframes coolness-ring-ccw {
+              0%   { opacity: 0; transform: scale(0.4)  rotate(0deg); }
+              30%  { opacity: 1; transform: scale(1.0)  rotate(-180deg); }
+              100% { opacity: 0; transform: scale(1.4)  rotate(-420deg); }
+            }
+            @keyframes coolness-beam {
+              0%   { opacity: 0; transform: rotate(var(--ang,0deg)) translateY(-32px) scaleY(0); }
+              30%  { opacity: 1; transform: rotate(var(--ang,0deg)) translateY(-32px) scaleY(1); }
+              100% { opacity: 0; transform: rotate(var(--ang,0deg)) translateY(-32px) scaleY(0.6); }
+            }
+            @keyframes coolness-sparkle {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.3); }
+              25%  { opacity: 1; transform: translate(calc(var(--ccx) * 0.35), calc(var(--ccy) * 0.35)) scale(1.1); }
+              100% { opacity: 0; transform: translate(var(--ccx), var(--ccy)) scale(0.25); }
+            }
+            @keyframes coolness-emoji {
+              0%   { opacity: 0;    transform: scale(0.2) rotate(-12deg); }
+              25%  { opacity: 1;    transform: scale(1.4) rotate(8deg); }
+              60%  { opacity: 0.95; transform: scale(1.15) rotate(-4deg); }
+              100% { opacity: 0;    transform: scale(1.6) translateY(-20px) rotate(0deg); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   creature_death: CreatureDeathEffect,
   freeze: FreezeEffect,
   ice_encase: IceEncaseEffect,
@@ -11332,12 +11638,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (delta <= 0 && pileTransferToHandPendingMeRef.current > 0) {
         pileTransferToHandPendingMeRef.current = Math.max(0, pileTransferToHandPendingMeRef.current - 1);
       }
+      // Hand-steal handshake: `play_hand_steal` already animated the
+      // stolen cards as flying clones from opp's hand. Burn ONE
+      // autoStart slot per stolen card so the diff branches below
+      // skip the steal slots but STILL run for any chained draws
+      // (e.g. Lilly, the Charming Infiltrator's +1 draw on each
+      // steal lands at the next slot AFTER the stolen one and must
+      // get its proper from-deck animation). Pre-Lilly the wholesale
+      // bail at the top of the deckDecreased branch was equivalent;
+      // now we have to consume per slot.
+      if (newHand.length > autoStart && stealSkipDrawRef.current > 0) {
+        const consumed = Math.min(newHand.length - autoStart, stealSkipDrawRef.current);
+        stealSkipDrawRef.current -= consumed;
+        autoStart += consumed;
+        if (autoStart >= newHand.length) {
+          prevHandLenRef.current = newHand.length;
+          return;
+        }
+      }
       if (newHand.length > autoStart && !stealInProgressRef.current && deckDecreased) {
-        // If cards arrived via steal, skip draw animation for them
-        const skipCount = stealSkipDrawRef.current;
-        if (skipCount > 0) {
-          stealSkipDrawRef.current = 0;
-        } else {
         // Play the draw cue per card. This catches server-side paths that
         // bypass engine.log('draw') — namely the initial-mulligan redraw
         // (server.js shifts cards directly from mainDeck/potionDeck). For
@@ -11369,7 +11688,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           setTimeout(() => {
             setDrawAnimCards(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
           }, 500);
-        }
         }
       } else if (newHand.length > autoStart && !stealInProgressRef.current && !deckDecreased && discardDecreased) {
         // Cards reclaimed from the discard pile into hand (Spontaneous
@@ -11583,6 +11901,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [oppDiscardHidden, setOppDiscardHidden] = useState(0);
   const [myDeletedHidden, setMyDeletedHidden] = useState(0);
   const [oppDeletedHidden, setOppDeletedHidden] = useState(0);
+  // Coolness Stack hidden counters — temporarily mask the new top of
+  // the Stack while a card is mid-flight from the deck/hand/discard
+  // (so the card doesn't pop into place before the animation finishes).
+  const [myCoolnessHidden, setMyCoolnessHidden] = useState(0);
+  const [oppCoolnessHidden, setOppCoolnessHidden] = useState(0);
   const myHandRectsRef = useRef([]);
   const oppHandRectsRef = useRef([]);
   const boardCardRectsRef = useRef({ me: {}, opp: {} }); // cardName → [DOMRect, ...]
@@ -14239,6 +14562,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         sel = `[data-perm-id="${permId}"][data-perm-owner="${ownerLabel}"]`;
       } else if (zoneType === 'area') {
         sel = `[data-area-zone][data-area-owner="${ownerLabel}"]`;
+      } else if (zoneType === 'coolnessStack') {
+        // Coolness Stack pile is owner-scoped only. Data attribute is
+        // `data-my-coolness` / `data-opp-coolness` (not the `me` / `opp`
+        // label flavor used by other zones).
+        sel = owner === myIdx ? '[data-my-coolness]' : '[data-opp-coolness]';
       } else if (zoneSlot >= 0) {
         sel = `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`;
       } else {
@@ -14278,7 +14606,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }, 400);
     };
-    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, color, duration }) => {
+    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, color, duration, thickness }) => {
       if (window.playSFX) window.playSFX('laser', { dedupe: 60, category: 'effect' });
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
@@ -14298,11 +14626,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const dur = duration || 1500;
       setBeamAnims(prev => [...prev, {
         id, color: color || '#ff2222',
+        thickness: typeof thickness === 'number' && thickness > 0 ? thickness : 1,
+        duration: dur,
         x1: sr.left + sr.width / 2, y1: sr.top + sr.height / 2,
         x2: tr.left + tr.width / 2, y2: tr.top + tr.height / 2,
       }]);
-      // Also play explosion on target
-      setTimeout(() => playAnimation('explosion', tgtEl, { duration: 800 }), 250);
+      // Layered impact: a primary explosion that runs for the FULL
+      // beam duration plus a quick secondary burst at the moment the
+      // beam connects, so the impact spectacle never dies before the
+      // beam line fades. Previously the explosion ended ~450 ms before
+      // the line did, leaving a "naked line" gap.
+      setTimeout(() => {
+        playAnimation('explosion', tgtEl, { duration: Math.max(dur - 200, 600) });
+        setTimeout(() => playAnimation('explosion', tgtEl, { duration: 800 }), Math.max(dur * 0.45, 350));
+      }, 220);
       setTimeout(() => setBeamAnims(prev => prev.filter(a => a.id !== id)), dur);
     };
     // Hand-to-board card-fly animation. The server fires this right before
@@ -14364,6 +14701,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         sourceEl = ownerIdx === myIdx
           ? document.querySelector(`.game-hand [data-hand-idx="${handIndex}"]`)
           : document.querySelector(`.game-hand-opp [data-hand-idx="${handIndex}"]`);
+      } else if (source === 'coolnessStack') {
+        // Stack-equip path (Modnir / Swellpnir / Swagdri free-play /
+        // Glorious Rebirth / Hipdall self-summon). Source is the
+        // owner's Coolness Stack pile. Mask the Stack-top card
+        // synchronously so the source slot looks empty for the entire
+        // flight (matches the hand→Stack UX where the source hand
+        // slot blanks the moment the fly starts). The actual array
+        // pop arrives later via game_state — once it lands, the
+        // hidden counter still applies to a now-empty array, which is
+        // a harmless overshoot. The cleanup setTimeout below releases
+        // the counter when the temp fly DOM is removed.
+        sourceEl = document.querySelector(ownerIdx === myIdx ? '[data-my-coolness]' : '[data-opp-coolness]');
+        const setHidden = ownerIdx === myIdx ? setMyCoolnessHidden : setOppCoolnessHidden;
+        setHidden(p => p + 1);
+        setTimeout(() => setHidden(p => Math.max(0, p - 1)), 700);
       } else {
         // Deck pile element. The owner's deck and opp's deck have
         // different selectors.
@@ -16096,6 +16448,266 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (el) playAnimation(type || 'holy_revival', el, { duration: 1200 });
     };
     socket.on('play_permanent_animation', onPermanentAnim);
+
+    // ── Coolness Stack movement animations ──
+    // Engine fires `coolness_stack_change` whenever a card enters or
+    // leaves the Stack. We translate these into discardAnims entries
+    // that fly between the relevant pile/hand/board rects. The hidden
+    // counters (myCoolnessHidden / oppCoolnessHidden / myDiscard…) keep
+    // the destination visually empty until the flight lands.
+    const onCoolnessStackChange = (payload) => {
+      const { owner, mode, dest, cards, from, fromHandIdx, fromHeroIdx, fromZoneSlot } = payload;
+      const isMe = owner === myIdx;
+      const setStackHidden = isMe ? setMyCoolnessHidden : setOppCoolnessHidden;
+      const setDiscHidden  = isMe ? setMyDiscardHidden  : setOppDiscardHidden;
+      const setDelHidden   = isMe ? setMyDeletedHidden  : setOppDeletedHidden;
+
+      // ── 0. Capture source rect SYNCHRONOUSLY ──
+      // Two socket events have just arrived — `game_state` (which mutated
+      // the hand array via setState) and `coolness_stack_change`. React
+      // hasn't committed the new state yet, so the DOM still shows the
+      // OLD layout: the source slot still contains the card that's
+      // about to fly. Snapshot its rect now, before the deferred rAF
+      // callback runs against the new layout.
+      let preCapturedSrcRect = null;
+      if (mode === 'push') {
+        const sidePrefix = isMe ? 'my' : 'opp';
+        const handClass = isMe ? 'me' : 'opp';
+        let srcEl = null;
+        if (from === 'hand' && fromHandIdx != null) {
+          srcEl = document.querySelector(`.game-hand-${handClass} .hand-slot[data-hand-idx="${fromHandIdx}"]`)
+               || document.querySelector(`.game-hand-${handClass} [data-hand-idx="${fromHandIdx}"]`);
+        } else if (from === 'support' && fromHeroIdx != null && fromZoneSlot != null) {
+          // Wildur redirect from a dying creature — fly from the actual support slot.
+          srcEl = document.querySelector(
+            `[data-support-zone][data-support-owner="${handClass}"][data-support-hero="${fromHeroIdx}"][data-support-slot="${fromZoneSlot}"]`
+          );
+        } else if (from === 'ability' && fromHeroIdx != null && fromZoneSlot != null) {
+          srcEl = document.querySelector(
+            `[data-ability-zone][data-ability-owner="${handClass}"][data-ability-hero="${fromHeroIdx}"][data-ability-slot="${fromZoneSlot}"]`
+          );
+        } else if (from === 'surprise' && fromHeroIdx != null) {
+          srcEl = document.querySelector(
+            `[data-surprise-zone][data-surprise-owner="${handClass}"][data-surprise-hero="${fromHeroIdx}"]`
+          );
+        } else if (from === 'area') {
+          srcEl = document.querySelector(`[data-area-zone][data-area-owner="${handClass}"]`);
+        } else if (from === 'permanent') {
+          // Use the player's permanents column as a generic anchor.
+          srcEl = document.querySelector(isMe ? '.board-permanents-me' : '.board-permanents-opp');
+        } else if (from === 'deck') {
+          srcEl = document.querySelector(`[data-${sidePrefix}-deck]`);
+        } else if (from === 'discard') {
+          srcEl = document.querySelector(`[data-${sidePrefix}-discard]`);
+        }
+        if (srcEl) preCapturedSrcRect = srcEl.getBoundingClientRect();
+      }
+
+      // ── 1. Mask the destination synchronously ──
+      // The `game_state` event arrived just before this one and applied
+      // the new pile lengths. Bump the hidden counter NOW so React's
+      // very first render of the new state masks the destination top
+      // card — no flash before the animation kicks in.
+      if (mode === 'push') {
+        setStackHidden(p => p + 1);
+      } else if (mode === 'pop') {
+        if (dest === 'discard') setDiscHidden(p => p + 1);
+        else if (dest === 'delete') setDelHidden(p => p + 1);
+        else if (dest === 'board') {
+          // Stack→Support summon/equip just committed. The
+          // `attach_hero_fly` event already bumped the Stack hidden
+          // counter for the flight; decrement it NOW so the next-top
+          // card doesn't briefly mask while React renders the new
+          // (shrunk) Stack length. The fly's own 700 ms cleanup will
+          // later try to decrement again — `Math.max(0, ...)` clamps
+          // that to a no-op.
+          setStackHidden(p => Math.max(0, p - 1));
+        }
+      } else if (mode === 'delete_all' && Array.isArray(cards)) {
+        setDelHidden(p => p + cards.length);
+      }
+      // ── 2. Defer the rect measurement + flight injection ──
+      // Two rAFs let React commit the new state (including the freshly
+      // appeared Stack zone) before we measure. The src rect is already
+      // captured above; only the destination still needs the deferred
+      // lookup so the new Stack-pile DOM anchor exists.
+      requestAnimationFrame(() => requestAnimationFrame(() => runCoolnessStackChange(payload, preCapturedSrcRect)));
+    };
+    const runCoolnessStackChange = ({ owner, mode, from, dest, card, cards, fromHandIdx, fromHeroIdx, fromZoneSlot }, preCapturedSrcRect) => {
+      const isMe = owner === myIdx;
+      // Two side-prefixes coexist in the codebase:
+      //   • data-attributes use `my` / `opp` (data-my-deck, data-my-coolness, …)
+      //   • CSS classes for hands use `me` / `opp` (.game-hand-me, .game-hand-opp)
+      const sidePrefix = isMe ? 'my'  : 'opp';   // for data-* selectors
+      const handClass  = isMe ? 'me'  : 'opp';   // for .game-hand-* class
+      const stackSel = `[data-${sidePrefix}-coolness]`;
+      const setStackHidden = isMe ? setMyCoolnessHidden : setOppCoolnessHidden;
+      const setDiscHidden  = isMe ? setMyDiscardHidden  : setOppDiscardHidden;
+      const setDelHidden   = isMe ? setMyDeletedHidden  : setOppDeletedHidden;
+
+      const FLIGHT_MS = 500;
+
+      // Inject a flight + arrange the matching hidden-counter decrement
+      // when the flight completes. The hidden counter was already
+      // BUMPED in the synchronous outer handler — only the decrement
+      // belongs here.
+      const launchFlight = ({ srcRect, dstRect, cardName, dest: animDest, hideOnDest }) => {
+        if (!srcRect || !dstRect) {
+          // Anchor missing — release the hidden counter we already bumped
+          // so the destination doesn't stay masked forever.
+          if (hideOnDest === 'stack') setStackHidden(p => Math.max(0, p - 1));
+          else if (hideOnDest === 'discard') setDiscHidden(p => Math.max(0, p - 1));
+          else if (hideOnDest === 'delete') setDelHidden(p => Math.max(0, p - 1));
+          return;
+        }
+        const id = Date.now() + Math.random();
+        const entry = {
+          id, cardName,
+          startX: srcRect.left + srcRect.width / 2 - 32,
+          startY: srcRect.top + srcRect.height / 2 - 45,
+          endX: dstRect.x, endY: dstRect.y,
+          dest: animDest,
+        };
+        setDiscardAnims(prev => [...prev, entry]);
+        setTimeout(() => {
+          setDiscardAnims(prev => prev.filter(a => a.id !== id));
+          if (hideOnDest === 'stack') setStackHidden(p => Math.max(0, p - 1));
+          else if (hideOnDest === 'discard') setDiscHidden(p => Math.max(0, p - 1));
+          else if (hideOnDest === 'delete') setDelHidden(p => Math.max(0, p - 1));
+        }, FLIGHT_MS);
+      };
+
+      if (mode === 'push') {
+        // Source rect: prefer the synchronously-captured one (taken
+        // BEFORE React commits the new layout, when the source slot
+        // still held the flying card). Falls back to a DOM lookup
+        // matching the same source-zone resolution.
+        let srcRect = preCapturedSrcRect || null;
+        if (!srcRect) {
+          let srcEl = null;
+          if (from === 'deck') {
+            srcEl = document.querySelector(`[data-${sidePrefix}-deck]`);
+          } else if (from === 'hand') {
+            if (fromHandIdx != null) {
+              srcEl = document.querySelector(`.game-hand-${handClass} .hand-slot[data-hand-idx="${fromHandIdx}"]`)
+                || document.querySelector(`.game-hand-${handClass} [data-hand-idx="${fromHandIdx}"]`);
+            }
+            if (!srcEl) srcEl = document.querySelector(`.game-hand-${handClass}`);
+          } else if (from === 'support' && fromHeroIdx != null && fromZoneSlot != null) {
+            srcEl = document.querySelector(
+              `[data-support-zone][data-support-owner="${handClass}"][data-support-hero="${fromHeroIdx}"][data-support-slot="${fromZoneSlot}"]`
+            );
+          } else if (from === 'ability' && fromHeroIdx != null && fromZoneSlot != null) {
+            srcEl = document.querySelector(
+              `[data-ability-zone][data-ability-owner="${handClass}"][data-ability-hero="${fromHeroIdx}"][data-ability-slot="${fromZoneSlot}"]`
+            );
+          } else if (from === 'surprise' && fromHeroIdx != null) {
+            srcEl = document.querySelector(
+              `[data-surprise-zone][data-surprise-owner="${handClass}"][data-surprise-hero="${fromHeroIdx}"]`
+            );
+          } else if (from === 'area') {
+            srcEl = document.querySelector(`[data-area-zone][data-area-owner="${handClass}"]`);
+          } else if (from === 'permanent') {
+            srcEl = document.querySelector(isMe ? '.board-permanents-me' : '.board-permanents-opp');
+          } else if (from === 'discard') {
+            srcEl = document.querySelector(`[data-${sidePrefix}-discard]`);
+          } else {
+            srcEl = document.querySelector(`[data-${sidePrefix}-deck]`);
+          }
+          srcRect = srcEl?.getBoundingClientRect() || null;
+        }
+        const dstRect = getPileCenter(stackSel);
+        launchFlight({ srcRect, dstRect, cardName: card, dest: 'stack', hideOnDest: 'stack' });
+        if (window.playSFX) window.playSFX('discard', { dedupe: 80 });
+        return;
+      }
+
+      if (mode === 'pop') {
+        const srcRect = document.querySelector(stackSel)?.getBoundingClientRect();
+        if (!srcRect) {
+          // No source anchor — release any bumped destination hidden counter.
+          if (dest === 'discard') setDiscHidden(p => Math.max(0, p - 1));
+          else if (dest === 'delete') setDelHidden(p => Math.max(0, p - 1));
+          return;
+        }
+        let dstSel, animDest, hideOnDest;
+        if (dest === 'discard') { dstSel = `[data-${sidePrefix}-discard]`; animDest = 'discard'; hideOnDest = 'discard'; }
+        else if (dest === 'delete') { dstSel = `[data-${sidePrefix}-deleted]`; animDest = 'deleted'; hideOnDest = 'delete'; }
+        else if (dest === 'hand') { dstSel = `.game-hand-${handClass}`; animDest = 'stack'; hideOnDest = null; }
+        else if (dest === 'board') { return; }
+        else return;
+        const dstRect = getPileCenter(dstSel);
+        launchFlight({ srcRect, dstRect, cardName: card, dest: animDest, hideOnDest });
+        return;
+      }
+
+      if (mode === 'delete_all') {
+        const srcRect = document.querySelector(stackSel)?.getBoundingClientRect();
+        const dstRect = getPileCenter(`[data-${sidePrefix}-deleted]`);
+        if (!srcRect || !dstRect || !Array.isArray(cards)) {
+          // Release any pre-bumped delete-pile hidden counters.
+          if (Array.isArray(cards)) setDelHidden(p => Math.max(0, p - cards.length));
+          return;
+        }
+        cards.forEach((cardName, i) => {
+          // Note: hidden counter for the deleted pile was already bumped
+          // by N up front; each individual flight's setTimeout drops it
+          // by 1 when it lands.
+          const id = Date.now() + Math.random() + i;
+          setTimeout(() => {
+            const entry = {
+              id, cardName,
+              startX: srcRect.left + srcRect.width / 2 - 32,
+              startY: srcRect.top + srcRect.height / 2 - 45,
+              endX: dstRect.x, endY: dstRect.y,
+              dest: 'deleted',
+            };
+            setDiscardAnims(prev => [...prev, entry]);
+            setTimeout(() => {
+              setDiscardAnims(prev => prev.filter(a => a.id !== id));
+              setDelHidden(p => Math.max(0, p - 1));
+            }, FLIGHT_MS);
+          }, i * 80);
+        });
+      }
+    };
+    socket.on('coolness_stack_change', onCoolnessStackChange);
+
+    // ── Ragnarock: ability-zone → discard fly-out ──
+    // Engine broadcasts `ability_zone_to_discard` after splicing the
+    // top copy of an Ability out of the activator's Hero stack. We
+    // animate the card flying from that ability slot to the owner's
+    // discard pile. The discard length already grew on sync, so we
+    // bump the corresponding hidden counter to mask the new top until
+    // the flight lands.
+    const onAbilityZoneToDiscard = ({ owner, heroIdx, zoneSlot, cardName }) => {
+      const isMe = owner === myIdx;
+      // `me`/`opp` for zone owner attributes; `my`/`opp` for pile data attributes.
+      const zoneOwner = isMe ? 'me' : 'opp';
+      const sidePrefix = isMe ? 'my' : 'opp';
+      const srcEl = document.querySelector(
+        `[data-ability-zone][data-ability-owner="${zoneOwner}"][data-ability-hero="${heroIdx}"][data-ability-slot="${zoneSlot}"]`
+      );
+      const sr = srcEl?.getBoundingClientRect();
+      const dst = getPileCenter(`[data-${sidePrefix}-discard]`);
+      if (!sr || !dst) return;
+      const id = Date.now() + Math.random();
+      const setHidden = isMe ? setMyDiscardHidden : setOppDiscardHidden;
+      setDiscardAnims(prev => [...prev, {
+        id, cardName,
+        startX: sr.left + sr.width / 2 - 32,
+        startY: sr.top + sr.height / 2 - 45,
+        endX: dst.x, endY: dst.y,
+        dest: 'discard',
+      }]);
+      setHidden(p => p + 1);
+      if (window.playSFX) window.playSFX('discard', { dedupe: 80 });
+      setTimeout(() => {
+        setDiscardAnims(prev => prev.filter(a => a.id !== id));
+        setHidden(p => Math.max(0, p - 1));
+      }, 500);
+    };
+    socket.on('ability_zone_to_discard', onAbilityZoneToDiscard);
     const onRamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, targetPermId, cardName, duration, trailType }) => {
       if (window.playSFX) window.playSFX('attack_ram', { category: 'effect' });
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
@@ -16111,6 +16723,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         tgtEl = document.querySelector(`[data-perm-id="${targetPermId}"][data-perm-owner="${tgtLabel}"]`);
       } else if (targetZoneType === 'area') {
         tgtEl = document.querySelector(`[data-area-zone][data-area-owner="${tgtLabel}"]`);
+      } else if (targetZoneType === 'coolnessStack') {
+        // Coolness Stack pile is owner-scoped only; data attribute uses
+        // `my` / `opp` (not the `me` / `opp` label flavor).
+        tgtEl = document.querySelector(targetOwner === myIdx ? '[data-my-coolness]' : '[data-opp-coolness]');
       } else if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
         tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
       } else {
@@ -17103,14 +17719,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (tgtIsMe) pileTransferToHandPendingMeRef.current  += 1;
         else         pileTransferToHandPendingOppRef.current += 1;
       }
-      // Pre-register hand → pile transfers so the diff-based hand
-      // fly-out detector below suppresses its duplicate animation.
-      // See the ref-decl block (handToPilePendingMeRef) for the full
-      // rationale. The auto-clear setTimeout guards against stale
-      // entries when the pile doesn't actually grow (forced-discard
-      // followed by a same-tick splice — the net-zero case the
-      // engine-side broadcast was added specifically to cover).
-      if (from === 'hand' && (to === 'discard' || to === 'deleted') && cardName) {
+      // Pre-register hand → pile AND support → pile transfers so the
+      // diff-based fly-out detector below suppresses its duplicate
+      // animation. (See `handToPilePendingMeRef` block for the full
+      // rationale — the bucket pre-consumes by name, so adding
+      // support-source transfers here makes the slot-specific
+      // creature-death broadcast win over the diff-detector's name-
+      // keyed FIFO rect lookup, which always picks the leftmost rect
+      // when multiple same-named creatures are on the board.)
+      if ((from === 'hand' || from === 'support') && (to === 'discard' || to === 'deleted') && cardName) {
         const ref = srcIsMe ? handToPilePendingMeRef : handToPilePendingOppRef;
         const bucket = ref.current[to];
         const entry = { cardName };
@@ -17151,10 +17768,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               document.querySelector(`${base} .hand-slot[data-hand-idx="${extras.handIdx}"]`) ||
               document.querySelector(`${base} [data-hand-idx="${extras.handIdx}"]`);
             if (specific) return specific;
-            // Slot might not exist yet — fall back to the last existing slot
-            // (end of hand where new cards land) or the container.
+            // Slot doesn't exist yet — the broadcast fires before the
+            // state mutation, so the new slot won't render until the
+            // next sync. Project a synthetic rect just RIGHT of the
+            // last existing slot so the flight lands where the new
+            // card will actually appear instead of the previous
+            // last-slot's center (which is one card-width too far
+            // left). Mirrors `play_hand_steal`'s `lastRect.right`
+            // targeting at app-board.jsx:18545.
             const slots = document.querySelectorAll(`${base} .hand-slot, ${base} [data-hand-idx]`);
-            if (slots.length > 0) return slots[slots.length - 1];
+            if (slots.length > 0) {
+              const lastRect = slots[slots.length - 1].getBoundingClientRect();
+              const projected = {
+                left:  lastRect.right,
+                top:   lastRect.top,
+                width: lastRect.width,
+                height: lastRect.height,
+                right: lastRect.right + lastRect.width,
+                bottom: lastRect.bottom,
+              };
+              return { getBoundingClientRect: () => projected };
+            }
           }
           return document.querySelector(base);
         }
@@ -18085,6 +18719,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('play_heal_zero', onHealZero);
+    // Server-driven 0-damage feedback. Fired from the engine when a
+    // damage hit is fully absorbed by a buff multiplier (Damage Immune,
+    // Petrified) — the diff-based damage-number detector wouldn't see
+    // it because HP didn't change. Routes hero targets (zoneSlot < 0)
+    // through `setDamageNumbers` and creature targets through
+    // `setCreatureDamageNumbers`. Each component's amount-aware label
+    // renders the entry as a plain "0".
+    const onDamageZero = ({ owner, heroIdx, zoneSlot }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const id = Date.now() + Math.random();
+      const entry = { id, amount: 0, ownerLabel, heroIdx, zoneSlot };
+      if (zoneSlot == null || zoneSlot < 0) {
+        setDamageNumbers(prev => [...prev, entry]);
+        setTimeout(() => setDamageNumbers(prev => prev.filter(e => e.id !== id)), 1800);
+      } else {
+        setCreatureDamageNumbers(prev => [...prev, entry]);
+        setTimeout(() => setCreatureDamageNumbers(prev => prev.filter(e => e.id !== id)), 1800);
+      }
+    };
+    socket.on('play_damage_zero', onDamageZero);
     const onGuardianAngel = ({ owner, heroIdx }) => {
       const label = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${label}"][data-hero-idx="${heroIdx}"]`);
@@ -18134,6 +18788,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => img.remove(), 2700);
     };
     socket.on('dark_deepsea_god_manifest', onDDGManifest);
+    // Yolomungandr manifest — boss-summon spectacle for the Coolness
+    // Stack finisher. Same fade-grow-pulse-fade arc as DDG, sized to
+    // the board container, but tinted cyan-brass to match the Cool
+    // archetype palette (Wowhalla's gear background).
+    const onYolomungandrManifest = () => {
+      if (window.playSFX) window.playSFX('ddg_manifest', { category: 'effect' });
+      const container = document.querySelector('.board-center') || document.querySelector('.game-board') || document.body;
+      const rect = container.getBoundingClientRect();
+      const img = document.createElement('img');
+      img.src = '/Yolomungandr.png';
+      img.className = 'yolomungandr-manifest';
+      img.draggable = false;
+      img.style.cssText = [
+        'position:fixed',
+        `left:${rect.left}px`,
+        `top:${rect.top}px`,
+        `width:${rect.width}px`,
+        `height:${rect.height}px`,
+        'pointer-events:none',
+        'z-index:9500',
+        'object-fit:contain',
+        'transform-origin:center center',
+        'opacity:0',
+        'animation:yolomungandrManifest 2500ms ease-in-out forwards',
+        'filter:drop-shadow(0 0 40px rgba(120,210,255,0.85))',
+      ].join(';');
+      document.body.appendChild(img);
+      setTimeout(() => img.remove(), 2700);
+    };
+    socket.on('yolomungandr_manifest', onYolomungandrManifest);
     const onChaosScreen = () => {
       const overlay = document.createElement('div');
       overlay.className = 'chaos-screen-overlay';
@@ -18216,6 +18900,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('tempeste_redirect_strike', onTempesteRedirectStrike);
       socket.off('creature_damage_floater', onCreatureDamageFloater);
       socket.off('play_permanent_animation', onPermanentAnim);
+      socket.off('coolness_stack_change', onCoolnessStackChange);
+      socket.off('ability_zone_to_discard', onAbilityZoneToDiscard);
       socket.off('surprise_flip', onSurpriseFlip);
       socket.off('surprise_reset', onSurpriseReset);
       socket.off('play_ram_animation', onRamAnimation);
@@ -18242,9 +18928,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_skull_burst', onSkullBurst);
       socket.off('play_heal_beam', onHealBeam);
       socket.off('play_heal_zero', onHealZero);
+      socket.off('play_damage_zero', onDamageZero);
       socket.off('play_guardian_angel', onGuardianAngel);
       socket.off('hero_announcement', onHeroAnnouncement);
       socket.off('dark_deepsea_god_manifest', onDDGManifest);
+      socket.off('yolomungandr_manifest', onYolomungandrManifest);
       socket.off('play_chaos_screen', onChaosScreen);
       socket.off('play_gold_coins', onGoldCoins);
       socket.off('deck_to_deleted', onDeckToDeleted);
@@ -18740,6 +19428,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setOppTargetHighlight([]);
     }
   }, [gameState.potionTargeting]);
+
+  // Same cleanup for non-potion target prompts (Charme Lv1's ability
+  // borrow, any future `promptEffectTarget` flow that runs on the
+  // opponent's side). The active player's client emits
+  // `targeting_update` while picking, the opponent's client renders
+  // the picks as `oppTargetHighlight` (red zone outline), but if the
+  // prompt belongs to the OPPONENT and they close it, only their
+  // `gameState.effectPrompt` flips to null on our side — the
+  // highlight ref-state was sticky. Watch for the opp-side prompt
+  // disappearing and clear.
+  useEffect(() => {
+    const ep = gameState.effectPrompt;
+    if (!ep || ep.ownerIdx !== (myIdx === 0 ? 1 : 0)) {
+      // Either no prompt at all, or the prompt belongs to ME (in
+      // which case `oppTargetHighlight` represents nothing the
+      // opponent is currently picking on my view).
+      if (oppTargetHighlight.length > 0) setOppTargetHighlight([]);
+    }
+  }, [gameState.effectPrompt, myIdx]);
 
   // Damage number + Gold gain animations — detect changes from game state
   const [damageNumbers, setDamageNumbers] = useState([]);
@@ -19463,7 +20170,38 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'mill') {
         const p = playerByName(entry.player);
         const dest = entry.destination === 'delete' ? 'deleted' : 'discarded';
+        const cards = Array.isArray(entry.cards) ? entry.cards : null;
+        // When the engine logs the milled card names (targeted-mill
+        // path: actionMillCards with `targetCardName`, or any future
+        // mill helper that surfaces `cards: [...]`), render them
+        // explicitly so the player sees WHICH cards were milled —
+        // e.g. Cute Nerd Magenta sending a chosen deck card to
+        // discard. Falls back to the count-only summary when the
+        // log entry doesn't carry the names (random mill batches).
+        if (cards && cards.length > 0 && cards.length <= 8) {
+          return <span>{pName(p.name, p.color)} milled {cards.map((c, i) => <React.Fragment key={i}>{i > 0 && ', '}{cName(c)}</React.Fragment>)} ({dest}){entry.source ? <> by {cName(entry.source)}</> : ''}.</span>;
+        }
         return <span>{pName(p.name, p.color)} milled {entry.count} card{entry.count>1?'s':''} ({dest}){entry.source ? <> by {cName(entry.source)}</> : ''}.</span>;
+      }
+      if (t === 'magenta_discard') {
+        const p = playerByName(entry.player);
+        return <span>{pName(p.name, p.color)} discarded {cName(entry.discarded)} (Cute Nerd Magenta).</span>;
+      }
+      if (t === 'phase_start') {
+        // Engine fires this for all six PHASE_NAMES values
+        // ('START', 'RESOURCE', 'MAIN1', 'ACTION', 'MAIN2', 'END').
+        // Display them with friendly names so the log reads like a
+        // turn timeline rather than enum values.
+        const phaseDisplay = {
+          START:    'Start Phase',
+          RESOURCE: 'Resource Phase',
+          MAIN1:    'Main Phase 1',
+          ACTION:   'Action Phase',
+          MAIN2:    'Main Phase 2',
+          END:      'End Phase',
+        }[entry.phase] || entry.phase;
+        const p = entry.player ? playerByName(entry.player) : null;
+        return <span className="log-info">▸ {p ? <>{pName(p.name, p.color)}'s </> : null}{phaseDisplay}</span>;
       }
       if (t === 'additional_action_used') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} used an additional action ({cName(entry.provider)}).</span>; }
       if (t === 'atk_grant') { return <span className="log-info">{entry.hero} gained +{entry.amount} ATK from {cName(entry.source)}.</span>; }
@@ -19888,6 +20626,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {isChainPickSelected && <div className="chain-pick-number">{chainPickStep + 1}</div>}
                 {hero?.name && !isRamming ? (
                   <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={gameSkins}
+                    abilities={p.abilityZones?.[i]}
                     style={isStunned?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' } : undefined} />
                 ) : hero?.name && isRamming ? (
                   <div className="board-zone-empty" style={{ opacity: 0.3 }}>{hero.name.split(',')[0]}</div>
@@ -20929,6 +21668,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               });
               return hasTempeste ? <TempesteRainOverlay /> : null;
             })()}
+            {/* Wowhalla — brass-gear ambient background while the Hall of */}
+            {/* the Cool is in either player's Area zone. */}
+            {(((gameState.areaZones?.[0] || []).includes('Wowhalla, the Hall of the Cool'))
+              || ((gameState.areaZones?.[1] || []).includes('Wowhalla, the Hall of the Cool')))
+              && <WowhallaGearsOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Stinky Stables')) || ((gameState.areaZones?.[1] || []).includes('Stinky Stables'))) && <StinkyStablesOverlay />}
             {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
@@ -21015,10 +21759,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               )}
             </div>
             <div className="board-player-side board-side-me">{renderPlayerSide(me, false)}</div>
-            {/* Permanent zones — positioned absolutely to avoid layout interference */}
-            {(opp.permanents || []).length > 0 && (
+            {/* Permanent zones + Coolness Stack — positioned absolutely to avoid layout interference. */}
+            {/* The Stack is rendered as a child of the permanents column so it tracks with the */}
+            {/* permanent block's position when the column grows (Flying Island, extra permanents). */}
+            {((opp.permanents || []).length > 0
+              || (opp.coolnessStack || []).length > 0
+              || (gameState.areaZones?.[oppIdx] || []).includes('Wowhalla, the Hall of the Cool')) && (
               <div className="board-permanents board-permanents-opp">
-                {opp.permanents.map(perm => {
+                {(opp.permanents || []).map(perm => {
                   const permTargetId = `perm-${oppIdx}-${perm.id}`;
                   const isValidPermTarget = isTargeting && validTargetIds.has(permTargetId);
                   const isSelectedPermTarget = selectedSet.has(permTargetId);
@@ -21036,11 +21784,56 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     </div>
                   );
                 })}
+                {((opp.coolnessStack || []).length > 0
+                  || (gameState.areaZones?.[oppIdx] || []).includes('Wowhalla, the Hall of the Cool'))
+                  && (() => {
+                  // Render the wrapper as soon as Wowhalla is in this
+                  // player's Area so the data anchor exists BEFORE the
+                  // first push lands — without it, the very first
+                  // deck→Stack flight has no destination rect and the
+                  // animation silently no-ops. The slot also acts as
+                  // an empty placeholder during the brief window
+                  // between Wowhalla descending and the seed push.
+                  const stackLen = (opp.coolnessStack || []).length;
+                  const fullyMasked = stackLen === 0 || oppCoolnessHidden >= stackLen;
+                  const visibleLen = Math.max(0, stackLen - oppCoolnessHidden);
+                  const topName = stackLen === 0
+                    ? null
+                    : (fullyMasked
+                        ? opp.coolnessStack[stackLen - 1]
+                        : opp.coolnessStack[visibleLen - 1]);
+                  const stackTargetId = `coolness-${oppIdx}`;
+                  const isValidStackTarget = isTargeting && validTargetIds.has(stackTargetId);
+                  const isSelectedStackTarget = selectedSet.has(stackTargetId);
+                  return (
+                    <div data-opp-coolness="1"
+                      className={'board-coolness-slot' + (isValidStackTarget ? ' potion-target-valid' : '') + (isSelectedStackTarget ? ' potion-target-selected' : '')}
+                      onClick={isValidStackTarget ? () => togglePotionTarget(stackTargetId)
+                        : (stackLen > 0 ? () => setPileViewer({ title: 'Opponent Coolness Stack', cards: opp.coolnessStack }) : undefined)}
+                      onMouseEnter={() => topName && !fullyMasked && setHoveredPileCard && setHoveredPileCard(topName)}
+                      onMouseLeave={() => setHoveredPileCard && setHoveredPileCard(null)}
+                      style={isValidStackTarget ? { cursor: 'pointer' } : undefined}>
+                      {topName ? (
+                        <div style={fullyMasked ? { visibility: 'hidden' } : undefined}>
+                          <BoardCard cardName={topName} label={visibleLen > 1 ? `${visibleLen}` : null} />
+                        </div>
+                      ) : (
+                        // Empty placeholder — same dimensions as a card
+                        // so the rect anchor is meaningful. No visible
+                        // content; the cyan slot border alone cues the
+                        // empty Stack.
+                        <div style={{ width: 'var(--zone-w, 68px)', height: 'var(--zone-h, 95px)' }} />
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
-            {(me.permanents || []).length > 0 && (
+            {((me.permanents || []).length > 0
+              || (me.coolnessStack || []).length > 0
+              || (gameState.areaZones?.[myIdx] || []).includes('Wowhalla, the Hall of the Cool')) && (
               <div className="board-permanents board-permanents-me">
-                {me.permanents.map(perm => {
+                {(me.permanents || []).map(perm => {
                   const permTargetId = `perm-${myIdx}-${perm.id}`;
                   const isValidPermTarget = isTargeting && validTargetIds.has(permTargetId);
                   const isSelectedPermTarget = selectedSet.has(permTargetId);
@@ -21058,6 +21851,66 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     </div>
                   );
                 })}
+                {((me.coolnessStack || []).length > 0
+                  || (gameState.areaZones?.[myIdx] || []).includes('Wowhalla, the Hall of the Cool'))
+                  && (() => {
+                  // Render as soon as Wowhalla is in our Area — even when
+                  // the Stack is still empty (e.g. puzzle init or the
+                  // window between Wowhalla descend and the seed push).
+                  // The empty slot's data anchor is what the deck→Stack
+                  // flight needs to find on the very first push.
+                  const stackLen = (me.coolnessStack || []).length;
+                  const fullyMasked = stackLen === 0 || myCoolnessHidden >= stackLen;
+                  const visibleLen = Math.max(0, stackLen - myCoolnessHidden);
+                  const topName = stackLen === 0
+                    ? null
+                    : (fullyMasked
+                        ? me.coolnessStack[stackLen - 1]
+                        : me.coolnessStack[visibleLen - 1]);
+                  const stackTargetId = `coolness-${myIdx}`;
+                  const isValidStackTarget = isTargeting && validTargetIds.has(stackTargetId);
+                  const isSelectedStackTarget = selectedSet.has(stackTargetId);
+                  // Top-of-Stack play indicator: server tells us if the
+                  // top is playable from the Stack right now. We only
+                  // surface the play prompt during the player's turn
+                  // and only when no other prompts/effects are blocking.
+                  const canPlayFromStack = !isSpectator && !isTargeting && !isEffectLocked
+                    && isMyTurn && me.coolnessStackTopPlayable;
+                  // Click flow:
+                  //   • In targeting mode → toggle as a target.
+                  //   • Top is playable + my turn → fire play directly.
+                  //     The card's `resolveFromCoolnessStack` opens its
+                  //     own picker (Modnir/Swellpnir highlight eligible
+                  //     hero zones, Bifab opens deck-search, etc.) and
+                  //     the cost is only paid after that picker
+                  //     confirms — no extra confirm dialog needed.
+                  //   • Otherwise (Stack has cards but top isn't
+                  //     playable) → open the pile viewer.
+                  const onStackClick = isValidStackTarget
+                    ? () => togglePotionTarget(stackTargetId)
+                    : canPlayFromStack
+                      ? () => socket.emit('play_from_coolness_stack', { roomId: gameState.roomId })
+                      : (stackLen > 0 ? () => setPileViewer({ title: 'My Coolness Stack', cards: me.coolnessStack }) : undefined);
+                  return (
+                    <div data-my-coolness="1"
+                      className={'board-coolness-slot'
+                        + (isValidStackTarget ? ' potion-target-valid' : '')
+                        + (isSelectedStackTarget ? ' potion-target-selected' : '')
+                        + (canPlayFromStack ? ' coolness-playable' : '')}
+                      onClick={onStackClick}
+                      onMouseEnter={() => topName && !fullyMasked && setHoveredPileCard && setHoveredPileCard(topName)}
+                      onMouseLeave={() => setHoveredPileCard && setHoveredPileCard(null)}
+                      style={(isValidStackTarget || canPlayFromStack) ? { cursor: 'pointer' } : undefined}>
+                      {topName ? (
+                        <div style={fullyMasked ? { visibility: 'hidden' } : undefined}>
+                          <BoardCard cardName={topName} label={visibleLen > 1 ? `${visibleLen}` : null} />
+                        </div>
+                      ) : (
+                        <div style={{ width: 'var(--zone-w, 68px)', height: 'var(--zone-h, 95px)' }} />
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -21362,14 +22215,46 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {beamAnims.length > 0 && (
         <div className="beam-animation-container">
           <svg>
-            {beamAnims.map(b => (
-              <g key={b.id}>
-                <line className="beam-line-outer" x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} />
-                <line className="beam-line-glow" x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} />
-                <line className="beam-line-core" x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} style={{ stroke: b.color }} />
-                <circle className="beam-impact" cx={b.x2} cy={b.y2} r="5" fill={b.color} opacity="0.8" />
-              </g>
-            ))}
+            {beamAnims.map(b => {
+              // Base widths from CSS: outer=24, glow=12, core=3.
+              // `thickness` scales every layer + the impact pieces so
+              // bigger beams (Phatnir's laser) look proportionally
+              // beefier without needing dedicated CSS classes.
+              const k = b.thickness || 1;
+              const dur = b.duration || 1500;
+              // CSS variable drives the impact-ring keyframe duration
+              // so the shockwaves stay alive for the full lifetime of
+              // the beam.
+              const durStyle = { '--beamDur': dur + 'ms' };
+              const ringR = 18 * k; // base ring birth radius
+              return (
+                <g key={b.id}>
+                  <line className="beam-line-outer" x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} style={k !== 1 ? { strokeWidth: 24 * k } : undefined} />
+                  <line className="beam-line-glow"  x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} style={k !== 1 ? { strokeWidth: 12 * k } : undefined} />
+                  <line className="beam-line-core"  x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} style={{ stroke: b.color, ...(k !== 1 ? { strokeWidth: 3 * k } : {}) }} />
+                  {/* Sustained central flash — a stationary glow blob */}
+                  {/* that pulses for the full beam duration. */}
+                  <circle className="beam-flash"
+                    cx={b.x2} cy={b.y2} r={ringR * 1.4}
+                    fill={b.color} opacity="0.85" style={durStyle} />
+                  {/* Three staggered shockwave rings expanding outward, */}
+                  {/* each running for the full beam duration so the */}
+                  {/* impact never goes dark while the line is still up. */}
+                  <circle className="beam-shockwave beam-shockwave-1"
+                    cx={b.x2} cy={b.y2} r={ringR}
+                    fill="none" stroke={b.color} strokeWidth={3 * k}
+                    style={{ ...durStyle, '--beamRingMax': (ringR * 9) + 'px' }} />
+                  <circle className="beam-shockwave beam-shockwave-2"
+                    cx={b.x2} cy={b.y2} r={ringR}
+                    fill="none" stroke={b.color} strokeWidth={2 * k}
+                    style={{ ...durStyle, '--beamRingMax': (ringR * 12) + 'px' }} />
+                  <circle className="beam-shockwave beam-shockwave-3"
+                    cx={b.x2} cy={b.y2} r={ringR}
+                    fill="none" stroke={b.color} strokeWidth={1.5 * k}
+                    style={{ ...durStyle, '--beamRingMax': (ringR * 16) + 'px' }} />
+                </g>
+              );
+            })}
           </svg>
         </div>
       )}
@@ -22117,9 +23002,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         }}>×{entry.count}</div>
                       )}
                       <div className="gallery-source-badge" style={{
-                        background: entry.source === 'hand' ? 'rgba(80,200,120,.85)' : entry.source === 'discard' ? 'rgba(180,80,200,.85)' : 'rgba(80,140,220,.85)',
+                        background: entry.source === 'hand' ? 'rgba(80,200,120,.85)'
+                          : entry.source === 'discard' ? 'rgba(180,80,200,.85)'
+                          : entry.source === 'stack' ? 'rgba(120,220,255,.9)'
+                          : 'rgba(80,140,220,.85)',
                       }}>
-                        {entry.source === 'hand' ? 'HAND' : entry.source === 'discard' ? 'DISCARD' : 'DECK'}
+                        {entry.source === 'hand' ? 'HAND'
+                          : entry.source === 'discard' ? 'DISCARD'
+                          : entry.source === 'stack' ? 'STACK'
+                          : 'DECK'}
                       </div>
                     </div>
                   );

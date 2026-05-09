@@ -6222,6 +6222,31 @@ function evaluateState(engine, cpuIdx) {
   };
   score += sumEngineValue(ps) - sumEngineValue(opp);
 
+  // ── Hero passive value ───────────────────────────────────────────
+  // Heroes whose passive scales latent across many turns (Lilly's
+  // draw-on-steal feeding the rest of the deck plan, future heroes
+  // with similar long-tail value) opt into a flat eval bonus via:
+  //
+  //    cpuMeta: { heroPassiveValue: <number> }
+  //
+  // Each alive own hero with this meta adds the value to the score;
+  // opp side subtracts. Dead heroes drop their bonus, so removing a
+  // high-passive-value enemy hero (or losing one of our own) shows
+  // up as a swing on TOP of the standard ±500 KO term — making MCTS
+  // protect / hunt them proportionally to the magnitude their script
+  // declares. Distinct from `engineValue` (which lives on Abilities
+  // and scales with stack size) because Hero passives don't stack.
+  const sumHeroPassiveValue = (pl) => {
+    let total = 0;
+    for (const h of (pl.heroes || [])) {
+      if (!h?.name || h.hp <= 0) continue;
+      const meta = loadCardEffect(h.name)?.cpuMeta;
+      if (typeof meta?.heroPassiveValue === 'number') total += meta.heroPassiveValue;
+    }
+    return total;
+  };
+  score += sumHeroPassiveValue(ps) - sumHeroPassiveValue(opp);
+
   // Hand-value differential — weighted by card PLAYABILITY rather than
   // flat size. A card that can plausibly be played within the next ~2
   // turns is worth full value; a "dead" card (unaffordable within the
@@ -6263,6 +6288,45 @@ function evaluateState(engine, cpuIdx) {
   const ownHandValue = valueHand(ps.hand, cpuIdx);
   const oppHandValue = valueHand(opp.hand, oppIdx);
   score += ownHandValue - oppHandValue;
+
+  // ── Coolness Stack value ──────────────────────────────────────────
+  // Stack cards are future plays — they reach hand-equivalent
+  // accessibility once they hit the top (or get summoned out via
+  // Hipdall / Bifab / similar). Per-card valuation reuses the
+  // hand-card estimator so push-from-hand is roughly net-neutral,
+  // push-from-deck is net-positive, and pop-to-use loses the Stack
+  // value the way a hand-play loses the hand-card value (the
+  // effect's payoff lands in the other eval terms). No special pop
+  // penalty — the natural Stack-value loss IS the cost of using the
+  // resource, not extra punishment.
+  //
+  // TOP-OF-STACK BONUS: cards declaring `playableFromCoolnessStack`
+  // or `summonableFromCoolnessStack` are FREE to use the moment
+  // they're on top — that's strictly better than buried inventory.
+  // Crediting the bonus only to the topmost card means MCTS rolls
+  // the right ordering naturally: a "search and push" effect picks
+  // the Stack-playable target because that pick scores higher in
+  // the post-state, AND a follow-up push that buries it scores
+  // worse than a follow-up that doesn't (so the rollout prefers
+  // chains that leave the powerful Stack-only card uncovered when
+  // possible). No hard-coded preference list — the value comes
+  // from the eval delta the card's `playableFromCoolnessStack`
+  // declaration already carries.
+  const STACK_TOP_PLAYABLE_BONUS = 35;
+  const ownStackValue = valueHand(ps.coolnessStack || [], cpuIdx);
+  const oppStackValue = valueHand(opp.coolnessStack || [], oppIdx);
+  score += ownStackValue - oppStackValue;
+  const stackTopPlayableBonus = (stack) => {
+    if (!stack?.length) return 0;
+    const topName = stack[stack.length - 1];
+    const topScript = loadCardEffect(topName);
+    if (!topScript) return 0;
+    return (topScript.playableFromCoolnessStack || topScript.summonableFromCoolnessStack)
+      ? STACK_TOP_PLAYABLE_BONUS
+      : 0;
+  };
+  score += stackTopPlayableBonus(ps.coolnessStack);
+  score -= stackTopPlayableBonus(opp.coolnessStack);
 
   // ── Top-of-deck preview: cards the opponent will draw next turn ───
   // The CPU sees opp's deck order during MCTS rollouts (snapshot

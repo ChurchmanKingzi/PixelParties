@@ -44,8 +44,12 @@ module.exports = {
       // Gate: only fires while a Queen is controlled.
       if (!findControlledQueen(engine, pi)) return;
 
-      // Hard once-per-turn at the player level.
-      if (!ctx.hardOncePerTurn('sparkfly-worker-steal')) return;
+      // HARD once-per-turn (player-level) — only one Worker steal per
+      // turn total, even with multiple Workers in play. Pre-check
+      // without claiming so cancelling the picker doesn't burn the
+      // slot. Stored at `gs.hoptUsed[key:pi]` per the engine's
+      // canonical HOPT registry.
+      if (engine.gs.hoptUsed?.[`sparkfly-worker-steal:${pi}`] === engine.gs.turn) return;
 
       const targets = collectNonHeroBoardTargets(gs, engine);
       // Don't offer the just-summoned Worker as a steal target — it would
@@ -67,6 +71,8 @@ module.exports = {
       const sel = filteredTargets.find(t => t.id === picked[0]);
       if (!sel?._cardInstance) return;
 
+      // Commit — claim the player-level HOPT now and resolve.
+      ctx.hardOncePerTurn('sparkfly-worker-steal');
       await stealBoardCardToHand(engine, pi, sel._cardInstance, CARD_NAME);
     },
   },
