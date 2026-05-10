@@ -17,7 +17,7 @@
 //  owner's next turn start or when consumed.
 // ═══════════════════════════════════════════
 
-const { harpyformerInherentAction } = require('./_harpyformer-shared');
+const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyformer-shared');
 
 const CARD_NAME    = 'Harpyformer Choir';
 const ABILITY_NAME = 'Summoning Magic';
@@ -103,23 +103,13 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
-    // Confirm discard
-    const result = await engine.promptGeneric(pi, {
-      type: 'cardGallery',
-      cards: [{ name: ABILITY_NAME, source: 'hand' }],
+    const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
       title: CARD_NAME,
       description: `Discard "${ABILITY_NAME}" to reduce the next damage a Creature you control takes by 100 until your next turn.`,
-      confirmLabel: '🎵 Discard & Shield',
-      confirmClass: 'btn-info',
-      cancellable: true,
+      source: CARD_NAME,
+      logType: 'choir_discard',
     });
-    if (!result || result.cancelled) return false;
-
-    const idx = ps.hand.indexOf(ABILITY_NAME);
-    if (idx < 0) return false;
-    ps.hand.splice(idx, 1);
-    ps.discardPile.push(ABILITY_NAME);
-    engine.log('choir_discard', { player: ps.username, card: ABILITY_NAME });
+    if (!ok) return false;
 
     // Activate the shield on this creature instance
     ctx.card.counters._choirShield = true;

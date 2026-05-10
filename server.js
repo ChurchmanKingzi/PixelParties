@@ -1758,7 +1758,9 @@ function sendGameState(room, playerIdx, extra) {
       // see what the CPU is holding. Has no effect on MP games or the
       // CPU itself (the CPU brain reads from gs directly, not the
       // redacted client-side state).
-      hand: (pi === playerIdx || (room.type === 'singleplayer' && DEBUG_REVEAL_NPC_HAND)) ? ps.hand : [], handCount: ps.hand.length,
+      hand: (pi === playerIdx
+             || (room.type === 'singleplayer' && DEBUG_REVEAL_NPC_HAND)
+             || room.type === 'puzzle') ? ps.hand : [], handCount: ps.hand.length,
       revealedHandCards: pi !== playerIdx ? (() => {
         // SINGLEPLAYER debug reveal: show every card in the CPU's hand.
         // The client renders `revealedHandCards` as face-up tiles, so
@@ -1766,6 +1768,12 @@ function sendGameState(room, playerIdx, extra) {
         // requiring client-side changes. Gated on DEBUG_REVEAL_NPC_HAND
         // so public builds don't leak CPU information.
         if (room.type === 'singleplayer' && DEBUG_REVEAL_NPC_HAND) {
+          return ps.hand.map((name, index) => ({ index, name }));
+        }
+        // Puzzle mode reveals the CPU opponent's full hand to the
+        // player — solving puzzles requires perfect information about
+        // what the opponent can react with.
+        if (room.type === 'puzzle') {
           return ps.hand.map((name, index) => ({ index, name }));
         }
         const result = [];
@@ -1839,6 +1847,19 @@ function sendGameState(room, playerIdx, extra) {
         return result;
       })() : [],
       mainDeckCards: pi === playerIdx ? ps.mainDeck : [], deckCount: ps.mainDeck.length,
+      // Public-knowledge top of deck (Premonition stash, etc.) — sent
+      // to both players. Validated against `mainDeck` here so any
+      // out-of-band shuffle/mutation that didn't update the array
+      // gracefully falls back to "no visibility" instead of leaking
+      // an outdated name.
+      deckTopVisible: (() => {
+        const dtv = ps.deckTopVisible || [];
+        if (dtv.length === 0) return [];
+        const cap = Math.min(dtv.length, ps.mainDeck.length);
+        let valid = 0;
+        while (valid < cap && dtv[valid] === ps.mainDeck[valid]) valid++;
+        return dtv.slice(0, valid);
+      })(),
       potionDeckCards: pi === playerIdx ? ps.potionDeck : [], potionDeckCount: ps.potionDeck.length,
       discardPile: ps.discardPile, deletedPile: ps.deletedPile,
       disconnected: ps.disconnected || false, left: ps.left || false,
@@ -2385,6 +2406,17 @@ function sendSpectatorGameState(room) {
         ? ps.hand.map((name, index) => ({ index, name }))
         : [],
       mainDeckCards: [], deckCount: ps.mainDeck.length,
+      // Public-knowledge top of deck (Premonition stash, etc.) — same
+      // validation as the per-player view so spectators see the same
+      // semi-transparent overlay both players do.
+      deckTopVisible: (() => {
+        const dtv = ps.deckTopVisible || [];
+        if (dtv.length === 0) return [];
+        const cap = Math.min(dtv.length, ps.mainDeck.length);
+        let valid = 0;
+        while (valid < cap && dtv[valid] === ps.mainDeck[valid]) valid++;
+        return dtv.slice(0, valid);
+      })(),
       potionDeckCards: [], potionDeckCount: ps.potionDeck.length,
       discardPile: ps.discardPile, deletedPile: ps.deletedPile,
       disconnected: ps.disconnected || false, left: ps.left || false,
@@ -3305,6 +3337,24 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   return false;
 }
 
+/**
+ * Distracting Crystal in `pi`'s hand blocks any effect they activate
+ * that would shuffle cards from hand / discard / board back into the
+ * deck. The card-author tags matching effects with
+ * `script.shufflesIntoDeck: true`; this helper consults the tag and
+ * the `pi`-side hand contents. Used as a top-of-handler gate in every
+ * `doActivate*` / `doPlay*` / `doUseArtifactEffect` / `doConfirmPotion`
+ * path so the play is silently rejected before any state mutation.
+ */
+function isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName) {
+  if (!cardName) return false;
+  const ps = gs.players?.[pi];
+  if (!ps) return false;
+  if (!(ps.hand || []).includes('Distracting Crystal')) return false;
+  const sc = loadCardEffect(cardName);
+  return !!sc?.shufflesIntoDeck;
+}
+
 async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwner, attachmentZoneSlot, viaCreatureInstId }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
@@ -3312,6 +3362,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Spell', 'Attack'], { charmedOwner });
   if (!v) return false;
   const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName)) return false;
 
   // Wolflesia-style Creature spell-cast routing: the client sends
   // `viaCreatureInstId` when the player picked a Creature as the
@@ -3716,6 +3767,95 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         }
       }
     }
+    // Spreading Rumor fumble rider — the inherent path was taken
+    // because the casting Hero had Action capacity, but the Spell
+    // whiffed (0 cards discarded). Retroactively consume the Action
+    // that would have been spent. Order: prefer an additional-action
+    // provider; otherwise mark the main Action spent (advance to
+    // Action Phase from Main 1, or to Main Phase 2 from an Action-
+    // Phase cast — including the "between two actions" case where
+    // the engine already consumed _bonusMainActions during the
+    // inherent play). `_preventPhaseAdvance` suppresses the engine's
+    // auto-MAIN2 below so this rider owns all phase changes.
+    if (gs._spreadingRumorFumbled) {
+      const fumble = gs._spreadingRumorFumbled;
+      delete gs._spreadingRumorFumbled;
+      gs._preventPhaseAdvance = true;
+      if (!gs.result) {
+        const fps = gs.players[fumble.pi];
+        const typeId = (typeof room.engine.findAdditionalActionForCard === 'function')
+          ? room.engine.findAdditionalActionForCard(fumble.pi, fumble.cardName, fumble.heroIdx)
+          : null;
+        if (typeId) {
+          room.engine.consumeAdditionalAction(fumble.pi, typeId);
+          room.engine.log('rumor_fumble_consume_additional', {
+            player: fps?.username,
+          });
+          room.engine.sync();
+        } else if (gs.currentPhase === 2) {
+          // Main Phase 1 → consume the upcoming main Action: half-
+          // second pacing, advance to Action Phase, mark hero acted,
+          // then either stay (second-Action grant alive) or advance
+          // to Main Phase 2.
+          room.engine.log('rumor_fumble_consume_main', {
+            player: fps?.username,
+          });
+          await room.engine._delay(500);
+          if (gs.currentPhase === 2) {
+            await room.engine.advanceToPhase(fumble.pi, 3);
+          }
+          const fps2 = gs.players[fumble.pi];
+          if (fps2) {
+            if (!Array.isArray(fps2.heroesActedThisTurn)) fps2.heroesActedThisTurn = [];
+            if (!fps2.heroesActedThisTurn.includes(fumble.heroIdx)) {
+              fps2.heroesActedThisTurn.push(fumble.heroIdx);
+            }
+            // Engine reset _actionsPlayedThisPhase to 0 on ACTION
+            // entry — bump back to 1 so the second-Action gate fires
+            // correctly for any follow-up plays this phase.
+            fps2._actionsPlayedThisPhase = (fps2._actionsPlayedThisPhase || 0) + 1;
+          }
+          room.engine.sync();
+          await room.engine._delay(500);
+          const hasSecondAction = !!(fps2 && (
+            ((fps2._bonusMainActions || 0) > 0)
+            || (fps2.bonusActions?.heroIdx === fumble.heroIdx
+                && fps2.bonusActions.remaining > 0)
+            || room.engine.cardInstances.some(c => {
+              if (c.owner !== fumble.pi || !c.counters?.additionalActionAvail) return false;
+              const config = room.engine._additionalActionTypes?.[c.counters.additionalActionType];
+              return !!config?.isSecondActionGrant;
+            })
+          ));
+          if (!hasSecondAction && gs.currentPhase === 3) {
+            await room.engine.advanceToPhase(fumble.pi, 4);
+          }
+        } else if (gs.currentPhase === 3) {
+          // Action Phase — engine already ticked _actionsPlayedThis-
+          // Phase (and consumed _bonusMainActions if relevant) for
+          // the inherent play. Mark the hero acted (if not already)
+          // and advance to Main Phase 2 — per spec the "between two
+          // actions" fumble consumes the second Action, no stay.
+          room.engine.log('rumor_fumble_consume_main', {
+            player: fps?.username,
+          });
+          if (fps) {
+            if (!Array.isArray(fps.heroesActedThisTurn)) fps.heroesActedThisTurn = [];
+            if (!fps.heroesActedThisTurn.includes(fumble.heroIdx)) {
+              fps.heroesActedThisTurn.push(fumble.heroIdx);
+            }
+          }
+          room.engine.sync();
+          await room.engine._delay(500);
+          if (gs.currentPhase === 3) {
+            await room.engine.advanceToPhase(fumble.pi, 4);
+          }
+        }
+        // currentPhase 4 (MAIN2) with no additional → defensive
+        // no-op. The inherent gate (in spreading-rumor.js) shouldn't
+        // have allowed this play in the first place.
+      }
+    }
     if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction && !gs._preventPhaseAdvance) {
       await room.engine.advanceToPhase(pi, 4);
     }
@@ -3793,6 +3933,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   const effectName = inst.counters?._effectOverride || creatureName;
   const script = loadCardEffect(effectName);
   if (!script?.creatureEffect || !script?.onCreatureEffect) return false;
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, effectName)) return false;
 
   // Phase + action-economy gate. The default creature-effect path is
   // Main-Phase-only and free. Creatures that opt into `creatureActionCost`
@@ -3995,6 +4136,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
   const script = loadCardEffect(abilityName);
   if (!script?.freeActivation || !script?.onFreeActivate) return false;
   if (isActionPhase && !script.actionPhaseEligible) return false;
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName)) return false;
 
   const hoptKey = `free-ability:${abilityName}:${pi}`;
   if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
@@ -4091,7 +4233,20 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
       if (!script.noDefaultFlash) {
         room.engine._broadcastEvent('ability_activated', { owner: heroOwner, heroIdx, zoneIdx });
       }
-      if (isActionPhase) {
+      // Force-end-of-turn rider — Premonition sets this on its
+      // onFreeActivate. Same flag the doPlaySpell / doActivateAbility
+      // paths consume; same rationale (advance has to happen here,
+      // not inside the script, because of the `_spellResolutionDepth`
+      // guard on `advanceToPhase`).
+      if (gs._spellEndsTurn) {
+        delete gs._spellEndsTurn;
+        if (!gs.result) {
+          const cur = gs.currentPhase;
+          if (cur === 2 || cur === 3 || cur === 4) {
+            await room.engine.advanceToPhase(pi, 5);
+          }
+        }
+      } else if (isActionPhase) {
         const actingPs = gs.players[pi];
         actingPs._actionsPlayedThisPhase = (actingPs._actionsPlayedThisPhase || 0) + 1;
         if (actingPs._actionsPlayedThisPhase === 2 && (actingPs._bonusMainActions || 0) > 0) {
@@ -4432,6 +4587,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
 
   const script = loadCardEffect(abilityName);
   if (!script?.actionCost || !script?.onActivate) return false;
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName)) return false;
 
   const hoptKey = `ability-action:${abilityName}:${pi}`;
   if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
@@ -4623,7 +4779,21 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
       _skipReactionCheck: true,
     });
 
-    if (isActionPhase) {
+    // Force-end-of-turn rider — same flag the doPlaySpell path consumes
+    // (see the comment block there for why the advance has to happen
+    // here, after onActivate's depth release, instead of inside the
+    // ability script). Premonition's "Immediately end your turn
+    // afterwards" clause is the first ability to use this; the flag
+    // name is shared because the semantics are identical.
+    if (gs._spellEndsTurn) {
+      delete gs._spellEndsTurn;
+      if (!gs.result) {
+        const cur = gs.currentPhase;
+        if (cur === 2 || cur === 3 || cur === 4) {
+          await room.engine.advanceToPhase(pi, 5);
+        }
+      }
+    } else if (isActionPhase) {
       await room.engine.advanceToPhase(pi, 4);
     }
     // (additional-action providers were already consumed upfront before
@@ -4764,6 +4934,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       chosen = idx >= 0 ? availableEffects[idx] : null;
     }
     if (!chosen?.inst) return false;
+    if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, chosen.name)) return false;
 
     // ── Action-economy gate for `heroEffectActionCost: true` heroes ──
     // Mirror of the doPlaySpell / doPlayCreature / actionCost-Ability
@@ -5107,6 +5278,10 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   const script = loadCardEffect(potionName);
   if (!script) { gs.potionTargeting = null; return false; }
   if (script.validateSelection && !script.validateSelection(selectedIds, validTargets)) return false;
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, potionName)) {
+    gs.potionTargeting = null;
+    return false;
+  }
 
   const ps = gs.players[pi];
   if (cardType === 'Artifact' && goldCost > 0 && !script.manualGoldCost) {
@@ -5455,10 +5630,19 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
   const handReduction = ps._handCostReductions?.[handIndex] || 0;
   const costReduction = playerReduction + handReduction;
   const cost = Math.max(0, rawCost - costReduction);
-  if ((ps.gold || 0) < cost) return false;
 
   const script = loadCardEffect(cardName);
   if (!script) return false;
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName)) return false;
+  // `manualGoldCost` Artifacts (Dark Gear's level-scaled cost, Cool
+  // Repair / Beer's per-target multiplier, etc.) compute their own
+  // actual cost inside `resolve` — the cards.json `cost` is only the
+  // BASE / per-unit price for UI display. Skipping the base-cost gate
+  // here lets a player use Dark Gear on a Lv0 Creature (actual cost 0)
+  // even when they're short on gold; the script's own `canActivate`
+  // and `getValidTargets` filter targets by what they can actually
+  // afford. Standard Artifacts still gate on the base cost.
+  if (!script.manualGoldCost && (ps.gold || 0) < cost) return false;
   if ((cardData.subtype || '').toLowerCase() === 'reaction' && !script.proactivePlay) return false;
   if (script.canActivate && !script.canActivate(gs, pi)) return false;
   if (script.blockedByHandLock && ps.handLocked) return false;
@@ -6834,6 +7018,15 @@ async function setupGameState(room) {
     playerStates.push({ userId:p.userId, username:p.username, socketId:p.socketId,
       color:usr?.color||'#00f0ff', avatar:usr?.avatar||null, cardback:usr?.cardback||null, board:usr?.board||null,
       heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
+      // Top-first list of card names that are publicly known to be on
+      // top of `mainDeck` (Premonition's face-down stash, future similar
+      // effects). Index 0 = drawn next. Maintained alongside `mainDeck`
+      // shifts (drawn cards drop the front entry) and shuffles (cleared).
+      // Sent to BOTH players and rendered semi-transparently on the
+      // deck pile. A defensive prefix-match validation runs at state-
+      // send time so any unhandled mutation just degrades visibility
+      // instead of leaking a stale name.
+      deckTopVisible: [],
       hand:[], mainDeck, potionDeck, sideDeck, discardPile:[], deletedPile:[], disconnected:false, left:false, gold:0,
       abilityGivenThisTurn:[false,false,false], islandZoneCount:[0,0,0],
       damageLocked:false, itemLocked:false, dealtDamageToOpponent:false, potionLocked:false, potionsUsedThisTurn:0,
@@ -8708,6 +8901,41 @@ io.on('connection', (socket) => {
       }
     }
 
+    // Populated Island Turtle pre-block: a Turtle authored into a
+    // Support Zone takes up 3 zones in live play, but the puzzle
+    // builder writes it into a single slot. Walk every Hero on
+    // both sides and, for each that hosts a Turtle, fill up to 2
+    // of its OTHER currently-free slots with the `_ZoneBlocked`
+    // sentinel so the multi-zone occupation matches in-game
+    // behavior (the client renders sentinel slots with the red ✕
+    // overlay; placement validation reads them as occupied).
+    // Already-filled slots are left alone — the puzzle author may
+    // have intentionally placed companion cards beside the Turtle.
+    {
+      const TURTLE_NAME = 'Populated Island Turtle';
+      const TURTLE_SENTINEL = '_ZoneBlocked';
+      for (let pi = 0; pi < 2; pi++) {
+        const ps = gs.players[pi];
+        if (!ps?.supportZones) continue;
+        for (let hi = 0; hi < ps.supportZones.length; hi++) {
+          const sup = ps.supportZones[hi] || [];
+          let turtleSlot = -1;
+          for (let z = 0; z < sup.length; z++) {
+            if ((sup[z] || [])[0] === TURTLE_NAME) { turtleSlot = z; break; }
+          }
+          if (turtleSlot < 0) continue;
+          let blocked = 0;
+          for (let z = 0; z < sup.length && blocked < 2; z++) {
+            if (z === turtleSlot) continue;
+            if ((sup[z] || []).length === 0) {
+              sup[z] = [TURTLE_SENTINEL];
+              blocked++;
+            }
+          }
+        }
+      }
+    }
+
     // Track permanents
     for (let pi = 0; pi < 2; pi++) {
       for (const pm of (gs.players[pi].permanents || [])) {
@@ -8744,6 +8972,31 @@ io.on('connection', (socket) => {
         }
         room.engine._resetTerrorTracking();
         await room.engine.runHooks('onGameStart', { _skipReactionCheck: true });
+        // Mirror the normal-game pre-draw timing for cards whose
+        // effect "triggers at the start of the game, before both
+        // players draw their starting hands" (Bill, the Angry
+        // Auctioneer; Sid, the King of Thieves; future similar).
+        // Puzzles preset the hand instead of drawing, but the hook
+        // still has to run so those Heroes' opening effects fire on
+        // every puzzle attempt.
+        await room.engine.runHooks('onBeforeHandDraw', { _skipReactionCheck: true });
+        // Auto-reveal pass for preset hands. Live games route every
+        // hand-add through `actionDrawCards` / `actionAddCard-
+        // FromDeckToHand` / etc., which call
+        // `_autoRevealOnEnterHand` per slot — but puzzle hands are
+        // copied directly from `puzzleData` into `ps.hand` and never
+        // touch those helpers. Without this pass, a puzzle that
+        // starts with a Weakening / Mana Absorbing / Distracting
+        // Crystal in hand would NOT have it revealed, which silently
+        // disables the Crystal's whole effect set (hero-effect
+        // negation, +1 Spell levels, shuffle-into-deck lock).
+        for (let pi = 0; pi < (gs.players || []).length; pi++) {
+          const ps = gs.players[pi];
+          if (!ps?.hand) continue;
+          for (let i = 0; i < ps.hand.length; i++) {
+            room.engine._autoRevealOnEnterHand(pi, i, ps.hand[i]);
+          }
+        }
         // Puzzles skip the normal Resource/Action phases and jump straight to Main Phase 1.
         // Fire onTurnStart so cards that rely on it for per-turn setup (Slime Rancher,
         // additional actions, etc.) are correctly initialised before the player acts.

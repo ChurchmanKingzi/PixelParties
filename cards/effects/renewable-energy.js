@@ -16,6 +16,9 @@
 
 module.exports = {
   deleteOnUse: true,
+  // Shuffles discard cards back into deck — flagged for "No Retreat!"
+  // detection.
+  shufflesIntoDeck: true,
 
   canActivate(gs, pi) {
     const ps = gs.players[pi];

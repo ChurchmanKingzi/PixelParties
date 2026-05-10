@@ -20,6 +20,9 @@ const CARD_NAME = 'Guard Duty';
 
 module.exports = {
   inherentAction: true, // Free additional Action — no main-action cost.
+  // Shuffles discard pile back into deck — flagged for "No Retreat!"
+  // detection.
+  shufflesIntoDeck: true,
 
   spellPlayCondition(gs, pi) {
     return !gs[ONCE_PER_GAME_KEY]?.[pi];

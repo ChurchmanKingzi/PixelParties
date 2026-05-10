@@ -20,7 +20,7 @@
 //    is in hand.
 // ═══════════════════════════════════════════
 
-const { harpyformerInherentAction } = require('./_harpyformer-shared');
+const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyformer-shared');
 
 const CARD_NAME = 'Shanty Harpyformer';
 const ABILITY_NAME = 'Navigation';
@@ -75,30 +75,14 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
-    // ── Step 1: prompt player to pick a Navigation Ability from hand to discard
-    const navCardsInHand = (ps.hand || [])
-      .map((cn, i) => ({ name: cn, handIndex: i }))
-      .filter(c => c.name === ABILITY_NAME);
-
-    // Build gallery for the discard pick (deduplicated display, but we need index)
-    const discardResult = await engine.promptGeneric(pi, {
-      type: 'cardGallery',
-      cards: [{ name: ABILITY_NAME, source: 'hand' }],
+    // ── Step 1: discard a Navigation Ability from hand (in-hand click)
+    const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
       title: CARD_NAME,
       description: `Discard a "${ABILITY_NAME}" Ability from your hand, then reveal a card to search for a copy.`,
-      confirmLabel: '🗑️ Discard Navigation',
-      confirmClass: 'btn-danger',
-      cancellable: true,
+      source: CARD_NAME,
+      logType: 'shanty_discard',
     });
-
-    if (!discardResult || discardResult.cancelled) return false;
-
-    // Remove one copy of Navigation from hand
-    const navIdx = ps.hand.indexOf(ABILITY_NAME);
-    if (navIdx < 0) return false; // safety check
-    ps.hand.splice(navIdx, 1);
-    ps.discardPile.push(ABILITY_NAME);
-    engine.log('shanty_discard', { player: ps.username, card: ABILITY_NAME });
+    if (!ok) return false;
     engine.sync();
 
     // ── Step 2: prompt player to reveal a card from their (remaining) hand

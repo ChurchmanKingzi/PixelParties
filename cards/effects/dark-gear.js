@@ -76,7 +76,13 @@ function getStealableCreatures(engine, playerIdx) {
     const inst = t.cardInstance;
     if (inst && engine.isCreatureImmune(inst, 'targeting_immune')) return false;
     if (inst && engine.isCreatureImmune(inst, 'control_immune')) return false;
-    const cd = cardDB[t.cardName];
+    // Read the EFFECTIVE card data — instances may carry a per-instance
+    // override (Biomancy Token: a Potion repurposed as a Creature/Token
+    // with `_cardDataOverride.level = 0/1/2` based on its Biomancy
+    // level). Without this, the lookup hits the static `cardDB` entry
+    // for the underlying Potion (level: null), and `hasNumeric-
+    // CreatureLevel` filters tokens out of the steal pool.
+    const cd = (inst ? engine.getEffectiveCardData(inst) : null) || cardDB[t.cardName];
     // Dark Gear's cost scales with the target's level, so level-less
     // Creatures (Artifact-Creatures like Pollution Spewer) are NOT valid
     // targets — `hasNumericCreatureLevel` returns false for `level: null`,
@@ -156,8 +162,14 @@ module.exports = {
     const oppIdx = pi === 0 ? 1 : 0;
     const oppPs = gs.players[oppIdx];
     const cardDB = engine._getCardDB();
-    const cd = cardDB[target.cardName];
-    const level = cd?.level || 1;
+    // Match the effective-card-data lookup used in `getStealableCreatures`
+    // so the cost computed here agrees with the cost shown by the
+    // targeting filter (Biomancy Token's per-instance level override
+    // would otherwise fall back to the underlying Potion's null level
+    // and silently round to the `|| 1` default).
+    const targetInst = target.cardInstance;
+    const cd = (targetInst ? engine.getEffectiveCardData(targetInst) : null) || cardDB[target.cardName];
+    const level = cd?.level != null ? cd.level : 1;
     const totalCost = level * BASE_COST;
 
     // Final gold check (may have changed since canActivate)

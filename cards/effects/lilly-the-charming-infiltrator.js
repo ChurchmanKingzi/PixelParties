@@ -40,6 +40,18 @@ module.exports = {
       if (ctx.takerPi !== ctx.cardOwner) return;
       const hero = ctx.attachedHero;
       if (!hero?.name || hero.hp <= 0) return;
+      // Stream Lilly's card to both players — same `card_reveal`
+      // broadcast that active Hero / Spell / Ability activations use
+      // when they fire, so opp (and spectators) can see exactly which
+      // Hero passive triggered the bonus draw. Pair it with the
+      // standard hero-zone flash for a clean source highlight, and a
+      // small delay so the reveal lands before the draw animation.
+      const engine = ctx._engine;
+      engine._broadcastEvent('card_effect_flash', {
+        owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx,
+      });
+      engine._broadcastEvent('card_reveal', { cardName: hero.name });
+      await engine._delay(400);
       // One draw per stolen card. The hook is emitted once per card
       // by the source effect, so this single draw IS the per-card
       // multiplier the user described.

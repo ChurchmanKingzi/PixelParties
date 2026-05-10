@@ -10,6 +10,9 @@
 module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
+  // Shuffles hand back into deck — flagged for "No Retreat!"
+  // detection.
+  shufflesIntoDeck: true,
 
   // CPU threat assessment: net +1 draw per activation (refills hand + 1).
   supportYield() {

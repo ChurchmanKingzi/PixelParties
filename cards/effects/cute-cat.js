@@ -91,12 +91,21 @@ module.exports = {
       const engine = ctx._engine;
       const pi     = ctx.cardOwner;
 
-      // Reveal the card to both players. `card_reveal` triggers the
-      // CardRevealOverlay (same overlay used by attached-Hero reveals,
-      // deck searches, etc.) so the player actually notices Cute Cat
-      // landed before it bounces.
-      engine._broadcastEvent('card_reveal', { cardName: CARD_NAME, playerIdx: pi });
+      // SYNC FIRST so Cute Cat is visible in the support slot before
+      // anything else fires. The engine-default `summon_effect` glow
+      // was already broadcast by `doPlayCreature` (BEFORE our onPlay
+      // ran) — if we open the `card_reveal` overlay first, the glow's
+      // CSS animation has been running for a few frames on a still-
+      // empty slot and the player perceives "reveal first, summon
+      // animation last". Syncing first commits the slot's render
+      // while the glow is still mid-animation, so the glow visibly
+      // plays UNDERNEATH the reveal in parallel with the effect.
       engine.sync();
+      // Brief beat for React to commit the slot render before the
+      // overlay zooms up — without this the overlay can win the same
+      // frame and obscure the visible-Cute-Cat moment.
+      await engine._delay(80);
+      engine._broadcastEvent('card_reveal', { cardName: CARD_NAME, playerIdx: pi });
       await engine._delay(ON_BOARD_HOLD_MS);
 
       // Defer the OWN-side mill: onCreatureDeath fires during the

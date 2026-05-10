@@ -78,6 +78,9 @@ module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   isPostSummonHandReaction: true, // Custom flag, see _checkPostSummonHandReactions.
+  // Shuffles hand cards back into deck — flagged for "No Retreat!"
+  // detection.
+  shufflesIntoDeck: true,
 
   // Trigger only fires when the summon was DIRECT FROM DECK and we
   // haven't used Cosmic Manipulation this turn.

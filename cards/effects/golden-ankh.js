@@ -26,6 +26,60 @@ module.exports = {
   // "only revive if there's a use this turn".
   cpuMeta: { evaluateThroughTurnEnd: true },
 
+  /**
+   * Pre-plan heuristic — keep the CPU from spending 10 gold + a hand
+   * card to revive a Hero who has nothing to do that turn. Without
+   * this guard, `evaluateThroughTurnEnd` alone is insufficient: the
+   * MCTS rollout can still find tiny positional bumps that beat the
+   * +30 gate threshold even though nothing useful is achievable.
+   *
+   * Returns true iff at least one dead Hero on the player's side
+   * would, IF revived, have a meaningful play this turn — a card
+   * in hand they could cast, an active Hero effect, or an activate-
+   * able Ability / Creature already attached to them.
+   *
+   * Implementation samples the live engine helpers
+   * (`getHeroPlayableCards`, `getActiveHeroEffects`, `getActivatable-
+   * Abilities`, `getActivatableCreatures`) with the dead Hero's HP
+   * temporarily set positive — they all gate on hp > 0 internally.
+   * The mutation is fully reverted in `finally` so the heuristic is
+   * side-effect-free.
+   */
+  cpuShouldPlay(engine, pi) {
+    const gs = engine.gs;
+    const ps = gs.players[pi];
+    if (!ps) return false;
+    const heroes = ps.heroes || [];
+    for (let hi = 0; hi < heroes.length; hi++) {
+      const hero = heroes[hi];
+      if (!hero?.name || hero.hp > 0) continue;
+
+      const savedHp = hero.hp;
+      hero.hp = 100;
+      let useful = false;
+      try {
+        const playable = engine.getHeroPlayableCards?.(pi);
+        if (playable?.own?.[hi]?.length > 0) { useful = true; }
+        if (!useful) {
+          const heroEffects = engine.getActiveHeroEffects?.(pi);
+          if (Array.isArray(heroEffects) && heroEffects.some(e => e.heroIdx === hi)) useful = true;
+        }
+        if (!useful) {
+          const abilities = engine.getActivatableAbilities?.(pi);
+          if (Array.isArray(abilities) && abilities.some(a => a.heroIdx === hi)) useful = true;
+        }
+        if (!useful) {
+          const creatures = engine.getActivatableCreatures?.(pi);
+          if (Array.isArray(creatures) && creatures.some(c => c.heroIdx === hi)) useful = true;
+        }
+      } finally {
+        hero.hp = savedHp;
+      }
+      if (useful) return true;
+    }
+    return false;
+  },
+
   canActivate(gs, pi) {
     const ps = gs.players[pi];
     // Must have at least one dead hero

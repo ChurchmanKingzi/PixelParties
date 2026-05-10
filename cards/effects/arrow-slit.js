@@ -57,6 +57,30 @@ module.exports = {
     // an Arrow (defensive; shouldn't happen given Arrow's own gate).
     const initial = chainCtx.chain.find(l => l.isInitialCard);
     if (!initial || initial.cardType !== 'Attack') return false;
+    // Each Arrow Slit retriggers exactly one Arrow at resolve time —
+    // so the chain can only support as many Slits as the Arrows pi
+    // already played. Reject when every existing Arrow is already
+    // spoken for by a previously-chained Slit. The
+    // `_retriggeredByArrowSlit` flag is only stamped at resolve time,
+    // so during chain build we count Slits-already-chained vs
+    // Arrows-available manually here. Negated Slits don't claim any
+    // Arrow (their resolve skips), so they don't count against the
+    // budget — same exemption their resolution path applies.
+    let arrowsAvailable = 0;
+    let slitsAlreadyChained = 0;
+    for (const link of chainCtx.chain) {
+      if (link.isInitialCard) continue;
+      if (link.owner !== pi) continue;
+      if (link.negated) continue;
+      if (link._retriggeredByArrowSlit) continue;
+      if (link.cardName === CARD_NAME) {
+        slitsAlreadyChained++;
+        continue;
+      }
+      const linkScript = loadCardEffect(link.cardName);
+      if (linkScript?.isArrow) arrowsAvailable++;
+    }
+    if (arrowsAvailable <= slitsAlreadyChained) return false;
     return true;
   },
 

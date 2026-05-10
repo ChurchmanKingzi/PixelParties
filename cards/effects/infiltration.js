@@ -35,6 +35,11 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps || ps.handLocked) return false;
     const oi = pi === 0 ? 1 : 0;
+    // Turn-1 protection: peeking / taking from a shielded opp's deck
+    // is blocked. Same rule applies in onFreeActivate as a defensive
+    // re-check in case the activation reached the engine despite the
+    // greyed-out UI.
+    if (gs.firstTurnProtectedPlayer === oi) return false;
     const ops = gs.players[oi];
     if (!ops || (ops.mainDeck || []).length === 0) return false;
     return true;
@@ -49,6 +54,7 @@ module.exports = {
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name) return false;
     const oi = pi === 0 ? 1 : 0;
+    if (gs.firstTurnProtectedPlayer === oi) return false;
     const ops = gs.players[oi];
     if (!ops || (ops.mainDeck || []).length === 0) return false;
 

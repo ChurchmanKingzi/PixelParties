@@ -48,6 +48,13 @@ module.exports = {
       const oppIdx = ctx.playerIdx;
       const oppPs  = gs.players[oppIdx];
       if ((oppPs?.mainDeck || []).length === 0) return;
+      // Turn-1 protection: opp's deck is shielded from any effect that
+      // mills / peeks the top while protection is active. Jean's bonus
+      // mill is blocked the same as the original mill source would
+      // have been; an upstream gated mill normally won't reach here
+      // anyway, but a non-gated source (e.g., self-mill that splashes
+      // both decks) could otherwise feed Jean past the shield.
+      if (gs.firstTurnProtectedPlayer === oppIdx) return;
 
       // Stream Jean's hero card to both players before the bonus mill
       engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });

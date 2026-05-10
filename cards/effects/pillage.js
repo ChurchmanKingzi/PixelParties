@@ -23,6 +23,9 @@ module.exports = {
     const pi     = ctx.cardOwner;
     const oppIdx = pi === 0 ? 1 : 0;
     const oppPs  = ctx.players[oppIdx];
+    // Turn-1 protection: milling the top of a shielded opp's deck
+    // is blocked. Same gate Thieving / Infiltration / Enigma apply.
+    if (ctx._engine.gs.firstTurnProtectedPlayer === oppIdx) return false;
     return (oppPs?.mainDeck || []).length > 0;
   },
 
@@ -31,6 +34,9 @@ module.exports = {
     const gs      = engine.gs;
     const pi      = ctx.cardOwner;
     const oppIdx  = pi === 0 ? 1 : 0;
+
+    // Defensive re-check (same gate as canFreeActivate).
+    if (gs.firstTurnProtectedPlayer === oppIdx) return false;
 
     const count = MILL_BY_LEVEL[Math.min(level, 3) - 1] ?? 1;
 

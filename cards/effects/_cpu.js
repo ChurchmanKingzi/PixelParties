@@ -968,6 +968,23 @@ async function activateFreeAbilities(engine, helpers) {
             if (!script.canFreeActivate(ctx, slot.length)) continue;
           } catch { continue; }
         }
+        // Per-card "wait for a better state" predicate — same hook
+        // shape as the creature-effect loop. Mirrors that path so
+        // turn-ending free abilities (Premonition) and any future
+        // free ability whose value scales with rest-of-turn state can
+        // defer themselves to the right moment instead of shotgunning
+        // at the first runMainPhase pass and ending the CPU's turn
+        // with most actions unspent.
+        if (typeof script.cpuMeta?.shouldActivateNow === 'function') {
+          let shouldFire = true;
+          try {
+            shouldFire = !!script.cpuMeta.shouldActivateNow(engine, cpuIdx);
+          } catch { shouldFire = true; }
+          if (!shouldFire) {
+            tried.add(key);
+            continue;
+          }
+        }
         pick = { heroIdx: hi, zoneIdx: zi, abilityName, key };
         break;
       }
@@ -1332,6 +1349,19 @@ function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
   // calls doConfirmPotion to finish resolution.
   const isTargeted = !!(script.getValidTargets && script.targetingConfig);
   if (!isTargeted && !script.resolve) return null;
+  // Per-card CPU sanity gate. Cards whose value is strictly conditional
+  // on board state (Golden Ankh's "only revive if I'll use the Hero
+  // this turn", any future "useless without a follow-up" artifact)
+  // can opt in via `cpuShouldPlay(engine, pi) → bool`. Returning false
+  // makes the planner skip the play before the MCTS gate even runs —
+  // saves the gold + hand card the gate's threshold sometimes lets
+  // through on tiny positional deltas.
+  if (typeof script.cpuShouldPlay === 'function') {
+    let ok = true;
+    try { ok = !!script.cpuShouldPlay(engine, pi); }
+    catch (err) { console.error(`[cpu] cpuShouldPlay ${cardName} threw:`, err.message); ok = true; }
+    if (!ok) return null;
+  }
   return { kind: 'useEffect', cardName, handIdx, isTargeted };
 }
 

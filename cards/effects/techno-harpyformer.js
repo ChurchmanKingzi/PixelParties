@@ -10,7 +10,7 @@
 //    from hand to draw 2 cards.
 // ═══════════════════════════════════════════
 
-const { harpyformerInherentAction } = require('./_harpyformer-shared');
+const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyformer-shared');
 
 const CARD_NAME    = 'Techno Harpyformer';
 const ABILITY_NAME = 'Inventing';
@@ -53,22 +53,13 @@ module.exports = {
     const ps     = gs.players[pi];
     if (!ps) return false;
 
-    const result = await engine.promptGeneric(pi, {
-      type:         'cardGallery',
-      cards:        [{ name: ABILITY_NAME, source: 'hand' }],
-      title:        CARD_NAME,
-      description:  `Discard "${ABILITY_NAME}" to draw 2 cards.`,
-      confirmLabel: '🎵 Discard & Draw 2',
-      confirmClass: 'btn-info',
-      cancellable:  true,
+    const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
+      title: CARD_NAME,
+      description: `Discard "${ABILITY_NAME}" to draw 2 cards.`,
+      source: CARD_NAME,
+      logType: 'techno_discard',
     });
-    if (!result || result.cancelled) return false;
-
-    const idx = ps.hand.indexOf(ABILITY_NAME);
-    if (idx < 0) return false;
-    ps.hand.splice(idx, 1);
-    ps.discardPile.push(ABILITY_NAME);
-    engine.log('techno_discard', { player: ps.username, card: ABILITY_NAME });
+    if (!ok) return false;
     engine.sync();
 
     await engine.actionDrawCards(pi, 2);

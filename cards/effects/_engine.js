@@ -1139,21 +1139,20 @@ class GameEngine {
       }
     }
 
-    // ── Puzzle mode: opponent ALWAYS activates Surprises when offered ──
+    // ── Puzzle mode: opponent NEVER declines a prompt ──
     // The default below declines every cancellable prompt, which silently
-    // skipped opponent Surprise triggers in puzzles. The Surprise window
-    // confirms have shape { type: 'confirm', title: surpriseCardName, ... }
-    // — we detect them by looking up the title and checking `isSurprise`
-    // on the script. Live PvP / regular CPU games are unaffected (their
-    // CPU brain wrapper at _cpu.js handles its own logic before reaching
-    // this default).
-    if (this.isPuzzle && promptData.type === 'confirm' && cardName) {
-      const script = loadCardEffect(cardName);
-      if (script?.isSurprise) return true;
-    }
+    // skipped opponent Surprise triggers AND Reactions in puzzles. In
+    // puzzle mode the CPU should always opt into anything offered — fire
+    // every Reaction, confirm every Surprise, auto-pick the first
+    // option for any cardGallery. Live PvP / regular CPU games are
+    // unaffected (their CPU brain wrapper at _cpu.js handles its own
+    // logic before reaching this default).
+    const puzzleAutoFire = this.isPuzzle && promptPi === this._cpuPlayerIdx;
 
     // ── Default: cancellable → decline, mandatory → auto-resolve ──
-    if (promptData.cancellable) return null; // Decline optional actions
+    // (Puzzle CPU skips the decline branch and falls through to the
+    // mandatory-resolution logic below so reactions/targets fire.)
+    if (!puzzleAutoFire && promptData.cancellable) return null;
 
     const type = promptData.type;
 
@@ -1212,9 +1211,54 @@ class GameEngine {
     }
 
     if (type === 'handPick') {
+      // The client returns `{ selectedCards: [{ handIndex, cardName }] }`
+      // so the CPU's response must match that shape — the previous
+      // `{ selectedIndex }` shape silently failed every handPick consumer.
       const eligible = promptData.eligibleIndices || [];
-      if (eligible.length === 0) return null;
-      return { selectedIndex: eligible[0] };
+      if (eligible.length === 0) return { selectedCards: [] };
+      const ps = this.gs.players[promptPi];
+      if (!ps) return { selectedCards: [] };
+      const minSelect = promptData.minSelect || 1;
+      const maxSelect = promptData.maxSelect || eligible.length;
+
+      // `nameLockOnFirstSelect` (Visionary Genius Heinz, etc.) — the
+      // CPU should pick the most-numerous card NAME within the
+      // eligible set so it gets the largest possible discard-and-draw
+      // payoff. Falls back to first-eligible when no name has enough
+      // copies for the minimum.
+      if (promptData.nameLockOnFirstSelect) {
+        const counts = {};
+        for (const idx of eligible) {
+          const name = ps.hand?.[idx];
+          if (!name) continue;
+          counts[name] = (counts[name] || 0) + 1;
+        }
+        let bestName = null, bestCount = 0;
+        for (const [name, count] of Object.entries(counts)) {
+          if (count > bestCount) { bestName = name; bestCount = count; }
+        }
+        if (!bestName || bestCount < minSelect) return { selectedCards: [] };
+        const pickN = Math.min(maxSelect, bestCount);
+        const selectedIndices = [];
+        for (const idx of eligible) {
+          if (selectedIndices.length >= pickN) break;
+          if (ps.hand[idx] === bestName) selectedIndices.push(idx);
+        }
+        return {
+          selectedCards: selectedIndices.map(idx => ({
+            handIndex: idx, cardName: ps.hand[idx],
+          })),
+        };
+      }
+
+      // Generic: take the first `pickN` eligible indices.
+      const pickN = Math.min(maxSelect, eligible.length);
+      const selectedIndices = eligible.slice(0, pickN);
+      return {
+        selectedCards: selectedIndices.map(idx => ({
+          handIndex: idx, cardName: ps.hand?.[idx] ?? null,
+        })),
+      };
     }
 
     if (type === 'pickHandCard') {
@@ -1225,6 +1269,18 @@ class GameEngine {
       const eligible = promptData.eligibleIndices;
       const idx = eligible ? eligible[0] : 0;
       return { cardName: ps.hand[idx], handIndex: idx };
+    }
+
+    if (type === 'pickFromOppHand') {
+      // Single-pick from the OPPONENT's hand (Letter of Misinformations).
+      // The CPU just takes the first eligible slot — `eligibleIndices`
+      // already excludes Letter copies that the script forbids picking.
+      const oppPi = promptPi === 0 ? 1 : 0;
+      const ops = this.gs.players[oppPi];
+      if (!ops || !ops.hand || ops.hand.length === 0) return null;
+      const eligible = promptData.eligibleIndices;
+      const idx = (eligible && eligible.length > 0) ? eligible[0] : 0;
+      return { handIndex: idx, cardName: ops.hand[idx] || null };
     }
 
     if (type === 'heroAction') {
@@ -1332,8 +1388,18 @@ class GameEngine {
       }
     }
 
-    // Cancellable → decline (return empty)
-    if (config.cancellable) return [];
+    // Puzzle CPU always picks the first available target — even on
+    // optional / cancellable prompts. Matches the puzzle-mode rule
+    // that the CPU never declines anything (it auto-fires every
+    // Reaction it has, and any target choice within those reactions
+    // resolves to the first valid option). Mirrors the parallel
+    // override in `_getCpuGenericResponse`.
+    const puzzleAutoFire = this.isPuzzle
+      && _promptedPlayerIdx === this._cpuPlayerIdx;
+
+    // Cancellable → decline (return empty), unless puzzle CPU is the
+    // recipient (which falls through to the mandatory-pick logic).
+    if (!puzzleAutoFire && config.cancellable) return [];
 
     // Mandatory → honour `minRequired` / `maxTotal` so multi-pick prompts
     // (Gathering Storm forces opp to pick 3, sacrifice prompts force N
@@ -1535,6 +1601,78 @@ class GameEngine {
   /** Remove a CardInstance from tracking. */
   _untrackCard(instanceId) {
     this.cardInstances = this.cardInstances.filter(c => c.id !== instanceId);
+  }
+
+  /**
+   * Auto-stamp `_permanentlyRevealedHandIndices[handIdx] = true` for
+   * any card whose script opts in via `revealOnEnterHand: true`. Called
+   * from every canonical add-to-hand path (draw, tutor, transfer);
+   * idempotent — re-stamping the same index is a no-op. Cards that
+   * mutate their own hand-state directly without going through one of
+   * these helpers (a card script that does `ps.hand.push(name)` raw)
+   * miss the auto-reveal — those few one-off paths can call this
+   * helper themselves if they need the same coverage.
+   */
+  _autoRevealOnEnterHand(playerIdx, handIdx, cardName) {
+    if (!cardName || handIdx < 0) return;
+    const script = loadCardEffect(cardName);
+    if (!script?.revealOnEnterHand) return;
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return;
+    if (!ps._permanentlyRevealedHandIndices) ps._permanentlyRevealedHandIndices = {};
+    ps._permanentlyRevealedHandIndices[handIdx] = true;
+  }
+
+  /**
+   * Weakening Crystal aura — while a copy sits in a player's hand,
+   * every alive Hero on that player's side is afflicted with
+   * `negated` for the duration. Stamps the status with a
+   * `_byWeakeningCrystal: true` marker so the helper can tell its
+   * own auras apart from independently-applied negation (Crash
+   * Course / Cute Yokai / etc.); cleansing helpers
+   * (`getCleansableStatuses`) already exclude `negated` outright,
+   * but the marker also ensures REMOVAL only takes our auras off.
+   *
+   * Called from `sync()` so every state push is consistent:
+   *   • Crystal added or revealed → next sync applies negated to
+   *     all the controller's heroes.
+   *   • Crystal discarded / played / transferred away → next sync
+   *     clears the marker-tagged negation; non-Crystal-sourced
+   *     negations stay put.
+   *
+   * No-op for sides without a Crystal in hand AND no marker-tagged
+   * negation to clean up. Idempotent — safe to call repeatedly.
+   */
+  _refreshWeakeningCrystalNegation() {
+    const players = this.gs?.players;
+    if (!Array.isArray(players)) return;
+    for (let pi = 0; pi < players.length; pi++) {
+      const ps = players[pi];
+      if (!ps?.heroes) continue;
+      const hasCrystal = (ps.hand || []).includes('Weakening Crystal');
+      for (const hero of ps.heroes) {
+        if (!hero?.name) continue;
+        if (hasCrystal) {
+          // Apply the aura. Don't override a non-Crystal negation
+          // (someone else applied it; their removal logic owns it).
+          // Re-stamping our own marker is a no-op, but we keep the
+          // original `appliedTurn` field so cards keying on
+          // "negated this turn?" stay accurate.
+          const cur = hero.statuses?.negated;
+          if (!cur || cur._byWeakeningCrystal === true) {
+            if (!hero.statuses) hero.statuses = {};
+            hero.statuses.negated = {
+              _byWeakeningCrystal: true,
+              appliedTurn: cur?.appliedTurn ?? this.gs?.turn ?? 0,
+            };
+          }
+        } else if (hero.statuses?.negated?._byWeakeningCrystal === true) {
+          // Last Crystal left this hand — clean OUR aura, leave
+          // any other negation source untouched.
+          delete hero.statuses.negated;
+        }
+      }
+    }
   }
 
   /**
@@ -4915,8 +5053,12 @@ class GameEngine {
       }
 
       const cardName = ps.mainDeck.shift();
+      // Premonition / future top-of-deck visibility tracker: drawing the
+      // top card consumes one slot of public visibility.
+      if (ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.shift();
       ps.hand.push(cardName);
       const inst = this._trackCard(cardName, playerIdx, ZONES.HAND);
+      this._autoRevealOnEnterHand(playerIdx, ps.hand.length - 1, cardName);
       drawn.push(inst);
 
       this.log('draw', { player: ps.username, card: cardName });
@@ -4945,8 +5087,10 @@ class GameEngine {
         if (!this.gs._nomuDrawCount) this.gs._nomuDrawCount = {};
         this.gs._nomuDrawCount[nomuKey] = (this.gs._nomuDrawCount[nomuKey] || 0) + 1;
         const extraCard = ps.mainDeck.shift();
+        if (ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.shift();
         ps.hand.push(extraCard);
         const extraInst = this._trackCard(extraCard, playerIdx, ZONES.HAND);
+        this._autoRevealOnEnterHand(playerIdx, ps.hand.length - 1, extraCard);
         drawn.push(extraInst);
         this.log('draw', { player: ps.username, card: extraCard });
         this._broadcastEvent('nomu_draw', { playerIdx, cardName: extraCard });
@@ -4967,6 +5111,21 @@ class GameEngine {
     if (drawn.length > 0 && this.gs.currentPhase !== PHASES.RESOURCE && !this._inSurpriseResolution) {
       if (!this._pendingSurpriseDraws) this._pendingSurpriseDraws = {};
       this._pendingSurpriseDraws[playerIdx] = (this._pendingSurpriseDraws[playerIdx] || 0) + drawn.length;
+    }
+
+    // Trailing pacing delay — when an effect that resolves multiple
+    // draws back-to-back fires (Crystal Well + Mary Crestmas chained
+    // off the same hand transfer, Wisdom + a follow-up draw, etc.),
+    // each `actionDrawCards` call leaves this short tail so the next
+    // call's first card animation doesn't overlap. Skipped for the
+    // Resource Phase auto-draw (already paced by the phase rhythm)
+    // and during MCTS rollouts (`_fastMode` short-circuits `_delay`
+    // anyway, so this is just a clarity guard).
+    if (drawn.length > 0
+        && !opts._isResourceDraw
+        && !opts._skipTrailingDelay
+        && this.gs.currentPhase !== PHASES.RESOURCE) {
+      await this._delay(250);
     }
 
     return drawn;
@@ -4991,6 +5150,17 @@ class GameEngine {
       if (count === 0) return [];
     }
     const drawn = [];
+    // Visual pacing — sync EVERY draw (including the last) and wait
+    // a short stagger between them so the cards' hand-fly-in
+    // animations chain. The last card's stagger is replaced by a
+    // longer trailing tail below: the client animation lasts ~500ms
+    // (see `setTimeout(... 500)` in app-board.jsx's draw-anim
+    // handler), and the caller's cleanup must NOT run until that
+    // last card has fully landed — otherwise a consuming card like
+    // Potion of Greed begins its hand → deleted-pile exit while the
+    // second draw is still mid-flight, producing crossed paths.
+    const interDrawDelay = count > 1 ? 220 : 0;
+    const lastCardLandingDelay = 380;
     for (let i = 0; i < count; i++) {
       if ((ps.potionDeck || []).length === 0) break;
       const cardName = ps.potionDeck.shift();
@@ -5008,11 +5178,27 @@ class GameEngine {
         _isResourceDraw: false,
         _isPotionDraw: true,
       });
+      // Sync THIS draw immediately so the client kicks off its
+      // flight animation now, even when this is the final card.
+      if (interDrawDelay > 0) this.sync();
+      // Stagger only between draws — the trailing tail covers the
+      // last card's landing time.
+      if (interDrawDelay > 0 && i < count - 1) {
+        await this._delay(interDrawDelay);
+      }
     }
     // Accumulate for surprise draw checks (same as regular draws)
     if (drawn.length > 0 && this.gs.currentPhase !== PHASES.RESOURCE && !this._inSurpriseResolution) {
       if (!this._pendingSurpriseDraws) this._pendingSurpriseDraws = {};
       this._pendingSurpriseDraws[playerIdx] = (this._pendingSurpriseDraws[playerIdx] || 0) + drawn.length;
+    }
+    // Trailing — wait long enough for the LAST drawn card to finish
+    // its hand-fly-in animation before this function returns. The
+    // client's animation lasts ~500ms; 600ms gives a small buffer
+    // past landing so the caller's next sync (and any consequent
+    // hand → discard / deleted-pile flight) starts cleanly.
+    if (drawn.length > 0 && this.gs.currentPhase !== PHASES.RESOURCE) {
+      await this._delay(lastCardLandingDelay);
     }
     return drawn;
   }
@@ -5051,6 +5237,7 @@ class GameEngine {
     for (let i = 0; i < count; i++) {
       if (ps.mainDeck.length === 0) break;
       const cardName = ps.mainDeck.shift();
+      if (ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.shift();
       if (destination === 'delete') {
         ps.deletedPile.push(cardName);
       } else {
@@ -5102,6 +5289,10 @@ class GameEngine {
       const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
     }
+    // Shuffling the main deck destroys any Premonition-stash visibility
+    // on the top — the public-knowledge top cards are no longer at the
+    // top, so clear the tracker. Potion-deck shuffles don't touch it.
+    if (deckType === 'main' && ps.deckTopVisible) ps.deckTopVisible.length = 0;
   }
 
   async actionDestroyCard(source, targetCard, opts = {}) {
@@ -5700,6 +5891,7 @@ class GameEngine {
       for (let i = 0; i < toMill; i++) {
         const cardName = ps.mainDeck.shift();
         if (!cardName) break;
+        if (ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.shift();
         if (await pushOrRescue(cardName)) {
           milledCards.push(cardName);
         }
@@ -6784,7 +6976,23 @@ class GameEngine {
         // (and any chained reactions) should not fire.
         if (!rescuedFromDelete && resolvedInst) {
           resolvedInst.zone = destZone;
-          await this.runHooks(hookName, { playerIdx, card: resolvedInst, cardName: resolvedCardName, discardedCardName: resolvedCardName, _fromHand: true, _skipReactionCheck: true });
+          await this.runHooks(hookName, {
+            playerIdx, card: resolvedInst,
+            cardName: resolvedCardName,
+            discardedCardName: resolvedCardName,
+            // Discarded card's instance id — same role as in
+            // `actionDiscardHandCard`'s hook. Listeners with
+            // `activeIn: ['hand', 'discard', 'deleted']` (Skull
+            // Necklace, etc.) need it to identify "I am the
+            // just-discarded inst" vs "I'm a sibling copy that was
+            // already sitting in the destination pile".
+            discardedInstId: resolvedInst.id,
+            // Forwards the calling effect's source tag (Mary
+            // Crestmas, Spreading Rumor, etc.) so listeners can key
+            // off who triggered the discard.
+            source: opts.source || null,
+            _fromHand: true, _skipReactionCheck: true,
+          });
         }
         this.sync();
       }
@@ -9171,7 +9379,23 @@ class GameEngine {
         this.sync();
         break;
 
-      case PHASES.ACTION:
+      case PHASES.ACTION: {
+        // Skip-Action-Phase rider — Potion of Greed sets
+        // `ps._skipActionPhaseTurn = gs.turn` on the active player, so
+        // the engine routes ACTION → MAIN2 immediately and the player
+        // forfeits their Action this turn. Cleared inline so the flag
+        // can't accidentally trip a future turn (also auto-stale via
+        // turn comparison).
+        const activeP_act = this.gs.activePlayer;
+        const activePs_act = this.gs.players[activeP_act];
+        if (activePs_act?._skipActionPhaseTurn === this.gs.turn) {
+          delete activePs_act._skipActionPhaseTurn;
+          this.log('action_phase_skipped', { player: activePs_act.username });
+          await this.runHooks(HOOKS.ON_PHASE_END, { phase: phaseName, phaseIndex: phase });
+          await this._delay(200);
+          await this.runPhase(PHASES.MAIN2);
+          break;
+        }
         // Reset per-phase action count (tracks total actions played for
         // Torchure-style second-action-slot semantics)
         for (const ps of this.gs.players) {
@@ -9186,6 +9410,7 @@ class GameEngine {
         // Player-controlled — wait for card play or manual skip
         this.sync();
         break;
+      }
 
       case PHASES.END:
         // Automatic phase — process status expiry, hooks, then switch turn
@@ -9866,14 +10091,26 @@ class GameEngine {
     // future hand-augmenting action. Fizzles silently here so card
     // scripts that forget to guard don't leak broken state (card
     // removed from deck but never reaches hand).
-    if (ps.handLocked) return false;
+    // `_bypassHandLock` opts callers in to ignore the lock — used by
+    // Kassaran's "ignores any effects that would prevent you from
+    // drawing cards" clause. Same shape as actionDrawCards' opts.
+    // _unpreventable bypass.
+    if (ps.handLocked && !opts._bypassHandLock) return false;
     const idx = (ps.mainDeck || []).indexOf(cardName);
     if (idx < 0) return false;
 
     ps.mainDeck.splice(idx, 1);
+    // If the spliced card was the top of the deck and that top was
+    // publicly known (Premonition stash, Kassaran reveal), shift the
+    // visibility tracker too so the next sync doesn't show a stale
+    // top-of-deck overlay.
+    if (idx === 0 && ps.deckTopVisible && ps.deckTopVisible.length > 0) {
+      ps.deckTopVisible.shift();
+    }
     if (!ps.hand) ps.hand = [];
     ps.hand.push(cardName);
     const inst = this._trackCard(cardName, pi, ZONES.HAND);
+    this._autoRevealOnEnterHand(pi, ps.hand.length - 1, cardName);
 
     this._broadcastEvent('deck_search_add', { cardName, playerIdx: pi });
     this.log('deck_search', {
@@ -9903,6 +10140,99 @@ class GameEngine {
         cancellable: false,
       });
     }
+    return true;
+  }
+
+  /**
+   * Move a card from `fromPi`'s hand into the opposite player's hand.
+   * Used by Crystal Well's "add a card from your hand to your
+   * opponent's hand to draw" action and Letter of Misinformations'
+   * proactive transfer. Splices from the source hand at `handIdx`,
+   * pushes to the destination hand, retags the inst's zone+owner so
+   * future state-sends route the card to the correct side, and fires
+   * `onCardTransferredToOppHand` so listeners (Mary Crestmas's draw
+   * trigger, Letter of Misinformations's self-trigger) can react.
+   * Honors the destination's `handLocked` flag — an opp under hand-
+   * lock can't receive a transferred card.
+   *
+   * Returns true on success, false if the index is out of range,
+   * the destination is hand-locked, or the move otherwise fails.
+   */
+  async actionTransferCardToOppHand(fromPi, handIdx, opts = {}) {
+    const fromPs = this.gs.players[fromPi];
+    if (!fromPs) return false;
+    const toPi = fromPi === 0 ? 1 : 0;
+    const toPs = this.gs.players[toPi];
+    if (!toPs) return false;
+    if (handIdx < 0 || handIdx >= (fromPs.hand?.length || 0)) return false;
+    if (toPs.handLocked && !opts._bypassHandLock) return false;
+
+    const cardName = fromPs.hand[handIdx];
+
+    // Locate the inst BEFORE the splice so we can preserve identity
+    // (originalOwner, counters) across the move. Match by zone+owner
+    // +name, then verify by hand position via the tracked rank — the
+    // splice interceptor keeps inst order in sync with the hand
+    // array.
+    let inst = null;
+    {
+      const matches = this.cardInstances.filter(c =>
+        c.owner === fromPi && c.zone === ZONES.HAND && c.name === cardName,
+      );
+      // Take the first matching inst — engine state already keeps inst
+      // ordering in sync with hand array order.
+      inst = matches[0] || null;
+    }
+
+    fromPs.hand.splice(handIdx, 1);
+    if (!toPs.hand) toPs.hand = [];
+    const toHandIdx = toPs.hand.length;
+    toPs.hand.push(cardName);
+
+    if (inst) {
+      inst.owner = toPi;
+      inst.zone = ZONES.HAND;
+      inst.heroIdx = -1;
+      inst.zoneSlot = -1;
+    } else {
+      inst = this._trackCard(cardName, toPi, ZONES.HAND);
+      // No prior inst — `_trackCard` defaults `originalOwner` to the
+      // tracking player; explicitly stamp the source side so the
+      // "originally owned by" check stays accurate downstream.
+      inst.originalOwner = fromPi;
+    }
+    this._autoRevealOnEnterHand(toPi, toHandIdx, cardName);
+
+    this.log('hand_transfer', {
+      from: fromPs.username, to: toPs.username, card: cardName,
+      by: opts.source || null,
+    });
+
+    // Cross-side flight animation — same channel Sparkfly Queen /
+    // Enigma use for cross-deck transfers. Source is the giver's
+    // hand at the original index (which still resolves on the client
+    // since the broadcast goes out before the next sync).
+    this._broadcastEvent('play_pile_transfer', {
+      fromOwner: fromPi, toOwner: toPi, cardName,
+      from: 'hand', to: 'hand',
+      fromHandIdx: handIdx, toHandIdx,
+    });
+
+    await this.runHooks(HOOKS.ON_CARD_TRANSFERRED_TO_OPP_HAND, {
+      fromPi, toPi, cardName,
+      originalOwner: inst.originalOwner ?? fromPi,
+      fromHandIdx: handIdx, toHandIdx,
+      // The just-transferred inst's id — listeners can compare
+      // against `ctx.card.id` to fire ONLY for the moved card and
+      // not for sibling copies that happen to share the listener's
+      // activeIn zone (e.g. a giver who has multiple Letters of
+      // Misinformations in hand, or a recipient who already had a
+      // matching card on their side).
+      transferredInstId: inst.id,
+      _skipReactionCheck: opts._skipReactionCheck !== false,
+    });
+
+    this.sync();
     return true;
   }
 
@@ -13396,17 +13726,28 @@ class GameEngine {
     const heroScript = hero ? loadCardEffect(hero.name) : null;
     const isBakhmHero = !!(heroScript?.isBakhmHero);
 
-    // Confirmation prompt
-    const confirmed = await this.promptGeneric(heroOwner, {
-      type: 'confirm',
-      title: cardName,
-      message: isBakhmHero
-        ? `Flip ${cardName} face-down on ${hero.name}'s Support Zone?`
-        : `Place ${cardName} into ${hero?.name || 'your Hero'}'s Surprise Zone?`,
-      confirmLabel: '🎭 Set Surprise',
-      cancelLabel: 'Cancel',
-      cancellable: true,
-    });
+    // Confirmation prompt — human-UI only. The CPU brain auto-
+    // declines every cancellable confirm by default, so without this
+    // bypass `cpuMeta: { alwaysCommit: true }` on Camel / Vermin /
+    // any future PACMAN-reset Creature force-commits past the MCTS
+    // gate but then silently fizzles HERE, leaving the CPU unable
+    // to ever re-set its Surprise Creatures despite the explicit
+    // archetype intent. The activation already came from a
+    // deliberate `doActivateCreatureEffect` call (free-activate or
+    // creature-effect loop); re-asking the CPU to confirm it is
+    // redundant and self-contradictory.
+    const confirmed = this.isCpuPlayer(heroOwner)
+      ? true
+      : await this.promptGeneric(heroOwner, {
+          type: 'confirm',
+          title: cardName,
+          message: isBakhmHero
+            ? `Flip ${cardName} face-down on ${hero.name}'s Support Zone?`
+            : `Place ${cardName} into ${hero?.name || 'your Hero'}'s Surprise Zone?`,
+          confirmLabel: '🎭 Set Surprise',
+          cancelLabel: 'Cancel',
+          cancellable: true,
+        });
 
     if (!confirmed) return false;
 
@@ -14876,6 +15217,14 @@ class GameEngine {
         // Generic draw/search lock
         if (script.blockedByHandLock && ps.handLocked) continue;
 
+        // Distracting Crystal in hand blocks any effect that would
+        // shuffle cards from hand / discard / board back to deck.
+        // Mirror of the server's `isShuffleIntoDeckBlockedByDistracting-
+        // Crystal` gate so the activation panel greys out the
+        // ability instead of letting the player click a button that
+        // silently rejects.
+        if (script.shufflesIntoDeck && (ps.hand || []).includes('Distracting Crystal')) continue;
+
         result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length });
       }
     }
@@ -15080,6 +15429,11 @@ class GameEngine {
     const isMainPhase = currentPhase === 2 || currentPhase === 4;
     const isActionPhase = currentPhase === 3;
     if (!isMainPhase && !isActionPhase) return [];
+    // Weakening Crystal's hero-effect lock is now applied as a real
+    // `negated` status on every alive Hero on the side that holds a
+    // copy in hand (see `_refreshWeakeningCrystalNegation`). The
+    // per-hero gate further down already greys negated heroes, so
+    // no extra short-circuit is needed here.
 
     // Phase + action-economy gate for `heroEffectActionCost: true` heroes.
     // Mirrors the same logic doPlaySpell / doPlayCreature use when the
@@ -15116,6 +15470,11 @@ class GameEngine {
       // target. The hero stays alive and can still take normal Actions
       // — only the targeted activation is hidden (no glow, no button).
       if (hero.statuses?.blinded && script.requiresTarget === true) continue;
+
+      // Distracting Crystal in hand blocks Hero Effects whose script
+      // declares `shufflesIntoDeck: true` (e.g. Elana, the Rocky
+      // Rebel). Mirrors the server play-handler gate.
+      if (script.shufflesIntoDeck && (ps.hand || []).includes('Distracting Crystal')) continue;
 
       // Phase eligibility:
       //   • heroEffectActionCost heroes — Action Phase OR Main Phase
@@ -15681,6 +16040,13 @@ class GameEngine {
           handLockBlocked = true;
         }
 
+        // Distracting Crystal in hand blocks shuffle-into-deck plays —
+        // grey out abilities like Leadership while a copy is held.
+        // Mirrors the server-side play handler gate.
+        if (canActivate && script.shufflesIntoDeck && (ps.hand || []).includes('Distracting Crystal')) {
+          canActivate = false;
+        }
+
         // Check script's canFreeActivate condition
         if (canActivate && script.canFreeActivate) {
           try {
@@ -15964,13 +16330,50 @@ class GameEngine {
 
   /** Internal: is this hero currently capable of "acting" (the standard
    *  alive-and-uninhibited gate that dead/frozen/stunned/negated/bound
-   *  heroes fail)? Used by both passive and active borrow checks. */
+   *  heroes fail)? Used by both passive and active borrow checks.
+   *  STRICTER than `isHeroIncapacitated` — this one rejects ALL forms
+   *  of negation (including Weakening-Crystal's effect-only form),
+   *  because Lizbeth borrowing IS Lizbeth's own effect, and a Hero's
+   *  effect is suppressed under either form of negation. */
   _heroCanAct(playerIdx, heroIdx) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     const s = hero.statuses || {};
     if (s.frozen || s.stunned || s.negated || s.bound) return false;
     return true;
+  }
+
+  /**
+   * Centralized "Hero is incapacitated for Action purposes" gate.
+   * Returns true when the Hero CANNOT take an Action — used by
+   * `inherentAction` capacity checks and any future card script that
+   * needs to ask "is this Hero capable of acting right now?"
+   *
+   * Incapacitating conditions:
+   *   • No Hero in slot, or dead (hp <= 0).
+   *   • Frozen / Stunned / Bound — the standard CC trio. (Bound
+   *     specifically blocks Actions per `validateActionPlay`.)
+   *   • Hard-Negated — `statuses.negated` from any source other than
+   *     Weakening Crystal. Hard negation blanks ability zones (see
+   *     `heroMeetsLevelReq`), so the Hero genuinely can't act on a
+   *     Lv > 0 card. Weakening-Crystal-sourced negation is the
+   *     lighter "effect-only" form: abilities still work, plays
+   *     still go through, only the Hero's own effect is suppressed —
+   *     so Weakening-Crystal-negated Heroes are NOT incapacitated by
+   *     this gate and retain Action capacity.
+   *
+   * Mirrors `validateActionPlay`'s incapacitation gate (which omits
+   * negated since `heroMeetsLevelReq` handles the level-side
+   * consequences). Use this when the question is "can this Hero hold
+   * an Action slot?" rather than "is this play eligible?"
+   */
+  isHeroIncapacitated(playerIdx, heroIdx) {
+    const hero = this.gs?.players?.[playerIdx]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return true;
+    const s = hero.statuses || {};
+    if (s.frozen || s.stunned || s.bound) return true;
+    if (s.negated && !s.negated._byWeakeningCrystal) return true;
+    return false;
   }
 
   /** Internal: does `(playerIdx, heroIdx)` have a `Smugbeth, the Rebel
@@ -16210,6 +16613,14 @@ class GameEngine {
       scan(transMap_lvr);
       if (bestOffset < 0) rawLevel = Math.max(0, rawLevel + bestOffset);
     }
+    // Mana Absorbing Crystal: while a copy sits in the controller's
+    // hand, every Spell in their hand has its level raised by +1.
+    // Applied AFTER any per-card reductions so the +1 still bites
+    // even on a Sparkfly-Queen-rebated stolen Spell.
+    if (cardData.cardType === 'Spell'
+        && (ps_lvr?.hand || []).includes('Mana Absorbing Crystal')) {
+      rawLevel += 1;
+    }
     if (rawLevel <= 0 && !cardData.spellSchool1) return true;
 
     // Test the level requirement against each candidate ability-zone
@@ -16217,9 +16628,13 @@ class GameEngine {
     // legacy single-pass behaviour). For Lizbeth-style borrowers, each
     // opponent hero is its own candidate (own + that opponent's zones);
     // we return true as soon as ANY candidate passes — never summed
-    // across opponents. Negated heroes get blanked: only Lv0 cards
-    // without a school requirement remain playable.
-    const candidates = hero.statuses?.negated
+    // across opponents. "Hard" Negation blanks ability zones: only
+    // Lv0 cards without a school requirement remain playable.
+    // Weakening-Crystal-sourced negation is intentionally lighter —
+    // it ONLY suppresses the Hero's effect, leaving Abilities (and
+    // therefore plays > Lv 0) functional.
+    const negStatus_lvr = hero.statuses?.negated;
+    const candidates = (negStatus_lvr && !negStatus_lvr._byWeakeningCrystal)
       ? [[]]
       : this._getCandidateAbilityZoneSets(playerIdx, heroIdx);
     for (const abZones of candidates) {
@@ -16522,8 +16937,12 @@ class GameEngine {
     // For Lizbeth-style borrowers, walk each candidate ability-zone set
     // (own, then own+opp1, own+opp2, …) and return the MINIMUM cost
     // — the player wants the cheapest playable path. Mirrors the
-    // per-opponent semantics in `heroMeetsLevelReq`.
-    const candidates = hero.statuses?.negated
+    // per-opponent semantics in `heroMeetsLevelReq`. Weakening-Crystal-
+    // sourced negation is the lighter "effect-only" form and does NOT
+    // blank ability zones (matches the parallel branch in
+    // `heroMeetsLevelReq`).
+    const negStatus_w = hero.statuses?.negated;
+    const candidates = (negStatus_w && !negStatus_w._byWeakeningCrystal)
       ? [[]]
       : this._getCandidateAbilityZoneSets(playerIdx, heroIdx);
     let bestCost = -1; // -1 = not playable
@@ -17946,12 +18365,18 @@ class GameEngine {
       if (hi < 0) continue;
 
       // Find all non-Creature/non-Token cards on this hero's support zones (Artifacts, Spells, Attacks, etc.)
-      // Creatures and Tokens have their own mechanics; immovable cards (e.g. Divine Gift of Coolness) are protected
+      // Creatures and Tokens have their own mechanics; immovable cards (e.g. Divine Gift of Coolness) are protected.
+      // Read EFFECTIVE card data (per-instance overrides) — Biomancy
+      // Tokens are tracked under the underlying Potion's name but
+      // their `_cardDataOverride.cardType = 'Creature/Token'` makes
+      // them Creatures for game-rules purposes. Without the override
+      // lookup, the static DB returns the Potion's data and the death-
+      // cleanup filter would discard the token alongside the Hero.
       const cardDB = this._getCardDB();
       const destroyableInstances = this.cardInstances.filter(c => {
         if (c.owner !== pi || c.zone !== 'support' || c.heroIdx !== hi) return false;
         if (c.counters?.immovable) return false; // Immovable cards stay even on dead heroes
-        const cd = cardDB[c.name];
+        const cd = this.getEffectiveCardData(c) || cardDB[c.name];
         if (cd && (hasCardType(cd, 'Creature') || hasCardType(cd, 'Token'))) return false;
         return true;
       });
@@ -18105,6 +18530,7 @@ class GameEngine {
     if (opts.requireStack && !this.hasCoolnessStack(playerIdx)) return null;
     if (!ps.mainDeck?.length) return null;
     const cardName = ps.mainDeck.shift();
+    if (ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.shift();
     ps.coolnessStack.push(cardName);
     const inst = this._trackCard(cardName, playerIdx, ZONES.COOLNESS_STACK);
     this.log('coolness_stack_push', { player: ps.username, card: cardName, from: 'deck', source: opts.source || null });
@@ -18777,6 +19203,12 @@ class GameEngine {
     // Tick progress counter even in fast mode — the hook timeout watches
     // it, and MCTS rollouts that call sync() should count as progress too.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
+    // Re-apply Weakening Crystal's negation aura before every state
+    // push. Runs in fast mode too — MCTS rollouts need the negated
+    // status visible to the hook gates so a simulated Hero with a
+    // Crystal in hand can't fire passives that the live game wouldn't
+    // allow either.
+    this._refreshWeakeningCrystalNegation();
     if (this._fastMode) return; // Skip state-broadcast + SC-tracking during simulations.
     // ── SC tracking: check ability/support zone states ──
     if (this.gs._scTracking) {

@@ -126,7 +126,15 @@
       "Bash(grep -n \"^  sync\\\\b\\\\|sync\\(\\)\\\\s*{$\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\\\\_engine.js\")",
       "Bash(findstr /i \"queen summon mass-multiplication divine-gift-of-coolness divine-gift-of-skill weird-doll soul-shard\")",
       "Bash(grep -iE \"fighting|necromancy|destruction-magic|biomancy\\\\.js$|trapping\")",
-      "Bash(grep -n \"^[^ ].*\\\\\\(.*\\) {$\\\\| function .*\\) {$\\\\|^  [a-zA-Z_].*\\(.*\\) {$\\\\|^  async [a-zA-Z_].*\\(.*\\) {$\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\\\\_engine.js\")"
+      "Bash(grep -n \"^[^ ].*\\\\\\(.*\\) {$\\\\| function .*\\) {$\\\\|^  [a-zA-Z_].*\\(.*\\) {$\\\\|^  async [a-zA-Z_].*\\(.*\\) {$\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\\\\_engine.js\")",
+      "Bash(kill %1)",
+      "Bash(taskkill /F /FI \"WINDOWTITLE eq node*\")",
+      "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(grep -n \"useEffect.*\\\\\\\\[\\\\\\\\]\\\\\\\\|useEffect.*window\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\public\\\\app-board.jsx\")",
+      "Bash(wait)",
+      "Bash(grep -n \"structuredClone\\\\|cloneDeep\\\\|hoptUsed\\\\s*:.*{...\\\\|JSON.parse\\(JSON.stringify\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\\\\_engine.js\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\\\\_cpu.js\")",
+      "Bash(grep -lE \"ps\\\\.hand.*splice.*ps\\\\.mainDeck\\\\.push|discardPile.*splice.*mainDeck\\\\.push|actionRecycleCards|hand.*\\\\\\\\\\\\$.*deck\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\" -r)",
+      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\"; grep -E \"//.*\\(shuffle|recycle|return.*deck\\)\" {} | head -2')"
     ]
   }
 }

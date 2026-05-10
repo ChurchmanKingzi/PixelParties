@@ -11,7 +11,7 @@
 //    Ability from hand to gain 6 Gold.
 // ═══════════════════════════════════════════
 
-const { harpyformerInherentAction } = require('./_harpyformer-shared');
+const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyformer-shared');
 
 const CARD_NAME  = 'Country Harpyformer';
 const ABILITY_NAME = 'Adventurousness';
@@ -54,23 +54,13 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
-    // Confirm discard
-    const result = await engine.promptGeneric(pi, {
-      type: 'cardGallery',
-      cards: [{ name: ABILITY_NAME, source: 'hand' }],
+    const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
       title: CARD_NAME,
       description: `Discard "${ABILITY_NAME}" to gain 6 Gold.`,
-      confirmLabel: '🪙 Discard & Gain 6 Gold',
-      confirmClass: 'btn-success',
-      cancellable: true,
+      source: CARD_NAME,
+      logType: 'country_discard',
     });
-    if (!result || result.cancelled) return false;
-
-    const idx = ps.hand.indexOf(ABILITY_NAME);
-    if (idx < 0) return false;
-    ps.hand.splice(idx, 1);
-    ps.discardPile.push(ABILITY_NAME);
-    engine.log('country_discard', { player: ps.username, card: ABILITY_NAME });
+    if (!ok) return false;
 
     await ctx.gainGold(6);
     engine.sync();

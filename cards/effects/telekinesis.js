@@ -19,9 +19,13 @@ module.exports = {
   // Additional Action if the hero has Magic Arts level 1+
   inherentAction(gs, pi, heroIdx, engine) {
     const ps = gs.players[pi];
-    const hero = ps?.heroes?.[heroIdx];
-    if (!hero?.name || hero.hp <= 0) return false;
-    if (hero.statuses?.negated) return false;
+    if (!ps) return false;
+    // Centralized incapacitation gate — rejects dead / Frozen /
+    // Stunned / Bound / hard-Negated Heroes. Weakening-Crystal-
+    // sourced negation is the lighter "effect-only" form and does
+    // NOT disqualify a Hero from acting; the helper handles the
+    // distinction so we don't duplicate it here.
+    if (engine?.isHeroIncapacitated?.(pi, heroIdx)) return false;
     const abZones = ps.abilityZones?.[heroIdx] || [];
     let magicArtsCount = 0;
     for (const slot of abZones) {

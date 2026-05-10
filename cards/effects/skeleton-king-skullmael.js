@@ -3,10 +3,10 @@
 //  Creature (Summoning Magic Lv1, Skeletons) — 50 HP
 //
 //  You can only control 1 "Skeleton King Skullmael". While you control
-//  this Creature, "Skeleton" Creatures that are summoned from the
-//  discard pile may use their active effects the turn they are
-//  summoned and don't have their effects negated by the effect of
-//  Necromancy.
+//  this Creature that was summoned from the discard pile, "Skeleton"
+//  Creatures that are summoned from the discard pile may use their
+//  active effects the turn they are summoned and don't have their
+//  effects negated by the effect of Necromancy.
 //
 //  Implementation:
 //    1. `canSummon` enforces the 1-controlled cap.
@@ -18,6 +18,13 @@
 //       (`_summonedByNecromancy: true`), ALSO strips the standard
 //       Necromancy negation that necromancy.js stamped just before
 //       firing the entry hooks.
+//    3. The aura is gated by an instance-level flag
+//       `_skullmaelFromDiscard` stamped on Skullmael's OWN
+//       onCardEnterZone — true iff Skullmael himself arrived via a
+//       discard-pile summon. A hand-played Skullmael lacks the flag
+//       and grants no buff. The flag lives on the inst, so it
+//       naturally dies with this Skullmael — a re-revived next copy
+//       of Skullmael starts fresh.
 // ═══════════════════════════════════════════
 
 const { isSkeletonCreature } = require('./_skeleton-shared');
@@ -49,11 +56,28 @@ module.exports = {
       // newly-arriving card is `ctx.enteringCard`.
       const entering = ctx.enteringCard;
       if (!entering) return;
-      if (entering.id === ctx.card.id) return; // self-arrival, skip
       if (ctx.toZone !== 'support') return;
+
+      // ── Self-arrival: stamp the discard-summon origin onto this
+      //    Skullmael instance. The aura gate below reads this flag —
+      //    a Skullmael who entered the board via a normal hand summon
+      //    grants nothing; only one revived from the discard pile
+      //    enables the buff for other Skeletons.
+      if (entering.id === ctx.card.id) {
+        if (ctx._summonedFromDiscard) {
+          ctx.card.counters._skullmaelFromDiscard = true;
+        }
+        return;
+      }
+
       // Only react to discard-pile summons. Tutors / Necromancy /
       // Raise the Minions! / Skeleton Necromancer all stamp this flag.
       if (!ctx._summonedFromDiscard) return;
+
+      // Aura gate: this Skullmael himself must have been revived from
+      // the discard pile for the buff to fire. Hand-summoned
+      // Skullmaels are silent.
+      if (!ctx.card.counters?._skullmaelFromDiscard) return;
 
       // Same-side check: Skullmael's controller equals the entering
       // creature's controller.

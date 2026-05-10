@@ -36,6 +36,14 @@ const HOOKS = {
   // — fromZone is 'deck' | 'hand' so listeners can discriminate
   // (e.g. a future card that only triggers on hand-rips).
   ON_CARD_TAKEN_FROM_OPP: 'onCardTakenFromOpponent',
+  // Fires when a card moves from one player's hand into the opposite
+  // player's hand (Crystal Well's swap, Letter of Misinformations
+  // landing on opp). One emit per card so multi-card transfers fire
+  // the listener N times. Context: { fromPi, toPi, cardName,
+  // originalOwner, fromHandIdx, toHandIdx }. Mary Crestmas reads it
+  // for her draw trigger; Letter of Misinformations reads it for its
+  // self-trigger when it's the card being transferred.
+  ON_CARD_TRANSFERRED_TO_OPP_HAND: 'onCardTransferredToOppHand',
   BEFORE_PLAY:      'beforePlay',
   ON_PLAY:          'onPlay',
   ON_DISCARD:       'onDiscard',

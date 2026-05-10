@@ -15,6 +15,9 @@
 module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
+  // Shuffles hand cards back into the deck — flagged for "No Retreat!"
+  // detection.
+  shufflesIntoDeck: true,
 
   // CPU threat assessment: mulligan nets zero cards at Lv1/2 (replaces same
   // count); only Lv3 adds +1 bonus draw. Card-filtering value not modeled.

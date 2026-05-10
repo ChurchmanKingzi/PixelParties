@@ -12,7 +12,7 @@
 //    target by 100 HP.
 // ═══════════════════════════════════════════
 
-const { harpyformerInherentAction } = require('./_harpyformer-shared');
+const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyformer-shared');
 
 const CARD_NAME    = 'Ballad Harpyformer';
 const ABILITY_NAME = 'Support Magic';
@@ -58,23 +58,16 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
-    // Confirm discard
-    const result = await engine.promptGeneric(pi, {
-      type: 'cardGallery',
-      cards: [{ name: ABILITY_NAME, source: 'hand' }],
+    // Discard cost: in-hand click selection (ineligible cards dim,
+    // copies of the named Ability highlight). Cancellable — bailing
+    // here returns false so HOPT isn't stamped.
+    const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
       title: CARD_NAME,
       description: `Discard "${ABILITY_NAME}" to heal a friendly target by 100 HP.`,
-      confirmLabel: '💚 Discard & Heal',
-      confirmClass: 'btn-success',
-      cancellable: true,
+      source: CARD_NAME,
+      logType: 'ballad_discard',
     });
-    if (!result || result.cancelled) return false;
-
-    const idx = ps.hand.indexOf(ABILITY_NAME);
-    if (idx < 0) return false;
-    ps.hand.splice(idx, 1);
-    ps.discardPile.push(ABILITY_NAME);
-    engine.log('ballad_discard', { player: ps.username, card: ABILITY_NAME });
+    if (!ok) return false;
     engine.sync();
 
     // Prompt for a friendly target (hero or creature)

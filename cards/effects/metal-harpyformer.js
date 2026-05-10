@@ -10,7 +10,7 @@
 //    from hand to deal 50 damage to any target.
 // ═══════════════════════════════════════════
 
-const { harpyformerInherentAction } = require('./_harpyformer-shared');
+const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyformer-shared');
 
 const CARD_NAME    = 'Metal Harpyformer';
 const ABILITY_NAME = 'Fighting';
@@ -56,23 +56,13 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
-    // Confirm discard
-    const result = await engine.promptGeneric(pi, {
-      type: 'cardGallery',
-      cards: [{ name: ABILITY_NAME, source: 'hand' }],
+    const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
       title: CARD_NAME,
       description: `Discard "${ABILITY_NAME}" to deal 50 damage to any target.`,
-      confirmLabel: '⚔️ Discard & Attack',
-      confirmClass: 'btn-danger',
-      cancellable: true,
+      source: CARD_NAME,
+      logType: 'metal_discard',
     });
-    if (!result || result.cancelled) return false;
-
-    const idx = ps.hand.indexOf(ABILITY_NAME);
-    if (idx < 0) return false;
-    ps.hand.splice(idx, 1);
-    ps.discardPile.push(ABILITY_NAME);
-    engine.log('metal_discard', { player: ps.username, card: ABILITY_NAME });
+    if (!ok) return false;
     engine.sync();
 
     // Prompt for target

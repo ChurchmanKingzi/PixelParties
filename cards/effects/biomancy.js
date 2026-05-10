@@ -112,11 +112,18 @@ module.exports = {
 
         const { inst, actualSlot } = placeResult;
 
-        // Override card data so the engine treats this Potion as a Creature/Token
+        // Override card data so the engine treats this Potion as a Creature/Token.
+        // The token's level scales with Biomancy's level (Lv1→0 / Lv2→1 /
+        // Lv3→2) — exposed via `_cardDataOverride.level` so any system
+        // that reads effective card data (Dark Gear's level-scaled cost
+        // gate, the on-board level badge, hover tooltip) sees a numeric
+        // level instead of `null`.
+        const tokenLevel = Math.max(0, entry.level - 1);
         inst.counters._cardDataOverride = {
           ...(potionData || {}),
           cardType: 'Creature/Token',
           hp: stats,
+          level: tokenLevel,
           effect: `Once per turn: Deal ${stats} damage to any target on the board.`,
         };
         // Load the Biomancy Token's creature effect script instead of the potion's

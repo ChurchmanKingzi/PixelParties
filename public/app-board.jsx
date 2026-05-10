@@ -407,6 +407,35 @@ function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
 }
 
 // Opponent draw animation — face-down card flies from opp deck to opp hand
+// Kassaran reveal flip — top card flies from deck pile to screen center,
+// flips face-up there, then continues to the destination (hand on match
+// or back to deck top on miss). All timing is CSS-driven; this component
+// just sets the start / center / end CSS vars and the cardback / face-up
+// images. Auto-removed by the scheduler that mounted it after the
+// keyframes complete.
+function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardName, cardbackUrl }) {
+  const card = CARDS_BY_NAME[cardName];
+  const imgUrl = card ? cardImageUrl(card.name) : null;
+  return (
+    <div className="kassaran-flip-card"
+      style={{
+        '--sx': startX + 'px', '--sy': startY + 'px',
+        '--cx': centerX + 'px', '--cy': centerY + 'px',
+        '--ex': endX + 'px', '--ey': endY + 'px',
+      }}>
+      <div className="kassaran-flip-inner">
+        <div className="kassaran-flip-back">
+          <img src={cardbackUrl || '/cardback.png'} draggable={false} />
+        </div>
+        <div className="kassaran-flip-front">
+          {imgUrl ? <img src={imgUrl} draggable={false} />
+            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg3)', fontSize: 10, color: 'var(--text)', textAlign: 'center', padding: 4 }}>{cardName}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl }) {
   const dx = endX - startX;
   const dy = endY - startY;
@@ -567,7 +596,7 @@ function CardRevealEntry({ cardName, onDone }) {
   );
 }
 
-function ExplosionEffect({ x, y }) {
+function ExplosionEffect({ x, y, opacity }) {
   const particles = useMemo(() => Array.from({ length: 24 }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 25 + Math.random() * 55;
@@ -580,8 +609,13 @@ function ExplosionEffect({ x, y }) {
       dur: 350 + Math.random() * 400,
     };
   }), []);
+  // Optional `opacity` prop — passed through from playAnimation options
+  // so callers can dim the burst (Laser Volley wants its impacts more
+  // ghostly than a regular hit explosion). Defaults to 1 / fully
+  // opaque, preserving every existing caller's look.
+  const wrapperOpacity = (typeof opacity === 'number' && opacity >= 0 && opacity <= 1) ? opacity : 1;
   return (
-    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, opacity: wrapperOpacity }}>
       <div className="anim-explosion-flash" />
       {particles.map((p, i) => (
         <div key={i} className="anim-explosion-particle" style={{
@@ -2065,6 +2099,78 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
   );
 });
 
+// Crystal Well — gemstones of all kinds scattered across the
+// battlefield floor while the Spell occupies an Area Zone. Same
+// pattern as the Bonegrinder overlay: pre-computed random scatter
+// (no per-paint recompute), `inset: 0` to coat the whole board,
+// `pointerEvents: none` so it never blocks card / zone interaction.
+// zIndex -1 paints under the in-flow board contents.
+//
+// Variety comes from a fixed palette of `filter: hue-rotate(...)
+// saturate(...)` recipes applied to the same 💎 glyph — sapphire
+// (default blue), ruby, emerald, topaz/amber, amethyst, citrine.
+// Each recipe is hand-tuned to a vivid full-saturation tone so the
+// floor reads as a treasure of multi-coloured crystals instead of
+// a wash of muted hues. NOT randomized — the engine picks one of
+// the discrete recipes per gem.
+const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
+  // Each entry pairs a CSS filter that re-tints the default-blue
+  // 💎 glyph with a matching glow color so the text-shadow halos
+  // each gem in its own light. Saturation/brightness intentionally
+  // boosted so the colors stay vivid against the dark board.
+  const GEM_VARIANTS = [
+    // Sapphire — the default blue, just amped.
+    { filter: 'saturate(1.6) brightness(1.15)',                      glow: '255, 60, 60'  /* unused */, label: 'sapphire' },
+    // Ruby — strong red.
+    { filter: 'hue-rotate(180deg) saturate(2.4) brightness(1.1)',    glow: '255, 60, 60',                  label: 'ruby' },
+    // Emerald — vivid green.
+    { filter: 'hue-rotate(120deg) saturate(2.2) brightness(1.05)',   glow: '60, 255, 120',                 label: 'emerald' },
+    // Topaz / amber — bright orange.
+    { filter: 'hue-rotate(150deg) saturate(2.5) brightness(1.2)',    glow: '255, 160, 40',                 label: 'topaz' },
+    // Amethyst — saturated purple.
+    { filter: 'hue-rotate(-90deg) saturate(2.0) brightness(1.05)',   glow: '210, 90, 255',                 label: 'amethyst' },
+    // Citrine — bright yellow.
+    { filter: 'hue-rotate(165deg) saturate(2.6) brightness(1.3)',    glow: '255, 230, 60',                 label: 'citrine' },
+  ];
+  // Override the sapphire glow now that the array is defined (the
+  // first entry's `glow` was a placeholder). Done here rather than
+  // inline to keep the table easy to read.
+  GEM_VARIANTS[0].glow = '90, 170, 255';
+
+  const gems = useMemo(() => Array.from({ length: 48 }, () => ({
+    variant: GEM_VARIANTS[(Math.random() * GEM_VARIANTS.length) | 0],
+    left: Math.random() * 100,
+    top:  Math.random() * 100,
+    // Wider scaling range than the Bonegrinder bones — small chips
+    // alongside fist-sized centerpieces sells "treasure".
+    size: 18 + Math.random() * 42,
+    rot:  (Math.random() * 360) | 0,
+    opacity: 0.7 + Math.random() * 0.3,
+  })), []);
+
+  return (
+    <div className="crystal-well-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      zIndex: -1,
+      overflow: 'hidden',
+      // Faint cool wash behind the gem litter so the colored gems
+      // pop without the board background fighting them.
+      background: 'radial-gradient(ellipse at center, rgba(40,80,120,0.10) 0%, rgba(20,40,80,0.18) 100%)',
+    }}>
+      {gems.map((g, i) => (
+        <span key={'g'+i} style={{
+          position: 'absolute',
+          left: g.left + '%', top: g.top + '%',
+          fontSize: g.size + 'px',
+          opacity: g.opacity,
+          transform: `translate(-50%, -50%) rotate(${g.rot}deg)`,
+          filter: `${g.variant.filter} drop-shadow(0 0 6px rgba(${g.variant.glow}, 0.55))`,
+        }}>💎</span>
+      ))}
+    </div>
+  );
+});
+
 // Stinky Stables — enormous face-less dung piles pinned to the LEFT/RIGHT
 // margins of the battlefield (zones live in the central ~80%). Unicode has
 // no face-less poop emoji (💩 always has eyes/mouth), so each pile is drawn
@@ -3436,6 +3542,132 @@ const ANIM_REGISTRY = {
   snake_bite: SnakeBiteEffect,
   cannibalism_chomp: CannibalismChompEffect,
   cosmic_summon: CosmicSummonEffect,
+  // Mini's tutor-summon flair — small purple hearts orbit and rise
+  // around the just-placed Creature, signalling "Cute Annoyance Mini
+  // pulled this one in for you". Triggered by the rider step in
+  // cute-annoyance-mini.js after `summonCreatureWithHooks` succeeds.
+  mini_hearts: (() => {
+    return function MiniHeartsEffect({ x, y }) {
+      // Hearts are scattered in a tight ring around the slot center,
+      // each rising on its own delay so the cluster reads as a brief
+      // floating burst rather than a single explosion.
+      const hearts = useMemo(() => Array.from({ length: 12 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const startDist = 14 + Math.random() * 22;
+        return {
+          startX: Math.cos(angle) * startDist,
+          startY: Math.sin(angle) * startDist + 10,
+          rise: 36 + Math.random() * 32,
+          drift: -14 + Math.random() * 28,
+          size: 14 + Math.random() * 10,
+          delay: Math.random() * 280,
+          dur: 700 + Math.random() * 400,
+          // Two purple shades — primary (vivid) and secondary
+          // (lighter pink-purple) — alternated so the cluster
+          // reads as varied rather than uniform.
+          color: Math.random() < 0.65 ? '#c64bff' : '#e896ff',
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {hearts.map((h, i) => (
+            <div key={'mh' + i} style={{
+              position: 'absolute',
+              left: h.startX, top: h.startY,
+              fontSize: h.size,
+              color: h.color,
+              textShadow: `0 0 6px ${h.color}, 0 0 10px rgba(180,80,255,.6)`,
+              animation: `miniHeartsFloat ${h.dur}ms ease-out ${h.delay}ms forwards`,
+              opacity: 0,
+              '--mhRise': '-' + h.rise + 'px',
+              '--mhDrift': h.drift + 'px',
+            }}>♥</div>
+          ))}
+          <style>{`
+            @keyframes miniHeartsFloat {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.5); }
+              25%  { opacity: 1; transform: translate(calc(var(--mhDrift) * 0.4), calc(var(--mhRise) * 0.3)) scale(1.0); }
+              70%  { opacity: 1; transform: translate(calc(var(--mhDrift) * 0.85), calc(var(--mhRise) * 0.8)) scale(1.05); }
+              100% { opacity: 0; transform: translate(var(--mhDrift), var(--mhRise)) scale(0.85); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // Grave Worm burrow-out — black/brown particle burst shooting up
+  // and outward from the support slot. Conveys the worm clawing out
+  // of fresh black earth. Triggered by the card's onPlay.
+  grave_worm_burrow: (() => {
+    return function GraveWormBurrowEffect({ x, y }) {
+      // Soil chunks burst upward and outward, gravity-pulled back down
+      // partway through their lifespan.
+      const chunks = useMemo(() => Array.from({ length: 22 }, () => {
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.9; // mostly upward, ±80°
+        const speed = 35 + Math.random() * 70;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed - (10 + Math.random() * 25),
+          size: 3 + Math.random() * 6,
+          color: ['#1a1a1a', '#2a1a08', '#3a2410', '#0d0d0d', '#4a2e15'][Math.floor(Math.random() * 5)],
+          delay: Math.random() * 120,
+          dur: 500 + Math.random() * 350,
+        };
+      }), []);
+      // Slow-drifting black smoke wisps for atmosphere.
+      const wisps = useMemo(() => Array.from({ length: 8 }, () => ({
+        startX: -28 + Math.random() * 56,
+        rise: 50 + Math.random() * 70,
+        size: 14 + Math.random() * 18,
+        delay: 100 + Math.random() * 250,
+        dur: 700 + Math.random() * 400,
+        opacity: 0.25 + Math.random() * 0.35,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Dark earth disc — the mound of upturned soil. */}
+          <div style={{
+            position: 'absolute', left: -34, top: 6, width: 68, height: 18,
+            background: 'radial-gradient(ellipse at center, rgba(20,12,4,.85) 0%, rgba(10,6,2,.55) 60%, transparent 90%)',
+            borderRadius: '50%',
+            animation: 'graveWormMound 700ms ease-out forwards',
+          }} />
+          {/* Soil chunks shooting upward + outward */}
+          {chunks.map((c, i) => (
+            <div key={'gw' + i} className="anim-explosion-particle" style={{
+              '--dx': c.dx + 'px', '--dy': c.dy + 'px', '--size': c.size + 'px',
+              '--color': c.color,
+              animationDelay: c.delay + 'ms', animationDuration: c.dur + 'ms',
+            }} />
+          ))}
+          {/* Slow black smoke wisps */}
+          {wisps.map((w, i) => (
+            <div key={'gws' + i} style={{
+              position: 'absolute', left: w.startX, top: 0,
+              width: w.size, height: w.size,
+              borderRadius: '50%',
+              background: `radial-gradient(circle, rgba(0,0,0,${w.opacity}) 0%, rgba(20,15,10,${w.opacity * 0.6}) 50%, transparent 80%)`,
+              animation: `graveWormWisp ${w.dur}ms ease-out ${w.delay}ms forwards`,
+              opacity: 0,
+              '--gwRise': '-' + w.rise + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes graveWormMound {
+              0%   { opacity: 0;   transform: scale(0.4); }
+              30%  { opacity: 1;   transform: scale(1.1); }
+              100% { opacity: 0.4; transform: scale(1.0); }
+            }
+            @keyframes graveWormWisp {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              30%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(0, var(--gwRise)) scale(1.4); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   // Coolness Stack summon — cyan-and-brass burst with a "🆒" pop and
   // counter-rotating geometric rings. Distinct from a normal hand
   // summon so the player sees "this Creature came from the Stack".
@@ -4942,6 +5174,56 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // Rain of Spores — full-board yellow particle shower. Reuses the
+  // `deepseaSporeFall` keyframes (same top-to-bottom drift), but with
+  // a saturated yellow / gold palette so it reads as the titular
+  // "spore rain". Triggered by the `rain_of_spores_activated` socket
+  // event.
+  rain_of_spores_rain: (() => {
+    return function RainOfSporesRainEffect({ x, y, w, h }) {
+      const W = Math.max(w || window.innerWidth, 480);
+      const H = Math.max(h || window.innerHeight, 320);
+      const palette = ['#fff066', '#ffd428', '#ffe88a', '#f5b800', '#fff7b2'];
+      const spores = useMemo(() => Array.from({ length: 200 }, () => ({
+        xStart: Math.random() * W - W / 2,
+        yStart: -H / 2 - 40,
+        xEnd:   (-50 + Math.random() * 100),
+        yEnd:   H / 2 + 40,
+        wobble: (-25 + Math.random() * 50),
+        delay:  Math.random() * 1600,
+        dur:    1500 + Math.random() * 700,
+        size:   3 + Math.random() * 6,
+        color:  palette[Math.floor(Math.random() * palette.length)],
+        opacity: 0.6 + Math.random() * 0.35,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10090 }}>
+          {/* Soft golden wash over the play area */}
+          <div style={{
+            position: 'absolute', left: -W / 2, top: -H / 2, width: W, height: H,
+            background: 'radial-gradient(ellipse at center, rgba(255,220,80,.10) 0%, rgba(255,200,40,.04) 55%, transparent 85%)',
+            animation: 'deepseaSporesWash 2400ms ease-in-out forwards',
+            opacity: 0,
+          }} />
+          {spores.map((s, i) => (
+            <div key={'rs'+i} style={{
+              position: 'absolute', left: s.xStart, top: s.yStart,
+              width: s.size, height: s.size, borderRadius: '50%',
+              background: `radial-gradient(circle at 35% 35%, ${s.color}, ${s.color}aa 55%, transparent 80%)`,
+              boxShadow: `0 0 ${s.size * 2}px ${s.color}`,
+              animation: `deepseaSporeFall ${s.dur}ms linear ${s.delay}ms forwards`,
+              opacity: 0,
+              '--dsEndX': s.xEnd + 'px',
+              '--dsEndY': s.yEnd + 'px',
+              '--dsWobble': s.wobble + 'px',
+              '--dsOpacity': s.opacity,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+
   // Deepsea Spores rain — full-board particle shower in the archetype
   // palette (teal, blue, dark-blue, red, dark-red). Spores drift in
   // serpentine paths from the top of the viewport down through the
@@ -11400,6 +11682,32 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     hoverSelectors: '.board-card:hover, .card-reveal-entry:hover, .card-mini:hover, .card-name-picker-row:hover, .revealed-hand-card:hover, .status-badge:hover, .buff-icon:hover, .option-tooltip-hover:hover',
   });
 
+  // Wheel-scroll redirect — when ANY `.board-tooltip` is visible and its
+  // content overflows the viewport (Sparkfly Queen with stacked
+  // inherited effects, dense long card text, etc.), redirect the page
+  // wheel scroll to the tooltip itself. Without this the tooltip is
+  // `pointer-events: none` so wheel events can't reach it directly.
+  // Picks the LAST scrollable `.board-tooltip` in DOM order — the main
+  // hover tooltip renders after token / pile / deck-top variants, so
+  // it wins ties. Returns early without preventing default when no
+  // scrollable tooltip is present, so normal page-scroll keeps working.
+  useEffect(() => {
+    const onWheel = (e) => {
+      const tooltips = document.querySelectorAll('.board-tooltip');
+      if (tooltips.length === 0) return;
+      let target = null;
+      for (let i = tooltips.length - 1; i >= 0; i--) {
+        const t = tooltips[i];
+        if (t.scrollHeight > t.clientHeight) { target = t; break; }
+      }
+      if (!target) return;
+      target.scrollTop += e.deltaY;
+      e.preventDefault();
+    };
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, []);
+
   // Board skin helpers — construct zone background style from board ID
   const boardZoneStyle = (boardId, zoneType) => {
     if (!boardId) return undefined;
@@ -11742,6 +12050,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // Opponent draw animation tracking
   const [oppDrawAnims, setOppDrawAnims] = useState([]);
+  // Kassaran reveal-flip animations — entries auto-removed by setTimeout
+  // after the CSS keyframes complete.
+  const [kassaranFlips, setKassaranFlips] = useState([]);
+  // Deck-top tooltip — set on hover over a deck pile whose top card is
+  // publicly known (Premonition stash, Kassaran miss reveal, Enigma
+  // restack). Carries the cardName + the deck pile's bounding rect so
+  // the tooltip renders anchored to the LEFT of the deck rather than
+  // covering it (the standard board-tooltip is a full-height right-
+  // anchored panel that would sit on top of the deck pile).
+  const [deckTopTooltip, setDeckTopTooltip] = useState(null);
   const [oppDrawHidden, setOppDrawHidden] = useState(new Set()); // indices to hide during anim
   // Bounce-return animation tracking — keys are `${owner}-${handIdx}`.
   // Hand slot matching this key stays invisible while the flying card is
@@ -13111,9 +13429,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const cardTypes = gameState.effectPrompt.cardTypes || {};
       const typeLimits = gameState.effectPrompt.typeLimits || {};
       const thisType = cardTypes[idx];
+      // `nameLockOnFirstSelect` (Heinz): once the first card is
+      // selected, only further copies of the SAME card name remain
+      // eligible. Already-selected cards still toggle off normally
+      // (when the last one toggles off the lock vanishes and every
+      // eligible card becomes clickable again).
+      const nameLockActive = !!gameState.effectPrompt.nameLockOnFirstSelect
+        && handPickSelected.size > 0;
+      let lockedName = null;
+      if (nameLockActive) {
+        for (const si of handPickSelected) { lockedName = me.hand[si]; break; }
+      }
       let willChange;
       if (handPickSelected.has(idx)) {
         willChange = true; // Deselection always succeeds.
+      } else if (nameLockActive && me.hand[idx] !== lockedName) {
+        willChange = false; // Different name — locked out.
       } else if (handPickSelected.size >= maxSelect) {
         willChange = false;
       } else if (thisType && typeLimits[thisType] !== undefined) {
@@ -13130,6 +13461,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const next = new Set(prev);
         if (next.has(idx)) { next.delete(idx); return next; }
         if (next.size >= maxSelect) return prev;
+        // Re-check the name lock inside the updater since `prev` may
+        // differ from the closure-captured `handPickSelected` under
+        // StrictMode/double-invocation. Same lookup pattern: peek any
+        // existing selection's card name.
+        if (gameState.effectPrompt.nameLockOnFirstSelect && next.size > 0) {
+          let lockedName2 = null;
+          for (const si of next) { lockedName2 = me.hand[si]; break; }
+          if (lockedName2 && me.hand[idx] !== lockedName2) return prev;
+        }
         if (thisType && typeLimits[thisType] !== undefined) {
           let selectedOfType = 0;
           for (const si of next) {
@@ -14608,7 +14948,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }, 400);
     };
-    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, color, duration, thickness }) => {
+    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, color, duration, thickness, miss, impactOpacity }) => {
       if (window.playSFX) window.playSFX('laser', { dedupe: 60, category: 'effect' });
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
@@ -14626,22 +14966,43 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const tr = tgtEl.getBoundingClientRect();
       const id = Date.now() + Math.random();
       const dur = duration || 1500;
+      // Miss mode (Laser Volley dodge) — the beam lands next to the
+      // target instead of on it, and the target-side explosion is
+      // suppressed. We pick a side that stays on-screen (away from
+      // the closer viewport edge), with a small extra fudge so it
+      // visually clears the card. Vertical jitter keeps repeated
+      // misses from drawing identical beams.
+      let endX = tr.left + tr.width / 2;
+      let endY = tr.top + tr.height / 2;
+      if (miss) {
+        const cardCx = tr.left + tr.width / 2;
+        const lean = cardCx < window.innerWidth / 2 ? 1 : -1; // away from the nearer edge
+        endX = cardCx + lean * (tr.width * 0.85 + 18);
+        endY = tr.top + tr.height * (0.35 + Math.random() * 0.35);
+      }
       setBeamAnims(prev => [...prev, {
         id, color: color || '#ff2222',
         thickness: typeof thickness === 'number' && thickness > 0 ? thickness : 1,
         duration: dur,
         x1: sr.left + sr.width / 2, y1: sr.top + sr.height / 2,
-        x2: tr.left + tr.width / 2, y2: tr.top + tr.height / 2,
+        x2: endX, y2: endY,
       }]);
-      // Layered impact: a primary explosion that runs for the FULL
-      // beam duration plus a quick secondary burst at the moment the
-      // beam connects, so the impact spectacle never dies before the
-      // beam line fades. Previously the explosion ended ~450 ms before
-      // the line did, leaving a "naked line" gap.
-      setTimeout(() => {
-        playAnimation('explosion', tgtEl, { duration: Math.max(dur - 200, 600) });
-        setTimeout(() => playAnimation('explosion', tgtEl, { duration: 800 }), Math.max(dur * 0.45, 350));
-      }, 220);
+      if (!miss) {
+        // Layered impact: a primary explosion that runs for the FULL
+        // beam duration plus a quick secondary burst at the moment the
+        // beam connects, so the impact spectacle never dies before the
+        // beam line fades. Previously the explosion ended ~450 ms before
+        // the line did, leaving a "naked line" gap. `impactOpacity`
+        // (forwarded from the broadcast payload) lets callers dim the
+        // burst — Laser Volley fires many beams in rapid succession
+        // and a full-opacity burst per target visually swamps the
+        // board.
+        const impactOpts = (typeof impactOpacity === 'number') ? { opacity: impactOpacity } : {};
+        setTimeout(() => {
+          playAnimation('explosion', tgtEl, { duration: Math.max(dur - 200, 600), ...impactOpts });
+          setTimeout(() => playAnimation('explosion', tgtEl, { duration: 800, ...impactOpts }), Math.max(dur * 0.45, 350));
+        }, 220);
+      }
       setTimeout(() => setBeamAnims(prev => prev.filter(a => a.id !== id)), dur);
     };
     // Hand-to-board card-fly animation. The server fires this right before
@@ -14797,6 +15158,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('deepsea_spores_activated', onDeepseaSporesActivated);
+
+    // Rain of Spores activation — full-screen yellow particle rain.
+    // No per-target follow-up (unlike Deepsea Spores), since the
+    // Spell's effect is hand interaction rather than board mutation.
+    const onRainOfSporesActivated = () => {
+      if (window.playSFX) window.playSFX('elem_water', { category: 'effect' });
+      const vx = window.innerWidth / 2;
+      const vy = window.innerHeight / 2;
+      const id = Date.now() + Math.random();
+      setGameAnims(prev => [...prev, {
+        id, type: 'rain_of_spores_rain', x: vx, y: vy,
+        w: window.innerWidth, h: window.innerHeight,
+      }]);
+      setTimeout(() => setGameAnims(prev => prev.filter(a => a.id !== id)), 2400);
+    };
+    socket.on('rain_of_spores_activated', onRainOfSporesActivated);
     const onNomuDraw = ({ playerIdx: drawPlayer }) => {
       const ownerLabel = drawPlayer === myIdx ? 'me' : 'opp';
       const handEl = ownerLabel === 'me' ? document.querySelector('.hand-container')
@@ -17772,21 +18149,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (specific) return specific;
             // Slot doesn't exist yet — the broadcast fires before the
             // state mutation, so the new slot won't render until the
-            // next sync. Project a synthetic rect just RIGHT of the
-            // last existing slot so the flight lands where the new
-            // card will actually appear instead of the previous
-            // last-slot's center (which is one card-width too far
-            // left). Mirrors `play_hand_steal`'s `lastRect.right`
-            // targeting at app-board.jsx:18545.
+            // next sync. Project a synthetic rect for where the new
+            // slot WILL render. The hand uses `justify-content:
+            // center`, so growing it shifts every existing card LEFT
+            // by ~half a card-width and the new slot lands ~half a
+            // card-width RIGHT of the old last slot's center —
+            // i.e., its left edge sits at `lastRect.right -
+            // halfCardWidth`. Older code projected at `lastRect.
+            // right` (zero shift), which made the flight overshoot
+            // by half a card width on a centered hand. Half-shift
+            // here aligns the flight with the eventual centered
+            // position; on overflow-compressed hands the difference
+            // is small either way.
             const slots = document.querySelectorAll(`${base} .hand-slot, ${base} [data-hand-idx]`);
             if (slots.length > 0) {
               const lastRect = slots[slots.length - 1].getBoundingClientRect();
+              const halfW = lastRect.width / 2;
+              const projLeft = lastRect.right - halfW;
               const projected = {
-                left:  lastRect.right,
+                left:  projLeft,
                 top:   lastRect.top,
                 width: lastRect.width,
                 height: lastRect.height,
-                right: lastRect.right + lastRect.width,
+                right: projLeft + lastRect.width,
                 bottom: lastRect.bottom,
               };
               return { getBoundingClientRect: () => projected };
@@ -17953,6 +18338,90 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => card.remove(), durationMs + 100);
     };
     socket.on('play_pile_transfer', onPileTransfer);
+
+    // Kassaran reveal flip — server emits this event BEFORE mutating
+    // state, so we can suppress the auto-draw / deckTopVisible diff
+    // animations on the upcoming sync. Then we spawn the flying card,
+    // which lands roughly when the server's matching delay expires.
+    const onKassaranFlip = ({ owner, cardName, outcome, toHandIdx }) => {
+      const isMe = owner === myIdx;
+      const deckSel = isMe ? '[data-my-deck]' : '[data-opp-deck]';
+      const deckEl = document.querySelector(deckSel);
+      if (!deckEl) return;
+      const dr = deckEl.getBoundingClientRect();
+      // Position the flying card so its top-left aligns with the deck
+      // pile's top-left — the wrapper is 64x90 (matching the deck pile),
+      // so this overlays cleanly on top of the cardback at start.
+      const sx = dr.left;
+      const sy = dr.top;
+      // Center of viewport, offset by half the wrapper size so the card
+      // is centered (the keyframes pin to top-left, not center).
+      const cx = window.innerWidth / 2 - 32;
+      const cy = window.innerHeight / 2 - 45;
+      let ex = sx, ey = sy; // miss → back to deck pile (same coords)
+      if (outcome === 'match') {
+        // Suppress the auto-draw-anim that would otherwise fire when
+        // the server's pending state mutation grows the hand. Mirrors
+        // the play_pile_transfer suppressor pattern.
+        if (isMe) pileTransferToHandPendingMeRef.current  += 1;
+        else      pileTransferToHandPendingOppRef.current += 1;
+        // Target: project the rightmost edge of the last existing
+        // hand slot — same trick `play_pile_transfer` uses when the
+        // destination slot doesn't exist yet (state mutation is still
+        // pending). The own hand renders cards inside `.hand-slot`
+        // wrappers; opp's hand uses `.hand-card` directly.
+        const slotSel = isMe
+          ? '.game-hand-me .game-hand-cards .hand-slot'
+          : '.game-hand-opp .game-hand-cards .hand-card';
+        const slots = document.querySelectorAll(slotSel);
+        if (slots.length > 0) {
+          const lastRect = slots[slots.length - 1].getBoundingClientRect();
+          ex = lastRect.right;
+          ey = lastRect.top;
+        } else {
+          // Empty hand — fall back to the hand row container center.
+          const handRow = document.querySelector(isMe ? '.game-hand-me' : '.game-hand-opp');
+          if (handRow) {
+            const hr = handRow.getBoundingClientRect();
+            ex = hr.left + hr.width / 2 - 32;
+            ey = hr.top + hr.height / 2 - 45;
+          }
+        }
+        // Hide the newly-rendered hand slot for the duration of the
+        // flight — same `bounceReturnHidden` mechanism `play_pile_-
+        // transfer` uses. Without this, the new card pops into its
+        // real slot the instant the sync arrives, while the flying
+        // card is still mid-air at a different (projected) position;
+        // the visual jump is what the user reported as "lands in the
+        // middle of the hand".
+        if (toHandIdx != null && toHandIdx >= 0) {
+          const hideKey = `${owner}-${toHandIdx}`;
+          setBounceReturnHidden(prev => {
+            const next = new Set(prev);
+            next.add(hideKey);
+            return next;
+          });
+          setTimeout(() => {
+            setBounceReturnHidden(prev => {
+              if (!prev.has(hideKey)) return prev;
+              const next = new Set(prev);
+              next.delete(hideKey);
+              return next;
+            });
+          }, 2050); // animation is 2000ms; +50ms guard for the unhide.
+        }
+      }
+      const id = Date.now() + Math.random();
+      const cardbackUrl = isMe ? me.cardback : opp.cardback;
+      setKassaranFlips(prev => [...prev, {
+        id, startX: sx, startY: sy, centerX: cx, centerY: cy,
+        endX: ex, endY: ey, cardName, cardbackUrl,
+      }]);
+      setTimeout(() => {
+        setKassaranFlips(prev => prev.filter(a => a.id !== id));
+      }, 2000);
+    };
+    socket.on('kassaran_reveal_flip', onKassaranFlip);
 
     // Side-deck-to-hand appear: the card materialises in the receiver's
     // hand without a flight animation. Suppresses the auto-draw watcher
@@ -18870,6 +19339,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick);
       socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange);
       socket.off('deepsea_spores_activated', onDeepseaSporesActivated);
+      socket.off('rain_of_spores_activated', onRainOfSporesActivated);
       socket.off('nomu_draw', onNomuDraw);
       socket.off('ability_activated', onAbilityActivated); socket.off('ability_block_flash', onAbilityBlockFlash); socket.off('play_beam_animation', onBeamAnimation);
       socket.off('hero_ascension', onHeroAscension);
@@ -18917,6 +19387,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('divine_time_rewind', onDivineTimeRewind);
       socket.off('discard_to_deck_animation', onDiscardToDeck);
       socket.off('play_pile_transfer', onPileTransfer);
+      socket.off('kassaran_reveal_flip', onKassaranFlip);
       socket.off('side_deck_appear', onSideDeckAppear);
       socket.off('deck_to_discard_animation', onDeckToDiscard);
       socket.off('discard_to_deleted_animation', onDiscardToDeleted);
@@ -19673,8 +20144,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const animType = cur.stunned?.animationType;
           if (animType) setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);
         }
-        // Gained negated → electric strike animation
-        if (cur.negated && !prev.negated) {
+        // Gained negated → electric strike animation. Skip Weakening
+        // Crystal's aura (passive in-hand effect — re-applied every
+        // sync, would otherwise re-fire the burst on each refresh).
+        if (cur.negated && !prev.negated && !cur.negated._byWeakeningCrystal) {
           const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
           const animType = cur.negated?.animationType || 'electric_strike';
           setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);
@@ -19684,8 +20157,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
           setTimeout(() => playAnimation('thaw', sel, { duration: 900 }), 50);
         }
-        // Lost negated → thaw animation
-        if (!cur.negated && prev.negated) {
+        // Lost negated → thaw animation. Same skip — losing a Crystal-
+        // sourced aura (player discarded their last Crystal) is a
+        // silent wakeup, not a thaw burst.
+        if (!cur.negated && prev.negated && !prev.negated._byWeakeningCrystal) {
           const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
           setTimeout(() => playAnimation('thaw', sel, { duration: 900 }), 50);
         }
@@ -20162,6 +20637,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         return <span>{pName(p.name, p.color)} added {cName(entry.card)} from their deck to their hand via {cName(entry.by)}!</span>;
       }
       if (t === 'charme_steal') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} stole {cName(entry.card)} from {entry.from}!</span>; }
+      if (t === 'sid_steal') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} stole {cName(entry.card)} from {entry.fromOpp}'s deck via Sid, the King of Thieves!</span>; }
       if (t === 'charme_control') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} took control of {entry.target}!</span>; }
       if (t === 'damage_blocked') { return <span className="log-info">Damage to {entry.target} was blocked ({entry.reason}).</span>; }
       if (t === 'bartas_second_cast') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} casts {cName(entry.spell)} at a second target!</span>; }
@@ -20639,7 +21115,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && isFrozen && <FrozenOverlay />}
                 {hero?.name && isStunned && !isStunned._baihuPetrify && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
                 {hero?.name && isStunned?._baihuPetrify && <div className="baihu-petrify-overlay" />}
-                {hero?.name && isNegated && <NegatedOverlay />}
+                {hero?.name && isNegated && !isNegated._byWeakeningCrystal && <NegatedOverlay />}
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
                 {hero?.name && isHealReversed && <HealReversedOverlay />}
@@ -20813,7 +21289,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         {[0, 1, 2].flatMap(i => {
           const hero = heroes[i];
           const isDead = hero && hero.hp !== undefined && hero.hp <= 0;
-          const isFrozenOrStunned = hero?.statuses?.frozen || hero?.statuses?.stunned || hero?.statuses?.negated;
+          // Negated is intentionally NOT included here — a negated
+          // Hero (e.g. one whose controller holds a Weakening Crystal)
+          // has their HERO EFFECT silenced, but their Abilities (the
+          // cards in their ability zones) remain activatable. Mirrors
+          // the engine-side `getActivatableAbilities` /
+          // `getFreeActivatableAbilities` gates which only filter on
+          // frozen/stunned for ability activation. Frozen and stunned
+          // DO silence the whole hero (no actions, no abilities).
+          const isFrozenOrStunned = hero?.statuses?.frozen || hero?.statuses?.stunned;
           const abilityAttachActive2 = !isOpp && gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
           const heroIneligible = !isOpp && abilityDrag && (() => {
             if (abilityAttachActive2) {
@@ -21191,6 +21675,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <BoardCard cardName={oppPendingPlacement.cardName} hp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} maxHp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
                   ) : cards.length > 0 ? (
                     (() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey];
+                    // Multi-zone Creature placeholder slot (Populated
+                    // Island Turtle's `_ZoneBlocked` sentinel). The
+                    // engine pushes this name into companion slots
+                    // when a multi-zone Creature is summoned; the
+                    // sentinel keeps the slot occupied for placement
+                    // checks but is invisible to targeting / cardDB
+                    // lookups. Render: dimmed black-red wash with a
+                    // big red ✕ so the player sees the slot is
+                    // unusable for the duration.
+                    if (cards[0] === '_ZoneBlocked') {
+                      return (
+                        <div style={{
+                          position: 'absolute', inset: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: 'radial-gradient(ellipse at center, rgba(60,0,0,.55) 0%, rgba(20,0,0,.7) 80%)',
+                          border: '2px dashed rgba(220, 40, 40, .55)',
+                          borderRadius: 6,
+                          pointerEvents: 'none',
+                        }}>
+                          <span style={{
+                            fontSize: 64, lineHeight: 1, fontWeight: 900,
+                            color: '#ff3333',
+                            textShadow: '0 0 8px rgba(255,30,30,.95), 0 0 16px rgba(255,30,30,.6)',
+                            opacity: 0.9,
+                          }}>✕</span>
+                        </div>
+                      );
+                    }
                     // Unknown face-down surprise (opponent/spectator sees '?')
                     if (cards[0] === '?') {
                       return <BoardCard cardName="?" faceDown={true} style={{ opacity: 0.6 }} />;
@@ -21326,13 +21838,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       // effective level — base + delta — so a Field
                       // Cannon (base 3) reduced by 1 reads "Lv2" not
                       // "Lv-1", and a Lv0 slime that's gained 2 levels
-                      // still reads "Lv2" (0 + 2). Badge appears only
-                      // when the delta is non-zero, i.e. the level has
-                      // been modified from base.
-                      const delta = cc?.level;
-                      if (!delta) return null;
+                      // still reads "Lv2" (0 + 2). For tokens whose
+                      // base level is set per-instance via
+                      // `_cardDataOverride.level` (Biomancy Token
+                      // mirroring its Biomancy ability's level), prefer
+                      // the override over the static DB level and show
+                      // the badge unconditionally — those tokens
+                      // wouldn't display a level otherwise (delta is 0
+                      // and the static DB entry has `level: null`).
+                      const delta = cc?.level || 0;
+                      const overrideLvl = cc?._cardDataOverride?.level;
+                      if (delta === 0 && overrideLvl == null) return null;
                       const topName = cards[cards.length - 1];
-                      const baseLvl = CARDS_BY_NAME[topName]?.level || 0;
+                      const baseLvl = overrideLvl != null
+                        ? overrideLvl
+                        : (CARDS_BY_NAME[topName]?.level || 0);
                       return <div className="creature-level">Lv{baseLvl + delta}</div>;
                     })()}
                     {cc?.headCounter > 0 ? (
@@ -21457,17 +21977,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <span className="orbit-font" style={{ fontSize: 18, fontWeight: 800, color: opp.color }}>{opp.username}</span>
             {oppDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
           </div>
-          <div className={"game-hand-cards" + (gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')}>
+          <div className={"game-hand-cards"
+            + (gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')
+            + (gameState.effectPrompt?.type === 'pickFromOppHand' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')}>
             {Array.from({ length: opp.handCount || 0 }).map((_, i) => {
               const isBlindPick = gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx;
               const isSelected = isBlindPick && blindPickSelected.has(i);
               const maxSelect = isBlindPick ? (gameState.effectPrompt.maxSelect || 2) : 0;
               const isFull = isBlindPick && !isSelected && blindPickSelected.size >= maxSelect;
+              // Letter of Misinformations / "pick a card from opp's
+              // hand" prompt. The server already populated
+              // `_revealedHandIndices` for the eligible slots, so
+              // `revealEntry` will fill in for those — we just need
+              // to make them clickable while the prompt is active
+              // for the local player.
+              const isPickFromOppHand = gameState.effectPrompt?.type === 'pickFromOppHand'
+                && gameState.effectPrompt?.ownerIdx === myIdx;
+              const pickEligible = isPickFromOppHand
+                && (gameState.effectPrompt.eligibleIndices || []).includes(i);
               const revealEntry = (opp.revealedHandCards || []).find(r => r.index === i);
               return (
                 <div key={i}
-                  className={'board-card hand-card' + (revealEntry ? ' revealed-hand-card' : ' face-down') + (isSelected ? ' blind-pick-selected' : '') + (isBlindPick && !isSelected && !isFull ? ' blind-pick-eligible' : '') + (isFull ? ' hand-card-dimmed' : '')}
-                  data-hand-idx={i} style={(oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current) || bounceReturnHidden.has(`${oppIdx}-${i}`)) ? { visibility: 'hidden' } : (isBlindPick ? { cursor: 'pointer' } : undefined)}
+                  className={'board-card hand-card'
+                    + (revealEntry ? ' revealed-hand-card' : ' face-down')
+                    + (isSelected ? ' blind-pick-selected' : '')
+                    + (isBlindPick && !isSelected && !isFull ? ' blind-pick-eligible' : '')
+                    + (isFull ? ' hand-card-dimmed' : '')
+                    + (pickEligible ? ' blind-pick-eligible' : '')
+                    + (isPickFromOppHand && !pickEligible ? ' hand-card-dimmed' : '')}
+                  data-hand-idx={i} style={(oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current) || bounceReturnHidden.has(`${oppIdx}-${i}`)) ? { visibility: 'hidden' } : ((isBlindPick || pickEligible) ? { cursor: 'pointer' } : undefined)}
                   onClick={isBlindPick ? () => {
                     // Compute the NEXT selection set outside the
                     // setState updater. React may double-invoke state
@@ -21484,7 +22022,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     if (gameState.effectPrompt?.autoConfirm && next.size === maxSelect) {
                       respondToPrompt({ selectedIndices: [...next] });
                     }
-                  } : undefined}>
+                  } : (pickEligible ? () => {
+                    // Click-pick from opp's hand. The server-resolver
+                    // expects { handIndex, cardName }; cardName comes
+                    // from the same `revealedHandCards` entry that
+                    // makes the slot face-up.
+                    if (window.playSFX) window.playSFX('ui_click');
+                    respondToPrompt({ handIndex: i, cardName: revealEntry?.name || null });
+                  } : undefined)}>
                   {revealEntry ? (
                     <img src={cardImageUrl(revealEntry.name)} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} draggable={false}
                       onMouseEnter={() => { const c = CARDS_BY_NAME[revealEntry.name]; if (c) setBoardTooltip(c); }}
@@ -21630,6 +22175,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div className="board-center" ref={boardCenterRef} style={{ position: 'relative', isolation: 'isolate' }}>
             {(((gameState.areaZones?.[0] || []).includes('Acid Rain')) || ((gameState.areaZones?.[1] || []).includes('Acid Rain'))) && <AcidRainOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('The Bonegrinder')) || ((gameState.areaZones?.[1] || []).includes('The Bonegrinder'))) && <BonegrinderOverlay />}
+            {(((gameState.areaZones?.[0] || []).includes('Crystal Well')) || ((gameState.areaZones?.[1] || []).includes('Crystal Well'))) && <CrystalWellOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Deepsea Castle')) || ((gameState.areaZones?.[1] || []).includes('Deepsea Castle'))) && <DeepseaCastleOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Slippery Ice')) || ((gameState.areaZones?.[1] || []).includes('Slippery Ice'))) && <SlipperyIceOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('The Cosmic Depths')) || ((gameState.areaZones?.[1] || []).includes('The Cosmic Depths'))) && <CosmicDepthsOverlay />}
@@ -21935,7 +22481,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div className="board-util board-util-right">
             <div className="board-util-side">
               <BoardZone type="deck" label="Deck" faceDown style={oppBoardZone('deck')}>
-                {opp.deckCount > 0 ? <div className="board-card face-down" data-opp-deck="1"><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{opp.deckCount}</div></div>
+                {opp.deckCount > 0 ? <div className="board-card face-down" data-opp-deck="1"
+                  onMouseEnter={(e) => {
+                    const top = opp.deckTopVisible?.[0];
+                    if (top && CARDS_BY_NAME[top]) {
+                      setDeckTopTooltip({ cardName: top, rect: e.currentTarget.getBoundingClientRect() });
+                    }
+                  }}
+                  onMouseLeave={() => setDeckTopTooltip(null)}><img src={opp.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} />
+                  {/* Premonition stash: top card publicly known, rendered semi-
+                      transparently above the cardback so both players can see
+                      what's coming. `deckTopVisible[0]` is the next card to be
+                      drawn. */}
+                  {opp.deckTopVisible?.[0] && cardImageUrl(opp.deckTopVisible[0]) && (
+                    <img src={cardImageUrl(opp.deckTopVisible[0])}
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+                        objectFit: 'cover', opacity: 0.45, pointerEvents: 'none' }}
+                      draggable={false} />
+                  )}
+                  <div className="board-card-label">{opp.deckCount}</div></div>
                 : <div className="board-card" data-opp-deck="1"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
               <BoardZone type="potion" label="Potions" faceDown style={oppBoardZone('potion')}>
@@ -21955,7 +22519,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </div>
               <div onClick={() => !isSpectator && me.deckCount > 0 && setDeckViewer('deck')} style={{ cursor: !isSpectator && me.deckCount > 0 ? 'pointer' : 'default' }} data-my-deck="1">
               <BoardZone type="deck" label="Deck" faceDown style={myBoardZone('deck')}>
-                {me.deckCount > 0 ? <div className="board-card face-down"><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} /><div className="board-card-label">{me.deckCount}</div></div>
+                {me.deckCount > 0 ? <div className="board-card face-down"
+                  onMouseEnter={(e) => {
+                    const top = me.deckTopVisible?.[0];
+                    if (top && CARDS_BY_NAME[top]) {
+                      setDeckTopTooltip({ cardName: top, rect: e.currentTarget.getBoundingClientRect() });
+                    }
+                  }}
+                  onMouseLeave={() => setDeckTopTooltip(null)}><img src={me.cardback || "/cardback.png"} style={{width:'100%',height:'100%',objectFit:'cover'}} draggable={false} />
+                  {me.deckTopVisible?.[0] && cardImageUrl(me.deckTopVisible[0]) && (
+                    <img src={cardImageUrl(me.deckTopVisible[0])}
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+                        objectFit: 'cover', opacity: 0.45, pointerEvents: 'none' }}
+                      draggable={false} />
+                  )}
+                  <div className="board-card-label">{me.deckCount}</div></div>
                 : <div className="board-card"><div className="deck-empty-label">0</div></div>}
               </BoardZone>
               </div>
@@ -22025,6 +22603,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   return selectedOfType >= typeLimits[thisType];
                 })();
                 const isHandPickMaxed = isHandPick && !isHandPickSelected && handPickSelected.size >= (gameState.effectPrompt.maxSelect || 3);
+                // Heinz-style name lock — once a card is picked, all
+                // hand cards with a different name are dimmed and
+                // un-clickable. Already-selected cards stay highlighted
+                // so they can be toggled off.
+                const isHandPickNameLocked = (() => {
+                  if (!isHandPick) return false;
+                  if (!gameState.effectPrompt.nameLockOnFirstSelect) return false;
+                  if (isHandPickSelected) return false;
+                  if (handPickSelected.size === 0) return false;
+                  let lockedName = null;
+                  for (const si of handPickSelected) { lockedName = me.hand[si]; break; }
+                  return lockedName != null && me.hand[item.origIdx] !== lockedName;
+                })();
                 const isStealMarked = stealMarkedMe.has(item.origIdx);
                 const isStealHighlighted = stealHighlightMe.has(item.origIdx);
                 const isStealHidden = stealHiddenMe.has(item.origIdx) && hand.length === stealExpectedMeCountRef.current;
@@ -22069,8 +22660,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const dynamic    = (me.handLevelOffsetsDynamic || {})[item.origIdx] || 0;
                 const handLevelOffset = Math.min(persistent, transient, dynamic, 0);
                 const handCardData = CARDS_BY_NAME[item.card];
-                const handEffectiveLevel = handLevelOffset !== 0 && handCardData?.level != null
-                  ? (handCardData.level + handLevelOffset)
+                // Mana Absorbing Crystal — while a copy is in our hand,
+                // every Spell's level reads +1. Hand-wide boost (not
+                // per-index), so it stacks on top of any per-card
+                // reduction map above.
+                const manaCrystalBoost =
+                  handCardData?.cardType === 'Spell'
+                  && (me.hand || []).includes('Mana Absorbing Crystal')
+                  ? 1 : 0;
+                // Floor at 0 — Sparkfly Queen's −3 transient offset on a
+                // Lv1/Lv2 stolen card would otherwise read as "Lv-2" /
+                // "Lv-1". Level requirements never go below 0 in this
+                // game (any Hero can satisfy a Lv0 cast) so the badge
+                // should track that semantic.
+                const handEffectiveLevel = (handLevelOffset !== 0 || manaCrystalBoost !== 0)
+                  && handCardData?.level != null
+                  ? Math.max(0, handCardData.level + handLevelOffset + manaCrystalBoost)
                   : null;
                 const handLevelHostHeroIdx = (me.handLevelOffsetHeroFilter || {})[item.origIdx];
                 const handLevelIsHeroFiltered = handLevelHostHeroIdx != null;
@@ -22086,23 +22691,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   : null;
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTarget ? ' hand-pick-eligible' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '')}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTarget ? ' hand-pick-eligible' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '')}
                     style={(isDrawAnim || isPendingPlay || isStealHidden || bounceReturnHidden.has(`${myIdx}-${item.origIdx}`)) ? { visibility: 'hidden' } : undefined}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
                     onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
                     <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} />
-                    {handEffectiveLevel != null && (
-                      <div
-                        className={'creature-level' + (handLevelIsHeroFiltered ? ' creature-level-hero-filtered' : '')}
-                        onMouseEnter={handLevelIsHeroFiltered
-                          ? (e) => showGameTooltip(e, `Reduced level only applies when ${me.heroes?.[handLevelHostHeroIdx]?.name || 'the corresponding Hero'} plays this card.`)
-                          : undefined}
-                        onMouseLeave={handLevelIsHeroFiltered ? hideGameTooltip : undefined}>
-                        Lv{handEffectiveLevel}
-                      </div>
-                    )}
+                    {handEffectiveLevel != null && (() => {
+                      // "Boosted" = effective level is HIGHER than the
+                      // printed base (Mana Absorbing Crystal's +1).
+                      // Render the badge in red so the player visually
+                      // distinguishes a punishing increase from a
+                      // friendly reduction.
+                      const baseLevel = handCardData?.level ?? 0;
+                      const isBoosted = handEffectiveLevel > baseLevel;
+                      return (
+                        <div
+                          className={'creature-level' + (handLevelIsHeroFiltered ? ' creature-level-hero-filtered' : '')}
+                          onMouseEnter={handLevelIsHeroFiltered
+                            ? (e) => showGameTooltip(e, `Reduced level only applies when ${me.heroes?.[handLevelHostHeroIdx]?.name || 'the corresponding Hero'} plays this card.`)
+                            : undefined}
+                          onMouseLeave={handLevelIsHeroFiltered ? hideGameTooltip : undefined}
+                          style={isBoosted ? {
+                            color: '#ff5555',
+                            textShadow: '0 0 6px rgba(255,90,90,0.7), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000',
+                          } : undefined}>
+                          Lv{handEffectiveLevel}
+                        </div>
+                      );
+                    })()}
                     {handEffectiveCost != null && (
                       <div className="hand-cost-override"
                         onMouseEnter={e => showGameTooltip(e, `Cost reduced by ${handCostReduction} this turn (was ${handCardData.cost}).`)}
@@ -22139,6 +22757,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {oppDrawAnims.map(anim => (
         <OppDrawAnimCard key={anim.id} startX={anim.startX} startY={anim.startY}
           endX={anim.endX} endY={anim.endY} cardName={anim.cardName} cardbackUrl={opp.cardback} />
+      ))}
+      {kassaranFlips.map(anim => (
+        <KassaranFlipCard key={anim.id}
+          startX={anim.startX} startY={anim.startY}
+          centerX={anim.centerX} centerY={anim.centerY}
+          endX={anim.endX} endY={anim.endY}
+          cardName={anim.cardName} cardbackUrl={anim.cardbackUrl} />
       ))}
       {/* Spectator: bottom player draw animations (face-down, like opponent) */}
       {isSpectator && specMeDrawAnims.map(anim => (
@@ -22445,6 +23070,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const r = el.getBoundingClientRect();
         return <div className="immune-tooltip" style={{ position: 'fixed', left: r.right + 8, top: r.top - 4, borderColor: 'rgba(255,200,0,.4)', color: '#ffdd88' }}>Provides an additional Action.</div>;
       })()}
+
+      {/* Deck-top tooltip — anchored to the LEFT of the deck pile so the
+          tooltip doesn't sit on top of the deck and obscure the very
+          card it's previewing. The standard `.board-tooltip` is a full-
+          height right-anchored panel; we reuse its styling but override
+          `right` to position the tooltip's right edge just left of the
+          deck pile (12px gap). */}
+      {deckTopTooltip && CARDS_BY_NAME[deckTopTooltip.cardName] && (
+        <div className="board-tooltip"
+          style={{ right: window.innerWidth - deckTopTooltip.rect.left + 12 }}>
+          <CardTooltipContent card={CARDS_BY_NAME[deckTopTooltip.cardName]} />
+        </div>
+      )}
 
       {/* Pile hover tooltip (rendered at top level to escape overflow clipping) */}
       {hoveredPileCard && CARDS_BY_NAME[hoveredPileCard] && (() => {
@@ -23127,6 +23765,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </DraggablePanel>
       )}
 
+      {/* ── Effect Prompt: Pick from Opponent's Hand (Letter of
+          Misinformations) — eligible slots in opp's hand are revealed
+          face-up + clickable; the cancel button bows out (after one
+          pick, the cancel label switches to "Done" via server). ── */}
+      {isMyEffectPrompt && ep.type === 'pickFromOppHand' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(255,200,80,.6)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#ffc850', marginBottom: 4 }}>{ep.title || 'Pick a Card'}</div>
+          {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>}
+          {ep.instruction && <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>{ep.instruction}</div>}
+          {ep.cancellable !== false && <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+            onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || 'Cancel'} (Esc)</button>}
+        </DraggablePanel>
+      )}
+
       {/* ── Waiting for opponent (when they have an active effect prompt) ── */}
       {(isOppEffectPrompt || isActivePlayerPromptForOpp) && !gameState.potionTargeting && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 260 }}>
@@ -23136,6 +23788,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'optionPicker' ? '🤔 Opponent is deciding...' :
              ep.type === 'forceDiscard' || ep.type === 'forceDiscardCancellable' ? (ep.opponentTitle || '🗑 Opponent is discarding...') :
              ep.type === 'pickHandCard' ? (ep.opponentTitle || '🎴 Opponent is choosing a card...') :
+             ep.type === 'pickFromOppHand' ? '✉️ Opponent is reading your hand...' :
              ep.type === 'abilityAttach' ? '⚡ Opponent is equipping...' :
              ep.type === 'blindHandPick' ? '🫳 Opponent is stealing...' :
              ep.type === 'cardNamePicker' ? '🍀 Opponent is declaring...' :
@@ -23152,6 +23805,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'forceDiscard' ? (ep.opponentSubtitle || 'Waiting for opponent to discard a card...') :
              ep.type === 'forceDiscardCancellable' ? 'Waiting for opponent to discard or pass...' :
              ep.type === 'pickHandCard' ? (ep.opponentSubtitle || 'Waiting for opponent to pick a card from their hand...') :
+             ep.type === 'pickFromOppHand' ? 'Opponent is taking a card from your hand...' :
              ep.type === 'handPick' ? 'Waiting for opponent to select cards...' :
              ep.type === 'optionPicker' ? 'Waiting for opponent to choose an option...' :
              ep.type === 'playerPicker' ? 'Waiting for opponent to pick a player...' :
@@ -23351,6 +24005,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {isMyEffectPrompt && ep.type === 'handPick' && (() => {
         const minSel = ep.minSelect ?? 1;
         const canConfirm = handPickSelected.size >= minSel;
+        // When `nameLockOnFirstSelect` is set, the confirm label
+        // suffixes the current selection count (e.g. "Discard 3").
+        // Heinz uses this — the count can vary 1..maxSelect on the
+        // fly as the player toggles copies.
+        const baseLabel = ep.confirmLabel || 'Confirm';
+        const dynamicLabel = ep.nameLockOnFirstSelect
+          ? `${baseLabel} ${handPickSelected.size}`
+          : baseLabel;
         return (
           <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(200,100,255,.85)' }}>
             <div className="orbit-font" style={{ fontSize: 13, color: '#cc66ff', marginBottom: 4 }}>{ep.title || 'Select Cards'}</div>
@@ -23364,7 +24026,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 onClick={() => {
                   const selected = [...handPickSelected].map(idx => ({ handIndex: idx, cardName: me.hand[idx] }));
                   respondToPrompt({ selectedCards: selected });
-                }}>{ep.confirmLabel || 'Confirm'}</button>
+                }}>{dynamicLabel}</button>
               {ep.cancellable !== false && (
                 <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
                   onClick={() => respondToPrompt({ cancelled: true })}>Cancel</button>

@@ -1,0 +1,118 @@
+// ═══════════════════════════════════════════
+//  CARD EFFECT: "Spike Trap"
+//  Spell (Surprise, Lv2, Decay Magic)
+//
+//  Activate when the user is chosen by an Attack
+//  or Spell. Negate that Attack/Spell and inflict
+//  200 damage to the attacker. Opponent may
+//  discard 2 cards to negate this Surprise.
+// ═══════════════════════════════════════════
+
+const CARD_NAME = 'Spike Trap';
+const SPIKE_DAMAGE = 200;
+const COUNTER_DISCARD_COST = 2;
+
+module.exports = {
+  isSurprise: true,
+
+  /**
+   * Trigger gate: source must be an Attack or Spell played by the
+   * opponent against this hero, and that opponent's hero must still
+   * be alive (no point retaliating against a dead body).
+   */
+  surpriseTrigger(gs, ownerIdx, heroIdx, sourceInfo, engine) {
+    if (!sourceInfo) return false;
+    const cd = engine._getCardDB()[sourceInfo.cardName];
+    if (!cd) return false;
+    if (cd.cardType !== 'Attack' && cd.cardType !== 'Spell') return false;
+    const attacker = gs.players[sourceInfo.owner]?.heroes?.[sourceInfo.heroIdx];
+    return !!(attacker?.name && attacker.hp > 0);
+  },
+
+  async onSurpriseActivate(ctx, sourceInfo) {
+    const engine = ctx._engine;
+    const gs = engine.gs;
+    const ownerPi = ctx.cardOwner;
+    const oppPi = ownerPi === 0 ? 1 : 0;
+    const opp = gs.players[oppPi];
+
+    // Opp counter-window: discard 2 to negate Spike Trap. Only offered
+    // when opp actually has 2 cards in hand — otherwise skip the
+    // prompt entirely (no point asking for an impossible cost).
+    if (opp && (opp.hand?.length || 0) >= COUNTER_DISCARD_COST) {
+      const eligibleIndices = [];
+      for (let i = 0; i < opp.hand.length; i++) eligibleIndices.push(i);
+
+      // Use a confirm prompt first ("pay 2 discard to negate?"); only
+      // open the discard picker if they accept. forceDiscard prompts
+      // on opp would be jarring if the answer is just "no".
+      const confirmed = await engine.promptGeneric(oppPi, {
+        type: 'confirm',
+        title: CARD_NAME,
+        message: `Discard ${COUNTER_DISCARD_COST} cards from your hand to negate ${CARD_NAME}?`,
+        showCard: CARD_NAME,
+        confirmLabel: '🗑️ Discard 2',
+        cancelLabel: 'No',
+        cancellable: true,
+      });
+
+      if (confirmed === true || confirmed?.confirmed === true) {
+        // Sequential 2-card forced discards. Each iteration shrinks
+        // the eligible set so the same slot can't be picked twice.
+        let discarded = 0;
+        for (let n = 0; n < COUNTER_DISCARD_COST; n++) {
+          const eligible = [];
+          for (let i = 0; i < (opp.hand?.length || 0); i++) eligible.push(i);
+          if (eligible.length === 0) break;
+          const result = await engine.promptGeneric(oppPi, {
+            type: 'forceDiscard',
+            title: CARD_NAME,
+            description: `Discard ${COUNTER_DISCARD_COST - discarded} more card${COUNTER_DISCARD_COST - discarded > 1 ? 's' : ''} to negate ${CARD_NAME}.`,
+            instruction: 'Click a card in your hand to discard it.',
+            eligibleIndices: eligible,
+            cancellable: false,
+          });
+          if (!result || result.cardName == null) break;
+          const ok = await engine.actionDiscardHandCard(
+            oppPi, result.cardName, result.handIndex,
+            { source: CARD_NAME },
+          );
+          if (!ok) break;
+          discarded++;
+        }
+        if (discarded >= COUNTER_DISCARD_COST) {
+          engine.log('spike_trap_countered', {
+            player: opp.username, by: CARD_NAME,
+          });
+          engine.sync();
+          return null; // Spike Trap fizzles — no damage, no negation.
+        }
+        // Couldn't actually pay the full cost (hand emptied mid-flow,
+        // race condition). Treat as "no counter" — Spike Trap fires.
+      }
+    }
+
+    // Counter declined / not affordable: deal 200 to the attacker and
+    // negate the triggering Attack/Spell.
+    const attacker = gs.players[sourceInfo.owner]?.heroes?.[sourceInfo.heroIdx];
+    if (attacker?.name && attacker.hp > 0) {
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'red_cut', owner: sourceInfo.owner,
+        heroIdx: sourceInfo.heroIdx, zoneSlot: -1,
+      });
+      await engine._delay(400);
+      const source = { name: CARD_NAME, owner: ownerPi, heroIdx: ctx.cardHeroIdx };
+      await engine.actionDealDamage(source, attacker, SPIKE_DAMAGE, 'other', {
+        _skipReactionCheck: true,
+      });
+    }
+
+    engine.log('spike_trap_fired', {
+      player: gs.players[ownerPi]?.username,
+      attacker: sourceInfo.cardName,
+      damage: SPIKE_DAMAGE,
+    });
+    engine.sync();
+    return { effectNegated: true };
+  },
+};

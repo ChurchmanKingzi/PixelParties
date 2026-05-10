@@ -1,0 +1,36 @@
+=== PIXEL PARTIES DECK ===
+Name: Structure Deck: Flying Sparks
+Cover: Sparkfly Queen
+
+== HEROES ==
+Enigma, the Seller of Secrets
+Lilly, the Charming Infiltrator
+Alice, the Puppeteer Girl
+
+== MAIN DECK ==
+2x Aggressive Town Guard
+4x Booby Trap
+4x Cute Cheese
+2x Dark Gear
+4x Deepsea Idol
+1x Divine Gift of Fire
+2x Fireshield
+4x Hive's Crown
+1x Initiation Ritual
+3x Juice
+4x Performance
+4x Ska Harpyformer
+4x Sparkfly Architect
+4x Sparkfly Attendant
+4x Sparkfly Queen
+4x Sparkfly Worker
+5x Summoning Magic
+4x Treasure Chest
+
+== POTION DECK ==
+2x Elixir of Quickness
+2x Magnetic Potion
+2x Monster in a Bottle
+1x Resuscitation Potion
+
+== SIDE DECK ==
