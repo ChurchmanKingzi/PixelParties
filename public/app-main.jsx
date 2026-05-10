@@ -2066,6 +2066,51 @@ function App() {
     document.documentElement.style.setProperty('--accent', user && user.color ? user.color : '#00f0ff');
   }, [user?.color]);
 
+  // ── App-wide tooltip wheel-scroll redirect ──
+  // Card tooltips (battle `.board-tooltip`, deck-editor / shop / deck-
+  // builder `.tooltip.card-tooltip`, and the inner scrollable
+  // `.card-tooltip-info`) all set `pointer-events: none` so they don't
+  // block hover-out detection on the source card. Side effect: wheel
+  // events never reach those elements, so their `overflow: auto` /
+  // `overflow-y: auto` styling is dead. We listen at window level,
+  // find any visible tooltip element with overflow, and proxy the
+  // wheel delta to its `scrollTop`. When no tooltip is overflowing,
+  // the wheel falls through to normal page scroll. Always-on so it
+  // covers every screen — battle, puzzle, deck builder, shop, etc.
+  useEffect(() => {
+    const onWheel = (e) => {
+      // Candidate scrollable targets, in priority order. The inner
+      // `.card-tooltip-info` is the actual scroll viewport for the
+      // CardMini-style local tooltips (the outer `.tooltip` wrapper
+      // is `overflow: hidden`); for board tooltips the outer
+      // `.board-tooltip` IS the scrollable element.
+      const selectors = [
+        '.card-tooltip-info',
+        '.board-tooltip',
+        '.tooltip.card-tooltip',
+      ];
+      for (const sel of selectors) {
+        const els = document.querySelectorAll(sel);
+        for (let i = els.length - 1; i >= 0; i--) {
+          const el = els[i];
+          if (!el.isConnected) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) continue;
+          if (el.scrollHeight - el.clientHeight <= 1) continue;
+          // Found something to scroll.
+          e.preventDefault();
+          const step = e.deltaMode === 1 ? e.deltaY * 16
+                     : e.deltaMode === 2 ? e.deltaY * el.clientHeight
+                     : e.deltaY;
+          el.scrollTop += step;
+          return;
+        }
+      }
+    };
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, []);
+
   // Escape key → return to main menu from any sub-screen (except play — handled by PlayScreen/GameBoard)
   useEffect(() => {
     const handleEsc = (e) => {

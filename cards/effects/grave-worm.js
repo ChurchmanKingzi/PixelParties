@@ -79,15 +79,16 @@ module.exports = {
 
       // Burrow-out animation — black particles bursting upward from
       // the support slot, indicating the worm clawing out of fresh
-      // black earth. Fires for ANY summon path (hand, discard
-      // revive, etc.).
+      // black earth. Fired in PARALLEL with the on-summon effect:
+      // the broadcast goes out, then the draw begins immediately
+      // — no `_delay` between them, so the animation runs while the
+      // draw resolves rather than gating the effect.
       engine._broadcastEvent('play_zone_animation', {
         type: 'grave_worm_burrow',
         owner: pi,
         heroIdx: ctx.cardHeroIdx,
         zoneSlot: ctx.card.zoneSlot,
       });
-      await engine._delay(250);
 
       await engine.actionDrawCards(pi, 1);
       engine.log('grave_worm_summon_draw', {

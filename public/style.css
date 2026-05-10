@@ -5260,6 +5260,21 @@ body:has(.reaction-chain-overlay) .board-tooltip {
   right: 196px;
 }
 
+/* In battle / puzzle-player mode the player's hand strip
+  (`.game-hand-me`, z-index 10000) renders ABOVE the tooltip
+   (z-index 9999) by design — the hand stays interactive while a
+   tooltip is open. Without an offset, the bottom ~15-20% of the
+   tooltip would render behind the hand and be unreadable. Lift the
+   tooltip's bottom edge above the hand strip so its full content
+   area is visible AND the wheel-scroll redirect's `scrollHeight >
+   clientHeight` test reflects the actual visible viewport.
+   Only applies on screens that have a hand strip — puzzle editor /
+   shop / deck builder don't render `.game-hand-me`, so the rule
+   is naturally scoped via `body:has`. */
+body:has(.game-hand-me) .board-tooltip {
+  bottom: var(--hand-min-h);
+}
+
 /* ===== NOTIFICATION ===== */
 .notification {
   position: fixed;

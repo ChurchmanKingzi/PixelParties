@@ -281,13 +281,16 @@ module.exports = {
     // Mini-summon flair — purple hearts pop around the just-placed
     // Creature. Routed through the standard `play_zone_animation`
     // dispatcher so it anchors to the support slot's bounding rect.
+    // Fired in PARALLEL with the post-summon hooks — no `_delay`
+    // between the broadcast and the action-used hooks below, so the
+    // hearts animate while downstream listeners resolve rather
+    // than gating them.
     engine._broadcastEvent('play_zone_animation', {
       type: 'mini_hearts',
       owner: pi,
       heroIdx: slot.heroIdx,
       zoneSlot: placed.actualSlot,
     });
-    await engine._delay(150);
 
     // Mark the additional-action use for any listeners that key
     // off "an additional Action was taken this turn".

@@ -11682,31 +11682,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     hoverSelectors: '.board-card:hover, .card-reveal-entry:hover, .card-mini:hover, .card-name-picker-row:hover, .revealed-hand-card:hover, .status-badge:hover, .buff-icon:hover, .option-tooltip-hover:hover',
   });
 
-  // Wheel-scroll redirect — when ANY `.board-tooltip` is visible and its
-  // content overflows the viewport (Sparkfly Queen with stacked
-  // inherited effects, dense long card text, etc.), redirect the page
-  // wheel scroll to the tooltip itself. Without this the tooltip is
-  // `pointer-events: none` so wheel events can't reach it directly.
-  // Picks the LAST scrollable `.board-tooltip` in DOM order — the main
-  // hover tooltip renders after token / pile / deck-top variants, so
-  // it wins ties. Returns early without preventing default when no
-  // scrollable tooltip is present, so normal page-scroll keeps working.
-  useEffect(() => {
-    const onWheel = (e) => {
-      const tooltips = document.querySelectorAll('.board-tooltip');
-      if (tooltips.length === 0) return;
-      let target = null;
-      for (let i = tooltips.length - 1; i >= 0; i--) {
-        const t = tooltips[i];
-        if (t.scrollHeight > t.clientHeight) { target = t; break; }
-      }
-      if (!target) return;
-      target.scrollTop += e.deltaY;
-      e.preventDefault();
-    };
-    window.addEventListener('wheel', onWheel, { passive: false });
-    return () => window.removeEventListener('wheel', onWheel);
-  }, []);
+  // (Wheel-scroll redirect for `.board-tooltip` was previously here.
+  // Moved to the App() component in app.jsx so a single always-on
+  // handler covers every screen — battle, puzzle, deck builder,
+  // shop — uniformly, including the deck-builder variant the
+  // GameBoard-scoped handler couldn't see.)
 
   // Board skin helpers — construct zone background style from board ID
   const boardZoneStyle = (boardId, zoneType) => {

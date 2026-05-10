@@ -2068,6 +2068,12 @@ function useCardTooltip(opts) {
     return () => clearInterval(id);
   }, [tooltipCard, hoverSelectors]);
 
+  // (Wheel-scroll redirect for tooltips lives in App() in app.jsx —
+  // always-on so it covers every screen uniformly. Used to be here
+  // gated on `tooltipCard`, but the deck builder doesn't use this
+  // hook so it never fired there. The App-level handler covers all
+  // tooltip variants in one place.)
+
   const showTooltip = useCallback((card, side) => {
     setTooltipCard(card || null);
     if (side) setTooltipSide(side);
