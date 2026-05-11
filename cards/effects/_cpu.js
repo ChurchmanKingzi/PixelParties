@@ -1035,7 +1035,7 @@ async function activateCreatureEffects(engine, helpers) {
         );
         if (!inst) continue;
         if (inst.faceDown) continue; // face-down surprises aren't actives
-        if (inst.turnPlayed === gs.turn) continue; // summoning sickness
+        if (inst.turnPlayed === gs.turn && !inst.counters?._hasHaste) continue; // summoning sickness
         const hoptKey = `creature-effect:${inst.id}`;
         if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
 
@@ -3245,8 +3245,13 @@ function pickHealTargetsMulti(engine, ownTargets, enemyTargets, cardName, maxSel
     if (t.type === 'hero' && heroHasAttachment(engine, t, 'Overheal Shock')) add(t);
   }
   // 2) Own targets — skip own-hero with Overheal Shock (would kill us)
-  const safeOwn = ownTargets.filter(t =>
-    !(t.type === 'hero' && heroHasAttachment(engine, t, 'Overheal Shock')));
+  //    and skip `cpuMeta.preferDead` creatures (Cute Cat etc. — the
+  //    CPU never protects creatures that want to die).
+  const safeOwn = ownTargets.filter(t => {
+    if (t.type === 'hero' && heroHasAttachment(engine, t, 'Overheal Shock')) return false;
+    if (targetIsPreferDead(engine, t)) return false;
+    return true;
+  });
   // 3) Fresh Lifeforce Howitzer priority
   for (const t of safeOwn) {
     if (targetHasFreshLifeforceHowitzer(engine, t)) add(t);
@@ -3287,8 +3292,12 @@ function pickBuffTargetsMulti(engine, ownTargets, cardName, maxSelect) {
     const single = pickBuffTarget(engine, ownTargets, cardName);
     return single ? [single] : [];
   }
-  const heroes = ownTargets.filter(t => t.type === 'hero');
-  const creatures = ownTargets.filter(t => t.type !== 'hero');
+  // Drop `cpuMeta.preferDead` creatures (Cute Cat etc.) — the CPU
+  // never buffs creatures that want to die. Heroes don't carry the
+  // flag, so the hero buckets below are untouched.
+  const filteredOwn = ownTargets.filter(t => !targetIsPreferDead(engine, t));
+  const heroes = filteredOwn.filter(t => t.type === 'hero');
+  const creatures = filteredOwn.filter(t => t.type !== 'hero');
   const ascFirst = (a, b) => {
     const aAsc = targetIsAscendedOrAscendableHero(engine, a) ? 1 : 0;
     const bAsc = targetIsAscendedOrAscendableHero(engine, b) ? 1 : 0;
@@ -4137,9 +4146,12 @@ function pickHealTarget(engine, ownTargets, enemyTargets, cardName, _config) {
     if (heroHasAttachment(engine, t, 'Overheal Shock')) return t;
   }
 
-  // 2) Skip own Heroes with Overheal Shock attached.
+  // 2) Skip own Heroes with Overheal Shock attached, and creatures
+  //    flagged `cpuMeta.preferDead` (Cute Cat etc. — the CPU never
+  //    spends a heal / cleanse on creatures that want to die).
   const safeOwn = ownTargets.filter(t => {
     if (t.type === 'hero' && heroHasAttachment(engine, t, 'Overheal Shock')) return false;
+    if (targetIsPreferDead(engine, t)) return false;
     return true;
   });
 
@@ -4395,10 +4407,14 @@ function pickSelfDamageTarget(engine, ownTargets, config) {
 
 function pickBuffTarget(engine, ownTargets, cardName) {
   if (!ownTargets.length) return null;
+  // Drop `cpuMeta.preferDead` creatures (Cute Cat etc.) — the CPU
+  // never buffs creatures that want to die. Heroes are unaffected.
+  const filtered = ownTargets.filter(t => !targetIsPreferDead(engine, t));
+  if (!filtered.length) return null;
   // Prefer Hero targets; de-prioritize targets already carrying the buff
   // (naive check by card name in their counters).
-  const heroes = ownTargets.filter(t => t.type === 'hero');
-  const creatures = ownTargets.filter(t => t.type !== 'hero');
+  const heroes = filtered.filter(t => t.type === 'hero');
+  const creatures = filtered.filter(t => t.type !== 'hero');
   const pool = heroes.length ? heroes : creatures;
   const withoutBuff = pool.filter(t => !targetHasBuff(engine, t, cardName));
   const final = withoutBuff.length ? withoutBuff : pool;
@@ -4448,6 +4464,22 @@ function heroHasAttachment(engine, t, attachmentName) {
     if ((slot || []).includes(attachmentName)) return true;
   }
   return false;
+}
+
+/**
+ * Creature whose card script declares `cpuMeta.preferDead: true` —
+ * the CPU should NEVER spend defensive resources (heal, cleanse,
+ * buff) on it. Cute Cat is the prototype: its on-summon self-discard
+ * is the whole point of the card, so any "save it" play is wasted
+ * tempo on a creature that wants to die. Future revival /
+ * sacrifice-engine creatures opt in the same way.
+ */
+function targetIsPreferDead(engine, t) {
+  if (!t || (t.type !== 'creature' && t.type !== 'equip')) return false;
+  const inst = t.cardInstance || findSupportInstance(engine, t);
+  if (!inst) return false;
+  const script = loadCardEffect(inst.name);
+  return script?.cpuMeta?.preferDead === true;
 }
 
 function targetHasFreshLifeforceHowitzer(engine, t) {

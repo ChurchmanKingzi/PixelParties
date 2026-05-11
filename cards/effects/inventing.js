@@ -43,33 +43,35 @@ module.exports = {
 
     if (level <= 2) {
       const maxDiscard = level >= 2 ? 2 : 1;
-      let count = 0;
-
-      for (let i = 0; i < maxDiscard; i++) {
-        if ((ps.hand || []).length === 0) break;
-
-        const result = await engine.promptGeneric(pi, {
-          type:        'forceDiscardCancellable',
-          title:       `${CARD_NAME} Lv${level}`,
-          description: i === 0
-            ? `Click a card to discard it and draw 1 card.${maxDiscard > 1 ? ' You may discard a second card.' : ''}`
-            : 'Click a second card to discard it and draw 1 more, or cancel.',
-          cancellable: true,
-        });
-
-        if (!result || result.cancelled) break;
-        const { cardName, handIndex } = result;
-        if (cardName === undefined || handIndex === undefined) break;
-
-        if (ps.hand[handIndex] === cardName) ps.hand.splice(handIndex, 1);
-        else { const fi = ps.hand.indexOf(cardName); if (fi >= 0) ps.hand.splice(fi, 1); }
-        ps.discardPile.push(cardName);
-        await engine.runHooks('onDiscard', {
-          playerIdx: pi, cardName, discardedCardName: cardName,
-          _fromHand: true, _skipReactionCheck: true,
-        });
-        count++;
-      }
+      // Wrap the entire discard loop in a single forced-discard batch
+      // so Lv2's two discards count as ONE multi-card event for
+      // listeners (Cute Bunny etc.). `actionDiscardHandCard` was
+      // taught to participate in `_batchDiscardCount` when inside a
+      // `withDiscardBatch` wrapper; the wrapper fires
+      // `onForcedDiscardBatchEnd` once with the aggregate count.
+      const count = await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
+        let n = 0;
+        for (let i = 0; i < maxDiscard; i++) {
+          if ((ps.hand || []).length === 0) break;
+          const result = await engine.promptGeneric(pi, {
+            type:        'forceDiscardCancellable',
+            title:       `${CARD_NAME} Lv${level}`,
+            description: i === 0
+              ? `Click a card to discard it and draw 1 card.${maxDiscard > 1 ? ' You may discard a second card.' : ''}`
+              : 'Click a second card to discard it and draw 1 more, or cancel.',
+            cancellable: true,
+          });
+          if (!result || result.cancelled) break;
+          const { cardName, handIndex } = result;
+          if (cardName === undefined || handIndex === undefined) break;
+          const ok = await engine.actionDiscardHandCard(pi, cardName, handIndex, {
+            source: CARD_NAME,
+          });
+          if (!ok) break;
+          n++;
+        }
+        return n;
+      });
 
       if (count === 0) return false;
 

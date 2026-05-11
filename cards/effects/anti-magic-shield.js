@@ -10,22 +10,30 @@ module.exports = {
   isPostTargetReaction: true,
 
   /**
-   * Condition: source is opponent's Spell, at least one targeted hero
-   * belongs to Shield's owner AND can cast it AND has Magic Arts >= spell level.
+   * Condition: source is opponent's Spell (or Hero-effect damage
+   * "treated as a Spell" via a `_spell`-typed damageType), at least
+   * one targeted hero belongs to Shield's owner AND can cast it AND
+   * has Magic Arts >= spell level. For Hero-effect "Spell"s the
+   * "spell level" defaults to 0 (no card-spec level to read), so
+   * the level gate degenerates to "Magic Arts ≥ 0" = always true.
    */
-  postTargetCondition(gs, pi, engine, targetedHeroes, sourceCard) {
+  postTargetCondition(gs, pi, engine, targetedHeroes, sourceCard, opts) {
     if (!targetedHeroes || targetedHeroes.length === 0) return false;
 
     // Source must be an opponent's card
     const srcOwner = sourceCard?.controller ?? sourceCard?.owner ?? -1;
     if (srcOwner === pi) return false;
 
-    // Source must be a Spell (not Attack, Creature, etc.)
+    // Source must be a Spell (real card) OR Spell-typed damage from
+    // a Hero effect (Alice the Puppeteer Girl etc.).
     const cardDB = engine._getCardDB();
     const srcData = cardDB[sourceCard?.name];
-    if (!srcData || srcData.cardType !== 'Spell') return false;
+    const isSpellCard = srcData?.cardType === 'Spell';
+    const dmgType = opts?.damageType;
+    const isSpellDamageType = /_spell$/.test(dmgType || '');
+    if (!isSpellCard && !isSpellDamageType) return false;
 
-    const spellLevel = srcData.level || 0;
+    const spellLevel = isSpellCard ? (srcData.level || 0) : 0;
 
     // At least one targeted hero must belong to this player
     // AND have Magic Arts level >= spell level

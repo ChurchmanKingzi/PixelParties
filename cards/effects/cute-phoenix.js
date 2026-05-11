@@ -10,11 +10,11 @@
 //
 //  2. ACTIVE — once per turn, deal 50 damage
 //     to any target × the number of Creatures
-//     in the controller's discard pile. The
-//     damage is uncategorised ("other" type),
-//     so it bypasses fire / status / etc.
-//     resistances. Animation: a flame strike on
-//     the target.
+//     with DIFFERENT NAMES in the controller's
+//     discard pile. The damage is uncategorised
+//     ("other" type), so it bypasses fire /
+//     status / etc. resistances. Animation: a
+//     flame strike on the target.
 //
 //  3. SELF-REVIVE — if defeated by an
 //     opponent's card or effect (NOT by status
@@ -33,15 +33,22 @@ const { hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Cute Phoenix';
 
+/**
+ * Count DISTINCT Creature card names in the discard pile. Duplicates
+ * of the same name fold into a single tick — the card text says
+ * "Creatures with different names in your discard pile", so a pile
+ * of [Cute Bunny, Cute Bunny, Cute Dog] counts as 2, not 3.
+ */
 function countCreaturesInDiscard(engine, ps) {
   if (!ps?.discardPile) return 0;
   const cardDB = engine._getCardDB();
-  let n = 0;
+  const seen = new Set();
   for (const cn of ps.discardPile) {
+    if (seen.has(cn)) continue;
     const cd = cardDB[cn];
-    if (cd && hasCardType(cd, 'Creature')) n++;
+    if (cd && hasCardType(cd, 'Creature')) seen.add(cn);
   }
-  return n;
+  return seen.size;
 }
 
 module.exports = {
@@ -163,7 +170,7 @@ module.exports = {
       damageType: 'other',
       baseDamage: damage,
       title: CARD_NAME,
-      description: `Deal ${damage} damage (50 × ${count} Creatures in discard) to any target.`,
+      description: `Deal ${damage} damage (50 × ${count} different-named Creature${count === 1 ? '' : 's'} in discard) to any target.`,
       confirmLabel: `🔥 Burn! (${damage})`,
       confirmClass: 'btn-danger',
       cancellable: true,

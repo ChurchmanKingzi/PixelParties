@@ -78,7 +78,11 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel) {
     // turn"), uniqueness gates (Cute Phoenix), and sacrifice tributes
     // are all bypassed by Necromancy — the player could revive a
     // Primordium they already summoned this turn.
-    if (!engine.isCreatureSummonable(cardName, pi, heroIdx)) continue;
+    // `_bypassBeforeSummon: true` tells cards whose summonability
+    // depends on a `beforeSummon`-paid cost (King Trex's auto-
+    // sacrifice path) to apply the STRICT per-Hero rule here, since
+    // Necromancy bypasses beforeSummon entirely.
+    if (!engine.isCreatureSummonable(cardName, pi, heroIdx, { _bypassBeforeSummon: true })) continue;
     seen.add(cardName);
     result.push({ name: cardName, source: 'discard' });
   }
@@ -300,10 +304,14 @@ module.exports = {
     if (vacarnBypass) {
       // Lift summoning sickness so the Skeleton can fire its active
       // effect this turn ("may use their active effects the turn
-      // they're summoned"). Engine-side creature-effect HOPT gate
-      // checks `inst.turnPlayed === currentTurn`; setting it to the
-      // previous turn lets the gate read the creature as not-fresh.
-      inst.turnPlayed = (gs.turn || 0) - 1;
+      // they're summoned"). Mark the inst with the Haste flag —
+      // engine-side creature-effect summoning-sickness gates honor
+      // `counters._hasHaste`. `turnPlayed` stays at the real summon
+      // turn so "was summoned this turn" reads (Alice the Puppeteer
+      // Girl, Hive's Crown, Singing's exclude-fresh filter, etc.)
+      // correctly recognize the Creature as a fresh summon.
+      if (!inst.counters) inst.counters = {};
+      inst.counters._hasHaste = true;
     }
 
     engine.log('necromancy', {

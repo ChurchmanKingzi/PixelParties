@@ -104,10 +104,17 @@ module.exports = {
     // including dead, Frozen, Stunned, Bound, negated etc. — per the
     // universal "place" rule. Only fully-empty Hero slots (no name)
     // are skipped because there's no Support Zone to occupy.
+    //
+    // Per-Hero `canSummon` filter (`_bypassBeforeSummon: true`) honors
+    // each Creature's gating rule. This is a placement that skips
+    // `beforeSummon`, so cards like King Trex re-apply their strict
+    // per-Hero archetype rule (no Gigantisaur-occupied Hero when the
+    // auto-sacrifice can't run).
     const freeZones = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const h = ps.heroes[hi];
       if (!h?.name) continue;
+      if (!engine.isCreatureSummonable(chosenName, pi, hi, { _bypassBeforeSummon: true })) continue;
       for (let si = 0; si < 3; si++) {
         if ((ps.supportZones?.[hi]?.[si] || []).length === 0) {
           const dead = h.hp <= 0;

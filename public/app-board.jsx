@@ -27,6 +27,32 @@ function setBoardTooltip(card) {
   window._boardTooltipSetter?.(card);
 }
 
+// ── Rusting Crystal / BGG cost helpers ───────────────────────
+// Mirror of `applyRustingCrystalCostMultiplier` in server.js so the
+// hand-card cost UI matches what the server actually charges. While
+// a copy of "Rusting Crystal" sits in `me`'s hand, the base cost of
+// every OTHER Artifact is doubled — unless "Big Gwen Guard" is in
+// one of `me`'s Support Zones (its passive aura suppresses all self-
+// reveal Crystal effects). Idempotent / non-stacking: multiple
+// Rusting Crystals still produce a single ×2.
+function _meControlsBigGwenGuard(me) {
+  if (!me?.supportZones) return false;
+  for (const heroZones of me.supportZones) {
+    if (!Array.isArray(heroZones)) continue;
+    for (const slot of heroZones) {
+      if (Array.isArray(slot) && slot.includes('Big Gwen Guard')) return true;
+    }
+  }
+  return false;
+}
+
+function applyCrystalCostMods(me, cardName, baseCost) {
+  if (!me || cardName === 'Rusting Crystal') return baseCost;
+  if (!(me.hand || []).includes('Rusting Crystal')) return baseCost;
+  if (_meControlsBigGwenGuard(me)) return baseCost;
+  return baseCost * 2;
+}
+
 function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, revealTooltipWhenFaceDown, abilities }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
@@ -3933,6 +3959,276 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // Gigantisaur Spinor — giant reptile jaws snap shut on the target.
+  // Two scaly green jaws drop in from above + below, snap together
+  // with sharp white triangular teeth interlocking, hold a beat,
+  // then retreat. Scales every visual axis off `damage` (50 =
+  // unassuming, 400 = very powerful):
+  //   • jaw width, height, tooth count and tooth size all grow,
+  //   • the drop distance grows so the bigger jaws really arrive
+  //     from off-screen,
+  //   • blood-spatter density / spread grow,
+  //   • a "CHOMP!" roar text only appears above the 0.6 intensity
+  //     mark (damage ≳ 260) — keeps low-damage bites understated.
+  // Damage scaling is forwarded via the `play_zone_animation`
+  // payload (`damage` extra) → `onZoneAnim` → `playAnimation` →
+  // `GameAnimationRenderer` (...rest spread) → here.
+  dino_bite: (() => {
+    return function DinoBiteEffect({ x, y, damage, gore }) {
+      // `gore` extends the bite past the damage-driven intensity cap
+      // — used by Chimera's tribute consumption to read as bloodier
+      // and more menacing than a normal damage bite. Scalar in [0,1];
+      // boolean `true` lands at full gore.
+      const goreLevel = gore === true ? 1 : Math.max(0, Math.min(1, +gore || 0));
+      const t = Math.max(0, Math.min(1, ((damage || 50) - 50) / 350));
+      const lerp = (a, b) => a + (b - a) * t;
+      const goreScale = 1 + goreLevel * 0.18;       // jaws / teeth bigger
+      const jawW = lerp(80, 230) * goreScale;
+      const jawH = lerp(20, 38) * goreScale;
+      const toothW = lerp(8, 16) * (1 + goreLevel * 0.10);
+      const toothH = lerp(10, 24) * goreScale;
+      const teethCount = Math.round(lerp(5, 9) + goreLevel * 2);
+      const dropDist = lerp(90, 260);
+      const splatterCount = Math.round(lerp(12, 32) * (1 + goreLevel * 0.85));
+      const animMs = lerp(900, 1600);
+      // Gore-mode drips: a few vertical blood streaks falling from the
+      // snap point after the chomp lands. Empty array when goreLevel=0.
+      const drips = useMemo(() => Array.from(
+        { length: Math.round(goreLevel * 9) }, () => ({
+          xOff: -40 + Math.random() * 80,
+          len:  20 + Math.random() * 36,
+          dur:  600 + Math.random() * 380,
+          delay: 420 + Math.random() * 140,
+        }),
+      ), [goreLevel]);
+
+      // Tooth `x` is in the JAW'S OWN coordinate space (0 → jawW),
+      // so each tooth lands somewhere along the gum line. The jaw
+      // itself is offset `left: -jawW / 2` in the outer fixed
+      // container, which means the whole row ends up centered
+      // around the target — same axis the jaws sit on, so the row
+      // and the gum stay aligned.
+      const teeth = useMemo(() => Array.from({ length: teethCount }, (_, i) => {
+        const ratio = (i + 0.5) / teethCount;
+        return {
+          x: ratio * jawW,
+          rot: -10 + Math.random() * 20,
+          scale: 0.85 + Math.random() * 0.3,
+        };
+      }), [teethCount, jawW]);
+
+      const splatters = useMemo(() => Array.from({ length: splatterCount }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (24 + Math.random() * 50) * (0.55 + t * 0.85 + goreLevel * 0.55);
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed - 6,
+          size: 3 + Math.random() * (3 + t * 4 + goreLevel * 3),
+          delay: 380 + Math.random() * 120,
+        };
+      }), []);
+
+      // Gore-mode darkens the jaw skin slightly — same green base but
+      // deeper, more menacing under the spatter.
+      const jawGradient = (top) => goreLevel > 0
+        ? (top
+          ? 'linear-gradient(180deg, #2b401a 0%, #20361a 35%, #102206 80%, #060f02 100%)'
+          : 'linear-gradient(0deg,   #2b401a 0%, #20361a 35%, #102206 80%, #060f02 100%)')
+        : (top
+          ? 'linear-gradient(180deg, #3a5a25 0%, #2f4e1d 35%, #1f3a10 80%, #0f2208 100%)'
+          : 'linear-gradient(0deg,   #3a5a25 0%, #2f4e1d 35%, #1f3a10 80%, #0f2208 100%)');
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Upper jaw — drops from above, snaps to (-jawH - toothH/2). */}
+          <div style={{
+            position: 'absolute',
+            left: -jawW / 2, top: -jawH - toothH * 0.4,
+            width: jawW, height: jawH,
+            background: jawGradient(true),
+            backgroundImage: `${jawGradient(true)}, repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 3px, transparent 3px 9px)`,
+            borderRadius: `${jawH * 0.6}px ${jawH * 0.6}px 8px 8px`,
+            border: '1.5px solid #0a1a04',
+            boxShadow: 'inset 0 2px 4px rgba(255,255,255,.18), 0 -3px 14px rgba(0,0,0,.55)',
+            opacity: 0,
+            '--biteDrop': dropDist + 'px',
+            animation: `dino-bite-jaw-top ${animMs}ms cubic-bezier(.16,0,.6,.42) forwards`,
+          }}>
+            {teeth.map((tooth, i) => (
+              <div key={'tt' + i} style={{
+                position: 'absolute',
+                left: tooth.x, top: jawH - 2,
+                width: toothW, height: toothH,
+                marginLeft: -toothW / 2,
+                background: 'linear-gradient(180deg, #ffffff 0%, #f4f1d8 55%, #b8b48c 100%)',
+                clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
+                transform: `rotate(${tooth.rot}deg) scale(${tooth.scale})`,
+                transformOrigin: '50% 0',
+                filter: 'drop-shadow(0 1px 1px rgba(0,0,0,.55))',
+              }} />
+            ))}
+          </div>
+
+          {/* Lower jaw — rises from below, snaps to (toothH/2). */}
+          <div style={{
+            position: 'absolute',
+            left: -jawW / 2, top: toothH * 0.4,
+            width: jawW, height: jawH,
+            background: jawGradient(false),
+            backgroundImage: `${jawGradient(false)}, repeating-linear-gradient(-45deg, rgba(255,255,255,.05) 0 3px, transparent 3px 9px)`,
+            borderRadius: `8px 8px ${jawH * 0.6}px ${jawH * 0.6}px`,
+            border: '1.5px solid #0a1a04',
+            boxShadow: 'inset 0 -2px 4px rgba(255,255,255,.18), 0 3px 14px rgba(0,0,0,.55)',
+            opacity: 0,
+            '--biteDrop': dropDist + 'px',
+            animation: `dino-bite-jaw-bot ${animMs}ms cubic-bezier(.16,0,.6,.42) forwards`,
+          }}>
+            {teeth.map((tooth, i) => (
+              <div key={'tb' + i} style={{
+                position: 'absolute',
+                left: tooth.x, top: -toothH + 2,
+                width: toothW, height: toothH,
+                marginLeft: -toothW / 2,
+                background: 'linear-gradient(0deg, #ffffff 0%, #f4f1d8 55%, #b8b48c 100%)',
+                clipPath: 'polygon(50% 0, 0 100%, 100% 100%)',
+                transform: `rotate(${tooth.rot}deg) scale(${tooth.scale})`,
+                transformOrigin: '50% 100%',
+                filter: 'drop-shadow(0 -1px 1px rgba(0,0,0,.55))',
+              }} />
+            ))}
+          </div>
+
+          {/* Snap-impact flash. Default: red-orange. Gore mode swaps
+              in a deeper crimson tinge — reads "blood spray", not
+              "fire spark". */}
+          <div style={{
+            position: 'absolute',
+            width: lerp(90, 260) * goreScale, height: lerp(36, 100) * goreScale,
+            left: -lerp(45, 130) * goreScale, top: -lerp(18, 50) * goreScale,
+            borderRadius: '50%',
+            background: goreLevel > 0
+              ? 'radial-gradient(ellipse, rgba(220,30,20,.95) 0%, rgba(140,10,10,.55) 45%, transparent 78%)'
+              : 'radial-gradient(ellipse, rgba(255,80,40,.9) 0%, rgba(180,30,10,.45) 45%, transparent 75%)',
+            opacity: 0,
+            animation: `dino-bite-flash 520ms ease-out ${lerp(360, 460)}ms forwards`,
+          }} />
+
+          {/* Blood / chunk splatter — radiates from the snap point.
+              Gore mode goes deeper, darker, with a tighter dark core. */}
+          {splatters.map((s, i) => (
+            <div key={'spl' + i} style={{
+              position: 'absolute',
+              left: 0, top: 0,
+              width: s.size, height: s.size,
+              marginLeft: -s.size / 2, marginTop: -s.size / 2,
+              borderRadius: '50%',
+              background: goreLevel > 0
+                ? 'radial-gradient(circle, #b81810 0%, #5e0a08 50%, #200404 100%)'
+                : 'radial-gradient(circle, #d31a08 0%, #821010 60%, #3a0808 100%)',
+              boxShadow: goreLevel > 0
+                ? '0 0 6px rgba(160,10,10,.85)'
+                : '0 0 4px rgba(180,30,10,.7)',
+              opacity: 0,
+              '--sdx': s.dx + 'px', '--sdy': s.dy + 'px',
+              animation: `dino-bite-blood ${lerp(450, 720)}ms ease-out ${s.delay}ms forwards`,
+            }} />
+          ))}
+
+          {/* Gore-only: blood drips — vertical streaks falling from
+              the snap line after the jaws meet. Drawn as elongated
+              ellipses streaking downward with a slight motion-blur. */}
+          {drips.map((d, i) => (
+            <div key={'drp' + i} style={{
+              position: 'absolute',
+              left: d.xOff, top: 0,
+              width: 4, height: d.len,
+              marginLeft: -2,
+              background: 'linear-gradient(180deg, rgba(110,10,10,0) 0%, #8e0c08 35%, #4a0808 100%)',
+              borderRadius: '2px 2px 50% 50%',
+              filter: 'drop-shadow(0 1px 2px rgba(60,4,4,.7))',
+              opacity: 0,
+              '--dripLen': d.len + 'px',
+              animation: `dino-bite-drip ${d.dur}ms ease-in ${d.delay}ms forwards`,
+            }} />
+          ))}
+
+          {/* Roar text. Damage path: CHOMP! at >260 dmg. Gore path:
+              DEVOUR! always shows, in deep crimson with a darker
+              outline — reads more brutal than the warm fiery CHOMP. */}
+          {goreLevel > 0 ? (
+            <div style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: lerp(36, 62) + 'px',
+              color: '#ffd0c0',
+              fontWeight: 900,
+              fontStyle: 'italic',
+              textShadow: '2px 2px 0 #200404, -1px -1px 0 #200404, 1px -1px 0 #200404, -1px 1px 0 #200404, 0 0 14px rgba(200,30,20,.9)',
+              opacity: 0,
+              whiteSpace: 'nowrap',
+              animation: `dino-bite-roar 760ms ease-out ${lerp(400, 460)}ms forwards`,
+              pointerEvents: 'none',
+            }}>DEVOUR!</div>
+          ) : (t > 0.6 && (
+            <div style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: lerp(28, 60) + 'px',
+              color: '#ffe8aa',
+              fontWeight: 900,
+              fontStyle: 'italic',
+              textShadow: '2px 2px 0 #220500, -1px -1px 0 #220500, 1px -1px 0 #220500, -1px 1px 0 #220500, 0 0 12px rgba(255,100,40,.8)',
+              opacity: 0,
+              whiteSpace: 'nowrap',
+              animation: `dino-bite-roar 720ms ease-out ${lerp(400, 460)}ms forwards`,
+              pointerEvents: 'none',
+            }}>CHOMP!</div>
+          ))}
+
+          <style>{`
+            @keyframes dino-bite-jaw-top {
+              0%   { opacity: 0; transform: translateY(calc(var(--biteDrop) * -1)) rotate(-3deg); }
+              8%   { opacity: 1; }
+              38%  { transform: translateY(0) rotate(0); }
+              44%  { transform: translateY(3px) rotate(.5deg); }
+              52%  { transform: translateY(0) rotate(0); }
+              78%  { opacity: 1; transform: translateY(0) rotate(0); }
+              100% { opacity: 0; transform: translateY(calc(var(--biteDrop) * -0.4)) rotate(-4deg); }
+            }
+            @keyframes dino-bite-jaw-bot {
+              0%   { opacity: 0; transform: translateY(var(--biteDrop)) rotate(3deg); }
+              8%   { opacity: 1; }
+              38%  { transform: translateY(0) rotate(0); }
+              44%  { transform: translateY(-3px) rotate(-.5deg); }
+              52%  { transform: translateY(0) rotate(0); }
+              78%  { opacity: 1; transform: translateY(0) rotate(0); }
+              100% { opacity: 0; transform: translateY(calc(var(--biteDrop) * 0.4)) rotate(4deg); }
+            }
+            @keyframes dino-bite-flash {
+              0%   { opacity: 0; transform: scale(.25, .3); }
+              30%  { opacity: 1; transform: scale(1.05, .95); }
+              100% { opacity: 0; transform: scale(2.1, 1.5); }
+            }
+            @keyframes dino-bite-blood {
+              0%   { opacity: 0; transform: translate(0, 0) scale(.35); }
+              25%  { opacity: 1; transform: translate(calc(var(--sdx) * .4), calc(var(--sdy) * .4)) scale(1.1); }
+              100% { opacity: 0; transform: translate(var(--sdx), var(--sdy)) scale(.55); }
+            }
+            @keyframes dino-bite-drip {
+              0%   { opacity: 0; transform: translateY(-4px) scaleY(.2); }
+              12%  { opacity: 1; transform: translateY(0) scaleY(1); }
+              80%  { opacity: 1; transform: translateY(calc(var(--dripLen) * 1.4)) scaleY(1.1); }
+              100% { opacity: 0; transform: translateY(calc(var(--dripLen) * 1.7)) scaleY(.95); }
+            }
+            @keyframes dino-bite-roar {
+              0%   { opacity: 0; transform: translate(-50%, -50%) scale(.45) rotate(-10deg); }
+              22%  { opacity: 1; transform: translate(-50%, -50%) scale(1.2) rotate(3deg); }
+              60%  { opacity: 1; transform: translate(-50%, -50%) scale(1.0) rotate(-1deg); }
+              100% { opacity: 0; transform: translate(-50%, -50%) scale(.85) rotate(0); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   // 500 Piranhas in a Monster Suit — many small bite marks chomping
   // the host. Crescents of red + a few teeth-shape sparks; bites
   // appear at random points across the zone, not concentrically.
@@ -5998,6 +6294,267 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ── Gigantisaur Stomp ─────────────────────────────────────
+  //  A colossal scaly dinosaur leg drops from far above the
+  //  screen, slams into the target's slot, kicks up a brown
+  //  dust shockwave, and retracts. Bigger, heavier, slower
+  //  than magic_hammer — the leg is twice the size, falls
+  //  from 820px up, and the squash on the target lingers
+  //  longer before bouncing back.
+  giant_dino_stomp: (() => {
+    return function GiantDinoStompEffect({ x, y, w, h }) {
+      const targetH = h || 90;
+      const legW = 120;
+      const legH = 250;
+      // Brown dust chunks bursting sideways/up from the impact.
+      const dust = useMemo(() => Array.from({ length: 22 }, () => {
+        const angle = -Math.PI * 0.12 + Math.random() * Math.PI * 1.24; // mostly sideways
+        const speed = 28 + Math.random() * 75;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: -Math.abs(Math.sin(angle) * speed) - 6,
+          size: 4 + Math.random() * 8,
+          color: ['#7a5a35','#5c4220','#8a6a40','#3e2d18','#a07a48','#4a3520'][Math.floor(Math.random() * 6)],
+          delay: 360 + Math.random() * 120,
+          dur: 380 + Math.random() * 320,
+        };
+      }), []);
+      // Apply heavy squash to the actual target element on impact.
+      useEffect(() => {
+        const timer = setTimeout(() => {
+          const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
+          let best = null, bestDist = Infinity;
+          els.forEach(el => {
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            const d = Math.abs(cx - x) + Math.abs(cy - y);
+            if (d < bestDist) { bestDist = d; best = el; }
+          });
+          if (best && bestDist < 100) {
+            best.classList.add('giant-dino-stomp-squashed');
+            setTimeout(() => best.classList.remove('giant-dino-stomp-squashed'), 850);
+          }
+        }, 480);
+        return () => clearTimeout(timer);
+      }, []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* The leg — drops from far above, slams, retracts */}
+          <div className="anim-dino-leg" style={{
+            width: legW, height: legH,
+            marginLeft: -legW / 2, marginTop: -targetH / 2 - legH,
+          }} />
+          {/* Brown dust shockwave ring on impact */}
+          <div className="anim-dino-impact" />
+          {/* Warm secondary flash */}
+          <div className="anim-dino-impact-flash" />
+          {/* Dust/dirt chunks flying outward */}
+          {dust.map((d, i) => (
+            <div key={'ds'+i} className="anim-explosion-particle" style={{
+              '--dx': d.dx + 'px', '--dy': d.dy + 'px', '--size': d.size + 'px',
+              '--color': d.color, animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // ── Wooly Mammoth Stomp (Slippery Whoolmoth) ───────────────
+  //  Sibling of `giant_dino_stomp` — same colossal-leg drop +
+  //  ground shockwave + heavy squash, but a thick wooly mammoth
+  //  leg with shaggy brown fur instead of green dino scales.
+  //  Reuses the same anim-dino-impact / anim-dino-impact-flash
+  //  shockwave CSS (brown dust palette already matches).
+  mammoth_stomp: (() => {
+    return function MammothStompEffect({ x, y, w, h }) {
+      const targetH = h || 90;
+      const legW = 130;
+      const legH = 260;
+      // Brown dust chunks plus loose hair tufts flying outward.
+      const dust = useMemo(() => Array.from({ length: 24 }, () => {
+        const angle = -Math.PI * 0.12 + Math.random() * Math.PI * 1.24;
+        const speed = 28 + Math.random() * 75;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: -Math.abs(Math.sin(angle) * speed) - 6,
+          size: 4 + Math.random() * 9,
+          // Mammoth-fur browns + a few earth tones for the dust.
+          color: ['#6b4a2a','#4a3018','#825a32','#3a2812','#a8784a','#5a3c1f'][Math.floor(Math.random() * 6)],
+          delay: 360 + Math.random() * 130,
+          dur: 380 + Math.random() * 340,
+        };
+      }), []);
+      // Heavy squash on the target — reuses the same class the dino
+      // stomp uses; squash animation is identical, only the leg
+      // visual is mammoth-specific.
+      useEffect(() => {
+        const timer = setTimeout(() => {
+          const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
+          let best = null, bestDist = Infinity;
+          els.forEach(el => {
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            const d = Math.abs(cx - x) + Math.abs(cy - y);
+            if (d < bestDist) { bestDist = d; best = el; }
+          });
+          if (best && bestDist < 100) {
+            best.classList.add('giant-dino-stomp-squashed');
+            setTimeout(() => best.classList.remove('giant-dino-stomp-squashed'), 850);
+          }
+        }, 480);
+        return () => clearTimeout(timer);
+      }, []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* The wooly leg — thick brown trunk with shaggy fur strands.
+              Reuses dinoStompDrop keyframes via the shared anim. */}
+          <div className="anim-mammoth-leg" style={{
+            width: legW, height: legH,
+            marginLeft: -legW / 2, marginTop: -targetH / 2 - legH,
+          }} />
+          <div className="anim-dino-impact" />
+          <div className="anim-dino-impact-flash" />
+          {dust.map((d, i) => (
+            <div key={'ms'+i} className="anim-explosion-particle" style={{
+              '--dx': d.dx + 'px', '--dy': d.dy + 'px', '--size': d.size + 'px',
+              '--color': d.color, animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // ── Slippery Spikeblock Ice-Block Crash ────────────────────
+  //  A jagged ice block hurtles in from the left side, flies
+  //  across the screen toward the target, and shatters on
+  //  impact into icy shards + a frosty shockwave. Distinct
+  //  from `freeze` (snowball burst pattern) and `frostbringer`
+  //  (overhead drop) — this one is a horizontal projectile.
+  ice_block_crash: (() => {
+    return function IceBlockCrashEffect({ x, y }) {
+      // Icy shard burst on impact.
+      const shards = useMemo(() => Array.from({ length: 18 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 30 + Math.random() * 70;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed - 8,
+          size: 4 + Math.random() * 7,
+          color: ['#cfeaff','#9fd0f0','#e0f4ff','#7fb8d8','#bfe2f8'][Math.floor(Math.random() * 5)],
+          delay: 360 + Math.random() * 80,
+          dur: 380 + Math.random() * 220,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* The ice block — flies in from off-screen-left, slows on
+              impact, then shatters (CSS handles the timing). */}
+          <div className="anim-ice-block" />
+          {/* Frosty shockwave ring on hit */}
+          <div className="anim-ice-block-impact" />
+          {/* Cold-flash secondary glow */}
+          <div className="anim-ice-block-flash" />
+          {/* Shard particles bursting outward */}
+          {shards.map((s, i) => (
+            <div key={'ib'+i} className="anim-explosion-particle" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // ── Gigantisaur Ankylos Tail Smash ─────────────────────────
+  //  A massive scaly tail with a bone-spiked club swings in
+  //  from the upper-right at a steep angle, slams the target,
+  //  and whips back. The club end pivots around its own anchor
+  //  point (left edge of the assembly) so the heavy club lands
+  //  cleanly on the target while the tail trails offscreen.
+  ankylo_tail_smash: (() => {
+    return function AnkyloTailSmashEffect({ x, y }) {
+      const tailLength    = 460;
+      const tailThickness = 50;
+      const clubSize      = 130;
+
+      // Bone-spike chips + dust bursting from the impact.
+      const chips = useMemo(() => Array.from({ length: 26 }, () => {
+        const angle = -Math.PI * 0.20 + Math.random() * Math.PI * 1.40;
+        const speed = 36 + Math.random() * 90;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: -Math.abs(Math.sin(angle) * speed) - 6,
+          size: 5 + Math.random() * 9,
+          color: ['#9a8868','#6b5235','#c4b48c','#3a2818','#a08055','#1a1308'][Math.floor(Math.random() * 6)],
+          delay: 380 + Math.random() * 140,
+          dur: 380 + Math.random() * 340,
+        };
+      }), []);
+
+      // Squash the actual target element on impact (~440ms in).
+      useEffect(() => {
+        const timer = setTimeout(() => {
+          const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
+          let best = null, bestDist = Infinity;
+          els.forEach(el => {
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            const d = Math.abs(cx - x) + Math.abs(cy - y);
+            if (d < bestDist) { bestDist = d; best = el; }
+          });
+          if (best && bestDist < 100) {
+            best.classList.add('giant-dino-stomp-squashed');
+            setTimeout(() => best.classList.remove('giant-dino-stomp-squashed'), 850);
+          }
+        }, 440);
+        return () => clearTimeout(timer);
+      }, []);
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Tail + club pivots around the club end (transform-origin
+              0% 50%). The container's left edge IS the club position;
+              the tail extends right from there. Translate animates the
+              whole assembly down from upper-right, rotation interpolates
+              from -78° to 0° so the club lands square on the target. */}
+          <div className="anim-ankylo-tail-pivot" style={{
+            position: 'absolute',
+            left: 0,
+            top: -tailThickness / 2,
+            width: tailLength,
+            height: tailThickness,
+            transformOrigin: '0% 50%',
+          }}>
+            {/* Tail body — segmented dino skin, club at left */}
+            <div className="anim-ankylo-tail" style={{
+              position: 'absolute',
+              left: clubSize * 0.45, top: 0,
+              width: tailLength - clubSize * 0.45, height: tailThickness,
+            }} />
+            {/* Heavy bone-spiked club at the business end */}
+            <div className="anim-ankylo-club" style={{
+              position: 'absolute',
+              width: clubSize, height: clubSize,
+              left: -clubSize * 0.15,
+              top: (tailThickness - clubSize) / 2,
+            }} />
+          </div>
+
+          {/* Impact shockwave ring */}
+          <div className="anim-ankylo-impact" />
+          {/* Warm secondary flash */}
+          <div className="anim-ankylo-impact-flash" />
+          {/* Dust + spike chips flying outward */}
+          {chips.map((c, i) => (
+            <div key={'ac'+i} className="anim-explosion-particle" style={{
+              '--dx': c.dx + 'px', '--dy': c.dy + 'px', '--size': c.size + 'px',
+              '--color': c.color, animationDelay: c.delay + 'ms', animationDuration: c.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
   dark_gear_spin_cw: (() => {
     return function DarkGearCWEffect({ x, y }) {
       return (
@@ -6050,6 +6607,120 @@ const ANIM_REGISTRY = {
             animation: 'cloudFormCenter 400ms ease-out 600ms forwards',
             opacity: 0,
           }}>☁️</div>
+        </div>
+      );
+    };
+  })(),
+  // ── Spectral Armor ────────────────────────────────────────
+  //  A medieval knight's shield rises above the protected target
+  //  with a teal halo. While the armor is visible the target
+  //  itself is washed in a teal hue (~700ms), then the damage
+  //  number lands halved. Distinct from Cloud in a Bottle (which
+  //  reuses `cloud_gather`) — Spectral Armor's visual is the
+  //  pre-damage moment of "the strike is being deflected by
+  //  ghostly armor", not a fog roll-in.
+  spectral_armor: (() => {
+    return function SpectralArmorEffect({ x, y }) {
+      // Apply a brief teal-tint class to the target hero/support
+      // element so the damaged thing visibly recolors for the
+      // duration of the halving animation. Same DOM-walk pattern
+      // giant_dino_stomp uses to find the targeted zone element.
+      useEffect(() => {
+        const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
+        let best = null, bestDist = Infinity;
+        els.forEach(el => {
+          const r = el.getBoundingClientRect();
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          const d = Math.abs(cx - x) + Math.abs(cy - y);
+          if (d < bestDist) { bestDist = d; best = el; }
+        });
+        if (best && bestDist < 120) {
+          best.classList.add('spectral-armor-teal');
+          const t = setTimeout(() => best.classList.remove('spectral-armor-teal'), 700);
+          return () => { clearTimeout(t); best.classList.remove('spectral-armor-teal'); };
+        }
+      }, []);
+
+      // Sparkle dust around the armor as it materialises.
+      const sparks = useMemo(() => Array.from({ length: 14 }, () => {
+        const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.4;
+        const dist = 35 + Math.random() * 35;
+        return {
+          x: Math.cos(angle) * dist,
+          y: Math.sin(angle) * dist - 30,
+          size: 3 + Math.random() * 5,
+          delay: 80 + Math.random() * 240,
+          dur: 380 + Math.random() * 280,
+        };
+      }), []);
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Halo behind the armor */}
+          <div style={{
+            position: 'absolute',
+            left: -48, top: -68,
+            width: 96, height: 96,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(110,240,240,.7) 0%, rgba(60,200,210,.32) 40%, transparent 72%)',
+            animation: 'spectralArmorHalo 700ms ease-out forwards',
+            opacity: 0,
+          }} />
+          {/* Knight shield — rises from below the target, peaks, then
+              fades up and out. drop-shadow gives the teal glow. */}
+          <div style={{
+            position: 'absolute',
+            left: -36, top: -80,
+            fontSize: 64,
+            filter: 'drop-shadow(0 0 12px rgba(110,240,240,.95)) drop-shadow(0 0 26px rgba(60,200,210,.65))',
+            animation: 'spectralArmorRise 700ms cubic-bezier(.2,.6,.3,1) forwards',
+            opacity: 0,
+            lineHeight: 1,
+          }}>🛡️</div>
+          {/* Crossed-swords beneath the shield for a fuller knight-
+              armor silhouette (helm + body + flanking weapons). */}
+          <div style={{
+            position: 'absolute',
+            left: -22, top: -28,
+            fontSize: 36,
+            filter: 'drop-shadow(0 0 8px rgba(110,240,240,.85))',
+            animation: 'spectralArmorRise 700ms cubic-bezier(.2,.6,.3,1) 60ms forwards',
+            opacity: 0,
+            lineHeight: 1,
+          }}>⚔️</div>
+          {/* Sparkle dust */}
+          {sparks.map((s, i) => (
+            <div key={'sa' + i} style={{
+              position: 'absolute',
+              left: s.x, top: s.y,
+              width: s.size, height: s.size,
+              borderRadius: '50%',
+              background: '#cfffff',
+              boxShadow: '0 0 8px rgba(120,240,240,.9)',
+              animation: `spectralArmorSpark ${s.dur}ms ease-out ${s.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+          <style>{`
+            @keyframes spectralArmorRise {
+              0%   { transform: translateY(28px) scale(.45); opacity: 0; }
+              22%  { opacity: 1; }
+              55%  { transform: translateY(-8px) scale(1.15); opacity: 1; }
+              78%  { transform: translateY(-14px) scale(1.05); opacity: .95; }
+              100% { transform: translateY(-26px) scale(.92); opacity: 0; }
+            }
+            @keyframes spectralArmorHalo {
+              0%   { transform: scale(.3);  opacity: 0; }
+              30%  { transform: scale(1.1); opacity: .9; }
+              60%  { transform: scale(1.45); opacity: .55; }
+              100% { transform: scale(1.85); opacity: 0; }
+            }
+            @keyframes spectralArmorSpark {
+              0%   { transform: scale(.4); opacity: 0; }
+              30%  { opacity: 1; }
+              100% { transform: scale(1.5) translateY(-12px); opacity: 0; }
+            }
+          `}</style>
         </div>
       );
     };
@@ -12925,7 +13596,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // should match.
         {
           const handReduction = (me.handCostReductions || {})[handIdx] || 0;
-          const effCost = Math.max(0, (card.cost || 0) - handReduction);
+          // Rusting Crystal aura: base cost doubled BEFORE reductions
+          // (mirrors `applyRustingCrystalCostMultiplier` server-side).
+          const baseAfterCrystal = applyCrystalCostMods(me, cardName, card.cost || 0);
+          const effCost = Math.max(0, baseAfterCrystal - handReduction);
           if ((me.gold || 0) < effCost) return true;
         }
         // Once-per-game artifacts (Smug Coin, etc.)
@@ -13204,6 +13878,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // don't.
   const canHeroNormalSummon = (playerData, heroIdx, card) => {
     if (!card || card.cardType !== 'Creature') return false;
+    // Inherit the server's full eligibility pipeline (level/school,
+    // free zone, summon lock, action economy, AND per-Hero canSummon
+    // — Gigantisaurs' 1-per-Hero archetype lock, Cute Phoenix
+    // uniqueness, etc.). Without this gate, empty Support Zones on
+    // Heroes already hosting a Gigantisaur still light up as valid
+    // drop targets under a Gigantisaur drag, even though the server
+    // refuses the play. canHeroPlayCard reads from `heroPlayableCards`
+    // — see getHeroPlayableCards in cards/effects/_engine.js. The
+    // "stricter sibling" level/school checks below stay in place
+    // because they exclude card-side placement bypass paths
+    // (Deepsea bounce-place) that canHeroPlayCard accepts.
+    if (!canHeroPlayCard(playerData, heroIdx, card)) return false;
     const hero = playerData.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.bound) return false;
@@ -13375,23 +14061,47 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const forceDiscardCancellableActive = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt.ownerIdx === myIdx;
     if (forceDiscardCancellableActive) {
       if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return; // Can't discard the resolving card
+      // Same `eligibleIndices` narrowing as the forced variant —
+      // ignore clicks on dimmed cards (Pteranos, etc.).
+      const eligible = gameState.effectPrompt.eligibleIndices;
+      if (eligible && !eligible.includes(idx)) return;
       if (e.cancelable) e.preventDefault();
       socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
       return;
     }
 
-    // Pick Hand Card mode (Deepsea Castle second pick, etc.) — click
-    // a highlighted hand card to submit { cardName, handIndex }. Unlike
-    // forceDiscard, the clicked card isn't implicitly discarded — the
-    // caller decides what to do with the selection.
+    // Pick Hand Card mode (Deepsea Castle second pick, Raptoren's
+    // chain summon, etc.) — click a highlighted hand card to submit
+    // `{ cardName, handIndex }`. Unlike forceDiscard, the clicked
+    // card isn't implicitly discarded — the caller decides what to
+    // do with the selection.
+    //
+    // Drag-and-drop variant: when the prompt sets `dragSummonMode:
+    // true` and provides `eligibleHostsByCardName`, the player can
+    // ALSO drag the highlighted card onto a Support Zone (mirroring
+    // normal-creature summon UX). The drop carries
+    // `targetHeroIdx` + `targetSlotIdx` in the response so the
+    // script can skip its zone-pick prompt. Plain clicks behave
+    // identically to the existing flow.
     const pickHandCardActive = gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt.ownerIdx === myIdx;
+    const pickHandCardPrompt = pickHandCardActive ? gameState.effectPrompt : null;
+    const pickHandCardHosts = pickHandCardPrompt?.eligibleHostsByCardName?.[cardName] || null;
+    const pickHandCardDragMode = pickHandCardActive
+      && pickHandCardPrompt.dragSummonMode === true
+      && Array.isArray(pickHandCardHosts)
+      && pickHandCardHosts.length > 0;
     if (pickHandCardActive) {
-      const eligible = gameState.effectPrompt.eligibleIndices;
+      const eligible = pickHandCardPrompt.eligibleIndices;
       if (eligible && !eligible.includes(idx)) return;
       if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return;
+      if (!pickHandCardDragMode) {
+        if (e.cancelable) e.preventDefault();
+        socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
+        return;
+      }
+      // Drag-summon mode — DON'T emit yet. Fall through to the drag-
+      // init below; onMove/onUp handle pickHandCard-specific tracking.
       if (e.cancelable) e.preventDefault();
-      socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cardName, handIndex: idx } });
-      return;
     }
 
     // Hand Pick mode (Shard of Chaos, Leadership) — toggle card selection
@@ -13517,7 +14227,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const isEquipPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Artifact'
       && (['equipment','creature'].includes((card.subtype || '').toLowerCase().trim())
           || (card.subtype || '').toLowerCase().split('/').some(t => t.trim() === 'creature'))
-      && (me.gold || 0) >= Math.max(0, (card.cost || 0) - ((me.handCostReductions || {})[idx] || 0));
+      && (me.gold || 0) >= Math.max(0, applyCrystalCostMods(me, card.name, card.cost || 0) - ((me.handCostReductions || {})[idx] || 0));
     // "Artifact-activatable" is click-to-use (potions / Wheels-style). It
     // excludes Equipment AND Artifact-Creatures — both of those are drag-
     // to-hero plays instead. Reaction-subtype Artifacts (Invisibility
@@ -13573,6 +14283,51 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       // Outside hand zone — use card-type-specific drag mode
       setHandDrag(null);
+
+      // pickHandCard drag-summon (Raptoren's bonus summon): drag a
+      // highlighted Gigantisaur onto an eligible Support Zone. Targets
+      // are constrained by the prompt's `eligibleHostsByCardName[
+      // cardName]` list — dropping anywhere else is a no-op (the drop
+      // cancels silently in onUp). Hero-zone drops auto-pick the
+      // first eligible slot on that hero, mirroring normal Equipment
+      // drag UX.
+      if (pickHandCardDragMode) {
+        let targetHero = -1, targetSlot = -1;
+        const supEls = document.querySelectorAll('[data-support-zone]');
+        for (const el of supEls) {
+          const r = el.getBoundingClientRect();
+          if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+            if (el.dataset.supportOwner !== 'me') continue;
+            const hi = parseInt(el.dataset.supportHero);
+            const si = parseInt(el.dataset.supportSlot);
+            if (pickHandCardHosts.some(h => h.heroIdx === hi && h.slotIdx === si)) {
+              targetHero = hi; targetSlot = si;
+            }
+          }
+        }
+        if (targetHero < 0) {
+          const heroEls = document.querySelectorAll('[data-hero-zone]');
+          for (const el of heroEls) {
+            const r = el.getBoundingClientRect();
+            if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
+              if (el.dataset.heroOwner !== 'me') continue;
+              const hi = parseInt(el.dataset.heroIdx);
+              const hostsForHero = pickHandCardHosts.filter(h => h.heroIdx === hi);
+              if (hostsForHero.length > 0) {
+                targetHero = hi;
+                targetSlot = hostsForHero[0].slotIdx;
+              }
+            }
+          }
+        }
+        setAbilityDrag(null);
+        setPlayDrag({
+          idx, cardName, card, mouseX: mx, mouseY: my,
+          targetHero, targetSlot,
+          pickHandCardDrag: true,
+        });
+        return;
+      }
 
       if (isAbilityPlayable) {
         // Ability play-mode drag — find valid hero/zone target
@@ -14051,6 +14806,45 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
 
     const onUp = (upX, upY) => {
+      // pickHandCard drag-summon intercept — handles both the
+      // click path (no drag) and the drop-on-zone path. Plain click
+      // emits the standard `{cardName, handIndex}` so the script
+      // does its own zone-pick; drop on a valid host emits with
+      // `targetHeroIdx` + `targetSlotIdx` to skip the zone-pick.
+      // Drop on an invalid area cancels silently — the player can
+      // try again without losing the prompt.
+      if (pickHandCardDragMode) {
+        if (!dragging) {
+          if (window.playSFX) window.playSFX('ui_click');
+          socket.emit('effect_prompt_response', {
+            roomId: gameState.roomId,
+            response: { cardName, handIndex: idx },
+          });
+          setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
+          return;
+        }
+        setPlayDrag(prev => {
+          if (!prev) return null;
+          if (prev.targetHero >= 0 && prev.targetSlot >= 0) {
+            if (window.playSFX) window.playSFX('ui_click');
+            socket.emit('effect_prompt_response', {
+              roomId: gameState.roomId,
+              response: {
+                cardName: prev.cardName,
+                handIndex: prev.idx,
+                targetHeroIdx: prev.targetHero,
+                targetSlotIdx: prev.targetSlot,
+              },
+            });
+          }
+          // Else: dragged but no valid drop — cancel silently. The
+          // prompt stays open so the player can try again.
+          return null;
+        });
+        setHandDrag(null); setAbilityDrag(null);
+        return;
+      }
+
       if (!dragging) {
         // Hand-activated-effect intercept (Luna Kiai's "Summon or Reveal").
         // PER-COPY: this specific hand slot is activatable iff its index
@@ -14988,25 +15782,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Hand-to-board card-fly animation. The server fires this right before
     // the sendGameState that removes the card from the owner's hand, so the
     // source cardback is still in the DOM at the handIndex we were told.
-    const onHandToBoard = ({ ownerIdx, cardName, handIndex, zoneType, heroIdx, slotIdx, faceDown }) => {
-      // Don't animate for the owner — they already saw their own drag/drop.
-      if (ownerIdx === myIdx) return;
-      const sourceEl = document.querySelector(`.game-hand-opp [data-hand-idx="${handIndex}"]`);
+    const onHandToBoard = ({ ownerIdx, cardName, handIndex, zoneType, heroIdx, slotIdx, faceDown, _forceOwnerAnim }) => {
+      // Don't animate for the owner — they already saw their own
+      // drag/drop. `_forceOwnerAnim: true` opts the owner back in,
+      // used for card-effect chain summons (Raptoren's bonus summon)
+      // that resolve via click instead of drag-and-drop — there's no
+      // pre-existing client-side drag animation to ride on, so the
+      // server-side flight is the ONLY visual cue.
+      const ownerIsMe = ownerIdx === myIdx;
+      if (ownerIsMe && !_forceOwnerAnim) return;
+      const sourceEl = ownerIsMe
+        ? document.querySelector(`.game-hand-me [data-hand-idx="${handIndex}"]`)
+        : document.querySelector(`.game-hand-opp [data-hand-idx="${handIndex}"]`);
+      const ownerLabel = ownerIsMe ? 'me' : 'opp';
       let destEl = null;
       if (zoneType === 'support') {
-        destEl = document.querySelector(`[data-support-zone][data-support-owner="opp"][data-support-hero="${heroIdx}"][data-support-slot="${slotIdx}"]`);
+        destEl = document.querySelector(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${slotIdx}"]`);
       } else if (zoneType === 'ability') {
-        destEl = document.querySelector(`[data-ability-zone][data-ability-owner="opp"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`);
+        destEl = document.querySelector(`[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`);
       } else if (zoneType === 'surprise') {
-        destEl = document.querySelector(`[data-surprise-zone][data-surprise-owner="opp"][data-surprise-hero="${heroIdx}"]`);
+        destEl = document.querySelector(`[data-surprise-zone][data-surprise-owner="${ownerLabel}"][data-surprise-hero="${heroIdx}"]`);
       } else if (zoneType === 'hero') {
         // Attachment Spells: land on the hero's card itself.
-        destEl = document.querySelector(`[data-hero-zone][data-hero-owner="opp"][data-hero-idx="${heroIdx}"]`);
+        destEl = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       } else if (zoneType === 'permanent') {
-        // Permanent Artifacts: land on the opp permanents row if rendered,
-        // otherwise default to the center of the opp hero row.
-        destEl = document.querySelector('.board-permanents-opp')
-          || document.querySelector('[data-hero-zone][data-hero-owner="opp"][data-hero-idx="1"]');
+        // Permanent Artifacts: land on the owner's permanents row if rendered,
+        // otherwise default to the center of their hero row.
+        destEl = document.querySelector(ownerIsMe ? '.board-permanents-me' : '.board-permanents-opp')
+          || document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="1"]`);
       }
       if (!sourceEl || !destEl) return;
       const sr = sourceEl.getBoundingClientRect();
@@ -15014,9 +15817,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const fly = document.createElement('div');
       fly.className = 'board-card hand-to-board-fly';
       const imgUrl = !faceDown && cardName ? cardImageUrl(cardName) : null;
+      const cardback = ownerIsMe ? (me.cardback || '/cardback.png') : (opp.cardback || '/cardback.png');
       fly.innerHTML = imgUrl
         ? `<img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" draggable="false" />`
-        : `<img src="${opp.cardback || '/cardback.png'}" style="width:100%;height:100%;object-fit:cover" draggable="false" />`;
+        : `<img src="${cardback}" style="width:100%;height:100%;object-fit:cover" draggable="false" />`;
       const dx = (dr.left + dr.width / 2) - (sr.left + sr.width / 2);
       const dy = (dr.top + dr.height / 2) - (sr.top + sr.height / 2);
       fly.style.cssText = `position:fixed;left:${sr.left}px;top:${sr.top}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 20px rgba(255,200,80,.6);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
@@ -15449,8 +16253,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // instead of during the wind-up.
       if (window.playSFX) window.playSFX('heavy_impact', { delay: 110, category: 'effect' });
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      // Support zones use `data-support-*` (Creatures and Equipment
+      // both render there); legacy `data-equip-*` selectors never
+      // matched and silently swallowed every creature-targeted punch.
       const sel = zoneSlot >= 0
-        ? `[data-equip-zone][data-equip-owner="${ownerLabel}"][data-equip-hero="${heroIdx}"][data-equip-slot="${zoneSlot}"]`
+        ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
         : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
       const el = document.querySelector(sel);
       if (!el) return;
@@ -17115,18 +17922,52 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)), dur);
     };
     socket.on('play_ram_animation', onRamAnimation);
-    const onCardTransfer = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, cardName, duration, particles }) => {
+    const onCardTransfer = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, sourceZoneKind, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneKind, cardName, duration, particles }) => {
       if (window.playSFX) window.playSFX('placement');
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
-      // Support hero zones (zoneSlot === -1) as source or target
-      const srcEl = sourceZoneSlot < 0
-        ? document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`)
-        : document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`);
-      const tgtEl = targetZoneSlot < 0
-        ? document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`)
-        : document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
+      // Zone resolution: `sourceZoneKind` / `targetZoneKind` may be
+      // 'ability' to target the per-Hero Ability Zone DOM elements
+      // (used by Slippery Pengu's ability-relocation animation).
+      // Default behavior unchanged: zoneSlot < 0 → hero zone, else
+      // support zone — preserves every existing transfer caller.
+      const resolveZone = (kind, label, hero, slot) => {
+        if (kind === 'ability') {
+          return document.querySelector(`[data-ability-zone][data-ability-owner="${label}"][data-ability-hero="${hero}"][data-ability-slot="${slot}"]`);
+        }
+        if (slot < 0) {
+          return document.querySelector(`[data-hero-zone][data-hero-owner="${label}"][data-hero-idx="${hero}"]`);
+        }
+        return document.querySelector(`[data-support-zone][data-support-owner="${label}"][data-support-hero="${hero}"][data-support-slot="${slot}"]`);
+      };
+      const srcEl = resolveZone(sourceZoneKind, srcLabel, sourceHeroIdx, sourceZoneSlot);
+      const tgtEl = resolveZone(targetZoneKind, tgtLabel, targetHeroIdx, targetZoneSlot);
       if (!srcEl || !tgtEl) return;
+      // For ability-zone moves (Slippery Pengu) the server delays
+      // mutating game state until after the fly animation, so the
+      // source slot still RENDERS its Ability card while the ghost
+      // flies — without intervention, the player sees TWO copies on
+      // screen. Hide the source slot's children for the animation
+      // duration via the same `data-bounce-hiding` mechanism the
+      // bounce flow uses. Keyed with an `ab-` prefix so support-zone
+      // hides (using `${owner}-${hero}-${slot}`) don't collide.
+      if (sourceZoneKind === 'ability') {
+        const hideKey = `ab-${sourceOwner}-${sourceHeroIdx}-${sourceZoneSlot}`;
+        const hideMs = (duration || 800) + 20;
+        setBounceOutgoingHidden(prev => {
+          const next = new Set(prev);
+          next.add(hideKey);
+          return next;
+        });
+        setTimeout(() => {
+          setBounceOutgoingHidden(prev => {
+            if (!prev.has(hideKey)) return prev;
+            const next = new Set(prev);
+            next.delete(hideKey);
+            return next;
+          });
+        }, hideMs);
+      }
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
       const id = Date.now() + Math.random();
@@ -18191,6 +19032,33 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // hand while new flies to support at the same time.
       if (to === 'support' && toHeroIdx != null && toSlotIdx != null) {
         const hideKey = `${tgtOwner}-${toHeroIdx}-${toSlotIdx}`;
+        setBounceOutgoingHidden(prev => {
+          const next = new Set(prev);
+          next.add(hideKey);
+          return next;
+        });
+        setTimeout(() => {
+          setBounceOutgoingHidden(prev => {
+            if (!prev.has(hideKey)) return prev;
+            const next = new Set(prev);
+            next.delete(hideKey);
+            return next;
+          });
+        }, 720);
+      }
+
+      // Source-slot hide for support → anywhere transitions. Same
+      // `bounceOutgoingHidden` set the destination block above uses;
+      // the support-zone renderer reads `data-bounce-hiding` and
+      // visibility-hides the slot's children for the duration. The
+      // engine has already spliced the card out of `supportZones[h][z]`
+      // by the time the broadcast lands, so the new render is empty
+      // anyway — this is a defensive belt to cover any frame where
+      // React hasn't committed yet, plus the temp-steal case where
+      // the flying-card div briefly overlapped the still-rendered
+      // source slot for the full 700ms transit.
+      if (from === 'support' && fromHeroIdx != null && fromSlotIdx != null) {
+        const hideKey = `${srcOwner}-${fromHeroIdx}-${fromSlotIdx}`;
         setBounceOutgoingHidden(prev => {
           const next = new Set(prev);
           next.add(hideKey);
@@ -20309,6 +21177,80 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (!isMyEffectPrompt || ep?.type !== 'skatesMove') setSkatesSelected(null);
   }, [ep?.type]);
 
+  // ── Slippery archetype Start-Phase sub-mode ──
+  // Two-step click flow analogous to Skates: click a highlighted
+  // Slippery to select it, then click one of its destination zones
+  // (or "Done Slipping" to exit). The prompt carries each eligible
+  // Creature's instId + per-source destination list, so re-rendering
+  // mid-loop after a chained move (Pengu, Snowman, etc.) just refreshes
+  // the highlights without needing a separate round-trip.
+  const [slipperySelected, setSlipperySelected] = useState(null); // selected instId or null
+  const slipperyCreatureSet = new Set();
+  const slipperyDestSet = new Set();
+  let slipperySelectedEntry = null;
+  if (isMyEffectPrompt && ep.type === 'slipperyMove') {
+    for (const c of (ep.creatures || [])) {
+      slipperyCreatureSet.add(`${myIdx}-${c.heroIdx}-${c.zoneSlot}`);
+    }
+    slipperySelectedEntry = (ep.creatures || []).find(c => c.instId === slipperySelected) || null;
+    if (slipperySelectedEntry) {
+      for (const d of (slipperySelectedEntry.dests || [])) {
+        slipperyDestSet.add(`${myIdx}-${d.heroIdx}-${d.slotIdx}`);
+      }
+    }
+  }
+  // ── Slippery Pengu Ability-move sub-mode ──
+  // Two-step click on Ability Zones: click an eligible Ability to
+  // select it, then click one of its highlighted destination Ability
+  // Zones (or the Skip button). Per-source destination lists arrive
+  // with the prompt so destination highlights toggle locally without
+  // a server round-trip.
+  const [pengueSelected, setPengueSelected] = useState(null); // { srcHi, srcZi, abilityName } | null
+  const pengueSrcSet = new Set();
+  const pengueDestSet = new Set();
+  let pengueSelectedEntry = null;
+  if (isMyEffectPrompt && ep.type === 'pengueAbilityMove') {
+    for (const a of (ep.abilities || [])) {
+      pengueSrcSet.add(`${a.srcHi}-${a.srcZi}`);
+    }
+    if (pengueSelected) {
+      pengueSelectedEntry = (ep.abilities || []).find(a =>
+        a.srcHi === pengueSelected.srcHi
+        && a.srcZi === pengueSelected.srcZi
+        && a.abilityName === pengueSelected.abilityName,
+      ) || null;
+      if (pengueSelectedEntry) {
+        for (const d of (pengueSelectedEntry.dests || [])) {
+          pengueDestSet.add(`${d.destHi}-${d.destZi}`);
+        }
+      }
+    }
+  }
+  useEffect(() => {
+    if (!isMyEffectPrompt || ep?.type !== 'pengueAbilityMove') {
+      setPengueSelected(null);
+      return;
+    }
+    if (pengueSelected && !(ep.abilities || []).some(a =>
+        a.srcHi === pengueSelected.srcHi && a.srcZi === pengueSelected.srcZi
+        && a.abilityName === pengueSelected.abilityName)) {
+      setPengueSelected(null);
+    }
+  }, [ep?.type, ep?.abilities]);
+
+  // Drop the local selection when the prompt closes OR when the
+  // selected Creature is no longer eligible (e.g. Pengu chained it
+  // and the new prompt no longer lists this instId).
+  useEffect(() => {
+    if (!isMyEffectPrompt || ep?.type !== 'slipperyMove') {
+      setSlipperySelected(null);
+      return;
+    }
+    if (slipperySelected != null && !(ep.creatures || []).some(c => c.instId === slipperySelected)) {
+      setSlipperySelected(null);
+    }
+  }, [ep?.type, ep?.creatures]);
+
   // ── Chain Target Pick (Chain Lightning / Qinglong / Bottled Lightning) ──
   const [chainPickSelected, setChainPickSelected] = useState([]); // [{id, type, owner, heroIdx, slotIdx?, cardName}]
   useEffect(() => {
@@ -21355,7 +22297,56 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isFriendshipActive = !isOpp && cards.includes('Friendship') && (gameState.additionalActions || []).some(aa =>
                   aa.typeId.startsWith('friendship_support') && aa.eligibleHandCards.length > 0 && aa.providers.some(p => p.heroIdx === i)
                 );
-                const onAbilityClick = attachPickZoneValid
+                // Slippery Pengu Ability-move highlights — source set
+                // is all eligible Ability Zones on the user's own side
+                // (`!isOpp` gate); destination set is per-selected-
+                // source (populated only after the player clicks a
+                // source).
+                //
+                // Same-name stack destinations are themselves valid
+                // SOURCES too (Hero B's Summoning Magic Lv 2 is both
+                // a movable source AND a valid drop target for Hero
+                // A's Summoning Magic). When a source is selected,
+                // such zones MUST be treated as destinations — that's
+                // the whole point of the picker. So we promote the
+                // dest highlight over the src highlight whenever a
+                // source is currently held, and route the click to
+                // the destination handler in that case.
+                const isPengueSrc = !isOpp && pengueSrcSet.has(`${i}-${z}`);
+                const isPengueSrcSelected = isPengueSrc && pengueSelected
+                  && pengueSelected.srcHi === i && pengueSelected.srcZi === z;
+                const isPengueDest = !isOpp && pengueDestSet.has(`${i}-${z}`);
+                // Resolve same-zone overlap: if a zone is the
+                // currently-selected source, it stays a "deselect"
+                // click (not a destination). Otherwise, when a source
+                // is selected, destination wins.
+                const isPengueDestActive = isPengueDest && pengueSelected
+                  && !isPengueSrcSelected;
+                const onAbilityClick = isPengueDestActive
+                  ? () => {
+                      respondToPrompt({
+                        srcHi: pengueSelected.srcHi,
+                        srcZi: pengueSelected.srcZi,
+                        abilityName: pengueSelected.abilityName,
+                        destHi: i,
+                        destZi: z,
+                      });
+                      setPengueSelected(null);
+                    }
+                  : isPengueSrc
+                  ? () => {
+                      const card = cards[0];
+                      if (!card) return;
+                      if (pengueSelected
+                          && pengueSelected.srcHi === i
+                          && pengueSelected.srcZi === z
+                          && pengueSelected.abilityName === card) {
+                        setPengueSelected(null);
+                      } else {
+                        setPengueSelected({ srcHi: i, srcZi: z, abilityName: card });
+                      }
+                    }
+                  : attachPickZoneValid
                   ? () => {
                       const pick = abilityAttachPick;
                       if (pick.source === 'effectPrompt') {
@@ -21382,8 +22373,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     } : (isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined);
                 return (
                   <div key={z}
-                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (attachPickZoneValid ? ' attach-pick-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isValidPotionTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '') + (isBlocking ? ' zone-ability-blocked' : '')}
+                    className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (attachPickZoneValid ? ' attach-pick-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isValidPotionTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '') + (isBlocking ? ' zone-ability-blocked' : '') + (isPengueSrc && !isPengueDestActive ? ' zone-pengue-src' : '') + (isPengueSrcSelected ? ' zone-pengue-selected' : '') + (isPengueDestActive ? ' zone-pengue-dest' : '')}
                     data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel} data-card-name={cards[0] || ''}
+                    data-bounce-hiding={bounceOutgoingHidden.has(`ab-${pi}-${i}-${z}`) ? 'true' : undefined}
                     onClick={onAbilityClick}
                     onMouseEnter={() => {
                       // Track hovered Luck's declared target for tooltip
@@ -21394,7 +22386,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       }
                     }}
                     onMouseLeave={() => { _activeLuckTooltipTarget = null; }}
-                    style={zsMerge('ability', (canActivate || attachPickZoneValid || isValidPotionTarget) ? { cursor: 'pointer' } : undefined)}>
+                    style={zsMerge('ability', (canActivate || attachPickZoneValid || isValidPotionTarget || isPengueSrc || isPengueDestActive) ? { cursor: 'pointer' } : undefined)}>
                     {cards.length > 0 ? (
                       <>
                         <AbilityStack cards={cards} />
@@ -21585,6 +22577,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const isSkatesCreature = skatesCreatureSet.has(`${pi}-${i}-${z}`);
               const isSkatesCreatureSelected = isSkatesCreature && skatesSelected === z;
               const isSkatesDest = skatesDestSet.has(`${pi}-${i}-${z}`);
+              // Slippery archetype Start-Phase sub-mode
+              const isSlipperyCreature = slipperyCreatureSet.has(`${pi}-${i}-${z}`);
+              const slipperyInstHere = isSlipperyCreature
+                ? (ep.creatures || []).find(c => c.heroIdx === i && c.zoneSlot === z)
+                : null;
+              const isSlipperyCreatureSelected = isSlipperyCreature
+                && slipperyInstHere
+                && slipperySelected === slipperyInstHere.instId;
+              const isSlipperyDest = slipperyDestSet.has(`${pi}-${i}-${z}`);
               // Chain target pick for creatures
               const creatureChainId = `equip-${pi}-${i}-${z}`;
               const isChainPickCreatureValid = chainPickValidIds.has(creatureChainId);
@@ -21598,7 +22599,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const isStolen = stolenBy != null;
               const stolenColor = isStolen ? (stolenBy === myIdx ? me.color : opp.color) : null;
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   onClick={isPendingBounceTarget ? () => {
                     // Click-to-swap: dispatches play_creature as if the
@@ -21625,6 +22626,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   } : isSkatesDest ? () => {
                     respondToPrompt({ creatureSlot: skatesSelected, destHeroIdx: i, destSlot: z });
                     setSkatesSelected(null);
+                  } : isSlipperyCreature ? () => {
+                    const instId = slipperyInstHere?.instId;
+                    if (instId == null) return;
+                    setSlipperySelected(prev => prev === instId ? null : instId);
+                  } : isSlipperyDest ? () => {
+                    if (slipperySelected == null) return;
+                    respondToPrompt({ instId: slipperySelected, destHeroIdx: i, destSlot: z });
+                    setSlipperySelected(null);
                   } : (isCreatureActivatable && !isEffectLocked) ? () => {
                     socket.emit('activate_creature_effect', { roomId: gameState.roomId, heroIdx: i, zoneSlot: z, charmedOwner: creatureEffectEntry?.charmedOwner });
                   } : (isEquipActivatable && !isEffectLocked) ? () => {
@@ -21642,7 +22651,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     }
                   } : isZonePickTarget ? () => respondToPrompt({ owner: pi, heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
                   style={zsMerge('support', {
-                    ...((isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined),
+                    ...((isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isSlipperyCreature || isSlipperyDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined),
                     ...(isStolen && stolenColor ? { '--charmed-color': stolenColor } : undefined),
                   })}
                   data-bounce-hiding={bounceOutgoingHidden.has(`${pi}-${i}-${z}`) ? 'true' : undefined}>
@@ -21976,16 +22985,63 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const pickEligible = isPickFromOppHand
                 && (gameState.effectPrompt.eligibleIndices || []).includes(i);
               const revealEntry = (opp.revealedHandCards || []).find(r => r.index === i);
+              // "Permanently revealed" badge — server marks Crystals
+              // and similar always-revealed cards with permanent:true.
+              // In puzzle mode every slot is exposed, so the marker is
+              // the only visual cue that THIS card is also revealed by
+              // the rules (Treacherous Crystal in hand, Crystal-Well-
+              // gifted Crystals, Bamboo Shield, etc.).
+              const isPermaRevealed = !!revealEntry?.permanent;
+              // Treacherous Crystal opt-in trigger affordance. The
+              // card's text says "your opponent MAY take control" —
+              // the lend is consent-based. Clicking the Crystal during
+              // my turn calls `trigger_treacherous_crystal` server-side,
+              // which steals every eligible opp Creature for the rest
+              // of this turn (Cardinal-immune ones are skipped).
+              // Pulses pink while it's my turn AND at least one opp
+              // Creature is stealable (not already stolen, not
+              // Cardinal-immune) — disappears after the trigger so the
+              // player gets the "click used" cue. BGG suppression
+              // gates the affordance too: no point pulsing for a no-op.
+              const oppHasTreacherous = revealEntry?.name === 'Treacherous Crystal';
+              const isTreacherousClickable = oppHasTreacherous
+                && gameState.activePlayer === myIdx
+                && !isEffectLocked
+                && (() => {
+                  // Build the same eligibility check the server uses:
+                  // at least one un-stolen, non-Cardinal-immune opp
+                  // Creature must exist. Equipment, faceDown, and
+                  // already-stolen instances don't count.
+                  const opp2 = gameState.players?.[oppIdx];
+                  if (!opp2) return false;
+                  for (let h = 0; h < (opp2.heroes || []).length; h++) {
+                    const zones = opp2.supportZones?.[h] || [];
+                    for (let z = 0; z < zones.length; z++) {
+                      if ((zones[z] || []).length === 0) continue;
+                      const cardName = zones[z][0];
+                      const cd = CARDS_BY_NAME[cardName];
+                      if (!cd || cd.cardType !== 'Creature') continue;
+                      const counters = (gameState.creatureCounters || {})[`${oppIdx}-${h}-${z}`] || {};
+                      if (counters._stolenBy != null) continue;
+                      if (counters._cardinalImmune) continue;
+                      if (counters.faceDown) continue;
+                      return true;
+                    }
+                  }
+                  return false;
+                })();
               return (
                 <div key={i}
                   className={'board-card hand-card'
                     + (revealEntry ? ' revealed-hand-card' : ' face-down')
+                    + (isPermaRevealed ? ' hand-card-perma-revealed' : '')
+                    + (isTreacherousClickable ? ' hand-card-treacherous-click' : '')
                     + (isSelected ? ' blind-pick-selected' : '')
                     + (isBlindPick && !isSelected && !isFull ? ' blind-pick-eligible' : '')
                     + (isFull ? ' hand-card-dimmed' : '')
                     + (pickEligible ? ' blind-pick-eligible' : '')
                     + (isPickFromOppHand && !pickEligible ? ' hand-card-dimmed' : '')}
-                  data-hand-idx={i} style={(oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current) || bounceReturnHidden.has(`${oppIdx}-${i}`)) ? { visibility: 'hidden' } : ((isBlindPick || pickEligible) ? { cursor: 'pointer' } : undefined)}
+                  data-hand-idx={i} style={(oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current) || bounceReturnHidden.has(`${oppIdx}-${i}`)) ? { visibility: 'hidden' } : ((isBlindPick || pickEligible || isTreacherousClickable) ? { cursor: 'pointer' } : undefined)}
                   onClick={isBlindPick ? () => {
                     // Compute the NEXT selection set outside the
                     // setState updater. React may double-invoke state
@@ -22009,7 +23065,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // makes the slot face-up.
                     if (window.playSFX) window.playSFX('ui_click');
                     respondToPrompt({ handIndex: i, cardName: revealEntry?.name || null });
-                  } : undefined)}>
+                  } : (isTreacherousClickable ? () => {
+                    // Trigger Treacherous Crystal's lend. Server steals
+                    // every eligible opp Creature (Cardinal-immune ones
+                    // are exempt). Steal lasts until next turn start
+                    // via `_revertStolenCreatures`. After this fires
+                    // the stolen Creatures appear on opp's board with
+                    // the cross-side controller outline and any with
+                    // creatureEffect become clickable for me directly.
+                    if (window.playSFX) window.playSFX('ui_click');
+                    socket.emit('trigger_treacherous_crystal', { roomId: gameState.roomId });
+                  } : undefined))}>
                   {revealEntry ? (
                     <img src={cardImageUrl(revealEntry.name)} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} draggable={false}
                       onMouseEnter={() => { const c = CARDS_BY_NAME[revealEntry.name]; if (c) setBoardTooltip(c); }}
@@ -22558,15 +23624,32 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isAbilityAttach = gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
                 const isAttachEligible = isAbilityAttach && (gameState.effectPrompt.eligibleCards || []).includes(item.card);
                 const isAnyDiscard = isForceDiscard || isForceDiscardCancellable;
-                const forceDiscardEligible = isForceDiscard && gameState.effectPrompt.eligibleIndices;
+                // `eligibleIndices` narrows which hand cards may be
+                // picked in a discard prompt — same filter applies to
+                // both the forced and cancellable variants (Pteranos
+                // restricts to different-name Gigantisaurs, etc.).
+                const forceDiscardEligible = isAnyDiscard && gameState.effectPrompt.eligibleIndices;
                 const isForceDiscardEligible = !forceDiscardEligible || gameState.effectPrompt.eligibleIndices.includes(item.origIdx);
                 // Pick-a-Hand-Card prompt (Deepsea Castle swap-in, any
                 // future single-pick-from-hand effect): eligible cards
                 // use the purple "pick" highlight; ineligible ones dim.
+                // Prompts with `highlightStyle: 'urgent'` (Saint
+                // Nicolas's Potion-give pick) opt into a stronger
+                // pulsing variant so the eligible slots really pop.
                 const isPickHandCard = gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt?.ownerIdx === myIdx;
                 const pickEligibleList = isPickHandCard ? gameState.effectPrompt.eligibleIndices : null;
                 const isPickHandCardEligible = isPickHandCard && (!pickEligibleList || pickEligibleList.includes(item.origIdx));
                 const isPickHandCardDimmed = isPickHandCard && !isPickHandCardEligible;
+                const isPickHandCardUrgent = isPickHandCard
+                  && gameState.effectPrompt?.highlightStyle === 'urgent'
+                  && isPickHandCardEligible;
+                // Saint Nicolas escrow marker — server reports the
+                // owner's currently-marked Potion slot via
+                // `_stNicolasEscrowedHandIdx`. The marker stays on the
+                // slot from pay through commit/refund, so the player
+                // sees which Potion is committed to be transferred.
+                const isStNicolasEscrowed = me._stNicolasEscrowedHandIdx === item.origIdx
+                  && item.origIdx >= 0;
                 const isHandPick = gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt?.ownerIdx === myIdx;
                 const isHandPickSelected = isHandPick && handPickSelected.has(item.origIdx);
                 const isHandPickEligible = isHandPick && (gameState.effectPrompt.eligibleIndices || []).includes(item.origIdx);
@@ -22613,10 +23696,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // reuse the standard `hand-pick-eligible` outline so
                 // the player gets the same "click me" feedback they
                 // see in handPick / pickHandCard modes.
-                const isPotionHandTarget = !!(gameState.potionTargeting?.ownerIdx === myIdx
-                  && (gameState.potionTargeting.validTargets || []).some(
-                    t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === item.origIdx
-                  ));
+                const potionHandTargetEntry = gameState.potionTargeting?.ownerIdx === myIdx
+                  ? (gameState.potionTargeting.validTargets || []).find(
+                      t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === item.origIdx
+                    )
+                  : null;
+                const isPotionHandTarget = !!potionHandTargetEntry;
+                // Selected multi-pick hand target (Cool Presents gifting) —
+                // distinguishes selected from unselected so selected cards
+                // get the solid purple `hand-pick-selected` outline instead
+                // of the dashed `hand-pick-eligible` one. Click toggles via
+                // `togglePotionTarget` (standard potion picker plumbing).
+                const isPotionHandTargetSelected = isPotionHandTarget
+                  && potionSelection.includes(potionHandTargetEntry.id);
                 // Per-instance hand-card level offsets. Merge three maps:
                 //   • `handLevelOffsets`           — Rocky Slime style,
                 //     persistent (carries onto the summoned creature).
@@ -22665,13 +23757,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // entry exists for this hand slot AND the card has a base
                 // cost, we render a discounted-cost badge over the card.
                 // Floor at 0 — the rule explicitly caps cost there.
+                //
+                // Rusting Crystal aura doubles the BASE cost of every
+                // OTHER Artifact in this player's hand before the
+                // reduction is applied — same order the server uses
+                // (`applyRustingCrystalCostMultiplier` before
+                // `costReduction`). Big Gwen Guard on this player's side
+                // suppresses the aura; `applyCrystalCostMods` handles
+                // both cases. Badge renders whenever the effective cost
+                // ends up DIFFERENT from the printed base; the boosted
+                // case is styled red (mirrors the Lv-boost badge).
                 const handCostReduction = (me.handCostReductions || {})[item.origIdx] || 0;
-                const handEffectiveCost = handCostReduction > 0 && handCardData?.cost != null
-                  ? Math.max(0, handCardData.cost - handCostReduction)
+                const handBaseCostAfterCrystal = handCardData?.cost != null
+                  ? applyCrystalCostMods(me, item.card, handCardData.cost)
                   : null;
+                const handEffectiveCost = handBaseCostAfterCrystal != null
+                  && (handCostReduction > 0 || handBaseCostAfterCrystal !== handCardData.cost)
+                  ? Math.max(0, handBaseCostAfterCrystal - handCostReduction)
+                  : null;
+                const handCostIsBoosted = handEffectiveCost != null
+                  && handCardData?.cost != null
+                  && handEffectiveCost > handCardData.cost;
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTarget ? ' hand-pick-eligible' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '')}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '')}
                     style={(isDrawAnim || isPendingPlay || isStealHidden || bounceReturnHidden.has(`${myIdx}-${item.origIdx}`)) ? { visibility: 'hidden' } : undefined}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
@@ -22703,8 +23812,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     })()}
                     {handEffectiveCost != null && (
                       <div className="hand-cost-override"
-                        onMouseEnter={e => showGameTooltip(e, `Cost reduced by ${handCostReduction} this turn (was ${handCardData.cost}).`)}
-                        onMouseLeave={hideGameTooltip}>
+                        onMouseEnter={e => {
+                          const parts = [];
+                          if (handBaseCostAfterCrystal !== handCardData.cost) {
+                            parts.push(`Rusting Crystal doubles the cost (base ${handCardData.cost} → ${handBaseCostAfterCrystal})`);
+                          }
+                          if (handCostReduction > 0) {
+                            parts.push(`Reduced by ${handCostReduction} this turn`);
+                          }
+                          showGameTooltip(e, parts.length
+                            ? parts.join('. ') + '.'
+                            : `Effective cost ${handEffectiveCost} (printed ${handCardData.cost}).`);
+                        }}
+                        onMouseLeave={hideGameTooltip}
+                        style={handCostIsBoosted ? {
+                          color: '#ff5555',
+                          textShadow: '0 0 6px rgba(255,90,90,0.7), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000',
+                        } : undefined}>
                         ◆{handEffectiveCost}
                       </div>
                     )}
@@ -23718,6 +24842,52 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </DraggablePanel>
       )}
 
+      {/* ── Effect Prompt: Slippery Pengu Ability Move ── */}
+      {isMyEffectPrompt && ep.type === 'pengueAbilityMove' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#7fd0ff' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#7fd0ff', marginBottom: 8 }}>🐧 Slippery Pengu</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
+            {ep.description || 'Move an Ability from one of your Heroes to an adjacent Hero.'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .8, marginBottom: 10 }}>
+            {pengueSelected
+              ? 'Now click a highlighted Ability Zone to confirm the move.'
+              : 'Click a highlighted Ability to select it for moving.'}
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            {pengueSelected && (
+              <button className="btn" style={{ padding: '6px 14px', fontSize: 11 }}
+                onClick={() => setPengueSelected(null)}>↩ Deselect</button>
+            )}
+            <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+              onClick={() => { setPengueSelected(null); respondToPrompt({ cancelled: true }); }}>{ep.cancelLabel || '✕ Skip'}</button>
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── Effect Prompt: Slippery Start-Phase Sub-Mode ── */}
+      {isMyEffectPrompt && ep.type === 'slipperyMove' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#7fd0ff' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#7fd0ff', marginBottom: 8 }}>❄️ Slippery Movement</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
+            {ep.description || 'You may move your Slippery Creatures around!'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .8, marginBottom: 10 }}>
+            {slipperySelected != null
+              ? 'Now click a highlighted Support Zone to confirm the move.'
+              : 'Click a highlighted Slippery Creature to select it.'}
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            {slipperySelected != null && (
+              <button className="btn" style={{ padding: '6px 14px', fontSize: 11 }}
+                onClick={() => setSlipperySelected(null)}>↩ Deselect</button>
+            )}
+            <button className="btn btn-danger" style={{ padding: '6px 16px', fontSize: 11 }}
+              onClick={() => { setSlipperySelected(null); respondToPrompt({ done: true }); }}>{ep.doneLabel || '✓ Done Slipping'}</button>
+          </div>
+        </DraggablePanel>
+      )}
+
       {/* ── Effect Prompt: Status Select (Beer, etc.) ── */}
       {isMyEffectPrompt && ep.type === 'statusSelect' && (
         <StatusSelectPrompt key={ep.title} ep={ep} onRespond={respondToPrompt} />
@@ -23780,6 +24950,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'confirm' ? 'Waiting for opponent to confirm...' :
              ep.type === 'zonePick' ? 'Waiting for opponent to select a zone...' :
              ep.type === 'skatesMove' ? 'Waiting for opponent to move a creature...' :
+             ep.type === 'slipperyMove' ? 'Waiting for opponent to slide their Slippery Creatures...' :
+             ep.type === 'pengueAbilityMove' ? 'Waiting for opponent to move an Ability...' :
              ep.type === 'chainTargetPick' ? 'Waiting for opponent to select targets...' :
              ep.type === 'heroAction' ? 'Waiting for opponent to play a card...' :
              ep.type === 'forceDiscard' ? (ep.opponentSubtitle || 'Waiting for opponent to discard a card...') :

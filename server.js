@@ -1772,9 +1772,41 @@ function sendGameState(room, playerIdx, extra) {
         }
         // Puzzle mode reveals the CPU opponent's full hand to the
         // player — solving puzzles requires perfect information about
-        // what the opponent can react with.
+        // what the opponent can react with. Mark mechanically-revealed
+        // slots (auto-reveal Crystals like Treacherous Crystal,
+        // Crystal-Well-given cards routed through `revealOnEnterHand`,
+        // Bamboo Shield, etc.) with `permanent: true` so the client
+        // can paint an extra indicator over them — otherwise the
+        // puzzle-wide reveal flattens the visual distinction between
+        // "the puzzle exposes everything" and "this card is actually
+        // revealed by the rules right now".
         if (room.type === 'puzzle') {
-          return ps.hand.map((name, index) => ({ index, name }));
+          const permaSet = new Set();
+          const permaMap = ps._permanentlyRevealedHandIndices || {};
+          for (const kStr of Object.keys(permaMap)) {
+            const idx = +kStr;
+            if (idx >= 0 && idx < ps.hand.length) permaSet.add(idx);
+          }
+          // Per-instance `_permanentlyRevealed` → map to hand position
+          // via Kth-by-name rank, matching the splice interceptor.
+          const trackingRank = {};
+          for (const inst of (room.engine?.cardInstances || [])) {
+            if (inst.owner !== pi) continue;
+            if (inst.zone !== 'hand') continue;
+            const rank = trackingRank[inst.name] || 0;
+            trackingRank[inst.name] = rank + 1;
+            if (inst.counters?._permanentlyRevealed) {
+              let seen = 0;
+              for (let i = 0; i < ps.hand.length; i++) {
+                if (ps.hand[i] !== inst.name) continue;
+                if (seen === rank) { permaSet.add(i); break; }
+                seen++;
+              }
+            }
+          }
+          return ps.hand.map((name, index) => permaSet.has(index)
+            ? { index, name, permanent: true }
+            : { index, name });
         }
         const result = [];
         const seenIdx = new Set();
@@ -2108,10 +2140,12 @@ function sendGameState(room, playerIdx, extra) {
         // surfaces the stealer so the client can paint their color.
         const key = `${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
         const hasCounters = Object.keys(inst.counters).length > 0;
-        const hasSummoningSickness = inst.turnPlayed === currentTurn && (() => {
-          const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
-          return !!(script?.creatureEffect);
-        })();
+        const hasSummoningSickness = inst.turnPlayed === currentTurn
+          && !inst.counters?._hasHaste
+          && (() => {
+            const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
+            return !!(script?.creatureEffect);
+          })();
         const isFaceDown = !!inst.faceDown;
         const isStolen = inst.stolenBy != null && inst.controller !== inst.owner;
         if (hasCounters || hasSummoningSickness || isFaceDown || isStolen) {
@@ -2208,6 +2242,40 @@ function sendGameState(room, playerIdx, extra) {
     // `canHeroNormalSummon` empty-slot drop check so Mary's free
     // Support Zones light up under a Cute Phoenix drag.
     heroBypassSummonCards: room.engine ? room.engine.getHeroBypassSummonCards(playerIdx) : {},
+    // Saint Nicolas action-tax escrow: if the owner is mid-action with
+    // a Potion marked for transfer, send the current hand index so the
+    // client can paint the marker. Resolves the inst id to a hand
+    // position robustly — the splice interceptor keeps the engine's
+    // inst order aligned with the hand array, so the Nth-by-name
+    // walk lands the marker on the right slot even with duplicates.
+    _stNicolasEscrowedHandIdx: (() => {
+      const myPs = gs.players[playerIdx];
+      const esc = myPs?._stNicolasEscrow;
+      if (!esc) return -1;
+      const handArr = myPs.hand || [];
+      // Prefer inst-id resolution.
+      if (esc.instId != null && room.engine) {
+        let rank = 0, seen = 0;
+        for (const c of (room.engine.cardInstances || [])) {
+          if (c.zone !== 'hand') continue;
+          if (c.owner !== playerIdx) continue;
+          if (c.name !== esc.cardName) continue;
+          if (c.id === esc.instId) { rank = seen; break; }
+          seen++;
+        }
+        let count = 0;
+        for (let i = 0; i < handArr.length; i++) {
+          if (handArr[i] === esc.cardName) {
+            if (count === rank) return i;
+            count++;
+          }
+        }
+      }
+      // Fallback: first occurrence by name, then the stored handIdx.
+      const byName = handArr.indexOf(esc.cardName);
+      if (byName >= 0) return byName;
+      return Number.isInteger(esc.handIdx) ? esc.handIdx : -1;
+    })(),
     // Hand slots with a clickable "activate in hand without playing"
     // effect (Luna Kiai's "reveal to Burn a Hero" — any future card
     // with the same shape). Each entry is `{ cardName, handIndex,
@@ -2523,10 +2591,12 @@ function sendSpectatorGameState(room) {
         // surfaces the stealer so the client can paint their color.
         const key = `${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
         const hasCounters = Object.keys(inst.counters).length > 0;
-        const hasSummoningSickness = inst.turnPlayed === currentTurn && (() => {
-          const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
-          return !!(script?.creatureEffect);
-        })();
+        const hasSummoningSickness = inst.turnPlayed === currentTurn
+          && !inst.counters?._hasHaste
+          && (() => {
+            const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
+            return !!(script?.creatureEffect);
+          })();
         const isFaceDown = !!inst.faceDown;
         const isStolen = inst.stolenBy != null && inst.controller !== inst.owner;
         if (hasCounters || hasSummoningSickness || isFaceDown || isStolen) {
@@ -2760,7 +2830,7 @@ async function advanceToNextGame(room, loserIdx) {
  * No DB writes (ELO, wins, losses, SC rewards, game history).
  * Just sets gs.result and syncs to the client.
  */
-function puzzleEndGame(room, winnerIdx, reason) {
+async function puzzleEndGame(room, winnerIdx, reason) {
   const gs = room.gameState;
   if (!gs || gs.result) return;
   const loserIdx = winnerIdx === 0 ? 1 : 0;
@@ -2787,7 +2857,13 @@ function puzzleEndGame(room, winnerIdx, reason) {
   gs.rematchRequests = [];
   room.status = 'finished';
 
-  // Award SC for first-time official puzzle completion
+  // Award SC for first-time official puzzle completion. AWAITED inline
+  // so the result sync at the bottom carries the final scAwarded value
+  // — previously this was a fire-and-forget IIFE plus an immediate
+  // sync, which let the client see `scAwarded: 0` first and then the
+  // real value milliseconds later. If the player dismissed the
+  // result view in that window, the SC notification text was
+  // generated from the stale zero.
   if (puzzleSuccess && gs._puzzleAttemptId && gs._puzzleDifficulty) {
     const SC_BY_DIFFICULTY = { easy: 3, medium: 6, hard: 10 };
     const scAmount = SC_BY_DIFFICULTY[gs._puzzleDifficulty] || 0;
@@ -2795,57 +2871,49 @@ function puzzleEndGame(room, winnerIdx, reason) {
     const puzzleId = gs._puzzleAttemptId;
 
     if (userId && scAmount > 0) {
-      (async () => {
-        try {
-          // Check if already completed
-          const existing = await db.get(
-            'SELECT puzzle_id FROM puzzle_completions WHERE user_id = ? AND puzzle_id = ?',
+      try {
+        const existing = await db.get(
+          'SELECT puzzle_id FROM puzzle_completions WHERE user_id = ? AND puzzle_id = ?',
+          [userId, puzzleId]
+        );
+        if (!existing) {
+          await db.run(
+            'INSERT INTO puzzle_completions (user_id, puzzle_id) VALUES (?, ?)',
             [userId, puzzleId]
           );
-          if (!existing) {
-            // First clear — record completion and award SC
-            await db.run(
-              'INSERT INTO puzzle_completions (user_id, puzzle_id) VALUES (?, ?)',
-              [userId, puzzleId]
-            );
-            await db.run('UPDATE users SET sc = sc + ? WHERE id = ?', [scAmount, userId]);
-            gs.result.scAwarded = scAmount;
-            console.log(`[Puzzle] Awarded ${scAmount} SC to ${winner.username} for first clear of ${puzzleId}`);
-          } else {
-            // Already completed — record but no SC
-            console.log(`[Puzzle] ${winner.username} re-cleared ${puzzleId} (no SC)`);
-          }
-        } catch (err) {
-          console.error('[Puzzle] SC award error:', err.message);
+          await db.run('UPDATE users SET sc = sc + ? WHERE id = ?', [scAmount, userId]);
+          gs.result.scAwarded = scAmount;
+          console.log(`[Puzzle] Awarded ${scAmount} SC to ${winner.username} for first clear of ${puzzleId}`);
+        } else {
+          console.log(`[Puzzle] ${winner.username} re-cleared ${puzzleId} (no SC)`);
         }
-        // Re-sync with updated scAwarded
-        for (let i = 0; i < 2; i++) sendGameState(room, i);
-      })();
+      } catch (err) {
+        console.error('[Puzzle] SC award error:', err.message);
+      }
     }
   }
 
-  // Track tutorial completion (no SC reward)
+  // Track tutorial completion (no SC reward) — also awaited so the
+  // sync below carries the up-to-date completion record.
   if (puzzleSuccess && gs.isTutorial && gs._puzzleAttemptId) {
     const userId = winner?.userId;
     const puzzleId = gs._puzzleAttemptId;
     if (userId) {
-      (async () => {
-        try {
-          const existing = await db.get(
-            'SELECT puzzle_id FROM puzzle_completions WHERE user_id = ? AND puzzle_id = ?',
+      try {
+        const existing = await db.get(
+          'SELECT puzzle_id FROM puzzle_completions WHERE user_id = ? AND puzzle_id = ?',
+          [userId, puzzleId]
+        );
+        if (!existing) {
+          await db.run(
+            'INSERT INTO puzzle_completions (user_id, puzzle_id) VALUES (?, ?)',
             [userId, puzzleId]
           );
-          if (!existing) {
-            await db.run(
-              'INSERT INTO puzzle_completions (user_id, puzzle_id) VALUES (?, ?)',
-              [userId, puzzleId]
-            );
-            console.log(`[Tutorial] ${winner.username} cleared ${puzzleId}`);
-          }
-        } catch (err) {
-          console.error('[Tutorial] completion tracking error:', err.message);
+          console.log(`[Tutorial] ${winner.username} cleared ${puzzleId}`);
         }
-      })();
+      } catch (err) {
+        console.error('[Tutorial] completion tracking error:', err.message);
+      }
     }
   }
 
@@ -3176,7 +3244,12 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   const cardData = getCardDB()[cardName];
   if (!cardData || cardData.cardType !== 'Artifact') return false;
 
-  const rawCost = cardData.cost || 0;
+  // Rusting Crystal aura — doubles the base cost BEFORE reductions
+  // so discounts apply to the already-doubled price. Idempotent for
+  // multi-copy / suppressed cases (see helper).
+  const rawCost = applyRustingCrystalCostMultiplier(
+    gs, pi, cardName, cardData.cost || 0, room.engine,
+  );
   // Player-wide next-artifact discount (Shu'Chaku) AND per-hand-index
   // discounts (Play Money) both stack, capped at 0.
   const playerReduction = ps._nextArtifactCostReduction || 0;
@@ -3346,11 +3419,40 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
  * `doActivate*` / `doPlay*` / `doUseArtifactEffect` / `doConfirmPotion`
  * path so the play is silently rejected before any state mutation.
  */
-function isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName) {
+/**
+ * Rusting Crystal aura — while a copy sits in `pi`'s hand, the cost
+ * of every OTHER Artifact the player plays is doubled. The
+ * doubling is applied to the base cost BEFORE per-play reductions
+ * (Shu'Chaku discount, Play Money rebate). Big Gwen Guard's
+ * suppression aura lifts the effect. Idempotent — multiple Rusting
+ * Crystals in hand still produce a single ×2, matching "This effect
+ * does not stack with itself."
+ *
+ * Returns the (possibly-doubled) base cost.
+ */
+function applyRustingCrystalCostMultiplier(gs, pi, cardName, baseCost, engine) {
+  if (!cardName || cardName === 'Rusting Crystal') return baseCost;
+  const ps = gs.players?.[pi];
+  if (!ps) return baseCost;
+  if (!(ps.hand || []).includes('Rusting Crystal')) return baseCost;
+  if (engine) {
+    const { selfRevealEffectsSuppressed } = require('./cards/effects/_crystals-shared');
+    if (selfRevealEffectsSuppressed(engine, pi)) return baseCost;
+  }
+  return baseCost * 2;
+}
+
+function isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName, engine) {
   if (!cardName) return false;
   const ps = gs.players?.[pi];
   if (!ps) return false;
   if (!(ps.hand || []).includes('Distracting Crystal')) return false;
+  // Big Gwen Guard's aura suppresses every self-reveal Crystal's
+  // in-hand effect for its controller (see _crystals-shared.js).
+  if (engine) {
+    const { selfRevealEffectsSuppressed } = require('./cards/effects/_crystals-shared');
+    if (selfRevealEffectsSuppressed(engine, pi)) return false;
+  }
   const sc = loadCardEffect(cardName);
   return !!sc?.shufflesIntoDeck;
 }
@@ -3362,7 +3464,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Spell', 'Attack'], { charmedOwner });
   if (!v) return false;
   const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
-  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName)) return false;
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName, room.engine)) return false;
 
   // Wolflesia-style Creature spell-cast routing: the client sends
   // `viaCreatureInstId` when the player picked a Creature as the
@@ -3452,6 +3554,35 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     }
   }
 
+  // Hero-script pre-action cost (Saint Nicolas Potion pick + mark).
+  // Fires AFTER action-economy is set up so we don't prompt the player
+  // when the action wouldn't be legal anyway, but BEFORE we set
+  // `_resolvingCard` / start the spell — that way the prompt feels
+  // pre-action, and any state mutation the hook performs (Potion
+  // escrow marker) is reversible via the commit/refund pair below.
+  // `payHeroActionCost` is async: it may run a `pickHandCard` prompt.
+  // Returns false when the player cancels — we refund action-economy
+  // and bail without ever resolving the spell.
+  const paidHeroCost = await room.engine.payHeroActionCost(pi, heroIdx);
+  if (!paidHeroCost) {
+    if (additionalConsumed && consumedInst) {
+      consumedInst.counters.additionalActionAvail = 1;
+    }
+    if (actionCounterIncrementedHere) {
+      ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
+    }
+    if (bonusMainActionsConsumedHere) {
+      ps._bonusMainActions = 1;
+    }
+    if (_viaCreature) delete gs._spellCasterOverride;
+    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    return false;
+  }
+  // From here on the hero cost is in 'pending' state — the try/finally
+  // below must call commit (on success) or refund (on cancel/negate)
+  // before doPlaySpell returns. The `finally` block is a safety net.
+  let _heroCostFinalized = false;
+
   const nth = ps.hand.slice(0, handIndex + 1).filter(c => c === cardName).length;
   ps._resolvingCard = { name: cardName, nth };
 
@@ -3498,6 +3629,12 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     });
 
     if (chainResult.negated) {
+      // Refund the Hero pre-action cost — the spell never actually
+      // resolved its effect (a Reaction negated it). Saint Nicolas
+      // treats negation as "didn't go through", so the marked Potion
+      // stays in hand.
+      await room.engine.refundHeroActionCost(pi, heroIdx);
+      _heroCostFinalized = true;
       const hi = getResolvingHandIndex(ps);
       ps._resolvingCard = null;
       if (hi >= 0) { ps.hand.splice(hi, 1); if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++; }
@@ -3555,6 +3692,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     await room.engine._flushSurpriseDrawChecks();
 
     if (gs._spellCancelled && !gs._spellNegatedByEffect) {
+      // Player aborted the spell mid-resolve (target cancel, etc.) —
+      // refund the Hero pre-action cost. Marked Potion stays in hand.
+      await room.engine.refundHeroActionCost(pi, heroIdx);
+      _heroCostFinalized = true;
       delete gs._pendingCardReveal;
       delete gs._pendingPlayLog;
       ps._resolvingCard = null;
@@ -3585,6 +3726,13 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       return true;
     }
     delete gs._spellCancelled;
+
+    // Spell resolved cleanly past the cancel gate — commit the Hero
+    // pre-action cost. Saint Nicolas transfers the marked Potion to
+    // the opponent's hand here, so the visual flight runs concurrently
+    // with the spell's resolution / post-cast bookkeeping.
+    await room.engine.commitHeroActionCost(pi, heroIdx);
+    _heroCostFinalized = true;
 
     if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
     else room.engine._firePendingPlayLog();
@@ -3888,6 +4036,12 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   } catch (err) {
     console.error('[Engine] doPlaySpell error:', err.message, err.stack);
   } finally {
+    // Safety net: if neither commit nor refund ran (uncaught error,
+    // unexpected exit), refund so a marked Potion isn't stranded in
+    // the player's hand with a stale escrow flag.
+    if (!_heroCostFinalized) {
+      try { await room.engine.refundHeroActionCost(pi, heroIdx); } catch {}
+    }
     // Safety-net release — idempotent via _releaseSpellDepth's flag, so
     // this is a no-op if resolution already released normally above. Only
     // fires on error / early returns that skipped the explicit release.
@@ -3929,11 +4083,19 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   if (charmedOwner != null
       && hero.charmedBy !== pi && hero.controlledBy !== pi
       && inst.stolenBy !== pi) return false;
+  // Cardinal Beast immunity — Cardinals + Golden-Wings wearers
+  // resist Treacherous Crystal's lend. Check by counter AND name:
+  // the counter is set in Cardinal Beasts' onPlay hook, which
+  // puzzle-placed Cardinals never fire, so the name fallback is
+  // the load-bearing gate for puzzle setups.
+  const { CARDINAL_NAMES: CARDS_CARDINAL } = require('./cards/effects/_cardinal-shared');
+  if (charmedOwner != null && charmedOwner !== pi
+      && (inst.counters?._cardinalImmune || CARDS_CARDINAL.includes(inst.name))) return false;
 
   const effectName = inst.counters?._effectOverride || creatureName;
   const script = loadCardEffect(effectName);
   if (!script?.creatureEffect || !script?.onCreatureEffect) return false;
-  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, effectName)) return false;
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, effectName, room.engine)) return false;
 
   // Phase + action-economy gate. The default creature-effect path is
   // Main-Phase-only and free. Creatures that opt into `creatureActionCost`
@@ -3984,7 +4146,14 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     if (!isMainPhase) return false;
   }
 
-  if (inst.turnPlayed === (gs.turn || 0)) return false;
+  // Summoning sickness gate — Creatures can't fire their active
+  // effect on the turn they're summoned. `counters._hasHaste` lifts
+  // the gate (set by revives that explicitly grant Haste — Vacarn's
+  // Necromancy on its Skeletons, Forceful Revival, …). The actual
+  // `turnPlayed` stays correct so "was summoned this turn" reads
+  // (Alice the Puppeteer Girl, Hive's Crown, etc.) still see the
+  // creature as fresh.
+  if (inst.turnPlayed === (gs.turn || 0) && !inst.counters?._hasHaste) return false;
 
   const hoptKey = `creature-effect:${inst.id}`;
   if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
@@ -4023,6 +4192,55 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     }
 
     gs._pendingCardReveal = { cardName: creatureName, ownerIdx: pi };
+
+    // Open a reaction window around the creature-effect activation so
+    // Reaction Artifacts that target THIS event (Gigantisaur Skull) can
+    // chain in. `cardType: 'CreatureEffect'` keeps existing reactions
+    // (Tool Freezer / Master's Plan / Cute Camera) out — they all filter
+    // on Spell/Attack/Artifact/Reaction cardTypes. The activating inst
+    // is stashed on gs so the reaction's resolve can find it without
+    // squeezing extra fields through the initialLink filter.
+    gs._creatureEffectActivationContext = {
+      activatingInst: inst,
+      activator: pi,
+      creatureName,
+      heroIdx,
+    };
+    let creatureEffectChainResult;
+    try {
+      creatureEffectChainResult = await room.engine.executeCardWithChain({
+        cardName: creatureName, owner: pi, heroIdx, cardType: 'CreatureEffect',
+        goldCost: 0, resolve: null, fromBoard: true,
+      });
+    } finally {
+      delete gs._creatureEffectActivationContext;
+    }
+
+    // Negation path — Skull doesn't negate today, but future reactions
+    // composing on CreatureEffect could. Mirrors the ability-negation
+    // policy at line 4184: stamp HOPT (the activation fired and was
+    // countered), refund any consumed additional-action provider, and
+    // bail without running the script's onCreatureEffect.
+    if (creatureEffectChainResult?.negated) {
+      if (charmedHeroCreature) {
+        inst.controller = origController;
+        inst.owner = origOwner;
+        delete inst.heroOwner;
+      } else if (isStolenByPi) {
+        delete inst.heroOwner;
+      }
+      delete gs._pendingCardReveal;
+      delete gs._pendingPlayLog;
+      if (consumedAdditionalCreatureInst) {
+        consumedAdditionalCreatureInst.counters.additionalActionAvail = 1;
+      }
+      if (!gs.hoptUsed) gs.hoptUsed = {};
+      gs.hoptUsed[hoptKey] = gs.turn;
+      await room.engine._flushSurpriseDrawChecks();
+      await room.engine._executeDeferredSurprises();
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      return true;
+    }
 
     const ctx = room.engine._createContext(inst, {});
     const resolved = await script.onCreatureEffect(ctx);
@@ -4095,6 +4313,78 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   return true;
 }
 
+/**
+ * Treacherous Crystal — when the active player clicks an opp-side
+ * copy of the Crystal in opp's hand, claim temporary control of EVERY
+ * Creature on opp's board (regardless of host Hero state — dead,
+ * frozen, stunned, bound, missing, etc.) except those carrying
+ * `_cardinalImmune` (Cardinal Beasts, Golden Wings wearers, …).
+ *
+ * Mechanism: per-instance `stolenBy = pi` flip via `actionStealCreature`,
+ * which already wires `inst.controller` over to the borrower and queues
+ * the auto-revert through `_revertStolenCreatures` at the next turn
+ * start. Identical to Deepsea Succubus's temporary steal, just blanket
+ * over the whole board.
+ *
+ * Gates:
+ *   • Must be the active player's turn.
+ *   • Opp must currently hold ≥1 Treacherous Crystal in hand.
+ *   • Big Gwen Guard suppression on opp's side disables the lend.
+ *   • At least one already-unstolen opp Creature must exist (otherwise
+ *     the click is a no-op).
+ */
+function doTriggerTreacherousCrystal(room, pi) {
+  if (!room?.engine || !room.gameState) return false;
+  const gs = room.gameState;
+  if (pi !== gs.activePlayer) return false;
+  if (gs.potionTargeting) return false;
+
+  const oi = pi === 0 ? 1 : 0;
+  const oppPs = gs.players[oi];
+  if (!oppPs) return false;
+  if (!(oppPs.hand || []).includes('Treacherous Crystal')) return false;
+
+  // BGG suppression aura on opp's side — same gate the engine's
+  // `isTreacherousLent` honors.
+  const { selfRevealEffectsSuppressed } = require('./cards/effects/_crystals-shared');
+  if (selfRevealEffectsSuppressed(room.engine, oi)) return false;
+
+  const cardDB = room.engine._getCardDB();
+  // Cardinal Beasts are always exempt — by counter (Golden-Wings
+  // grants, onPlay-stamped Cardinals) AND by name. The name-based
+  // fallback covers puzzle setups: puzzle-placed Cardinals never
+  // fire their onPlay, so `_cardinalImmune` is unset, and the
+  // counter check alone would let them be stolen.
+  const { CARDINAL_NAMES } = require('./cards/effects/_cardinal-shared');
+  let stolenCount = 0;
+  for (const inst of room.engine.cardInstances) {
+    if (inst.zone !== 'support') continue;
+    if (inst.owner !== oi) continue;
+    if (inst.faceDown) continue;
+    if (inst.stolenBy != null) continue;
+    if (inst.counters?._cardinalImmune) continue;
+    if (CARDINAL_NAMES.includes(inst.name)) continue;
+    // Restrict to Creature card type. Equipment / token instances
+    // shouldn't be stealable, even if some future card flagged them
+    // as supportable.
+    const cd = cardDB[inst.name];
+    if (!cd || cd.cardType !== 'Creature') continue;
+    const ok = room.engine.actionStealCreature(pi, inst, {
+      sourceName: 'Treacherous Crystal',
+    });
+    if (ok) stolenCount++;
+  }
+
+  if (stolenCount === 0) return false;
+
+  room.engine.log('treacherous_crystal_trigger', {
+    player: gs.players[pi]?.username, stolenCount,
+  });
+  for (let i = 0; i < 2; i++) sendGameState(room, i);
+  sendSpectatorGameState(room);
+  return true;
+}
+
 async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, borrowedFromOwner }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
@@ -4136,7 +4426,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
   const script = loadCardEffect(abilityName);
   if (!script?.freeActivation || !script?.onFreeActivate) return false;
   if (isActionPhase && !script.actionPhaseEligible) return false;
-  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName)) return false;
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
 
   const hoptKey = `free-ability:${abilityName}:${pi}`;
   if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
@@ -4291,6 +4581,13 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   if (ps.summonLocked) return false;
   const freshBlocked = room.engine.getSummonBlocked(pi);
   if (freshBlocked.includes(cardName)) return false;
+  // Per-Hero `canSummon` gate. `getSummonBlocked` only refuses when
+  // NO capable Hero accepts the card (card-wide check, cardHeroIdx
+  // = -1) — that lets archetype rules like Gigantisaurs slip through
+  // when ONE Hero is occupied but another is free. Re-run the per-
+  // Hero check against the specific destination so e.g. Chimera /
+  // Pteranos / Spinor refuse a Hero that already hosts a Gigantisaur.
+  if (!room.engine.isCreatureSummonable(cardName, pi, heroIdx)) return false;
   const creatureHero = ps.heroes?.[heroIdx];
   if (creatureHero?.statuses?.charmed) return false;
 
@@ -4372,12 +4669,40 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     return idx;
   };
 
+  // Hero-script pre-action cost (Saint Nicolas Potion pick + mark).
+  // Same pattern as doPlaySpell — see that path for the full rationale.
+  // If the player cancels the prompt, refund every action-economy
+  // mutation we performed above and bail without ever resolving.
+  const paidHeroCost = await room.engine.payHeroActionCost(pi, heroIdx);
+  if (!paidHeroCost) {
+    ps._resolvingCard = null;
+    if (additionalConsumed && consumedInst) {
+      consumedInst.counters.additionalActionAvail = 1;
+    }
+    if (actionCounterIncrementedHere) {
+      ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
+    }
+    if (bonusMainActionsConsumedHere) {
+      ps._bonusMainActions = 1;
+    }
+    delete ps._requestedBouncePlaceSlot;
+    delete ps._requestedNormalSummonSlot;
+    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    return false;
+  }
+  let _heroCostFinalized = false;
+
   try {
     const chainResult = await room.engine.executeCardWithChain({
       cardName, owner: pi, heroIdx, cardType: 'Creature', goldCost: 0,
     });
 
     if (chainResult.negated) {
+      // Negated by a Reaction — the creature never actually summoned,
+      // refund the Hero pre-action cost (Saint Nicolas keeps the
+      // marked Potion in hand).
+      await room.engine.refundHeroActionCost(pi, heroIdx);
+      _heroCostFinalized = true;
       commitHandRemoval();
       // Foreign-origin Creatures (Magic Lamp gifts etc.) discard to
       // the ORIGINAL owner's pile when negated before placement.
@@ -4416,6 +4741,10 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     const placementConsumed = ps._placementConsumedByCard === cardName;
     if (placementConsumed) delete ps._placementConsumedByCard;
     if (!beforeSummonOk && !placementConsumed) {
+      // beforeSummon refused (tribute cancelled etc.) — refund Hero
+      // pre-action cost.
+      await room.engine.refundHeroActionCost(pi, heroIdx);
+      _heroCostFinalized = true;
       ps._resolvingCard = null;
       // Roll back ALL action-economy bookkeeping — the Creature never
       // resolved (beforeSummon cancelled the play), so the Action
@@ -4433,6 +4762,33 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
+    // `beforeSummon` may upgrade an engine-decided NORMAL summon into
+    // an inherent (additional-Action) summon — used by Big Gwen Guard
+    // when the player picks the "Special" branch of its summon-mode
+    // prompt. The script stamps `gs._summonModeUpgradedToInherent`
+    // with its `cardOwner`; we refund the Action slot the engine
+    // consumed upfront and flip the local `effectiveIsInherent`
+    // so the downstream gates (heroesActedThisTurn push, phase
+    // advance) match the upgraded mode.
+    let effectiveIsInherent = isInherentAction;
+    if (gs._summonModeUpgradedToInherent === pi) {
+      delete gs._summonModeUpgradedToInherent;
+      if (!isInherentAction) {
+        if (additionalConsumed && consumedInst) {
+          consumedInst.counters.additionalActionAvail = 1;
+          additionalConsumed = false;
+        }
+        if (actionCounterIncrementedHere) {
+          ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
+          actionCounterIncrementedHere = false;
+        }
+        if (bonusMainActionsConsumedHere) {
+          ps._bonusMainActions = 1;
+          bonusMainActionsConsumedHere = false;
+        }
+        effectiveIsInherent = true;
+      }
+    }
 
     let actualZoneSlot = zoneSlot;
     let inst = null;
@@ -4442,6 +4798,9 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       commitHandRemoval();
       const placeResult = room.engine.summonCreature(cardName, pi, heroIdx, zoneSlot);
       if (!placeResult) {
+        // Place fizzled (full zone, etc.) — refund Hero pre-action cost.
+        await room.engine.refundHeroActionCost(pi, heroIdx);
+        _heroCostFinalized = true;
         // Fizzle on a full zone — foreign-origin Creatures still route
         // their fizzle discard back to the original owner's pile.
         const fizzleDiscardOwner = room.engine._consumeHandCardOrigin(pi, cardName);
@@ -4480,6 +4839,12 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       sendToSpectators(room, 'summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
     }
 
+    // Creature is on the board — commit the Hero pre-action cost.
+    // Saint Nicolas transfers the marked Potion to opp's hand here so
+    // the visual flight runs alongside the summon animation.
+    await room.engine.commitHeroActionCost(pi, heroIdx);
+    _heroCostFinalized = true;
+
     if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
 
     // Mark the summoning Hero as having spent their Action — mirrors
@@ -4490,7 +4855,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     // `heroesActedThisTurn` empty, so the engine's action-already-used
     // gate would let any other Hero perform action 2 unrestricted —
     // bypassing the heroRestricted gate on Soul Shard Ba's grant etc.
-    if (!isInherentAction && !additionalConsumed && !isReactionSubtype) {
+    if (!effectiveIsInherent && !additionalConsumed && !isReactionSubtype) {
       if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
       if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
     }
@@ -4522,11 +4887,11 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     await room.engine.runHooks('onAnyActionResolved', {
       actionType: 'creature', playerIdx: pi, cardName, heroIdx,
       isAdditional: !!usingAdditional,
-      isInherent: !!isInherentAction,
+      isInherent: !!effectiveIsInherent,
       isFree: false,
       _skipReactionCheck: true,
     });
-    if (isActionPhase && !usingAdditional && !isInherentAction) {
+    if (isActionPhase && !usingAdditional && !effectiveIsInherent) {
       await room.engine.advanceToPhase(pi, 4);
     }
     if (isActionPhase && usingAdditional) {
@@ -4543,6 +4908,12 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     }
   } catch (err) {
     console.error('[Engine] doPlayCreature error:', err.message);
+  } finally {
+    // Safety net: if neither commit nor refund ran (unexpected exit),
+    // refund so a marked Potion isn't stranded with stale escrow.
+    if (!_heroCostFinalized) {
+      try { await room.engine.refundHeroActionCost(pi, heroIdx); } catch {}
+    }
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -4579,6 +4950,10 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
   // Divine Gift of Skill lock — chosen hero can't act unless they have
   // Magic Arts >= 1. Action-cost ability activations are Actions.
   if (room.engine.isHeroSkillLocked(heroOwner, heroIdx)) return false;
+  // Hero-script Action gate (Saint Nicolas no-Potion lock). The
+  // engine helper short-circuits to `true` for Heroes without the
+  // hook so this is a no-op for everyone else.
+  if (!room.engine.canHeroPerformAction(heroOwner, heroIdx)) return false;
 
   const abilitySlot = ps.abilityZones?.[heroIdx]?.[zoneIdx];
   if (!abilitySlot || abilitySlot.length === 0) return false;
@@ -4587,7 +4962,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
 
   const script = loadCardEffect(abilityName);
   if (!script?.actionCost || !script?.onActivate) return false;
-  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName)) return false;
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
 
   const hoptKey = `ability-action:${abilityName}:${pi}`;
   if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
@@ -4666,6 +5041,32 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
   // declines from this activation's prompts (see HOPT-keep logic below).
   room.engine._lastPromptGerryDeclined = false;
 
+  // Hero-script pre-action cost (Saint Nicolas Potion pick + mark) —
+  // mirrors doPlaySpell / doPlayCreature. If the player cancels the
+  // pick, refund every action-economy mutation performed above and
+  // bail before the ability actually fires.
+  const paidHeroCost = await room.engine.payHeroActionCost(heroOwner, heroIdx);
+  if (!paidHeroCost) {
+    if (consumedAdditionalInst) {
+      consumedAdditionalInst.counters.additionalActionAvail = 1;
+    }
+    if (actionCounterIncrementedHere) {
+      actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
+    }
+    if (bonusMainActionsConsumedHere) {
+      actingPs._bonusMainActions = 1;
+    }
+    if (heroesActedPushedHere && actingPs.heroesActedThisTurn) {
+      const idx = actingPs.heroesActedThisTurn.indexOf(heroIdx);
+      if (idx >= 0) actingPs.heroesActedThisTurn.splice(idx, 1);
+    }
+    if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
+    delete gs._pendingPlayLog;
+    for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+    return false;
+  }
+  let _heroCostFinalized = false;
+
   try {
     const inst = room.engine.cardInstances.find(c =>
       c.owner === heroOwner && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
@@ -4678,6 +5079,10 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
     });
 
     if (chainResult.negated) {
+      // Negated — refund the Hero pre-action cost (Saint Nicolas
+      // keeps the marked Potion).
+      await room.engine.refundHeroActionCost(heroOwner, heroIdx);
+      _heroCostFinalized = true;
       if (isActionPhase) await room.engine.advanceToPhase(pi, 4);
       // (additional-action providers were already consumed upfront before
       // activation, so no manual consume is needed here on negation.)
@@ -4730,9 +5135,16 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
       // confirms keep HOPT consumed — the activator committed; opp's
       // Gerrymander declined for them, the slot is spent.
       if (room.engine._lastPromptGerryDeclined) {
+        // Gerrymander veto — Saint Nicolas Potion still goes (the
+        // activator committed). Commit the cost.
+        await room.engine.commitHeroActionCost(heroOwner, heroIdx);
+        _heroCostFinalized = true;
         room.engine._lastPromptGerryDeclined = false;
         room.engine.log('gerrymander_veto', { player: gs.players[pi].username, ability: abilityName });
       } else {
+        // Player cancelled — refund Hero pre-action cost.
+        await room.engine.refundHeroActionCost(heroOwner, heroIdx);
+        _heroCostFinalized = true;
         delete gs.hoptUsed[hoptKey];
         // Standard cancel ALSO rolls back the action-economy
         // bookkeeping — the ability never resolved, so the Action
@@ -4757,6 +5169,11 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
+
+    // Ability resolved cleanly — commit the Hero pre-action cost so
+    // the Potion flight runs alongside the ability's own animations.
+    await room.engine.commitHeroActionCost(heroOwner, heroIdx);
+    _heroCostFinalized = true;
 
     // `usingAdditional` reflects whether this activation consumed an
     // additional-action provider (Main-Phase activation, or Action-Phase
@@ -4800,6 +5217,11 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
     // activation, so no manual consume is needed here on success.)
   } catch (err) {
     console.error('[doActivateAbility]', err.message);
+  } finally {
+    // Safety net for the Hero pre-action cost — see doPlaySpell.
+    if (!_heroCostFinalized) {
+      try { await room.engine.refundHeroActionCost(heroOwner, heroIdx); } catch {}
+    }
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -4934,7 +5356,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       chosen = idx >= 0 ? availableEffects[idx] : null;
     }
     if (!chosen?.inst) return false;
-    if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, chosen.name)) return false;
+    if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, chosen.name, room.engine)) return false;
 
     // ── Action-economy gate for `heroEffectActionCost: true` heroes ──
     // Mirror of the doPlaySpell / doPlayCreature / actionCost-Ability
@@ -5278,7 +5700,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   const script = loadCardEffect(potionName);
   if (!script) { gs.potionTargeting = null; return false; }
   if (script.validateSelection && !script.validateSelection(selectedIds, validTargets)) return false;
-  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, potionName)) {
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, potionName, room.engine)) {
     gs.potionTargeting = null;
     return false;
   }
@@ -5350,7 +5772,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
 
   if (chainResult.resolveResult?.aborted) {
     ps._resolvingCard = null;
-    const freshTargets = script.getValidTargets ? script.getValidTargets(gs, pi, room.engine) : validTargets;
+    const freshTargets = script.getValidTargets ? script.getValidTargets(gs, pi, room.engine, handIndex) : validTargets;
     const config = typeof script.targetingConfig === 'function'
       ? script.targetingConfig(gs, pi, goldCost)
       : { ...script.targetingConfig };
@@ -5582,7 +6004,18 @@ async function doUsePotion(room, pi, { cardName, handIndex }) {
       } else if (chainResult.resolveResult?.placed) {
         checkPotionLock(ps, gs, pi);
       } else {
-        const potionHookCtx = { potionName: cardName, potionOwner: pi, placed: false, _skipReactionCheck: true };
+        // `fromHandIndex` carries the pre-splice hand slot the Potion
+        // occupied — listeners that re-route the spent Potion (Saint
+        // Nicolas's redirect to opp's hand) use it for the source rect
+        // of any cross-hand flight animation. Without it, the client
+        // falls back to the hand container's center and the visual
+        // looks like the card teleported out of the middle of the
+        // hand instead of leaving its actual slot.
+        const potionHookCtx = {
+          potionName: cardName, potionOwner: pi,
+          fromHandIndex: currentIdx,
+          placed: false, _skipReactionCheck: true,
+        };
         await room.engine.runHooks('afterPotionUsed', potionHookCtx);
         if (potionHookCtx.placed) {
           checkPotionLock(ps, gs, pi);
@@ -5623,7 +6056,10 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
   if (!cardData || cardData.cardType !== 'Artifact') return false;
   if ((cardData.subtype || '').toLowerCase() === 'equipment') return false;
 
-  const rawCost = cardData.cost || 0;
+  // Rusting Crystal aura — doubles the base cost BEFORE reductions.
+  const rawCost = applyRustingCrystalCostMultiplier(
+    gs, pi, cardName, cardData.cost || 0, room.engine,
+  );
   // Same stacked discount as the equip path: Shu'Chaku's next-artifact
   // reduction + Play Money's per-hand-index reduction, capped at 0.
   const playerReduction = ps._nextArtifactCostReduction || 0;
@@ -5633,7 +6069,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
 
   const script = loadCardEffect(cardName);
   if (!script) return false;
-  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName)) return false;
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName, room.engine)) return false;
   // `manualGoldCost` Artifacts (Dark Gear's level-scaled cost, Cool
   // Repair / Beer's per-target multiplier, etc.) compute their own
   // actual cost inside `resolve` — the cards.json `cost` is only the
@@ -5651,7 +6087,12 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
   // handle Artifact targeting (scheduled for 2i), so callers should pre-filter
   // those and only invoke this helper on the non-targeting path.
   if (script.getValidTargets && script.targetingConfig) {
-    const validTargets = script.getValidTargets(gs, pi, room.engine);
+    // `handIndex` lets the script exclude its own resolving slot from
+    // hand-target picks (Cool Presents gifting). `_resolvingCard` is
+    // only stamped after the player confirms (doConfirmPotion), so
+    // scripts that need self-exclusion at the targeting-build stage
+    // rely on this explicit argument.
+    const validTargets = script.getValidTargets(gs, pi, room.engine, handIndex);
     const config = typeof script.targetingConfig === 'function'
       ? script.targetingConfig(gs, pi, cost)
       : { ...script.targetingConfig };
@@ -7956,6 +8397,22 @@ io.on('connection', (socket) => {
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
     doActivateCreatureEffect(room, pi, params).catch(err => console.error('[activate_creature_effect] error:', err.message));
+  });
+
+  // Treacherous Crystal — explicit trigger emitted when the player
+  // clicks the Crystal in opp's hand. Steals all eligible opp
+  // Creatures for the rest of this turn (Cardinal-immune ones are
+  // exempt). The card text says "may take control", so the lend is
+  // opt-in: clicking is the consent gesture. Steals revert at the
+  // next turn start via the engine's `_revertStolenCreatures`
+  // cleanup, same path Deepsea Succubus's temporary steals use.
+  socket.on('trigger_treacherous_crystal', (params) => {
+    if (!currentUser) return;
+    const room = rooms.get(params?.roomId);
+    if (!room?.gameState) return;
+    const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+    doTriggerTreacherousCrystal(room, pi);
   });
 
   // Activate an equipped card's active effect (Slippery Skates, etc.)

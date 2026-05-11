@@ -98,11 +98,18 @@ module.exports = {
     const chosenName = creaturePick.cardName;
 
     // ── Step 2: pick a target hero's free Support Zone ────────────────────
+    //
+    // Per-Hero `canSummon` filter (`_bypassBeforeSummon: true`) honors
+    // each Creature's gating rule. This is a placement that skips
+    // `beforeSummon`, so cards like King Trex re-apply their strict
+    // per-Hero archetype rule (no Gigantisaur-occupied Hero when the
+    // auto-sacrifice can't run).
 
     const freeZones = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const h = ps.heroes[hi];
       if (!h?.name || h.hp <= 0) continue;
+      if (!engine.isCreatureSummonable(chosenName, pi, hi, { _bypassBeforeSummon: true })) continue;
       for (let si = 0; si < 3; si++) {
         if ((ps.supportZones?.[hi]?.[si] || []).length === 0) {
           freeZones.push({ heroIdx: hi, slotIdx: si, label: `${h.name} — Slot ${si + 1}` });

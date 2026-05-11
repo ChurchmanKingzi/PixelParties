@@ -124,37 +124,62 @@ module.exports = {
     },
 
     // ── 2a. Mill trigger: Cute Cat dies on the board ─────────────
-    // "your deck" → the LISTENER's controller's deck. Each Cute Cat
-    // independently observes the death event and fires its own once-
-    // per-turn mill on its own deck.
+    // "your deck" = the deck of the player whose discard pile the
+    // dying Cat lands in (= the corpse's `originalOwner`). Listeners
+    // on either side observe the death, but they ALL target the
+    // dying Cat's owner — multiple Cute Cat instances reading the
+    // same event redirect onto the SAME player's deck, where the
+    // per-turn HOPT (`_cuteCatMillUsed`) dedupes. This fixes the
+    // cross-side leak where OPP's Cute Cat in OPP's discard milled
+    // OPP's deck whenever MY Cute Cat died (each listener was
+    // milling its OWN controller).
     onCreatureDeath: async (ctx) => {
       const death = ctx.creature;
       if (!death || death.name !== CARD_NAME) return;
-      // Skip the dying Cat's own controller during a self-discard-on-
-      // summon — onPlay handles that mill manually AFTER the discard
-      // push so the ordering is observable to the player.
-      if (ctx._engine.gs._cuteCatSelfDiscardSkipOwner === ctx.cardOwner) return;
-      await tryMillCuteCat(ctx._engine, ctx.cardOwner);
+      const millOwner = death.originalOwner ?? death.owner;
+      if (millOwner == null) return;
+      // Skip during the self-discard-on-summon path — onPlay handles
+      // the mill manually AFTER the discard push so the ordering is
+      // observable to the player. The flag tracks the dying Cat's
+      // owner, so the compare is against `millOwner` (not the
+      // listener's `cardOwner`).
+      if (ctx._engine.gs._cuteCatSelfDiscardSkipOwner === millOwner) return;
+      await tryMillCuteCat(ctx._engine, millOwner);
     },
 
     // ── 2b. Mill trigger: Cute Cat discarded from hand ───────────
+    // `ctx.playerIdx` is the player whose HAND the Cat came from —
+    // the discard lands in that player's pile, so the mill targets
+    // that side. Cross-side listeners use the same event payload and
+    // re-target onto the same player; HOPT dedupes.
     onDiscard: async (ctx) => {
       if (!ctx._fromHand) return;
       if (ctx.discardedCardName !== CARD_NAME) return;
-      await tryMillCuteCat(ctx._engine, ctx.cardOwner);
+      if (ctx.playerIdx == null) return;
+      await tryMillCuteCat(ctx._engine, ctx.playerIdx);
     },
 
     // ── 2c. Mill trigger: Cute Cat milled from deck ──────────────
+    // `ctx.playerIdx` is the player whose DECK was milled — that's
+    // the deck the Cat landed in. Mill on the SAME side; cross-side
+    // listeners re-target onto the milled side, HOPT dedupes.
     onMill: async (ctx) => {
       if (!Array.isArray(ctx.milledCards) || !ctx.milledCards.includes(CARD_NAME)) return;
-      await tryMillCuteCat(ctx._engine, ctx.cardOwner);
+      if (ctx.playerIdx == null) return;
+      await tryMillCuteCat(ctx._engine, ctx.playerIdx);
     },
   },
 
   // CPU hint: a self-killing Cat is a deck-thinning engine. Make own
   // copies very attractive sacrifice fodder, opp copies neutral (they
   // mill themselves, which actually helps us — don't waste an Attack).
+  // `preferDead: true` keeps the CPU from spending defensive resources
+  // (heal, cleanse, buff) on Cute Cat — the on-summon self-discard is
+  // the whole point of the card, so any "save it" play is wasted
+  // tempo on a creature that wants to die. Heal / buff target pickers
+  // honour the flag and skip such creatures.
   cpuMeta: {
     onDeathBenefit: 18,
+    preferDead: true,
   },
 };

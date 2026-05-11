@@ -86,11 +86,16 @@ module.exports = {
     const discardIdx = ps.discardPile.indexOf(chosenName);
     if (discardIdx < 0) return false;
 
-    // Pick a free Support Zone
+    // Pick a free Support Zone — per-Hero `canSummon` filter
+    // (`_bypassBeforeSummon: true`) honors each Creature's gating
+    // rule. This is a placement that skips `beforeSummon`, so cards
+    // like King Trex re-apply their strict per-Hero archetype rule
+    // (no Gigantisaur-occupied Hero when auto-sacrifice can't run).
     const freeZones = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
+      if (!engine.isCreatureSummonable(chosenName, pi, hi, { _bypassBeforeSummon: true })) continue;
       for (let zi = 0; zi < 3; zi++) {
         if (((ps.supportZones[hi] || [])[zi] || []).length === 0) {
           freeZones.push({ heroIdx: hi, slotIdx: zi });

@@ -61,10 +61,18 @@ module.exports = {
     const usedNames = new Set(hero._omikronSummoned || []);
 
     // ── Step 1: gallery of implemented creatures (excluding already-used names) ──
+    //
+    // Per-Hero `canSummon` filter (with `_bypassBeforeSummon: true`)
+    // honors each Creature's gating rule against THIS Omikron's Hero
+    // (the placement is fixed to `heroIdx`). Placement doesn't run
+    // `beforeSummon`, so cards like King Trex re-apply their strict
+    // per-Hero archetype rule — no Gigantisaur-occupied Hero when the
+    // auto-sacrifice can't run.
 
     const galleryCards = Object.values(cardDB)
       .filter(cd => hasCardType(cd, 'Creature') && !hasCardType(cd, 'Token') && cd.subtype !== 'Token' && !!loadCardEffect(cd.name))
       .filter(cd => !usedNames.has(cd.name))
+      .filter(cd => engine.isCreatureSummonable(cd.name, pi, heroIdx, { _bypassBeforeSummon: true }))
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(cd => ({ name: cd.name, source: 'omikron' }));
 

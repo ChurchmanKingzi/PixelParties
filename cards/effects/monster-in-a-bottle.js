@@ -56,8 +56,14 @@ function hasFreeZone(ps, heroIdx) {
 
 /**
  * Build the list of eligible creatures from hand + discard.
+ *
+ * `engine` (optional) — when present, the per-Hero filter also consults
+ * `engine.isCreatureSummonable(name, pi, hi, { _bypassBeforeSummon: true })`,
+ * so per-creature `canSummon` hooks like King Trex's relaxed-but-bypass-aware
+ * rule are honored (placement here skips `beforeSummon`, so we want strict
+ * mode — Trex can't land on a Gigantisaur-occupied Hero via the Bottle).
  */
-function getEligibleCreatures(gs, pi) {
+function getEligibleCreatures(gs, pi, engine = null) {
   const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/cards.json'), 'utf-8'));
   const cardDB = {};
   allCards.forEach(c => { cardDB[c.name] = c; });
@@ -77,10 +83,11 @@ function getEligibleCreatures(gs, pi) {
       // Check if ANY living hero with free zones can summon this
       let canSummon = false;
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (canHeroSummon(ps, hi, cd) && hasFreeZone(ps, hi)) {
-          canSummon = true;
-          break;
-        }
+        if (!canHeroSummon(ps, hi, cd)) continue;
+        if (!hasFreeZone(ps, hi)) continue;
+        if (engine && !engine.isCreatureSummonable(name, pi, hi, { _bypassBeforeSummon: true })) continue;
+        canSummon = true;
+        break;
       }
       if (!canSummon) continue;
       seen.add(name + ':' + source);
@@ -97,12 +104,12 @@ module.exports = {
   isPotion: true,
   deferBroadcast: true, // Broadcast after creature+zone selected, not before
 
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
     // Summon lock blocks all summoning
     if (ps?.summonLocked) return false;
     // Need eligible creatures
-    const { eligible } = getEligibleCreatures(gs, pi);
+    const { eligible } = getEligibleCreatures(gs, pi, engine);
     return eligible.length > 0;
   },
 
@@ -134,10 +141,11 @@ module.exports = {
           if (summonBlocked.includes(name)) continue;
           let canSummon = false;
           for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-            if (canHeroSummon(ps, hi, cd) && hasFreeZone(ps, hi)) {
-              canSummon = true;
-              break;
-            }
+            if (!canHeroSummon(ps, hi, cd)) continue;
+            if (!hasFreeZone(ps, hi)) continue;
+            if (!engine.isCreatureSummonable(name, pi, hi, { _bypassBeforeSummon: true })) continue;
+            canSummon = true;
+            break;
           }
           if (!canSummon) continue;
           seen.add(name + ':' + source);
@@ -169,6 +177,7 @@ module.exports = {
       const freeZones = [];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         if (!canHeroSummon(ps, hi, cd)) continue;
+        if (!engine.isCreatureSummonable(creatureName, pi, hi, { _bypassBeforeSummon: true })) continue;
         const hero = ps.heroes[hi];
         const supZones = ps.supportZones[hi] || [];
         for (let s = 0; s < 3; s++) {

@@ -134,7 +134,10 @@
       "Bash(wait)",
       "Bash(grep -n \"structuredClone\\\\|cloneDeep\\\\|hoptUsed\\\\s*:.*{...\\\\|JSON.parse\\(JSON.stringify\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\\\\_engine.js\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\\\\_cpu.js\")",
       "Bash(grep -lE \"ps\\\\.hand.*splice.*ps\\\\.mainDeck\\\\.push|discardPile.*splice.*mainDeck\\\\.push|actionRecycleCards|hand.*\\\\\\\\\\\\$.*deck\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\" -r)",
-      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\"; grep -E \"//.*\\(shuffle|recycle|return.*deck\\)\" {} | head -2')"
+      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\"; grep -E \"//.*\\(shuffle|recycle|return.*deck\\)\" {} | head -2')",
+      "Bash(xargs -I{} grep -l \"actionDealDamage\\\\|actionHealHero\\\\|ctx\\\\.dealDamage\\\\|ctx\\\\.healHero\" {})",
+      "Bash(Get-ChildItem *)",
+      "Bash(cd /tmp)"
     ]
   }
 }

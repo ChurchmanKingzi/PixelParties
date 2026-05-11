@@ -158,9 +158,15 @@ module.exports = {
 
       // Bypass summoning sickness for THIS instance only — the card text
       // explicitly grants "may activate its active effect this turn."
-      // turnPlayed = previous turn means the standard
-      // `inst.turnPlayed === gs.turn` HOPT gate evaluates false.
-      inst.turnPlayed = (gs.turn || 0) - 1;
+      // Mark the inst with the Haste flag rather than fake-aging
+      // `turnPlayed`. The engine's creature-effect summoning-sickness
+      // gates respect `counters._hasHaste`, while `turnPlayed` stays
+      // at the real summon turn so "was summoned this turn" reads
+      // (Alice the Puppeteer Girl, Hive's Crown, Singing's exclude-
+      // fresh filter, etc.) correctly recognize this Creature as a
+      // fresh summon.
+      if (!inst.counters) inst.counters = {};
+      inst.counters._hasHaste = true;
 
       engine._broadcastEvent('summon_effect', {
         owner: pi, heroIdx, zoneSlot: actualSlot, cardName: chosenName,

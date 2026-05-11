@@ -145,11 +145,17 @@ module.exports = {
       const cardDB = {};
       JSON.parse(allCards).forEach(c => { cardDB[c.name] = c; });
 
-      // Find all Lv <=1 Creatures in hand and deck
+      // Find all Lv <=1 Creatures in hand and deck. Per-Creature
+      // `canSummon` filter (`_bypassBeforeSummon: true`) is applied
+      // against THIS Hero (the placement is fixed to `heroIdx`) —
+      // placement skips `beforeSummon`, so cards like King Trex
+      // re-apply their strict per-Hero archetype rule.
+      const canPlaceOnHere = (name) =>
+        engine.isCreatureSummonable(name, pi, heroIdx, { _bypassBeforeSummon: true });
       const eligibleCards = [];
       for (const name of (ps.hand || [])) {
         const c = cardDB[name];
-        if (c && hasCardType(c, 'Creature') && (c.level || 0) <= 1) {
+        if (c && hasCardType(c, 'Creature') && (c.level || 0) <= 1 && canPlaceOnHere(name)) {
           if (!eligibleCards.some(e => e.name === name && e.source === 'hand')) {
             eligibleCards.push({ name, source: 'hand' });
           }
@@ -157,7 +163,7 @@ module.exports = {
       }
       for (const name of (ps.mainDeck || [])) {
         const c = cardDB[name];
-        if (c && hasCardType(c, 'Creature') && (c.level || 0) <= 1) {
+        if (c && hasCardType(c, 'Creature') && (c.level || 0) <= 1 && canPlaceOnHere(name)) {
           if (!eligibleCards.some(e => e.name === name && e.source === 'deck')) {
             eligibleCards.push({ name, source: 'deck' });
           }

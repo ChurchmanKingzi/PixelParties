@@ -2,10 +2,10 @@
 //  CARD EFFECTS: "Skeleton Bard"
 //  Creature (Summoning Magic Lv1, Skeletons) — 50 HP
 //
-//  You may once per turn choose another Creature you control with a
-//  once per turn effect. It may immediately use its once per turn
-//  effect an additional time. You can only activate this effect of
-//  "Skeleton Bard" once per turn.
+//  You may once per turn choose another "Skeleton" Creature you
+//  control with a once per turn effect. It may immediately use its
+//  once per turn effect an additional time. You can only activate
+//  this effect of "Skeleton Bard" once per turn.
 //
 //  "Additional time" is read literally — the chosen Creature's
 //  `onCreatureEffect` is invoked directly with a fresh ctx, which the
@@ -22,19 +22,22 @@
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
+const { isSkeletonCreature } = require('./_skeleton-shared');
 
 const CARD_NAME = 'Skeleton Bard';
 const HOPT_KEY = 'skeleton-bard';
 
 /**
- * Own creatures (excluding self) whose script defines a
+ * Own SKELETON creatures (excluding self) whose script defines a
  * creatureEffect AND whose own `canActivateCreatureEffect` gate
  * currently returns true. The latter check matters because Bard's
  * "use its once-per-turn effect again" only makes sense when the
  * target could legally fire it RIGHT NOW — e.g. Skeleton Priest
  * with no eligible Spells in discard, or a PACMAN reset target
  * whose Surprise Zone isn't empty, are both unactivatable and
- * therefore not valid encore targets.
+ * therefore not valid encore targets. The Skeleton-archetype filter
+ * uses `_skeleton-shared.isSkeletonCreature` which already handles
+ * the "treated as Skeleton" overrides (Skullmael's revives, etc.).
  */
 function eligibleTargets(engine, pi, selfId) {
   const out = [];
@@ -43,6 +46,7 @@ function eligibleTargets(engine, pi, selfId) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.id === selfId) continue;
     if (inst.faceDown) continue;
+    if (!isSkeletonCreature(inst.name, engine, inst)) continue;
     const effectName = inst.counters?._effectOverride || inst.name;
     const script = loadCardEffect(effectName);
     if (!script?.creatureEffect) continue;
@@ -100,7 +104,7 @@ module.exports = {
     }));
     const picked = await engine.promptEffectTarget(pi, targetEntries, {
       title: CARD_NAME,
-      description: 'Pick another Creature you control to fire its once-per-turn effect again.',
+      description: 'Pick another Skeleton Creature you control to fire its once-per-turn effect again.',
       confirmLabel: '🎵 Encore!',
       confirmClass: 'btn-success',
       cancellable: true,

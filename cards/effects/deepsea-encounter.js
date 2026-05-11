@@ -34,22 +34,28 @@ function _isCreatureTarget(t) {
 module.exports = {
   isPostTargetReaction: true,
 
-  postTargetCondition(gs, pi, engine, targetedHeroes, sourceCard) {
+  postTargetCondition(gs, pi, engine, targetedHeroes, sourceCard, opts) {
     if (!targetedHeroes?.length) return false;
 
     // Source must belong to the opponent.
     const srcOwner = sourceCard?.controller ?? sourceCard?.owner ?? -1;
     if (srcOwner === pi || srcOwner < 0) return false;
 
-    // Source type gate: Attack, Spell, or Creature effect (Creature effects
-    // come from Creature instances on the board).
+    // Source type gate: Attack, Spell, Creature effect, OR a Hero
+    // effect whose runtime damage tag matches one of those families
+    // (Alice the Puppeteer Girl's "treated as a Destruction Magic
+    // Spell", etc.).
     const cardDB = engine._getCardDB();
     const srcData = cardDB[sourceCard?.name];
     if (!srcData) return false;
     const isAttack = hasCardType(srcData, 'Attack');
     const isSpell = hasCardType(srcData, 'Spell');
     const isCreatureEffect = hasCardType(srcData, 'Creature') && sourceCard?.zone === 'support';
-    if (!isAttack && !isSpell && !isCreatureEffect) return false;
+    const dmgType = opts?.damageType;
+    const dmgTypeMatches = dmgType === 'attack'
+      || /_spell$/.test(dmgType || '')
+      || dmgType === 'creature_effect';
+    if (!isAttack && !isSpell && !isCreatureEffect && !dmgTypeMatches) return false;
 
     // At least one target must be a Creature in one of OUR Support Zones.
     const ownCreatureTargets = targetedHeroes.filter(t =>

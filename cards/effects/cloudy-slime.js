@@ -47,12 +47,18 @@ module.exports = {
       // Fizzle if no eligible creatures
       if (eligibleCards.length === 0) return;
 
-      // Find ALL free support zones across all own heroes
-      const getFreeZones = () => {
+      // Find ALL free support zones across all own heroes. When a
+      // candidate name is passed, the per-Hero filter consults the
+      // Creature's `canSummon` rule with `_bypassBeforeSummon: true`
+      // (placement skips `beforeSummon`, so cards like King Trex
+      // re-apply their strict per-Hero archetype rule).
+      const getFreeZones = (forCardName = null) => {
         const zones = [];
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
           const hero = ps.heroes[hi];
           if (!hero?.name || hero.hp <= 0) continue;
+          if (forCardName
+              && !engine.isCreatureSummonable(forCardName, pi, hi, { _bypassBeforeSummon: true })) continue;
           const supZones = ps.supportZones[hi] || [];
           for (let s = 0; s < 3; s++) { // Base zones only
             if ((supZones[s] || []).length === 0) {
@@ -63,7 +69,7 @@ module.exports = {
         return zones;
       };
 
-      // Fizzle if no free zones anywhere
+      // Fizzle if no free zones anywhere (sentinel — name-agnostic)
       if (getFreeZones().length === 0) return;
 
       // Step 1: Confirm
@@ -95,9 +101,10 @@ module.exports = {
         });
         if (!selected) return; // Escape = abort
 
-        // Step 3: Pick a zone
-        const freeZones = getFreeZones();
-        if (freeZones.length === 0) return;
+        // Step 3: Pick a zone — filter by the selected Creature's
+        // per-Hero `canSummon` rule.
+        const freeZones = getFreeZones(selected.cardName);
+        if (freeZones.length === 0) continue;
 
         const zone = await ctx.promptZonePick(freeZones, {
           title: 'Cloudy Slime',

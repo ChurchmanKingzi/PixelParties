@@ -107,8 +107,69 @@ function gigantisaursCanSummon(ctx) {
   return false;
 }
 
+/**
+ * Is this card name a Gigantisaur Creature (per cards.json)? Helper
+ * used by every archetype consumer that needs to filter cards by
+ * name (discard / hand / deck scans).
+ */
+function isGigantisaurCreature(cardName, engine) {
+  if (!cardName) return false;
+  const cd = engine._getCardDB()[cardName];
+  if (!cd) return false;
+  return cd.archetype === ARCHETYPE && hasCardType(cd, 'Creature');
+}
+
+/**
+ * Count UNIQUE Gigantisaur Creature names in a pile array
+ * (player.discardPile, player.hand, etc.). Returns `{ count, names }`
+ * — names is an alphabetical-sorted list of the distinct names found.
+ */
+function countDistinctGigantisaursInPile(pile, engine) {
+  const names = new Set();
+  for (const n of (pile || [])) {
+    if (isGigantisaurCreature(n, engine)) names.add(n);
+  }
+  return { count: names.size, names: [...names].sort() };
+}
+
+/**
+ * Count Gigantisaur Creature INSTANCES in the player's support zones.
+ * Returns the raw count of tracked support insts. Used by Raptoren's
+ * activatable draw and any future "draw per Gigantisaur" effect.
+ */
+function countGigantisaursInSupport(pi, engine) {
+  let n = 0;
+  for (const c of engine.cardInstances) {
+    if (c.zone !== 'support') continue;
+    if ((c.controller ?? c.owner) !== pi) continue;
+    if (isGigantisaurCreature(c.name, engine)) n++;
+  }
+  return n;
+}
+
+/**
+ * Find a Gigantisaur Creature instance you control (excluding an
+ * optional self-id). Used by sacrifice-tribute summoning paths
+ * (King Trex).
+ */
+function findOwnedGigantisaurs(pi, engine, opts = {}) {
+  const exclude = opts.excludeInstId;
+  const out = [];
+  for (const c of engine.cardInstances) {
+    if (c.zone !== 'support') continue;
+    if ((c.controller ?? c.owner) !== pi) continue;
+    if (exclude && c.id === exclude) continue;
+    if (isGigantisaurCreature(c.name, engine)) out.push(c);
+  }
+  return out;
+}
+
 module.exports = {
   ARCHETYPE,
   heroHasGigantisaur,
   gigantisaursCanSummon,
+  isGigantisaurCreature,
+  countDistinctGigantisaursInPile,
+  countGigantisaursInSupport,
+  findOwnedGigantisaurs,
 };

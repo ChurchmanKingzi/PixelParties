@@ -137,10 +137,15 @@ async function moveCreature(engine, pi, inst, destHeroIdx, destSlot) {
 
   engine.sync();
 
+  // `_isMove: true` so Slippery Creatures' on-move listeners fire
+  // (their per-Creature payoff distinguishes moves from initial
+  // summons via this flag). No `_onlyCard` filter — host-Hero
+  // reactors like Ingo / Maya / Pes'zet should still see the entry.
   await engine.runHooks('onCardEnterZone', {
-    _onlyCard: inst, enteringCard: inst,
+    enteringCard: inst,
     toZone: 'support', toHeroIdx: destHeroIdx,
     _skipReactionCheck: true,
+    _isMove: true,
   });
 
   return true;

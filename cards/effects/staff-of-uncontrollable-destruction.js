@@ -76,9 +76,15 @@ module.exports = {
     }
     const count = toDiscardNames.length;
 
-    for (const cardName of toDiscardNames) {
-      await engine.actionDiscardHandCard(pi, cardName, -1, { source: CARD_NAME });
-    }
+    // All hand-dump discards land in one forced-discard batch so on-
+    // discard reactors (Glass of Marbles, Skull Necklace, …) wait
+    // until every card has hit the pile before resolving — matches
+    // the engine-wide "discards first, reactors after" ordering.
+    await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
+      for (const cardName of toDiscardNames) {
+        await engine.actionDiscardHandCard(pi, cardName, -1, { source: CARD_NAME });
+      }
+    });
 
     const drawCount = count + 1;
     if (drawCount > 0) {

@@ -55,7 +55,14 @@ function levelCapForHost(engine, ps, heroIdx) {
 /** Enumerate every (hero, free-slot) pair the player could host the
  *  Creature on — one entry per individual slot, mirroring standard
  *  summon-target highlighting (the player picks ANY free Support Zone
- *  of ANY eligible Hero, not just the leftmost slot per Hero). */
+ *  of ANY eligible Hero, not just the leftmost slot per Hero).
+ *
+ *  The per-Hero `canSummon` check runs with `_bypassBeforeSummon:
+ *  true` because Ka summons via direct splice + _trackCard — never
+ *  calling `summonCreatureWithHooks`, so the chosen Creature's
+ *  `beforeSummon` won't fire. Cards whose summonability depends on a
+ *  beforeSummon-paid cost (King Trex's auto-sacrifice path) read
+ *  the flag and apply their strict per-Hero rule. */
 function eligibleHostSlots(engine, pi, creatureCardData) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
@@ -65,6 +72,7 @@ function eligibleHostSlots(engine, pi, creatureCardData) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned) continue;
     if (!engine.heroMeetsLevelReq(pi, hi, creatureCardData)) continue;
+    if (!engine.isCreatureSummonable(creatureCardData.name, pi, hi, { _bypassBeforeSummon: true })) continue;
     const zones = ps.supportZones?.[hi] || [[], [], []];
     for (let z = 0; z < 3; z++) {
       if ((zones[z] || []).length === 0) {
@@ -118,7 +126,12 @@ module.exports = {
         const cd = cardDB[name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
         if ((cd.level || 0) > levelCap) continue;
-        if (!engine.isCreatureSummonable(name, pi)) continue;
+        // `_bypassBeforeSummon: true` — Ka summons via direct splice
+        // + _trackCard, not summonCreatureWithHooks, so beforeSummon
+        // never runs. Cards whose canSummon depends on a cost paid in
+        // beforeSummon (King Trex's auto-sacrifice path) apply the
+        // STRICT rule here and refuse Gigantisaur-occupied Heroes.
+        if (!engine.isCreatureSummonable(name, pi, -1, { _bypassBeforeSummon: true })) continue;
         if (eligibleHostSlots(engine, pi, cd).length === 0) continue;
         seen.add(name);
         gallery.push({ name, source: 'deck', count });

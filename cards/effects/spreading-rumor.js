@@ -133,16 +133,23 @@ module.exports = {
       }
       const declared = result.cardName;
 
-      let discarded = 0;
-      while (true) {
-        const idx = (ops.hand || []).indexOf(declared);
-        if (idx < 0) break;
-        const ok = await engine.actionDiscardHandCard(oi, declared, idx, {
-          source: CARD_NAME,
-        });
-        if (!ok) break;
-        discarded++;
-      }
+      // Dump every copy of the declared name in one forced-discard
+      // batch — multi-copy reveals (Glass of Marbles, Skull Necklace,
+      // etc.) all resolve their on-discard reactors AFTER every copy
+      // has hit the pile, matching the engine-wide ordering.
+      const discarded = await engine.withDiscardBatch(oi, { source: CARD_NAME }, async () => {
+        let n = 0;
+        while (true) {
+          const idx = (ops.hand || []).indexOf(declared);
+          if (idx < 0) break;
+          const ok = await engine.actionDiscardHandCard(oi, declared, idx, {
+            source: CARD_NAME,
+          });
+          if (!ok) break;
+          n++;
+        }
+        return n;
+      });
 
       engine.log('rumor_resolved', {
         player: ps.username, opponent: ops.username,

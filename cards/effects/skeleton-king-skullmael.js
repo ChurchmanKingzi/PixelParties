@@ -89,11 +89,16 @@ module.exports = {
       if (!isSkeletonCreature(entering.name, engine)) return;
 
       // Lift summoning sickness so the Skeleton can fire its active
-      // creature effect this turn. Same trick Vacarn uses through
-      // necromancy.js — rewind turnPlayed by one so the engine's
-      // HOPT gate stops reading the creature as fresh.
+      // creature effect this turn. Mark with the Haste flag rather
+      // than rewinding `turnPlayed` — engine-side summoning-sickness
+      // gates respect `counters._hasHaste`, while `turnPlayed` stays
+      // at the real summon turn so genuine "was summoned this turn"
+      // reads (Alice the Puppeteer Girl, Hive's Crown, Singing's
+      // exclude-fresh filter, …) still see the creature as a fresh
+      // summon.
       if (entering.turnPlayed === (engine.gs.turn || 0)) {
-        entering.turnPlayed = (engine.gs.turn || 0) - 1;
+        if (!entering.counters) entering.counters = {};
+        entering.counters._hasHaste = true;
       }
 
       // Strip Necromancy's standard negation if it was just applied.

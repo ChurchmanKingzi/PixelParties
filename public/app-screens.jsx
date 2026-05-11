@@ -181,6 +181,14 @@ function MainMenu() {
       const success = result.isPuzzle && result.puzzleResult === 'success';
       if (success && result.scAwarded > 0) {
         setScFloat({ amount: result.scAwarded, id: Date.now() });
+        // Optimistically refresh the local SC counter — the server
+        // already incremented `users.sc` in the DB during
+        // `puzzleEndGame`, but `setUser` isn't called there and
+        // there's no auth refresh until the next `/auth/me` poll.
+        // Without this update the menu's SC display lags (still
+        // shows the pre-puzzle balance) until the user navigates
+        // away and back or reloads.
+        setUser(u => u ? { ...u, sc: (u.sc || 0) + result.scAwarded } : u);
         notify(`🧩 Puzzle cleared! +${result.scAwarded} SC`, 'success');
       } else if (success) {
         notify('🧩 Puzzle cleared!', 'success');
@@ -188,7 +196,7 @@ function MainMenu() {
         notify('Puzzle not cleared — try again!', 'info');
       }
     }
-  }, [puzzleAttemptState, notify]);
+  }, [puzzleAttemptState, notify, setUser]);
 
   // ── Tutorial system ──
   useEffect(() => {

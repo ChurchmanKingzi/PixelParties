@@ -34,13 +34,19 @@ module.exports = {
       const cardDB = {};
       JSON.parse(allCards).forEach(c => { cardDB[c.name] = c; });
 
-      // Find lv 0 Creatures in discard pile
+      // Find lv 0 Creatures in discard pile. Per-Creature `canSummon`
+      // filter (`_bypassBeforeSummon: true`) is applied against THIS
+      // Hero (the placement is fixed to `heroIdx`) — placement skips
+      // `beforeSummon`, so cards like King Trex re-apply their strict
+      // per-Hero archetype rule.
+      const canPlaceOnHere = (name) =>
+        engine.isCreatureSummonable(name, pi, heroIdx, { _bypassBeforeSummon: true });
       const eligibleCards = [];
       const seen = new Set();
       for (const name of (ps.discardPile || [])) {
         if (seen.has(name)) continue;
         const c = cardDB[name];
-        if (c && hasCardType(c, 'Creature') && (c.level || 0) === 0) {
+        if (c && hasCardType(c, 'Creature') && (c.level || 0) === 0 && canPlaceOnHere(name)) {
           seen.add(name);
           eligibleCards.push({ name, source: 'discard' });
         }
@@ -75,13 +81,13 @@ module.exports = {
 
       // Step 2 + 3: Pick creature → pick zone (with back navigation)
       while (true) {
-        // Recompute eligible cards
+        // Recompute eligible cards (re-check canSummon each loop too)
         const currentEligible = [];
         const currentSeen = new Set();
         for (const name of (ps.discardPile || [])) {
           if (currentSeen.has(name)) continue;
           const c = cardDB[name];
-          if (c && hasCardType(c, 'Creature') && (c.level || 0) === 0) {
+          if (c && hasCardType(c, 'Creature') && (c.level || 0) === 0 && canPlaceOnHere(name)) {
             currentSeen.add(name);
             currentEligible.push({ name, source: 'discard' });
           }

@@ -133,6 +133,37 @@ module.exports = {
       }
     }
 
+    // Fire `afterSpellResolved` so passive on-spell-cast listeners
+    // (Beato's orb collector, Reiza's post-cast stun, Andras/Bartas/
+    // Grisgar's re-cast attempts, Luck, etc.) treat this Hero
+    // effect as the Destruction Magic Spell the card text says it
+    // is. The synthetic `spellCardData` shape is a Lv0 Destruction
+    // Magic Spell so school-gated listeners pass; second-cast
+    // listeners that re-load the script via `loadCardEffect(spellName)`
+    // get Alice's Hero script (no `hooks.onPlay`) and bail out
+    // gracefully — no risk of recursion.
+    const damageTargets = [target];
+    try {
+      await engine.runHooks('afterSpellResolved', {
+        spellName: 'Alice, the Puppeteer Girl',
+        spellCardData: {
+          name: 'Alice, the Puppeteer Girl',
+          cardType: 'Spell',
+          subtype: 'Normal',
+          spellSchool1: 'Destruction Magic',
+          level: 0,
+        },
+        heroIdx,
+        casterIdx: pi,
+        damageTargets,
+        isSecondCast: false,
+        _isHeroEffectSpell: true,
+        _skipReactionCheck: true,
+      });
+    } catch (err) {
+      console.error('[Alice] afterSpellResolved fire failed:', err.message);
+    }
+
     engine.sync();
     await engine._delay(800); // Let beam + explosion finish
     return true;

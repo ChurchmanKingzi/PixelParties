@@ -116,6 +116,14 @@ module.exports = {
     const ps = ctx.players[pi];
     if (!ps) return false;
 
+    // Wrap the entire activation in a single discard batch so the
+    // tutor cost + optional rider-summon cost count as ONE multi-
+    // card discard event for listeners (Cute Bunny etc.) — even
+    // though they fire across two prompts. The wrapper's
+    // `onForcedDiscardBatchEnd` fires when this function returns,
+    // with the aggregate count (1 if rider declined, 2 if accepted).
+    return await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
+
     // ── Step 1: pay the tutor discard ──
     const handBefore = ps.hand.length;
     await engine.actionPromptForceDiscard(pi, 1, {
@@ -311,5 +319,6 @@ module.exports = {
     });
     engine.sync();
     return true;
+    }); // end withDiscardBatch
   },
 };

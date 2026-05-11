@@ -2563,7 +2563,14 @@ body {
   display: flex;
   flex: 1;
   justify-content: center;
-  overflow: hidden;
+  /* Allow vertical overflow so highlight outlines / glow / lift
+     transforms (Saint Nicolas escrow glow, hand-pick-selected lift,
+     urgent pick pulse, etc.) can extend above the container without
+     getting clipped at its top edge. Horizontal compression is
+     already handled by the per-slot `flex-shrink: 1` + `min-width`
+     below, so the previous `overflow: hidden` blanket clip was
+     overzealous — it cut off legitimate visual feedback. */
+  overflow: visible;
   padding: 2px 0;
   margin-left: calc(180px * var(--board-scale)); /* Match right margin for symmetric centering */
   margin-right: calc(180px * var(--board-scale)); /* Reserve space for gold display + sort/shuffle buttons */
@@ -2892,6 +2899,38 @@ body {
   border: 2px dashed rgba(255, 215, 70, .85);
   border-radius: 4px;
   pointer-events: none;
+}
+
+/* Permanently revealed hand card — opp-side cards mechanically
+   revealed by the rules (Treacherous Crystal in hand, Crystal-Well
+   transfers routed through revealOnEnterHand, Bamboo Shield, etc.).
+   In normal play the face-up vs face-down contrast already signals
+   "revealed", but puzzle mode flattens that by exposing every slot —
+   this golden glow is the surviving distinguisher. Server tags
+   eligible slots with `permanent: true` on the revealedHandCards
+   entry; the client paints this class on top of `revealed-hand-card`. */
+.board-card.hand-card.hand-card-perma-revealed {
+  box-shadow: 0 0 10px rgba(255, 215, 70, .8), 0 0 18px rgba(255, 180, 30, .4);
+  border: 2px solid rgba(255, 215, 70, .9);
+  border-radius: 6px;
+}
+
+/* Treacherous Crystal click affordance — paints the Crystal as
+   clickable while it's the active player's turn AND at least one
+   opp Creature is still stealable (un-stolen + not Cardinal-immune).
+   Pink-magenta pulse matches the cross-side charmed/control visual
+   (charmed hero outline, spellHeroPick panel border). Click emits
+   `trigger_treacherous_crystal` server-side, which flips `stolenBy`
+   on every eligible opp Creature for the rest of this turn. The
+   pulse fades after the trigger since no further opp Creatures are
+   stealable, giving a natural "click used" cue. */
+.board-card.hand-card.hand-card-treacherous-click {
+  cursor: pointer;
+  animation: treacherousCrystalPulse 1.4s ease-in-out infinite;
+}
+@keyframes treacherousCrystalPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(255, 105, 180, .60), 0 0 20px rgba(255, 60, 140, .30); }
+  50%      { box-shadow: 0 0 18px rgba(255, 105, 180, .95), 0 0 34px rgba(255, 60, 140, .60); }
 }
 
 
@@ -5051,6 +5090,80 @@ body {
   transform: translateY(-6px);
   transition: transform .15s, filter .15s;
 }
+
+/* Urgent pick variant — Saint Nicolas's mandatory Potion-give pick
+   demands more attention than the standard purple-dashed eligible
+   outline. Solid teal-green border + pulsing glow + slight upward
+   lift so the eligible Potions stand out from the rest of the hand.
+   Composes ON TOP of `.hand-pick-eligible` (both classes are on the
+   same slot), so this rule's box-shadow + animation win on cascade. */
+.hand-pick-eligible-urgent {
+  outline: 3px solid rgba(80, 220, 130, .95) !important;
+  outline-offset: 2px;
+  cursor: pointer !important;
+  animation: stNicolasPickPulse 1.05s ease-in-out infinite;
+}
+.hand-pick-eligible-urgent .board-card {
+  box-shadow: 0 0 14px rgba(80,220,130,.85), 0 0 26px rgba(40,180,90,.55) !important;
+  transform: translateY(-4px);
+  transition: transform .15s;
+}
+@keyframes stNicolasPickPulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(80,220,130,.55), 0 0 20px rgba(40,180,90,.30);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(120,255,170,.95), 0 0 40px rgba(60,220,120,.65);
+  }
+}
+
+/* Saint Nicolas escrow marker — paints the marked Potion (between
+   pay and commit/refund) with a steady golden glow so the player
+   sees which Potion is locked in to leave when the action resolves.
+   Different palette from the urgent-pick pulse above (which is
+   short-lived during the prompt) — escrow is the "committed,
+   waiting" state, so the visual is calm but unmistakable. */
+.hand-card-st-nicolas-escrowed {
+  outline: 3px solid rgba(255, 200, 80, .95);
+  outline-offset: 2px;
+}
+.hand-card-st-nicolas-escrowed .board-card {
+  box-shadow: 0 0 12px rgba(255,200,80,.75), 0 0 22px rgba(220,160,40,.45) !important;
+  filter: brightness(1.05);
+}
+
+/* Spectral Armor — teal hue overlay applied to the protected target
+   for the duration of the halved-damage hit (~700ms). The animation
+   component (see `spectral_armor` in app-board.jsx) walks
+   `[data-hero-zone],[data-support-zone]` for the closest match to the
+   damage origin, adds this class on mount, removes on cleanup. The
+   colored drop-shadow gives a ghostly "armored" outline; the hue +
+   saturation shift on the children paints the card itself teal
+   without losing readability. !important pierces inline filter
+   styles the renderer sets on the card image. */
+[data-hero-zone].spectral-armor-teal,
+[data-support-zone].spectral-armor-teal {
+  animation: spectralArmorTint 700ms ease-out forwards;
+}
+[data-hero-zone].spectral-armor-teal > *,
+[data-support-zone].spectral-armor-teal > * {
+  animation: spectralArmorTintChild 700ms ease-out forwards !important;
+}
+@keyframes spectralArmorTint {
+  0%   { filter: none; }
+  15%, 75% {
+    filter: drop-shadow(0 0 14px rgba(110, 240, 240, .9))
+            drop-shadow(0 0 28px rgba(60, 200, 210, .55));
+  }
+  100% { filter: none; }
+}
+@keyframes spectralArmorTintChild {
+  0%   { filter: none; }
+  15%, 75% {
+    filter: hue-rotate(155deg) saturate(1.4) brightness(1.05);
+  }
+  100% { filter: none; }
+}
 .blind-pick-active {
   overflow: visible !important;
 }
@@ -5353,6 +5466,410 @@ body:has(.game-hand-me) .board-tooltip {
   55%  { transform: scaleY(1.1)  scaleX(.94); }
   75%  { transform: scaleY(.96)  scaleX(1.02); }
   100% { transform: scaleY(1)    scaleX(1); }
+}
+
+/* ===== GIGANTISAUR STOMP ANIMATION ===== */
+
+/* Giant scaly dinosaur leg — drops from the top of the screen,
+   slams into the target, retracts upward. Wider/taller than the
+   magic hammer and travels MUCH further so it really reads as
+   "from off-screen." */
+.anim-dino-leg {
+  position: absolute;
+  border-radius: 22px 22px 14px 14px;
+  background: linear-gradient(180deg,
+    #3a5a25 0%, #2f4e1d 12%, #345a22 28%,
+    #2a4a18 48%, #1f3a10 68%, #18300a 88%, #102506 100%);
+  background-image:
+    linear-gradient(180deg,
+      #3a5a25 0%, #2f4e1d 12%, #345a22 28%,
+      #2a4a18 48%, #1f3a10 68%, #18300a 88%, #102506 100%),
+    repeating-linear-gradient(45deg,
+      rgba(255,255,255,.04) 0 4px, transparent 4px 14px),
+    repeating-linear-gradient(-45deg,
+      rgba(0,0,0,.18) 0 5px, transparent 5px 18px);
+  background-blend-mode: normal, overlay, multiply;
+  box-shadow:
+    inset 8px 0 14px rgba(0,0,0,.55),
+    inset -8px 0 14px rgba(0,0,0,.55),
+    inset 0 6px 0 rgba(255,255,255,.18),
+    inset 0 -8px 18px rgba(0,0,0,.6),
+    0 14px 50px rgba(0,0,0,.85);
+  border: 2px solid #0a1a04;
+  animation: dinoStompDrop 1.35s cubic-bezier(.18,0,.72,.45) forwards;
+  opacity: 0;
+}
+
+/* Three triangular claws hanging off the bottom edge of the leg */
+.anim-dino-leg::after {
+  content: '';
+  position: absolute;
+  left: -8%;
+  bottom: -18px;
+  width: 116%;
+  height: 28px;
+  background:
+    linear-gradient(135deg, transparent 47%, #18300a 47% 53%, transparent 53%) 0 0/40% 100% no-repeat,
+    linear-gradient(135deg, transparent 47%, #18300a 47% 53%, transparent 53%) 30% 0/40% 100% no-repeat,
+    linear-gradient(135deg, transparent 47%, #18300a 47% 53%, transparent 53%) 60% 0/40% 100% no-repeat;
+  clip-path: polygon(
+    0   0,   10% 0,   12% 100%,
+    20% 0,   30% 0,   32% 100%,
+    40% 0,   50% 0,   52% 100%,
+    60% 0,   70% 0,   72% 100%,
+    80% 0,   90% 0,   92% 100%,
+    100% 0,  100% 0,  100% 0
+  );
+}
+
+/* Highlight stripe down the front of the leg for some shape */
+.anim-dino-leg::before {
+  content: '';
+  position: absolute;
+  left: 18%; top: 8%;
+  width: 18%; height: 80%;
+  background: linear-gradient(180deg,
+    rgba(160,210,120,.32) 0%,
+    rgba(120,170,80,.18) 60%,
+    transparent 100%);
+  border-radius: 50%;
+  filter: blur(4px);
+}
+
+@keyframes dinoStompDrop {
+  0%   { transform: translateY(-820px) scaleY(1); opacity: 0; }
+  4%   { opacity: 1; }
+  38%  { transform: translateY(0) scaleY(1); }
+  42%  { transform: translateY(6px) scaleY(.72) scaleX(1.18); }
+  50%  { transform: translateY(0) scaleY(1); }
+  62%  { transform: translateY(-4px) scaleY(1.02) scaleX(.99); }
+  72%  { transform: translateY(0) scaleY(1); }
+  100% { transform: translateY(-780px) scaleY(1); opacity: 0; }
+}
+
+/* Impact shockwave — wide brown dust ring blasting outward */
+.anim-dino-impact {
+  position: absolute;
+  width: 220px;
+  height: 90px;
+  left: -110px;
+  top: -45px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse,
+    rgba(190,150,90,.85) 0%,
+    rgba(140,100,55,.55) 30%,
+    rgba(90,60,30,.25) 55%,
+    transparent 75%);
+  animation: dinoImpactRing .7s ease-out .38s forwards;
+  opacity: 0;
+}
+
+@keyframes dinoImpactRing {
+  0%   { transform: scale(.25, .35); opacity: 1; }
+  35%  { transform: scale(1.6, 1.1); opacity: .9; }
+  100% { transform: scale(2.6, 1.6); opacity: 0; }
+}
+
+/* A dimmer secondary flash that lingers for an extra beat */
+.anim-dino-impact-flash {
+  position: absolute;
+  width: 180px;
+  height: 70px;
+  left: -90px;
+  top: -35px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse,
+    rgba(255,250,200,.7) 0%, rgba(255,225,150,.35) 40%, transparent 70%);
+  animation: dinoImpactFlash .5s ease-out .36s forwards;
+  opacity: 0;
+}
+
+@keyframes dinoImpactFlash {
+  0%   { transform: scale(.3, .4); opacity: 1; }
+  35%  { transform: scale(1.5, 1); opacity: .9; }
+  100% { transform: scale(2.2, 1.4); opacity: 0; }
+}
+
+/* Squash class — applied to the actual target DOM element. Faster
+   and uglier than magic-hammer's: target gets crushed nearly flat
+   and lingers there a beat longer before springing back. */
+.giant-dino-stomp-squashed {
+  animation: dinoStompSquash .85s cubic-bezier(.2,.7,.3,1) forwards !important;
+  transform-origin: center bottom !important;
+}
+
+@keyframes dinoStompSquash {
+  0%   { transform: scaleY(1)    scaleX(1); }
+  10%  { transform: scaleY(.08)  scaleX(1.4); }
+  38%  { transform: scaleY(.08)  scaleX(1.4); }
+  56%  { transform: scaleY(1.15) scaleX(.92); }
+  72%  { transform: scaleY(.95)  scaleX(1.03); }
+  100% { transform: scaleY(1)    scaleX(1); }
+}
+
+/* ── Wooly Mammoth Stomp (Slippery Whoolmoth) ─────────────────
+   Brown fur palette + thicker silhouette than the dino leg.
+   Uses the SAME `dinoStompDrop` keyframes for fall/squash/retreat
+   timing so the impact lines up with the shared
+   `anim-dino-impact` shockwave + `giant-dino-stomp-squashed`
+   target squash. Only the leg surface, claws, and front
+   highlight are different — everything else is shared. */
+.anim-mammoth-leg {
+  position: absolute;
+  border-radius: 28px 28px 16px 16px;
+  background: linear-gradient(180deg,
+    #6b4a2a 0%, #5a3a20 14%, #6e4828 28%,
+    #4e3318 50%, #3a2412 72%, #2a1808 92%, #1a1004 100%);
+  /* Layered shaggy-fur stripes — diagonal short hairs in two
+     directions create the matted-fur look without an asset. */
+  background-image:
+    linear-gradient(180deg,
+      #6b4a2a 0%, #5a3a20 14%, #6e4828 28%,
+      #4e3318 50%, #3a2412 72%, #2a1808 92%, #1a1004 100%),
+    repeating-linear-gradient(110deg,
+      rgba(255,235,200,.10) 0 2px, transparent 2px 6px,
+      rgba(0,0,0,.22) 6px 8px, transparent 8px 13px),
+    repeating-linear-gradient(70deg,
+      rgba(0,0,0,.18) 0 3px, transparent 3px 9px);
+  background-blend-mode: normal, overlay, multiply;
+  box-shadow:
+    inset 9px 0 16px rgba(0,0,0,.6),
+    inset -9px 0 16px rgba(0,0,0,.6),
+    inset 0 6px 0 rgba(255,220,170,.18),
+    inset 0 -10px 22px rgba(0,0,0,.65),
+    0 14px 50px rgba(0,0,0,.85);
+  border: 2px solid #0a0604;
+  animation: dinoStompDrop 1.35s cubic-bezier(.18,0,.72,.45) forwards;
+  opacity: 0;
+}
+/* Three blunt toenails along the bottom — wider/rounder than the
+   dino's three sharp claws (mammoths don't have hooked talons). */
+.anim-mammoth-leg::after {
+  content: '';
+  position: absolute;
+  left: -4%;
+  bottom: -12px;
+  width: 108%;
+  height: 22px;
+  background:
+    radial-gradient(ellipse at 50% 0%, #2a1808 0% 38%, transparent 40%) 0% 0% / 34% 100% no-repeat,
+    radial-gradient(ellipse at 50% 0%, #2a1808 0% 38%, transparent 40%) 50% 0% / 34% 100% no-repeat,
+    radial-gradient(ellipse at 50% 0%, #2a1808 0% 38%, transparent 40%) 100% 0% / 34% 100% no-repeat;
+}
+/* Shaggy fur tufts hanging off the leg sides — a fringe of darker
+   strands giving the silhouette a rough edge. */
+.anim-mammoth-leg::before {
+  content: '';
+  position: absolute;
+  left: -10%; top: 0;
+  width: 120%; height: 100%;
+  background:
+    linear-gradient(90deg,
+      transparent 0%,
+      rgba(60,38,20,.55) 6%,
+      transparent 12%,
+      transparent 88%,
+      rgba(60,38,20,.55) 94%,
+      transparent 100%);
+  pointer-events: none;
+  filter: blur(.5px);
+}
+
+/* ── Slippery Spikeblock — Ice Block Crash ────────────────────
+   A jagged ice block flies in from off-screen left, slows on
+   impact (~38% of the keyframe), and shatters at ~50% with a
+   frosty shockwave + cold flash. Distinct from `freeze` (snowball
+   burst at the target) and from the overhead frost drops Blade /
+   Cold Coffin use. */
+.anim-ice-block {
+  position: absolute;
+  /* Anchor the block AT the target — translate from far-left to 0. */
+  left: -90px; top: -54px;
+  width: 90px; height: 90px;
+  background:
+    linear-gradient(135deg,
+      rgba(245,252,255,.95) 0%, rgba(190,220,238,.95) 30%,
+      rgba(140,180,210,.95) 60%, rgba(90,140,180,.95) 100%),
+    repeating-linear-gradient(45deg,
+      rgba(255,255,255,.18) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(-45deg,
+      rgba(120,170,200,.22) 0 3px, transparent 3px 10px);
+  background-blend-mode: normal, overlay, multiply;
+  /* Jagged ice silhouette — rough crystalline polygon shape. */
+  clip-path: polygon(
+    8% 18%, 22% 4%, 44% 12%, 62% 0%, 78% 8%, 94% 20%,
+    100% 40%, 92% 58%, 100% 78%, 84% 92%, 64% 100%,
+    44% 92%, 22% 100%, 6% 84%, 0% 60%, 4% 38%
+  );
+  border: 1px solid rgba(60,110,150,.6);
+  box-shadow:
+    inset 6px 6px 10px rgba(255,255,255,.55),
+    inset -8px -8px 14px rgba(40,80,120,.55),
+    0 6px 18px rgba(80,140,180,.55);
+  animation: iceBlockFly 700ms cubic-bezier(.4,.1,.6,.7) forwards;
+  opacity: 0;
+}
+@keyframes iceBlockFly {
+  0%   { transform: translate(-560px, -20px) rotate(-25deg) scale(1); opacity: 0; }
+  10%  { opacity: 1; }
+  38%  { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  44%  { transform: translate(8px, 4px) rotate(6deg) scale(1.12); opacity: 1; }
+  60%  { transform: translate(4px, 2px) rotate(0deg) scale(.7); opacity: .55; }
+  100% { transform: translate(0, 0) rotate(0deg) scale(.2); opacity: 0; }
+}
+
+/* Frosty shockwave ring on impact — pale blue-white instead of the
+   dino-stomp brown. */
+.anim-ice-block-impact {
+  position: absolute;
+  width: 220px;
+  height: 90px;
+  left: -110px;
+  top: -45px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse,
+    rgba(220,240,255,.9) 0%,
+    rgba(140,200,240,.55) 30%,
+    rgba(80,150,200,.25) 55%,
+    transparent 75%);
+  animation: iceBlockImpactRing .7s ease-out .40s forwards;
+  opacity: 0;
+}
+@keyframes iceBlockImpactRing {
+  0%   { transform: scale(.25, .35); opacity: 1; }
+  35%  { transform: scale(1.6, 1.15); opacity: .9; }
+  100% { transform: scale(2.6, 1.6); opacity: 0; }
+}
+
+/* Cool-tinted secondary flash. */
+.anim-ice-block-flash {
+  position: absolute;
+  width: 170px;
+  height: 70px;
+  left: -85px;
+  top: -35px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse,
+    rgba(240,250,255,.85) 0%, rgba(170,220,250,.4) 40%, transparent 70%);
+  animation: iceBlockFlash .55s ease-out .38s forwards;
+  opacity: 0;
+}
+@keyframes iceBlockFlash {
+  0%   { transform: scale(.3, .4); opacity: 1; }
+  35%  { transform: scale(1.55, 1.1); opacity: .9; }
+  100% { transform: scale(2.3, 1.55); opacity: 0; }
+}
+
+/* ── Gigantisaur Ankylos Tail Smash ───────────────────────────
+   Pivots from the LEFT edge of the assembly (club end) so the
+   club lands on the target while the tail trails offscreen-right.
+   See `ankylo_tail_smash` in app-board.jsx for the JSX side. */
+.anim-ankylo-tail-pivot {
+  animation: ankyloTailSwing 1.3s cubic-bezier(.18,0,.62,.45) forwards;
+  opacity: 0;
+}
+
+.anim-ankylo-tail {
+  background:
+    linear-gradient(180deg,
+      #3a5a25 0%, #2f4e1d 15%, #345a22 30%,
+      #2a4a18 50%, #1f3a10 70%, #18300a 90%, #102506 100%),
+    repeating-linear-gradient(90deg,
+      rgba(0,0,0,.22) 0 8px, transparent 8px 26px);
+  background-blend-mode: normal, multiply;
+  border-radius: 24px 14px 14px 24px;
+  border: 2px solid #0a1a04;
+  box-shadow:
+    inset 0 4px 0 rgba(255,255,255,.18),
+    inset 0 -6px 16px rgba(0,0,0,.55),
+    0 6px 22px rgba(0,0,0,.55);
+}
+
+.anim-ankylo-club {
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 35%,
+    #6c8a48 0%, #4a6a28 28%, #2f4e1d 58%, #18300a 86%, #0a1a04 100%);
+  border: 3px solid #0a1a04;
+  box-shadow:
+    inset -8px -6px 14px rgba(0,0,0,.55),
+    inset 6px 4px 10px rgba(255,255,255,.18),
+    0 8px 28px rgba(0,0,0,.85);
+}
+
+/* Bone-spike protrusions jutting from the club. ::before is the
+   leading edge (faces the target), ::after the trailing edge. */
+.anim-ankylo-club::before {
+  content: '';
+  position: absolute;
+  left: -22%;
+  top: 38%;
+  width: 42%;
+  height: 24%;
+  clip-path: polygon(100% 0, 100% 100%, 0 50%);
+  background: linear-gradient(90deg, #e4d8b0 0%, #b8a880 60%, #8c7a50 100%);
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.55));
+}
+.anim-ankylo-club::after {
+  content: '';
+  position: absolute;
+  right: -22%;
+  top: 38%;
+  width: 42%;
+  height: 24%;
+  clip-path: polygon(0 0, 0 100%, 100% 50%);
+  background: linear-gradient(90deg, #8c7a50 0%, #b8a880 40%, #e4d8b0 100%);
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.55));
+}
+
+@keyframes ankyloTailSwing {
+  0%   { opacity: 0; transform: translate(180px, -540px) rotate(-78deg); }
+  6%   { opacity: 1; }
+  22%  { transform: translate(140px, -260px) rotate(-50deg); }
+  34%  { transform: translate(54px,  -64px) rotate(-18deg); }
+  40%  { transform: translate(0,       0)   rotate(0deg); }
+  44%  { transform: translate(-4px,    6px) rotate(2deg); }
+  52%  { transform: translate(0,       0)   rotate(0deg); }
+  68%  { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate(220px, -540px) rotate(-90deg); }
+}
+
+.anim-ankylo-impact {
+  position: absolute;
+  width: 240px;
+  height: 100px;
+  left: -120px;
+  top: -50px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse,
+    rgba(200,160,90,.85) 0%,
+    rgba(150,110,55,.55) 30%,
+    rgba(90,60,30,.25) 55%,
+    transparent 75%);
+  animation: ankyloImpactRing .75s ease-out .40s forwards;
+  opacity: 0;
+}
+@keyframes ankyloImpactRing {
+  0%   { transform: scale(.25, .35); opacity: 1; }
+  35%  { transform: scale(1.7, 1.2); opacity: .9; }
+  100% { transform: scale(2.8, 1.7); opacity: 0; }
+}
+
+.anim-ankylo-impact-flash {
+  position: absolute;
+  width: 200px;
+  height: 80px;
+  left: -100px;
+  top: -40px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse,
+    rgba(255,245,200,.75) 0%, rgba(255,220,140,.35) 40%, transparent 70%);
+  animation: ankyloImpactFlash .55s ease-out .38s forwards;
+  opacity: 0;
+}
+@keyframes ankyloImpactFlash {
+  0%   { transform: scale(.3, .4); opacity: 1; }
+  35%  { transform: scale(1.6, 1.1); opacity: .9; }
+  100% { transform: scale(2.3, 1.5); opacity: 0; }
 }
 
 .stranglehold-squeezed {
@@ -5891,6 +6408,59 @@ body:has(.game-hand-me) .board-tooltip {
 @keyframes skatesDestPulse {
   0%, 100% { box-shadow: 0 0 8px 2px rgba(0,255,100,.4); }
   50%      { box-shadow: 0 0 14px 4px rgba(0,255,100,.7); }
+}
+
+/* ── Slippery Start-Phase sub-mode highlighting ── */
+.zone-slippery-creature {
+  box-shadow: 0 0 8px 2px rgba(127,208,255,.55) !important;
+  animation: slipperyCreaturePulse 1.3s ease-in-out infinite;
+}
+.zone-slippery-selected {
+  box-shadow: 0 0 14px 5px rgba(170,235,255,.85) !important;
+  outline: 2px solid rgba(220,250,255,.9);
+}
+.zone-slippery-dest {
+  box-shadow: 0 0 10px 3px rgba(140,255,220,.55) !important;
+  animation: slipperyDestPulse 1.05s ease-in-out infinite;
+}
+@keyframes slipperyCreaturePulse {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(127,208,255,.45); }
+  50%      { box-shadow: 0 0 16px 5px rgba(127,208,255,.8); }
+}
+@keyframes slipperyDestPulse {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(140,255,220,.45); }
+  50%      { box-shadow: 0 0 16px 5px rgba(140,255,220,.8); }
+}
+
+/* ── Slippery Pengu Ability-move highlighting ──
+   Double box-shadow (hard ring + soft glow) so the highlights remain
+   visible on occupied Ability Zones — a glow-only treatment was
+   getting visually masked by stacked Ability cards. */
+.zone-pengue-src {
+  box-shadow: 0 0 0 3px rgba(127,208,255,.95), 0 0 14px 5px rgba(127,208,255,.55) !important;
+  animation: pengueSrcPulse 1.3s ease-in-out infinite;
+  position: relative;
+  z-index: 2;
+}
+.zone-pengue-selected {
+  box-shadow: 0 0 0 4px rgba(220,250,255,.95), 0 0 18px 6px rgba(170,235,255,.8) !important;
+  outline: 2px solid rgba(220,250,255,.95);
+  position: relative;
+  z-index: 3;
+}
+.zone-pengue-dest {
+  box-shadow: 0 0 0 4px rgba(140,255,220,.95), 0 0 16px 6px rgba(140,255,220,.65) !important;
+  animation: pengueDestPulse 1.05s ease-in-out infinite;
+  position: relative;
+  z-index: 2;
+}
+@keyframes pengueSrcPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(127,208,255,.85), 0 0 12px 4px rgba(127,208,255,.5); }
+  50%      { box-shadow: 0 0 0 3px rgba(127,208,255,1),   0 0 20px 7px rgba(127,208,255,.85); }
+}
+@keyframes pengueDestPulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(140,255,220,.85), 0 0 12px 4px rgba(140,255,220,.5); }
+  50%      { box-shadow: 0 0 0 4px rgba(140,255,220,1),   0 0 20px 7px rgba(140,255,220,.85); }
 }
 
 /* ── Chain Target Pick highlighting ── */

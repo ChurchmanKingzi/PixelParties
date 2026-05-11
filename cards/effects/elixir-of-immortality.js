@@ -262,13 +262,20 @@ async function reviveCreature(engine, pi, chosen) {
 
   let targetHi = -1, targetSi = -1;
 
+  // Per-Hero `canSummon` filter (`_bypassBeforeSummon: true`) — this
+  // revival places without running `beforeSummon`, so cards like King
+  // Trex re-apply their strict per-Hero archetype rule (no Gigantisaur-
+  // occupied Hero when the auto-sacrifice can't run).
+  const canPlaceOn = (hi) =>
+    engine.isCreatureSummonable(chosen.name, pi, hi, { _bypassBeforeSummon: true });
+
   const origSlot = (ps.supportZones[chosen.heroIdx] || [])[chosen.zoneSlot] || [];
-  if (origSlot.length === 0 && ps.heroes[chosen.heroIdx]?.hp > 0) {
+  if (origSlot.length === 0 && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
     targetHi = chosen.heroIdx;
     targetSi = chosen.zoneSlot;
   }
 
-  if (targetHi < 0 && ps.heroes[chosen.heroIdx]?.hp > 0) {
+  if (targetHi < 0 && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
     const supZones = ps.supportZones[chosen.heroIdx] || [];
     for (let z = 0; z < supZones.length; z++) {
       if ((supZones[z] || []).length === 0) { targetHi = chosen.heroIdx; targetSi = z; break; }
@@ -279,6 +286,7 @@ async function reviveCreature(engine, pi, chosen) {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       if (hi === chosen.heroIdx) continue;
       if (!ps.heroes[hi]?.name || ps.heroes[hi].hp <= 0) continue;
+      if (!canPlaceOn(hi)) continue;
       const supZones = ps.supportZones[hi] || [];
       for (let z = 0; z < supZones.length; z++) {
         if ((supZones[z] || []).length === 0) { targetHi = hi; targetSi = z; break; }

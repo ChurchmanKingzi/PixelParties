@@ -42,15 +42,24 @@ module.exports = {
    * - Opponent's Attack or Spell targeting exactly 1 of IC owner's targets
    * - IC owner has 2+ living targets (protecting one leaves others targetable)
    */
-  postTargetCondition: (gs, pi, engine, targetedHeroes, sourceCard) => {
+  postTargetCondition: (gs, pi, engine, targetedHeroes, sourceCard, opts) => {
     // Source must be from the opponent
     const sourceOwner = sourceCard?.controller ?? sourceCard?.owner ?? -1;
     if (sourceOwner === pi) return false;
 
-    // Source must be an Attack or Spell
+    // Source must be an Attack or Spell — either by the source card's
+    // cardType (real Attack / Spell), or by the runtime damageType
+    // (Hero-effect damage tagged `'attack'` / `_spell` is "treated as"
+    // the corresponding card type, e.g. Alice the Puppeteer Girl).
+    // Sources with no card-DB entry (synthetic / puzzle-authored)
+    // fall through to the original permissive behavior.
     const cardDB = engine._getCardDB();
     const srcData = sourceCard?.name ? cardDB[sourceCard.name] : null;
-    if (srcData && !hasCardType(srcData, 'Attack') && !hasCardType(srcData, 'Spell')) return false;
+    const isAttackOrSpell = srcData
+      && (hasCardType(srcData, 'Attack') || hasCardType(srcData, 'Spell'));
+    const dmgType = opts?.damageType;
+    const dmgTypeMatches = dmgType === 'attack' || /_spell$/.test(dmgType || '');
+    if (srcData && !isAttackOrSpell && !dmgTypeMatches) return false;
 
     // Exactly 1 target, belonging to the IC owner
     if (targetedHeroes.length !== 1) return false;

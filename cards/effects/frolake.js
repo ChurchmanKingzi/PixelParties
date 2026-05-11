@@ -88,24 +88,29 @@ module.exports = {
       // card so a Spell mid-resolve isn't accidentally discarded
       // (defensive — onTurnEnd usually runs with no resolving
       // card, but Skull Necklace and other reactive triggers may
-      // queue mid-flow).
-      while ((ps.hand?.length || 0) > 0) {
-        const eligible = (ps.hand || []).map((_, i) => i);
-        const result = await engine.promptGeneric(pi, {
-          type: 'forceDiscardCancellable',
-          title: CARD_NAME,
-          description: `Discard any number of cards, then draw until you have 4. (${ps.hand.length} in hand)`,
-          instruction: 'Click a card in your hand to discard it, or Done to refill.',
-          eligibleIndices: eligible,
-          cancellable: true,
-          cancelLabel: 'Done',
-        });
-        if (!result || result.cancelled || result.cardName == null) break;
-        const ok = await engine.actionDiscardHandCard(pi, result.cardName, result.handIndex, {
-          source: CARD_NAME,
-        });
-        if (!ok) break;
-      }
+      // queue mid-flow). The whole loop runs inside one forced-
+      // discard batch so on-discard reactors (Glass of Marbles,
+      // Skull Necklace, …) wait for the entire pre-refill dump
+      // before resolving.
+      await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
+        while ((ps.hand?.length || 0) > 0) {
+          const eligible = (ps.hand || []).map((_, i) => i);
+          const result = await engine.promptGeneric(pi, {
+            type: 'forceDiscardCancellable',
+            title: CARD_NAME,
+            description: `Discard any number of cards, then draw until you have 4. (${ps.hand.length} in hand)`,
+            instruction: 'Click a card in your hand to discard it, or Done to refill.',
+            eligibleIndices: eligible,
+            cancellable: true,
+            cancelLabel: 'Done',
+          });
+          if (!result || result.cancelled || result.cardName == null) break;
+          const ok = await engine.actionDiscardHandCard(pi, result.cardName, result.handIndex, {
+            source: CARD_NAME,
+          });
+          if (!ok) break;
+        }
+      });
 
       const need = Math.max(0, 4 - (ps.hand?.length || 0));
       if (need > 0) {

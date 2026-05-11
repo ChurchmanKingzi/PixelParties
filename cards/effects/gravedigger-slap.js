@@ -3,21 +3,22 @@
 //  Attack (Normal, Lv2, Fighting) — BANNED
 //
 //  Choose a target and deal damage equal to
-//  40 × (number of Creatures in your own discard
-//  pile) to it. Single-target only — explicitly
-//  cannot hit more than 1 target even under
-//  multi-target boosters.
+//  40 × (number of Creatures with DIFFERENT
+//  NAMES in your own discard pile) to it.
+//  Single-target only — explicitly cannot hit
+//  more than 1 target even under multi-target
+//  boosters.
 //
 //  Implementation:
 //   • `requiresTarget: true` — Blinded gating.
-//   • `onPlay` builds the count via the same
-//     `hasCardType('Creature')` filter the rest
-//     of the codebase uses, then runs the
-//     standard `promptDamageTarget` single-pick.
-//     `damageType: 'attack'` so Phalanx Pike /
-//     attack-blockers gate normally and the
-//     Surprise window opens via the standard
-//     `actionDealDamage` path.
+//   • `onPlay` builds the distinct-name count
+//     via the same `hasCardType('Creature')`
+//     filter the rest of the codebase uses, then
+//     runs the standard `promptDamageTarget`
+//     single-pick. `damageType: 'attack'` so
+//     Phalanx Pike / attack-blockers gate
+//     normally and the Surprise window opens
+//     via the standard `actionDealDamage` path.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -25,15 +26,22 @@ const { hasCardType } = require('./_hooks');
 const CARD_NAME = 'Gravedigger Slap';
 const PER_CREATURE_DAMAGE = 40;
 
+/**
+ * Count DISTINCT Creature card names in `ps`'s own discard pile.
+ * Duplicates fold into one tick — the card text says "Creatures
+ * with different names in your discard pile", so a pile of
+ * [Skeleton, Skeleton, Goblin] counts as 2, not 3.
+ */
 function countCreaturesInOwnDiscard(engine, ps) {
   if (!ps?.discardPile) return 0;
   const cardDB = engine._getCardDB();
-  let n = 0;
+  const seen = new Set();
   for (const cn of ps.discardPile) {
+    if (seen.has(cn)) continue;
     const cd = cardDB[cn];
-    if (cd && hasCardType(cd, 'Creature')) n++;
+    if (cd && hasCardType(cd, 'Creature')) seen.add(cn);
   }
-  return n;
+  return seen.size;
 }
 
 module.exports = {
@@ -60,7 +68,7 @@ module.exports = {
         baseDamage: damage,
         title: CARD_NAME,
         description: damage > 0
-          ? `Deal ${damage} damage (${PER_CREATURE_DAMAGE} × ${count} Creatures in your discard pile) to a target.`
+          ? `Deal ${damage} damage (${PER_CREATURE_DAMAGE} × ${count} different-named Creature${count === 1 ? '' : 's'} in your discard pile) to a target.`
           : `Your discard pile has no Creatures — this Attack would deal 0 damage. Pick a target anyway?`,
         confirmLabel: `⚰️ Slap! (${damage})`,
         confirmClass: 'btn-danger',

@@ -231,10 +231,14 @@ module.exports = {
         return;
       }
 
-      // Summoning-sickness bypass for THIS instance only — card text grants
-      // "may activate its active effect this turn." (Forceful Revival
-      // pattern.)
-      summonRes.inst.turnPlayed = (gs.turn || 0) - 1;
+      // Summoning-sickness bypass for THIS instance only — card text
+      // grants "may activate its active effect this turn." Mark with
+      // Haste rather than fake-aging `turnPlayed`, so genuine
+      // "was summoned this turn" reads (Alice the Puppeteer Girl,
+      // Hive's Crown, Singing's exclude-fresh filter, …) still see
+      // this Creature as a fresh summon.
+      if (!summonRes.inst.counters) summonRes.inst.counters = {};
+      summonRes.inst.counters._hasHaste = true;
 
       // Black-water whirlpool + bubbles on the newly placed Creature.
       // Fires AFTER summon hooks resolve so any on-summon effects (Dark
