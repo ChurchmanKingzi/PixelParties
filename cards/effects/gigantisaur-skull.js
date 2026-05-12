@@ -32,9 +32,13 @@ const { hasCardType } = require('./_hooks');
 const CARD_NAME = 'Gigantisaur Skull';
 
 /**
- * Every Creature on the board that can legally be Frozen — alive
- * support-zone occupant, not face-down, not status-immune. Used by
- * both the proactive target picker and the proactive playability gate.
+ * Every Creature on the board that can legally be targeted by Freeze —
+ * alive support-zone occupant, not face-down, not freeze_immune. Uses
+ * the TARGETING-side gate so omni-immune Creatures (Cardinal Beasts,
+ * Golden-Wings wearers, …) stay selectable; the actual Freeze
+ * application fizzles silently in `_freezeCreature` via the
+ * application-side `canApplyCreatureStatus`. Used by both the
+ * proactive target picker and the proactive playability gate.
  */
 function _allFreezeableCreatureTargets(engine) {
   const gs = engine.gs;
@@ -57,7 +61,7 @@ function _allFreezeableCreatureTargets(engine) {
         );
         if (!inst) continue;
         if (inst.faceDown) continue;
-        if (!engine.canApplyCreatureStatus(inst, 'frozen')) continue;
+        if (!engine.canTargetForStatus(inst, 'frozen')) continue;
         out.push({
           id: `equip-${pi}-${hi}-${si}`,
           type: 'equip', owner: pi, heroIdx: hi, slotIdx: si,
@@ -82,11 +86,11 @@ async function _freezeCreature(engine, inst, byPi) {
   });
   await engine._delay(400);
 
-  if (!inst.counters) inst.counters = {};
-  inst.counters.frozen = 1;
-  inst.counters.frozenAppliedBy = byPi;
-  inst.counters.frozenDuration = 1;
-  return true;
+  return await engine.applyCreatureStatus(inst, 'frozen', {
+    sourceOwner: byPi,
+    duration: 1,
+    source: 'Gigantisaur Skull',
+  });
 }
 
 module.exports = {

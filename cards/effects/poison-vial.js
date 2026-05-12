@@ -87,14 +87,11 @@ module.exports = {
         // `potion_resolved` animation regardless of whether the status
         // actually applies, so a fizzle still gives the player visual
         // feedback that the throw landed.
-        if (engine.canApplyCreatureStatus(inst, 'poisoned')) {
-          if (inst.counters.poisoned) {
-            inst.counters.poisonStacks = (inst.counters.poisonStacks || 1) + 2;
-          } else {
-            inst.counters.poisoned = 1;
-            inst.counters.poisonStacks = 2;
-          }
-        }
+        await engine.applyCreatureStatus(inst, 'poisoned', {
+          stacks: 2, addStacks: true,
+          sourceOwner: pi,
+          source: 'Poison Vial',
+        });
       }
     }
 

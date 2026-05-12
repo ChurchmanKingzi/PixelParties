@@ -69,6 +69,12 @@ function hasOpponentCreatures(engine, playerIdx) {
  */
 function getStealableCreatures(engine, playerIdx) {
   const oppIdx = playerIdx === 0 ? 1 : 0;
+  // Per-side non-damage shield (The Great Wall of Deri etc.). Dark
+  // Gear is a non-damage targeting effect, so if opp controls any
+  // shielder, NONE of opp's Creatures are valid targets — short-
+  // circuit so the card is correctly grayed out in hand via
+  // `getUnactivatableArtifacts` instead of opening an empty picker.
+  if (engine._isSideNondamageShielded(oppIdx)) return [];
   const ps = engine.gs.players[playerIdx];
   const gold = ps.gold || 0;
   const cardDB = engine._getCardDB();

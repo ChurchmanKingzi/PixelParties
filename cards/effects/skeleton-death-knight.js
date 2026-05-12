@@ -58,7 +58,9 @@ module.exports = {
       if ((inst.controller ?? inst.owner) !== oi) continue;
       if (inst.counters?.negated) continue;
       if (inst.counters?.cc_immune) continue;
-      if (engine.canApplyCreatureStatus(inst, 'negated', { name: CARD_NAME, owner: pi })) return true;
+      // Targeting-side gate — omni-immune Creatures stay in the
+      // activation pool. The Negate application fizzles in resolve.
+      if (engine.canTargetForStatus(inst, 'negated')) return true;
     }
     return false;
   },
@@ -93,7 +95,8 @@ module.exports = {
           if (!inst) return false;
           if (inst.counters?.negated) return false;
           if (inst.counters?.cc_immune) return false;
-          return engine.canApplyCreatureStatus(inst, 'negated', { name: CARD_NAME, owner: pi });
+          // Targeting-side gate — omni-immune Creatures stay selectable.
+          return engine.canTargetForStatus(inst, 'negated');
         }
         return false;
       },

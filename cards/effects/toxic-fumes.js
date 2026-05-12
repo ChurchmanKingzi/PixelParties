@@ -26,7 +26,7 @@ const { hasCardType } = require('./_hooks');
 function hasPoisonableOwnCreature(gs, pi, engine) {
   const cardDB = engine._getCardDB();
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi || inst.zone !== 'support' || inst.faceDown) continue;
+    if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support' || inst.faceDown) continue;
     const cd = cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (engine.canApplyCreatureStatus(inst, 'poisoned')) return true;

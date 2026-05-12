@@ -57,10 +57,10 @@ module.exports = {
           // their effect "land" on the target even when the status
           // itself fizzles against an immune creature.
           engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx });
-          if (engine.canApplyCreatureStatus(inst, 'burned')) {
-            inst.counters.burned = 1;
-            inst.counters.burnAppliedBy = ctx.cardOwner;
-          }
+          await engine.applyCreatureStatus(inst, 'burned', {
+            sourceOwner: ctx.cardOwner,
+            source: 'Fiery Slime',
+          });
         }
       }
       engine.log('burn', { target: target.cardName, by: 'Fiery Slime', type: target.type });

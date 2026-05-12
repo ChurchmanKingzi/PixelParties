@@ -105,15 +105,19 @@ module.exports = {
           c.owner === target.owner && c.zone === 'support' &&
           c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
         );
-        if (inst && engine.canApplyCreatureStatus(inst, 'frozen')) {
-          inst.counters.frozen = 1;
-          inst.counters.frozenAppliedBy = pi;
-          // The engine's cleanseCreatureStatuses() checks for key+'Unhealable'
-          // and skips removal — this is the canonical way to make a status stick.
-          inst.counters.frozenUnhealable = true;
-          engine.log('freeze_applied', {
-            target: inst.name, by: 'Cold Coffin', unhealable: true,
+        if (inst) {
+          const applied = await engine.applyCreatureStatus(inst, 'frozen', {
+            sourceOwner: pi,
+            source: 'Cold Coffin',
           });
+          if (applied) {
+            // The engine's cleanseCreatureStatuses() checks for key+'Unhealable'
+            // and skips removal — this is the canonical way to make a status stick.
+            inst.counters.frozenUnhealable = true;
+            engine.log('freeze_applied', {
+              target: inst.name, by: 'Cold Coffin', unhealable: true,
+            });
+          }
         }
       }
 

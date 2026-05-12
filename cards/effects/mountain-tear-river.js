@@ -64,10 +64,11 @@ async function burnHero(engine, owner, heroIdx, appliedBy) {
   });
 }
 
-function burnCreature(inst, appliedBy) {
-  if (!inst.counters) inst.counters = {};
-  inst.counters.burned = 1;
-  inst.counters.burnAppliedBy = appliedBy;
+async function burnCreature(engine, inst, appliedBy) {
+  await engine.applyCreatureStatus(inst, 'burned', {
+    sourceOwner: appliedBy,
+    source: 'Mountain Tear River',
+  });
 }
 
 function isAlreadyBurned(target, engine) {
@@ -148,8 +149,8 @@ module.exports = {
     if (isCreatureSource) {
       const cd = engine._getCardDB()[srcInst.name];
       const hp = srcInst.counters?.currentHp ?? cd?.hp ?? 0;
-      if (hp > 0 && engine.canApplyCreatureStatus?.(srcInst, 'burned') !== false) {
-        burnCreature(srcInst, pi);
+      if (hp > 0) {
+        await burnCreature(engine, srcInst, pi);
         engine.log('mountain_tear_river_burn', {
           target: srcInst.name, type: 'creature',
           player: ps.username,
@@ -193,8 +194,8 @@ module.exports = {
           if (t.type === 'hero') {
             const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
             if (h?.name && h.hp > 0) await burnHero(engine, t.owner, t.heroIdx, pi);
-          } else if (t.cardInstance && engine.canApplyCreatureStatus?.(t.cardInstance, 'burned') !== false) {
-            burnCreature(t.cardInstance, pi);
+          } else if (t.cardInstance) {
+            await burnCreature(engine, t.cardInstance, pi);
           }
         }
         engine.log('mountain_tear_river_extra_burns', {

@@ -126,10 +126,11 @@ module.exports = {
             type: 'electric_strike', owner: tgtOwner,
             heroIdx: tgtHeroIdx, zoneSlot: target.slotIdx,
           });
-          if (engine.canApplyCreatureStatus(inst, 'stunned')) {
-            inst.counters.stunned = 1;
-            engine.log('stun', { target: inst.name, by: 'Ferocious Tiger Kick', type: 'creature' });
-          }
+          const applied = await engine.applyCreatureStatus(inst, 'stunned', {
+            sourceOwner: ctx.cardOwner,
+            source: 'Ferocious Tiger Kick',
+          });
+          if (applied) engine.log('stun', { target: inst.name, by: 'Ferocious Tiger Kick', type: 'creature' });
         }
       }
 

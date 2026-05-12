@@ -51,10 +51,11 @@ module.exports = {
             type: 'electric_strike', owner: result.target.owner,
             heroIdx: result.target.heroIdx, zoneSlot: result.target.slotIdx,
           });
-          if (engine.canApplyCreatureStatus(inst, 'stunned')) {
-            inst.counters.stunned = 1;
-            engine.log('stun', { target: inst.name, by: 'Heavy Hit', type: 'creature' });
-          }
+          const applied = await engine.applyCreatureStatus(inst, 'stunned', {
+            sourceOwner: ctx.cardOwner,
+            source: 'Heavy Hit',
+          });
+          if (applied) engine.log('stun', { target: inst.name, by: 'Heavy Hit', type: 'creature' });
         }
       }
 

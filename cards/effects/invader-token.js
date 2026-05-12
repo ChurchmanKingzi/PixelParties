@@ -192,7 +192,7 @@ function ownDamageTargets(engine, pi) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    if (inst.owner !== pi) continue;
+    if ((inst.controller ?? inst.owner) !== pi) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     out.push({

@@ -40,7 +40,7 @@ function applyFreezeImmunity(engine, pi) {
   // Creatures only (not Equipment Artifacts)
   const cardDB = engine._getCardDB();
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi || inst.zone !== 'support') continue;
+    if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
     const cd = cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     inst.counters.freeze_immune = 1;
@@ -72,7 +72,7 @@ function removeFreezeImmunity(engine, pi) {
   // Creatures only
   const cardDB = engine._getCardDB();
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi || inst.zone !== 'support') continue;
+    if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
     const cd = cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (inst.counters.freeze_immune) delete inst.counters.freeze_immune;
@@ -102,7 +102,7 @@ async function thawAll(engine, pi) {
 
   // Creatures
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi || inst.zone !== 'support' || !inst.counters.frozen) continue;
+    if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support' || !inst.counters.frozen) continue;
     delete inst.counters.frozen;
     engine._broadcastEvent('play_zone_animation', { type: 'thaw', owner: pi, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
     engine.log('thaw', { target: inst.name, by: 'The Sun Sword' });
@@ -232,7 +232,7 @@ module.exports = {
     /**
      * After creature damage batch: burn creatures hit by this hero's attacks.
      */
-    afterCreatureDamageBatch: (ctx) => {
+    afterCreatureDamageBatch: async (ctx) => {
       if (!ctx.entries) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
@@ -254,11 +254,11 @@ module.exports = {
           type: 'flame_strike', owner: inst.owner,
           heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
         });
-        if (engine.canApplyCreatureStatus(inst, 'burned')) {
-          inst.counters.burned = 1;
-          inst.counters.burnAppliedBy = pi;
-          engine.log('burn_applied', { target: inst.name, by: 'The Sun Sword' });
-        }
+        const applied = await engine.applyCreatureStatus(inst, 'burned', {
+          sourceOwner: pi,
+          source: 'The Sun Sword',
+        });
+        if (applied) engine.log('burn_applied', { target: inst.name, by: 'The Sun Sword' });
       }
     },
   },

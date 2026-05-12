@@ -46,9 +46,10 @@ module.exports = {
           // Animation plays unconditionally so the player sees the
           // freeze land even when the status fizzles on an immune target.
           engine._broadcastEvent('play_zone_animation', { type: 'ice_encase', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx });
-          if (engine.canApplyCreatureStatus(inst, 'frozen')) {
-            inst.counters.frozen = 1;
-          }
+          await engine.applyCreatureStatus(inst, 'frozen', {
+            sourceOwner: ctx.cardOwner,
+            source: 'Icy Slime',
+          });
         }
       }
       engine.log('freeze', { target: target.cardName, by: 'Icy Slime', type: target.type });

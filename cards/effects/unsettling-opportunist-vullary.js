@@ -152,7 +152,10 @@ module.exports = {
     // lockstep with the buff. `negated_placement` parallels the flag
     // `actionPlaceCreature` would set under `negateEffects: true`,
     // keeping placement-style negate state consistent.
-    res.inst.counters.negated = 1;
+    await engine.applyCreatureStatus(res.inst, 'negated', {
+      sourceOwner: pi,
+      source: CARD_NAME,
+    });
     res.inst.counters.negated_placement = 1;
     await engine.actionAddCreatureBuff(res.inst, NEGATED_BUFF, {
       expiresAtTurn: engine.gs.turn + 1,

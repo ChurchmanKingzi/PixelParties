@@ -2134,14 +2134,28 @@ function sendGameState(room, playerIdx, extra) {
       const currentTurn = gs.turn || 0;
       for (const inst of room.engine.cardInstances) {
         if (inst.zone !== 'support') continue;
-        // Key by OWNER — the creature renders on its owner's board even
-        // when its `controller` has been flipped by a steal. The client
-        // reads `creatureCounters[${ownerPi}-${hi}-${zi}]`. `_stolenBy`
-        // surfaces the stealer so the client can paint their color.
-        const key = `${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
+        // Key by PHYSICAL side. Temporary steals (Deepsea Succubus,
+        // `inst.stolenBy != null`) leave the card on its owner's
+        // supportZones array — keyed by owner. Permanent cross-side
+        // placements (Chilly Wizard) physically move the card to the
+        // controller's supportZones array — keyed by controller. Owner
+        // never changes (it tracks the card's true owner for discard /
+        // deck routing); `_stolenBy` still surfaces the stealer so the
+        // client paints the colored border on the un-moved cases.
+        const physicalSide = (inst.stolenBy != null)
+          ? inst.owner
+          : (inst.controller ?? inst.owner);
+        const key = `${physicalSide}-${inst.heroIdx}-${inst.zoneSlot}`;
         const hasCounters = Object.keys(inst.counters).length > 0;
         const hasSummoningSickness = inst.turnPlayed === currentTurn
           && !inst.counters?._hasHaste
+          // Chilly Dog (Mischief Militia) lifts summoning sickness for
+          // Frozen Creatures the same player controls — the haste
+          // grant is now derived live, so puzzle-mode boards with
+          // pre-frozen-sick allies under a Chilly Dog correctly drop
+          // the sickness overlay on the client too.
+          && !(inst.counters?.frozen
+               && room.engine._isChillyDogActiveFor(inst.controller ?? inst.owner))
           && (() => {
             const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
             return !!(script?.creatureEffect);
@@ -2351,10 +2365,25 @@ function sendGameState(room, playerIdx, extra) {
     // onto the tooltip name. Cleared automatically on the next turn
     // because the engine compares the stored turn against `gs.turn`.
     deepseaSporesActive: !!(gs._deepseaSporesActiveTurn != null && gs._deepseaSporesActiveTurn === gs.turn),
+    // Chilly Dog (Mischief Militia) aura side-flags, derived live by
+    // the engine helper. Client uses these to skip the
+    // `board-zone-dead` gray-out on Frozen Heroes whose ability /
+    // hero-effect activations remain available (Chilly Dog lifts the
+    // FROZEN-only silence). Index = player side.
+    chillyDogActiveSides: room.engine
+      ? [room.engine._isChillyDogActiveFor(0), room.engine._isChillyDogActiveFor(1)]
+      : [false, false],
     activatableEquips: room.engine ? room.engine.getActivatableEquips(playerIdx) : [],
     activatablePermanents: room.engine ? room.engine.getActivatablePermanents(playerIdx) : [],
     activatableAreas: room.engine ? room.engine.getActivatableAreas(playerIdx) : [],
     heroPlayableCards: room.engine ? room.engine.getHeroPlayableCards(playerIdx) : { own: {}, charmed: {} },
+    // Cross-side-playable Creature names — cards whose script exports
+    // `playOnAnyHeroSide: true` AND at least one OWN Hero appears as a
+    // valid host in `heroPlayableCards.own`. The client uses this to
+    // light up free Support Zones on BOTH sides during the drag UX
+    // (Chilly Wizard summons onto either player's Hero). Empty array
+    // when the engine isn't initialised yet.
+    crossSidePlayableCards: room.engine ? room.engine.getCrossSidePlayableCards(playerIdx) : [],
     bouncePlacementTargets: room.engine ? room.engine.getBouncePlacementTargets(playerIdx) : {},
     bakhmSurpriseSlots: room.engine ? (() => {
       const result = [];
@@ -2585,14 +2614,28 @@ function sendSpectatorGameState(room) {
       const currentTurn = gs.turn || 0;
       for (const inst of room.engine.cardInstances) {
         if (inst.zone !== 'support') continue;
-        // Key by OWNER — the creature renders on its owner's board even
-        // when its `controller` has been flipped by a steal. The client
-        // reads `creatureCounters[${ownerPi}-${hi}-${zi}]`. `_stolenBy`
-        // surfaces the stealer so the client can paint their color.
-        const key = `${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`;
+        // Key by PHYSICAL side. Temporary steals (Deepsea Succubus,
+        // `inst.stolenBy != null`) leave the card on its owner's
+        // supportZones array — keyed by owner. Permanent cross-side
+        // placements (Chilly Wizard) physically move the card to the
+        // controller's supportZones array — keyed by controller. Owner
+        // never changes (it tracks the card's true owner for discard /
+        // deck routing); `_stolenBy` still surfaces the stealer so the
+        // client paints the colored border on the un-moved cases.
+        const physicalSide = (inst.stolenBy != null)
+          ? inst.owner
+          : (inst.controller ?? inst.owner);
+        const key = `${physicalSide}-${inst.heroIdx}-${inst.zoneSlot}`;
         const hasCounters = Object.keys(inst.counters).length > 0;
         const hasSummoningSickness = inst.turnPlayed === currentTurn
           && !inst.counters?._hasHaste
+          // Chilly Dog (Mischief Militia) lifts summoning sickness for
+          // Frozen Creatures the same player controls — the haste
+          // grant is now derived live, so puzzle-mode boards with
+          // pre-frozen-sick allies under a Chilly Dog correctly drop
+          // the sickness overlay on the client too.
+          && !(inst.counters?.frozen
+               && room.engine._isChillyDogActiveFor(inst.controller ?? inst.owner))
           && (() => {
             const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
             return !!(script?.creatureEffect);
@@ -2621,6 +2664,7 @@ function sendSpectatorGameState(room) {
     activatablePermanents: [],
     activatableAreas: [],
     heroPlayableCards: { own: {}, charmed: {} },
+    crossSidePlayableCards: [],
     bouncePlacementTargets: {},
     bakhmSurpriseSlots: [],
     ushabtiSummonable: [],
@@ -4077,8 +4121,13 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // engine-side filter in getActivatableCreatures and the hook gate in
   // runHooks. Defensive: a stale activate request from a client whose
   // UI hasn't seen the freeze/stun yet would otherwise resolve.
-  if (inst.counters?.frozen || inst.counters?.stunned
-      || inst.counters?.negated || inst.counters?.nulled) return false;
+  // Chilly Dog (Mischief Militia) lifts the FROZEN-only silence on the
+  // activator's own side — same controller-aware check as the engine.
+  const instCtrlForCD = inst.controller ?? inst.owner;
+  const chillyDogLiftsForCreature = instCtrlForCD === pi
+    && room.engine._isChillyDogActiveFor(pi);
+  if (inst.counters?.stunned || inst.counters?.negated || inst.counters?.nulled) return false;
+  if (inst.counters?.frozen && !chillyDogLiftsForCreature) return false;
 
   if (charmedOwner != null
       && hero.charmedBy !== pi && hero.controlledBy !== pi
@@ -4152,8 +4201,17 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // Necromancy on its Skeletons, Forceful Revival, …). The actual
   // `turnPlayed` stays correct so "was summoned this turn" reads
   // (Alice the Puppeteer Girl, Hive's Crown, etc.) still see the
-  // creature as fresh.
-  if (inst.turnPlayed === (gs.turn || 0) && !inst.counters?._hasHaste) return false;
+  // creature as fresh. Chilly Dog also lifts the gate live for a
+  // Frozen own-controlled Creature, mirroring the engine helper —
+  // this catches puzzle-mode boards where Chilly Dog spawned
+  // pre-frozen-sick allies without firing the haste-grant hook.
+  if (inst.turnPlayed === (gs.turn || 0) && !inst.counters?._hasHaste) {
+    const ctrlForCD = inst.controller ?? inst.owner;
+    const chillyDogLiftsSickness = inst.counters?.frozen
+      && ctrlForCD === pi
+      && room.engine._isChillyDogActiveFor(pi);
+    if (!chillyDogLiftsSickness) return false;
+  }
 
   const hoptKey = `creature-effect:${inst.id}`;
   if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
@@ -4349,6 +4407,20 @@ function doTriggerTreacherousCrystal(room, pi) {
   const { selfRevealEffectsSuppressed } = require('./cards/effects/_crystals-shared');
   if (selfRevealEffectsSuppressed(room.engine, oi)) return false;
 
+  // Per-side non-damage shield (The Great Wall of Deri etc.) on the
+  // crystal-holder's side. Treacherous Crystal's steal is a non-
+  // damage effect "chosen by your opponent" (the triggering player),
+  // so a Wall on the crystal-holder's side protects every Creature
+  // they control — net result: zero steals possible, abort the
+  // entire trigger.
+  if (typeof room.engine._isSideNondamageShielded === 'function'
+      && room.engine._isSideNondamageShielded(oi)) {
+    room.engine.log('treacherous_crystal_blocked', {
+      player: gs.players[pi]?.username, reason: 'nondamage_shield',
+    });
+    return false;
+  }
+
   const cardDB = room.engine._getCardDB();
   // Cardinal Beasts are always exempt — by counter (Golden-Wings
   // grants, onPlay-stamped Cardinals) AND by name. The name-based
@@ -4413,9 +4485,11 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
   if (!hero?.name || hero.hp <= 0) return false;
   // Bound blocks "Actions" (Spell/Attack/Creature plays from hand)
   // — NOT Ability activations like Alchemy, Adventurousness, etc.
-  // Frozen/Stunned still gate ability activations because those
-  // statuses silence the hero outright.
-  if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
+  // Stunned silences the hero outright. Frozen also silences UNLESS
+  // the activator has Chilly Dog (Mischief Militia) in play — its
+  // aura lifts the Frozen-only silence on own-side Heroes' Abilities.
+  if (hero.statuses?.stunned) return false;
+  if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
 
   const abilitySlot = ps.abilityZones?.[heroIdx]?.[zoneIdx];
@@ -5248,8 +5322,11 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
   // Bound blocks "Actions" (Spell/Attack/Creature plays from hand) only.
   // Hero-effect activations are an "effect", not an Action — Bound's
   // text-spec ("ONLY Actions, but not their Abilities or effects")
-  // covers hero effects too. Frozen/stunned/negated still silence them.
-  if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
+  // covers hero effects too. Stunned / negated still silence them.
+  // Chilly Dog (Mischief Militia) lifts the Frozen-only silence on
+  // the activator's own side.
+  if (hero.statuses?.stunned || hero.statuses?.negated) return false;
+  if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
   // _actionLockedTurn (Treasure Hunter's Backpack, etc.) blocks "Actions"
   // only — Spell/Attack/Creature plays and `actionCost` Ability activations.
@@ -5609,8 +5686,11 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
   const hero = ps.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   // Bound blocks "Actions" only — equip-effect activations are an
-  // "effect" per the spec and stay alive under Bound.
-  if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
+  // "effect" per the spec and stay alive under Bound. Stunned still
+  // silences. Frozen silences UNLESS the activator has Chilly Dog
+  // (Mischief Militia) in play.
+  if (hero.statuses?.stunned) return false;
+  if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;
 
   const slot = (ps.supportZones[heroIdx] || [])[zoneSlot] || [];
   if (slot.length === 0) return false;
@@ -5711,17 +5791,33 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   }
 
   gs.potionTargeting = null;
-  room.engine.log('card_played', { player: ps.username, card: potionName, cardType, cost: goldCost || 0 });
   room.engine._trackTerrorResolvedEffect(pi, potionName);
 
   const nth = ps.hand.slice(0, handIndex + 1).filter(c => c === potionName).length;
   ps._resolvingCard = { name: potionName, nth };
 
+  // `deferReveal: true` opts the script into the engine's standard
+  // pending-reveal mechanism: stash the card name on
+  // `gs._pendingCardReveal` (+ pending play-log) so the first prompt
+  // resolution inside resolve fires both at the natural commitment
+  // moment, instead of broadcasting immediately on target-confirm.
+  // Field Standard uses this so opp doesn't see the card stream when
+  // the re-fired Creature effect later aborts and Standard stays in
+  // hand. Cards without the opt-in keep the legacy immediate-broadcast
+  // behaviour.
   const oi = pi === 0 ? 1 : 0;
-  const oppSid = gs.players[oi]?.socketId;
-  if (oppSid) io.to(oppSid).emit('card_reveal', { cardName: potionName });
-  sendToSpectators(room, 'card_reveal', { cardName: potionName });
-  await room.engine._delay(100);
+  if (script.deferReveal) {
+    gs._pendingCardReveal = { cardName: potionName, ownerIdx: pi };
+    room.engine._setPendingPlayLog('card_played', {
+      player: ps.username, card: potionName, cardType, cost: goldCost || 0,
+    });
+  } else {
+    room.engine.log('card_played', { player: ps.username, card: potionName, cardType, cost: goldCost || 0 });
+    const oppSid = gs.players[oi]?.socketId;
+    if (oppSid) io.to(oppSid).emit('card_reveal', { cardName: potionName });
+    sendToSpectators(room, 'card_reveal', { cardName: potionName });
+    await room.engine._delay(100);
+  }
 
   if (cardType === 'Artifact' && ps.itemLocked && (ps.hand || []).length > 0) {
     await room.engine.actionPromptForceDiscard(pi, 1, {
@@ -5772,6 +5868,11 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
 
   if (chainResult.resolveResult?.aborted) {
     ps._resolvingCard = null;
+    // Drop any stashed pending reveal/log so they don't leak into the
+    // next unrelated card play. Only relevant when `deferReveal` was
+    // set; harmless no-op otherwise.
+    delete gs._pendingCardReveal;
+    delete gs._pendingPlayLog;
     const freshTargets = script.getValidTargets ? script.getValidTargets(gs, pi, room.engine, handIndex) : validTargets;
     const config = typeof script.targetingConfig === 'function'
       ? script.targetingConfig(gs, pi, goldCost)
@@ -5792,11 +5893,24 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       ps.gold += goldCost;
     }
     ps._resolvingCard = null;
+    // Same pending-state cleanup as the aborted branch.
+    delete gs._pendingCardReveal;
+    delete gs._pendingPlayLog;
     for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
   }
 
   await room.engine._delay(100);
+
+  // Fallback fire of the stashed pending reveal/log for `deferReveal`
+  // scripts whose resolve completed without ever firing an inner
+  // prompt. The standard prompt-resolution paths inside
+  // `resolveEffectPrompt` / `resolveGenericPrompt` already drain the
+  // stash on first commit, so this is a no-op when an inner prompt
+  // ran.
+  if (script.deferReveal && gs._pendingCardReveal) {
+    room.engine._firePendingCardReveal();
+  }
 
   const hi = getResolvingHandIndex(ps);
   ps._resolvingCard = null;
@@ -5913,6 +6027,71 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
   return true;
 }
 
+/**
+ * Rewrite `equip`-type validTargets so their `id` and `owner` fields
+ * point at the creature's PHYSICAL side rather than `inst.owner`. Two
+ * paths produce a controller / owner mismatch:
+ *   • Temporary steals (Deepsea Succubus, `inst.stolenBy != null`) —
+ *     the card stays on the owner's supportZones array, so physical
+ *     side = owner. No rewrite needed.
+ *   • Permanent cross-side placements (Chilly Wizard) — the card was
+ *     physically moved to the controller's supportZones array, so
+ *     physical side = controller. Without this rewrite, target IDs
+ *     read `equip-<owner>-…` while the slot is rendered under
+ *     `<controller>`, and the client's `t.owner === pi` highlight
+ *     match silently fails — the user couldn't burn / freeze / etc.
+ *     a cross-side-summoned Chilly Wizard.
+ *
+ * `owner` field on the validTarget is the slot's render-side from the
+ * client's POV; the IDs are owner-derived (`equip-${owner}-…`). The
+ * rewrite is a no-op when controller == owner (the common case). All
+ * targeting cards that emit `equip-${inst.owner}-…` IDs flow through
+ * this helper without per-card changes.
+ */
+function normalizeValidTargets(validTargets, casterPi, engine, config) {
+  if (!Array.isArray(validTargets)) return validTargets;
+  for (const t of validTargets) {
+    if (t?.type !== 'equip') continue;
+    const inst = t.cardInstance;
+    if (!inst) continue;
+    if (inst.stolenBy != null) continue; // physical side = owner already
+    const physSide = inst.controller ?? inst.owner;
+    if (physSide === t.owner) continue;
+    t.owner = physSide;
+    t.id = `equip-${physSide}-${t.heroIdx}-${t.slotIdx}`;
+  }
+  // Non-damage opponent shield filter (The Great Wall of Deri, any
+  // future "your Creatures can't be chosen by opp's non-damage
+  // cards/effects" card). Targeting Artifacts build their own
+  // `getValidTargets` list rather than going through the engine's
+  // promptDamageTarget / promptMultiTarget chokepoints — so we
+  // apply the filter HERE, on the server side, after the script
+  // returns its raw target list. Skipped when the targetingConfig
+  // tags damage targeting (`damageType` / `baseDamage` set) or when
+  // the caller opts out via `ignoreUntargetable: true`.
+  if (engine && typeof casterPi === 'number' && config
+      && !config.ignoreUntargetable) {
+    // See `_isSideNondamageShielded` filter in promptDamageTarget
+    // for the rationale — `baseDamage > 0` is the canonical "deals
+    // damage" signal; status-application pickers that set
+    // `damageType: 'status'` without `baseDamage` are correctly
+    // treated as non-damage targeting here.
+    const isDamageTargeting = typeof config.baseDamage === 'number' && config.baseDamage > 0;
+    if (!isDamageTargeting && typeof engine._isSideNondamageShielded === 'function') {
+      for (let i = validTargets.length - 1; i >= 0; i--) {
+        const t = validTargets[i];
+        if (t?.type !== 'equip' || !t.cardInstance) continue;
+        const tgtCtrl = t.cardInstance.controller ?? t.cardInstance.owner;
+        if (tgtCtrl === casterPi) continue;
+        if (engine._isSideNondamageShielded(tgtCtrl)) {
+          validTargets.splice(i, 1);
+        }
+      }
+    }
+  }
+  return validTargets;
+}
+
 async function doUsePotion(room, pi, { cardName, handIndex }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
@@ -5939,13 +6118,15 @@ async function doUsePotion(room, pi, { cardName, handIndex }) {
   // targeting brain). Callers should pre-filter those — this branch still
   // supports them for the human socket path.
   if (script.getValidTargets && script.targetingConfig) {
-    const validTargets = script.getValidTargets(gs, pi, room.engine);
     // targetingConfig may be a function (per-call computation) or a
     // static object — normalize so the client always receives a plain
     // config object.
     const cfg = typeof script.targetingConfig === 'function'
       ? script.targetingConfig(gs, pi)
       : script.targetingConfig;
+    const validTargets = normalizeValidTargets(
+      script.getValidTargets(gs, pi, room.engine), pi, room.engine, cfg,
+    );
     gs.potionTargeting = {
       potionName: cardName, handIndex, ownerIdx: pi,
       cardType: 'Potion', validTargets, config: cfg,
@@ -6080,7 +6261,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
   // afford. Standard Artifacts still gate on the base cost.
   if (!script.manualGoldCost && (ps.gold || 0) < cost) return false;
   if ((cardData.subtype || '').toLowerCase() === 'reaction' && !script.proactivePlay) return false;
-  if (script.canActivate && !script.canActivate(gs, pi)) return false;
+  if (script.canActivate && !script.canActivate(gs, pi, room.engine)) return false;
   if (script.blockedByHandLock && ps.handLocked) return false;
 
   // Targeting-required Artifacts enter targeting mode; the CPU doesn't yet
@@ -6092,13 +6273,15 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
     // only stamped after the player confirms (doConfirmPotion), so
     // scripts that need self-exclusion at the targeting-build stage
     // rely on this explicit argument.
-    const validTargets = script.getValidTargets(gs, pi, room.engine, handIndex);
     const config = typeof script.targetingConfig === 'function'
       ? script.targetingConfig(gs, pi, cost)
       : { ...script.targetingConfig };
     if (script.manualGoldCost && !config.maxTotal) {
       config.maxTotal = cost > 0 ? Math.floor((ps.gold || 0) / cost) : 99;
     }
+    const validTargets = normalizeValidTargets(
+      script.getValidTargets(gs, pi, room.engine, handIndex), pi, room.engine, config,
+    );
     gs.potionTargeting = {
       potionName: cardName, handIndex, ownerIdx: pi,
       cardType: 'Artifact', goldCost: cost, validTargets, config,
@@ -6179,6 +6362,16 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
         ps.hand.splice(currentIdx, 1);
         if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
         if (chainResult.negated) ps.discardPile.push(cardName);
+        else if (gs._spellPlacedOnBoard) {
+          // Area Artifacts (Smuggler's Pier, etc.) and any future
+          // "card stays on the board after resolve" Artifact route
+          // themselves into a board zone via `placeArea` inside their
+          // resolve. The placeArea helper stamps `gs._spellPlacedOnBoard
+          // = true`; we consume the flag here so the standard
+          // hand-to-discard disposition is skipped. Mirrors the same
+          // flag-consume logic in doPlaySpell (~L3853).
+          delete gs._spellPlacedOnBoard;
+        }
         else if (script.deleteOnUse) ps.deletedPile.push(cardName);
         else ps.discardPile.push(cardName);
       }
@@ -8484,7 +8677,36 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doPlayCreature(room, pi, params).catch(err => console.error('[play_creature] error:', err.message));
+    // Cross-side destination hint: stashed on gs (not ps) for the
+    // Creature script's onPlay to consume. Only honoured for Creature
+    // scripts that opt in via `playOnAnyHeroSide: true`; without that
+    // gate, a malicious client could relocate any summoned Creature
+    // anywhere. The hint addresses an opp-side Support Zone; same-side
+    // values are ignored by the consumer.
+    if (params?.crossSideHost
+        && typeof params.crossSideHost === 'object'
+        && room.engine) {
+      const script = loadCardEffect(params.cardName);
+      if (script?.playOnAnyHeroSide === true) {
+        if (!room.gameState._chillyWizardHint) room.gameState._chillyWizardHint = {};
+        room.gameState._chillyWizardHint[pi] = {
+          ownerIdx: params.crossSideHost.ownerIdx,
+          heroIdx: params.crossSideHost.heroIdx,
+          slotIdx: params.crossSideHost.slotIdx,
+        };
+      }
+    }
+    doPlayCreature(room, pi, params)
+      .catch(err => console.error('[play_creature] error:', err.message))
+      .finally(() => {
+        // Clear any stale cross-side hint — if the play was negated /
+        // fizzled / never fired onPlay, the hint must NOT carry over to
+        // the next Creature play. Consumed plays clear it themselves
+        // inside `_consumeCrossSideHint`, so this is a defensive sweep.
+        if (room.gameState?._chillyWizardHint) {
+          delete room.gameState._chillyWizardHint[pi];
+        }
+      });
   });
 
 

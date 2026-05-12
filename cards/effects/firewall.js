@@ -97,10 +97,12 @@ module.exports = {
           target.cardInstance, DAMAGE, 'destruction_spell',
           { sourceOwner: ctx.cardOwner, canBeNegated: true }
         );
-        if ((target.cardInstance.counters?.currentHp ?? 1) > 0
-            && engine.canApplyCreatureStatus(target.cardInstance, 'burned')) {
-          target.cardInstance.counters.burned = true;
-          engine.log('creature_burned', {
+        if ((target.cardInstance.counters?.currentHp ?? 1) > 0) {
+          const applied = await engine.applyCreatureStatus(target.cardInstance, 'burned', {
+            sourceOwner: ctx.cardOwner,
+            source: CARD_NAME,
+          });
+          if (applied) engine.log('creature_burned', {
             card: target.cardInstance.name, owner: target.cardInstance.owner, by: CARD_NAME,
           });
         }
@@ -133,10 +135,12 @@ module.exports = {
       );
 
       // Burn the creature if it survived
-      if ((srcInst.counters?.currentHp ?? 0) > 0
-          && engine.canApplyCreatureStatus(srcInst, 'burned')) {
-        srcInst.counters.burned = true;
-        engine.log('creature_burned', {
+      if ((srcInst.counters?.currentHp ?? 0) > 0) {
+        const applied = await engine.applyCreatureStatus(srcInst, 'burned', {
+          sourceOwner: ctx.cardOwner,
+          source: CARD_NAME,
+        });
+        if (applied) engine.log('creature_burned', {
           card: srcInst.name, owner: srcInst.owner, by: CARD_NAME,
         });
       }

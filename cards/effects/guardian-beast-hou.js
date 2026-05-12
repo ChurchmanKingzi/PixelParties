@@ -83,6 +83,13 @@ module.exports = {
 
     const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.card.heroIdx, cardInstance: ctx.card };
 
+    // Pre-damage post-target hand-reaction window — one consolidated
+    // prompt per source for Sculpture Guards / Spectral Armor / etc.
+    const pickedTargets = tgtIds
+      .map(id => refreshedTargets.find(t => t.id === id))
+      .filter(Boolean);
+    await engine.preDamageMultiTargetWindow(source, pickedTargets);
+
     // Phase 1: fire ALL explosion animations in the same frame. Each
     // _broadcastEvent flushes synchronously, so the client receives
     // every explosion event before the JS yields — they mount and

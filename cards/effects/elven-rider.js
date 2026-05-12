@@ -83,11 +83,12 @@ const RESOLVING_KEY = '_elvenRiderResolving';
  */
 function isValidRiderTrigger(engine, deathInfo, ownerIdx) {
   if (!deathInfo) return false;
-  // Must have been ours. `originalOwner` tolerates stolen Elven returning
-  // to us via death (the standard engine rule that a stolen creature's
-  // discard goes to the original owner, and we mirror the "controller"
-  // semantic for the live check via `owner`).
-  if (deathInfo.owner !== ownerIdx) return false;
+  // Must have been a Creature WE CONTROLLED. The `controller` field on
+  // deathInfo (set by the engine) is the gameplay-truth side; an Elven
+  // cross-side-placed onto opp's board and dying there doesn't trigger
+  // our Rider. Falls back to `owner` for any older payload that
+  // pre-dates the controller field.
+  if ((deathInfo.controller ?? deathInfo.owner) !== ownerIdx) return false;
   const cardDB = engine._getCardDB();
   const cd = cardDB[deathInfo.name];
   if (!isElvenCreature(cd)) return false;

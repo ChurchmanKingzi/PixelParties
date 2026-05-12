@@ -34,7 +34,8 @@ module.exports = {
     // Own creatures
     for (const inst of engine.cardInstances) {
       if (inst.zone !== 'support' || inst.faceDown) continue;
-      if (inst.owner !== pi && inst.controller !== pi) continue;
+      // Controller-aware: "Creatures you control".
+      if ((inst.controller ?? inst.owner) !== pi) continue;
       const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
       if (!cd || !hasCardType(cd, 'Creature')) continue;
       const hp = inst.counters?.currentHp ?? cd.hp ?? 0;

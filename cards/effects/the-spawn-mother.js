@@ -212,6 +212,26 @@ module.exports = {
         await engine._delay(450);
       }
 
+      // Pre-damage post-target hand-reaction window — one consolidated
+      // prompt per source for Sculpture Guards / Spectral Armor / etc.
+      // covering the full hero + creature target list. The per-player
+      // `_sgPromptedFor` dedup flag prevents double-prompting when the
+      // inner `processCreatureDamageBatch` re-fires the same window.
+      {
+        const allTargets = [
+          ...heroHits.map(ht => ({
+            type: 'hero', owner: ht.owner, heroIdx: ht.heroIdx,
+            cardName: gs.players[ht.owner]?.heroes?.[ht.heroIdx]?.name,
+          })),
+          ...creatureHits.map(inst => ({
+            type: 'creature', owner: inst.controller ?? inst.owner,
+            heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+            cardName: inst.name,
+          })),
+        ];
+        await engine.preDamageMultiTargetWindow(source, allTargets);
+      }
+
       // Hero damage — one actionDealDamage per hero (the engine's hero
       // damage path is per-target). Each fires its own afterDamage so
       // listeners (Vinepire-style trackers) see each hit.

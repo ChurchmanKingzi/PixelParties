@@ -62,10 +62,12 @@ module.exports = {
 
       // ── Ally creature death branch ──
       // "A target you control" — the dying creature's CURRENT
-      // controller (`death.owner`) must be us. Charmed/stolen
-      // creatures originally ours but currently opp-controlled don't
-      // count; opp's creatures we charmed and that die DO count.
-      if (death.owner !== pi) return;
+      // controller must be us. The deathInfo `controller` field is
+      // the engine's gameplay-truth side (originally-ours but cross-
+      // side-placed onto opp's board doesn't count; opp's creatures
+      // we currently control DO count). Falls back to `owner` for old
+      // payloads that pre-date the controller field.
+      if ((death.controller ?? death.owner) !== pi) return;
 
       // Same-source co-fatality gate: if Nornstellar itself is also
       // queued to die in the current batch (its currentHp has

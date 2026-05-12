@@ -41,8 +41,8 @@ function countUniqueArtifacts(engine, pi, heroIdx, excludeId) {
     if (excludeId && inst.id === excludeId) continue;
     if (inst.zone !== 'support') continue;
     if (inst.heroIdx !== heroIdx) continue;
-    // Support cards belong to the hero's owner, not necessarily the controller
-    if (inst.owner !== pi && inst.controller !== pi) continue;
+    // Artifacts attached on the hero column we currently control.
+    if ((inst.controller ?? inst.owner) !== pi) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Artifact')) continue;
     names.add(inst.name);

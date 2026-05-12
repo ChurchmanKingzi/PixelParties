@@ -2249,6 +2249,45 @@ body {
   100% { opacity: 0; transform: translate(-6px, var(--scDropY)); }
 }
 
+/* Flame slash — Thaw Blader's blade strike. Diagonal sword slash
+   wreathed in fire: a bright blade streak sweeps across the target,
+   a hot white-orange glint pops at the midpoint, a lingering flame
+   trail glows along the cut path, embers scatter outward, and a
+   heat-shimmer wash dilates the slot briefly. */
+@keyframes flameSlashBlade {
+  0%   { opacity: 0; transform: rotate(-42deg) translateX(-130%); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: rotate(-42deg) translateX(130%); }
+}
+@keyframes flameSlashGlint {
+  0%   { opacity: 0; transform: scale(0.25); }
+  35%  { opacity: 1; transform: scale(1.5); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+@keyframes flameSlashTrail {
+  0%   { opacity: 0; transform: rotate(-42deg) scaleX(0); }
+  22%  { opacity: 1; transform: rotate(-42deg) scaleX(1); }
+  70%  { opacity: 0.95; transform: rotate(-42deg) scaleX(1); }
+  100% { opacity: 0; transform: rotate(-42deg) scaleX(1); }
+}
+@keyframes flameSlashHeat {
+  0%   { opacity: 0; transform: scale(0.45); filter: blur(0px); }
+  35%  { opacity: 0.85; transform: scale(1.05); filter: blur(1.5px); }
+  100% { opacity: 0; transform: scale(1.45); filter: blur(2.5px); }
+}
+@keyframes flameSlashEmber {
+  0%   { opacity: 0; transform: translate(0, 0) scale(1); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform:
+    translate(calc(cos(var(--fsAngle)) * var(--fsDist)), calc(sin(var(--fsAngle)) * var(--fsDist)))
+    scale(0.2); }
+}
+@keyframes flameSlashFlame {
+  0%   { opacity: 0; transform: rotate(-42deg) translate(var(--fsfStartX, 0), 0) scale(0.4); }
+  30%  { opacity: 1; transform: rotate(-42deg) translate(var(--fsfStartX, 0), -6px) scale(1.15); }
+  100% { opacity: 0; transform: rotate(-42deg) translate(var(--fsfStartX, 0), -22px) scale(0.8); }
+}
+
 /* Crescent reap — Skeleton Reaper's signature curved blade-arc cut.
    Path uses pathLength="1" so dashoffset 1→0 is a normalized "draw"
    regardless of the actual SVG path length (which scales with target
@@ -3049,6 +3088,82 @@ body {
   25%  { transform: rotateY(0deg); }
   35%  { transform: rotateY(180deg); }
   100% { transform: rotateY(180deg); }
+}
+
+/* Colored Snow's Potion reveal — two-phase animation. Phase 1 flies
+   the Potion from the controller's Potion Deck to the center of the
+   screen face-down, then dramatically flips face-up and HOLDS at the
+   center for the duration of the Potion's resolve (which may include
+   targeting prompts). Phase 2, triggered when the script adds the
+   `.exiting` class to the same DOM element, flies the card from the
+   center to its post-resolve destination (deleted pile, Support Zone
+   for Biomancy, opp hand for Saint Nicolas, or discard). */
+.colored-snow-reveal-card {
+  position: fixed;
+  width: 64px;
+  height: 90px;
+  pointer-events: none;
+  z-index: 10100;
+  perspective: 800px;
+  animation: colored-snow-reveal-in 1500ms cubic-bezier(.4,.1,.3,1) forwards;
+}
+.colored-snow-reveal-card.exiting {
+  animation: colored-snow-reveal-out 500ms ease-in forwards;
+}
+/* Handoff exit — used when another animation (Saint Nicolas's
+   play_pile_transfer) owns the actual flight to the destination.
+   The reveal card just fades + shrinks slightly in place so the
+   pile-transfer flight is the only thing the player tracks. */
+.colored-snow-reveal-card.handoff {
+  animation: colored-snow-reveal-handoff 350ms ease-out forwards;
+}
+@keyframes colored-snow-reveal-handoff {
+  0%   { left: var(--cx); top: var(--cy); transform: scale(2.6); opacity: 1; }
+  100% { left: var(--cx); top: var(--cy); transform: scale(2.2); opacity: 0; }
+}
+.colored-snow-reveal-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: colored-snow-reveal-flip 1500ms ease-in-out forwards;
+}
+.colored-snow-reveal-back,
+.colored-snow-reveal-front {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,.6);
+}
+.colored-snow-reveal-front {
+  transform: rotateY(180deg);
+}
+.colored-snow-reveal-back img,
+.colored-snow-reveal-front img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+@keyframes colored-snow-reveal-in {
+  0%   { left: var(--sx); top: var(--sy); transform: scale(1); }
+  40%  { left: var(--cx); top: var(--cy); transform: scale(2.6); }
+  100% { left: var(--cx); top: var(--cy); transform: scale(2.6); }
+}
+@keyframes colored-snow-reveal-flip {
+  0%   { transform: rotateY(0deg); }
+  60%  { transform: rotateY(0deg); }
+  80%  { transform: rotateY(180deg); }
+  100% { transform: rotateY(180deg); }
+}
+@keyframes colored-snow-reveal-out {
+  0%   { left: var(--cx); top: var(--cy); transform: scale(2.6); opacity: 1; }
+  100% { left: var(--ex); top: var(--ey); transform: scale(1); opacity: .4; }
 }
 
 /* Opponent's known re-set surprise: semi-transparent face-up card */
@@ -4766,6 +4881,15 @@ body {
    the inbound flying card can visually "arrive" into an empty-looking
    slot. */
 [data-bounce-hiding="true"] > * {
+  visibility: hidden !important;
+}
+
+/* Creature-originated ram (Bear Rider's dash, etc.) — hide the inert
+   copy of the Creature in its Support Zone for the duration of the
+   flight so only the airborne ram card is visible. Mirrors the bounce-
+   hiding rule: the slot's background / border stay rendered so the
+   layout doesn't shift, just the card contents disappear. */
+[data-support-ramming="true"] > * {
   visibility: hidden !important;
 }
 

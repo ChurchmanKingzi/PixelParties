@@ -109,28 +109,24 @@ module.exports = {
         if (!inst) return;
 
         // Stun creature (independent of poison)
-        if (engine.canApplyCreatureStatus(inst, 'stunned')) {
-          inst.counters.stunned = 1;
-          inst.counters.stunnedAppliedBy = pi;
-          engine.log('status_add', {
-            target: inst.name, status: 'stunned', owner: target.owner,
-          });
-        }
+        const stunApplied = await engine.applyCreatureStatus(inst, 'stunned', {
+          sourceOwner: pi,
+          source: hero.name,
+        });
+        if (stunApplied) engine.log('status_add', {
+          target: inst.name, status: 'stunned', owner: target.owner,
+        });
 
-        // Poison creature (independent of stun)
-        if (engine.canApplyCreatureStatus(inst, 'poisoned')) {
-          if (inst.counters.poisoned) {
-            inst.counters.poisonStacks = (inst.counters.poisonStacks || 1) + 1;
-          } else {
-            inst.counters.poisoned = 1;
-            inst.counters.poisonStacks = 1;
-          }
-          inst.counters.poisonAppliedBy = pi;
-          engine.log('poison_applied', {
-            target: inst.name, stacks: inst.counters.poisonStacks,
-            by: hero.name,
-          });
-        }
+        // Poison creature (independent of stun) — stacks additively.
+        const poisonApplied = await engine.applyCreatureStatus(inst, 'poisoned', {
+          stacks: 1, addStacks: true,
+          sourceOwner: pi,
+          source: hero.name,
+        });
+        if (poisonApplied) engine.log('poison_applied', {
+          target: inst.name, stacks: inst.counters.poisonStacks,
+          by: hero.name,
+        });
 
         engine.log('reiza_torment', {
           target: inst.name, by: hero.name,

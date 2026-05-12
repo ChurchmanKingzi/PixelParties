@@ -126,6 +126,20 @@ module.exports = {
 
       if (used >= maxBlocks) return;
 
+      // Play the source's intended status animation BEFORE removing
+      // the status — only the EFFECT is blocked; the visual still
+      // "hits" the target. The engine surfaces the source's
+      // `animationType` (or a per-status default — freeze /
+      // flame_strike / electric_strike) on `ctx.animationType`; without
+      // this broadcast the diff-detector misses the animation because
+      // the status never appears in synced state (Resistance removes
+      // it inline on the apply hook before any sync fires).
+      if (ctx.animationType) {
+        engine._broadcastEvent('play_zone_animation', {
+          type: ctx.animationType, owner: pi, heroIdx, zoneSlot: -1,
+        });
+      }
+
       // Remove the status — it is now blocked. `bypassUnhealable`
       // makes Resistance correctly absorb Venom Infusion Lv3's
       // unhealable Poison: Venom's "unhealable" prevents the Poison

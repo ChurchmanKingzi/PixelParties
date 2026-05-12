@@ -162,7 +162,14 @@ module.exports = {
         // turn protection / control_immune / new immune flags can
         // also be acquired mid-loop via reaction effects.
         if (!inst || (inst.counters?.currentHp ?? 1) <= 0) continue;
-        if ((inst.controller ?? inst.owner) === ctx.cardOwner) continue;
+        const tgtCtrl = inst.controller ?? inst.owner;
+        if (tgtCtrl === ctx.cardOwner) continue;
+        // Per-side non-damage shield (The Great Wall of Deri). Molinda's
+        // steal is a non-damage effect — opp's protected Creatures are
+        // unreachable even though the preceding damage hit them legally
+        // (damage targeting bypasses the shield, but the follow-up
+        // control flip does not).
+        if (engine._isSideNondamageShielded?.(tgtCtrl)) continue;
         if (engine.isCreatureImmune?.(inst, 'control_immune')) continue;
         if (inst.counters?._cardinalImmune) continue;
         if (inst.counters?._baihuPetrify) continue;
@@ -204,7 +211,12 @@ module.exports = {
         // off BEFORE actionTransferCreature so they overlap with
         // its 800-ms card-flight animation — the hearts trail
         // the card as it crosses the board.
-        const srcOwner = inst.owner;
+        // Animation source = PHYSICAL side (where the slot currently
+        // renders, before the transfer flips it). Equivalent to
+        // `inst.owner` under the standard convention; defensive
+        // against temp-steal scenarios (Succubus) where the card
+        // stayed on its original side.
+        const srcOwner = engine.physicalSide(inst);
         const srcHeroIdx = inst.heroIdx;
         const srcSlotIdx = inst.zoneSlot;
         engine._broadcastEvent('play_zone_animation', {

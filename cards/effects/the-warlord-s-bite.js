@@ -90,11 +90,13 @@ module.exports = {
           c.owner === tgtOwner && c.zone === 'support' &&
           c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
         );
-        if (inst && engine.canApplyCreatureStatus(inst, 'poisoned')) {
-          inst.counters.poisoned = 1;
-          inst.counters.poisonStacks = stacks;
-          inst.counters.poisonAppliedBy = pi;
-          engine.log('poison_applied', {
+        if (inst) {
+          const applied = await engine.applyCreatureStatus(inst, 'poisoned', {
+            stacks,
+            sourceOwner: pi,
+            source: "The Warlord's Bite",
+          });
+          if (applied) engine.log('poison_applied', {
             target: inst.name, by: "The Warlord's Bite", stacks,
           });
         }

@@ -71,7 +71,8 @@ module.exports = {
       // If shield is already active from an earlier batch in the same resolution, auto-apply
       if (gs._moniaShieldActive != null) {
         for (const e of entries) {
-          if (!e.cancelled && !e.isStatusDamage && e.canBeNegated !== false && e.inst.owner === gs._moniaShieldActive) {
+          if (!e.cancelled && !e.isStatusDamage && e.canBeNegated !== false
+              && (e.inst.controller ?? e.inst.owner) === gs._moniaShieldActive) {
             e.cancelled = true;
           }
         }
@@ -86,8 +87,10 @@ module.exports = {
       const promptable = entries.filter(e => !e.cancelled && !e.isStatusDamage);
       if (promptable.length === 0) return;
 
-      // Determine affected creature owners
-      const affectedOwners = new Set(promptable.map(e => e.inst.owner));
+      // Determine affected creature CONTROLLERS (gameplay-side, not
+      // raw owner — so a cross-side-placed Creature on opp's board
+      // counts under opp).
+      const affectedOwners = new Set(promptable.map(e => e.inst.controller ?? e.inst.owner));
 
       // Build prompt options (no "Cancel" — the panel has its own cancel button)
       let options;
@@ -136,10 +139,11 @@ module.exports = {
       // Set shield active for subsequent batches in this resolution
       gs._moniaShieldActive = protectOwner;
 
-      // Cancel ONLY negatable entries for the protected owner
-      // Unnegatable damage (Acid Vial, Ida) still goes through — Monia "wastes" the effect
+      // Cancel ONLY negatable entries for the protected controller.
+      // Unnegatable damage (Acid Vial, Ida) still goes through — Monia "wastes" the effect.
+      const matchesProtect = (e) => (e.inst.controller ?? e.inst.owner) === protectOwner;
       for (const e of promptable) {
-        if (e.inst.owner === protectOwner && e.canBeNegated !== false) {
+        if (matchesProtect(e) && e.canBeNegated !== false) {
           e.cancelled = true;
         }
       }
@@ -147,15 +151,21 @@ module.exports = {
       engine.log('monia_protect', {
         player: ps.username, hero: hero.name,
         protectedOwner: gs.players[protectOwner]?.username,
-        creaturesProtected: promptable.filter(e => e.inst.owner === protectOwner).map(e => e.inst.name),
+        creaturesProtected: promptable.filter(matchesProtect).map(e => e.inst.name),
       });
 
       // ── Animation: Monia rams into each protected creature ──
-      const protectedCreatures = promptable.filter(e => e.inst.owner === protectOwner);
+      // `targetOwner` uses physical side so the ram lands on the slot
+      // the player sees (cross-side-placed Creatures live on the
+      // controller's board).
+      const protectedCreatures = promptable.filter(matchesProtect);
       for (const e of protectedCreatures) {
+        const physSide = e.inst.stolenBy != null
+          ? e.inst.owner
+          : (e.inst.controller ?? e.inst.owner);
         engine._broadcastEvent('play_ram_animation', {
           sourceOwner: ctx.cardOriginalOwner, sourceHeroIdx: heroIdx,
-          targetOwner: e.inst.owner, targetHeroIdx: e.inst.heroIdx,
+          targetOwner: physSide, targetHeroIdx: e.inst.heroIdx,
           targetZoneSlot: e.inst.zoneSlot,
           cardName: hero.name, duration: 600,
           trailType: 'fire_stars',
@@ -190,9 +200,13 @@ module.exports = {
       if (!flags?.moniaProtection) return;
       if (flags.moniaUsedThisTurn) return;
 
+      // Side attribution uses CONTROLLER — a cross-side-placed
+      // Creature counts under the side that currently controls it.
+      const creatureSide = creature.controller ?? creature.owner;
+
       // If shield is already active, auto-apply
       if (gs._moniaShieldActive != null) {
-        if (creature.owner === gs._moniaShieldActive) {
+        if (creatureSide === gs._moniaShieldActive) {
           ctx.cancelled = true;
         }
         return;
@@ -202,10 +216,10 @@ module.exports = {
       if (!ps || (ps.hand || []).length === 0) return;
 
       const creatureName = creature.name || 'Creature';
-      const ownerLabel = creature.owner === pi ? 'your' : (gs.players[creature.owner]?.username || 'Player') + "'s";
+      const ownerLabel = creatureSide === pi ? 'your' : (gs.players[creatureSide]?.username || 'Player') + "'s";
 
       const options = [
-        { id: `save-${creature.owner}`, label: `🛡️ Protect ${creatureName} (discard 1)` },
+        { id: `save-${creatureSide}`, label: `🛡️ Protect ${creatureName} (discard 1)` },
       ];
 
       const result = await engine.promptGeneric(pi, {
@@ -231,10 +245,12 @@ module.exports = {
         protectedCreature: creatureName, effectType: ctx.effectType,
       });
 
-      // Animation: Monia rams into creature
+      // Animation: Monia rams into creature. `targetOwner` is the
+      // PHYSICAL side (where the creature actually renders) so a
+      // cross-side-placed Creature gets the ram on opp's slot.
       engine._broadcastEvent('play_ram_animation', {
         sourceOwner: ctx.cardOriginalOwner, sourceHeroIdx: heroIdx,
-        targetOwner: creature.owner, targetHeroIdx: creature.heroIdx,
+        targetOwner: creatureSide, targetHeroIdx: creature.heroIdx,
         targetZoneSlot: creature.zoneSlot,
         cardName: hero.name, duration: 600,
         trailType: 'fire_stars',

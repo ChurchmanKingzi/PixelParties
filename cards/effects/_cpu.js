@@ -2685,10 +2685,27 @@ function mctsValidateGenericEntry(entry, promptData) {
 
 // Enumerate alternative values for a branchable generic prompt. Returns an
 // array of { value, label } entries usable as plan values.
-function mctsEnumerateGenericAlternatives(promptData) {
+function mctsEnumerateGenericAlternatives(promptData, cpuIdxForBias) {
   const type = promptData.type;
   if (type === 'zonePick') {
-    return (promptData.zones || []).map(z => ({
+    let zones = (promptData.zones || []).slice();
+    // Card-driven placement preference — same `cpuMeta.preferOpponent
+    // SupportZone` flag the heuristic path consults. Sorts opp-side
+    // zones first so MCTS explores them before own-side alternatives
+    // (the rollout cap often truncates after the top N branches).
+    try {
+      const sourceName = promptData.title;
+      const script = sourceName ? loadCardEffect(sourceName) : null;
+      if (script?.cpuMeta?.preferOpponentSupportZone && cpuIdxForBias != null) {
+        const oppIdx = cpuIdxForBias === 0 ? 1 : 0;
+        zones.sort((a, b) => {
+          const aOpp = a.ownerIdx === oppIdx ? 0 : 1;
+          const bOpp = b.ownerIdx === oppIdx ? 0 : 1;
+          return aOpp - bOpp;
+        });
+      }
+    } catch { /* ignore — keep original ordering */ }
+    return zones.map(z => ({
       value: { heroIdx: z.heroIdx, slotIdx: z.slotIdx },
       label: `zone=h${z.heroIdx}s${z.slotIdx}`,
     }));
@@ -2901,7 +2918,7 @@ function installCpuBrain(engine) {
           kind: `generic:${promptData.type}`,
           title: promptData.title,
           cancellable: !!promptData.cancellable,
-          alternatives: mctsEnumerateGenericAlternatives(promptData),
+          alternatives: mctsEnumerateGenericAlternatives(promptData, playerIdx),
           picked,
           wasScripted: scriptedValue != null,
         });
@@ -3655,7 +3672,22 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   if (type === 'zonePick') {
     const zones = promptData.zones || [];
     if (!zones.length) return null;
-    const z = zones[Math.floor(Math.random() * zones.length)];
+    // Card-driven placement preference. The source card's script can
+    // expose `cpuMeta.preferOpponentSupportZone: true` (Chilly Wizard
+    // and any future cross-side placement Creature). When set, the
+    // heuristic narrows the candidate pool to zones on the opp's side
+    // — falls back to all zones if none qualify.
+    let pool = zones;
+    try {
+      const sourceName = promptData.title;
+      const script = sourceName ? loadCardEffect(sourceName) : null;
+      if (script?.cpuMeta?.preferOpponentSupportZone) {
+        const oppIdx = cpuIdx === 0 ? 1 : 0;
+        const oppPool = zones.filter(z => z.ownerIdx === oppIdx);
+        if (oppPool.length > 0) pool = oppPool;
+      }
+    } catch { /* ignore — fall through to uniform pick */ }
+    const z = pool[Math.floor(Math.random() * pool.length)];
     return { heroIdx: z.heroIdx, slotIdx: z.slotIdx };
   }
   // Hand-pick (mulligan) prompts: Leadership, Horn in a Bottle, etc.
@@ -5647,7 +5679,7 @@ function computeGoldDemand(engine, pi) {
     }
   }
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi || inst.zone !== 'support') continue;
+    if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
     const script = loadCardEffect(inst.name);
     if (typeof script?.cpuGoldCostForActivation !== 'function') continue;
     try {

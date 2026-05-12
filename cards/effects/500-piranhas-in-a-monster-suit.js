@@ -67,7 +67,10 @@ function _validVictims(engine, pi) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    if (inst.owner !== oi) continue;
+    // Filter to opp-CONTROLLED creatures, not opp-owned: a stolen
+    // creature is no longer a legal opp target, and a Chilly Wizard
+    // cross-side-summoned onto opp's board IS.
+    if ((inst.controller ?? inst.owner) !== oi) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (engine.isOmniImmune(inst)) continue;          // Cardinal / omni

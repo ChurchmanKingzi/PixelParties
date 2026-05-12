@@ -95,6 +95,13 @@ module.exports = {
 
       if (selectedTargets.length === 0) return;
 
+      // Pre-damage post-target hand-reaction window — single
+      // consolidated prompt for Sculpture Guards / Spectral Armor.
+      await engine.preDamageMultiTargetWindow(
+        { name: 'Chain Lightning', owner: pi, heroIdx: ctx.cardHeroIdx },
+        selectedTargets,
+      );
+
       // Chain lightning animation + damage
       let prevOwner = selectedTargets[0].owner;
       let prevHeroIdx = selectedTargets[0].heroIdx;

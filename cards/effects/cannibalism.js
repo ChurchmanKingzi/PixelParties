@@ -117,11 +117,14 @@ module.exports = {
   activeIn: ['ability'],
 
   hooks: {
-    /** Ally Creature died — offer the prompt. */
+    /** Ally Creature died — offer the prompt. Side attribution uses
+     *  CONTROLLER so a Creature cross-side-placed onto opp's board
+     *  (Chilly Wizard) feeds opp's Cannibalism, not the original
+     *  owner's. */
     onCreatureDeath: async (ctx) => {
       const death = ctx.creature;
       if (!death) return;
-      const ownerSide = death.owner ?? death.originalOwner;
+      const ownerSide = death.controller ?? death.owner;
       await tryEat(ctx, death.name, ownerSide);
     },
 

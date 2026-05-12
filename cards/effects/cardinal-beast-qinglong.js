@@ -62,6 +62,12 @@ module.exports = {
     });
     if (selectedTargets.length === 0) return false;
 
+    // Pre-damage post-target hand-reaction window.
+    await engine.preDamageMultiTargetWindow(
+      { name: 'Cardinal Beast Qinglong', owner: pi, heroIdx },
+      selectedTargets,
+    );
+
     // Chain lightning from Qinglong → target 1 → target 2 → target 3
     let prevOwner = pi, prevHeroIdx = heroIdx, prevZoneSlot = zoneSlot;
 

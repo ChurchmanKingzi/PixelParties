@@ -267,13 +267,12 @@ module.exports = {
         // Cardinal Beasts (and anything else with `_cardinalImmune`)
         // refuse every status, including the ones Tea is "redirecting"
         // here — canApplyCreatureStatus is the single point of truth.
-        if (inst && engine.canApplyCreatureStatus(inst, key)) {
-          if (key === 'poisoned') {
-            inst.counters.poisoned = 1;
-            inst.counters.poisonStacks = poisonStacks;
-          } else {
-            inst.counters[key] = 1;
-          }
+        if (inst) {
+          await engine.applyCreatureStatus(inst, key, {
+            stacks: key === 'poisoned' ? poisonStacks : undefined,
+            sourceOwner: pi,
+            source: 'Tea',
+          });
         }
       }
     }

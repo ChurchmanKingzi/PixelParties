@@ -63,7 +63,10 @@ function applyBonusToAll(ctx) {
   const cardDB  = engine._getCardDB();
 
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi && inst.controller !== pi) continue;
+    // Controller-aware filter — "Creatures you control". The old
+    // `owner OR controller === pi` form wrongly included cross-side-
+    // placed cards still owned by us but currently controlled by opp.
+    if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.zone !== 'support') continue;
     if (inst.counters._laynBonus) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
@@ -79,7 +82,10 @@ function applyBonusToAll(ctx) {
  */
 function removeBonusFromAll(engine, pi) {
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi && inst.controller !== pi) continue;
+    // Controller-aware filter — "Creatures you control". The old
+    // `owner OR controller === pi` form wrongly included cross-side-
+    // placed cards still owned by us but currently controlled by opp.
+    if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.zone !== 'support') continue;
     const bonus = inst.counters._laynBonus || 0;
     if (!bonus) continue;

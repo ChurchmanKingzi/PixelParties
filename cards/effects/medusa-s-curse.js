@@ -119,11 +119,12 @@ module.exports = {
       for (const inst of creatureTargets) {
         // Re-gate at apply time: cardinal-immune / shielded creatures
         // got the visual petrify above but the actual stun + buff are
-        // refused here. Without this gate, the inline counter write
-        // would bypass every immunity check.
-        if (!engine.canApplyCreatureStatus(inst, 'stunned')) continue;
-        inst.counters.stunned = 1;
-        inst.counters.stunnedAppliedBy = pi;
+        // refused here. applyCreatureStatus handles immunity internally.
+        const applied = await engine.applyCreatureStatus(inst, 'stunned', {
+          sourceOwner: pi,
+          source: "Medusa's Curse",
+        });
+        if (!applied) continue;
         // Route through actionAddCreatureBuff so damageMultiplier is pulled
         // from BUFF_EFFECTS (the old inline write skipped this, leaving the
         // buff with no multiplier — which is why creature damage-immunity

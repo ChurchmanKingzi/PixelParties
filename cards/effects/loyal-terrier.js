@@ -103,8 +103,10 @@ module.exports = {
       // for that case; it falls out of the engine's revive path.
       if (ctx.card.counters?._dyingThisBatch) return;
 
-      // Dying creature must be ours.
-      if ((death.owner ?? death.originalOwner) !== pi) return;
+      // Dying creature must be one WE CONTROLLED. Controller (not
+      // owner) is the gameplay-truth side — a Loyal cross-side-placed
+      // onto opp's board doesn't count as ours.
+      if ((death.controller ?? death.owner) !== pi) return;
       // …and a Loyal that is NOT Terrier itself ("except Loyal
       // Terrier"). Excluding Terrier here prevents the runaway where
       // every Terrier in a multi-Terrier wipe paid out a 50-damage

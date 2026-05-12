@@ -49,10 +49,12 @@ module.exports = {
           }
         }
         for (const { inst } of result.creatures) {
-          if (inst && !inst.counters.burned && !inst.faceDown && !inst.counters._cardinalImmune) {
-            inst.counters.burned = true;
-            engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: 'Divine Gift of Fire' });
-          }
+          if (!inst || inst.faceDown) continue;
+          const applied = await engine.applyCreatureStatus(inst, 'burned', {
+            sourceOwner: pi,
+            source: 'Divine Gift of Fire',
+          });
+          if (applied) engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: 'Divine Gift of Fire' });
         }
 
         engine._broadcastEvent('play_zone_animation', {
@@ -99,9 +101,12 @@ module.exports = {
 
       // Apply Burned to all collected creatures
       for (const { inst } of result.creatures) {
-        if (inst.counters.burned || inst.faceDown || inst.counters._cardinalImmune) continue;
-        inst.counters.burned = true;
-        engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: 'Divine Gift of Fire' });
+        if (!inst || inst.faceDown) continue;
+        const applied = await engine.applyCreatureStatus(inst, 'burned', {
+          sourceOwner: pi,
+          source: 'Divine Gift of Fire',
+        });
+        if (applied) engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: 'Divine Gift of Fire' });
       }
 
       // Single reaction window for the entire batch

@@ -134,7 +134,10 @@ module.exports = {
 
       const entries = ctx.entries || [];
       for (const e of entries) {
-        if (e.inst.owner !== pi) continue;
+        // Controller-aware: "your Creatures" filters by current
+        // controller, not original owner, so cross-side-placed
+        // Creatures dying on opp's side don't feed your Elixir.
+        if ((e.inst.controller ?? e.inst.owner) !== pi) continue;
         if (e.inst.counters.currentHp !== undefined && e.inst.counters.currentHp <= 0) {
           if (ps.discardPile.includes(e.inst.name)) {
             if (!perm._pendingCreatures) perm._pendingCreatures = [];

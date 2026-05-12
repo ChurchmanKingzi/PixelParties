@@ -288,7 +288,10 @@ module.exports = {
       for (const e of entries) {
         if (e.cancelled) continue;
         if (!e.inst) continue;
-        if (e.inst.controller !== ownerIdx && e.inst.owner !== ownerIdx) continue;
+        // Controller-aware "Creatures you control" — the OR form
+        // wrongly included cross-side-placed Creatures still owned by
+        // us but currently controlled by opp.
+        if ((e.inst.controller ?? e.inst.owner) !== ownerIdx) continue;
         // Skip entries whose source is our own redirect re-fire.
         if (e.source?._tempesteRedirected) continue;
         if (e.amount <= 0) continue;
@@ -317,7 +320,10 @@ module.exports = {
       candidate.cancelled = true;
 
       engine._broadcastEvent('tempeste_redirect_strike', {
-        fromOwner: candidate.inst.owner,
+        // Animation source = PHYSICAL side (where the creature renders).
+        fromOwner: candidate.inst.stolenBy != null
+          ? candidate.inst.owner
+          : (candidate.inst.controller ?? candidate.inst.owner),
         fromHeroIdx: candidate.inst.heroIdx,
         fromZoneSlot: candidate.inst.zoneSlot,
         toOwner: ownerIdx, toHeroIdx: ctx.cardHeroIdx,

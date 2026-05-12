@@ -70,8 +70,11 @@ module.exports = {
     if (target.type === 'hero') {
       await engine.addHeroStatus(target.owner, target.heroIdx, 'stunned', { duration: 1, appliedBy: pi });
     } else if (target.cardInstance) {
-      if (!target.cardInstance.counters) target.cardInstance.counters = {};
-      target.cardInstance.counters.stunned = 1;
+      await engine.applyCreatureStatus(target.cardInstance, 'stunned', {
+        sourceOwner: pi,
+        duration: 1,
+        source: 'Lolki, Trickstar of Coolness',
+      });
     }
     engine.sync();
   },

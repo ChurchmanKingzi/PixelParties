@@ -70,16 +70,11 @@ module.exports = {
           addStacks: 1, appliedBy: pi,
         });
       } else if (target.cardInstance) {
-        const inst = target.cardInstance;
-        if (engine.canApplyCreatureStatus(inst, 'poisoned')) {
-          if (inst.counters.poisoned) {
-            inst.counters.poisonStacks = (inst.counters.poisonStacks || 1) + 1;
-          } else {
-            inst.counters.poisoned = 1;
-            inst.counters.poisonStacks = 1;
-          }
-          inst.counters.poisonAppliedBy = pi;
-        }
+        await engine.applyCreatureStatus(target.cardInstance, 'poisoned', {
+          stacks: 1, addStacks: true,
+          sourceOwner: pi,
+          source: 'Toxic Trap',
+        });
       }
       engine.log('poison_applied', { target: target.cardName, stacks: 1, by: 'Toxic Trap' });
       engine.sync();
@@ -110,14 +105,12 @@ module.exports = {
       });
       await engine._delay(500);
 
-      if (engine.canApplyCreatureStatus(srcInst, 'poisoned')) {
-        if (srcInst.counters.poisoned) {
-          srcInst.counters.poisonStacks = (srcInst.counters.poisonStacks || 1) + 1;
-        } else {
-          srcInst.counters.poisoned = 1;
-          srcInst.counters.poisonStacks = 1;
-        }
-        srcInst.counters.poisonAppliedBy = pi;
+      const applied = await engine.applyCreatureStatus(srcInst, 'poisoned', {
+        stacks: 1, addStacks: true,
+        sourceOwner: pi,
+        source: 'Toxic Trap',
+      });
+      if (applied) {
         engine.log('poison_applied', {
           target: srcInst.name, stacks: srcInst.counters.poisonStacks,
           by: 'Toxic Trap',

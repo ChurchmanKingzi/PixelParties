@@ -66,14 +66,12 @@ module.exports = {
             appliedBy: pi,
           });
         } else if (t.type === 'creature' && t.inst) {
-          if (engine.canApplyCreatureStatus(t.inst, 'poisoned')) {
-            if (t.inst.counters.poisoned) {
-              t.inst.counters.poisonStacks = (t.inst.counters.poisonStacks || 1) + 1;
-            } else {
-              t.inst.counters.poisoned = 1;
-              t.inst.counters.poisonStacks = 1;
-            }
-            t.inst.counters.poisonAppliedBy = pi;
+          const applied = await engine.applyCreatureStatus(t.inst, 'poisoned', {
+            stacks: 1, addStacks: true,
+            sourceOwner: pi,
+            source: hero.name,
+          });
+          if (applied) {
             engine.log('poison_applied', {
               target: t.inst.name, stacks: t.inst.counters.poisonStacks,
               by: hero.name,

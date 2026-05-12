@@ -56,8 +56,19 @@ function permanentlyOwnedHero(hero, pi) {
 
 function permanentlyOwnedCreature(engine, inst, pi) {
   if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
-  if (inst.owner !== pi) return false;
-  if (inst.stolenBy != null && inst.stolenBy !== pi) return false;
+  // BSC requires BOTH axes of ownership to match the user:
+  //   • DECK-SIDE ("permanently owned") — `inst.originalOwner === pi`
+  //     so a Creature Diplomacy'd / Dark-Gear'd / Molinda'd off the
+  //     opponent (whose `inst.owner` now points at the stealer because
+  //     the card physically moved) is correctly excluded — opp still
+  //     owns the card in deck/discard terms.
+  //   • GAMEPLAY-SIDE ("currently owned") — `(inst.controller ??
+  //     inst.owner) === pi` so a Creature you originally own but
+  //     someone else currently controls (temp steal like Deepsea
+  //     Succubus, or your own Chilly Wizard given away cross-side) is
+  //     correctly excluded too.
+  if ((inst.originalOwner ?? inst.owner) !== pi) return false;
+  if ((inst.controller ?? inst.owner) !== pi) return false;
   const host = engine.gs.players[pi]?.heroes?.[inst.heroIdx];
   if (!host?.name || host.hp <= 0) return false;
   if (host.charmedBy != null && host.charmedBy !== pi) return false;

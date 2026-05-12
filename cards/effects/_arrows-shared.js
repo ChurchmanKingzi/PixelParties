@@ -350,11 +350,11 @@ async function applyBurnToTarget(engine, pi, loc, sourceLabel) {
       appliedBy: pi, _skipReactionCheck: true,
     });
   } else if (loc.kind === 'creature' && loc.inst) {
-    if (engine.canApplyCreatureStatus(loc.inst, 'burned') && !loc.inst.counters?.burned) {
-      loc.inst.counters = loc.inst.counters || {};
-      loc.inst.counters.burned = true;
-      engine.log('creature_burned', { card: loc.inst.name, owner: loc.inst.owner, by: sourceLabel });
-    }
+    const applied = await engine.applyCreatureStatus(loc.inst, 'burned', {
+      sourceOwner: pi,
+      source: sourceLabel,
+    });
+    if (applied) engine.log('creature_burned', { card: loc.inst.name, owner: loc.inst.owner, by: sourceLabel });
   }
 }
 
@@ -365,14 +365,14 @@ async function applyPoisonStacksToTarget(engine, pi, loc, stacks, sourceLabel) {
       addStacks: stacks, appliedBy: pi, _skipReactionCheck: true,
     });
   } else if (loc.kind === 'creature' && loc.inst) {
-    if (engine.canApplyCreatureStatus(loc.inst, 'poisoned')) {
-      loc.inst.counters = loc.inst.counters || {};
-      const cur = loc.inst.counters.poisoned || 0;
-      loc.inst.counters.poisoned = cur + stacks;
-      engine.log('creature_poisoned', {
-        card: loc.inst.name, owner: loc.inst.owner, stacks, total: loc.inst.counters.poisoned, by: sourceLabel,
-      });
-    }
+    await engine.applyCreatureStatus(loc.inst, 'poisoned', {
+      stacks, addStacks: true,
+      sourceOwner: pi,
+      source: sourceLabel,
+    });
+    engine.log('creature_poisoned', {
+      card: loc.inst.name, owner: loc.inst.owner, stacks, total: loc.inst.counters?.poisonStacks, by: sourceLabel,
+    });
   }
 }
 

@@ -7,45 +7,45 @@
 //    negated when it's summoned by the effect
 //    of Necromancy.
 //
-//  ON SUMMON BY NECROMANCY: choose another
-//    Creature in your discard pile; this Creature
-//    gains that Creature's effect while it
-//    remains on the board.
+//  ON SUMMON BY NECROMANCY: choose up to 2
+//    Creatures with different names in your
+//    discard pile (excluding Sah itself). Sah
+//    resolves each chosen Creature's on-summon
+//    effect AS IF IT WERE ITS OWN — i.e. each
+//    selected Creature's `onPlay` fires once,
+//    routed through Sah's instance (Sah is the
+//    host hero / zone subject). The mimicked
+//    Creature's hooks/effects are NOT inherited
+//    persistently — the override is bound only
+//    while each `onPlay` runs, then cleared.
 //
-//  Implementation: the chosen Creature's name is
-//  stamped onto `inst.counters._effectOverride`.
-//  Two engine paths consult this counter and
-//  re-route through `loadCardEffect(override)`:
-//    1. Active creature-effect activation
-//       (server.js): `creatureEffect`,
-//       `canActivateCreatureEffect`,
-//       `onCreatureEffect`.
-//    2. Passive hook dispatch
-//       (CardInstance.getHook in _engine.js):
-//       any `hooks.<name>` defined on the
-//       override script fires from Sah's
-//       instance.
-//  After binding, Sah immediately re-fires
-//  `onPlay` for its own instance — this
-//  triggers the mimicked Creature's on-summon
-//  effect with Sah as the subject (host hero,
-//  zone slot, owner, etc.). The summon-flag
-//  context (`_summonedFromDiscard`,
-//  `_summonedByNecromancy`, `_necromancyLevel`)
-//  is forwarded so the mimicked Creature's
-//  trigger gates ("on summon from discard",
-//  "on summon by Necromancy") fire correctly.
-//  `onCardEnterZone` does NOT need a manual
-//  re-fire — Necromancy fires it AFTER Sah's
-//  onPlay returns, so the override is already
-//  bound by then and the mimic hook dispatch
-//  picks it up automatically.
+//  Implementation:
+//    • `inst.counters._effectOverride` is bound
+//      to the chosen Creature's name just before
+//      that Creature's `onPlay` is dispatched
+//      via `engine.runHooks('onPlay', { _onlyCard:
+//      inst, … })`. CardInstance.getHook routes
+//      Sah's hook lookups through the override
+//      script for the duration of the fire, so
+//      the dispatcher finds the chosen Creature's
+//      onPlay and runs it with Sah's instance as
+//      the subject. The summon-flag context
+//      (`_summonedFromDiscard`,
+//      `_summonedByNecromancy`,
+//      `_necromancyLevel`) is forwarded so the
+//      mimicked Creature's trigger gates fire
+//      correctly.
+//    • After every chosen Creature's onPlay
+//      resolves, `_effectOverride` is deleted —
+//      no persistent inheritance of active
+//      effects or passive hooks. Sah falls back
+//      to a hook-less Creature for the rest of
+//      its time on the board.
+//
 //  Sah's own `bypassNecromancyNegation` flag and
 //  `canSummon` predicate stay intact (those are
 //  consulted by name at summon time, not via
-//  the override). The mimic effect persists for
-//  as long as Sah remains on the board — the
-//  inst's counters are discarded with the inst.
+//  the override).
 //
 //  HARD 1/TURN by name.
 // ═══════════════════════════════════════════
@@ -57,17 +57,30 @@ const {
   markSoulShardEffectFired,
 } = require('./_soul-shards-shared');
 const { hasCardType } = require('./_hooks');
+const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Soul Shard Sah';
+const MAX_PICKS = 2;
+
+/**
+ * Does this Creature have an on-summon effect we can resolve?
+ * "On-summon effect" = an `onPlay` hook. Vanilla stat Creatures with
+ * no `hooks.onPlay` are excluded from Sah's picker per the new effect
+ * text: there's nothing for Sah to resolve, so showing them would just
+ * be dead options.
+ */
+function _hasOnSummonEffect(cardName) {
+  if (!cardName) return false;
+  const script = loadCardEffect(cardName);
+  return typeof script?.hooks?.onPlay === 'function';
+}
 
 module.exports = {
   activeIn: ['support'],
   bypassNecromancyNegation: true,
   canSummon: canSummonSoulShard,
   cpuMeta: { pileFuel: SOUL_SHARD_PILE_FUEL },
-  // Sandy Blob gate — Sah's mimic effect only runs when summoned by
-  // Necromancy specifically (stricter than the other Shards' from-
-  // discard gate; Sah uses the `_summonedByNecromancy` flag).
+  // Sandy Blob gate — Sah's effect only fires when summoned by Necromancy.
   summonEffectActivates: soulShardEffectActivates_FromNecromancy,
 
   hooks: {
@@ -82,73 +95,87 @@ module.exports = {
       if (!ps?.discardPile?.length) return;
 
       // Build deduped gallery of distinct Creature names from the own
-      // discard pile, excluding Sah itself ("another Creature"). Other
-      // Soul Shards are valid targets — mimicking another Shard is legal
-      // (the per-name 1/turn cap fires on Sah, not the mimicked Shard,
-      // and the override only routes hook/activation lookups; the
-      // mimicked Shard's own onPlay does NOT re-fire).
+      // discard pile, excluding Sah itself AND Creatures with no
+      // `onPlay` hook (nothing to resolve, so they're not eligible).
       const cardDB = engine._getCardDB();
       const counts = {};
       for (const name of ps.discardPile) {
         if (name === CARD_NAME) continue;
         const cd = cardDB[name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
+        if (!_hasOnSummonEffect(name)) continue;
         counts[name] = (counts[name] || 0) + 1;
       }
       const gallery = Object.entries(counts)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([name, count]) => ({ name, source: 'discard', count }));
+      // No eligible Creatures → Sah fizzles. (Sah's body stays on the
+      // board; only the mimic effect doesn't fire.)
       if (gallery.length === 0) return;
 
+      // Multi-select: up to MAX_PICKS distinct names. The gallery is
+      // already deduped by name, so picking 2 entries naturally yields 2
+      // different Creatures.
       const pick = await engine.promptGeneric(pi, {
-        type: 'cardGallery',
+        type: 'cardGalleryMulti',
         cards: gallery,
         title: CARD_NAME,
-        description: 'Choose another Creature in your discard pile. Soul Shard Sah gains that Creature\'s effect while it remains on the board.',
+        description: `Choose up to ${MAX_PICKS} Creatures with different names from your discard pile. Soul Shard Sah resolves each of their on-summon effects as if they were its own.`,
+        confirmLabel: '✨ Resolve!',
         cancellable: true,
+        alwaysConfirmable: true,
+        selectCount: MAX_PICKS,
+        minSelect: 0,
+        maxTotal: MAX_PICKS,
       });
-      if (!pick || pick.cancelled || !pick.cardName) return;
-      const chosenName = pick.cardName;
+      if (!pick || pick.cancelled) return;
+      // `promptGeneric` returns `selectedCards` as an array of plain
+      // string names for `cardGalleryMulti`. The gallery was deduped
+      // by name above, so `chosenNames` is already distinct.
+      const chosenNames = (pick.selectedCards || []).filter(Boolean);
+      if (chosenNames.length === 0) return;
 
-      // Bind the chosen Creature's effect onto Sah's instance. The
-      // engine's creature-effect activation path and CardInstance.getHook
-      // both consult `inst.counters._effectOverride`.
       const inst = ctx.card;
       if (!inst) return;
       inst.counters = inst.counters || {};
-      inst.counters._effectOverride = chosenName;
 
-      // Effect fully committed (mimic bound) — Sandy Blob marker.
-      // The subsequent re-fire of onPlay for the mimicked Creature
-      // runs against Sah's own inst; if the mimicked Creature's
-      // onPlay sets its OWN marker that's fine — Sandy Blob would
-      // already have fired off Sah's marker by then.
+      // Effect fully committed (mimic bound, at least one pick) —
+      // Sandy Blob marker. Mimicked Creatures' own onPlays may set
+      // their own markers; Sah's marker is set here regardless.
       markSoulShardEffectFired(ctx);
       engine.log('soul_shard_sah_mimic', {
-        player: ps.username, mimicking: chosenName,
+        player: ps.username, mimicking: chosenNames,
       });
       engine.sync();
 
-      // Immediately re-fire onPlay for Sah's own instance. With the
-      // override now set, CardInstance.getHook routes the lookup to the
-      // mimicked Creature's onPlay, which then fires in Sah's context
-      // (ctx.card = Sah, host hero/zone = Sah's). Forward the summon
-      // flags Sah received from Necromancy so the mimicked Creature's
-      // own trigger gates ("on summon from discard / by Necromancy")
-      // fire correctly. `_onlyCard: inst` keeps OTHER cards from
-      // re-reacting — they already saw Sah's original summon.
+      // Summon-flag context forwarded so each mimicked Creature's own
+      // trigger gates ("on summon from discard / by Necromancy") fire.
       const summonExtras = {
         _summonedFromDiscard: !!ctx._summonedFromDiscard,
         _summonedByNecromancy: !!ctx._summonedByNecromancy,
         _necromancyLevel: ctx._necromancyLevel,
         _summonedBySoulShardSah: true,
       };
-      await engine.runHooks('onPlay', {
-        _onlyCard: inst, playedCard: inst,
-        cardName: chosenName, zone: 'support',
-        heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
-        ...summonExtras,
-      });
+
+      // Fire each chosen Creature's onPlay sequentially against Sah's
+      // instance. Bind the override JUST BEFORE the fire, then leave it
+      // in place across the loop — getHook reads it on every dispatch,
+      // and we want each iteration to route to that iteration's chosen
+      // Creature. After the loop, drop the override entirely; Sah has
+      // no persistent hooks of its own.
+      try {
+        for (const chosenName of chosenNames) {
+          inst.counters._effectOverride = chosenName;
+          await engine.runHooks('onPlay', {
+            _onlyCard: inst, playedCard: inst,
+            cardName: chosenName, zone: 'support',
+            heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+            ...summonExtras,
+          });
+        }
+      } finally {
+        delete inst.counters._effectOverride;
+      }
     },
   },
 };

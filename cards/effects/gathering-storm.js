@@ -305,6 +305,10 @@ module.exports = {
       const source = { name: CARD_NAME, owner: ownerIdx, heroIdx: ctx.cardHeroIdx };
       const chosen = picked.map(id => targets.find(t => t.id === id)).filter(Boolean);
 
+      // Pre-damage post-target hand-reaction window — one consolidated
+      // prompt per Gathering Storm tick for Sculpture Guards etc.
+      await engine.preDamageMultiTargetWindow(source, chosen);
+
       // ── Animate + damage each picked target ──
       // Dedicated `gathering_storm_strike` event so the client can
       // route the per-target damage cue to a lightning SFX (rather

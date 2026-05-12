@@ -60,6 +60,18 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   }
   await engine._delay(550);
 
+  // Pre-damage post-target hand-reaction window — one consolidated
+  // prompt per source for Sculpture Guards / Spectral Armor / Bamboo
+  // Shield / Homerun! / Cloud in a Bottle covering the full hero hit
+  // list. Required because the per-hero `actionDealDamage` loop below
+  // does not invoke the central post-target hub.
+  {
+    const allTgts = heroHits.map(({ hi, hero }) => ({
+      type: 'hero', owner: oi, heroIdx: hi, cardName: hero.name,
+    }));
+    await engine.preDamageMultiTargetWindow(source, allTgts);
+  }
+
   for (const { hi, hero } of heroHits) {
     if (hero.hp <= 0) continue; // May have died from a prior hit in this loop
     await engine.actionDealDamage(source, hero, DAMAGE, 'creature');

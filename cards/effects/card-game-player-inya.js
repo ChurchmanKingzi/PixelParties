@@ -59,7 +59,7 @@ const TOKEN_HP = 10;
 function _countBuddies(engine, pi) {
   let n = 0;
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi) continue;
+    if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.zone !== 'support') continue;
     if (!inst.counters?._fantasyBuddyToken) continue;
     const hp = inst.counters?.currentHp ?? inst.counters?._cardDataOverride?.hp ?? 0;

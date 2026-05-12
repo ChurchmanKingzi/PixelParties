@@ -88,7 +88,7 @@ function buildOwnStatusedTargets(engine, pi) {
   const targets = buildOwnStatusedHeroes(engine, pi);
   const negKeys = getCleansableStatuses();
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi || inst.zone !== 'support' || inst.faceDown) continue;
+    if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support' || inst.faceDown) continue;
     if (!negKeys.some(k => inst.counters?.[k])) continue;
     targets.push({
       id: `equip-${pi}-${inst.heroIdx}-${inst.zoneSlot}`,

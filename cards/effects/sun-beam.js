@@ -50,7 +50,10 @@ module.exports = {
         if (inst.name === POLLUTION_TOKEN) continue; // explicit exclusion
 
         if (inst.zone === 'support') {
-          const isOwnSupport = inst.owner === pi;
+          // "Your" / "opponent's" is the CONTROLLER axis. A Creature
+          // you originally own but cross-side-placed onto opp's board
+          // counts as theirs for picker semantics.
+          const isOwnSupport = (inst.controller ?? inst.owner) === pi;
           if (isOwnSupport) ownSupportAvailable++;
           targets.push({
             id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,

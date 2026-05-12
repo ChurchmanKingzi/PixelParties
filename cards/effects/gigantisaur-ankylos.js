@@ -104,11 +104,12 @@ module.exports = {
       });
     } else if (target.cardInstance) {
       const inst = target.cardInstance;
-      if (engine.canApplyCreatureStatus(inst, 'stunned')) {
-        inst.counters.stunned = 1;
-        inst.counters.stunnedAppliedBy = pi;
-        engine.log('status_add', { target: inst.name, status: 'stunned', owner: target.owner });
-      }
+      const applied = await engine.applyCreatureStatus(inst, 'stunned', {
+        sourceOwner: pi,
+        duration: 1,
+        source: 'Gigantisaur Ankylos',
+      });
+      if (applied) engine.log('status_add', { target: inst.name, status: 'stunned', owner: target.owner });
     }
 
     engine.log('ankylos_stun', {

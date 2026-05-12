@@ -87,11 +87,16 @@ module.exports = {
             { sourceOwner: pi, canBeNegated: true },
           );
 
-          // Freeze the creature if still on the board and not immune
+          // Freeze the creature if still on the board. Routed through
+          // applyCreatureStatus so ON_STATUS_APPLIED fires (Bear Rider /
+          // Chilly Wizard / Colored Snow / future listeners).
           const stillAlive = engine.cardInstances.find(c => c.id === inst.id && c.zone === 'support');
-          if (stillAlive && !stillAlive.counters.frozen && engine.canApplyCreatureStatus(stillAlive, 'frozen')) {
-            stillAlive.counters.frozen = 1;
-            engine.log('freeze', { target: inst.name, by: 'Icebolt', type: 'creature' });
+          if (stillAlive) {
+            const applied = await engine.applyCreatureStatus(stillAlive, 'frozen', {
+              sourceOwner: pi,
+              source: 'Icebolt',
+            });
+            if (applied) engine.log('freeze', { target: inst.name, by: 'Icebolt', type: 'creature' });
           }
         }
       }

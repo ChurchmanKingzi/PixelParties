@@ -63,6 +63,12 @@ function getFreeZones(ps) {
  */
 function getEligibleCreatures(engine, pi, maxCreatureLevel) {
   const oppIdx = pi === 0 ? 1 : 0;
+  // Per-side non-damage shield (The Great Wall of Deri etc.).
+  // Diplomacy is a non-damage targeting effect, so if opp controls
+  // any shielder, NONE of opp's Creatures are valid targets —
+  // short-circuit so `canFreeActivate` returns false and the
+  // ability is correctly grayed out via `getActivatableAbilities`.
+  if (engine._isSideNondamageShielded(oppIdx)) return [];
   const cardDB = engine._getCardDB();
   const targets = [];
   for (const inst of engine.cardInstances) {

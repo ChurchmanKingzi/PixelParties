@@ -117,13 +117,15 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
   if (!ops) return;
   const cardDB = engine._getCardDB();
 
-  for (const h of (ops.heroes || [])) {
+  // Collect all targets up front so the post-target hand-reaction
+  // window can fire ONCE with the full hero+creature list (Sculpture
+  // Guards / Spectral Armor get one consolidated prompt per source).
+  const heroTargetsList = [];
+  for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
+    const h = ops.heroes[hi];
     if (!h?.name || h.hp <= 0) continue;
-    await engine.actionDealDamage(sourceInst, h, DAMAGE, 'creature', {
-      sourceOwner: pi, canBeNegated: true,
-    });
+    heroTargetsList.push({ type: 'hero', owner: oi, heroIdx: hi, cardName: h.name });
   }
-
   const creatureEntries = [];
   for (const inst of engine.cardInstances) {
     if ((inst.controller ?? inst.owner) !== oi) continue;
@@ -136,6 +138,23 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
       source: sourceInst, sourceOwner: pi, canBeNegated: true,
     });
   }
+  await engine.preDamageMultiTargetWindow(sourceInst, [
+    ...heroTargetsList,
+    ...creatureEntries.map(e => ({
+      type: 'creature', owner: e.inst.controller ?? e.inst.owner,
+      heroIdx: e.inst.heroIdx, slotIdx: e.inst.zoneSlot,
+      cardName: e.inst.name,
+    })),
+  ]);
+
+  for (const ht of heroTargetsList) {
+    const h = ops.heroes?.[ht.heroIdx];
+    if (!h?.name || h.hp <= 0) continue;
+    await engine.actionDealDamage(sourceInst, h, DAMAGE, 'creature', {
+      sourceOwner: pi, canBeNegated: true,
+    });
+  }
+
   if (creatureEntries.length > 0) {
     await engine.processCreatureDamageBatch(creatureEntries);
   }

@@ -76,11 +76,13 @@ module.exports = {
           c.owner === target.owner && c.zone === 'support' &&
           c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
         );
-        if (inst && engine.canApplyCreatureStatus(inst, 'frozen')) {
-          inst.counters.frozen = 1;
-          inst.counters.frozenAppliedBy = pi;
-          inst.counters.frozenDuration = 3;
-          engine.log('freeze_applied', { target: inst.name, by: 'Divine Gift of Biseria', duration: 3 });
+        if (inst) {
+          const applied = await engine.applyCreatureStatus(inst, 'frozen', {
+            sourceOwner: pi,
+            duration: 3,
+            source: 'Divine Gift of Biseria',
+          });
+          if (applied) engine.log('freeze_applied', { target: inst.name, by: 'Divine Gift of Biseria', duration: 3 });
         }
       }
 

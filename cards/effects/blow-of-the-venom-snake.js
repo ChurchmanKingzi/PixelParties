@@ -110,12 +110,12 @@ module.exports = {
             type: 'poison_splash', owner: tgtOwner,
             heroIdx: tgtHeroIdx, zoneSlot: target.slotIdx,
           });
-          if (engine.canApplyCreatureStatus(inst, 'poisoned')) {
-            inst.counters.poisoned = 1;
-            inst.counters.poisonStacks = poisonStacks;
-            inst.counters.poisonAppliedBy = pi;
-            engine.log('poison_applied', { target: inst.name, by: 'Blow of the Venom Snake', stacks: poisonStacks });
-          }
+          const applied = await engine.applyCreatureStatus(inst, 'poisoned', {
+            stacks: poisonStacks,
+            sourceOwner: pi,
+            source: 'Blow of the Venom Snake',
+          });
+          if (applied) engine.log('poison_applied', { target: inst.name, by: 'Blow of the Venom Snake', stacks: poisonStacks });
         }
       }
 

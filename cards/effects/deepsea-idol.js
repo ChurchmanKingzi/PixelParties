@@ -70,13 +70,14 @@ module.exports = {
     let saved = 0;
     for (const e of entries) {
       if (!e.inst) continue;
-      if (e.inst.owner !== pi) continue;
+      // Controller-aware: protects "Creatures you control".
+      if ((e.inst.controller ?? e.inst.owner) !== pi) continue;
       if (e.cancelled) continue;
       e.cancelled = true;
       saved++;
       engine._broadcastEvent('play_zone_animation', {
         type: 'deepsea_idol_negate',
-        owner: e.inst.owner,
+        owner: engine.physicalSide(e.inst),
         heroIdx: e.inst.heroIdx,
         zoneSlot: e.inst.zoneSlot,
       });

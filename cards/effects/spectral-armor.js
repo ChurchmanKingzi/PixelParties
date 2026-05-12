@@ -6,27 +6,35 @@
 //  control would take any damage. Halve that
 //  damage (rounded up).
 //
-//  Wiring (pre-damage reaction):
-//    • `isPreDamageReaction: true` — the engine
-//      offers this card BEFORE the damage applies,
-//      so the halving can save a Hero from lethal
-//      damage (an after-damage restore-half would
-//      arrive after the death-check already fired).
-//    • `preDamageResolve` returns
-//      `{ amountOverride: ceil(amount / 2) }` — the
-//      damage still LANDS (animations, afterDamage,
-//      armed-arrow riders, on-hit status apply all
-//      fire normally) but the dealt amount is
-//      halved before HP loss.
-//    • No lingering buff (this is the only
-//      difference from Cloud in a Bottle).
+//  Wiring — two entry points, consolidated UX:
 //
-//  CPU decision-making:
+//   1. `isPostTargetReaction` (primary) — fires
+//      ONCE per damage source after targets are
+//      determined. If 2+ of the activator's Heroes
+//      are in the target list, the player chooses
+//      WHICH ONE gets the halve. The chosen Hero
+//      is stamped via `engine.addSpectralArmorMark`;
+//      `_actionDealDamageImpl` consumes the mark
+//      before damage applies and halves the amount
+//      in-flight.
+//
+//   2. `isPreDamageReaction` (fallback) — fires
+//      per-Hero for damage paths that don't route
+//      through the post-target hub (direct
+//      `actionDealDamage` from recoil, status
+//      ticks, etc.). Gated by the per-source
+//      `_saPromptedFor` flag so it never re-prompts
+//      after the post-target window has fired.
+//
+//  Dedup: per-player `_saPromptedFor[pi]` is set in
+//  `postTargetCondition` (covers both accept AND
+//  decline paths) and in `preDamageCondition`. All
+//  three flags + the halve-marks are cleared at
+//  chain-resolve.
+//
+//  CPU decision-making (preDamage path only):
 //    • PUZZLE mode → activate iff halving would
-//      save the targeted Hero from lethal damage
-//      (otherwise hold). The user wants the puzzle
-//      brain to make the optimal save without
-//      wasting Spectral Armor on a non-lethal hit.
+//      save the targeted Hero from lethal damage.
 //    • COMBAT mode → MCTS-evaluate "halve now vs
 //      hold for later" via `mctsPickFromOptions`.
 //      The rollout naturally weighs whether the
@@ -35,44 +43,80 @@
 //      hits queued, and what the rest-of-turn
 //      score looks like with vs without the
 //      Spectral Armor still in hand.
-//      → No heuristics inside the decision; the
-//      engine's `evaluateState` does the arithmetic.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Spectral Armor';
 
 module.exports = {
-  isPreDamageReaction: true,
-
-  // Strictly reactive — never proactively played, never a chain-link
-  // candidate. Hand-side card stays dimmed in the normal action UI.
+  // Cards.json subtype 'Reaction' + engine validateActionPlay's
+  // reaction-subtype filter block proactive Main-Phase casts.
   canActivate: () => false,
   neverPlayable: true,
-  activeIn: ['hand'],
+  // Active in hand (defensive) and discard (where the card lands once
+  // the post-target framework consumes it). Both zones host the
+  // beforeDamage / onChainResolve hooks below.
+  activeIn: ['hand', 'discard'],
 
-  /**
-   * Trigger: any positive incoming damage to a Hero we control. No
-   * source-type filter (the card text says "any damage"). The engine
-   * already gates target ownership before reaching this — `ownerIdx`
-   * is the target Hero's controller.
-   */
-  preDamageCondition(_gs, _ownerIdx, _engine, _target, _heroIdx, _source, amount, _type) {
-    return amount > 0;
+  // ── Batch-level (consolidated multi-target prompt) ──────────────
+  isPostTargetReaction: true,
+
+  postTargetCondition(gs, pi, engine, targetedTargets /*, sourceCard, opts */) {
+    if (_alreadyPrompted(gs, pi)) return false;
+    const eligible = _collectOwnedHeroTargets(gs, pi, targetedTargets).length > 0;
+    if (eligible) {
+      // Side effect — covers decline path. Once the prompt is offered
+      // (accept or decline), no further SA prompts for this source.
+      _markPrompted(gs, pi);
+    }
+    return eligible;
   },
 
-  /**
-   * Halve the incoming damage (rounded up). Pre-damage path, so the
-   * HP drop uses the halved amount — saves from lethal when
-   * original > hp ≥ halved. `amountOverride` keeps the hit live for
-   * downstream effects (Reiza Poison+Stun, armed-arrow Burn riders,
-   * etc.); only the HP-loss number is reduced.
-   */
+  async postTargetResolve(engine, pi, targetedTargets /*, sourceCard, opts */) {
+    const candidates = _collectOwnedHeroTargets(engine.gs, pi, targetedTargets);
+    if (candidates.length === 0) return { effectNegated: false };
+    _markPrompted(engine.gs, pi);
+
+    let picked;
+    if (candidates.length === 1) {
+      picked = candidates[0];
+    } else {
+      const result = await engine.promptEffectTarget(pi, candidates.map(c => ({
+        id: c.id, type: 'hero',
+        owner: c.owner, heroIdx: c.heroIdx, cardName: c.cardName,
+      })), {
+        title: CARD_NAME,
+        description: 'Choose one of your Heroes to halve the incoming damage.',
+        confirmLabel: '🛡️ Halve!',
+        confirmClass: 'btn-info',
+        cancellable: false,
+        maxTotal: 1,
+      });
+      picked = (result && result.length > 0)
+        ? (candidates.find(c => c.id === result[0]) || candidates[0])
+        : candidates[0];
+    }
+
+    _addMark(engine.gs, _keyForHero(picked.owner, picked.heroIdx));
+    engine.log('spectral_armor_prompt_accepted', {
+      player: engine.gs.players[pi]?.username, target: picked.cardName,
+    });
+    engine.sync();
+    return { effectNegated: false };
+  },
+
+  // ── Per-hero fallback (direct hero damage paths) ─────────────────
+  isPreDamageReaction: true,
+
+  preDamageCondition(gs, ownerIdx, _engine, _target, _heroIdx, _source, amount /*, type */) {
+    if (_alreadyPrompted(gs, ownerIdx)) return false;
+    if (!(amount > 0)) return false;
+    _markPrompted(gs, ownerIdx);
+    return true;
+  },
+
   async preDamageResolve(engine, ownerIdx, target, heroIdx, _source, amount, _type) {
+    _markPrompted(engine.gs, ownerIdx);
     const halved = Math.ceil(amount / 2);
-    // Knight-armor + teal-tint animation on the protected Hero. The
-    // animation duration (~700ms) overlaps the damage-floater +
-    // hp-bar tween so the player sees the armor materialise as the
-    // (now-halved) damage lands.
     engine._broadcastEvent('play_zone_animation', {
       type: 'spectral_armor', owner: ownerIdx, heroIdx, zoneSlot: -1,
     });
@@ -87,17 +131,12 @@ module.exports = {
   },
 
   /**
-   * CPU decision-maker. Async — returns a Promise that the engine's
-   * `_getCpuGenericResponse` plumbing awaits. Returning `undefined`
-   * defers to the engine's default (which would activate every
-   * reaction ASAP — wrong for a "save it for the lethal hit" card).
+   * CPU decision-maker — fires for the pre-damage prompt path. The
+   * post-target prompt is a generic confirm with no extra context;
+   * the engine's default activation policy handles it.
    *
-   * Puzzle mode: deterministic save-from-lethal heuristic, matching
-   * the user's spec ("always use if reduced damage is not lethal").
-   * Combat mode: MCTS over [confirm, decline] with a rollout that
-   * applies the halved-damage / full-damage hit and then plays the
-   * rest of the turn out — the engine's evaluator scores both
-   * resulting states and picks the better one.
+   * Puzzle mode: deterministic save-from-lethal heuristic.
+   * Combat mode: MCTS over [confirm, decline].
    */
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic') return undefined;
@@ -105,7 +144,7 @@ module.exports = {
     if ((promptData?._gerryOriginalTitle || promptData?.title) !== CARD_NAME) return undefined;
 
     const ctx = promptData._preDamageContext;
-    if (!ctx) return undefined; // No structured context — fall through.
+    if (!ctx) return undefined;
 
     const { targetOwner, targetHeroIdx, amount } = ctx;
     const target = engine.gs?.players?.[targetOwner]?.heroes?.[targetHeroIdx];
@@ -115,28 +154,13 @@ module.exports = {
     const wouldLethal = target.hp <= amount;
     const halvedSaves = wouldLethal && target.hp > halved;
 
-    // ── PUZZLE MODE — deterministic ─────────────────────────────
-    // Always use Spectral Armor when it cleanly saves the Hero
-    // from a lethal hit. Otherwise hold — puzzle solutions are
-    // single-turn so "save for later" usually means "don't burn
-    // resource on a non-lethal hit". A puzzle whose intended
-    // solution wants the halving for chip damage can drop the
-    // Spectral Armor from the CPU's hand entirely.
     if (engine.isPuzzle) {
       return halvedSaves ? { confirmed: true } : null;
     }
 
-    // ── COMBAT MODE — MCTS ──────────────────────────────────────
-    // Lazy-require to avoid a CPU↔card-script load cycle, same
-    // pattern Barker uses for its placement MCTS.
     let mctsPick = null;
     try { ({ mctsPickFromOptions: mctsPick } = require('./_cpu')); } catch {}
     if (typeof mctsPick !== 'function' || engine._inMctsSim) {
-      // Inside a rollout (or _cpu unavailable) — fall back to the
-      // same deterministic save-from-lethal we use for puzzles.
-      // This isn't the main heuristic the user warned against
-      // because it only fires inside nested rollouts; the outer
-      // MCTS pick decides the real activation choice.
       return halvedSaves ? { confirmed: true } : null;
     }
 
@@ -150,32 +174,119 @@ module.exports = {
       const ps = eng.gs?.players?.[targetOwner];
       if (!t || !ps) return false;
       if (opt.id === 'confirm') {
-        // Spectral Armor activates: damage halved, card consumed.
         const dealt = Math.min(t.hp, halved);
         t.hp -= dealt;
         const hIdx = (ps.hand || []).indexOf(CARD_NAME);
         if (hIdx >= 0) ps.hand.splice(hIdx, 1);
       } else {
-        // Decline: full damage, Spectral Armor stays in hand.
         const dealt = Math.min(t.hp, amount);
         t.hp -= dealt;
       }
       return true;
     };
 
-    // Async — engine's `_getCpuGenericResponse` plumbing returns the
-    // value as-is, and `promptGeneric`'s caller awaits the result.
-    // Wrap in a Promise so the engine sees a thenable and unwraps it
-    // correctly (sibling pattern to Barker's MCTS branch).
     return (async () => {
       try {
         const best = await mctsPick(engine, options, apply, { horizon: 4 });
         return best?.value ?? null;
       } catch (err) {
         console.error('[Spectral Armor MCTS]', err.message);
-        // Last-ditch fallback if MCTS itself throws: save-from-lethal.
         return halvedSaves ? { confirmed: true } : null;
       }
     })();
   },
+
+  hooks: {
+    /**
+     * Consume the per-target halve-mark on incoming hero damage.
+     * Mutates `ctx.amount` to ceil(amount / 2) and plays the
+     * `spectral_armor` animation. Runs FIRST among damage-modifier
+     * hooks (matching the legacy engine ordering: SA halve →
+     * Homerun! cancel-if-lethal → Bamboo Shield pin-to-0) via the
+     * deterministic SA → HR → BS naming-order tiebreak inside the
+     * engine's hook dispatch.
+     */
+    beforeDamage: (ctx) => {
+      if (ctx.cancelled) return;
+      const target = ctx.target;
+      if (!target || target.hp === undefined) return;
+      if (!(ctx.amount > 0)) return;
+      const engine = ctx._engine;
+      const tgtOwner = engine._findHeroOwner(target);
+      if (tgtOwner < 0) return;
+      const tgtHi = (engine.gs.players[tgtOwner]?.heroes || []).indexOf(target);
+      if (tgtHi < 0) return;
+      if (!_consumeMark(engine.gs, _keyForHero(tgtOwner, tgtHi))) return;
+      const halved = Math.ceil(ctx.amount / 2);
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'spectral_armor', owner: tgtOwner, heroIdx: tgtHi, zoneSlot: -1,
+      });
+      engine.log('spectral_armor_apply', {
+        target: engine._heroLabel(target), original: ctx.amount, halved,
+      });
+      ctx.amount = halved;
+    },
+
+    /**
+     * Chain-resolve cleanup. Both the per-target halve-mark set and
+     * the per-player prompt dedup map live for the duration of a
+     * single chain; clear them so the next chain starts fresh.
+     */
+    onChainResolve: (ctx) => {
+      const gs = ctx._engine.gs;
+      if (gs._saMarks) delete gs._saMarks;
+      if (gs._saPromptedFor) delete gs._saPromptedFor;
+    },
+  },
 };
+
+// ─── Per-player prompt dedup ───────────────────────────────────────
+
+function _alreadyPrompted(gs, pi) {
+  return !!gs._saPromptedFor?.[pi];
+}
+function _markPrompted(gs, pi) {
+  if (!gs._saPromptedFor) gs._saPromptedFor = {};
+  gs._saPromptedFor[pi] = true;
+}
+
+// ─── Per-target halve-mark set + one-shot consume ──────────────────
+
+function _addMark(gs, key) {
+  if (!key) return;
+  if (!gs._saMarks) gs._saMarks = new Set();
+  gs._saMarks.add(key);
+}
+function _consumeMark(gs, key) {
+  const set = gs?._saMarks;
+  if (!set || !key || !set.has(key)) return false;
+  set.delete(key);
+  return true;
+}
+function _keyForHero(ownerIdx, heroIdx) {
+  return `sa-hero-${ownerIdx}-${heroIdx}`;
+}
+
+/**
+ * Filter the source's target list to alive Heroes controlled by `pi`.
+ * Spectral Armor's card text says "any target you control"; the
+ * current implementation covers Heroes only (matching the existing
+ * pre-damage reaction's scope). Adding Creature support would require
+ * a parallel creature-mark + creature-damage consumption hook.
+ */
+function _collectOwnedHeroTargets(gs, pi, targetedTargets) {
+  const out = [];
+  if (!Array.isArray(targetedTargets)) return out;
+  for (const t of targetedTargets) {
+    if (!t || t.type !== 'hero') continue;
+    if (t.owner !== pi) continue;
+    const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
+    if (!hero?.name || hero.hp <= 0) continue;
+    out.push({
+      id: `hero-${t.owner}-${t.heroIdx}`,
+      owner: t.owner, heroIdx: t.heroIdx,
+      cardName: hero.name,
+    });
+  }
+  return out;
+}

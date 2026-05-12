@@ -75,8 +75,10 @@ module.exports = {
       const ps     = gs.players[pi];
       if (!ps) return;
 
-      // ── Filter: must be OUR Loyal, not Shepherd itself ──
-      if ((death.owner ?? death.originalOwner) !== pi) return;
+      // ── Filter: must be A LOYAL WE CONTROLLED, not Shepherd itself ──
+      // Controller (not owner) is the gameplay-truth side — a Loyal
+      // cross-side-placed onto opp's board doesn't count as ours.
+      if ((death.controller ?? death.owner) !== pi) return;
       if (death.name === CARD_NAME) return;
       if (!isLoyalCreature(death.name, engine)) return;
 

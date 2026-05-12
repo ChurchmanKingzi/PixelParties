@@ -59,10 +59,13 @@ function targetIsBurned(engine, t) {
 }
 
 /**
- * Can the target receive a new Burned status right now?
- * Leans on the engine's canApplyCreatureStatus for creatures, and
- * mirrors the hero-side gates that addHeroStatus would hit (immune /
- * charmed / burn_immune).
+ * Can the target receive a new Burned status right now? Targeting-
+ * side gate — omni-immune Creatures (Cardinal Beasts etc.) stay in
+ * the AoE pool so the flame_strike animation lands on them; the
+ * actual Burn application fizzles silently inside the resolve loop
+ * via `applyCreatureStatus` (which gates on `canApplyCreatureStatus`).
+ * Mirrors the hero-side gates that `addHeroStatus` would hit
+ * (immune / charmed / burn_immune).
  */
 function targetCanBeBurned(engine, t) {
   if (t.type === 'hero') {
@@ -76,7 +79,7 @@ function targetCanBeBurned(engine, t) {
   }
   if (!t.inst) return false;
   if (t.inst.counters?.burned) return false;
-  return engine.canApplyCreatureStatus(t.inst, 'burned');
+  return engine.canTargetForStatus(t.inst, 'burned');
 }
 
 /**
@@ -233,9 +236,12 @@ module.exports = {
             });
           } else {
             const inst = engine.cardInstances.find(c => c.id === t.inst.id);
-            if (inst && engine.canApplyCreatureStatus(inst, 'burned')) {
-              inst.counters.burned = true;
-              engine.log('creature_burned', {
+            if (inst) {
+              const applied = await engine.applyCreatureStatus(inst, 'burned', {
+                sourceOwner: pi,
+                source: CARD_NAME,
+              });
+              if (applied) engine.log('creature_burned', {
                 card: inst.name, owner: inst.owner, by: CARD_NAME,
               });
             }

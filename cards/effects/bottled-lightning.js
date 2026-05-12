@@ -47,6 +47,13 @@ module.exports = {
     });
     if (selectedTargets.length === 0) return true;
 
+    // Pre-damage post-target hand-reaction window — one consolidated
+    // prompt per source for Sculpture Guards / Spectral Armor / etc.
+    await engine.preDamageMultiTargetWindow(
+      { name: 'Bottled Lightning', owner: pi, heroIdx: -1 },
+      selectedTargets,
+    );
+
     // Chain lightning animation + damage
     let prevOwner = selectedTargets[0].owner;
     let prevHeroIdx = selectedTargets[0].heroIdx;

@@ -27,7 +27,7 @@ function countLivingTargets(gs, pi, engine) {
     if (hero?.name && hero.hp > 0) count++;
   }
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi || inst.zone !== 'support' || inst.faceDown) continue;
+    if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support' || inst.faceDown) continue;
     const cd = cardDB[inst.name];
     if (cd && hasCardType(cd, 'Creature')) count++;
   }

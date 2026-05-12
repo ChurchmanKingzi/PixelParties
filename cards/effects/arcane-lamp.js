@@ -148,9 +148,11 @@ module.exports = {
       // broadcast still plays the flame_strike animation on the picked
       // target — animation always happens, only the Burn write is
       // skipped on omni-immune targets.
-      if (engine.canApplyCreatureStatus(inst, 'burned')) {
-        inst.counters.burned = true;
-        inst.counters.burnAppliedBy = pi;
+      const burnApplied = await engine.applyCreatureStatus(inst, 'burned', {
+        sourceOwner: pi,
+        source: CARD_NAME,
+      });
+      if (burnApplied) {
         engine.log('creature_burned', {
           card: inst.name, owner: inst.owner, by: CARD_NAME,
         });

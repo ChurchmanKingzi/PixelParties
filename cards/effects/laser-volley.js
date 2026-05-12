@@ -202,6 +202,19 @@ module.exports = {
       // the impact explosions, not before them.
       await engine._delay(Math.max(BEAM_DUR - STAGGER * (targets.length - 1) - 200, 250));
 
+      // Pre-damage post-target hand-reaction window — one consolidated
+      // prompt per source for Sculpture Guards / Spectral Armor / etc.
+      // covering every unspared target.
+      {
+        const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx };
+        const allUnspared = targets
+          .filter(t => !sparedIds.has(t.id))
+          .map(t => t.kind === 'hero'
+            ? { type: 'hero', owner: oi, heroIdx: t.heroIdx, cardName: t.cardName }
+            : { type: 'creature', owner: oi, heroIdx: t.heroIdx, slotIdx: t.slotIdx, cardName: t.cardName });
+        await engine.preDamageMultiTargetWindow(source, allUnspared);
+      }
+
       // Deal 200 to every unspared target. Skip-reaction-check so a
       // single Spell doesn't open multiple nested counter windows
       // — Spike Trap / Anti-Magic etc. already ran in the chain.

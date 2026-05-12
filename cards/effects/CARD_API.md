@@ -65,6 +65,9 @@ At least one of these must be present, or the loader will ignore the file.
 | `noDefaultFlash` | `bool` | `false` | Skip the default activation flash animation. |
 | `animationType` | `string` | `'explosion'` | Animation played on resolved potion/artifact targets. Use `'none'` to skip. |
 | `cpuMeta` | `object` | — | CPU evaluation hints — see "CPU Metadata (cpuMeta)" below. |
+| `bypassStatusFilter` | `bool` | `false` | When `true`, the card's hooks fire even while the card is Frozen / Stunned / Negated. Same flag the engine has long honoured for Hero / Ability passives; extended to support-zone Creatures for "cannot be negated" passives like Chilly Wizard's status mirror. |
+| `selfFreezeImmune` | `bool` | `false` | **Opt-in marker.** Set to `true` on any Creature whose `onPlay` stamps `inst.counters.freeze_immune` (or otherwise becomes freeze-immune the moment it lands). Pickers that need to filter out Creatures that can't be Frozen — currently SnowItAll's hand-summon picker; future "Freeze-as-cost" cards — read this flag to exclude them before the player can pick. Cardinal Beasts are filtered via their existing omni-immune name list, so they don't need the flag. **When adding a new Creature that stamps `freeze_immune` in `onPlay`, set this flag too.** |
+| `firesOnAnyDamageTarget` | `bool` | `false` | Surprise opt-in. Routes the surprise through `_checkDamageSurpriseWindow`, which fires on incoming damage to ANY target you control (Hero or Creature). Standard `_checkSurpriseWindow` only fires for Hero targets and is unchanged. Banner Bearer is the first consumer. Surprise's `onSurpriseActivate` may return `{ damageReduced: N, effectNegated: bool }` to reduce/negate the damage event. |
 
 ---
 
@@ -234,8 +237,69 @@ targetingConfig: {
   minRequired: 1,                     // Min required before confirm enabled
   alwaysConfirmable: true,            // Confirm enabled even with 0 selections
   greenSelect: true,                  // Green highlight instead of red
+  damageType: 'destruction_spell',    // Optional — tag damage-targeting (see below)
+  baseDamage: 100,                    // REQUIRED for damage targeting (see below)
 }
 ```
+
+### Damage Targeting vs Non-Damage Targeting
+
+The engine distinguishes "damage targeting" from "non-damage targeting"
+via `config.baseDamage > 0`. Cards that pick a target and DEAL damage to
+it MUST set `baseDamage` to the per-target damage amount (`baseDamage:
+hero.atk` for Attacks, fixed values for damage Spells / Artifacts). This
+signal is consulted by several engine filters:
+
+* **Great Wall of Deri** (and any future `isNondamageOpponentShield`
+  card): protects the controller's Creatures from being chosen as
+  targets by opp's cards / effects EXCEPT when the picker is tagged
+  damage targeting. Set `baseDamage > 0` on every damage picker so opp
+  can still legally aim damage spells / attacks at your protected
+  Creatures.
+
+* **Status-application pickers** (Freeze, Stun, Negate, Charm, Poison,
+  Burn-as-status, Bind, etc.) should set `damageType: 'status'` and
+  leave `baseDamage` undefined. The Wall filter treats these as
+  non-damage and correctly excludes the protected opp Creatures from
+  the picker.
+
+### Adding a New Card That Targets Opp Creatures Non-Damage
+
+If your script targets opp Creatures via a NON-damage effect (steal /
+control / status apply / bounce / destroy-without-damage / etc.), the
+engine's chokepoints (`promptDamageTarget`, `promptMultiTarget`,
+`promptEffectTarget`, `normalizeValidTargets`) automatically filter
+out protected opp Creatures — your picker will list zero opp
+Creatures if all of them are Wall-protected.
+
+For cards whose **`canActivate` / `canFreeActivate` requires opp
+Creatures to be selectable** (so they can correctly gray out in hand
+when zero legal targets remain — Dark Gear / Diplomacy pattern), add
+an explicit short-circuit at the top of your target-eligibility
+helper:
+
+```js
+const oppIdx = pi === 0 ? 1 : 0;
+// Per-side non-damage shield (The Great Wall of Deri etc.). Card is
+// non-damage, so opp's protected Creatures are unreachable — short-
+// circuit so the card is correctly grayed out in hand instead of
+// opening an empty picker.
+if (engine._isSideNondamageShielded(oppIdx)) return [];
+```
+
+For cards whose effect is **auto-triggered** rather than player-picked
+(Cute Angel Molinda's afterCreatureDamageBatch steal, Treacherous
+Crystal's server-side trigger, etc.), check per-creature in the
+trigger handler:
+
+```js
+const tgtCtrl = inst.controller ?? inst.owner;
+if (engine._isSideNondamageShielded?.(tgtCtrl)) continue;
+```
+
+The Wall's "except direct damage" exception means damage-dealing
+auto-triggers (recoil damage, on-summon damage, etc.) do NOT need the
+check — the damage itself bypasses the shield by definition.
 
 ---
 
@@ -370,7 +434,7 @@ card scripts have to the game engine.
 | `ctx.moveCard(targetCard, toZone, toHeroIdx, toSlot)` | `Promise` | Move a card to a new zone |
 | `ctx.discardCards(playerIdx, count)` | `Promise` | Force player to discard N cards (opens prompt) |
 | `ctx.safePlaceInSupport(cardName, pi, heroIdx, slot)` | `{inst, actualSlot}\|null` | Place card in Support Zone with fallback. Does NOT fire onPlay/onCardEnterZone — caller must do that. |
-| `ctx.addStatus(target, statusName, opts)` | `Promise` | Apply a status effect. `opts`: `{ duration, permanent, stacks, bypassImmune, addStacks }` |
+| `ctx.addStatus(target, statusName, opts)` | `Promise` | Apply a status effect. `opts`: `{ duration, permanent, stacks, bypassImmune, addStacks }`. For **heroes** only. **For creatures**, use `engine.applyCreatureStatus(inst, statusName, opts)` — see below. |
 | `ctx.removeStatus(target, statusName)` | `Promise` | Remove a status effect |
 | `ctx.addBuff(hero, pi, heroIdx, buffName, opts)` | `Promise` | Add a buff to a hero. `opts`: `{ expiresAtTurn, expiresForPlayer }` |
 | `ctx.addCreatureBuff(inst, buffName, opts)` | `Promise` | Add a buff to a creature |
@@ -393,8 +457,8 @@ card scripts have to the game engine.
 | `ctx.promptMultiTarget(config)` | `Promise<target[]>` | Multi-select version. Config adds `{ min, max }`. |
 | `ctx.executeAttack(config)` | `Promise<{target,damage}\|null>` | Full attack flow: target select → ATK-based damage → animations. Config: `{ damageMultiplier, flatDamage, side, types, excludeSelf, ... }` |
 | `ctx.promptConfirmEffect(config)` | `Promise<bool>` | Yes/no dialog. Config: `{ title, message }` |
-| `ctx.promptCardGallery(cards, config)` | `Promise<{cardName}\|null>` | Card picker. `cards`: `[{ name, source, cost, ... }]` |
-| `ctx.promptCardGalleryMulti(cards, config)` | `Promise<{selectedCards[]}\|null>` | Multi-select card picker. Config adds `{ selectCount, minSelect, maxBudget, costKey }` |
+| `ctx.promptCardGallery(cards, config)` | `Promise<{cardName}\|null>` | Card picker. `cards`: `[{ name, source, cost, ... }]`. **Do NOT use for hand-only picks — see "Hand-only pickers" rule below.** |
+| `ctx.promptCardGalleryMulti(cards, config)` | `Promise<{selectedCards[]}\|null>` | Multi-select card picker. Config adds `{ selectCount, minSelect, maxBudget, costKey }`. **Do NOT use for hand-only picks — see "Hand-only pickers" rule below.** |
 | `ctx.promptZonePick(zones, config)` | `Promise<{heroIdx, slotIdx}\|null>` | Zone picker. `zones`: `[{ heroIdx, slotIdx, label }]` |
 | `ctx.promptStatusSelect(targetName, statuses, config)` | `Promise<{selectedStatuses[]}\|null>` | Status effect picker for removal. |
 | `ctx.chooseTarget(type, filter)` | `Promise` | Low-level target chooser |
@@ -402,6 +466,53 @@ card scripts have to the game engine.
 | `ctx.chooseOption(options)` | `Promise` | Low-level option chooser |
 | `ctx.confirm(message)` | `Promise<bool>` | Low-level confirm dialog |
 | `ctx.performImmediateAction(heroIdx, config)` | `Promise<{played, cardName?, cardType?}>` | Hero-locked additional Action — see below |
+
+### Hand-only pickers — ALWAYS use `handPick`, NEVER a gallery
+
+**Rule:** any prompt that picks one or more cards FROM THE PLAYER'S HAND (and only from the hand) MUST use the `handPick` prompt — `promptCardGallery` / `promptCardGalleryMulti` are reserved for picks that span deck / discard / multi-source pools where a popup is the only sensible UI.
+
+The `handPick` prompt is rendered in-place over the player's existing hand:
+- Eligible cards are highlighted via `eligibleIndices` and clickable.
+- Click toggles selection; clicking a selected card deselects it.
+- Ineligible cards (and dynamically-ineligible ones — name caps full, total maxed, name-locked, etc.) get dimmed automatically.
+- The player never leaves the board view, never sees their hand duplicated in a gallery, and can keep dragging / interacting with the rest of the UI exactly as during a normal turn.
+
+Galleries hide the rest of the board behind a modal overlay, force the player to re-recognise their cards in a new layout, and don't compose with hand-level highlighting / drag affordances. For any "pick N cards from hand" mechanic, that's strictly the wrong tool — Visionary Genius Heinz, Leadership, Horn in a Bottle, Mischief Invasion, and every future hand-only multi-pick must funnel through `handPick`.
+
+Reach for `promptCardGallery` / `promptCardGalleryMulti` ONLY when the candidate pool is NOT (or not solely) the hand — Necromancy's discard-pile gallery, Sparkfly Queen's opp-deck steal preview, Saint Nicolas's Potion Deck reveal, etc.
+
+```js
+// Canonical hand-only picker. Engine: `engine.promptGeneric(pi, { ... })`.
+const result = await engine.promptGeneric(pi, {
+  type: 'handPick',
+  title: CARD_NAME,
+  description: 'Click cards in your hand to mark them. Click again to unmark.',
+  eligibleIndices: [...],   // hand indices that may be picked at all
+  minSelect: 0,             // 0 lets the player confirm with no picks
+  maxSelect: N,             // total cap across all picks
+  cancellable: true,
+  confirmLabel: '✨ Confirm!',
+
+  // Optional per-type caps. Each hand index maps to a "type" string,
+  // and each type has its own cap. The picker dims further copies of a
+  // type once its cap is filled (in addition to the global maxSelect).
+  cardTypes: { 0: 'Creature', 2: 'Creature', 5: 'Spell' },
+  typeLimits: { Creature: 2, Spell: 1 },
+
+  // Optional Heinz-style name lock: after the first pick, only cards
+  // sharing that name remain clickable. Toggling the last pick off
+  // releases the lock and re-enables every eligible card.
+  nameLockOnFirstSelect: true,
+});
+
+// Response shape:
+//   null OR { cancelled: true }                   → player cancelled
+//   { selectedCards: [{ handIndex, cardName }] }  → committed picks
+//                                                   (length may be 0 if
+//                                                   minSelect was 0)
+```
+
+Frontend reference: `app-board.jsx` handles `gameState.effectPrompt.type === 'handPick'` — see `isHandPickEligible`, `isHandPickSelected`, `isHandPickTypeFull`, `isHandPickMaxed`, `isHandPickNameLocked`.
 
 ### Immediate Additional Actions (hero-locked)
 
@@ -493,6 +604,30 @@ Defined in `_hooks.js`. Use with `ctx.addStatus()` / `ctx.removeStatus()`.
 | `poisoned` | ✅ | ☠️ | `poison_immune` |
 | `immune` | ❌ | 🛡️ | — |
 | `shielded` | ❌ | ✨ | — |
+
+### Applying creature statuses
+
+`engine.applyCreatureStatus(inst, statusName, opts)` is the **single** chokepoint every creature-status applier must use. Direct `inst.counters.<status> = 1` writes are forbidden in new card scripts — they bypass `canApplyCreatureStatus` (immunity gate) and skip the `ON_STATUS_APPLIED` hook fire, which would silently break Bear Rider's hand-level recompute, Chilly Wizard's status mirror, Colored Snow's reaction trigger, and any future creature-status-aware Creature.
+
+```js
+await engine.applyCreatureStatus(inst, 'frozen', {
+  duration:    2,            // optional — multi-turn statuses
+  stacks:      3,            // for stack-bearing statuses (currently only `poisoned`)
+  addStacks:   true,         // additive vs overwrite — true for poison stacking
+  sourceOwner: pi,           // player who applied — written to `<status>AppliedBy`
+  source:      'Cool Card',  // card-name string or { name } object — for logs
+  animationType: 'ice_encase', // OPTIONAL — omit / 'none' if you broadcast your own animation
+  logEvent:    false,        // default false — opt in for a `status_apply` log entry
+});
+// → true iff the status actually changed. Idempotent: re-applying an
+//   already-present non-stacking status returns false.
+```
+
+Returns `true` when the status changed, `false` when blocked (immune, already present and non-stacking, etc.). The helper handles every creature-status convention: `inst.counters[status] = 1` flag, `inst.counters.poisonStacks`, `inst.counters[status + 'Duration']`, `inst.counters[status + 'AppliedBy']` (plus legacy `poisonAppliedBy` / `burnAppliedBy` aliases).
+
+Hero-side, keep using `engine.addHeroStatus(playerIdx, heroIdx, statusName, opts)` — it already fires `ON_STATUS_APPLIED` and is the equivalent hook contract for the hero status map.
+
+`ON_STATUS_APPLIED` and `ON_STATUS_REMOVED` fire for both Heroes and Creatures. The creature path stamps `ctx._onCreature = true` on the hook context so listeners can discriminate; `ctx.target` is the hero object for hero events and the `inst` for creature events.
 
 ## Buff Effects
 

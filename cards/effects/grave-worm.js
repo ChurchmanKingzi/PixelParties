@@ -134,14 +134,17 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps) return;
 
-      // Filter: dying creature is OURS and an actual Creature. The
-      // card text's "except Grave Worm" carve-out is an anti-self-
-      // revive guard, NOT a blanket exclusion of Grave Worm deaths
-      // — sibling Worms in discard SHOULD react to a Grave Worm
-      // dying. So we only skip when the dying inst IS this listener
-      // (via id match), which already happens at Path A above.
-      const dyingOwner = death.owner ?? death.originalOwner;
-      if (dyingOwner !== pi) return;
+      // Filter: dying creature is OURS (we currently controlled it)
+      // and is an actual Creature. Side attribution uses CONTROLLER —
+      // a Creature you gave to opp via Chilly Wizard's cross-side
+      // placement counts as opp's creature dying, not yours. The card
+      // text's "except Grave Worm" carve-out is an anti-self-revive
+      // guard, NOT a blanket exclusion of Grave Worm deaths — sibling
+      // Worms in discard SHOULD react to a Grave Worm dying. So we
+      // only skip when the dying inst IS this listener (via id match
+      // at Path A above).
+      const dyingController = death.controller ?? death.owner;
+      if (dyingController !== pi) return;
       const cardDB = engine._getCardDB();
       const dyingCd = cardDB[death.name];
       if (!dyingCd || !hasCardType(dyingCd, 'Creature')) return;

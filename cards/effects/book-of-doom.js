@@ -80,6 +80,28 @@ module.exports = {
     const targets = selectedIds.map(id => validTargets.find(t => t.id === id)).filter(Boolean);
     if (targets.length === 0) return;
 
+    // Pre-damage post-target hand-reaction window. Book of Doom's
+    // custom targeting bypasses `promptDamageTarget` and
+    // `actionDealAoeDamage`, so the engine's normal post-target
+    // invocation never fires. We invoke it here ONCE with the full
+    // (mixed hero + creature) target list so Sculpture Guards (and
+    // any other `isPostTargetReaction` card) gets one consolidated
+    // prompt covering every Frozen target the activator controls in
+    // this source. The per-target pre-damage hooks downstream check
+    // `gs._sgPromptedThisDamageFlow` and skip after this resolves.
+    const postTargetList = targets.map(t => {
+      if (t.type === 'hero') {
+        return { type: 'hero', owner: t.owner, heroIdx: t.heroIdx, cardName: t.cardName };
+      }
+      return {
+        type: 'creature',
+        owner: t.owner, heroIdx: t.heroIdx, slotIdx: t.slotIdx,
+        cardName: t.cardName,
+      };
+    });
+    const synthSource = { name: CARD_NAME, owner: pi, heroIdx: -1 };
+    await engine._checkPostTargetHandReactions(postTargetList, synthSource, {});
+
     // Fire explosion animations on all targets simultaneously
     for (const target of targets) {
       engine._broadcastEvent('play_zone_animation', {

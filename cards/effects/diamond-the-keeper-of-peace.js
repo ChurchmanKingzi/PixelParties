@@ -43,7 +43,9 @@ module.exports = {
       // ── Effect 1: Status damage immunity for original-Lv0 creatures ──
       for (const e of entries) {
         if (e.cancelled) continue;
-        if (e.inst.owner !== pi) continue;
+        // Controller-aware: "Creatures you control" — a Creature you
+        // own but no longer control (cross-side-placed) is not yours.
+        if ((e.inst.controller ?? e.inst.owner) !== pi) continue;
         if (!e.isStatusDamage) continue;
         if (e.originalLevel !== 0) continue;
         // This creature has original level 0 and is taking status damage → immune
@@ -56,7 +58,7 @@ module.exports = {
       const oppIdx = pi === 0 ? 1 : 0;
       const opponentEntries = entries.filter(e =>
         !e.cancelled &&
-        e.inst.owner === pi &&
+        (e.inst.controller ?? e.inst.owner) === pi &&
         e.sourceOwner === oppIdx &&
         e.originalLevel === 0
       );

@@ -108,9 +108,12 @@ module.exports = {
           });
         } else {
           if (e.ref.zone !== 'support') continue;
-          if (engine.canApplyCreatureStatus(e.ref, 'stunned')) {
-            e.ref.counters.stunned = 1;
-            e.ref.counters.stunnedAppliedBy = pi;
+          const applied = await engine.applyCreatureStatus(e.ref, 'stunned', {
+            sourceOwner: pi,
+            duration: 1,
+            source: 'Poison Pollen',
+          });
+          if (applied) {
             engine.log('status_add', {
               target: e.ref.name, status: 'stunned', owner: e.owner,
             });

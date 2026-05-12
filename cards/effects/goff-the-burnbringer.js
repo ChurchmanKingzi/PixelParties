@@ -124,7 +124,11 @@ module.exports = {
         if (e.source?.name !== 'Burn') continue;
         if (e.type !== 'fire') continue;
         if (!e.inst) continue;
-        if (e.inst.owner === ctx.cardOwner) continue;
+        // Only doubles Burn on creatures OPP CONTROLS — own-controlled
+        // burned creatures (including ones cross-side-placed onto opp's
+        // side and now controlled by opp) don't get doubled. Controller-
+        // aware comparison.
+        if ((e.inst.controller ?? e.inst.owner) === ctx.cardOwner) continue;
         e.amount = (e.amount || 0) * 2;
         ctx._engine.log('goff_burn_doubled', {
           target: e.inst.name, newAmount: e.amount,

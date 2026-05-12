@@ -54,9 +54,10 @@ module.exports = {
           // Animation plays unconditionally so the player sees the
           // strike land even when the status fizzles on an immune target.
           engine._broadcastEvent('play_zone_animation', { type: 'electric_strike', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx });
-          if (engine.canApplyCreatureStatus(inst, 'negated')) {
-            inst.counters.negated = 1;
-          }
+          await engine.applyCreatureStatus(inst, 'negated', {
+            sourceOwner: ctx.cardOwner,
+            source: 'Sparky Slime',
+          });
         }
       }
       engine.log('negate', { target: target.cardName, by: 'Sparky Slime', type: target.type });

@@ -64,7 +64,7 @@ function getOwnTargetsWithStatuses(gs, pi, engine) {
   }
 
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi) continue;
+    if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
     if (!inst.counters) continue;

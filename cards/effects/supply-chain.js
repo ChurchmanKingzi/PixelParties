@@ -39,8 +39,9 @@ module.exports = {
         return;
       }
 
-      // Draw cards
-      await engine.actionDrawCards(pi, drawCount);
+      // Animated multi-draw — paces each card and settles the last
+      // one before Supply Chain itself heads to the discard pile.
+      await ctx.drawCardsAnimated(pi, drawCount);
 
       engine.log('supply_chain', { player: ps.username, drawn: drawCount });
       engine.sync();

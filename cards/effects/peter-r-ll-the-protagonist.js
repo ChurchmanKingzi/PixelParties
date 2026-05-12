@@ -198,14 +198,17 @@ module.exports = {
     },
 
     // Fires for EVERY creature death globally — gate on "creature was
-    // controlled by Peter's controller at time of death."
-    // ctx.creature.owner reflects the EFFECTIVE owner (stolen creatures
-    // have their owner reassigned to the stealer in actionMoveCard), so
-    // a simple === comparison is correct.
+    // controlled by Peter's controller at time of death." Use the
+    // engine-supplied `controller` field (added to deathInfo) so a
+    // cross-side-placed Creature (Chilly Wizard given to opp) is
+    // attributed to its CURRENT controller, not its original owner.
+    // Falls back to owner for any death payload that pre-dates the
+    // controller field.
     onCreatureDeath: async (ctx) => {
       const creature = ctx.creature;
       if (!creature) return;
-      if (creature.owner !== ctx.cardOwner) return;
+      const effectiveOwner = creature.controller ?? creature.owner;
+      if (effectiveOwner !== ctx.cardOwner) return;
       await offerAttach(ctx);
     },
   },

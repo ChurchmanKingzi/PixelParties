@@ -128,9 +128,11 @@ module.exports = {
         appliedCount++;
       } else if (tgt.cardInstance) {
         const inst = tgt.cardInstance;
-        if (engine.canApplyCreatureStatus(inst, 'burned')) {
-          inst.counters.burned = 1;
-          inst.counters.burnAppliedBy = pi;
+        const applied = await engine.applyCreatureStatus(inst, 'burned', {
+          sourceOwner: pi,
+          source: CARD_NAME,
+        });
+        if (applied) {
           inst.counters.burnPermanent = true;
           engine.log('status_add', { target: inst.name, status: 'burned', owner: tgt.owner, by: CARD_NAME });
           appliedCount++;

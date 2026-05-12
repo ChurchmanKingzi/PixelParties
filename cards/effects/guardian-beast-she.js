@@ -133,15 +133,12 @@ module.exports = {
         }
       } else if (tgt.cardInstance) {
         const inst = tgt.cardInstance;
-        const wasPoisoned = !!inst.counters?.poisoned;
-        if (wasPoisoned) {
-          inst.counters.poisonStacks = (inst.counters.poisonStacks || 1) + 1;
-          inst.counters.poisonPermanent = true;
-          engine.log('status_add', { target: inst.name, status: 'poisoned', addStacks: 1, by: CARD_NAME });
-        } else if (engine.canApplyCreatureStatus(inst, 'poisoned')) {
-          inst.counters.poisoned = 1;
-          inst.counters.poisonStacks = 1;
-          inst.counters.poisonAppliedBy = pi;
+        const applied = await engine.applyCreatureStatus(inst, 'poisoned', {
+          stacks: 1, addStacks: true,
+          sourceOwner: pi,
+          source: CARD_NAME,
+        });
+        if (applied) {
           inst.counters.poisonPermanent = true;
           engine.log('status_add', { target: inst.name, status: 'poisoned', owner: tgt.owner, by: CARD_NAME });
         }

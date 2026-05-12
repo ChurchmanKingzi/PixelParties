@@ -48,9 +48,12 @@ function pickableOppCards(engine, listenerOwner) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    if (inst.owner !== oi) continue; // Use raw owner, not controller — we
-    // want the physical opponent side. A stolen creature on opp's side
-    // still lives there; a charmed-hero equip likewise.
+    // Filter to instances OPP CURRENTLY CONTROLS — controller is the
+    // gameplay-truth side (a creature stolen by us is no longer in opp's
+    // target pool; a Chilly Wizard cross-side-summoned onto opp's board
+    // IS). `controller ?? owner` collapses to plain owner for everything
+    // that has never had its controller flipped.
+    if ((inst.controller ?? inst.owner) !== oi) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd) continue;
     if (hasCardType(cd, 'Hero') || hasCardType(cd, 'Ascended Hero')) continue;
@@ -66,7 +69,7 @@ function pickableOppCards(engine, listenerOwner) {
   // Ability zone instances.
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'ability') continue;
-    if (inst.owner !== oi) continue;
+    if ((inst.controller ?? inst.owner) !== oi) continue;
     out.push({
       id: `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
       type: 'ability',

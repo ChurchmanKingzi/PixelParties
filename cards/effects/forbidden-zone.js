@@ -104,6 +104,29 @@ module.exports = {
       const expiresAtTurn    = gs.turn + 2;
       const expiresForPlayer = pi;
 
+      // Pre-damage post-target hand-reaction window — one consolidated
+      // prompt per source for Sculpture Guards / Spectral Armor.
+      {
+        const allTgts = [];
+        for (const t of heroTargets) {
+          const h = oppPs.heroes?.[t.heroIdx];
+          if (!h?.name || h.hp <= 0) continue;
+          allTgts.push({ type: 'hero', owner: oppIdx, heroIdx: t.heroIdx, cardName: h.name });
+        }
+        for (const id of creatureTargetIds) {
+          const inst = engine.cardInstances.find(c => c.id === id);
+          if (!inst || inst.zone !== 'support') continue;
+          allTgts.push({
+            type: 'creature', owner: inst.controller ?? inst.owner,
+            heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name,
+          });
+        }
+        await engine.preDamageMultiTargetWindow(
+          { name: CARD_NAME, owner: pi, heroIdx },
+          allTgts,
+        );
+      }
+
       // ── Step 3: deal damage + apply lockout to every alive opp Hero ──
       for (const t of heroTargets) {
         const hero = oppPs.heroes[t.heroIdx];

@@ -30,7 +30,9 @@ module.exports = {
       if (inst.zone !== 'support') continue;
       if ((inst.controller ?? inst.owner) !== oi) continue;
       if (inst.counters?.burned) continue;
-      if (engine.canApplyCreatureStatus(inst, 'burned')) return true;
+      // Targeting-side gate — omni-immune Creatures stay in the
+      // can-activate pool. The Burn application fizzles in resolve.
+      if (engine.canTargetForStatus(inst, 'burned')) return true;
     }
     return false;
   },
@@ -57,7 +59,8 @@ module.exports = {
             c.zone === 'support' && c.owner === t.owner
             && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx,
           );
-          return !!inst && !inst.counters?.burned && engine.canApplyCreatureStatus(inst, 'burned');
+          // Targeting-side gate — omni-immune Creatures stay selectable.
+          return !!inst && !inst.counters?.burned && engine.canTargetForStatus(inst, 'burned');
         }
         return true;
       },
@@ -94,9 +97,12 @@ module.exports = {
         c.zone === 'support' && c.owner === target.owner
         && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx,
       );
-      if (inst && engine.canApplyCreatureStatus(inst, 'burned', { name: CARD_NAME, owner: pi })) {
-        inst.counters.burned = true;
-        engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: CARD_NAME });
+      if (inst) {
+        const applied = await engine.applyCreatureStatus(inst, 'burned', {
+          sourceOwner: pi,
+          source: CARD_NAME,
+        });
+        if (applied) engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: CARD_NAME });
       }
     }
     engine.sync();

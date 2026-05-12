@@ -133,7 +133,7 @@ module.exports = {
         targets.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h.name });
       }
       for (const inst of engine.cardInstances) {
-        if (inst.owner !== pi || inst.zone !== 'support') continue;
+        if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
         if (inst.faceDown) continue;
         const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;

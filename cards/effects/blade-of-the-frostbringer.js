@@ -101,10 +101,11 @@ module.exports = {
         });
         await engine._delay(300);
 
-        if (engine.canApplyCreatureStatus(inst, 'frozen')) {
-          inst.counters.frozen = 1;
-          engine.log('frostbringer_freeze', { target: inst.name, by: CARD_NAME });
-        }
+        const applied = await engine.applyCreatureStatus(inst, 'frozen', {
+          sourceOwner: ctx.cardOwner,
+          source: CARD_NAME,
+        });
+        if (applied) engine.log('frostbringer_freeze', { target: inst.name, by: CARD_NAME });
       }
 
       engine.sync();

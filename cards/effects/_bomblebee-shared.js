@@ -70,10 +70,16 @@ function bomblebeeHoptUsed(gs, inst) {
  */
 function isOpponentTargetDeath(ctx, listenerOwner) {
   if (ctx.creature) {
-    // Use originalOwner when present so a charmed/stolen creature dying
-    // is still attributed to its physical side. For "opponent" purposes
-    // both fields point to the same physical side anyway.
-    const ownerOfDead = ctx.creature.originalOwner ?? ctx.creature.owner;
+    // Use the CONTROLLER (gameplay side) for attribution. A creature
+    // currently controlled by opp dies → from listenerOwner's POV that
+    // is an opp-target death. A creature originally owned by listenerOwner
+    // but cross-side-placed onto opp's side (Chilly Wizard) and dying
+    // is opp's death from listenerOwner's POV — controller, not owner,
+    // is the right discriminator. Falls back to originalOwner / owner
+    // for death payloads that pre-date the `controller` field.
+    const ownerOfDead = ctx.creature.controller
+      ?? ctx.creature.originalOwner
+      ?? ctx.creature.owner;
     return ownerOfDead !== listenerOwner;
   }
   if (ctx.hero) {

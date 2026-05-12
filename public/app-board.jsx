@@ -432,6 +432,36 @@ function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
   );
 }
 
+// Colored Snow's two-phase Potion reveal. Phase 1 (`exiting === false`)
+// runs the in-and-flip keyframes via the base `colored-snow-reveal-card`
+// class — the card flies from `startX/Y` to `centerX/Y`, flips face-up,
+// and HOLDS at center until the script signals phase 2. Phase 2 toggles
+// the `exiting` class on, swapping the animation to the fly-to-
+// destination keyframes that target `endX/Y`.
+function ColoredSnowRevealCard({ startX, startY, centerX, centerY, endX, endY, exiting, handoff, cardName, cardbackUrl }) {
+  const card = CARDS_BY_NAME[cardName];
+  const imgUrl = card ? cardImageUrl(card.name) : null;
+  const exitClass = handoff ? ' handoff' : (exiting ? ' exiting' : '');
+  return (
+    <div className={'colored-snow-reveal-card' + exitClass}
+      style={{
+        '--sx': startX + 'px', '--sy': startY + 'px',
+        '--cx': centerX + 'px', '--cy': centerY + 'px',
+        '--ex': (endX ?? centerX) + 'px', '--ey': (endY ?? centerY) + 'px',
+      }}>
+      <div className="colored-snow-reveal-inner">
+        <div className="colored-snow-reveal-back">
+          <img src={cardbackUrl || '/cardback.png'} draggable={false} />
+        </div>
+        <div className="colored-snow-reveal-front">
+          {imgUrl ? <img src={imgUrl} draggable={false} />
+            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg3)', fontSize: 10, color: 'var(--text)', textAlign: 'center', padding: 4 }}>{cardName}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Opponent draw animation — face-down card flies from opp deck to opp hand
 // Kassaran reveal flip — top card flies from deck pile to screen center,
 // flips face-up there, then continues to the destination (hand on match
@@ -5741,6 +5771,118 @@ const ANIM_REGISTRY = {
   // white glint flashes on impact, and a crimson slash wound lingers
   // briefly in the cut's wake. Tuned to ~700ms so the cut resolves
   // before destruction fires.
+  // Flame slash — Thaw Blader's strike. A diagonal blade streak swept
+  // across the slot, wreathed in fire: a hot white-orange glint at the
+  // midpoint, a lingering ember-glow trail along the cut path, flame
+  // tongues dancing along the trail, embers scattering outward, and a
+  // brief heat-shimmer wash filling the slot. Mirrors scythe_cut's
+  // geometry — diagonal upper-right to lower-left — so the slash reads
+  // as a sword arc rather than a generic radial burst.
+  flame_slash: (() => {
+    return function FlameSlashEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 80, 80);
+      const hh = Math.max(h || 110, 110);
+      const len = Math.hypot(ww, hh) * 1.6;
+      // Embers fly outward in a fan, biased toward the slash axis so
+      // the cluster reads as "sparked off the blade" rather than a
+      // generic radial pop.
+      const embers = useMemo(() => Array.from({ length: 16 }, () => {
+        // Skew angles toward ±42° (the blade axis) by sampling around
+        // those two directions with a wide jitter.
+        const axis = Math.random() < 0.5 ? -42 : 138; // degrees, the two slash directions
+        const angleDeg = axis + (-55 + Math.random() * 110);
+        return {
+          angleRad: angleDeg * Math.PI / 180,
+          dist: 36 + Math.random() * 50,
+          size: 2 + Math.random() * 5,
+          color: ['#ffd066','#ff8a1a','#ff4a08','#ffae3a','#ffeab3'][Math.floor(Math.random() * 5)],
+          delay: 200 + Math.random() * 200,
+          dur: 380 + Math.random() * 260,
+        };
+      }), []);
+      // Flame tongues sit along the blade path, rising and fading
+      // shortly after the streak passes — they make the slash feel
+      // ENGULFED rather than steel-clean.
+      const flames = useMemo(() => Array.from({ length: 8 }, (_, i) => ({
+        startX: (-ww * 0.42) + (ww * 0.84) * (i / 7),
+        delay: 240 + i * 30 + Math.random() * 70,
+        dur: 420 + Math.random() * 220,
+        size: 18 + Math.random() * 10,
+        char: ['🔥','🔥','✦'][Math.floor(Math.random() * 3)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Heat-shimmer wash — a soft orange radial that swells and
+              fades behind the slash to suggest scorching air. */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.7, top: -hh * 0.65,
+            width: ww * 1.4, height: hh * 1.3,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,180,60,0.55) 0%, rgba(255,90,20,0.4) 35%, rgba(180,30,0,0.15) 70%, transparent 90%)',
+            opacity: 0,
+            animation: 'flameSlashHeat 620ms ease-out 60ms forwards',
+          }} />
+          {/* Blade streak — bright flame-coloured slash sweeping
+              upper-right to lower-left. */}
+          <div style={{
+            position: 'absolute', left: -len / 2, top: -3,
+            width: len, height: 6,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,160,40,.18) 18%, rgba(255,210,90,.95) 46%, rgba(255,255,220,1) 52%, rgba(255,140,30,.85) 62%, rgba(220,40,0,.5) 82%, transparent 100%)',
+            boxShadow: '0 0 14px rgba(255,160,40,.95), 0 0 28px rgba(255,100,20,.75), 0 0 48px rgba(220,40,0,.55)',
+            transform: 'rotate(-42deg) translateX(-130%)',
+            transformOrigin: 'center center',
+            animation: 'flameSlashBlade 460ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards',
+            opacity: 0,
+          }} />
+          {/* Impact glint — bright white-orange flash at midpoint. */}
+          <div style={{
+            position: 'absolute', left: -16, top: -16, width: 32, height: 32,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,230,1) 0%, rgba(255,210,80,.8) 35%, rgba(255,90,20,.5) 65%, transparent 80%)',
+            boxShadow: '0 0 18px rgba(255,200,80,1), 0 0 32px rgba(255,120,30,.8)',
+            animation: 'flameSlashGlint 400ms ease-out 200ms forwards',
+            opacity: 0,
+          }} />
+          {/* Ember-glow trail — lingering orange-red line along the
+              cut path after the blade has passed. */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.6, top: -4,
+            width: ww * 1.2, height: 8,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,80,10,.7) 18%, rgba(255,160,40,.95) 50%, rgba(255,80,10,.7) 82%, transparent 100%)',
+            boxShadow: '0 0 12px rgba(255,120,30,.85), 0 0 22px rgba(220,40,0,.55)',
+            transform: 'rotate(-42deg)',
+            transformOrigin: 'center center',
+            animation: 'flameSlashTrail 680ms ease-out 240ms forwards',
+            opacity: 0,
+          }} />
+          {/* Flame tongues along the slash path. */}
+          {flames.map((f, i) => (
+            <div key={'fsf'+i} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: f.size,
+              filter: 'drop-shadow(0 0 4px rgba(255,140,30,.9))',
+              opacity: 0,
+              animation: `flameSlashFlame ${f.dur}ms ease-out ${f.delay}ms forwards`,
+              '--fsfStartX': f.startX + 'px',
+            }}>{f.char}</div>
+          ))}
+          {/* Embers scattering outward. */}
+          {embers.map((e, i) => (
+            <div key={'fse'+i} style={{
+              position: 'absolute', left: -e.size / 2, top: -e.size / 2,
+              width: e.size, height: e.size, borderRadius: '50%',
+              background: e.color,
+              boxShadow: `0 0 6px ${e.color}, 0 0 12px rgba(255,140,30,.7)`,
+              animation: `flameSlashEmber ${e.dur}ms ease-out ${e.delay}ms forwards`,
+              opacity: 0,
+              '--fsAngle': e.angleRad + 'rad',
+              '--fsDist': e.dist + 'px',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
   scythe_cut: (() => {
     return function ScytheCutEffect({ x, y, w, h }) {
       const ww = Math.max(w || 80, 80);
@@ -12704,6 +12846,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Kassaran reveal-flip animations — entries auto-removed by setTimeout
   // after the CSS keyframes complete.
   const [kassaranFlips, setKassaranFlips] = useState([]);
+  // Colored Snow Potion-reveal animations — two-phase, so entries
+  // start with `exiting: false` (fly-in + flip + hold), then a later
+  // `colored_snow_reveal_end` event flips `exiting` to true (fly-out
+  // to destination) and schedules removal once the exit keyframes
+  // complete.
+  const [coloredSnowReveals, setColoredSnowReveals] = useState([]);
+  // Mirror of `coloredSnowReveals` as a Set of `${owner}-${cardName}`
+  // keys — keeps the pile-transfer suppressor in sync with React
+  // state without depending on the latest render's closure. Without
+  // this, side-effects like Saint Nicolas's `play_pile_transfer`
+  // (which fires WHILE the reveal is centred) would spawn a second
+  // floating card and a second hand-grow auto-anim, on top of the
+  // reveal's own fly-out.
+  const coloredSnowInFlightRef = useRef(new Set());
   // Deck-top tooltip — set on hover over a deck pile whose top card is
   // publicly known (Premonition stash, Kassaran miss reveal, Enigma
   // restack). Carries the cardName + the deck pile's bounding rect so
@@ -13753,6 +13909,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // dispatch play_creature — identical to having drag-dropped the
   // card there. Cleared on turn change, phase change, or Esc/cancel.
   const [pendingBouncePick, setPendingBouncePick] = useState(null); // { cardName, handIndex, card, bounceTargets, freeSlotTargets }
+  // Cross-side destination pick (Chilly Wizard click flow). When set,
+  // every empty Support Zone on either player's side lights up — plus
+  // every alive Hero with at least one free Support Zone — and clicking
+  // dispatches `play_creature` with an appropriate `crossSideHost` for
+  // opp-side picks. Mirrors the drag-drop UX so click and drag stay in
+  // sync. Cleared on selection / cancel / turn-end.
+  const [crossSidePlayPick, setCrossSidePlayPick] = useState(null); // { cardName, handIndex, card }
+  // Summoner picker for `playOnAnyHeroSide` Creatures (Chilly Wizard).
+  // After the player has chosen a destination (drop or click-pick), the
+  // engine still needs to know WHICH own Hero performed the summoning
+  // Action — important for action-economy bookkeeping (Saint Nicolas's
+  // Potion cost, Athor's discard trigger, hero-locked extra Actions, …).
+  // When 2+ own Heroes can summon the card we open this picker; with
+  // exactly one eligible summoner we auto-credit them and skip it.
+  // Shape: { cardName, handIndex, card, destination: { ownerIdx, heroIdx, slotIdx }, eligibleSummoners: [hi, …] }
+  const [summonerPick, setSummonerPick] = useState(null);
   // Click-to-attach an Ability. When set, eligible hero zones + their valid
   // ability slots (or existing stacks of the same ability) light up; clicking
   // one dispatches play_ability. Cleared on cancel / turn change / etc.
@@ -13771,6 +13943,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   useEffect(() => {
     setSpellHeroPick(null);
     setPendingBouncePick(null);
+    setCrossSidePlayPick(null);
+    setSummonerPick(null);
     const ep = gameState.effectPrompt;
     const epIsAttachTarget = ep?.type === 'abilityAttachTarget' && ep.ownerIdx === myIdx;
     if (!epIsAttachTarget) setAbilityAttachPick(null);
@@ -13969,6 +14143,61 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (!supZones[s] || supZones[s].length === 0) return s;
     }
     return -1;
+  };
+
+  // Eligible summoners for a `playOnAnyHeroSide` Creature — own Heroes
+  // that can validly act as the summon's "validation surface": in the
+  // playable map (own side), alive, non-CC, skill-unlocked, AND with at
+  // least one free Support Zone for the engine's initial placement.
+  // (The cross-side hint then relocates the Creature from that slot to
+  // the user's chosen destination.) Returned in hero-index order.
+  const getEligibleSummoners = (cardName) => {
+    const out = [];
+    const ownPlayable = gameState.heroPlayableCards?.own || {};
+    for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+      if (!(ownPlayable[hi] || []).includes(cardName)) continue;
+      const hero = me.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.bound) continue;
+      if (hero.buffs?.blessed_skill?.locked) continue;
+      if (findFreeSupportSlot(me, hi) < 0) continue;
+      out.push(hi);
+    }
+    return out;
+  };
+
+  // Emit `play_creature` for a `playOnAnyHeroSide` Creature, crediting
+  // the chosen `summonerHeroIdx` with the summoning Action and routing
+  // the eventual placement through `destination` (own- or opp-side).
+  // The cross-side hint relocates the Creature from the summoner's
+  // initial slot to the destination after `onPlay` resolves.
+  const dispatchCrossSideSummon = (cardName, summonerHeroIdx, destination) => {
+    const currentIdx = hand.findIndex(c => c === cardName);
+    if (currentIdx < 0) return;
+    const summonerSlot = findFreeSupportSlot(me, summonerHeroIdx);
+    if (summonerSlot < 0) return;
+    socket.emit('play_creature', {
+      roomId: gameState.roomId, cardName,
+      handIndex: currentIdx,
+      heroIdx: summonerHeroIdx, zoneSlot: summonerSlot,
+      crossSideHost: destination,
+      viaDragDrop: true,
+    });
+  };
+
+  // Route a `playOnAnyHeroSide` summon to either an auto-emit (when
+  // only one eligible summoner exists) or the summoner picker (2+).
+  // `destination` is always supplied — the hint is honoured even for
+  // same-side destinations so the engine can place onto the chosen
+  // summoner's slot first and then relocate to the dropped slot.
+  const routeCrossSideSummon = (cardName, handIndex, card, destination) => {
+    const eligible = getEligibleSummoners(cardName);
+    if (eligible.length === 0) return;
+    if (eligible.length === 1) {
+      dispatchCrossSideSummon(cardName, eligible[0], destination);
+      return;
+    }
+    setSummonerPick({ cardName, handIndex, card, destination, eligibleSummoners: eligible });
   };
 
   // Game start announcement + turn change announcements
@@ -14394,8 +14623,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         let targetHero = -1, targetSlot = -1;
         let targetBakhmSlot = -1;
         let surpriseTarget = false;
+        // Cross-side host: set when the cursor is over an OPP-side empty
+        // Support Zone AND the card is cross-side-playable (e.g. Chilly
+        // Wizard). The drop emit converts this into a `crossSideHost`
+        // payload field for the server's `play_creature` handler, which
+        // stashes it as a destination hint for the script's `onPlay`.
+        let crossSideHost = null;
         const heroActionHeroIdx = heroActionPrompt?.heroIdx;
         const isSurpriseCard = (card.subtype || '').toLowerCase() === 'surprise';
+        const crossSidePlayable = (gameState.crossSidePlayableCards || []).includes(cardName);
 
         // Surprise-subtype Creatures: check Surprise Zones (set face-down above
         // hero) AND Bakhm support slots (set face-down into Bakhm's support).
@@ -14464,7 +14700,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const hi = parseInt(el.dataset.supportHero);
               const si = parseInt(el.dataset.supportSlot);
               const isOwn = el.dataset.supportOwner === 'me';
-              if (!isOwn) continue;
+              if (!isOwn) {
+                // Cross-side play (Chilly Wizard): opp-side EMPTY zones
+                // are valid drop targets too. The host hero on opp's
+                // side doesn't need to meet the level-req — the card's
+                // `canBypassLevelReq` already gates this on the caster's
+                // OWN heroes server-side, and the server-published
+                // `crossSidePlayableCards` set means at least one own
+                // hero already qualifies. Skip during heroAction (the
+                // immediate-action prompt locks placement to one own
+                // Hero) and during bounce mode.
+                if (!crossSidePlayable || hasBounceTargets || heroActionHeroIdx !== undefined) continue;
+                const oppHero = opp.heroes?.[hi];
+                if (!oppHero?.name || oppHero.hp <= 0) continue;
+                const oppSlotCards = (opp.supportZones?.[hi] || [])[si] || [];
+                if (oppSlotCards.length > 0) continue;
+                crossSideHost = { ownerIdx: oppIdx, heroIdx: hi, slotIdx: si };
+                continue;
+              }
               // During heroAction, only the Coffee hero's zones are valid.
               if (heroActionHeroIdx !== undefined && hi !== heroActionHeroIdx) continue;
               const slotCards = (me.supportZones[hi] || [])[si] || [];
@@ -14484,7 +14737,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               if (isOccupied) {
                 if (hasBounceTargets && isBounceSlot) { targetHero = hi; targetSlot = si; }
               } else if (card.cardType === 'Creature') {
-                const canPlayHere = isHeroAction || canHeroNormalSummon(me, hi, card);
+                // Cross-side-playable cards (Chilly Wizard) accept any
+                // alive own Hero's empty Support Zone — the host Hero
+                // is just an address per the card's text.
+                const canPlayHere = isHeroAction
+                  || (crossSidePlayable && me.heroes?.[hi]?.hp > 0)
+                  || canHeroNormalSummon(me, hi, card);
                 if (!canPlayHere) continue;
                 if (si >= ((me.supportZones[hi] || []).length || 3)) continue;
                 targetHero = hi; targetSlot = si;
@@ -14501,30 +14759,49 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // LEFT-MOST free Support Zone. Skipped in bounce mode — bounce
           // targets are slot-specific and the user must explicitly aim
           // at the bounceable's slot.
-          if (targetHero < 0 && card.cardType === 'Creature' && !hasBounceTargets) {
+          if (targetHero < 0 && !crossSideHost && card.cardType === 'Creature' && !hasBounceTargets) {
             const heroEls3 = document.querySelectorAll('[data-hero-zone]');
             for (const el of heroEls3) {
               const r = el.getBoundingClientRect();
               if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
-                if (el.dataset.heroOwner !== 'me') continue;
                 const hi = parseInt(el.dataset.heroIdx);
-                if (heroActionHeroIdx !== undefined && hi !== heroActionHeroIdx) continue;
-                const canPlayHere = isHeroAction || canHeroNormalSummon(me, hi, card);
-                if (!canPlayHere) continue;
-                const supZones = me.supportZones[hi] || [];
-                let leftmost = -1;
-                for (let z = 0; z < 3; z++) {
-                  if ((supZones[z] || []).length === 0) { leftmost = z; break; }
-                }
-                if (leftmost >= 0) {
-                  targetHero = hi;
-                  targetSlot = leftmost;
+                if (el.dataset.heroOwner === 'me') {
+                  if (heroActionHeroIdx !== undefined && hi !== heroActionHeroIdx) continue;
+                  // Cross-side-playable cards relax the "this hero must
+                  // be a normal summoner" gate — any alive own hero
+                  // counts as a valid host address.
+                  const canPlayHere = isHeroAction
+                    || (crossSidePlayable && me.heroes?.[hi]?.hp > 0)
+                    || canHeroNormalSummon(me, hi, card);
+                  if (!canPlayHere) continue;
+                  const supZones = me.supportZones[hi] || [];
+                  let leftmost = -1;
+                  for (let z = 0; z < 3; z++) {
+                    if ((supZones[z] || []).length === 0) { leftmost = z; break; }
+                  }
+                  if (leftmost >= 0) {
+                    targetHero = hi;
+                    targetSlot = leftmost;
+                  }
+                } else if (crossSidePlayable && heroActionHeroIdx === undefined) {
+                  // Cross-side hero-zone fallback: drop on opp Hero card
+                  // → left-most free opp Support Zone on that Hero.
+                  const oppHero = opp.heroes?.[hi];
+                  if (!oppHero?.name || oppHero.hp <= 0) continue;
+                  const oppSupZones = opp.supportZones?.[hi] || [];
+                  let leftmost = -1;
+                  for (let z = 0; z < 3; z++) {
+                    if ((oppSupZones[z] || []).length === 0) { leftmost = z; break; }
+                  }
+                  if (leftmost >= 0) {
+                    crossSideHost = { ownerIdx: oppIdx, heroIdx: hi, slotIdx: leftmost };
+                  }
                 }
               }
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot, targetBakhmSlot, isSurprise: surpriseTarget });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot, targetBakhmSlot, isSurprise: surpriseTarget, crossSideHost });
       } else if (isEquipPlayable) {
         // Equip artifact drag — can drop on support zones OR heroes
         let targetHero = -1, targetSlot = -1;
@@ -14846,6 +15123,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
 
       if (!dragging) {
+        // Clicking a DIFFERENT hand card while a cross-side pick is open
+        // cancels the pick — the new card's click path takes over. Same-
+        // card clicks fall through and re-enter pick mode harmlessly.
+        if (crossSidePlayPick && crossSidePlayPick.cardName !== cardName) {
+          setCrossSidePlayPick(null);
+        }
         // Hand-activated-effect intercept (Luna Kiai's "Summon or Reveal").
         // PER-COPY: this specific hand slot is activatable iff its index
         // is listed in `handActivatableByIdx`. Already-revealed copies are
@@ -15027,6 +15310,37 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             //     hero picker: eligible heroes must meet canHeroPlay
             //     Card AND have a free Support Zone (base OR Flying
             //     Island extension).
+            // Cross-side-playable click (Chilly Wizard): instead of the
+            // generic hero picker, enter destination-pick mode — the
+            // board lights up every empty Support Zone AND every alive
+            // Hero with at least one free Support Zone. Mirrors the
+            // drag-drop UX 1:1. Falls back to the standard pickers only
+            // when the flag isn't set.
+            const isCsCard = (gameState.crossSidePlayableCards || []).includes(cardName);
+            if (isCsCard) {
+              // Must have at least one valid destination, otherwise fall
+              // through silently. Server-side `crossSidePlayableCards`
+              // already gated on at least one own qualifier, so we only
+              // need a free zone anywhere on the board.
+              let hasFree = false;
+              for (let pIdx = 0; pIdx < 2 && !hasFree; pIdx++) {
+                const ps2 = gameState.players?.[pIdx];
+                if (!ps2) continue;
+                for (let hi = 0; hi < (ps2.heroes || []).length && !hasFree; hi++) {
+                  const h2 = ps2.heroes[hi];
+                  if (!h2?.name || h2.hp <= 0) continue;
+                  const zones = ps2.supportZones?.[hi] || [];
+                  for (let z = 0; z < 3; z++) {
+                    if ((zones[z] || []).length === 0) { hasFree = true; break; }
+                  }
+                }
+              }
+              if (hasFree) {
+                setCrossSidePlayPick({ cardName, handIndex: idx, card });
+                setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
+                return;
+              }
+            }
             const bpTargets = (gameState.bouncePlacementTargets || {})[cardName] || [];
             if (bpTargets.length > 0) {
               // Enter "pick a target" mode — highlight BOTH occupied
@@ -15183,7 +15497,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             return null;
           }
 
+          // Cross-side drop (Chilly Wizard) on an OPP-side zone: route
+          // through the summoner picker / auto-summoner flow. The
+          // destination is the opp-side slot the cursor dropped on.
+          if (prev.crossSideHost && prev.targetHero < 0) {
+            routeCrossSideSummon(prev.cardName, prev.idx, prev.card, prev.crossSideHost);
+            return null;
+          }
+
           if (prev.targetHero < 0 || prev.targetSlot < 0) return null;
+
+          // Same-side Chilly Wizard drop: a `playOnAnyHeroSide` Creature
+          // dropped onto an OWN slot still goes through the summoner
+          // picker (so the player can credit a Hero OTHER than the
+          // drop-target as the actual summoner). The destination is
+          // the dropped slot.
+          if ((gameState.crossSidePlayableCards || []).includes(prev.cardName)) {
+            routeCrossSideSummon(prev.cardName, prev.idx, prev.card, {
+              ownerIdx: myIdx, heroIdx: prev.targetHero, slotIdx: prev.targetSlot,
+            });
+            return null;
+          }
 
           // Hero Action mode (Coffee, Guardian Beast Hu, …). Hero-locked
           // variants (Coffee) ignore `heroIdx` in the response and use
@@ -19271,6 +19605,101 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('kassaran_reveal_flip', onKassaranFlip);
 
+    // ── Colored Snow Potion reveal (two-phase) ──
+    // Phase 1 (`colored_snow_reveal_start`): spawn a flying card at
+    // the owner's Potion Deck position and animate it to centre + flip
+    // face-up. Phase 2 (`colored_snow_reveal_end`) flips the entry's
+    // `exiting` flag, which swaps the animation to the fly-to-
+    // destination keyframes, and schedules removal once that exit
+    // animation completes.
+    const onColoredSnowRevealStart = ({ owner, cardName }) => {
+      const isMe = owner === myIdx;
+      const deckSel = isMe ? '[data-my-potion-deck]' : '[data-opp-potion-deck]';
+      const deckEl = document.querySelector(deckSel);
+      if (!deckEl) return;
+      const dr = deckEl.getBoundingClientRect();
+      const sx = dr.left;
+      const sy = dr.top;
+      const cx = window.innerWidth / 2 - 32;
+      const cy = window.innerHeight / 2 - 45;
+      const cardbackUrl = isMe ? me.cardback : opp.cardback;
+      coloredSnowInFlightRef.current.add(`${owner}-${cardName}`);
+      setColoredSnowReveals(prev => [...prev, {
+        id: `cs-${owner}-${cardName}`,
+        owner, cardName,
+        startX: sx, startY: sy,
+        centerX: cx, centerY: cy,
+        endX: cx, endY: cy,
+        cardbackUrl,
+        exiting: false,
+      }]);
+    };
+    socket.on('colored_snow_reveal_start', onColoredSnowRevealStart);
+
+    const onColoredSnowRevealEnd = ({ owner, cardName, destination }) => {
+      // Compute the destination DOM rect for the fly-out keyframes.
+      const isMe = owner === myIdx;
+      let destEl = null;
+      // `handoff` mode: another animation (Saint Nicolas's
+      // `play_pile_transfer`) owns the actual flight to the destination.
+      // The reveal card fades in place so we don't have two copies
+      // flying at once.
+      let handoff = false;
+      switch (destination?.kind) {
+        case 'oppHand': {
+          // Saint Nicolas's `play_pile_transfer` (hand → hand cross-
+          // side) already animates the card to the specific receiver
+          // slot. Letting our own fly-out run too would double-flight
+          // the card. Hand off the visual to that pile transfer and
+          // just fade the reveal card.
+          handoff = true;
+          break;
+        }
+        case 'support': {
+          const ownerLabel = destination.owner === myIdx ? 'me' : 'opp';
+          destEl = document.querySelector(
+            `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${destination.heroIdx}"][data-support-slot="${destination.slotIdx}"]`,
+          );
+          break;
+        }
+        case 'discard': {
+          destEl = document.querySelector(destination.owner === myIdx ? '[data-my-discard]' : '[data-opp-discard]');
+          break;
+        }
+        case 'deleted':
+        default: {
+          destEl = document.querySelector(destination?.owner === myIdx ? '[data-my-deleted]' : '[data-opp-deleted]');
+          break;
+        }
+      }
+      let ex, ey;
+      if (destEl) {
+        const r = destEl.getBoundingClientRect();
+        ex = r.left + r.width / 2 - 32;
+        ey = r.top + r.height / 2 - 45;
+      }
+      setColoredSnowReveals(prev => prev.map(r => {
+        if (r.id !== `cs-${owner}-${cardName}`) return r;
+        return {
+          ...r,
+          exiting: !handoff,
+          handoff,
+          endX: ex != null ? ex : r.centerX,
+          endY: ey != null ? ey : r.centerY,
+        };
+      }));
+      // Remove the entry shortly after the exit animation completes,
+      // and drop the in-flight key from the suppression ref. Handoff
+      // mode uses the shorter `colored-snow-reveal-handoff` keyframe
+      // (350 ms); the standard fly-out is 500 ms.
+      const removalDelay = handoff ? 400 : 550;
+      setTimeout(() => {
+        setColoredSnowReveals(prev => prev.filter(r => r.id !== `cs-${owner}-${cardName}`));
+        coloredSnowInFlightRef.current.delete(`${owner}-${cardName}`);
+      }, removalDelay);
+    };
+    socket.on('colored_snow_reveal_end', onColoredSnowRevealEnd);
+
     // Side-deck-to-hand appear: the card materialises in the receiver's
     // hand without a flight animation. Suppresses the auto-draw watcher
     // (no source pile shrunk, so the fallback would otherwise animate
@@ -20236,6 +20665,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('discard_to_deck_animation', onDiscardToDeck);
       socket.off('play_pile_transfer', onPileTransfer);
       socket.off('kassaran_reveal_flip', onKassaranFlip);
+      socket.off('colored_snow_reveal_start', onColoredSnowRevealStart);
+      socket.off('colored_snow_reveal_end', onColoredSnowRevealEnd);
       socket.off('side_deck_appear', onSideDeckAppear);
       socket.off('deck_to_discard_animation', onDeckToDiscard);
       socket.off('discard_to_deleted_animation', onDiscardToDeleted);
@@ -20536,6 +20967,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         return;
       }
       if (pendingBouncePick) { setPendingBouncePick(null); return; }
+      if (crossSidePlayPick) { setCrossSidePlayPick(null); return; }
+      if (summonerPick) { setSummonerPick(null); return; }
       if (mulliganActive) { setMulliganDecided(true); socket.emit('mulligan_decision', { roomId: gameState.roomId, accept: false }); return; }
       if (pendingAbilityActivation) { setPendingAbilityActivation(null); return; }
       if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx && gameState.effectPrompt.cancellable !== false) {
@@ -21962,7 +22395,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // card itself as a clickable shortcut to that Hero's first
           // eligible Support Zone. Only fires for the local player.
           const isZonePickHero = !isOpp && zonePickHeroFirstSlot.has(i);
-          const onHeroClick = attachPickEligibleHero
+          // Cross-side click-pick on a Hero card. Whichever side the
+          // Hero lives on, a click summons the card into that Hero's
+          // LEFT-MOST free Support Zone. Opp-side picks route via a
+          // qualifying own Hero (validation surface) plus `crossSideHost`.
+          // Requires an alive host with at least one free slot.
+          const _csppHeroSide = isOpp ? opp : me;
+          const _csppHeroFreeSlot = !!crossSidePlayPick && hero?.hp > 0
+            ? (() => {
+                const zones = _csppHeroSide.supportZones?.[i] || [];
+                for (let z = 0; z < 3; z++) {
+                  if ((zones[z] || []).length === 0) return z;
+                }
+                return -1;
+              })()
+            : -1;
+          const isCsppHeroTarget = !!crossSidePlayPick && _csppHeroFreeSlot >= 0;
+          const onHeroClick = isCsppHeroTarget
+            ? () => {
+                const cspp = crossSidePlayPick;
+                setCrossSidePlayPick(null);
+                routeCrossSideSummon(cspp.cardName, cspp.handIndex, cspp.card, {
+                  ownerIdx: pi, heroIdx: i, slotIdx: _csppHeroFreeSlot,
+                });
+              }
+            : attachPickEligibleHero
             ? () => {
                 // Click the Hero → auto-attach to the first eligible slot.
                 // Standard ability: stack onto existing copy (if any) or first empty zone.
@@ -22019,10 +22476,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || attachPickEligibleHero) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || attachPickEligibleHero || isCsppHeroTarget) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
-                style={zsMerge('hero', { ...((isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
+                style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
                 {isChainPickSelected && <div className="chain-pick-number">{chainPickStep + 1}</div>}
                 {hero?.name && !isRamming ? (
                   <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={gameSkins}
@@ -22217,9 +22674,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // cards in their ability zones) remain activatable. Mirrors
           // the engine-side `getActivatableAbilities` /
           // `getFreeActivatableAbilities` gates which only filter on
-          // frozen/stunned for ability activation. Frozen and stunned
-          // DO silence the whole hero (no actions, no abilities).
-          const isFrozenOrStunned = hero?.statuses?.frozen || hero?.statuses?.stunned;
+          // frozen/stunned for ability activation.
+          //
+          // Stunned always silences. Frozen also silences UNLESS the
+          // Hero's controller has Chilly Dog (Mischief Militia) in
+          // play — its aura keeps own-side Frozen Heroes' Abilities
+          // usable, so we should NOT add the gray-out
+          // `board-zone-dead` class in that case. Server publishes
+          // the live aura state per side via `chillyDogActiveSides`.
+          const _abZoneSide = isOpp ? oppIdx : myIdx;
+          const _chillyDogLiftsAbZone = !!(gameState.chillyDogActiveSides || [])[_abZoneSide];
+          const isFrozenOrStunned = hero?.statuses?.stunned
+            || (hero?.statuses?.frozen && !_chillyDogLiftsAbZone);
           const abilityAttachActive2 = !isOpp && gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
           const heroIneligible = !isOpp && abilityDrag && (() => {
             if (abilityAttachActive2) {
@@ -22498,6 +22964,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const _isSurpriseCardDrag = !isOpp && playDrag
                 && (playDrag.card?.subtype || '').toLowerCase() === 'surprise';
               const isDraggingCreature = !isOpp && playDrag && playDrag.card?.cardType === 'Creature' && !playDrag.isEquip && !playDrag.isSurprise && !_isSurpriseCardDrag;
+              // Cross-side drag highlight (Chilly Wizard): when the card
+              // being dragged is in the server-published
+              // `crossSidePlayableCards` set, EMPTY opp-side Support Zones
+              // light up alongside own-side eligible zones. Same drag-
+              // valid class, applied symmetrically.
+              const _isCrossSideCreatureDrag = playDrag && playDrag.card?.cardType === 'Creature'
+                && !playDrag.isEquip && !playDrag.isSurprise && !_isSurpriseCardDrag
+                && (gameState.crossSidePlayableCards || []).includes(playDrag.cardName);
               const isDraggingAttachment = !isOpp && playDrag && playDrag.isSpell && (playDrag.card?.subtype || '').toLowerCase() === 'attachment';
               const heroActionActive = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx;
               const heroActionHeroIdx = heroActionActive ? gameState.effectPrompt.heroIdx : undefined;
@@ -22543,13 +23017,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // slot. Attachment Spells and other non-Creature drags keep
               // using the broad canHeroPlayCard check.
               const emptyCanPlayHere = isDraggingCreature && playDrag?.card
-                ? canHeroNormalSummon(me, i, playDrag.card)
+                ? (
+                    // Cross-side-playable cards (Chilly Wizard) accept
+                    // any alive own Hero's empty Support Zone, regardless
+                    // of whether THAT hero could normally summon the card.
+                    (_isCrossSideCreatureDrag && me.heroes?.[i]?.hp > 0)
+                    || canHeroNormalSummon(me, i, playDrag.card)
+                  )
                 : canPlayHere;
+              // Cross-side empty-zone eligibility (opp side): requires an
+              // alive opp hero AND an empty slot. Server already gated
+              // crossSidePlayableCards on at least one OWN hero
+              // qualifying, so no per-side level-req check here.
+              const isOppCrossSideValid = isOpp && _isCrossSideCreatureDrag
+                && cards.length === 0
+                && (opp.heroes?.[i]?.hp > 0)
+                && z < ((opp.supportZones?.[i] || []).length || 3);
               const isDragValidZone = (isDraggingCreature || isDraggingAttachment)
                 && cards.length === 0 && emptyCanPlayHere
                 && z < ((me.supportZones[i] || []).length || 3)
                 && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
-              const isDragInvalidZone = (isDraggingCreature || isDraggingAttachment) && !isDragValidZone && !isBouncePlaceTarget;
+              const isDragValidZoneAny = isDragValidZone || isOppCrossSideValid;
+              const isDragInvalidZone = (isDraggingCreature || isDraggingAttachment || _isCrossSideCreatureDrag) && !isDragValidZoneAny && !isBouncePlaceTarget;
               // heroAction: dim zones for non-Coffee heroes
               const isHeroActionZoneDimmed = heroActionActive && !isDraggingCreature && !isDraggingAttachment && i !== heroActionHeroIdx;
               // Additional Action provider selection highlight
@@ -22598,10 +23087,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const stolenBy = (gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._stolenBy;
               const isStolen = stolenBy != null;
               const stolenColor = isStolen ? (stolenBy === myIdx ? me.color : opp.color) : null;
+              // Cross-side click-pick destination slot. Every empty
+              // Support Zone on an alive Hero (either side) lights up
+              // and is clickable while `crossSidePlayPick` is active.
+              const _csppSide = isOpp ? opp : me;
+              const isCsppEmptySlot = !!crossSidePlayPick
+                && cards.length === 0
+                && (_csppSide.heroes?.[i]?.hp > 0)
+                && z < ((_csppSide.supportZones?.[i] || []).length || 3);
+              // Creature-originated ram (Bear Rider's dash, etc.) —
+              // hide the Creature inside this Support Zone for the
+              // duration of the flight so the player only sees ONE
+              // copy of it (the airborne ram card). The slot itself
+              // stays rendered to preserve layout. Matched on owner +
+              // hero + zone slot exactly.
+              const isSupportRamming = ramAnims.some(r =>
+                r.srcOwner === pi && r.srcHeroIdx === i && r.srcZoneSlot === z
+              );
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isDragValidZone ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
-                  onClick={isPendingBounceTarget ? () => {
+                  onClick={isCsppEmptySlot ? () => {
+                    // Click-pick destination chosen → route through the
+                    // summoner picker / auto-summoner helper. Destination
+                    // is the clicked slot (same- or opp-side).
+                    const cspp = crossSidePlayPick;
+                    setCrossSidePlayPick(null);
+                    routeCrossSideSummon(cspp.cardName, cspp.handIndex, cspp.card, {
+                      ownerIdx: pi, heroIdx: i, slotIdx: z,
+                    });
+                  } : isPendingBounceTarget ? () => {
                     // Click-to-swap: dispatches play_creature as if the
                     // card had been dragged here. Server treats the
                     // rest identically — occupied slot routes through
@@ -22651,10 +23166,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     }
                   } : isZonePickTarget ? () => respondToPrompt({ owner: pi, heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
                   style={zsMerge('support', {
-                    ...((isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isSlipperyCreature || isSlipperyDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined),
+                    ...((isCsppEmptySlot || isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isSlipperyCreature || isSlipperyDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined),
                     ...(isStolen && stolenColor ? { '--charmed-color': stolenColor } : undefined),
                   })}
-                  data-bounce-hiding={bounceOutgoingHidden.has(`${pi}-${i}-${z}`) ? 'true' : undefined}>
+                  data-bounce-hiding={bounceOutgoingHidden.has(`${pi}-${i}-${z}`) ? 'true' : undefined}
+                  data-support-ramming={isSupportRamming ? 'true' : undefined}>
                   {isChainPickCreatureSelected && <div className="chain-pick-number">{chainPickCreatureStep + 1}</div>}
                   {(isPlayTarget || isAutoTarget) && playDrag.card ? (
                     <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
@@ -23679,6 +24195,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   for (const si of handPickSelected) { lockedName = me.hand[si]; break; }
                   return lockedName != null && me.hand[item.origIdx] !== lockedName;
                 })();
+                // zonePick hand-highlight (Mischief Invasion's
+                // per-Creature summon loop, and any future card that
+                // wants to label one hand card as "currently being
+                // resolved" while queuing others). The prompt's
+                // `highlightHandIdx` is the active subject (rendered
+                // with the urgent pulsing outline); every index in
+                // `queuedHandIdxs` is upcoming and stays neutral; all
+                // other hand cards dim so the player's eye locks onto
+                // the pipeline. Opt-in: a zonePick prompt without
+                // either field leaves the hand untouched.
+                const zonePickHandActive = gameState.effectPrompt?.type === 'zonePick'
+                  && gameState.effectPrompt?.ownerIdx === myIdx
+                  && (gameState.effectPrompt.highlightHandIdx != null
+                      || Array.isArray(gameState.effectPrompt.queuedHandIdxs));
+                const isZonePickHandHighlight = zonePickHandActive
+                  && gameState.effectPrompt.highlightHandIdx === item.origIdx;
+                const isZonePickHandQueued = zonePickHandActive
+                  && (gameState.effectPrompt.queuedHandIdxs || []).includes(item.origIdx);
+                const isZonePickHandDimmed = zonePickHandActive
+                  && !isZonePickHandHighlight
+                  && !isZonePickHandQueued;
                 const isStealMarked = stealMarkedMe.has(item.origIdx);
                 const isStealHighlighted = stealHighlightMe.has(item.origIdx);
                 const isStealHidden = stealHiddenMe.has(item.origIdx) && hand.length === stealExpectedMeCountRef.current;
@@ -23780,7 +24317,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   && handEffectiveCost > handCardData.cost;
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '')}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '')}
                     style={(isDrawAnim || isPendingPlay || isStealHidden || bounceReturnHidden.has(`${myIdx}-${item.origIdx}`)) ? { visibility: 'hidden' } : undefined}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
@@ -23868,6 +24405,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           centerX={anim.centerX} centerY={anim.centerY}
           endX={anim.endX} endY={anim.endY}
           cardName={anim.cardName} cardbackUrl={anim.cardbackUrl} />
+      ))}
+      {coloredSnowReveals.map(rev => (
+        <ColoredSnowRevealCard key={rev.id}
+          startX={rev.startX} startY={rev.startY}
+          centerX={rev.centerX} centerY={rev.centerY}
+          endX={rev.endX} endY={rev.endY}
+          exiting={rev.exiting} handoff={rev.handoff}
+          cardName={rev.cardName} cardbackUrl={rev.cardbackUrl} />
       ))}
       {/* Spectator: bottom player draw animations (face-down, like opponent) */}
       {isSpectator && specMeDrawAnims.map(anim => (
@@ -25006,6 +25551,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* ── Spell/Attack Hero Selection (click-to-play) ── */}
+      {summonerPick && !result && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>
+            🐾 Summon {summonerPick.cardName}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>
+            Choose the Hero who performs the summoning Action:
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {summonerPick.eligibleSummoners.map(hi => {
+              const h = me.heroes[hi];
+              return (
+                <button key={hi} className="btn"
+                  style={{ padding: '8px 16px', fontSize: 12, borderColor: 'var(--accent)', color: 'var(--accent)', textAlign: 'left' }}
+                  onClick={() => {
+                    const pick = summonerPick;
+                    setSummonerPick(null);
+                    dispatchCrossSideSummon(pick.cardName, hi, pick.destination);
+                  }}>
+                  {h?.name || 'Hero ' + (hi + 1)}
+                </button>
+              );
+            })}
+            <button className="btn"
+              style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: 4 }}
+              onClick={() => setSummonerPick(null)}>Cancel</button>
+          </div>
+        </DraggablePanel>
+      )}
+
       {spellHeroPick && !result && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>

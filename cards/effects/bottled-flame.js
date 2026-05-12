@@ -38,15 +38,18 @@ module.exports = {
     // Creatures
     for (const inst of engine.cardInstances) {
       if (inst.owner !== takerIdx || inst.zone !== 'support' || inst.faceDown) continue;
-      if (inst.counters.burned || inst.counters._cardinalImmune) continue;
       const cd = cardDB[inst.name];
       if (!cd || cd.cardType !== 'Creature') continue;
-      inst.counters.burned = true;
-      inst.counters.burnAppliedBy = pi;
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'flame_strike', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+      const applied = await engine.applyCreatureStatus(inst, 'burned', {
+        sourceOwner: pi,
+        source: 'Bottled Flame',
       });
-      engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: 'Bottled Flame' });
+      if (applied) {
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'flame_strike', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+        });
+        engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: 'Bottled Flame' });
+      }
     }
 
     engine.sync();

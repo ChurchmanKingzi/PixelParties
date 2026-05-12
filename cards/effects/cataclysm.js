@@ -99,6 +99,23 @@ module.exports = {
 
       // ── Resolve damage ──
       const source = { name: CARD_NAME, owner: pi, heroIdx };
+
+      // Pre-damage post-target hand-reaction window — ONE consolidated
+      // prompt per source for Sculpture Guards / Spectral Armor / etc.
+      // covering the full hero + creature target list.
+      const allTargets = [
+        ...heroTargets.map(ht => ({
+          type: 'hero', owner: ht.owner, heroIdx: ht.heroIdx,
+          cardName: gs.players[ht.owner]?.heroes?.[ht.heroIdx]?.name,
+        })),
+        ...creatureTargets.map(inst => ({
+          type: 'creature', owner: inst.controller ?? inst.owner,
+          heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+          cardName: inst.name,
+        })),
+      ];
+      await engine.preDamageMultiTargetWindow(source, allTargets);
+
       // Heroes — sequential dealDamage so afterDamage hooks fire cleanly per target.
       for (const ht of heroTargets) {
         const live = gs.players[ht.owner]?.heroes?.[ht.heroIdx];

@@ -65,7 +65,7 @@ function hasValidContext(gs, pi, engine) {
 
   let hasOwnCreature = false;
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi) continue;
+    if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
     const cd = cardDB[inst.name];
@@ -89,7 +89,7 @@ function getOwnCreatureTargets(engine, pi) {
   const cardDB = engine._getCardDB();
   const targets = [];
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi) continue;
+    if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
     const cd = cardDB[inst.name];

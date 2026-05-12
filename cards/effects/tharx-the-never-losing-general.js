@@ -68,7 +68,7 @@ function _countCreatures(engine, pi) {
   const cardDB = engine._getCardDB();
   let count = 0;
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi || inst.zone !== 'support') continue;
+    if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
     const cd = cardDB[inst.name];
     if (cd && hasCardType(cd, 'Creature')) count++;
   }

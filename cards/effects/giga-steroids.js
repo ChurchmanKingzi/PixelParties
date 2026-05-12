@@ -120,7 +120,7 @@ function _recomputeOnSteroidsFlag(engine, pi) {
   if (!ps) return;
   let active = false;
   for (const inst of engine.cardInstances) {
-    if (inst.owner !== pi) continue;
+    if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.name !== CARD_NAME) continue;
     if (!inst.counters?.additionalActionAvail) continue;
     const typeId = inst.counters?.additionalActionType;

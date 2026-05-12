@@ -106,9 +106,15 @@ module.exports = {
       if (hero && hero.hp > 0 && !hero.statuses?.burned) {
         await engine.addHeroStatus(picked.owner, picked.heroIdx, 'burned', { permanent: true });
       }
-      // Also burn all creatures in this hero's support zones
+      // Also burn all creatures in this hero's support zones. PHYSICAL
+      // side identifies which player's board the slot is on — stolen
+      // creatures stay on owner's side; cross-side-placed creatures
+      // (Chilly Wizard) sit on the controller's side.
       for (const inst of engine.cardInstances) {
-        if (inst.owner !== picked.owner || inst.zone !== 'support' || inst.heroIdx !== picked.heroIdx) continue;
+        const physSide = inst.stolenBy != null
+          ? inst.owner
+          : (inst.controller ?? inst.owner);
+        if (physSide !== picked.owner || inst.zone !== 'support' || inst.heroIdx !== picked.heroIdx) continue;
         if (inst.faceDown) continue;
         const cd = cardDB[inst.name];
         if (!cd || cd.cardType !== 'Creature') continue;
@@ -116,18 +122,18 @@ module.exports = {
           type: 'flame_strike', owner: inst.owner,
           heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
         });
-        if (!inst.counters.burned && !inst.counters._cardinalImmune) {
-          inst.counters.burned = true;
-          inst.counters.burnAppliedBy = pi;
-          engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: 'Cardinal Beast Zhuque' });
-        }
+        const applied = await engine.applyCreatureStatus(inst, 'burned', {
+          sourceOwner: pi,
+          source: 'Cardinal Beast Zhuque',
+        });
+        if (applied) engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: 'Cardinal Beast Zhuque' });
       }
     } else if (picked.cardInstance) {
-      if (!picked.cardInstance.counters.burned && !picked.cardInstance.counters._cardinalImmune) {
-        picked.cardInstance.counters.burned = true;
-        picked.cardInstance.counters.burnAppliedBy = pi;
-        engine.log('creature_burned', { card: picked.cardName, owner: picked.owner, by: 'Cardinal Beast Zhuque' });
-      }
+      const applied = await engine.applyCreatureStatus(picked.cardInstance, 'burned', {
+        sourceOwner: pi,
+        source: 'Cardinal Beast Zhuque',
+      });
+      if (applied) engine.log('creature_burned', { card: picked.cardName, owner: picked.owner, by: 'Cardinal Beast Zhuque' });
     }
 
     engine.log('zhuque_burn', { player: gs.players[pi]?.username, target: picked.cardName });

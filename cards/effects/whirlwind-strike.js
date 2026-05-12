@@ -22,7 +22,14 @@ module.exports = {
 
       const atkDamage = hero.atk || 0;
 
-      // Use generic targeting: up to 2 enemy heroes
+      // Use generic targeting: up to 2 enemy heroes.
+      // `_skipPostTargetReactions: true` because we run the
+      // consolidated post-target window manually below with the FULL
+      // target list (selected heroes + their Creatures). Letting
+      // `promptMultiTarget` fire its own window with hero-only targets
+      // would lock the per-source dedup flag before the Creature batch
+      // is offered, hiding eligible reactions like Sculpture Guards on
+      // a Frozen Creature in a hit hero's support zone.
       const selectedHeroes = await ctx.promptMultiTarget({
         types: ['hero'],
         side: 'enemy',
@@ -33,6 +40,7 @@ module.exports = {
         confirmLabel: `🌪️ Whirlwind! (${atkDamage})`,
         confirmClass: 'btn-danger',
         cancellable: true,
+        _skipPostTargetReactions: true,
       });
 
       if (selectedHeroes.length === 0) return;
@@ -80,6 +88,28 @@ module.exports = {
             });
           }
         }
+      }
+
+      // Pre-damage post-target hand-reaction window — ONE consolidated
+      // prompt per source covering selected Heroes + all Creatures
+      // they're hitting. Built BEFORE damage flows so reactions
+      // (Sculpture Guards / Spectral Armor / Bamboo Shield / Homerun!
+      // / Cloud in a Bottle / Invisibility Cloak) see the full target
+      // list and can choose between hero or creature protection.
+      {
+        const allTgts = [
+          ...heroDamageTargets.map(({ tgt, hero: tgtHero }) => ({
+            type: 'hero', owner: tgt.owner, heroIdx: tgt.heroIdx,
+            cardName: tgtHero.name,
+          })),
+          ...allCreatureEntries.map(e => ({
+            type: 'creature',
+            owner: e.inst.controller ?? e.inst.owner,
+            heroIdx: e.inst.heroIdx, slotIdx: e.inst.zoneSlot,
+            cardName: e.inst.name,
+          })),
+        ];
+        await engine.preDamageMultiTargetWindow(attackSource, allTgts);
       }
 
       // ── RAM + DAMAGE per hero target ──

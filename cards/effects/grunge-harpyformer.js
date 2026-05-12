@@ -107,17 +107,18 @@ module.exports = {
       }
     } else if (target.cardInstance) {
       const inst = target.cardInstance;
-      if (engine.canApplyCreatureStatus(inst, 'burned') && !inst.counters.burned) {
-        const hookCtx = {
-          creature: inst, effectType: 'status',
-          source: { name: CARD_NAME, owner: pi, heroIdx },
-          cancelled: false, _skipReactionCheck: true,
-        };
-        await engine.runHooks('beforeCreatureAffected', hookCtx);
-        if (!hookCtx.cancelled) {
-          inst.counters.burned = true;
-          engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: CARD_NAME });
-        }
+      const hookCtx = {
+        creature: inst, effectType: 'status',
+        source: { name: CARD_NAME, owner: pi, heroIdx },
+        cancelled: false, _skipReactionCheck: true,
+      };
+      await engine.runHooks('beforeCreatureAffected', hookCtx);
+      if (!hookCtx.cancelled) {
+        const applied = await engine.applyCreatureStatus(inst, 'burned', {
+          sourceOwner: pi,
+          source: CARD_NAME,
+        });
+        if (applied) engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: CARD_NAME });
       }
     }
 

@@ -83,11 +83,12 @@ module.exports = {
       await engine.addHeroStatus(tgt.owner, tgt.heroIdx, 'stunned', { duration: 1, appliedBy: pi });
     } else if (tgt.cardInstance) {
       const inst = tgt.cardInstance;
-      if (engine.canApplyCreatureStatus(inst, 'stunned')) {
-        inst.counters.stunned = 1;
-        inst.counters.stunnedAppliedBy = pi;
-        engine.log('status_add', { target: inst.name, status: 'stunned', owner: tgt.owner });
-      }
+      const applied = await engine.applyCreatureStatus(inst, 'stunned', {
+        sourceOwner: pi,
+        duration: 1,
+        source: 'Guardian Beast Ji',
+      });
+      if (applied) engine.log('status_add', { target: inst.name, status: 'stunned', owner: tgt.owner });
     }
     engine.log('guardian_beast_ji_stun', {
       player: engine.gs.players[pi]?.username, target: tgt.cardName,
