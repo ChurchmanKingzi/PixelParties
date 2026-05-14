@@ -228,7 +228,13 @@ module.exports = {
       engine.log('bamboo_shield_apply', {
         target: engine._heroLabel(target), original: ctx.amount,
       });
-      ctx.amount = 0;
+      // Route through `setAmount` — direct `ctx.amount = 0` only
+      // mutates the local hook-ctx wrapper, NOT the underlying
+      // hookCtx the engine reads after the listener loop (the ctx is
+      // built via `{ ...hookCtx }`, a shallow copy, in
+      // `_engine.js#_createContext`). `setAmount` writes to hookCtx
+      // through its closure and also honours `cannotBeReduced`.
+      ctx.setAmount(0);
     },
 
     /**

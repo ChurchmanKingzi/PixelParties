@@ -11,8 +11,6 @@ module.exports = {
 
   hooks: {
     onPlay: async (ctx) => {
-      if (!ctx.hardOncePerTurn('fiery-slime-summon')) return;
-
       const engine = ctx._engine;
 
       // Note: Burned ignores Immune — so we do NOT filter out immune heroes

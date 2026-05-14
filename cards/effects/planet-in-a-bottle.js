@@ -37,11 +37,19 @@
 //  a new `_area-fetch-shared.js`.
 // ───────────────────────────────────────────────────────────────────
 
-/** Lv3-or-lower Area (Spells or Attacks with subtype 'Area'). */
-function isEligibleArea(cd) {
+/**
+ * Lv3-or-lower Area (Spells or Attacks with subtype 'Area'). Level
+ * check uses `engine.effectiveCardLevel` so Cataclysm's hand-level
+ * rebate / Mana Absorbing Crystal +1 / any future Area-level
+ * modifier flows through.
+ */
+function isEligibleArea(cd, engine, pi) {
   if (!cd) return false;
   if ((cd.subtype || '').toLowerCase() !== 'area') return false;
-  if ((cd.level || 0) > 3) return false;
+  const lvl = engine?.effectiveCardLevel
+    ? engine.effectiveCardLevel(cd, pi)
+    : (cd.level || 0);
+  if (lvl > 3) return false;
   return true;
 }
 
@@ -55,7 +63,7 @@ function playerControlsArea(gs, pi) {
  * by (name, source) so the same name from multiple piles gets one entry
  * per pile. Ordered by level then name, matching Reality Crack's sort.
  */
-function buildAreaGallery(ps, cardDB) {
+function buildAreaGallery(ps, cardDB, engine, pi) {
   const gallery = [];
   const seen = new Set();
 
@@ -64,9 +72,12 @@ function buildAreaGallery(ps, cardDB) {
       const key = name + ':' + source;
       if (seen.has(key)) continue;
       const cd = cardDB[name];
-      if (!isEligibleArea(cd)) continue;
+      if (!isEligibleArea(cd, engine, pi)) continue;
       seen.add(key);
-      gallery.push({ name, source, level: cd.level || 0 });
+      const lvl = engine?.effectiveCardLevel
+        ? engine.effectiveCardLevel(cd, pi)
+        : (cd.level || 0);
+      gallery.push({ name, source, level: lvl });
     }
   };
 
@@ -97,7 +108,7 @@ module.exports = {
     const cardDB = engine ? engine._getCardDB() : null;
     if (!cardDB) return true; // Fallback: let resolve() re-check.
 
-    return buildAreaGallery(ps, cardDB).length > 0;
+    return buildAreaGallery(ps, cardDB, engine, pi).length > 0;
   },
 
   async resolve(engine, pi) {
@@ -110,7 +121,7 @@ module.exports = {
     if (playerControlsArea(gs, pi)) return { cancelled: true };
 
     const cardDB = engine._getCardDB();
-    const gallery = buildAreaGallery(ps, cardDB);
+    const gallery = buildAreaGallery(ps, cardDB, engine, pi);
     if (gallery.length === 0) return { cancelled: true };
 
     // ── Step 1: Player picks an Area ──

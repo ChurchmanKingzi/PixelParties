@@ -5,7 +5,7 @@
 //  Goes to deleted pile after use.
 // ═══════════════════════════════════════════
 
-const { STATUS_EFFECTS } = require('./_hooks');
+const { STATUS_EFFECTS, hasCardType } = require('./_hooks');
 
 module.exports = {
   isPotion: true,
@@ -35,7 +35,7 @@ module.exports = {
           const slot = (ps.supportZones[hi] || [])[si] || [];
           if (slot.length === 0) continue;
           const pvCD = pvCardDB[slot[0]];
-          if (!pvCD || pvCD.cardType !== 'Creature') continue;
+          if (!pvCD || !hasCardType(pvCD, 'Creature')) continue;
           targets.push({
             id: `equip-${pi}-${hi}-${si}`,
             type: 'equip',

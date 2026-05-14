@@ -2,11 +2,21 @@
 //  CARD EFFECT: "Thalia, the Fun Fairy"
 //  Hero — Friendship / Friendship
 //
-//  PASSIVE: While this Hero is on the board,
+//  PASSIVE 1: While this Hero is on the board,
 //  every Support Magic Spell in your hand has
 //  its level reduced by Thalia's Friendship
 //  level. Applies to plays by ANY of your
 //  Heroes, not just Thalia herself.
+//
+//  PASSIVE 2: While this Hero is alive on your
+//  side, you do not draw cards through the
+//  effect of Friendship. Friendship's Lv2/3
+//  draw rider checks `hasActiveThaliaOnSide`
+//  on the same side before drawing, and skips
+//  the entire sparkle+draw block if Thalia is
+//  active. Independent of Thalia owning a
+//  Friendship herself — the negation is a
+//  side-wide rule whenever Thalia is active.
 //
 //  IMPLEMENTATION: hooks the engine's per-side
 //  `reduceCardLevel` pass — the engine walks
@@ -19,11 +29,11 @@
 //  helper (counts stacked copies + Performance
 //  wildcards layered on top).
 //
-//  STATUS GATE: returns 0 reduction if Thalia
-//  is dead, Frozen, Stunned, or Negated —
+//  STATUS GATE: both passives are silenced if
+//  Thalia is dead, Frozen, Stunned, or Negated —
 //  matching the standard hero-effect filter.
-//  No bypassStatusFilter (the effect IS a
-//  hero-typed passive, so it follows the
+//  No bypassStatusFilter (both effects ARE
+//  hero-typed passives, so they follow the
 //  normal silenced-while-disabled rules).
 // ═══════════════════════════════════════════
 
@@ -62,6 +72,25 @@ function getThaliaFriendshipLevel(engine, ownerIdx) {
   return 0;
 }
 
+/**
+ * True iff side `ownerIdx` has a Thalia who is alive AND not silenced
+ * (not Negated / Frozen / Stunned). Used by Friendship's draw rider to
+ * decide whether to skip the Lv2/3 draw — does NOT require Thalia to
+ * own Friendship herself (it's a side-wide rule keyed only on Thalia
+ * being on the board and active).
+ */
+function hasActiveThaliaOnSide(engine, ownerIdx) {
+  const ps = engine.gs?.players?.[ownerIdx];
+  if (!ps?.heroes) return false;
+  for (const hero of ps.heroes) {
+    if (!hero?.name || hero.name !== CARD_NAME) continue;
+    if (hero.hp <= 0) continue;
+    if (hero.statuses?.negated || hero.statuses?.frozen || hero.statuses?.stunned) continue;
+    return true;
+  }
+  return false;
+}
+
 module.exports = {
   activeIn: ['hero'],
 
@@ -77,4 +106,7 @@ module.exports = {
     if (cardData.spellSchool1 !== 'Support Magic') return 0;
     return getThaliaFriendshipLevel(engine, ownerIdx);
   },
+
+  // Exported for Friendship's afterSpellResolved draw gate.
+  hasActiveThaliaOnSide,
 };

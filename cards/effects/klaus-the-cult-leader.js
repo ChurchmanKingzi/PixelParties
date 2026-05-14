@@ -72,12 +72,15 @@ module.exports = {
       if (spellLevel <= 0) return; // Lv0 spell -> nothing qualifies.
       const seen = new Set();
       const eligible = [];
-      for (const cn of (ps.hand || [])) {
+      for (let i = 0; i < (ps.hand || []).length; i++) {
+        const cn = ps.hand[i];
         if (seen.has(cn)) continue;
         seen.add(cn);
         const cd = cardDB[cn];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
-        if ((cd.level || 0) >= spellLevel) continue;
+        // Effective level (Whoolmoth-style reducers, per-slot offsets).
+        const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
+        if (lvl >= spellLevel) continue;
         eligible.push(cn);
       }
       if (eligible.length === 0) return;

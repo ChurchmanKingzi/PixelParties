@@ -13,6 +13,8 @@
 //  opponent controls.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 const CARD_NAME = 'Yolomungandr, Ender of Coolness';
 const PER_CARD = 30;
 // Manifest spectacle timing — same shape as Dark Deepsea God's
@@ -121,7 +123,7 @@ async function fireGroupChoice(ctx, damage, postPromptReveal = false) {
     for (const inst of engine.cardInstances) {
       if (inst.owner === oppIdx && inst.zone === 'support') {
         const cd = engine._getCardDB()[inst.name];
-        if (cd?.cardType === 'Creature') {
+        if (cd && hasCardType(cd, 'Creature')) {
           entries.push({ inst, amount: damage, source: ctx.card, type: 'destruction_spell' });
         }
       }

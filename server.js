@@ -1728,6 +1728,16 @@ function sendGameState(room, playerIdx, extra) {
       username: ps.username, color: ps.color, avatar: ps.avatar, cardback: ps.cardback || null, board: ps.board || null,
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       surpriseZones: pi === playerIdx ? ps.surpriseZones : ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
+        // Puzzle mode: reveal opponent (CPU) surprises so the player can
+        // plan around them — they're part of the puzzle's authored setup,
+        // not hidden information the player is supposed to discover. The
+        // client's BoardZone face-down test keys on the `'?'` placeholder,
+        // so returning the real name here is sufficient to flip the
+        // rendering to face-up. `surpriseKnown` deliberately stays false
+        // so the "semi-transparent re-set" decoration (which means "the
+        // opponent has seen this via an effect") doesn't get applied —
+        // puzzle reveals are by-design, not by Premonition / similar.
+        if (gs.isPuzzle) return cn;
         // Face-up surprises (activated) are visible to opponent
         const inst = room.engine?.cardInstances.find(c => c.owner === pi && c.zone === 'surprise' && c.heroIdx === hi && c.name === cn);
         if (inst && !inst.faceDown) return cn;
@@ -2384,6 +2394,13 @@ function sendGameState(room, playerIdx, extra) {
     // (Chilly Wizard summons onto either player's Hero). Empty array
     // when the engine isn't initialised yet.
     crossSidePlayableCards: room.engine ? room.engine.getCrossSidePlayableCards(playerIdx) : [],
+    // Cross-side-playable Artifact names — Artifact-Creature hybrids
+    // (Powder Keg etc.) whose script exports `placesOnOpponentBoard:
+    // true`. The client uses this to enable opp-side Support Zones
+    // and Hero zones as drag-drop / click targets during the equip
+    // drag UX, and the server's `doPlayArtifact` consults the same
+    // flag to route placement onto the opp's side.
+    crossSidePlayableArtifacts: room.engine ? room.engine.getCrossSidePlayableArtifacts(playerIdx) : [],
     bouncePlacementTargets: room.engine ? room.engine.getBouncePlacementTargets(playerIdx) : {},
     bakhmSurpriseSlots: room.engine ? (() => {
       const result = [];
@@ -2665,6 +2682,7 @@ function sendSpectatorGameState(room) {
     activatableAreas: [],
     heroPlayableCards: { own: {}, charmed: {} },
     crossSidePlayableCards: [],
+    crossSidePlayableArtifacts: [],
     bouncePlacementTargets: {},
     bakhmSurpriseSlots: [],
     ushabtiSummonable: [],
@@ -3288,6 +3306,16 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   const cardData = getCardDB()[cardName];
   if (!cardData || cardData.cardType !== 'Artifact') return false;
 
+  // Artifact-Creature hybrids whose script declares
+  // `placesOnOpponentBoard: true` (Powder Keg etc.) accept the drag-
+  // drop path INTO the opponent's Support Zones. The downstream
+  // isArtifactCreature branch checks the same flag to flip the
+  // placement owner to opp. Other isTargetingArtifact cards still
+  // route exclusively through the click → use_artifact_effect path.
+  const _script = loadCardEffect(cardName);
+  const _isCrossSideArtifact = !!_script?.placesOnOpponentBoard;
+  if (_script?.isTargetingArtifact && !_isCrossSideArtifact) return false;
+
   // Rusting Crystal aura — doubles the base cost BEFORE reductions
   // so discounts apply to the already-doubled price. Idempotent for
   // multi-copy / suppressed cases (see helper).
@@ -3302,7 +3330,15 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   const cost = Math.max(0, rawCost - costReduction);
   if ((ps.gold || 0) < cost) return false;
 
-  const hero = ps.heroes[heroIdx];
+  // For cross-side artifacts (Powder Keg etc.), the client's `heroIdx`
+  // targets the OPPONENT's hero column. Dereference the host hero
+  // from opp's `ps` so existence and placement checks line up with
+  // the actual placement target. Standard (own-side) artifacts keep
+  // the original `ps.heroes[heroIdx]` semantics.
+  const placementOwner = _isCrossSideArtifact ? (pi === 0 ? 1 : 0) : pi;
+  const placementPs = gs.players[placementOwner];
+  if (!placementPs) return false;
+  const hero = placementPs.heroes[heroIdx];
   if (!hero || !hero.name) return false;
   const subLower = (cardData.subtype || '').toLowerCase();
   const isEquip = subLower === 'equipment';
@@ -3388,22 +3424,31 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   }
 
   if (isArtifactCreature) {
-    if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
+    // For cross-side placement, use opp's supportZones; otherwise own.
+    if (!placementPs.supportZones[heroIdx]) placementPs.supportZones[heroIdx] = [[], [], []];
     let finalSlot = zoneSlot;
     if (finalSlot < 0) {
       for (let z = 0; z < 3; z++) {
-        if ((ps.supportZones[heroIdx][z] || []).length === 0) { finalSlot = z; break; }
+        if ((placementPs.supportZones[heroIdx][z] || []).length === 0) { finalSlot = z; break; }
       }
       if (finalSlot < 0) return false;
     }
     if (finalSlot < 0 || finalSlot >= 3) return false;
-    if ((ps.supportZones[heroIdx][finalSlot] || []).length > 0) return false;
+    if ((placementPs.supportZones[heroIdx][finalSlot] || []).length > 0) return false;
 
     ps.hand.splice(handIndex, 1);
     if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
     room.engine.log('artifact_creature_placed', { player: ps.username, card: cardName, hero: hero.name, cost });
     room.engine._trackTerrorResolvedEffect(pi, cardName);
-    broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'support', heroIdx, slotIdx: finalSlot });
+    // Hand-to-board fly animation. Anchor to the destination's player
+    // index — for cross-side placement the fly lands on opp's row,
+    // not the playing player's, so the client renders the trajectory
+    // correctly.
+    broadcastHandToBoard(room, pi, {
+      cardName, handIndex, zoneType: 'support',
+      heroIdx, slotIdx: finalSlot,
+      destOwner: placementOwner,
+    });
 
     try {
       const oi = pi === 0 ? 1 : 0;
@@ -3428,14 +3473,30 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
             delete ps._nextArtifactCostReduction;
             delete ps._nextArtifactCostReductionTurn;
           }
+          // Cross-side placement marks the Creature instance owned by
+          // the opponent (host side) so all "you control" / sacrifice /
+          // buff reads on opp's side count it correctly. `isPlacement:
+          // true` runs onPlay + onCardEnterZone while skipping host-
+          // incapacitation gates (Powder Keg's text explicitly allows
+          // dead / Frozen / Stunned hosts).
           const placed = await room.engine.summonCreatureWithHooks(
-            cardName, pi, heroIdx, finalSlot,
-            { source: 'Artifact-Creature play' },
+            cardName, placementOwner, heroIdx, finalSlot,
+            {
+              source: 'Artifact-Creature play',
+              isPlacement: _isCrossSideArtifact,
+            },
           );
           if (!placed) {
             ps.discardPile.push(cardName);
             room.engine.log('artifact_creature_fizzle', { card: cardName, reason: 'no_free_zone_or_canceled' });
             return true;
+          }
+          // Cross-side artifacts re-stamp `originalOwner` to the
+          // playing player so the corpse routes to THEIR discard
+          // pile per the engine's standard discard-routing rule —
+          // Powder Keg conceptually belongs to whoever fired it.
+          if (_isCrossSideArtifact && placed.inst) {
+            placed.inst.originalOwner = pi;
           }
           return true;
         },
@@ -4106,8 +4167,14 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
 
   const heroOwner = charmedOwner != null ? charmedOwner : pi;
   const ps = gs.players[heroOwner];
-  const hero = ps?.heroes?.[heroIdx];
-  if (!hero?.name) return false;
+  if (!ps) return false;
+  const hero = ps.heroes?.[heroIdx];
+  // Creatures are independent of their slot's Hero — an own-side
+  // activation must succeed even when the Hero is dead or the slot
+  // is empty (e.g. left behind by Quetzahuitl's mass-delete). For
+  // charmed-side activations we still need a real Hero whose charm
+  // status this player owns, since an empty slot can't be charmed.
+  if (charmedOwner != null && !hero?.name) return false;
 
   const slot = (ps.supportZones[heroIdx] || [])[zoneSlot] || [];
   if (slot.length === 0) return false;
@@ -5932,6 +5999,16 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     const pilePs = gs.players[pileOwner];
     if (chainResult.negated) {
       pilePs.discardPile.push(potionName);
+    } else if (gs._spellPlacedOnBoard) {
+      // Targeting Artifact-Creatures (Powder Keg etc.) — the script's
+      // resolve placed the card itself onto the board as a tracked
+      // instance. Pushing the name to discard here would double-stamp
+      // it (one live inst + one phantom discard entry that surfaces
+      // the moment the inst dies). Same flag / semantics that the
+      // non-targeting `doUseArtifactEffect` path already honours
+      // (server.js:6429). Consume the flag so it doesn't leak into
+      // the next card play.
+      delete gs._spellPlacedOnBoard;
     } else if (cardType === 'Potion') {
       const potionHookCtx = { potionName, potionOwner: pi, placed: false, _skipReactionCheck: true };
       await room.engine.runHooks('afterPotionUsed', potionHookCtx);
@@ -6264,9 +6341,12 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
   if (script.canActivate && !script.canActivate(gs, pi, room.engine)) return false;
   if (script.blockedByHandLock && ps.handLocked) return false;
 
-  // Targeting-required Artifacts enter targeting mode; the CPU doesn't yet
-  // handle Artifact targeting (scheduled for 2i), so callers should pre-filter
-  // those and only invoke this helper on the non-targeting path.
+  // Targeting-required Artifacts enter targeting mode. The CPU brain's
+  // `playArtifacts` (cards/effects/_cpu.js) detects the `potionTargeting`
+  // state opened here and calls `resolveTargetingPrompt`, which routes
+  // through `engine._getCpuTargetResponse` to pick targets (cards can
+  // export `cpuResponse` for custom heuristics) and finishes via
+  // `doConfirmPotion`.
   if (script.getValidTargets && script.targetingConfig) {
     // `handIndex` lets the script exclude its own resolving slot from
     // hand-target picks (Cool Presents gifting). `_resolvingCard` is

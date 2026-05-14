@@ -2,45 +2,55 @@
 //  CARD EFFECT: "Field Standard"
 //  Artifact (Normal, Cost 10) — Banned base
 //
-//  Choose a level 3 or lower Creature you control
-//  that already used its active effect this turn
-//  and immediately use that effect an additional
-//  time. You can only play 1 'Field Standard' per
-//  turn.
+//  Choose up to 3 Lv≤1 Creatures with DIFFERENT
+//  names you control that already used their
+//  active effects this turn. They may use those
+//  effects an additional time this turn. You can
+//  only play 1 'Field Standard' per turn.
 //
 //  Implementation
 //  ──────────────
-//  • Targeting Artifact — `getValidTargets` builds
-//    the set of own Lv≤3 Creatures whose per-inst
-//    HOPT `creature-effect:${inst.id}` is stamped
-//    for this turn. That stamp is the engine's
-//    canonical "this Creature already activated
-//    its effect this turn" marker (see
-//    `_engine.js` ~L17128 and `server.js`'s
-//    `doActivateCreatureEffect`).
-//  • Re-fires via `script.onCreatureEffect(ctx)`
-//    using `engine._createContext(inst, {})`. We
-//    do NOT touch the Creature's HOPT — text says
-//    "use that effect an additional time", not
-//    "reset its once-per-turn slot". The fresh
-//    fire ignores any internal cancel-on-HOPT
-//    guard because `onCreatureEffect` itself does
-//    not re-check HOPT (the engine pre-checks via
-//    `canActivateCreatureEffect`).
+//  • Targeting Artifact — `getValidTargets` walks
+//    own Lv≤1 Creatures whose per-inst HOPT
+//    `creature-effect:${inst.id}` is stamped for
+//    the current turn (the engine's canonical
+//    "this Creature already activated its effect
+//    this turn" marker — see `_engine.js` ~L17400
+//    and `server.js`'s `doActivateCreatureEffect`).
+//    Targets are deduplicated by `inst.name` so the
+//    picker's `maxPerType: { equip: 3 }` cap is the
+//    only count gate the player has to think about
+//    — the "different names" clause is satisfied
+//    structurally by the name-dedupe, not by an
+//    extra client check that would have no live
+//    UI feedback (validateSelection only fires at
+//    server confirm).
+//  • Reimbursement model — for each picked Creature
+//    we DELETE its `creature-effect:${inst.id}`
+//    HOPT key from `gs.hoptUsed`. The standard
+//    activation gate (`exhausted = ...HOPT === turn`
+//    in `_engine.js` ~L17401) then evaluates false,
+//    so the player can click the Creature again to
+//    fire its effect a second time through the
+//    normal `doActivateCreatureEffect` path. We do
+//    NOT re-fire effects here — text says "they
+//    MAY use those effects", a player choice that
+//    happens on the next click, not an immediate
+//    re-fire.
 //  • Once-per-turn-by-name HOPT keyed on
 //    `field-standard:${pi}` — checked in
-//    `canActivate` so the play is rejected at
-//    the doUseArtifactEffect gate before any
-//    targeting UI opens. (There is no
-//    artifact-specific `*PlayCondition` hook in
-//    the engine the way Spells have
-//    `spellPlayCondition`; canActivate is the
-//    canonical play-time gate for Artifacts.)
-//  • Does NOT stamp `ps._artifactLockTurn` —
-//    text limits the card to "1 per turn" but
-//    doesn't lock the Artifact slot for the rest
-//    of the turn (the player can still play
-//    other Artifacts).
+//    `canActivate` so the play is rejected at the
+//    `doUseArtifactEffect` gate before any
+//    targeting UI opens. Stamped at the top of
+//    `resolve` once we know we have ≥1 valid pick;
+//    no deferred-reveal song-and-dance because the
+//    new "reimburse-only" flow has no abortable
+//    sub-step (cf. the old "re-fire immediately"
+//    flow which could be cancelled inside the
+//    re-fired Creature's prompt).
+//  • Does NOT stamp `ps._artifactLockTurn` — the
+//    1-per-turn limit is on Field Standard itself,
+//    not the Artifact slot.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -48,7 +58,8 @@ const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Field Standard';
 const HOPT_KEY_PREFIX = 'field-standard';
-const MAX_LEVEL = 3;
+const MAX_LEVEL = 1;
+const MAX_PICKS = 3;
 
 function _hoptUsed(gs, pi) {
   return gs.hoptUsed?.[`${HOPT_KEY_PREFIX}:${pi}`] === gs.turn;
@@ -61,9 +72,10 @@ function _stampHopt(gs, pi) {
 /**
  * Is this Creature instance an eligible Field Standard target?
  *   • Controlled by `pi` (own side, including stolen-by us).
- *   • Face-up Creature card-type, level ≤ 3.
+ *   • Face-up Creature card-type, level ≤ MAX_LEVEL.
  *   • Has used its active effect this turn — i.e. the engine's
  *     per-inst creature-effect HOPT is stamped for the current turn.
+ *   • Has an `onCreatureEffect` script to re-activate.
  *   • Host hero is alive (a Creature on a dead Hero stays on the
  *     board but its effect activation gates require a live host).
  */
@@ -89,30 +101,34 @@ function _isEligible(engine, inst, pi) {
 
 module.exports = {
   /**
-   * Deferred commitment: don't broadcast the card-reveal stream or
-   * stamp the once-per-turn HOPT until the picked Creature's effect
-   * ACTUALLY commits. `doConfirmPotion` honours this flag by
-   * stashing the reveal/log on `gs._pendingCardReveal` /
-   * `gs._pendingPlayLog` so the first prompt resolution inside the
-   * re-fired Creature's effect drains them at the real commitment
-   * moment — or our fallback fire below if the effect commits
-   * without any prompts. If the re-fired Creature's effect aborts
-   * (returns false), we return `{ cancelled: true }` from `resolve`;
-   * `doConfirmPotion`'s cancel branch then refunds gold, clears the
-   * pending stash, and leaves Field Standard untouched in hand.
-   */
-  deferReveal: true,
-
-  /**
    * Suppress the default `potion_resolved` explosion that
-   * `doConfirmPotion` would otherwise fire on the picked Creature
-   * BEFORE `resolve` runs. Field Standard's own visual (the
-   * `field_standard_rally` zone-anim broadcast inside `resolve`)
-   * fires only at the post-commit moment, so a player who
-   * repeatedly targets a Creature and then aborts inside its
-   * re-fired effect never spawns any animation at all.
+   * `doConfirmPotion` would otherwise fire on each picked Creature.
+   * Field Standard's own visual is the `field_standard_rally`
+   * zone-anim per reimbursed Creature, fired inside `resolve`.
    */
   animationType: 'none',
+
+  /**
+   * CPU evaluation hint. The card's value (Creatures firing their
+   * effects again) materialises through the REST of the current main
+   * phase / turn, NOT in the immediate post-play state — the
+   * reimbursement deletes HOPT keys but doesn't itself fire anything.
+   * Without `evaluateThroughTurnEnd`, the MCTS gate's recon scores
+   * Field Standard at the just-played snapshot (HOPTs cleared, -gold,
+   * -hand) and always reads net-negative. With it, the gate plays out
+   * the rest of the turn — subsequent `runMainPhase` passes activate
+   * the reimbursed Creatures, and the eval sees the resulting board
+   * impact (damage, gold, draws, …).
+   *
+   * Timing-within-turn is left to the natural CPU flow: `playArtifacts`
+   * runs BEFORE `activateBoardEffects` in each `runMainPhase` pass, so
+   * Field Standard's `canActivate` is naturally false in pass 1 (no
+   * Creature has HOPT'd yet) and true from pass 2 onward (after pass 1
+   * activated effects). Pick-count is decided by `cpuResponse` below
+   * — always taking the maximum eligible (up to 3 different names),
+   * matching the user-spec "reuse as many Creatures as possible".
+   */
+  cpuMeta: { evaluateThroughTurnEnd: true },
 
   /**
    * Play-time gate. Rejects the click before any targeting UI opens
@@ -131,11 +147,22 @@ module.exports = {
     return false;
   },
 
+  /**
+   * One eligible target per DISTINCT name in the controller's set
+   * of Lv≤1 effect-used Creatures. First inst encountered wins —
+   * the gameplay outcome (one Creature of that name becomes re-
+   * activatable) is identical regardless of which physical copy
+   * gets the reimbursement. Same dedupe pattern Cool Presents uses
+   * for "any number of different-named cards from your hand".
+   */
   getValidTargets(gs, pi, engine) {
     const out = [];
     if (!engine) return out;
+    const seenNames = new Set();
     for (const inst of engine.cardInstances) {
       if (!_isEligible(engine, inst, pi)) continue;
+      if (seenNames.has(inst.name)) continue;
+      seenNames.add(inst.name);
       out.push({
         id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
         type: 'equip',
@@ -148,89 +175,101 @@ module.exports = {
   },
 
   targetingConfig: {
-    description: 'Choose a Lv≤3 Creature you control that already used its active effect this turn. That effect resolves again.',
+    // `title` doubles as the CPU brain's lookup key — `cpuPickTargets`
+    // in `_cpu.js` reads `config.title` to resolve the card name and
+    // find the `cpuResponse` hook below. Without it the per-card
+    // override is skipped and the generic targeting brain handles the
+    // pick (which works for damage / heal / buff shapes, but doesn't
+    // know to take the max number of own-side equip targets for
+    // Field Standard's reimburse-as-many shape).
+    title: CARD_NAME,
+    description: 'Choose up to 3 Lv≤1 Creatures with different names that already used their effects this turn. Each picked Creature may use its effect again.',
     confirmLabel: '🚩 Rally!',
     confirmClass: 'btn-info',
     cancellable: true,
     exclusiveTypes: false,
-    maxPerType: { equip: 1 },
+    maxPerType: { equip: MAX_PICKS },
+    maxTotal: MAX_PICKS,
+    minRequired: 1,
   },
 
   validateSelection(selectedIds /*, validTargets */) {
-    return Array.isArray(selectedIds) && selectedIds.length === 1;
+    return Array.isArray(selectedIds)
+      && selectedIds.length >= 1
+      && selectedIds.length <= MAX_PICKS;
+  },
+
+  /**
+   * CPU target-picker override. Returns the maximum number of valid
+   * targets the picker allows (cap = `maxPerType.equip` = MAX_PICKS).
+   * The "different names" constraint is structurally enforced by
+   * `getValidTargets` (one inst per distinct name) — so the first N
+   * valid targets are by construction N different names.
+   *
+   * What this hook does NOT decide: WHEN to play Field Standard. That
+   * stays an MCTS gate decision via `cpuMeta.evaluateThroughTurnEnd`
+   * — the gate compares "play now" vs "skip" rollouts and commits when
+   * the rest-of-turn reimbursement value beats the gate threshold.
+   * What this hook DOES decide: assuming the gate has chosen to play
+   * the card, pick the maximum number of eligible Creatures. Picking
+   * fewer would leave reimbursement value on the table and bias the
+   * MCTS comparison against ever committing.
+   */
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'target') return undefined;
+    const validTargets = payload?.validTargets;
+    if (!Array.isArray(validTargets) || validTargets.length === 0) {
+      return payload?.config?.cancellable ? [] : undefined;
+    }
+    const cap = payload?.config?.maxPerType?.equip
+      ?? payload?.config?.maxTotal
+      ?? MAX_PICKS;
+    return validTargets.slice(0, Math.min(cap, validTargets.length)).map(t => t.id);
   },
 
   async resolve(engine, pi, selectedIds, validTargets) {
     if (!selectedIds || selectedIds.length === 0) return { cancelled: true };
-    const target = validTargets.find(t => t.id === selectedIds[0]);
-    if (!target?.cardInstance) return { cancelled: true };
 
-    const inst = target.cardInstance;
-    // Defensive re-check — the eligibility filter ran at play-time;
+    const picked = selectedIds
+      .map(id => (validTargets || []).find(t => t.id === id))
+      .filter(t => t && t.cardInstance);
+    if (picked.length === 0) return { cancelled: true };
+
+    // Defensive re-validate — eligibility filter ran at play-time;
     // an interleaved effect could in theory have moved/destroyed/HOPT-
-    // reset the creature between picker render and pick. Re-validate
-    // before committing.
-    if (!_isEligible(engine, inst, pi)) return { cancelled: true };
+    // reset a creature between picker render and confirm.
+    const eligible = picked.filter(t => _isEligible(engine, t.cardInstance, pi));
+    if (eligible.length === 0) return { cancelled: true };
 
-    const effectName = inst.counters?._effectOverride || inst.name;
-    const script = loadCardEffect(effectName);
-    if (!script?.onCreatureEffect) return { cancelled: true };
+    // Commit the once-per-turn-by-name HOPT now — we know at least
+    // one reimbursement will land.
+    _stampHopt(engine.gs, pi);
 
-    // Stash Field Standard's pending card-reveal + play-log OFF-SIDE
-    // before re-firing the Creature. `doConfirmPotion` set both
-    // (see `deferReveal: true`) — without this stash, the Creature's
-    // first internal prompt would drain them mid-effect and reveal
-    // Field Standard to opp BEFORE the effect has actually committed
-    // (e.g., if the Creature's later prompt cancels). Holding the
-    // stash off-side defers reveal to the post-commit moment below.
-    // Same pattern as SnowItAll's two-step picker — see
-    // `mischief-militia-snowitall.js`.
-    const savedReveal = engine.gs._pendingCardReveal;
-    delete engine.gs._pendingCardReveal;
-    const savedPlayLog = engine.gs._pendingPlayLog;
-    delete engine.gs._pendingPlayLog;
+    const reimbursedNames = [];
+    for (const t of eligible) {
+      const inst = t.cardInstance;
+      const hoptKey = `creature-effect:${inst.id}`;
+      // Reimburse: drop the engine's "effect used this turn" stamp so
+      // `canActivateCreatureEffect` (engine.js ~L17401) sees the
+      // Creature as fresh again.
+      if (engine.gs.hoptUsed && engine.gs.hoptUsed[hoptKey] !== undefined) {
+        delete engine.gs.hoptUsed[hoptKey];
+      }
+      reimbursedNames.push(inst.name);
 
-    // Re-fire the creature's onCreatureEffect with a fresh context
-    // anchored on the creature inst (not the Artifact). The
-    // Creature's per-inst HOPT stays stamped — Field Standard does
-    // not reset it (text: "use that effect an additional time", not
-    // "reset the once-per-turn slot").
-    const ctx = engine._createContext(inst, {});
-    let resolved;
-    try {
-      resolved = await script.onCreatureEffect(ctx);
-    } catch (err) {
-      console.error(`[Field Standard] re-fire of "${inst.name}" threw:`, err.message);
-      resolved = false;
+      // Brief "rallying flag" zone animation on the chosen Creature so
+      // the reimbursement moment is visible to both players. No client-
+      // side handler is required — unknown anim types render silently.
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'field_standard_rally',
+        owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+      });
+      await engine._delay(120);
     }
 
-    // If the re-fired Creature effect aborted (returned false — same
-    // contract `doActivateCreatureEffect` uses for own cancellation),
-    // bail without consuming Field Standard. `doConfirmPotion`'s
-    // cancelled branch will refund gold, leave the card in hand,
-    // and clear the (now-empty) pending stash slots. The off-side
-    // saved values are simply discarded.
-    if (resolved === false) return { cancelled: true };
-
-    // Commitment moment. Stamp the once-per-turn-by-name HOPT now.
-    // Restore + fire the stashed pending reveal/log so opp sees the
-    // Field Standard banner and the action-log entry appears at the
-    // actual commitment instant.
-    _stampHopt(engine.gs, pi);
-    if (savedReveal) engine.gs._pendingCardReveal = savedReveal;
-    if (savedPlayLog) engine.gs._pendingPlayLog = savedPlayLog;
-    engine._firePendingCardReveal();
-
-    // Brief "rallying flag" zone animation on the chosen Creature so
-    // the re-fire moment is visible to both players. No client-side
-    // handler is required — unknown anim types render silently.
-    engine._broadcastEvent('play_zone_animation', {
-      type: 'field_standard_rally',
-      owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
-    });
     engine.log('field_standard_refire', {
       player: engine.gs.players[pi]?.username,
-      creature: inst.name,
+      creatures: reimbursedNames,
     });
 
     engine.sync();

@@ -31,10 +31,12 @@ module.exports = {
 
     const cardDB = engine._getCardDB();
 
-    // Must have 1+ lv3 or lower Creature in discard
+    // Must have 1+ lv3-or-lower Creature in discard (effective level
+    // so Whoolmoth-style reducers / Phatnir's Cool-Stack rebate count).
     const hasEligible = (ps.discardPile || []).some(cn => {
       const cd = cardDB[cn];
-      return cd && cd.cardType === 'Creature' && (cd.level || 0) <= 3;
+      return cd && cd.cardType === 'Creature'
+          && engine.effectiveCardLevel(cd, pi) <= 3;
     });
     if (!hasEligible) return false;
 
@@ -64,7 +66,8 @@ module.exports = {
     for (const cn of (ps.discardPile || [])) {
       if (seen.has(cn)) continue;
       const cd = cardDB[cn];
-      if (!cd || cd.cardType !== 'Creature' || (cd.level || 0) > 3) continue;
+      if (!cd || cd.cardType !== 'Creature') continue;
+      if (engine.effectiveCardLevel(cd, pi) > 3) continue;
       seen.add(cn);
       galleryCards.push({ name: cn, source: 'discard' });
     }

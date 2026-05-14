@@ -78,7 +78,8 @@ module.exports = {
         if (name === CARD_NAME) continue;
         const cd = cardDB[name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
-        if ((cd.level || 0) > maxLevel) continue;
+        // Effective level honours hand-active reducers (Whoolmoth, …).
+        if (engine.effectiveCardLevel(cd, pi) > maxLevel) continue;
         return true;
       }
     }
@@ -116,9 +117,10 @@ module.exports = {
       if (n === CARD_NAME) continue;
       const cd = cardDB[n];
       if (!cd || !hasCardType(cd, 'Creature')) continue;
-      if ((cd.level || 0) > maxLevel) continue;
+      const lvl = engine.effectiveCardLevel(cd, pi);
+      if (lvl > maxLevel) continue;
       seen.add(n);
-      replacements.push({ name: n, source: 'hand', cost: cd.level || 0 });
+      replacements.push({ name: n, source: 'hand', cost: lvl });
     }
     if (replacements.length === 0) return null;
 

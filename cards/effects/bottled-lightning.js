@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════
 
 const { runDiscardChain } = require('./_bottled-shared');
+const { hasCardType } = require('./_hooks');
 
 module.exports = {
   isPotion: true,
@@ -35,7 +36,7 @@ module.exports = {
     for (const inst of engine.cardInstances) {
       if (inst.owner !== takerIdx || inst.zone !== 'support' || inst.faceDown) continue;
       const cd = cardDB[inst.name];
-      if (!cd || cd.cardType !== 'Creature') continue;
+      if (!cd || !hasCardType(cd, 'Creature')) continue;
       const hp = inst.counters?.currentHp ?? cd.hp ?? 0;
       if (hp <= 0) continue;
       targets.push({ id: `equip-${takerIdx}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: takerIdx, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst });

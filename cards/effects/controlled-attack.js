@@ -61,6 +61,21 @@ module.exports = {
       // Apply controlled status
       tgtHero.controlledBy = pi;
 
+      // Reaction-window hook — Very Special Prisoner triggers on this.
+      // Distinct `kind: 'controlled'` so listeners can tell Controlled
+      // Attack's takeover apart from Charme / Dark Gear / temp steals
+      // if they need finer-grained handling.
+      await engine.runHooks('onTakeControl', {
+        controllerPi: pi,
+        originalOwnerPi: target.owner,
+        targetType: 'hero',
+        targetName: tgtHero.name,
+        targetHero: tgtHero,
+        heroIdx: target.heroIdx,
+        kind: 'controlled',
+        sourceName: 'Controlled Attack',
+      });
+
       // Dark control energy animation
       engine._broadcastEvent('dark_control', {
         owner: target.owner,

@@ -224,7 +224,13 @@ module.exports = {
       engine.log('spectral_armor_apply', {
         target: engine._heroLabel(target), original: ctx.amount, halved,
       });
-      ctx.amount = halved;
+      // Route through `setAmount` — direct `ctx.amount = halved`
+      // only mutates the local hook-ctx wrapper, NOT the underlying
+      // hookCtx the engine reads after the listener loop (the ctx is
+      // built via `{ ...hookCtx }`, a shallow copy, in
+      // `_engine.js#_createContext`). `setAmount` writes to hookCtx
+      // through its closure and also honours `cannotBeReduced`.
+      ctx.setAmount(halved);
     },
 
     /**

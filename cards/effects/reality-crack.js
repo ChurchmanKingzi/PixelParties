@@ -59,19 +59,23 @@ module.exports = {
       const areaFromHand = {};
       const areaFromDeck = {};
 
+      // Effective-level filter — picks the post-reduction level so
+      // Cataclysm-rebated Areas (and any future Area-level modifier)
+      // pass the Lv≤3 gate correctly.
+      const effLvl = (cd) => engine.effectiveCardLevel(cd, pi);
       for (const n of (ps.hand || [])) {
         if (n === ctx.cardName) continue; // Exclude the Reality Crack being played
         const cd = cardDB[n];
         if (!cd || cd.cardType !== 'Spell') continue;
         if ((cd.subtype || '').toLowerCase() !== 'area') continue;
-        if ((cd.level || 0) > 3) continue;
+        if (effLvl(cd) > 3) continue;
         areaFromHand[n] = (areaFromHand[n] || 0) + 1;
       }
       for (const n of (ps.mainDeck || [])) {
         const cd = cardDB[n];
         if (!cd || cd.cardType !== 'Spell') continue;
         if ((cd.subtype || '').toLowerCase() !== 'area') continue;
-        if ((cd.level || 0) > 3) continue;
+        if (effLvl(cd) > 3) continue;
         areaFromDeck[n] = (areaFromDeck[n] || 0) + 1;
       }
 

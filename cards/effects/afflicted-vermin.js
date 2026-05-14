@@ -15,7 +15,6 @@
 //  Surprise Zone (re-set).
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
 
 module.exports = {
   isSurprise: true,
@@ -26,23 +25,12 @@ module.exports = {
    * creatures are already on the board.
    */
   surpriseTrigger: (gs, ownerIdx, heroIdx, summonInfo, engine) => {
-    const cardDB = engine._getCardDB();
     let otherCreatureCount = 0;
+    const summonedId = summonInfo?.cardInstance?.id;
     for (let pi = 0; pi < 2; pi++) {
-      const ps = gs.players[pi];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
-          const slot = (ps.supportZones[hi] || [])[si] || [];
-          if (slot.length === 0) continue;
-          const cd = cardDB[slot[0]];
-          if (!cd || !hasCardType(cd, 'Creature')) continue;
-          // Don't count the just-summoned creature
-          const inst = engine.cardInstances.find(c =>
-            c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
-          );
-          if (inst && summonInfo.cardInstance && inst.id === summonInfo.cardInstance.id) continue;
-          otherCreatureCount++;
-        }
+      for (const t of engine.getCreatureTargets(pi)) {
+        if (summonedId && t.cardInstance?.id === summonedId) continue;
+        otherCreatureCount++;
       }
     }
     return otherCreatureCount >= 1;
@@ -56,40 +44,21 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    const cardDB = engine._getCardDB();
     const summonedInstId = sourceInfo.cardInstance?.id;
 
-    // Build targets: all Creatures on board except the newly summoned one
+    // Build targets: all Creatures on board except the newly summoned
+    // one. `engine.getCreatureTargets` already iterates every Support
+    // Zone regardless of host-Hero state (creatures are independent of
+    // their Hero) and filters to actual Creatures including Artifact-
+    // Creature hybrids. Vermin-specific filters layer on top.
     const targets = [];
     for (let pIdx = 0; pIdx < 2; pIdx++) {
-      const ps = gs.players[pIdx];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (!ps.heroes[hi]?.name) continue;
-        for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
-          const slot = (ps.supportZones[hi] || [])[si] || [];
-          if (slot.length === 0) continue;
-          const cardName = slot[0];
-          const cd = cardDB[cardName];
-          if (!cd || !hasCardType(cd, 'Creature')) continue;
-          const inst = engine.cardInstances.find(c =>
-            c.owner === pIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
-          );
-          // Exclude the newly summoned creature
-          if (inst && summonedInstId && inst.id === summonedInstId) continue;
-          // Exclude immovable creatures
-          if (inst?.counters?.immovable) continue;
-          if (inst?.faceDown) continue; // Face-down surprises are not targetable
-
-          targets.push({
-            id: `equip-${pIdx}-${hi}-${si}`,
-            type: 'equip',
-            owner: pIdx,
-            heroIdx: hi,
-            slotIdx: si,
-            cardName,
-            cardInstance: inst,
-          });
-        }
+      for (const t of engine.getCreatureTargets(pIdx)) {
+        const inst = t.cardInstance;
+        if (inst && summonedInstId && inst.id === summonedInstId) continue;
+        if (inst?.counters?.immovable) continue;
+        if (inst?.faceDown) continue;
+        targets.push(t);
       }
     }
 

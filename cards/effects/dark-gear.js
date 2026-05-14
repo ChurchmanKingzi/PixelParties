@@ -24,18 +24,25 @@ const { hasNumericCreatureLevel } = require('./_hooks');
 const BASE_COST = 5;
 
 /**
- * Get all free support zones for a player (including dead heroes).
+ * Get all free support zones for a player. Dark Gear places a stolen
+ * Creature into any free Support Zone on the controller's side — the
+ * destination Hero isn't relevant to the effect, so a column with no
+ * Hero (or a dead Hero) still exposes its empty slots as legal
+ * destinations. Matches the engine-wide "Creatures are independent
+ * of their Hero" rule.
  */
 function getFreeZones(gs, playerIdx) {
   const ps = gs.players[playerIdx];
   const zones = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
-    if (!hero?.name) continue;
+    const heroLabel = hero?.name
+      ? (hero.hp <= 0 ? `${hero.name} (KO)` : hero.name)
+      : `Column ${hi + 1}`;
     for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
       const slot = (ps.supportZones[hi] || [])[si] || [];
       if (slot.length === 0) {
-        zones.push({ heroIdx: hi, slotIdx: si, label: `${hero.name} — Slot ${si + 1}` });
+        zones.push({ heroIdx: hi, slotIdx: si, label: `${heroLabel} — Slot ${si + 1}` });
       }
     }
   }

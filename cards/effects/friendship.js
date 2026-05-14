@@ -16,6 +16,8 @@
 //  LEVEL 3: Same as Lv2 but draw 3 cards.
 // ═══════════════════════════════════════════
 
+const { loadCardEffect } = require('./_loader');
+
 const ADDITIONAL_TYPE_PREFIX = 'friendship_support';
 
 function getTypeId(heroIdx) {
@@ -184,6 +186,20 @@ module.exports = {
       if (level < 2) return; // Lv1 grants the action but no draw
 
       const drawCount = level >= 3 ? 3 : 1;
+
+      // Thalia, the Fun Fairy: while alive and not silenced on the same
+      // side, "You do not draw cards through the effect of Friendship."
+      // Skips the whole sparkle+draw rider — the additional action and
+      // level reduction still work, only the draw is negated.
+      const thaliaScript = loadCardEffect('Thalia, the Fun Fairy');
+      if (thaliaScript?.hasActiveThaliaOnSide?.(engine, pi)) {
+        engine.log('friendship_draw_negated', {
+          player: ps.username,
+          hero: ps.heroes[heroIdx]?.name,
+          by: 'Thalia, the Fun Fairy',
+        });
+        return;
+      }
 
       // Play sparkle animation on Friendship's ability zone
       const abZones = ps.abilityZones[heroIdx] || [];

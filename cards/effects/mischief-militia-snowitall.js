@@ -71,7 +71,11 @@ function _getSummonableHandIndices(engine, pi) {
     const cd = cardDB[cn];
     if (!cd) continue;
     if (!hasCardType(cd, 'Creature')) continue;
-    if ((cd.level ?? 99) > 1) continue;
+    // Effective level via the canonical helper — passes the specific
+    // hand index so Rocky-Slime-style per-slot offsets count toward
+    // the Lv≤1 gate.
+    const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
+    if (lvl > 1) continue;
     if (!_isFreezableOnSummon(cn)) continue;
     out.push(i);
   }

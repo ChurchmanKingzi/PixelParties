@@ -144,7 +144,9 @@
       "Bash(ice sculpture\")",
       "Bash(Measure-Object)",
       "Bash(Select-Object -ExpandProperty Count)",
-      "Bash(Find-Item -Path \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\" -Filter \"*.js\" -Name \"*break*\",\"*shatter*\",\"*seal*\",\"*trap*\",\"*bind*\")"
+      "Bash(Find-Item -Path \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\" -Filter \"*.js\" -Name \"*break*\",\"*shatter*\",\"*seal*\",\"*trap*\",\"*bind*\")",
+      "Bash(Select-String \"Heal Burn\")",
+      "Bash(findstr /i \"divine-gift\")"
     ]
   }
 }

@@ -29,8 +29,6 @@ module.exports = {
 
   hooks: {
     onPlay: async (ctx) => {
-      if (!ctx.hardOncePerTurn('hardy-slime-summon')) return;
-
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;

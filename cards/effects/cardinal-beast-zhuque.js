@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════
 
 const { _checkCardinalWin, _setCardinalImmune } = require('./_cardinal-shared');
+const { hasCardType } = require('./_hooks');
 
 module.exports = {
   requiresTarget: true,
@@ -71,7 +72,7 @@ module.exports = {
       if (inst.owner !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
       if (inst.counters.burned) continue;
       const cd = cardDB[inst.name];
-      if (!cd || cd.cardType !== 'Creature') continue;
+      if (!cd || !hasCardType(cd, 'Creature')) continue;
       const hp = inst.counters?.currentHp ?? cd.hp ?? 0;
       if (hp <= 0) continue;
       targets.push({
@@ -117,7 +118,7 @@ module.exports = {
         if (physSide !== picked.owner || inst.zone !== 'support' || inst.heroIdx !== picked.heroIdx) continue;
         if (inst.faceDown) continue;
         const cd = cardDB[inst.name];
-        if (!cd || cd.cardType !== 'Creature') continue;
+        if (!cd || !hasCardType(cd, 'Creature')) continue;
         engine._broadcastEvent('play_zone_animation', {
           type: 'flame_strike', owner: inst.owner,
           heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,

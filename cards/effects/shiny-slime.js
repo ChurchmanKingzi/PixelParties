@@ -1,44 +1,33 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Shiny Slime"
-//  Creature — On summon (HOPT, mandatory):
-//  Draw 1 card for each unique lv 0 Creature
-//  (by original level) you control, including
-//  this one. Cards drawn 1 by 1 with delay.
+//  Creature — On summon: Draw 1 card for each
+//  unique lv 0 Creature (by original level) you
+//  control, including this one. Cards drawn 1 by
+//  1 with delay.
 //  At the start of owner's turn, gain 1 level.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
 
 module.exports = {
   activeIn: ['support'],
 
   hooks: {
     onPlay: async (ctx) => {
-      // Hard Once Per Turn — mandatory, not optional
-      if (!ctx.hardOncePerTurn('shiny-slime-summon')) return;
-
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const ps = ctx.players[pi];
 
-      // Use engine's cached card database
+      // Count unique level-0 Creature names across our Support Zones.
+      // Delegate enumeration to `engine.getCreatureTargets` — it
+      // already iterates every Support Zone regardless of host-Hero
+      // state (creatures are independent of their Hero) and filters
+      // down to actual Creatures, so we only need to layer the
+      // level-0 condition on top.
       const cardDB = engine._getCardDB();
-
-      // Count unique Creature names with original level 0 across all support
-      // zones. Creatures persist after their host hero dies, so include
-      // dead-hero columns too.
       const uniqueNames = new Set();
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
-        if (!hero?.name) continue;
-        for (const slot of (ps.supportZones[hi] || [])) {
-          for (const cardName of (slot || [])) {
-            const c = cardDB[cardName];
-            if (c && hasCardType(c, 'Creature') && (c.level || 0) === 0) {
-              uniqueNames.add(cardName);
-            }
-          }
-        }
+      for (const t of engine.getCreatureTargets(pi)) {
+        const c = cardDB[t.cardName];
+        if (c && (c.level || 0) === 0) uniqueNames.add(t.cardName);
       }
 
       const count = uniqueNames.size;

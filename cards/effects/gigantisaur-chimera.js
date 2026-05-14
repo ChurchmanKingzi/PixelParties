@@ -67,6 +67,30 @@ module.exports = {
   // limits the play, not an action gate.
   inherentAction: true,
 
+  cpuMeta: {
+    /**
+     * Massive eval bonus while Chimera is on the board. Game-defining
+     * body + once-per-turn N×100 blast off the discard pile — easily
+     * outweighs the 3 hand-card discard cost (typical Lv≤3 Gigantisaurs
+     * are ~30–60 in hand value, so 3 discards ≈ -150). +300 here keeps
+     * the summon a clearly positive play whenever the cost is payable.
+     */
+    cpuInstBonus(engine, inst /*, ownerIdx */) {
+      if (inst.zone !== 'support') return 0;
+      if (inst.faceDown) return 0;
+      return 300;
+    },
+
+    /**
+     * Chimera's onPlay force-ends the controller's turn, so the CPU
+     * must defer its summon until every OTHER viable play has been
+     * exhausted. The `fireAdditionalActions` loop's two-pass hand
+     * ordering respects this flag — non-deferred cards fire first,
+     * Chimera only gets considered once nothing else is left to do.
+     */
+    cpuDeferUntilLast: true,
+  },
+
   /**
    * Layered canSummon: standard per-Hero archetype gate PLUS the
    * cost gate (≥3 distinct Gigantisaur names in hand). Chimera in

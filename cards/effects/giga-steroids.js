@@ -200,6 +200,29 @@ module.exports = {
     return true;
   },
 
+  cpuMeta: {
+    /**
+     * Eval bonus for an active Giga Steroids grant — but ONLY when
+     * the owner has a non-Spell/Attack/Creature Action lined up to
+     * spend it on (Hero effect, Artifact, or Ability costing an
+     * Action). Without such an action, the grant sits unused and
+     * the 6-Gold + 1-card discard cost is pure waste; the bonus
+     * stays at 0 in that case so MCTS won't be lured into playing
+     * the artifact for nothing.
+     *
+     * Gated on `inst.counters.additionalActionAvail` so only the
+     * post-resolve state (grant alive) scores the bonus — the
+     * hand-side inst before resolve has no grant yet.
+     */
+    cpuInstBonus(engine, inst, ownerIdx) {
+      if (!inst.counters?.additionalActionAvail) return 0;
+      const typeId = inst.counters?.additionalActionType;
+      if (typeof typeId !== 'string' || !typeId.startsWith(TYPE_ID_PREFIX)) return 0;
+      if (!_hasAnyActionCostEffectAvailable(engine, ownerIdx)) return 0;
+      return 100;
+    },
+  },
+
   async resolve(engine, pi /*, selectedIds, validTargets */) {
     const gs = engine.gs;
     const ps = gs.players[pi];

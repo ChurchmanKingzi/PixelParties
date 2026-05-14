@@ -152,10 +152,14 @@ module.exports = {
       // re-apply their strict per-Hero archetype rule.
       const canPlaceOnHere = (name) =>
         engine.isCreatureSummonable(name, pi, heroIdx, { _bypassBeforeSummon: true });
+      // Effective level — Whoolmoth-style hand-active reducers
+      // collapse the printed level, so the Lv≤1 gate uses the live
+      // number rather than the static DB row.
+      const effLvl = (cd) => engine.effectiveCardLevel(cd, pi);
       const eligibleCards = [];
       for (const name of (ps.hand || [])) {
         const c = cardDB[name];
-        if (c && hasCardType(c, 'Creature') && (c.level || 0) <= 1 && canPlaceOnHere(name)) {
+        if (c && hasCardType(c, 'Creature') && effLvl(c) <= 1 && canPlaceOnHere(name)) {
           if (!eligibleCards.some(e => e.name === name && e.source === 'hand')) {
             eligibleCards.push({ name, source: 'hand' });
           }
@@ -163,7 +167,7 @@ module.exports = {
       }
       for (const name of (ps.mainDeck || [])) {
         const c = cardDB[name];
-        if (c && hasCardType(c, 'Creature') && (c.level || 0) <= 1 && canPlaceOnHere(name)) {
+        if (c && hasCardType(c, 'Creature') && effLvl(c) <= 1 && canPlaceOnHere(name)) {
           if (!eligibleCards.some(e => e.name === name && e.source === 'deck')) {
             eligibleCards.push({ name, source: 'deck' });
           }

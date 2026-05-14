@@ -36,7 +36,7 @@
 const CARD_NAME = 'Cooldin, King of Coolness';
 
 /** Collect eligible Areas (lv ≤ 3) from a source array. Preserves duplicates. */
-function collectAreasFromSource(names, cardDB, source) {
+function collectAreasFromSource(names, cardDB, source, engine, pi) {
   const out = [];
   for (let i = 0; i < names.length; i++) {
     const name = names[i];
@@ -44,7 +44,12 @@ function collectAreasFromSource(names, cardDB, source) {
     if (!cd) continue;
     if (cd.cardType !== 'Spell') continue;
     if ((cd.subtype || '').toLowerCase() !== 'area') continue;
-    if ((cd.level || 0) > 3) continue;
+    // Effective level (honours Cataclysm's `reduceCardLevel` for Area
+    // Spells in play, Mana Absorbing Crystal +1 in hand, etc.).
+    const lvl = engine?.effectiveCardLevel
+      ? engine.effectiveCardLevel(cd, pi)
+      : (cd.level || 0);
+    if (lvl > 3) continue;
     out.push({ name, source, sourceIdx: i });
   }
   return out;
@@ -156,9 +161,9 @@ module.exports = {
     if (ps._cantPlayAreaThisTurn === gs.turn) return false;
 
     const cardDB = engine._getCardDB();
-    const fromHand = collectAreasFromSource(ps.hand || [], cardDB, 'hand');
+    const fromHand = collectAreasFromSource(ps.hand || [], cardDB, 'hand', engine, pi);
     if (fromHand.length > 0) return true;
-    const fromDeck = collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck');
+    const fromDeck = collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);
     return fromDeck.length > 0;
   },
 
@@ -171,8 +176,8 @@ module.exports = {
     if (!ps) return false;
 
     const cardDB = engine._getCardDB();
-    const fromHand = collectAreasFromSource(ps.hand || [], cardDB, 'hand');
-    const fromDeck = collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck');
+    const fromHand = collectAreasFromSource(ps.hand || [], cardDB, 'hand', engine, pi);
+    const fromDeck = collectAreasFromSource(ps.mainDeck || [], cardDB, 'deck', engine, pi);
     const all = [...fromHand, ...fromDeck];
     if (all.length === 0) return false;
 

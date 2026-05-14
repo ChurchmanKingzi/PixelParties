@@ -107,13 +107,17 @@ module.exports = {
 
       const eligibleSpells = [];
       const seen = new Set();
-      for (const cardName of (ps.hand || [])) {
+      for (let i = 0; i < (ps.hand || []).length; i++) {
+        const cardName = ps.hand[i];
         if (seen.has(cardName)) continue;
         const cd = cardDB[cardName];
         if (!cd || !hasCardType(cd, 'Spell')) continue;
         if ((cd.subtype || '').toLowerCase() !== 'normal') continue;
         if (cd.spellSchool1 !== 'Destruction Magic' && cd.spellSchool2 !== 'Destruction Magic') continue;
-        if ((cd.level || 0) > 1) continue;
+        // Effective level (Mana Absorbing Crystal's +1 / future
+        // hand-active reducers / per-slot offsets).
+        const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
+        if (lvl > 1) continue;
         // Check hero has required spell schools for this spell
         const abZones = ps.abilityZones[heroIdx] || [];
         const countAb = (school) => {
@@ -125,7 +129,6 @@ module.exports = {
           }
           return c;
         };
-        const lvl = cd.level || 0;
         if (cd.spellSchool1 && countAb(cd.spellSchool1) < lvl) continue;
         if (cd.spellSchool2 && countAb(cd.spellSchool2) < lvl) continue;
         seen.add(cardName);

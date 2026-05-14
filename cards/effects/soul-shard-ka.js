@@ -125,7 +125,7 @@ module.exports = {
         if (seen.has(name)) continue;
         const cd = cardDB[name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
-        if ((cd.level || 0) > levelCap) continue;
+        if (engine.effectiveCardLevel(cd, pi) > levelCap) continue;
         // `_bypassBeforeSummon: true` — Ka summons via direct splice
         // + _trackCard, not summonCreatureWithHooks, so beforeSummon
         // never runs. Cards whose canSummon depends on a cost paid in

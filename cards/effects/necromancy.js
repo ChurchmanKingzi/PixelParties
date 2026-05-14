@@ -70,8 +70,17 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel) {
   for (const cardName of (ps.discardPile || [])) {
     if (seen.has(cardName)) continue;
     const cd = cardDB[cardName];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
-    if ((cd.level || 0) > necromancyLevel) continue;
+    // Strict `cardType === 'Creature'` — Necromancy summons from the
+    // discard pile, and per the design rule "anything summoning from
+    // the discard pile should not count Artifact-Creatures" (Powder
+    // Keg etc.), hybrids are deliberately excluded from the revival
+    // pool. Sibling cards Glorious Rebirth, Forceful Revival, and
+    // Cardinal Beast Xuanwu use the same strict check for the same
+    // reason.
+    if (!cd || cd.cardType !== 'Creature') continue;
+    // Effective level (Whoolmoth-style rebates + any future
+    // hand-active reducer that keys on card name).
+    if (engine.effectiveCardLevel(cd, pi) > necromancyLevel) continue;
     if (!heroCanSummon(ps, heroIdx, cd)) continue;
     // Per-card summoning condition (canSummon). Without this, per-turn
     // summon limits ("you can only summon 1 Deepsea Primordium per
@@ -90,8 +99,6 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel) {
 }
 
 // ─── CARD MODULE ─────────────────────────
-
-const { hasCardType } = require('./_hooks');
 
 module.exports = {
   activeIn: ['ability'],
@@ -147,11 +154,14 @@ module.exports = {
         return true;
       };
 
+      // Effective level applies — Whoolmoth-style reducers may push
+      // a printed Lv5 card to 0 and make it summonable.
+      const effLvl = (cd) => engine.effectiveCardLevel(cd, pi);
       let summonable = 0;
       for (const name of (ps.discardPile || [])) {
         const cd = cardDB[name];
         if (!cd || cd.cardType !== 'Creature') continue;
-        if ((cd.level || 0) > necroLevel) continue;
+        if (effLvl(cd) > necroLevel) continue;
         if (!heroCanSummon(cd)) continue;
         summonable++;
       }
@@ -161,7 +171,7 @@ module.exports = {
         for (const name of ps.mainDeck) {
           const cd = cardDB[name];
           if (!cd || cd.cardType !== 'Creature') continue;
-          if ((cd.level || 0) > necroLevel) continue;
+          if (effLvl(cd) > necroLevel) continue;
           if (!heroCanSummon(cd)) continue;
           latent++;
         }

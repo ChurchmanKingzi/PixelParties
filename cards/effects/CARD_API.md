@@ -113,6 +113,35 @@ cpuMeta: {
   // top of the engine inherit the base's role. Example: Divinity
   // = 120 (≈ "as valuable as a Lv4 Creature").
   engineValue: <number>,
+
+  // Generic per-instance eval bonus the CPU's `evaluateState` adds
+  // to (or subtracts from) the owner's score. Called once per
+  // tracked cardInstance in any zone; the script decides what
+  // contributes value based on the inst's state. Use this for:
+  //   • Game-defining bodies on the board (Gigantisaur Chimera
+  //     returns +300 while alive in support — outweighs the 3-
+  //     discard summon cost).
+  //   • Equipment whose value isn't visible in immediate effects
+  //     (The Great Wall of Deri returns +150 for the FIRST Wall on
+  //     a side; duplicates contribute nothing).
+  //   • Artifacts whose post-resolve grant is conditionally
+  //     valuable (Giga Steroids returns +100 ONLY when its grant
+  //     is alive AND the owner has a non-Spell/Attack/Creature
+  //     Action ready to spend it on).
+  // The function decides per-inst whether to return a bonus; dedup
+  // / gating logic lives inside the function. Thrown errors are
+  // swallowed (inst contributes 0).
+  cpuInstBonus(engine, inst, ownerIdx) → number,
+
+  // CPU should defer playing this card from hand until every OTHER
+  // viable additional-Action play has been exhausted. Used for
+  // cards whose `onPlay` force-ends the turn — Gigantisaur Chimera
+  // sends the controller to phase 5 immediately, so playing it
+  // first would skip every remaining Spell / Attack / Creature in
+  // hand. The CPU's `fireAdditionalActions` hand-iteration runs in
+  // two passes: non-deferred cards first, deferred cards only when
+  // the first pass finds nothing.
+  cpuDeferUntilLast: true,
 }
 ```
 

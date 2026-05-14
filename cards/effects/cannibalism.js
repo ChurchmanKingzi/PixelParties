@@ -6,21 +6,21 @@
 //  When an ally target (own Hero OR own Creature)
 //  is killed by ANY source (including the
 //  Cannibalism Hero's own player), each Cannibalism
-//  Hero with `hp < maxHp` is offered a confirm
-//  prompt: "Eat some of {dead name}?". Accept →
-//  the Hero heals 40 / 80 / 150 HP based on the
-//  Cannibalism stack level (1/2/3+).
+//  Hero with `hp < maxHp` AUTOMATICALLY heals
+//  40 / 80 / 150 HP based on the Cannibalism stack
+//  level (1/2/3+). The player has no choice —
+//  the eat is mandatory whenever the hero is
+//  wounded and the per-turn slot is unspent.
 //
-//  Soft once-per-turn per Cannibalism Hero: a
-//  decline does NOT claim the slot, so the player
-//  keeps getting prompted on subsequent ally deaths
-//  until they either accept or the turn ends. After
-//  acceptance, that Hero stops prompting for the
-//  rest of this turn.
+//  Hard once-per-turn per Cannibalism Hero —
+//  claimed on every fire (was previously "soft":
+//  claimed only on accept, but the player no
+//  longer declines, so the soft/hard distinction
+//  collapses to plain HOPT).
 //
 //  Stacking: when a Hero has multiple Cannibalism
 //  copies in the same ability slot, ONLY the
-//  lowest-id instance actually runs the prompt
+//  lowest-id instance actually runs the heal
 //  (sibling copies dedup to it). The heal amount
 //  is read from the full stack length so a Lv2
 //  Hero heals 80 even though only one inst fired.
@@ -66,28 +66,18 @@ async function tryEat(ctx, deadName, deadOwnerSide) {
   const sortedIds = stack.map(c => c.id).sort();
   if (ctx.card.id !== sortedIds[0]) return;
 
-  // Soft once-per-turn per Cannibalism Hero. Claimed only on accept;
-  // a decline leaves the slot open so future deaths still prompt.
+  // Hard once-per-turn per Cannibalism Hero. Auto-fires every eligible
+  // ally death until the slot is spent — the player no longer has a
+  // choice (the prior confirm prompt has been removed). Claimed
+  // BEFORE the heal so any reentrant deaths fired by downstream
+  // effects can't double-trigger this hero's eat.
   const hoptKey = `cannibalism_eat:${ourPi}-${ourHi}`;
   if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
+  if (!gs.hoptUsed) gs.hoptUsed = {};
+  gs.hoptUsed[hoptKey] = gs.turn;
 
   const level = Math.min(stack.length, HEAL_BY_LEVEL.length);
   const healAmount = HEAL_BY_LEVEL[level - 1];
-
-  const confirmed = await engine.promptGeneric(ourPi, {
-    type: 'confirm',
-    title: `Cannibalism — ${ourHero.name}`,
-    message: `Eat some of ${deadName}? Heal for ${healAmount} HP.`,
-    showCard: 'Cannibalism',
-    confirmLabel: '🍖 Yes!',
-    cancelLabel: 'No',
-    cancellable: true,
-  });
-  if (!confirmed) return;
-
-  // Claim the per-turn slot AFTER confirmation (soft semantics).
-  if (!gs.hoptUsed) gs.hoptUsed = {};
-  gs.hoptUsed[hoptKey] = gs.turn;
 
   // Visual: meat drumstick chomp + green healing particles on the
   // eating Hero. Anchored at the hero zone (zoneSlot: -1) so it

@@ -219,3 +219,86 @@ function _getResolvingHandIndex(ps) {
   }
   return -1;
 }
+
+/**
+ * CPU response handler for the optionPicker prompt that the area
+ * effect opens ("Pay X Gold to draw N cards"). The decision is non-
+ * trivial: spending Gold trades a fungible resource for hand cards,
+ * but also locks ALL further draws this turn (handLocked = true).
+ * Pure rule-of-thumb heuristics ("draw as many as you can afford")
+ * over-spend when the CPU's hand is already deep, and under-spend
+ * when a single key card would unlock the turn. MCTS-evaluates each
+ * payment tier (and the decline branch) with a full rest-of-turn
+ * rollout, then picks the tier that maximises the post-rollout
+ * evaluator score.
+ *
+ * Mirrors the Spectral Armor / Barker pattern — async wrapper around
+ * `mctsPickFromOptions`. Fast-mode and recursive-rollout bypasses
+ * fall through to the default brain (decline) so nested MCTS sims
+ * don't explode exponentially.
+ */
+module.exports.cpuResponse = function cpuResponse(engine, kind, promptData) {
+  if (kind !== 'generic') return undefined;
+  if (promptData?.type !== 'optionPicker') return undefined;
+  if ((promptData?._gerryOriginalTitle || promptData?.title) !== CARD_NAME) return undefined;
+
+  const baseOptions = promptData.options || [];
+  if (baseOptions.length === 0) return null;
+
+  let mctsPick = null;
+  try { ({ mctsPickFromOptions: mctsPick } = require('./_cpu')); } catch {}
+  if (typeof mctsPick !== 'function' || engine._inMctsSim) {
+    // Inside an outer rollout — can't nest a second MCTS. Pick a
+    // conservative mid-range payment (one card for 5 Gold) as the
+    // approximation so the outer rollout sees a realistic "I'd spend
+    // a little Gold for tempo" signal instead of a flat zero. Live
+    // (outside the rollout), the full MCTS picks the optimal tier.
+    // Falls back to decline only when the cheapest tier isn't on the
+    // option list (defensive — getValidTargets / canActivateAreaEffect
+    // should have already ruled this out).
+    const cheapest = baseOptions.find(opt => /pay-1$/.test(String(opt.id)));
+    if (cheapest) return { optionId: cheapest.id };
+    return null;
+  }
+
+  const cpuIdx = engine._cpuPlayerIdx;
+  if (typeof cpuIdx !== 'number' || cpuIdx < 0) return undefined;
+
+  // Two kinds of options: pay-N (each baseOptions entry) and decline.
+  // Decline is the canonical cancel — Smuggler's Pier's per-activator
+  // HOPT is only stamped on commit, so declining leaves the area
+  // window open for the rest of the turn (in case future state makes
+  // a draw more valuable).
+  const options = [
+    ...baseOptions.map(opt => ({ kind: 'pay', id: opt.id })),
+    { kind: 'cancel', id: 'cancel' },
+  ];
+
+  const apply = async (eng, opt) => {
+    const ps = eng.gs.players[cpuIdx];
+    if (!ps) return false;
+    if (opt.kind === 'cancel') return true; // no state change
+    const cards = parseInt(String(opt.id).replace('pay-', ''), 10);
+    if (!Number.isInteger(cards) || cards < 1) return false;
+    const cost = cards * GOLD_PER_CARD;
+    if ((ps.gold || 0) < cost) return false;
+    const deck = ps.mainDeck || [];
+    if (deck.length < cards) return false;
+    ps.gold -= cost;
+    for (let i = 0; i < cards; i++) ps.hand.push(deck.shift());
+    ps.handLocked = true;
+    return true;
+  };
+
+  return (async () => {
+    try {
+      const best = await mctsPick(engine, options, apply, { horizon: 2 });
+      if (!best) return null;
+      if (best.kind === 'cancel') return { cancelled: true };
+      return { optionId: best.id };
+    } catch (err) {
+      console.error('[Smuggler\'s Pier MCTS]', err.message);
+      return null;
+    }
+  })();
+};

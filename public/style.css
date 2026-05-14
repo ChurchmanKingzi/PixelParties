@@ -3090,6 +3090,181 @@ body {
   100% { transform: rotateY(180deg); }
 }
 
+/* Birthday Present three-card reveal & pick — phased visual:
+   Phase 1: slide-in from above (staggered ~250ms per card).
+   Phase 2: flip face-up (delay-chained off slide-in end).
+   Phase 3: hold at viewport centre waiting for opp's click.
+   Phase 4a: chosen card pulses with a 200ms gold glow.
+   Phase 4b: chosen + others fly to their target hand slots
+             (server provides `--ex` / `--ey` per card).
+   The outer `.bday-present-reveal-card` element handles position +
+   slide-in + fly-out keyframes; the inner element owns the flip and
+   the highlight glow so the two transform stacks don't fight. */
+.bday-present-reveal-card {
+  position: fixed;
+  width: 110px;
+  height: 154px;
+  z-index: 10100;
+  perspective: 1000px;
+  pointer-events: none;
+  /* `--idx` is -1 / 0 / 1 — horizontal slot around viewport centre.
+     `--delay` staggers each card's slide-in. The CSS variables `--ex`
+     / `--ey` are populated by the server's `pick_resolved` event when
+     the fly-out class is added. */
+  --cx: calc(50vw - 55px + var(--idx) * 130px);
+  --cy: calc(50vh - 77px);
+  left: var(--cx);
+  top: var(--cy);
+  animation: bday-present-slide-in 600ms cubic-bezier(.2,.7,.3,1) var(--delay, 0ms) backwards;
+}
+.bday-present-reveal-card.clickable {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.bday-present-reveal-card.clickable:hover .bday-present-reveal-inner {
+  filter: brightness(1.18) drop-shadow(0 0 14px rgba(255,230,140,.85));
+  transform: rotateY(180deg) scale(1.06);
+  transition: transform 180ms ease-out, filter 180ms ease-out;
+}
+.bday-present-reveal-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  /* Flip after slide-in completes (delay = slide-in duration 600ms +
+     100ms breath). End state stays at rotateY(180deg) showing the
+     front face. */
+  animation: bday-present-flip 600ms cubic-bezier(.3,.1,.3,1) calc(var(--delay, 0ms) + 700ms) forwards;
+  transform: rotateY(0deg);
+}
+.bday-present-reveal-back,
+.bday-present-reveal-front {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 16px 44px rgba(0,0,0,.75);
+}
+.bday-present-reveal-front {
+  transform: rotateY(180deg);
+}
+.bday-present-reveal-back img,
+.bday-present-reveal-front img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Phase 4a: chosen card highlight. The inner stack runs the flip's
+   forwards-state PLUS a layered 200ms glow keyframe. `chosen` lands
+   long after the flip's delay has elapsed, so chaining the original
+   flip animation is no-op cosmetically (it stays at rotateY(180)). */
+.bday-present-reveal-card.chosen .bday-present-reveal-inner {
+  animation:
+    bday-present-flip 600ms cubic-bezier(.3,.1,.3,1) calc(var(--delay, 0ms) + 700ms) forwards,
+    bday-present-highlight 200ms ease-in-out forwards;
+}
+@keyframes bday-present-highlight {
+  0%   { filter: brightness(1) drop-shadow(0 0 0 transparent);
+         transform: rotateY(180deg) scale(1); }
+  50%  { filter: brightness(1.45) drop-shadow(0 0 28px rgba(255,210,80,1));
+         transform: rotateY(180deg) scale(1.18); }
+  100% { filter: brightness(1.25) drop-shadow(0 0 18px rgba(255,210,80,.9));
+         transform: rotateY(180deg) scale(1.12); }
+}
+/* Phase 4b: fly-out. Outer element animates left/top toward (--ex, --ey).
+   Overrides the slide-in animation on the outer (the inner's flip
+   anim is separate and stays). The per-flight `--flight-delay` lets
+   the second activator-bound card wait its turn (so the two
+   user-bound cards land "one by one" instead of together). */
+.bday-present-reveal-card.flying-out {
+  animation: bday-present-fly-out 700ms cubic-bezier(.4,.1,.3,1) var(--flight-delay, 0ms) forwards;
+}
+/* Slide-in originates at the OWNER's deck pile (--sx, --sy captured
+   client-side at event time) and lands at the centre slot (--cx, --cy).
+   Animating `left` / `top` between two var() values is well-supported
+   in Chromium/Firefox/Safari. The `backwards` fill mode on the outer
+   keeps the element parked at the deck during the per-card delay so
+   each subsequent card starts at the deck position (not whatever the
+   first card's mid-flight position happened to be). */
+@keyframes bday-present-slide-in {
+  0%   { opacity: 0; left: var(--sx); top: var(--sy); transform: scale(0.35); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; left: var(--cx); top: var(--cy); transform: scale(1); }
+}
+@keyframes bday-present-flip {
+  0%   { transform: rotateY(0deg); }
+  100% { transform: rotateY(180deg); }
+}
+@keyframes bday-present-fly-out {
+  0%   { left: var(--cx); top: var(--cy); transform: scale(1); opacity: 1; }
+  100% { left: var(--ex); top: var(--ey); transform: scale(0.55); opacity: 0.7; }
+}
+
+/* Brackle's catapult — five-phase flying Creature card. THREE chained
+   CSS animations cover the full visual; the implicit `forwards`-filled
+   gaps between them are the HOLD (creature parked on Brackle) and
+   IMPACT (creature parked at target while the explosion plays) phases:
+     1. `brackle-catapult-load` (duration `--load-ms`) interpolates
+        source slot (--sx,--sy) → Brackle's hero zone (--mx,--my).
+        `forwards` fill parks the card on Brackle.
+     2. `brackle-catapult-fire` (duration `--fire-ms`, delay
+        `--fire-delay` = load + hold) interpolates Brackle → target
+        (--ex,--ey). `forwards` fill parks the card on the target for
+        the IMPACT phase.
+     3. `brackle-catapult-discard` (duration `--discard-ms`, delay
+        `--discard-delay` = load + hold + fire + impact) interpolates
+        target → the discard pile (--dx,--dy). The corpse's actual
+        flight to discard — replaces the diff-detector's auto-flight
+        (which is pre-suppressed client-side so it doesn't double-fire).
+   `pointer-events: none` + `z-index: 10100` match the other flying-
+   card animations (Kassaran, Colored Snow, Birthday Present). */
+.brackle-catapult-card {
+  position: fixed;
+  width: 64px;
+  height: 90px;
+  pointer-events: none;
+  z-index: 10100;
+  left: var(--sx);
+  top:  var(--sy);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .65);
+  animation:
+    brackle-catapult-load    var(--load-ms,    1100ms) cubic-bezier(.2, .65, .35, 1) forwards,
+    /* Fire phase intentionally snappy: steep cubic-bezier accelerates
+       hard off Brackle, fast tail-end, no settling — the projectile
+       just leaves. Default fire-ms matches the JS constant (300ms). */
+    brackle-catapult-fire    var(--fire-ms,    300ms)  cubic-bezier(.7, 0, .85, .35) var(--fire-delay,    1500ms) forwards,
+    /* Discard phase — the corpse curves down to the discard pile,
+       shrinking and tumbling. Slower / softer easing than fire so it
+       reads as "thrown away" rather than "second catapult". */
+    brackle-catapult-discard var(--discard-ms, 500ms)  cubic-bezier(.4, 0, .3, 1)    var(--discard-delay, 2100ms) forwards;
+}
+.brackle-catapult-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+@keyframes brackle-catapult-load {
+  0%   { left: var(--sx); top: var(--sy); transform: scale(1)    rotate(0deg); }
+  100% { left: var(--mx); top: var(--my); transform: scale(1.15) rotate(-4deg); }
+}
+@keyframes brackle-catapult-fire {
+  0%   { left: var(--mx); top: var(--my); transform: scale(1.15) rotate(-4deg); opacity: 1; }
+  20%  {                                  transform: scale(1.22) rotate(-2deg); }
+  100% { left: var(--ex); top: var(--ey); transform: scale(0.95) rotate(8deg);  opacity: 1; }
+}
+@keyframes brackle-catapult-discard {
+  0%   { left: var(--ex); top: var(--ey); transform: scale(0.95) rotate(8deg);   opacity: 1; }
+  100% { left: var(--dx); top: var(--dy); transform: scale(0.45) rotate(180deg); opacity: 0.2; }
+}
+
 /* Colored Snow's Potion reveal — two-phase animation. Phase 1 flies
    the Potion from the controller's Potion Deck to the center of the
    screen face-down, then dramatically flips face-up and HOLDS at the
@@ -3533,6 +3708,38 @@ body {
   25% { transform: translate(-3px, 2px); }
   50% { transform: translate(3px, -1px); }
   75% { transform: translate(-2px, -2px); }
+}
+
+/* Escape Attack — the saved Hero leans/dashes side-to-side to evade
+   the incoming Attack/Spell. Larger amplitude than chainShake so the
+   dodge reads clearly; paired with a subtle counter-rotation for the
+   "leaning into the dodge" feel. ~700ms total to land while the
+   damage call returns.
+   The animation is applied DEEP — to the BoardCard children of the
+   targeted Hero Zone — rather than to the zone div itself. Animating
+   the zone div added a layout-affecting `position: relative` shift
+   that re-measured the absolute-positioned Area Zones (which compute
+   their left coordinate from the Hero Zone rects), making them drift
+   along with the dodge. Animating the inner card only keeps the
+   zone's layout box pinned in place. */
+@keyframes escapeDodge {
+  0%   { transform: translateX(0) rotate(0deg); }
+  12%  { transform: translateX(-26px) rotate(-6deg); }
+  25%  { transform: translateX(0)     rotate(0deg);  }
+  38%  { transform: translateX(26px)  rotate(6deg);  }
+  52%  { transform: translateX(0)     rotate(0deg);  }
+  66%  { transform: translateX(-18px) rotate(-3deg); }
+  80%  { transform: translateX(18px)  rotate(3deg);  }
+  100% { transform: translateX(0)     rotate(0deg);  }
+}
+/* All direct visual children dodge together. Targeting the children
+   rather than the [data-hero-zone] wrapper keeps the wrapper's layout
+   box pinned — important because the Area Zones (rendered as siblings
+   in `.board-area-zones-center`) compute their left coordinates from
+   the Hero Zone rects. Animating the wrapper itself made the area
+   zones appear to drift along with the dodge. */
+.escape-dodging > * {
+  animation: escapeDodge 700ms cubic-bezier(.4, 1.6, .6, 1);
 }
 .chain-negate-symbol {
   position: absolute;

@@ -87,15 +87,21 @@ function getControlledSkeletons(engine, playerIdx) {
  * control") and Raise the Minions! ("free Support Zones of the user").
  */
 function getFreeSupportZonesAcrossHeroes(engine, playerIdx) {
+  // Empty / dead Hero columns expose their free Support Zone slots
+  // here too — the Skeleton tutors that consume this helper treat
+  // the destination Hero as irrelevant. Matches the engine-wide
+  // "Creatures are independent of their Hero" rule.
   const ps = engine.gs.players[playerIdx];
   if (!ps) return [];
   const zones = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
+    const heroLabel = hero?.name
+      ? (hero.hp <= 0 ? `${hero.name} (KO)` : hero.name)
+      : `Column ${hi + 1}`;
     for (let si = 0; si < 3; si++) {
       if (((ps.supportZones?.[hi] || [])[si] || []).length === 0) {
-        zones.push({ heroIdx: hi, slotIdx: si, label: `${hero.name} — Slot ${si + 1}` });
+        zones.push({ heroIdx: hi, slotIdx: si, label: `${heroLabel} — Slot ${si + 1}` });
       }
     }
   }

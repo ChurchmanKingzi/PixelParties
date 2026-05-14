@@ -5,6 +5,8 @@
 //  200/150/100 chain lightning damage.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
@@ -39,7 +41,7 @@ module.exports = {
       for (const inst of engine.cardInstances) {
         if (inst.owner !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
         const cd = cardDB[inst.name];
-        if (!cd || cd.cardType !== 'Creature') continue;
+        if (!cd || !hasCardType(cd, 'Creature')) continue;
         const hp = inst.counters?.currentHp ?? cd.hp ?? 0;
         if (hp <= 0) continue;
         targets.push({ id: `equip-${oppIdx}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: oppIdx, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst });

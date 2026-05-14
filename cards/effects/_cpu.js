@@ -27,6 +27,15 @@ const CPU_PROMPT_DELAY = 350;
 // to break out of pathological infinite-loop / stuck-await scenarios that
 // would otherwise hang the game indefinitely.
 const MAX_CPU_TURN_MS = 90000;
+// Per-rollout wall-clock cap. A single MCTS rollout that runs longer
+// than this trips its safety-loop deadline gates so the rank loop can
+// move on to the next candidate. Without this cap a pathological
+// rollout — e.g. Heal Burn's afterHeal→Lifeforce Howitzer→actionDeal-
+// Damage→afterDamage→Shield of Life→actionHealHero cascades repeated
+// across a 6-turn horizon × 80 UCB1 pulls — could monopolise the rank
+// budget and extend the live turn past MAX_CPU_TURN_MS, since
+// cpuPastDeadline used to short-circuit inside MCTS sims.
+const MAX_ROLLOUT_MS = 8000;
 
 // Set to false when the CPU is stable. Keep verbose while we're still shaking
 // out freeze bugs — every major decision point logs so a hang can be traced.
@@ -81,17 +90,34 @@ function stillCpuTurn(engine, cpuIdx) {
 }
 
 /**
- * True when the live CPU turn has run past its hard wall-clock cap. Used
- * by main-phase / action-phase safety loops and the MCTS gates to bail
- * out cleanly instead of grinding through more rollouts on a stuck turn.
- * Always false inside MCTS rollouts (`_inMctsSim`) so the deadline only
- * trips on the real turn, not on the simulated branches the live brain
- * is evaluating.
+ * True when the live CPU turn has run past its hard wall-clock cap, OR
+ * when the current MCTS rollout has run past its own per-rollout cap.
+ * Used by main-phase / action-phase safety loops and the MCTS gates to
+ * bail out cleanly instead of grinding through more rollouts on a
+ * stuck turn.
+ *
+ * The HARD live-turn check fires in ALL contexts (including nested
+ * MCTS rollouts). Without this, once a rollout slipped past the 90s
+ * live deadline, its inner runMainPhase / rolloutRestOfTurn safety
+ * checks would never trip, letting one pathological rollout extend the
+ * freeze far past MAX_CPU_TURN_MS. (Field report: Heal Burn deck
+ * freezing 2+ minutes on the CPU's turn.)
+ *
+ * The SOFT per-rollout cap (active only inside `_inMctsSim`) keeps a
+ * single rollout from monopolising the rank budget. Each rollout entry
+ * stamps `_mctsRolloutStartT`; the check trips after MAX_ROLLOUT_MS so
+ * the rank loop can move on to the next candidate / variation.
  */
 function cpuPastDeadline(engine) {
-  if (engine?._inMctsSim) return false;
   const dl = engine?._cpuTurnDeadline;
-  return typeof dl === 'number' && Date.now() >= dl;
+  if (typeof dl === 'number' && Date.now() >= dl) return true;
+  if (engine?._inMctsSim) {
+    const startT = engine._mctsRolloutStartT;
+    if (typeof startT === 'number' && (Date.now() - startT) >= MAX_ROLLOUT_MS) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -1319,24 +1345,40 @@ function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
   const isEquip = subLower === 'equipment';
   const isArtifactCreature = subLower.split('/').some(t => t.trim() === 'creature');
 
+  // Load the script up-front so the subtype dispatch can consult
+  // `isTargetingArtifact`. Artifact-Creature hybrids that ALSO declare
+  // `isTargetingArtifact: true` (Powder Keg etc.) skip the drag-to-own-Hero
+  // path on the server (server.js doPlayArtifact rejects them), so the CPU
+  // must route through the targeting/useEffect flow instead — otherwise
+  // the call to `doPlayArtifact` silently fails and the card sticks in the
+  // CPU's hand forever via the `tried` set in `playArtifacts`.
+  const script = loadCardEffect(cardName);
+  const isTargetingArtifact = !!script?.isTargetingArtifact;
+
   if (isEquip) {
     const heroIdx = pickHeroForEquip(engine, pi, cardName, cardData);
     if (heroIdx < 0) return null;
     return { kind: 'equipment', cardName, handIdx, heroIdx };
   }
 
-  if (isArtifactCreature) {
+  if (isArtifactCreature && !isTargetingArtifact) {
     const heroIdx = pickHeroForArtifactCreature(engine, pi);
     if (heroIdx < 0) return null;
     return { kind: 'artifactCreature', cardName, handIdx, heroIdx };
   }
 
-  // Normal / Reaction / Area Artifacts → doUseArtifactEffect path
-  const script = loadCardEffect(cardName);
+  // Normal / Reaction / Area / targeting-creature Artifacts → doUseArtifactEffect path
   if (!script) return null;
   if (subLower === 'surprise') return null;
   if (subLower === 'reaction' && !script.proactivePlay) return null;
-  if (script.canActivate && !script.canActivate(gs, pi)) return null;
+  // Pass `engine` as the 3rd arg — same shape as the server's
+  // `doUseArtifactEffect` (server.js ~L6114/L6264). Some scripts'
+  // canActivate gates need to walk `engine.cardInstances` for
+  // per-instance state (e.g. Field Standard checks each Creature's
+  // `creature-effect:${id}` HOPT to find "effect used this turn"
+  // targets) and short-circuit to false when engine is absent. Without
+  // this, those cards are invisible to the CPU planner.
+  if (script.canActivate && !script.canActivate(gs, pi, engine)) return null;
   if (script.blockedByHandLock && ps.handLocked) return null;
   // Juice: server-side `canActivate` returns true if EITHER side has a
   // cleansable status, so without this CPU-side guard the CPU happily
@@ -1632,7 +1674,15 @@ async function resolveTargetingPrompt(engine, helpers) {
   for (let safety = 0; safety < 4; safety++) {
     const tgt = engine.gs.potionTargeting;
     if (!tgt || tgt.ownerIdx !== engine._cpuPlayerIdx) return;
-    const picks = engine._getCpuTargetResponse(tgt.validTargets || [], tgt.config || {});
+    // Inject the card name as `title` so `_getCpuTargetResponse` can find
+    // the per-card `cpuResponse` override (engine.js:1416 reads
+    // `config.title` to identify the card). Targeting-artifact scripts
+    // typically omit `title` from their static `targetingConfig` since
+    // the targeting UI doesn't render it — but the CPU brain's per-card
+    // dispatch needs it, so we merge `potionName` in here as the
+    // canonical fallback.
+    const cfg = { title: tgt.potionName, ...(tgt.config || {}) };
+    const picks = engine._getCpuTargetResponse(tgt.validTargets || [], cfg);
     const selectedIds = Array.isArray(picks) ? picks : [];
     cpuLog(`      → confirm targeting "${tgt.potionName}" selectedIds=${JSON.stringify(selectedIds)}`);
     await helpers.doConfirmPotion(helpers.room, engine._cpuPlayerIdx, { selectedIds });
@@ -1921,7 +1971,22 @@ async function fireAdditionalActions(engine, helpers) {
     if (!stillCpuTurn(engine, cpuIdx)) return;
 
     let pick = null;
-    for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
+    // Hand iteration order: non-deferred cards first, then any cards
+    // tagged `cpuMeta.cpuDeferUntilLast: true` (Gigantisaur Chimera,
+    // any future "summoning me ends the turn" card). The deferred
+    // pass only fires when no non-deferred pick is viable, so the
+    // CPU exhausts all other plays before committing to the
+    // turn-ending one.
+    const handOrder = [];
+    for (let i = 0; i < ps.hand.length; i++) {
+      const s = loadCardEffect(ps.hand[i]);
+      if (!s?.cpuMeta?.cpuDeferUntilLast) handOrder.push(i);
+    }
+    for (let i = 0; i < ps.hand.length; i++) {
+      const s = loadCardEffect(ps.hand[i]);
+      if (s?.cpuMeta?.cpuDeferUntilLast) handOrder.push(i);
+    }
+    for (const handIdx of handOrder) {
       const cardName = ps.hand[handIdx];
       const cd = cardDB[cardName];
       if (!cd) continue;
@@ -5923,6 +5988,36 @@ function evaluateState(engine, cpuIdx) {
   }
   score += ownSupVal - oppSupVal;
 
+  // ── Per-instance CPU value bonus (generic) ───────────────────────
+  // Card scripts can declare `cpuMeta.cpuInstBonus(engine, inst,
+  // ownerIdx)` to add (or subtract) a custom number to the owner's
+  // score for any state this inst contributes that the standard
+  // support-slot / hand-value / counter terms miss. Used for:
+  //   • Gigantisaur Chimera — high "I'm alive on the board" bonus
+  //     beyond the +30 slot value (game-defining body).
+  //   • The Great Wall of Deri — bonus only for the FIRST Wall on
+  //     a side (duplicates contribute nothing).
+  //   • Giga Steroids — bonus only when the grant is active AND
+  //     the owner has a non-Spell/Attack/Creature Action ready to
+  //     spend it on.
+  //
+  // Generic — the engine walks every tracked inst and lets each
+  // card's function return its per-state bonus. Cards handle
+  // dedup / gating internally. Throws inside the function are
+  // swallowed; the inst contributes 0 in that case.
+  for (const inst of engine.cardInstances) {
+    const ctrl = inst.controller ?? inst.owner;
+    if (typeof ctrl !== 'number' || ctrl < 0) continue;
+    const script = loadCardEffect(inst.name);
+    const fn = script?.cpuMeta?.cpuInstBonus;
+    if (typeof fn !== 'function') continue;
+    let v;
+    try { v = fn(engine, inst, ctrl); } catch { continue; }
+    if (typeof v !== 'number' || !v) continue;
+    if (ctrl === cpuIdx) score += v;
+    else if (ctrl === oppIdx) score -= v;
+  }
+
   // ── Change Counters (Cosmic Depths) ──────────────────────────────
   // Generic counter resource — Analyzer / Gatherer / Argos accumulate
   // them passively from opponent draws and tutor effects. Counters
@@ -6876,7 +6971,9 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
   // end-to-end, so we can't use that flag as the "don't invoke driver"
   // signal any more.
   const prevInSim = engine._inMctsSim;
+  const prevRolloutStartT = engine._mctsRolloutStartT;
   engine._inMctsSim = true;
+  engine._mctsRolloutStartT = Date.now();
   engine.enterFastMode();
   engine._mctsTargetPlan = plan ? [...plan] : null;
   const recordBuf = record ? [] : null;
@@ -6910,6 +7007,7 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
     const firesAfter = { ...engine._hookFiresByCard };
     engine.restore(snap);
     engine._inMctsSim = prevInSim;
+    engine._mctsRolloutStartT = prevRolloutStartT;
     _cpuLogSilent = prevSilent;
     // Per-candidate heap-delta tracking (post-restore). A healthy GC
     // makes this ~0 — the snapshot/restore pair should release every
@@ -7205,7 +7303,9 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   if (evaluateThroughTurnEnd) {
     const snapSkip = engine.snapshot();
     const prevInSimSkip = engine._inMctsSim;
+    const prevRolloutStartTSkip = engine._mctsRolloutStartT;
     engine._inMctsSim = true;
+    engine._mctsRolloutStartT = Date.now();
     engine.enterFastMode();
     const prevSilentSkip = _cpuLogSilent;
     _cpuLogSilent = true;
@@ -7217,6 +7317,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
       engine.exitFastMode();
       engine.restore(snapSkip);
       engine._inMctsSim = prevInSimSkip;
+      engine._mctsRolloutStartT = prevRolloutStartTSkip;
     }
   } else {
     skipScore = evaluateState(engine, cpuIdx);
@@ -7225,7 +7326,9 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   // ── Recon rollout ──
   const snap = engine.snapshot();
   const prevInSim = engine._inMctsSim;
+  const prevRolloutStartT = engine._mctsRolloutStartT;
   engine._inMctsSim = true;
+  engine._mctsRolloutStartT = Date.now();
   engine.enterFastMode();
   engine._mctsTargetRecord = [];
   // Save+restore the silence flag so a nested gate (this one being called
@@ -7251,6 +7354,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   engine.exitFastMode();
   engine.restore(snap);
   engine._inMctsSim = prevInSim;
+  engine._mctsRolloutStartT = prevRolloutStartT;
 
   if (!reconCompleted) return false;
 
@@ -7268,7 +7372,9 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
       if (variation.plan === null) continue;
       const snap2 = engine.snapshot();
       const prevInSim2 = engine._inMctsSim;
+      const prevRolloutStartT2 = engine._mctsRolloutStartT;
       engine._inMctsSim = true;
+      engine._mctsRolloutStartT = Date.now();
       engine.enterFastMode();
       engine._mctsTargetPlan = [...variation.plan];
       const prevSilent2 = _cpuLogSilent;
@@ -7285,6 +7391,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
       engine.exitFastMode();
       engine.restore(snap2);
       engine._inMctsSim = prevInSim2;
+      engine._mctsRolloutStartT = prevRolloutStartT2;
     }
   }
 
@@ -7831,6 +7938,7 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
   const prevHorizon = _rolloutHorizon;
   const horizonOverride = Number.isInteger(opts.horizon) ? Math.max(0, opts.horizon) : null;
   if (horizonOverride !== null) _rolloutHorizon = horizonOverride;
+  const prevRolloutStartT = engine._mctsRolloutStartT;
   engine._inMctsSim = true;
   engine.enterFastMode();
   _cpuLogSilent = true;
@@ -7839,6 +7947,10 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
       // Honor the kill-flag mid-loop too: a previous option's rollout
       // may have tripped the cap. Bail out with whatever's best so far.
       if (engine._mctsKilledThisTurn) break;
+      // Stamp a fresh per-option deadline so cpuPastDeadline's per-
+      // rollout soft cap applies to each option independently.
+      engine._mctsRolloutStartT = Date.now();
+      if (cpuPastDeadline(engine)) break;
       let snap;
       try {
         snap = engine.snapshot();
@@ -7871,6 +7983,7 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
     }
   } finally {
     engine._inMctsSim = false;
+    engine._mctsRolloutStartT = prevRolloutStartT;
     engine.exitFastMode();
     _cpuLogSilent = prevSilent;
     if (horizonOverride !== null) _rolloutHorizon = prevHorizon;

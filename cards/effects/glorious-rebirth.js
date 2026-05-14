@@ -15,7 +15,12 @@ module.exports = {
     const topName = ps.coolnessStack[ps.coolnessStack.length - 1];
     const cd = engine?._getCardDB?.()[topName];
     if (!cd || cd.cardType !== 'Creature') return false;
-    if ((cd.level ?? 0) > MAX_LEVEL) return false;
+    // Effective level — Phatnir's Coolness-Stack-aware rebate and any
+    // future hand-active reducer pass through.
+    const lvl = engine?.effectiveCardLevel
+      ? engine.effectiveCardLevel(cd, pi)
+      : (cd.level || 0);
+    if (lvl > MAX_LEVEL) return false;
     return true;
   },
 
@@ -28,7 +33,7 @@ module.exports = {
       const topName = engine.getCoolnessStackTop(pi);
       const cardDB = engine._getCardDB();
       const cd = topName ? cardDB[topName] : null;
-      if (!cd || cd.cardType !== 'Creature' || (cd.level ?? 0) > MAX_LEVEL) {
+      if (!cd || cd.cardType !== 'Creature' || engine.effectiveCardLevel(cd, pi) > MAX_LEVEL) {
         engine.gs._spellCancelled = true;
         return;
       }

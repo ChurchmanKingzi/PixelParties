@@ -38,7 +38,7 @@ function _fightingLevel(engine, ps, heroIdx) {
   return engine.countAbilitiesForSchool('Fighting', abZones);
 }
 
-function _eligibleCreatureNames(engine, ps, maxLevel) {
+function _eligibleCreatureNames(engine, ps, maxLevel, pi) {
   if (!ps || maxLevel <= 0) return [];
   const cardDB = engine._getCardDB();
   const seen = new Set();
@@ -48,9 +48,14 @@ function _eligibleCreatureNames(engine, ps, maxLevel) {
     const cd = cardDB[cn];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (hasCardType(cd, 'Token') || cd.subtype === 'Token') continue;
-    if ((cd.level || 0) > maxLevel) continue;
+    // Effective level — Whoolmoth-style `reduceCardLevel` rebates
+    // / Phatnir's Cool-Stack discount push the printed level down,
+    // letting otherwise-out-of-range Creatures fall within the
+    // Fighting cap.
+    const lvl = engine.effectiveCardLevel(cd, pi);
+    if (lvl > maxLevel) continue;
     seen.add(cn);
-    out.push({ name: cn, source: 'discard', level: cd.level || 0 });
+    out.push({ name: cn, source: 'discard', level: lvl });
   }
   out.sort((a, b) => (a.level - b.level) || a.name.localeCompare(b.name));
   return out;
@@ -79,7 +84,7 @@ module.exports = {
       if (!h?.name || h.hp <= 0) continue;
       if (!_userHasFreeSupportSlot(ps, hi)) continue;
       const lvl = _fightingLevel(engine, ps, hi);
-      if (_eligibleCreatureNames(engine, ps, lvl).length > 0) return true;
+      if (_eligibleCreatureNames(engine, ps, lvl, pi).length > 0) return true;
     }
     return false;
   },
@@ -91,7 +96,7 @@ module.exports = {
     if (!ps) return false;
     if (!_userHasFreeSupportSlot(ps, heroIdx)) return false;
     const lvl = _fightingLevel(engine, ps, heroIdx);
-    return _eligibleCreatureNames(engine, ps, lvl).length > 0;
+    return _eligibleCreatureNames(engine, ps, lvl, pi).length > 0;
   },
 
   hooks: {
@@ -108,7 +113,7 @@ module.exports = {
       }
 
       const lvl = _fightingLevel(engine, ps, heroIdx);
-      const gallery = _eligibleCreatureNames(engine, ps, lvl);
+      const gallery = _eligibleCreatureNames(engine, ps, lvl, pi);
       if (gallery.length === 0) { gs._spellCancelled = true; return; }
       if (!_userHasFreeSupportSlot(ps, heroIdx)) { gs._spellCancelled = true; return; }
 
@@ -131,7 +136,7 @@ module.exports = {
       // Re-validate (state may have shifted during the prompt).
       const cardDB = engine._getCardDB();
       const cd = cardDB[chosenName];
-      if (!cd || !hasCardType(cd, 'Creature') || (cd.level || 0) > lvl) {
+      if (!cd || !hasCardType(cd, 'Creature') || engine.effectiveCardLevel(cd, pi) > lvl) {
         gs._spellCancelled = true;
         return;
       }

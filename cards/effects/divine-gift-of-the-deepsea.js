@@ -58,7 +58,7 @@ function getOwnControlledCreatureInsts(engine, pi) {
  * deck + hand at level ≤ maxLevel, EXCLUDING `excludeName` (the bounced
  * creature's name — even copies of it are off-limits).
  */
-function buildReplacementGallery(engine, ps, maxLevel, excludeName) {
+function buildReplacementGallery(engine, ps, pi, maxLevel, excludeName) {
   const cardDB = engine._getCardDB();
   const seen = new Map();
   const tryAdd = (cn, source) => {
@@ -67,8 +67,9 @@ function buildReplacementGallery(engine, ps, maxLevel, excludeName) {
     const cd = cardDB[cn];
     if (!cd || !hasCardType(cd, 'Creature')) return;
     if (hasCardType(cd, 'Token') || cd.subtype === 'Token') return;
-    if ((cd.level ?? 0) > maxLevel) return;
-    seen.set(cn, { name: cn, source, level: cd.level ?? 0 });
+    const lvl = engine.effectiveCardLevel(cd, pi);
+    if (lvl > maxLevel) return;
+    seen.set(cn, { name: cn, source, level: lvl });
   };
   for (const cn of (ps.mainDeck || [])) tryAdd(cn, 'deck');
   for (const cn of (ps.hand || [])) tryAdd(cn, 'hand');
@@ -82,17 +83,17 @@ function buildReplacementGallery(engine, ps, maxLevel, excludeName) {
  * in the player's deck/hand at level ≤ inst's level. Used by both the
  * play-time gate and the bounce-target picker filter.
  */
-function hasValidReplacement(engine, ps, inst) {
+function hasValidReplacement(engine, ps, pi, inst) {
   const cardDB = engine._getCardDB();
   const bouncedLevel = cardDB[inst.name]?.level ?? 0;
-  return buildReplacementGallery(engine, ps, bouncedLevel, inst.name).length > 0;
+  return buildReplacementGallery(engine, ps, pi, bouncedLevel, inst.name).length > 0;
 }
 
 function getValidBounceTargets(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   return getOwnControlledCreatureInsts(engine, pi)
-    .filter(inst => hasValidReplacement(engine, ps, inst));
+    .filter(inst => hasValidReplacement(engine, ps, pi, inst));
 }
 
 module.exports = {
@@ -168,7 +169,7 @@ module.exports = {
       // ── Step 3: pick replacement Creature from deck or hand.
       // Excludes the bounced Creature's name — copies of the same
       // Creature can't return to the same slot. ──
-      const gallery = buildReplacementGallery(engine, ps, bouncedLevel, bouncedT.cardName);
+      const gallery = buildReplacementGallery(engine, ps, pi, bouncedLevel, bouncedT.cardName);
       if (gallery.length === 0) {
         // Defensive — `getValidBounceTargets` should have filtered this
         // case out. Bounce already committed, fizzle silently.

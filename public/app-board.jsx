@@ -492,6 +492,106 @@ function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardNa
   );
 }
 
+// Birthday Present 3-card reveal & pick UI.
+//
+//   `state` shape:
+//     {
+//       cards:        [name0, name1, name2],
+//       ownerIdx, oppIdx,
+//       cardbackUrl:  string (owner's cardback),
+//       chosen:       null | string (set when pick lands),
+//       flights:      null | [{ cardName, toX, toY }, ...]
+//                              (set 200ms after chosen, triggers fly-out),
+//     }
+//   `interactive` is true on opp's client while the
+//   `birthdayPresentPick` prompt is open — enables click-to-pick on each
+//   of the three cards. Activator-side renders the same cards with
+//   `pointer-events: none` so they just watch.
+function BirthdayPresentReveal({ state, interactive, onPick }) {
+  const { cards, cardbackUrl, chosen, flights, sourceX, sourceY } = state;
+  return (
+    <>
+      {cards.map((cardName, i) => {
+        const card = CARDS_BY_NAME[cardName];
+        const imgUrl = card ? cardImageUrl(card.name) : null;
+        const isChosen = chosen === cardName;
+        const flight = flights ? flights.find(f => f.cardName === cardName) : null;
+        // -1 / 0 / +1 horizontal offset around viewport centre.
+        const slotIdx = i - 1;
+        const cls = ['bday-present-reveal-card'];
+        if (interactive && !chosen) cls.push('clickable');
+        if (isChosen) cls.push('chosen');
+        if (flight) cls.push('flying-out');
+        const handleClick = (interactive && !chosen && onPick)
+          ? () => onPick(cardName) : undefined;
+        return (
+          <div key={`bday-${i}-${cardName}`} className={cls.join(' ')}
+            style={{
+              '--idx': slotIdx,
+              '--delay': (i * 250) + 'ms',
+              // Slide-in origin = the activator's deck pile. Captured
+              // at event time in the socket handler and threaded
+              // through so each card slides FROM that point INTO the
+              // centre.
+              '--sx': (sourceX != null ? sourceX : 0) + 'px',
+              '--sy': (sourceY != null ? sourceY : 0) + 'px',
+              ...(flight ? {
+                '--ex': flight.toX + 'px',
+                '--ey': flight.toY + 'px',
+                // Per-flight stagger so user-bound cards land sequentially.
+                '--flight-delay': (flight.delay || 0) + 'ms',
+              } : {}),
+            }}
+            onClick={handleClick}>
+            <div className="bday-present-reveal-inner">
+              <div className="bday-present-reveal-back">
+                <img src={cardbackUrl || '/cardback.png'} draggable={false} />
+              </div>
+              <div className="bday-present-reveal-front">
+                {imgUrl ? <img src={imgUrl} draggable={false} />
+                  : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg3)', fontSize: 11, color: 'var(--text)', textAlign: 'center', padding: 4 }}>{cardName}</div>}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+// Brackle catapult — single five-phase flying card. THREE chained CSS
+// animations (load → fire → discard-fly) with `forwards` fills cover
+// the visible flow. The implicit gaps between animations are the
+// HOLD (creature parked on Brackle) and IMPACT (creature parked at
+// target while the explosion plays) phases — no extra animations
+// needed since `forwards` fill keeps the card visibly pinned in
+// place across each gap.
+function BrackleCatapultCard({ sx, sy, mx, my, ex, ey, dx, dy, cardName, loadMs, holdMs, fireMs, impactMs, discardMs }) {
+  const card = CARDS_BY_NAME[cardName];
+  const imgUrl = card ? cardImageUrl(card.name) : null;
+  // Each chained animation's `animation-delay` is the cumulative
+  // start-time across previous phases. CSS doesn't compute these
+  // for us, so we precompute and pass each as a variable.
+  const fireDelay    = (loadMs || 0) + (holdMs || 0);
+  const discardDelay = fireDelay + (fireMs || 0) + (impactMs || 0);
+  return (
+    <div className="brackle-catapult-card" style={{
+      '--sx': sx + 'px', '--sy': sy + 'px',
+      '--mx': mx + 'px', '--my': my + 'px',
+      '--ex': ex + 'px', '--ey': ey + 'px',
+      '--dx': dx + 'px', '--dy': dy + 'px',
+      '--load-ms':     loadMs    + 'ms',
+      '--fire-ms':     fireMs    + 'ms',
+      '--discard-ms':  discardMs + 'ms',
+      '--fire-delay':    fireDelay    + 'ms',
+      '--discard-delay': discardDelay + 'ms',
+    }}>
+      {imgUrl ? <img src={imgUrl} draggable={false} alt="" />
+        : <div style={{ width: '100%', height: '100%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--text)', padding: 4, textAlign: 'center' }}>{cardName}</div>}
+    </div>
+  );
+}
+
 function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl }) {
   const dx = endX - startX;
   const dy = endY - startY;
@@ -3651,6 +3751,85 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // Field Standard rally — trumpets blare radially outward and a
+  // celebratory confetti burst (🎉 🎊 ✨ ⭐) drifts upward, fired
+  // per reimbursed Creature inside `field-standard.js`'s `resolve`.
+  // Staggered ~120ms apart at broadcast time so multiple targets
+  // read as a sequenced fanfare rather than a single overload.
+  field_standard_rally: (() => {
+    return function FieldStandardRallyEffect({ x, y }) {
+      // Six trumpets evenly spaced around the slot center, blasting
+      // outward. Each starts at center, scales up as it travels, and
+      // fades past the slot's edge.
+      const trumpets = useMemo(() => Array.from({ length: 6 }, (_, i) => {
+        const angle = (i / 6) * Math.PI * 2 - Math.PI / 2; // top, then clockwise
+        const dist = 42;
+        return {
+          dx: Math.cos(angle) * dist,
+          dy: Math.sin(angle) * dist,
+          delay: i * 45,
+        };
+      }), []);
+      // Cheer confetti — randomized glyphs, angles, and rise heights.
+      // Drift is biased upward (-14 offset) so the cluster reads as
+      // celebratory "stuff thrown in the air" rather than a flat ring.
+      const cheers = useMemo(() => {
+        const glyphs = ['🎉', '🎊', '✨', '⭐'];
+        return Array.from({ length: 16 }, () => {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 26 + Math.random() * 22;
+          return {
+            glyph: glyphs[Math.floor(Math.random() * glyphs.length)],
+            dx: Math.cos(angle) * dist,
+            dy: Math.sin(angle) * dist - 14,
+            size: 11 + Math.random() * 9,
+            delay: Math.random() * 280,
+            dur: 700 + Math.random() * 380,
+          };
+        });
+      }, []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {trumpets.map((t, i) => (
+            <div key={'fstr' + i} style={{
+              position: 'absolute', left: -11, top: -11,
+              fontSize: 22, lineHeight: 1,
+              opacity: 0,
+              animation: `fsRallyTrumpet 1000ms ease-out ${t.delay}ms forwards`,
+              textShadow: '0 0 6px #ffe680, 0 0 12px rgba(255,200,80,0.85)',
+              '--fsDx': t.dx + 'px',
+              '--fsDy': t.dy + 'px',
+            }}>🎺</div>
+          ))}
+          {cheers.map((c, i) => (
+            <div key={'fsch' + i} style={{
+              position: 'absolute',
+              left: -c.size / 2, top: -c.size / 2,
+              fontSize: c.size, lineHeight: 1,
+              opacity: 0,
+              animation: `fsRallyCheer ${c.dur}ms ease-out ${c.delay}ms forwards`,
+              textShadow: '0 0 4px rgba(255,210,90,0.7)',
+              '--fsDx': c.dx + 'px',
+              '--fsDy': c.dy + 'px',
+            }}>{c.glyph}</div>
+          ))}
+          <style>{`
+            @keyframes fsRallyTrumpet {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.3); }
+              22%  { opacity: 1; transform: translate(calc(var(--fsDx) * 0.55), calc(var(--fsDy) * 0.55)) scale(1.15); }
+              72%  { opacity: 1; transform: translate(var(--fsDx), var(--fsDy)) scale(1.0); }
+              100% { opacity: 0; transform: translate(calc(var(--fsDx) * 1.25), calc(var(--fsDy) * 1.25)) scale(0.7); }
+            }
+            @keyframes fsRallyCheer {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              30%  { opacity: 1; transform: translate(calc(var(--fsDx) * 0.4), calc(var(--fsDy) * 0.4)) scale(1.05); }
+              100% { opacity: 0; transform: translate(var(--fsDx), var(--fsDy)) scale(0.55); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   // Grave Worm burrow-out — black/brown particle burst shooting up
   // and outward from the support slot. Conveys the worm clawing out
   // of fresh black earth. Triggered by the card's onPlay.
@@ -4755,6 +4934,122 @@ const ANIM_REGISTRY = {
               0%   { opacity: 0;   transform: scale(0.3) translateY(0); }
               35%  { opacity: 1;   transform: scale(1)   translateY(-2px); }
               100% { opacity: 0;   transform: scale(0.4) translateY(-10px); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Slimy Slime — green healing goo ───────────────────────────────
+  // Companion shape to hydra_goo (purple/toxic) — same splat-and-drip
+  // silhouette retuned to jade/lime tints, with a few floating green
+  // hearts to read clearly as a heal rather than damage.
+  slimy_heal_goo: (() => {
+    return function SlimyHealGooEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      const drops = useMemo(() => Array.from({ length: 16 }, (_, i) => {
+        const angle = (-Math.PI / 6) + Math.random() * (Math.PI * 7 / 6);
+        const speed = 30 + Math.random() * 50;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed + 16,
+          size: 5 + Math.random() * 7,
+          delay: i * 14 + Math.random() * 50,
+          dur: 380 + Math.random() * 220,
+          color: ['#52b788', '#74c69d', '#95d5b2', '#80ed99',
+                  '#38b000', '#a3e635', '#b7e4c7', '#2d6a4f'][Math.floor(Math.random() * 8)],
+        };
+      }), []);
+      const splats = useMemo(() => Array.from({ length: 6 }, () => ({
+        x: -cw * 0.32 + Math.random() * cw * 0.64,
+        y: -ch * 0.28 + Math.random() * ch * 0.56,
+        rx: 8 + Math.random() * 10,
+        ry: 5 + Math.random() * 6,
+        rot: -25 + Math.random() * 50,
+        delay: 80 + Math.random() * 220,
+        dur: 600 + Math.random() * 500,
+      })), [cw, ch]);
+      const hearts = useMemo(() => Array.from({ length: 8 }, (_, i) => ({
+        xOff: -36 + Math.random() * 72,
+        startY: 10 + Math.random() * 30,
+        delay: 160 + i * 40 + Math.random() * 120,
+        dur: 700 + Math.random() * 400,
+        size: 14 + Math.random() * 10,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Bright impact flash — luminous green glow. */}
+          <div style={{
+            position: 'absolute',
+            left: -cw * 0.45 + 'px', top: -ch * 0.35 + 'px',
+            width: cw * 0.9 + 'px', height: ch * 0.7 + 'px',
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse, #d8f3dc 0%, #95d5b2 25%, #52b78899 55%, transparent 80%)',
+            opacity: 0,
+            animation: 'slimy-heal-flash 360ms ease-out forwards',
+            filter: 'blur(2px)',
+          }} />
+          {/* Lingering splats — goo that "stuck" to the target. */}
+          {splats.map((s, i) => (
+            <div key={'shs' + i} style={{
+              position: 'absolute',
+              left: s.x + 'px', top: s.y + 'px',
+              width: (s.rx * 2) + 'px', height: (s.ry * 2) + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(ellipse, #80ed99 0%, #38b000 50%, #1b4332 90%)',
+              boxShadow: '0 0 8px rgba(80, 230, 130, 0.85), inset 0 -2px 4px rgba(0,0,0,0.35)',
+              transform: `rotate(${s.rot}deg)`,
+              opacity: 0,
+              animation: `slimy-heal-splat ${s.dur}ms ease-out ${s.delay}ms forwards`,
+            }} />
+          ))}
+          {/* Droplet spray. */}
+          {drops.map((d, i) => (
+            <div key={'shd' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: d.size + 'px', height: d.size + 'px',
+              borderRadius: '50%',
+              background: d.color,
+              boxShadow: `0 0 6px ${d.color}, inset -1px -1px 2px rgba(0,0,0,0.35)`,
+              opacity: 0,
+              animation: `slimy-heal-fling ${d.dur}ms cubic-bezier(0.2, 0.6, 0.4, 1) ${d.delay}ms forwards`,
+              '--shgdx': d.dx + 'px',
+              '--shgdy': d.dy + 'px',
+            }} />
+          ))}
+          {/* Rising green hearts to read clearly as a heal. */}
+          {hearts.map((hp, i) => (
+            <div key={'shh' + i} style={{
+              position: 'absolute', left: hp.xOff + 'px', top: hp.startY + 'px',
+              fontSize: hp.size + 'px',
+              filter: 'drop-shadow(0 0 4px rgba(100,255,140,0.85))',
+              opacity: 0,
+              animation: `slimy-heal-heart ${hp.dur}ms ease-out ${hp.delay}ms forwards`,
+            }}>💚</div>
+          ))}
+          <style>{`
+            @keyframes slimy-heal-flash {
+              0%   { opacity: 0;    transform: scale(0.4); }
+              25%  { opacity: 0.95; transform: scale(1.05); }
+              100% { opacity: 0;    transform: scale(1.35); }
+            }
+            @keyframes slimy-heal-fling {
+              0%   { opacity: 0;   transform: translate(0, 0) scale(0.4); }
+              15%  { opacity: 1;   transform: translate(calc(var(--shgdx) * 0.18), calc(var(--shgdy) * 0.18)) scale(1.1); }
+              80%  { opacity: 1;   transform: translate(calc(var(--shgdx) * 0.92), calc(var(--shgdy) * 0.92)) scale(0.95); }
+              100% { opacity: 0;   transform: translate(var(--shgdx), var(--shgdy)) scale(0.55); }
+            }
+            @keyframes slimy-heal-splat {
+              0%   { opacity: 0;    transform: scale(0.2); }
+              30%  { opacity: 1;    transform: scale(1.2); }
+              60%  { opacity: 0.95; transform: scale(1); }
+              100% { opacity: 0;    transform: scale(1.05) translateY(8px); }
+            }
+            @keyframes slimy-heal-heart {
+              0%   { opacity: 0; transform: translateY(0)    scale(0.6); }
+              30%  { opacity: 1; transform: translateY(-12px) scale(1); }
+              100% { opacity: 0; transform: translateY(-50px) scale(0.9); }
             }
           `}</style>
         </div>
@@ -6761,6 +7056,33 @@ const ANIM_REGISTRY = {
   //  reuses `cloud_gather`) — Spectral Armor's visual is the
   //  pre-damage moment of "the strike is being deflected by
   //  ghostly armor", not a fog roll-in.
+  // Escape Attack — the saved Hero physically dodges side-to-side
+  // out of the way of the incoming Attack/Spell. Mirrors Spectral
+  // Armor's DOM-walk pattern to find the targeted Hero Zone, then
+  // applies the `.escape-dodging` CSS class (see style.css's
+  // `escapeDodge` keyframe) for ~700ms. No overlay sprites — the
+  // dodge motion of the Hero card itself is the entire visual.
+  escape_dodge: (() => {
+    return function EscapeDodgeEffect({ x, y }) {
+      useEffect(() => {
+        const els = document.querySelectorAll('[data-hero-zone]');
+        let best = null, bestDist = Infinity;
+        els.forEach(el => {
+          const r = el.getBoundingClientRect();
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          const d = Math.abs(cx - x) + Math.abs(cy - y);
+          if (d < bestDist) { bestDist = d; best = el; }
+        });
+        if (best && bestDist < 120) {
+          best.classList.add('escape-dodging');
+          const t = setTimeout(() => best.classList.remove('escape-dodging'), 720);
+          return () => { clearTimeout(t); best.classList.remove('escape-dodging'); };
+        }
+      }, []);
+      return null;
+    };
+  })(),
+
   spectral_armor: (() => {
     return function SpectralArmorEffect({ x, y }) {
       // Apply a brief teal-tint class to the target hero/support
@@ -12846,6 +13168,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Kassaran reveal-flip animations — entries auto-removed by setTimeout
   // after the CSS keyframes complete.
   const [kassaranFlips, setKassaranFlips] = useState([]);
+  // Birthday Present 3-card reveal state — `null` when inactive, set
+  // to `{ cards, ownerIdx, oppIdx, cardbackUrl, chosen, flights }` while
+  // the slide-in / flip / hold / highlight / fly-out flow is on screen.
+  // Driven by two socket events: `birthday_present_reveal_start` opens
+  // it; `birthday_present_pick_resolved` fills `chosen` + (200ms later)
+  // `flights` and schedules cleanup after the fly-out completes.
+  const [bdayPresent, setBdayPresent] = useState(null);
+  // Brackle catapult animations — array (matches kassaranFlips shape)
+  // so multiple catapults in flight on the same board (unlikely but
+  // defensible) don't stomp each other. Entries auto-removed after
+  // their total duration. Driven by `play_brackle_catapult`.
+  const [brackleCatapults, setBrackleCatapults] = useState([]);
+  // Set of `${owner}-${heroIdx}-${zoneSlot}` keys for support slots
+  // currently masked by a Brackle catapult in flight (the original
+  // Creature must visually disappear from its slot while the flying
+  // overlay is in the air). Separate from `isSupportRamming` so a
+  // catapult and a ram on different slots can coexist without
+  // interfering with each other's masking.
+  const [brackleSourceHidden, setBrackleSourceHidden] = useState(new Set());
+  // Dedicated suppression bucket for Brackle catapult's discard-fly
+  // phase. Keyed `${owner}-${cardName}` → pending count. The catapult's
+  // third animation phase OWNS the corpse's flight from target → discard
+  // pile, so the diff-detectors must NOT auto-animate the same destroy
+  // from the source slot's board rect. The dedicated ref runs in
+  // ADDITION to `handToPilePendingMeRef`/`OppRef` (which sometimes
+  // pops at the wrong moment depending on intermediate state syncs),
+  // so even if one mechanism misses, the other still suppresses.
+  const brackleDiscardSuppressRef = useRef(new Map());
   // Colored Snow Potion-reveal animations — two-phase, so entries
   // start with `exiting: false` (fly-in + flip + hold), then a later
   // `colored_snow_reveal_end` event flips `exiting` to true (fly-out
@@ -13153,6 +13503,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
 
+        // Brackle catapult — dedicated suppression for the corpse's
+        // flight from target → discard, which the catapult animation
+        // owns. Without this, the diff-detector animates a SECOND
+        // flight from the source slot's board rect even though
+        // `handToPilePending` pre-registration was in place
+        // (intermediate syncs sometimes drain that bucket too eagerly).
+        {
+          const sm = brackleDiscardSuppressRef.current;
+          for (let i = newDiscardEntries.length - 1; i >= 0; i--) {
+            const k = `${myIdx}-${newDiscardEntries[i]}`;
+            const cur = sm.get(k) || 0;
+            if (cur > 0) {
+              if (cur <= 1) sm.delete(k);
+              else sm.set(k, cur - 1);
+              newDiscardEntries.splice(i, 1);
+            }
+          }
+        }
+
         // 1. Match against hand removals (hand count decreased)
         if (newCount < prevCount) {
           const storedRects = myHandRectsRef.current;
@@ -13350,6 +13719,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
 
+      // Brackle catapult — dedicated suppression. See the spectator-
+      // path block above for the rationale; this is the same logic
+      // for the non-spectator path.
+      {
+        const sm = brackleDiscardSuppressRef.current;
+        for (let i = newDiscardEntries.length - 1; i >= 0; i--) {
+          const k = `${myIdx}-${newDiscardEntries[i]}`;
+          const cur = sm.get(k) || 0;
+          if (cur > 0) {
+            if (cur <= 1) sm.delete(k);
+            else sm.set(k, cur - 1);
+            newDiscardEntries.splice(i, 1);
+          }
+        }
+      }
+
       // Deck→pile handshake: drop names already animated by the server's
       // deck_to_discard broadcast (mill) so they don't get a duplicate
       // phantom flight from a matching board card.
@@ -13477,6 +13862,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (idx >= 0) {
             handPendingOpp.deleted.splice(idx, 1);
             newDeletedEntries.splice(i, 1);
+          }
+        }
+      }
+
+      // Brackle catapult — dedicated suppression for opp-side discards.
+      // See the me-side block for the full rationale. Keyed by oppIdx
+      // since this detector watches opp's discardPile.
+      {
+        const sm = brackleDiscardSuppressRef.current;
+        for (let i = newDiscardEntries.length - 1; i >= 0; i--) {
+          const k = `${oppIdx}-${newDiscardEntries[i]}`;
+          const cur = sm.get(k) || 0;
+          if (cur > 0) {
+            if (cur <= 1) sm.delete(k);
+            else sm.set(k, cur - 1);
+            newDiscardEntries.splice(i, 1);
           }
         }
       }
@@ -14122,6 +14523,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     if (card.spellSchool1 && countSchool(card.spellSchool1) >= level) return true;
     if (card.spellSchool2 && countSchool(card.spellSchool2) >= level) return true;
+    // Ability-side gap-coverage — Divinity covers Creature summons up
+    // to its stack size for free. Mirrors the engine's
+    // `_findLevelGapCoverage` walk on the gap-coverage gate
+    // (`_testLevelReqForZones` ~L18512). Without this, a Lv3 Creature
+    // on a Lv1-school + Divinity-2 hero passes the server's
+    // `heroPlayableCards` check (and therefore `canHeroPlayCard`
+    // above) but the strict local school count here would reject the
+    // drop-zone highlight — the player sees no glowing slot and may
+    // not realise Divinity covers the gap. Counting Divinity stacks
+    // as wildcard contributors to either declared school matches the
+    // engine's "combined" semantics. Wisdom is intentionally NOT
+    // counted: it covers Spells only (Wisdom's own `coverLevelGap`
+    // refuses Creatures), and counting it here would mislead the
+    // highlight into lighting up zones the engine would later refuse.
+    const divinityCount = countSchool('Divinity');
+    if (card.spellSchool1 && countSchool(card.spellSchool1) + divinityCount >= level) return true;
+    if (card.spellSchool2 && countSchool(card.spellSchool2) + divinityCount >= level) return true;
     // Generic hero-level bypass — Ascended Beato, etc. Card-level bypasses
     // are deliberately NOT consulted here; see function docstring above.
     const blr = hero.bypassLevelReq;
@@ -14803,19 +15221,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
         setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot, targetBakhmSlot, isSurprise: surpriseTarget, crossSideHost });
       } else if (isEquipPlayable) {
-        // Equip artifact drag — can drop on support zones OR heroes
+        // Equip artifact drag — can drop on support zones OR heroes.
+        // Cross-side artifacts (Powder Keg etc., server-published in
+        // `crossSidePlayableArtifacts`) drop on the OPPONENT's row
+        // instead; their host Hero may be dead / Frozen / Stunned per
+        // the card text, so the alive-and-not-frozen gate is lifted
+        // for those.
+        const isCrossSideEquip = (gameState.crossSidePlayableArtifacts || []).includes(cardName);
+        const dropOwner = isCrossSideEquip ? oppIdx : myIdx;
+        const dropPs = isCrossSideEquip ? opp : me;
+        const dropOwnerTag = isCrossSideEquip ? 'opp' : 'me';
         let targetHero = -1, targetSlot = -1;
         // Check hero zones first (auto-place in first free base support zone)
         const heroEls = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls) {
           const r = el.getBoundingClientRect();
           if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
-            if (el.dataset.heroOwner === 'me') {
+            if (el.dataset.heroOwner === dropOwnerTag) {
               const hi = parseInt(el.dataset.heroIdx);
-              const hero = me.heroes[hi];
-              if (hero && hero.name && hero.hp > 0) {
-                // Check for a free base support zone (indices 0-2 only)
-                const supZones = me.supportZones[hi] || [];
+              const hero = dropPs?.heroes?.[hi];
+              // Cross-side: dead/Frozen hosts allowed (Powder Keg text).
+              // Standard equip: alive only.
+              const hostOk = hero && hero.name && (isCrossSideEquip || hero.hp > 0);
+              if (hostOk) {
+                const supZones = dropPs.supportZones?.[hi] || [];
                 for (let z = 0; z < 3; z++) {
                   if ((supZones[z] || []).length === 0) { targetHero = hi; targetSlot = -1; break; }
                 }
@@ -14831,19 +15260,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
               const hi = parseInt(el.dataset.supportHero);
               const si = parseInt(el.dataset.supportSlot);
-              const isOwn = el.dataset.supportOwner === 'me';
+              const isCorrectSide = el.dataset.supportOwner === dropOwnerTag;
               const isIsland = el.dataset.supportIsland === 'true';
-              if (isOwn && !isIsland && si < 3) { // Can only equip to base zones
-                const hero = me.heroes[hi];
-                if (hero && hero.name && hero.hp > 0) {
-                  const slotCards = (me.supportZones[hi] || [])[si] || [];
+              if (isCorrectSide && !isIsland && si < 3) { // Can only equip to base zones
+                const hero = dropPs?.heroes?.[hi];
+                const hostOk = hero && hero.name && (isCrossSideEquip || hero.hp > 0);
+                if (hostOk) {
+                  const slotCards = (dropPs.supportZones?.[hi] || [])[si] || [];
                   if (slotCards.length === 0) { targetHero = hi; targetSlot = si; }
                 }
               }
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot, isEquip: true });
+        setPlayDrag({
+          idx, cardName, card, mouseX: mx, mouseY: my,
+          targetHero, targetSlot, isEquip: true,
+          // `targetOwner` is consumed by the drop handler (~L15970) and
+          // forwarded to the server as the host-side hint. Standard
+          // equip drags omit it (own-side play); cross-side drags pin
+          // the opp's player index.
+          targetOwner: isCrossSideEquip ? dropOwner : undefined,
+          isCrossSideEquip,
+        });
       } else if (isSurprisePlayable && !isPlayable) {
         // Surprise drag — target hero zones (hero must be alive with empty surprise zone)
         let targetHero = -1;
@@ -16116,7 +16555,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Hand-to-board card-fly animation. The server fires this right before
     // the sendGameState that removes the card from the owner's hand, so the
     // source cardback is still in the DOM at the handIndex we were told.
-    const onHandToBoard = ({ ownerIdx, cardName, handIndex, zoneType, heroIdx, slotIdx, faceDown, _forceOwnerAnim }) => {
+    const onHandToBoard = ({ ownerIdx, cardName, handIndex, zoneType, heroIdx, slotIdx, faceDown, _forceOwnerAnim, destOwner }) => {
       // Don't animate for the owner — they already saw their own
       // drag/drop. `_forceOwnerAnim: true` opts the owner back in,
       // used for card-effect chain summons (Raptoren's bonus summon)
@@ -16128,22 +16567,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const sourceEl = ownerIsMe
         ? document.querySelector(`.game-hand-me [data-hand-idx="${handIndex}"]`)
         : document.querySelector(`.game-hand-opp [data-hand-idx="${handIndex}"]`);
-      const ownerLabel = ownerIsMe ? 'me' : 'opp';
+      // For cross-side placement (Powder Keg etc.), the destination is
+      // on the OPPOSITE side from the playing player — `destOwner` (if
+      // provided by the server) points at the host side, not the
+      // hand owner. Fall back to ownerIdx for the standard same-side
+      // placements that don't set it.
+      const destOwnerIdx = (typeof destOwner === 'number') ? destOwner : ownerIdx;
+      const destIsMe = destOwnerIdx === myIdx;
+      const destLabel = destIsMe ? 'me' : 'opp';
       let destEl = null;
       if (zoneType === 'support') {
-        destEl = document.querySelector(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${slotIdx}"]`);
+        destEl = document.querySelector(`[data-support-zone][data-support-owner="${destLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${slotIdx}"]`);
       } else if (zoneType === 'ability') {
-        destEl = document.querySelector(`[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`);
+        destEl = document.querySelector(`[data-ability-zone][data-ability-owner="${destLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${slotIdx}"]`);
       } else if (zoneType === 'surprise') {
-        destEl = document.querySelector(`[data-surprise-zone][data-surprise-owner="${ownerLabel}"][data-surprise-hero="${heroIdx}"]`);
+        destEl = document.querySelector(`[data-surprise-zone][data-surprise-owner="${destLabel}"][data-surprise-hero="${heroIdx}"]`);
       } else if (zoneType === 'hero') {
         // Attachment Spells: land on the hero's card itself.
-        destEl = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+        destEl = document.querySelector(`[data-hero-zone][data-hero-owner="${destLabel}"][data-hero-idx="${heroIdx}"]`);
       } else if (zoneType === 'permanent') {
         // Permanent Artifacts: land on the owner's permanents row if rendered,
         // otherwise default to the center of their hero row.
-        destEl = document.querySelector(ownerIsMe ? '.board-permanents-me' : '.board-permanents-opp')
-          || document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="1"]`);
+        destEl = document.querySelector(destIsMe ? '.board-permanents-me' : '.board-permanents-opp')
+          || document.querySelector(`[data-hero-zone][data-hero-owner="${destLabel}"][data-hero-idx="1"]`);
       }
       if (!sourceEl || !destEl) return;
       const sr = sourceEl.getBoundingClientRect();
@@ -16492,10 +16938,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }, 1200);
     };
     socket.on('alleria_spider_redirect', onAlleriaSpiderRedirect);
-    const onDarkControl = ({ owner, heroIdx }) => {
+    const onDarkControl = ({ owner, heroIdx, zoneSlot }) => {
       if (window.playSFX) window.playSFX('elem_dark', { category: 'effect' });
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
-      const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+      // Optional `zoneSlot` anchors the animation on a specific Support
+      // Zone (Aligning Goals targets Creatures) instead of the host
+      // Hero zone (Controlled Attack targets Heroes). Mirrors the
+      // burning-finger-slash convention right below.
+      const sel = (typeof zoneSlot === 'number' && zoneSlot >= 0)
+        ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
+        : `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`;
+      const el = document.querySelector(sel);
       if (!el) return;
       const r = el.getBoundingClientRect();
       const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
@@ -19605,6 +20058,263 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('kassaran_reveal_flip', onKassaranFlip);
 
+    // ── Brackle catapult — load (slow) → hold on Brackle → fire ──────────
+    // Single event carries source/Brackle/target coords + phase durations.
+    // Renders a flying Creature card that lifts off its slot, lands on
+    // Brackle, holds there visibly (via the load animation's `forwards`
+    // fill), then catapults to the target. Hides the source slot for
+    // the full animation so the original render doesn't show through.
+    const onBrackleCatapult = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, brackleOwner, brackleHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, targetType, discardOwner, cardName, loadMs, holdMs, fireMs, impactMs, discardMs }) => {
+      const srcLabel     = sourceOwner === myIdx ? 'me' : 'opp';
+      const brackleLabel = brackleOwner === myIdx ? 'me' : 'opp';
+      const tgtLabel     = targetOwner === myIdx ? 'me' : 'opp';
+      const discardLabel = discardOwner === myIdx ? 'my' : 'opp';
+
+      const srcEl = document.querySelector(
+        `[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`,
+      );
+      const brackleEl = document.querySelector(
+        `[data-hero-zone][data-hero-owner="${brackleLabel}"][data-hero-idx="${brackleHeroIdx}"]`,
+      );
+      let tgtEl;
+      if ((targetType === 'creature' || targetType === 'equip') && targetZoneSlot != null) {
+        tgtEl = document.querySelector(
+          `[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`,
+        );
+      } else {
+        tgtEl = document.querySelector(
+          `[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`,
+        );
+      }
+      // Discard pile element — `[data-my-discard]` / `[data-opp-discard]`
+      // per the existing convention used by `play_pile_transfer`'s
+      // `elementFor('discard', ...)` lookup.
+      const discardEl = document.querySelector(`[data-${discardLabel}-discard]`);
+      if (!srcEl || !brackleEl || !tgtEl) return;
+
+      const sr = srcEl.getBoundingClientRect();
+      const br = brackleEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const dr = discardEl ? discardEl.getBoundingClientRect() : null;
+
+      // Card half-size for centering the flying overlay on each zone's
+      // centre. 64x90 matches `.brackle-catapult-card` in style.css.
+      const CW = 64, CH = 90;
+      const sx = sr.left + sr.width / 2 - CW / 2;
+      const sy = sr.top  + sr.height / 2 - CH / 2;
+      const mx = br.left + br.width / 2 - CW / 2;
+      const my = br.top  + br.height / 2 - CH / 2;
+      const ex = tr.left + tr.width / 2 - CW / 2;
+      const ey = tr.top  + tr.height / 2 - CH / 2;
+      // Fallback: if the discard pile element couldn't be found (rare
+      // — only if the layout hasn't rendered the pile yet), the
+      // discard fly-out just decays into the target position.
+      const dx = dr ? dr.left + dr.width / 2 - CW / 2 : ex;
+      const dy = dr ? dr.top  + dr.height / 2 - CH / 2 : ey;
+
+      const id = Date.now() + Math.random();
+      const loadHoldFireMs = (loadMs || 0) + (holdMs || 0) + (fireMs || 0);
+      const totalMs = loadHoldFireMs + (impactMs || 0) + (discardMs || 0);
+
+      setBrackleCatapults(prev => [...prev, {
+        id, sx, sy, mx, my, ex, ey, dx, dy, cardName,
+        loadMs, holdMs, fireMs, impactMs, discardMs,
+      }]);
+
+      // Schedule the impact explosion at the target — fires the moment
+      // the catapulted Creature lands, right before the IMPACT-phase
+      // hold begins. Reuses the standard `explosion` animation type
+      // (same one Book of Doom uses for its multi-target burst).
+      setTimeout(() => {
+        const explSel = (targetType === 'creature' || targetType === 'equip') && targetZoneSlot != null
+          ? `[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`
+          : `[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`;
+        playAnimation('explosion', explSel, { duration: 700 });
+      }, loadHoldFireMs);
+
+      // Pre-suppress the diff-based discard-flight detector for THIS
+      // creature's name on the destination side. Without this, when
+      // the server's `actionDestroyCard` lands and the state syncs
+      // the new discard-pile entry, the diff-detector at
+      // `~L13386` would animate a SECOND flight from the (now-empty
+      // but originally-source) board rect to the discard pile —
+      // creating the "pops back to support zone then flies to
+      // discard" artifact the user reported. Pre-registering the
+      // name in the appropriate hand-to-pile pending bucket makes
+      // the diff-detector consume the entry without animating it,
+      // leaving our catapult overlay's third-phase fly-out as the
+      // sole visual flight. Auto-expires generously past the full
+      // animation runtime so a stuck pre-registration doesn't
+      // silently suppress an unrelated discard later in the same
+      // turn.
+      const pendingRef = discardOwner === myIdx ? handToPilePendingMeRef : handToPilePendingOppRef;
+      const pendingEntry = { cardName };
+      pendingRef.current.discard.push(pendingEntry);
+      setTimeout(() => {
+        const idx = pendingRef.current.discard.indexOf(pendingEntry);
+        if (idx >= 0) pendingRef.current.discard.splice(idx, 1);
+      }, totalMs + 500);
+      // Dedicated brackle-specific suppression bucket — defense-in-depth
+      // alongside `handToPilePending` since that bucket is shared with
+      // the engine's `play_pile_transfer` pre-suppression and can pop
+      // at unexpected moments. Keyed by `${owner}-${cardName}` so two
+      // catapults on different sides for the same Creature name don't
+      // collide. Auto-expires past the full animation window.
+      const suppressKey = `${discardOwner}-${cardName}`;
+      const sm = brackleDiscardSuppressRef.current;
+      sm.set(suppressKey, (sm.get(suppressKey) || 0) + 1);
+      setTimeout(() => {
+        const cur = sm.get(suppressKey) || 0;
+        if (cur <= 1) sm.delete(suppressKey);
+        else sm.set(suppressKey, cur - 1);
+      }, totalMs + 1000);
+
+      // Hide the source slot for the full animation so the original
+      // creature render doesn't show through the flying overlay.
+      const hideKey = `${sourceOwner}-${sourceHeroIdx}-${sourceZoneSlot}`;
+      setBrackleSourceHidden(prev => {
+        const next = new Set(prev);
+        next.add(hideKey);
+        return next;
+      });
+      // Auto-remove the overlay slightly after the animation ends.
+      setTimeout(() => {
+        setBrackleCatapults(prev => prev.filter(b => b.id !== id));
+      }, totalMs + 50);
+      // Source slot stays hidden a hair longer than the overlay so
+      // there's no flash of the original card between the despawn and
+      // the server's sacrifice sync.
+      setTimeout(() => {
+        setBrackleSourceHidden(prev => {
+          if (!prev.has(hideKey)) return prev;
+          const next = new Set(prev);
+          next.delete(hideKey);
+          return next;
+        });
+      }, totalMs + 250);
+    };
+    socket.on('play_brackle_catapult', onBrackleCatapult);
+
+    // ── Birthday Present: Phase 1/2/3 — slide-in + flip + hold ──────────
+    // Spawn the 3 floating reveal cards. They slide IN from the owner's
+    // deck pile (the cards literally came off that deck), so we
+    // capture the deck pile's top-left at event time and pass it as
+    // `--sx` / `--sy` for the slide-in keyframes. The cardback shown
+    // is the OWNER's (since the cards came out of their deck).
+    const onBdayPresentStart = ({ ownerIdx, oppIdx, cards }) => {
+      const cardbackUrl = ownerIdx === myIdx ? me.cardback : opp.cardback;
+      // Deck selector: the OWNER's deck. If owner is me, that's
+      // [data-my-deck]; otherwise [data-opp-deck]. The deck DOM has
+      // the same selector pattern Kassaran uses for its flight origin.
+      const deckSel = ownerIdx === myIdx ? '[data-my-deck]' : '[data-opp-deck]';
+      const deckEl = document.querySelector(deckSel);
+      let sx = window.innerWidth / 2, sy = window.innerHeight / 2;
+      if (deckEl) {
+        const dr = deckEl.getBoundingClientRect();
+        sx = dr.left;
+        sy = dr.top;
+      }
+      setBdayPresent({
+        cards: Array.isArray(cards) ? cards.slice(0, 3) : [],
+        ownerIdx, oppIdx,
+        cardbackUrl,
+        sourceX: sx, sourceY: sy,
+        chosen: null,
+        flights: null,
+      });
+    };
+    socket.on('birthday_present_reveal_start', onBdayPresentStart);
+
+    // ── Birthday Present: Phase 4 — highlight + fly-out ─────────────────
+    // The server emits this BEFORE the state-sync that grows the hands,
+    // so when we get here the hand still shows pre-rally counts. We
+    // (a) compute each flight's destination (x,y) by querying the
+    // recipient's hand row, (b) reserve `bounceReturnHidden` keys for
+    // the slots the upcoming sync will fill — keeping them invisible
+    // until the floating cards finish flying in, (c) mark the chosen
+    // card to trigger the 200ms highlight glow, then (d) 200ms later
+    // attach the flight payload so all three cards fly to their
+    // targets.
+    const onBdayPresentResolved = ({ ownerIdx: _o, oppIdx: _opp, chosen, flights }) => {
+      if (!Array.isArray(flights) || flights.length === 0) return;
+      const computedFlights = flights.map(f => {
+        const isMe = f.toOwner === myIdx;
+        // Same selector pattern Kassaran uses to find the receiver's
+        // hand row. Own hand uses `.hand-slot` wrappers; opp's hand
+        // uses `.hand-card` directly.
+        const slotSel = isMe
+          ? '.game-hand-me .game-hand-cards .hand-slot'
+          : '.game-hand-opp .game-hand-cards .hand-card';
+        const slots = document.querySelectorAll(slotSel);
+        let toX = 0, toY = 0;
+        if (slots.length > 0) {
+          // Project the destination just past the last existing slot.
+          // `toHandIdx` may be beyond the current hand length (the slot
+          // doesn't exist yet — state sync hasn't fired); we offset by
+          // (toHandIdx − last-existing-index) × slot-width so multiple
+          // cards landing in the same hand spread out correctly.
+          const lastRect = slots[slots.length - 1].getBoundingClientRect();
+          const slotW = lastRect.width;
+          const slotsBeyondLast = Math.max(0, f.toHandIdx - (slots.length - 1));
+          // -55 ≈ half the reveal-card width (110px). Centres the flying
+          // card on the destination slot's right-edge anchor.
+          toX = lastRect.right - 55 + slotsBeyondLast * slotW;
+          toY = lastRect.top - 32;
+        } else {
+          // Empty hand — fall back to the hand row container centre.
+          const handRow = document.querySelector(isMe ? '.game-hand-me' : '.game-hand-opp');
+          if (handRow) {
+            const hr = handRow.getBoundingClientRect();
+            toX = hr.left + hr.width / 2 - 55;
+            toY = hr.top + hr.height / 2 - 77;
+          }
+        }
+        return {
+          cardName: f.cardName, toX, toY,
+          toOwner: f.toOwner, toHandIdx: f.toHandIdx,
+          // Per-flight stagger — server attaches `delay` (ms) so the
+          // second activator-bound card waits a full flight duration
+          // and lands "one by one" with the first.
+          delay: f.delay || 0,
+        };
+      });
+
+      // Reserve `bounceReturnHidden` slots so the upcoming hand-grew
+      // sync doesn't pop the cards into the hand mid-flight. Same key
+      // shape Kassaran / `play_pile_transfer` use: `${owner}-${handIdx}`.
+      const hideKeys = computedFlights.map(f => `${f.toOwner}-${f.toHandIdx}`);
+      setBounceReturnHidden(prev => {
+        const next = new Set(prev);
+        for (const k of hideKeys) next.add(k);
+        return next;
+      });
+
+      // Phase 4a: mark chosen → triggers 200ms highlight glow.
+      setBdayPresent(prev => prev ? { ...prev, chosen } : prev);
+
+      // Phase 4b: 200ms later, attach flights → triggers fly-out. Each
+      // flight's own `delay` (read from CSS var by the keyframes) gates
+      // when it actually starts moving.
+      setTimeout(() => {
+        setBdayPresent(prev => prev ? { ...prev, flights: computedFlights } : prev);
+      }, 200);
+
+      // Clear reveal state + unhide hand slots once the LAST flight has
+      // completed (some flights have non-zero `delay`, e.g. the second
+      // activator-bound card at ~700ms). Use max(delay) + flight runtime.
+      const maxFlightDelay = computedFlights.reduce((m, f) => Math.max(m, f.delay || 0), 0);
+      const cleanupMs = 200 + maxFlightDelay + 700 + 80;
+      setTimeout(() => {
+        setBdayPresent(null);
+        setBounceReturnHidden(prev => {
+          const next = new Set(prev);
+          for (const k of hideKeys) next.delete(k);
+          return next;
+        });
+      }, cleanupMs);
+    };
+    socket.on('birthday_present_pick_resolved', onBdayPresentResolved);
+
     // ── Colored Snow Potion reveal (two-phase) ──
     // Phase 1 (`colored_snow_reveal_start`): spawn a flying card at
     // the owner's Potion Deck position and animate it to centre + flip
@@ -20665,6 +21375,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('discard_to_deck_animation', onDiscardToDeck);
       socket.off('play_pile_transfer', onPileTransfer);
       socket.off('kassaran_reveal_flip', onKassaranFlip);
+      socket.off('play_brackle_catapult', onBrackleCatapult);
+      socket.off('birthday_present_reveal_start', onBdayPresentStart);
+      socket.off('birthday_present_pick_resolved', onBdayPresentResolved);
       socket.off('colored_snow_reveal_start', onColoredSnowRevealStart);
       socket.off('colored_snow_reveal_end', onColoredSnowRevealEnd);
       socket.off('side_deck_appear', onSideDeckAppear);
@@ -20960,7 +21673,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (abilityAttachPick) {
         // effectPrompt-driven picks (Alex, …) resolve the prompt via Esc;
         // hand-driven picks are purely client state and just dismiss.
-        if (abilityAttachPick.source === 'effectPrompt' && abilityAttachPick.cancellable !== false) {
+        // For non-cancellable effectPrompt picks (Very Special Prisoner's
+        // forced attach, where the trigger has already been consumed and
+        // there's no graceful back-out), eat the Escape entirely — both
+        // the prompt response AND the UI dismissal — so the player can't
+        // accidentally leave themselves with a phantom resolve stuck on
+        // the server side.
+        if (abilityAttachPick.source === 'effectPrompt' && abilityAttachPick.cancellable === false) {
+          return;
+        }
+        if (abilityAttachPick.source === 'effectPrompt') {
           socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
         }
         setAbilityAttachPick(null);
@@ -22356,7 +23078,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             });
           })();
           const attachPickHeroDim = !isOpp && abilityAttachPick && !attachPickEligibleHero;
-          const equipTarget = !isOpp && playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1;
+          // Hero-row equip target highlight. Cross-side equip drags
+          // (Powder Keg etc.) light up the OPP's row instead of own.
+          const equipTarget = playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1
+            && (playDrag.isCrossSideEquip ? isOpp : !isOpp);
           const spellTarget = playDrag && playDrag.isSpell && playDrag.targetHero === i && (playDrag.charmedOwner != null ? isOpp : !isOpp) && !(playDrag.creatureCasterSlot >= 0);
           const pi = isOpp ? oppIdx : myIdx;
           const heroTargetId = `hero-${pi}-${i}`;
@@ -22941,8 +23666,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const z = slot.z;
               const isIsland = slot.isIsland;
               const cards = (supZones[i]||[])[z]||[];
-              const isPlayTarget = !isOpp && playDrag && playDrag.targetHero === i && (playDrag.targetSlot === z || playDrag.creatureCasterSlot === z);
-              const isAutoTarget = !isOpp && playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1 && z === autoSlot;
+              // Cross-side equip drag (Powder Keg etc.) drops onto OPP's
+              // row instead of own — flip the side gate to `isOpp` when
+              // the drag is flagged cross-side.
+              const _equipDragSideMatch = playDrag?.isEquip
+                && (playDrag.isCrossSideEquip ? isOpp : !isOpp);
+              const isPlayTarget = (_equipDragSideMatch && playDrag.targetHero === i && playDrag.targetSlot === z)
+                || (!isOpp && playDrag && !playDrag.isEquip && playDrag.targetHero === i && (playDrag.targetSlot === z || playDrag.creatureCasterSlot === z));
+              const isAutoTarget = _equipDragSideMatch && playDrag.targetHero === i && playDrag.targetSlot === -1 && z === autoSlot;
               const pi = isOpp ? oppIdx : myIdx;
               // Check all possible equip target IDs for this zone
               const equipTargetIds = (pt?.validTargets || []).filter(t => t.type === 'equip' && t.owner === pi && t.heroIdx === i && t.slotIdx === z).map(t => t.id);
@@ -23033,11 +23764,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 && cards.length === 0
                 && (opp.heroes?.[i]?.hp > 0)
                 && z < ((opp.supportZones?.[i] || []).length || 3);
+              // Cross-side equip drag (Powder Keg etc.) — every empty
+              // base Support Zone on opp's side is a valid drop target.
+              // Host Hero must EXIST in the column but may be dead /
+              // Frozen / Stunned / Negated per the card text. Restricted
+              // to base zones (z < 3) — Island zones aren't equipment-
+              // legal even on own-side equipment plays.
+              const _isCrossSideEquipDrag = !!(playDrag?.isEquip && playDrag.isCrossSideEquip);
+              const isOppCrossSideEquipValid = isOpp && _isCrossSideEquipDrag
+                && cards.length === 0
+                && !!opp.heroes?.[i]?.name
+                && !isIsland
+                && z < 3;
               const isDragValidZone = (isDraggingCreature || isDraggingAttachment)
                 && cards.length === 0 && emptyCanPlayHere
                 && z < ((me.supportZones[i] || []).length || 3)
                 && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
-              const isDragValidZoneAny = isDragValidZone || isOppCrossSideValid;
+              const isDragValidZoneAny = isDragValidZone || isOppCrossSideValid || isOppCrossSideEquipValid;
               const isDragInvalidZone = (isDraggingCreature || isDraggingAttachment || _isCrossSideCreatureDrag) && !isDragValidZoneAny && !isBouncePlaceTarget;
               // heroAction: dim zones for non-Coffee heroes
               const isHeroActionZoneDimmed = heroActionActive && !isDraggingCreature && !isDraggingAttachment && i !== heroActionHeroIdx;
@@ -23101,9 +23844,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // copy of it (the airborne ram card). The slot itself
               // stays rendered to preserve layout. Matched on owner +
               // hero + zone slot exactly.
-              const isSupportRamming = ramAnims.some(r =>
-                r.srcOwner === pi && r.srcHeroIdx === i && r.srcZoneSlot === z
-              );
+              //
+              // Brackle catapult uses its own dedicated set
+              // (`brackleSourceHidden`) on the same key shape so a
+              // catapult's source slot stays masked for the full
+              // load-hold-fire window — the flying overlay carries
+              // the Creature's visual through all three phases and
+              // the original render must NOT show through during the
+              // hold beat.
+              const isSupportRamming =
+                ramAnims.some(r =>
+                  r.srcOwner === pi && r.srcHeroIdx === i && r.srcZoneSlot === z,
+                )
+                || brackleSourceHidden.has(`${pi}-${i}-${z}`);
               return (
                 <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
@@ -23403,6 +24156,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       onMouseEnter={() => { window._aaTooltipKey = cKey; window.dispatchEvent(new Event('aaHover')); }}
                       onMouseLeave={() => { window._aaTooltipKey = null; window.dispatchEvent(new Event('aaHover')); }}
                     >⚡</div> : null; })()}
+                    {cards[cards.length - 1] === 'Golden Vermin' ? (() => {
+                      const used = cc?._goldenVerminUses || 0;
+                      const remaining = Math.max(0, 5 - used);
+                      return (
+                        <div className="head-counter-badge"
+                          onMouseEnter={e => showGameTooltip(e, `${remaining}/5 Gold-for-draw swaps left this turn. Whenever this Creature's controller would gain Gold, they may draw 1 card instead — up to 5 times per turn.`)}
+                          onMouseLeave={hideGameTooltip}
+                          style={{
+                            left: 'auto', bottom: 'auto', right: 1, top: 2,
+                            background: 'linear-gradient(135deg, #ffd966, #c08820)',
+                            borderColor: '#7a5510', color: '#3a2200',
+                          }}
+                        >
+                          <span className="head-counter-icon">🪙</span>
+                          <span className="head-counter-num">{remaining}</span>
+                        </div>
+                      );
+                    })() : null}
                     {cc?.summoningSickness ? <div className="summoning-sickness-icon"
                       onMouseEnter={e => showGameTooltip(e, 'This Creature cannot act the turn it was summoned.')}
                       onMouseLeave={hideGameTooltip}
@@ -24406,6 +25177,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           endX={anim.endX} endY={anim.endY}
           cardName={anim.cardName} cardbackUrl={anim.cardbackUrl} />
       ))}
+      {brackleCatapults.map(b => (
+        <BrackleCatapultCard key={b.id}
+          sx={b.sx} sy={b.sy} mx={b.mx} my={b.my} ex={b.ex} ey={b.ey} dx={b.dx} dy={b.dy}
+          cardName={b.cardName}
+          loadMs={b.loadMs} holdMs={b.holdMs} fireMs={b.fireMs}
+          impactMs={b.impactMs} discardMs={b.discardMs} />
+      ))}
+      {/* Birthday Present 3-card reveal & pick. The opp's click on a
+          floating card resolves the `birthdayPresentPick` prompt; the
+          activator just watches. `interactive` flips on iff the prompt
+          is open and addressed to this client. */}
+      {bdayPresent && (
+        <BirthdayPresentReveal
+          state={bdayPresent}
+          interactive={!!(isMyEffectPrompt && gameState.effectPrompt?.type === 'birthdayPresentPick')}
+          onPick={(cardName) => respondToPrompt({ cardName })}
+        />
+      )}
       {coloredSnowReveals.map(rev => (
         <ColoredSnowRevealCard key={rev.id}
           startX={rev.startX} startY={rev.startY}
@@ -25282,7 +26071,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         onClick={() => { if (window.playSFX) window.playSFX('ui_click'); respondToPrompt({ cardName: entry.name, source: entry.source }); }}
                         style={{ width: '100%', height: 120, cursor: 'pointer' }} />
                       {entry.count != null && (
-                        <div style={{
+                        <div style={ep.emphasizeCount ? {
+                          // Loud variant — used by cards where the discard /
+                          // deck count directly caps the effect's payload
+                          // (e.g. Layn's Rally: count = max copies the rally
+                          // can place). Larger, gold, high-contrast badge so
+                          // the player can read it at a glance without
+                          // squinting at the corner of the card art.
+                          position: 'absolute', top: 4, right: 4,
+                          background: 'linear-gradient(135deg, #ffd84a 0%, #ff9a1f 100%)',
+                          color: '#1a0c00',
+                          fontSize: 22, fontWeight: 900, lineHeight: 1,
+                          padding: '4px 9px',
+                          borderRadius: 8, pointerEvents: 'none', zIndex: 5,
+                          border: '2px solid #fff',
+                          boxShadow: '0 0 10px rgba(255,200,80,0.95), 0 2px 4px rgba(0,0,0,0.65)',
+                          textShadow: '0 1px 0 rgba(255,255,255,0.45)',
+                          letterSpacing: 0.5,
+                        } : {
                           position: 'absolute', top: 3, right: 3,
                           background: 'rgba(0,0,0,.75)', color: '#fff',
                           fontSize: 10, fontWeight: 700, padding: '1px 5px',
@@ -25338,7 +26144,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7 }}>Click a highlighted zone on the board.</div>
           {ep.cancellable !== false && (
             <button className="btn" style={{ marginTop: 10, padding: '6px 16px', fontSize: 11 }}
-              onClick={() => respondToPrompt({ cancelled: true })}>← Back</button>
+              onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || '← Back'}</button>
           )}
         </DraggablePanel>
       )}
@@ -25475,7 +26281,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* ── Waiting for opponent (when they have an active effect prompt) ── */}
-      {(isOppEffectPrompt || isActivePlayerPromptForOpp) && !gameState.potionTargeting && (
+      {(isOppEffectPrompt || isActivePlayerPromptForOpp) && !gameState.potionTargeting && ep?.type !== 'birthdayPresentPick' && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 260 }}>
           <div className="orbit-font" style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>
             {ep.type === 'cardGallery' || ep.type === 'cardGalleryMulti' ? '🔍 Opponent is choosing...' :
@@ -25979,7 +26785,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {pt.config?.cancellable !== false && (
               <button className="btn" style={{ padding: '8px 24px', fontSize: 12 }}
                 onClick={() => { socket.emit('cancel_potion', { roomId: gameState.roomId }); setPotionSelection([]); }}>
-                Cancel
+                {pt.config?.cancelLabel || 'Cancel'}
               </button>
             )}
           </div>

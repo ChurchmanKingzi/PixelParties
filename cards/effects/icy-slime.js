@@ -10,8 +10,6 @@ module.exports = {
 
   hooks: {
     onPlay: async (ctx) => {
-      if (!ctx.hardOncePerTurn('icy-slime-summon')) return;
-
       const engine = ctx._engine;
 
       const selected = await ctx.promptMultiTarget({

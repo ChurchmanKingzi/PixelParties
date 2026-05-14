@@ -28,7 +28,7 @@ const CARD_NAME = 'Skeleton Priest';
  * Lv1-or-lower Normal Destruction Magic Spells in this player's
  * discard pile. Returns a deduped {name, count} list.
  */
-function eligibleSpells(ps, engine) {
+function eligibleSpells(ps, engine, pi) {
   if (!ps) return [];
   const cardDB = engine._getCardDB();
   const counts = new Map();
@@ -38,7 +38,7 @@ function eligibleSpells(ps, engine) {
     if (cd.cardType !== 'Spell') continue;
     if ((cd.subtype || '').toLowerCase() !== 'normal') continue;
     if (cd.spellSchool1 !== 'Destruction Magic' && cd.spellSchool2 !== 'Destruction Magic') continue;
-    if ((cd.level || 0) > 1) continue;
+    if (engine.effectiveCardLevel(cd, pi) > 1) continue;
     counts.set(name, (counts.get(name) || 0) + 1);
   }
   return [...counts.entries()].map(([name, count]) => ({ name, count }))
@@ -52,7 +52,7 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
-    return eligibleSpells(ps, engine).length > 0;
+    return eligibleSpells(ps, engine, ctx.cardOwner).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -65,7 +65,7 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
-    const candidates = eligibleSpells(ps, engine);
+    const candidates = eligibleSpells(ps, engine, pi);
     if (candidates.length === 0) return false;
 
     const picked = await engine.promptGeneric(pi, {

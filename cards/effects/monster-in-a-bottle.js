@@ -73,12 +73,22 @@ function getEligibleCreatures(gs, pi, engine = null) {
   const seen = new Set();
   const summonBlocked = gs.summonBlocked || [];
 
+  // Effective level via the engine helper — honours `reduceCardLevel`
+  // hooks (Slippery Whoolmoth's 0-level rebate, Phatnir, …),
+  // per-card overrides, Mana Absorbing Crystal +1 on Spells, and the
+  // generic reducer hooks. Falls back to raw level when no engine
+  // ref is supplied (defensive — every live call site passes one).
+  const effLvl = (cd) =>
+    engine?.effectiveCardLevel
+      ? engine.effectiveCardLevel(cd, pi)
+      : (cd.level || 0);
+
   const checkSource = (list, source) => {
     for (const name of list) {
       if (seen.has(name + ':' + source)) continue;
       const cd = cardDB[name];
       if (!cd || !hasCardType(cd, 'Creature')) continue;
-      if ((cd.level || 0) > 3) continue;
+      if (effLvl(cd) > 3) continue;
       if (summonBlocked.includes(name)) continue;
       // Check if ANY living hero with free zones can summon this
       let canSummon = false;
@@ -132,12 +142,15 @@ module.exports = {
       const seen = new Set();
       const summonBlocked = gs.summonBlocked || [];
 
+      // Same effective-level helper as `getEligibleCreatures`.
+      const effLvl = (cd) => engine.effectiveCardLevel(cd, pi);
+
       const checkSrc = (list, source) => {
         for (const name of list) {
           if (seen.has(name + ':' + source)) continue;
           const cd = cardDB[name];
           if (!cd || !hasCardType(cd, 'Creature')) continue;
-          if ((cd.level || 0) > 3) continue;
+          if (effLvl(cd) > 3) continue;
           if (summonBlocked.includes(name)) continue;
           let canSummon = false;
           for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

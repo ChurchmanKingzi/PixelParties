@@ -19,51 +19,28 @@ const { STATUS_EFFECTS, getCleansableStatuses } = require('./_hooks');
 
 /**
  * Find all valid targets: heroes/creatures with 1+ negative status.
+ *
+ * Heroes / Creatures are enumerated via the engine's standard helpers
+ * (`getHeroTargets` filters by alive, `getCreatureTargets` enumerates
+ * every Support Zone regardless of host-Hero state — creatures are
+ * independent of their Hero — and already filters down to actual
+ * Creatures including Artifact-Creature hybrids). Cure-specific
+ * filters layer on top.
  */
 function getValidTargets(gs, engine, excludeHeroKey) {
   const negKeys = getCleansableStatuses();
   const targets = [];
   for (let pi = 0; pi < 2; pi++) {
-    const ps = gs.players[pi];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      // Exclude the casting hero if specified
-      if (excludeHeroKey && `${pi}-${hi}` === excludeHeroKey) continue;
-      if (hero.statuses && negKeys.some(k => hero.statuses[k])) {
-        targets.push({
-          id: `hero-${pi}-${hi}`,
-          type: 'hero',
-          owner: pi,
-          heroIdx: hi,
-          cardName: hero.name,
-        });
-      }
+    for (const t of engine.getHeroTargets(pi)) {
+      if (excludeHeroKey && `${t.owner}-${t.heroIdx}` === excludeHeroKey) continue;
+      const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
+      if (!hero?.statuses) continue;
+      if (negKeys.some(k => hero.statuses[k])) targets.push(t);
     }
-    // Creatures — persist on dead heroes, so don't gate on host hero HP.
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (!ps.heroes[hi]?.name) continue;
-      for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
-        const slot = (ps.supportZones[hi] || [])[si] || [];
-        if (slot.length === 0) continue;
-        const inst = engine.cardInstances.find(c =>
-          c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
-        );
-        if (!inst) continue;
-        const cureCD = engine._getCardDB()[inst.name];
-        if (!cureCD || cureCD.cardType !== 'Creature') continue; // Only Creatures can be cured
-        if (negKeys.some(k => inst.counters[k])) {
-          targets.push({
-            id: `equip-${pi}-${hi}-${si}`,
-            type: 'equip',
-            owner: pi,
-            heroIdx: hi,
-            slotIdx: si,
-            cardName: slot[0],
-            cardInstance: inst,
-          });
-        }
-      }
+    for (const t of engine.getCreatureTargets(pi)) {
+      const inst = t.cardInstance;
+      if (!inst) continue;
+      if (negKeys.some(k => inst.counters?.[k])) targets.push(t);
     }
   }
   return targets;

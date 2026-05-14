@@ -114,6 +114,9 @@ const HOOKS = {
   // ── Ascension ──
   ON_ASCENSION: 'onAscension',  // Fires when a Hero ascends into an Ascended Hero (reaction window)
 
+  // ── Control changes ──
+  ON_TAKE_CONTROL: 'onTakeControl',  // Fires when a player gains control of an opponent's target (Hero or Creature). Covers permanent transfers (Dark Gear, Diplomacy), temporary creature steals (Aligning Goals, Treacherous Crystal, Deepsea Succubus), Charme Lv3 hero steals, and Controlled Attack's hero-control mark. Context: { controllerPi, originalOwnerPi, targetType: 'hero'|'creature', targetName, targetInst?, targetHero?, heroIdx, kind: 'steal'|'transfer'|'charm'|'controlled' }
+
   // ── Archetype-specific (fired from cards/effects/_*-shared.js modules) ──
   ON_POLLUTION_TOKEN_REMOVED: 'onPollutionTokenRemoved',  // Fired by _pollution-shared when a Pollution Token leaves the board (Pollution Spewer, etc.)
 };

@@ -12,7 +12,6 @@
 // ═══════════════════════════════════════════
 
 const { attachSteamEngine, setCreatureHp } = require('./_steam-dwarf-shared');
-const { hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Steam Dwarf Brewer';
 
@@ -23,34 +22,17 @@ const CARD_NAME = 'Steam Dwarf Brewer';
  * their host hero dies, so dead-hero columns are NOT filtered out.
  */
 function getBrewTargets(engine, pi, selfInstId) {
-  const gs = engine.gs;
-  const ps = gs.players[pi];
-  if (!ps) return [];
-  const cardDB = engine._getCardDB();
+  // `engine.getCreatureTargets` already iterates every Support Zone
+  // regardless of host-Hero state (creatures are independent of their
+  // Hero) and filters down to actual Creatures including Artifact-
+  // Creature hybrids. Brewer-specific filters: skip self and face-down.
   const targets = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
-    if (!hero?.name) continue;
-    for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
-      const slot = (ps.supportZones[hi] || [])[si] || [];
-      if (slot.length === 0) continue;
-      const cd = cardDB[slot[0]];
-      if (!cd || !hasCardType(cd, 'Creature')) continue;
-      const inst = engine.cardInstances.find(c =>
-        c.owner === pi && c.zone === 'support' &&
-        c.heroIdx === hi && c.zoneSlot === si
-      );
-      if (!inst) continue;
-      if (inst.id === selfInstId) continue;   // exclude self
-      if (inst.faceDown) continue;
-      targets.push({
-        id: `equip-${pi}-${hi}-${si}`,
-        type: 'equip',
-        owner: pi, heroIdx: hi, slotIdx: si,
-        cardName: slot[0],
-        cardInstance: inst,
-      });
-    }
+  for (const t of engine.getCreatureTargets(pi)) {
+    const inst = t.cardInstance;
+    if (!inst) continue;
+    if (inst.id === selfInstId) continue;
+    if (inst.faceDown) continue;
+    targets.push(t);
   }
   return targets;
 }

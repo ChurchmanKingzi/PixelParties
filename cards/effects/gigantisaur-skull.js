@@ -27,8 +27,6 @@
 //  at the opp's turn-end tick.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
-
 const CARD_NAME = 'Gigantisaur Skull';
 
 /**
@@ -41,33 +39,22 @@ const CARD_NAME = 'Gigantisaur Skull';
  * proactive target picker and the proactive playability gate.
  */
 function _allFreezeableCreatureTargets(engine) {
-  const gs = engine.gs;
-  const cardDB = engine._getCardDB();
+  // Delegate Creature enumeration to the engine's standard helper —
+  // it already iterates every Support Zone regardless of host-Hero
+  // state (creatures are independent of their Hero) and filters down
+  // to actual Creatures (including Artifact-Creature hybrids).
+  // Layer the Freeze-specific filters on top: non-face-down + the
+  // TARGETING-side `canTargetForStatus` gate (omni-immune Creatures
+  // stay selectable so the application-side fizzles silently rather
+  // than the picker hiding them).
   const out = [];
   for (let pi = 0; pi < 2; pi++) {
-    const ps = gs.players[pi];
-    if (!ps) continue;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (!ps.heroes[hi]?.name) continue;
-      for (let si = 0; si < 3; si++) {
-        const slot = (ps.supportZones?.[hi] || [])[si] || [];
-        if (slot.length === 0) continue;
-        const cardName = slot[0];
-        const cd = cardDB[cardName];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
-        const inst = engine.cardInstances.find(c =>
-          c.owner === pi && c.zone === 'support'
-          && c.heroIdx === hi && c.zoneSlot === si,
-        );
-        if (!inst) continue;
-        if (inst.faceDown) continue;
-        if (!engine.canTargetForStatus(inst, 'frozen')) continue;
-        out.push({
-          id: `equip-${pi}-${hi}-${si}`,
-          type: 'equip', owner: pi, heroIdx: hi, slotIdx: si,
-          cardName, cardInstance: inst,
-        });
-      }
+    for (const t of engine.getCreatureTargets(pi)) {
+      const inst = t.cardInstance;
+      if (!inst) continue;
+      if (inst.faceDown) continue;
+      if (!engine.canTargetForStatus(inst, 'frozen')) continue;
+      out.push(t);
     }
   }
   return out;

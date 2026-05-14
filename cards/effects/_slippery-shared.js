@@ -46,8 +46,12 @@ function adjacentHeroIndices(heroIdx) {
 }
 
 /**
- * Free Support Zones on adjacent live Heroes for `inst`.
- * Returns array of `{ heroIdx, slotIdx, label }`.
+ * Free Support Zones on adjacent Heroes for `inst`. Adjacency is by
+ * column index (0↔1↔2), so a Hero Zone that is dead or empty still
+ * counts as an adjacent destination — its Support Zones are valid
+ * landing slots even though the column has no Hero, since Creatures
+ * are independent of their Hero (rule established alongside the
+ * Quetzahuitl mass-delete fix). Returns `{ heroIdx, slotIdx, label }`.
  */
 function destinationsFor(engine, pi, inst) {
   const ps = engine.gs.players[pi];
@@ -55,13 +59,15 @@ function destinationsFor(engine, pi, inst) {
   const out = [];
   for (const hi of adjacentHeroIndices(inst.heroIdx)) {
     const hero = ps.heroes?.[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
     const zones = ps.supportZones?.[hi] || [[], [], []];
+    const heroLabel = hero?.name
+      ? (hero.hp <= 0 ? `${hero.name} (KO)` : hero.name)
+      : `Column ${hi + 1}`;
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) {
         out.push({
           heroIdx: hi, slotIdx: zi,
-          label: `${hero.name} — Slot ${zi + 1}`,
+          label: `${heroLabel} — Slot ${zi + 1}`,
         });
       }
     }
@@ -303,11 +309,18 @@ function slipperyOnMoveGate(ctx) {
   return ctx.enteringCard.id === ctx.card.id;
 }
 
-/** Card-DB-backed test: is this card name a Slippery archetype member? */
+/**
+ * Card-DB-backed test: is this card a Slippery-archetype CREATURE?
+ * The cardType gate is load-bearing — Slippery Skates carries the
+ * same archetype tag but is an Equipment Artifact, NOT a Creature,
+ * so it must never appear in the turn-start mover. Future Slippery
+ * Spells / Attacks / Artifacts are similarly excluded by this gate.
+ */
 function isSlipperyCard(cardName, engine) {
   if (!cardName) return false;
   const cd = engine._getCardDB()[cardName];
-  return cd?.archetype === ARCHETYPE;
+  if (!cd || cd.archetype !== ARCHETYPE) return false;
+  return cd.cardType === 'Creature';
 }
 
 module.exports = {

@@ -16,9 +16,11 @@
 //  Plugs into the engine's generic level-manipulation mechanism via
 //  `coverLevelGap`. The engine walks abilities and finds a coverage
 //  handler without knowing about Divinity by name — same hook
-//  Wisdom uses, just with `discardCost: 0`. Coverage is also opened
-//  up to the Attack card type (the engine's gap-coverage branch is
-//  Spell-only by default; Divinity flips it on for Attacks too).
+//  Wisdom uses, just with `discardCost: 0`. Coverage applies to
+//  Spell, Attack, AND Creature plays — the engine's gap-coverage
+//  branch was Spell-only by default; Divinity opens it up to Attacks
+//  and Creature summons too (the engine's `_testLevelReqForZones`
+//  consults the same `coverLevelGap` hook for all three types).
 // ═══════════════════════════════════════════
 
 module.exports = {
@@ -61,12 +63,12 @@ module.exports = {
   },
 
   /**
-   * Generic level-gap coverage. Called by the engine when a Spell
-   * or Attack's effective level exceeds the hero's school count by
-   * `gap`. Divinity covers up to `abilityLevel` levels of gap free
-   * of charge.
+   * Generic level-gap coverage. Called by the engine when a Spell,
+   * Attack, or Creature's effective level exceeds the hero's school
+   * count by `gap`. Divinity covers up to `abilityLevel` levels of
+   * gap free of charge.
    *
-   * @param {object} cardData - The Spell or Attack being played
+   * @param {object} cardData - The Spell / Attack / Creature being played
    * @param {number} abilityLevel - Divinity's slot size on this hero (1-3)
    * @param {object} engine - Engine reference (unused; signature parity with Wisdom)
    * @param {number} gap - Remaining level gap after silent reductions
@@ -74,7 +76,9 @@ module.exports = {
    */
   coverLevelGap(cardData, abilityLevel, engine, gap) {
     const ct = cardData?.cardType;
-    if (ct !== 'Spell' && ct !== 'Attack') return { coverable: false, discardCost: 0 };
+    if (ct !== 'Spell' && ct !== 'Attack' && ct !== 'Creature') {
+      return { coverable: false, discardCost: 0 };
+    }
     if (gap <= 0) return { coverable: true, discardCost: 0 };
     if (abilityLevel >= gap) return { coverable: true, discardCost: 0 };
     return { coverable: false, discardCost: 0 };

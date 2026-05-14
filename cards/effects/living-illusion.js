@@ -126,18 +126,21 @@ module.exports = {
       // that actually care.
       const deck = ps.mainDeck || [];
       const countMap = {};
+      const effLevels = {};
       for (const name of deck) {
         const cd = cardDB[name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
-        if ((cd.level || 0) > 3) continue;
+        const lvl = engine.effectiveCardLevel(cd, pi);
+        if (lvl > 3) continue;
         if (!engine.isCreatureSummonable(name, pi, userHeroIdx)) continue;
         countMap[name] = (countMap[name] || 0) + 1;
+        effLevels[name] = lvl;
       }
       const gallery = Object.entries(countMap)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([name, count]) => ({
           name, source: 'deck', count,
-          level: cardDB[name]?.level || 0,
+          level: effLevels[name] ?? (cardDB[name]?.level || 0),
         }));
 
       if (gallery.length === 0) {

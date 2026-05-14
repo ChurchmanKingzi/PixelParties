@@ -27,42 +27,21 @@ module.exports = {
   },
 
   getValidTargets(gs, playerIdx, engine) {
+    if (!engine) return [];
     const targets = [];
-    const cardDB = engine ? engine._getCardDB() : {};
+    // Heroes — alive only, and not turn-1-protected. `getHeroTargets`
+    // already filters by alive; the first-turn-protection check stays
+    // here as the only Acid-Vial-specific gate.
+    // Creatures — `getCreatureTargets` already iterates every Support
+    // Zone regardless of host-Hero state (creatures are independent
+    // of their Hero) and filters by `hasCardType(cd, 'Creature')`,
+    // which keeps Artifact-Creature hybrids (Powder Keg, Pollution
+    // Spewer, …) included.
     for (let pi = 0; pi < 2; pi++) {
-      const ps = gs.players[pi];
-
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
-        targets.push({
-          id: `hero-${pi}-${hi}`,
-          type: 'hero',
-          owner: pi,
-          heroIdx: hi,
-          cardName: hero.name,
-        });
+      if (gs.firstTurnProtectedPlayer !== pi) {
+        targets.push(...engine.getHeroTargets(pi));
       }
-
-      // Creatures in support zones — creatures persist after their host
-      // hero dies, so don't skip dead-hero support zones here.
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (!ps.heroes[hi]?.name) continue;
-        for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
-          const slot = (ps.supportZones[hi] || [])[si] || [];
-          if (slot.length === 0) continue;
-          const cd = cardDB[slot[0]];
-          if (!cd || cd.cardType !== 'Creature') continue;
-          targets.push({
-            id: `equip-${pi}-${hi}-${si}`,
-            type: 'equip',
-            owner: pi,
-            heroIdx: hi,
-            slotIdx: si,
-            cardName: slot[0],
-          });
-        }
-      }
+      targets.push(...engine.getCreatureTargets(pi));
     }
     return targets;
   },

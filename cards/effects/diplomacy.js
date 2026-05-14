@@ -40,17 +40,22 @@ function getMaxCreatureLevel(level) {
 }
 
 /**
- * Get all free support zones across ALL of the player's heroes.
+ * Get all free support zones across the player's columns — empty /
+ * dead Hero columns are eligible too, since the placement effect
+ * doesn't care which specific Hero hosts the stolen Creature
+ * (Creatures are independent of their Hero).
  */
 function getFreeZones(ps) {
   const zones = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
-    if (!hero?.name) continue;
+    const heroLabel = hero?.name
+      ? (hero.hp <= 0 ? `${hero.name} (KO)` : hero.name)
+      : `Column ${hi + 1}`;
     for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
       const slot = (ps.supportZones[hi] || [])[si] || [];
       if (slot.length === 0) {
-        zones.push({ heroIdx: hi, slotIdx: si, label: `${hero.name} — Slot ${si + 1}` });
+        zones.push({ heroIdx: hi, slotIdx: si, label: `${heroLabel} — Slot ${si + 1}` });
       }
     }
   }

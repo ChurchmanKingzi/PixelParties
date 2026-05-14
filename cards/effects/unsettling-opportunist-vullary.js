@@ -54,16 +54,19 @@ function freeHostSlot(ps, heroIdx) {
   return -1;
 }
 
-function levelMaxNCreatureNames(engine, hand, maxLevel) {
+function levelMaxNCreatureNames(engine, pi, hand, maxLevel) {
   const cardDB = engine._getCardDB();
   const seen = new Set();
   const out = [];
-  for (const cn of (hand || [])) {
+  for (let i = 0; i < (hand || []).length; i++) {
+    const cn = hand[i];
     if (seen.has(cn)) continue;
     seen.add(cn);
     const cd = cardDB[cn];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
-    if ((cd.level || 0) > maxLevel) continue;
+    // Effective level (handIdx forwarded so per-slot offsets count).
+    const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
+    if (lvl > maxLevel) continue;
     out.push(cn);
   }
   return out;
@@ -89,7 +92,7 @@ module.exports = {
     // Mode B: Mary attached — summon Lv≤3 Creature with bypass.
     if (ps.summonLocked) return false;
     if (freeHostSlot(ps, ctx.cardHeroIdx) < 0) return false;
-    return levelMaxNCreatureNames(engine, ps.hand, 3).length > 0;
+    return levelMaxNCreatureNames(engine, ctx.cardOwner, ps.hand, 3).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -113,7 +116,7 @@ module.exports = {
     // Mode B: bypass-summon a Lv≤3 Creature with negate-until-next-turn.
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const eligible = levelMaxNCreatureNames(engine, ps.hand, 3);
+    const eligible = levelMaxNCreatureNames(engine, pi, ps.hand, 3);
     if (eligible.length === 0) return false;
 
     const slot = freeHostSlot(ps, heroIdx);

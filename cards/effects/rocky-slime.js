@@ -4,11 +4,10 @@
 //
 //  When you summon this Creature, choose any
 //  Creature in your hand or on the board and
-//  permanently reduce its level by 1. You can
-//  only activate this effect once per turn.
-//  At the beginning of each of your turns, you
-//  may increase this Creature's level on your
-//  side of the board by 1.
+//  permanently reduce its level by 1. At the
+//  beginning of each of your turns, you may
+//  increase this Creature's level on your side
+//  of the board by 1.
 //
 //  Single-click picker: builds a `validTargets`
 //  list mixing `type: 'hand'` entries (one per
@@ -55,10 +54,6 @@ module.exports = {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      // Pre-check HOPT without claiming — claim only after the player
-      // commits a target so cancelling the picker doesn't burn the
-      // once-per-turn slot.
-      if (engine.gs.hoptUsed?.[`rocky-slime-summon:${pi}`] === engine.gs.turn) return;
       const ps = engine.gs.players[pi];
       if (!ps) return;
       const cardDB = engine._getCardDB();
@@ -129,9 +124,6 @@ module.exports = {
 
       const target = validTargets.find(t => t.id === picked[0]);
       if (!target) return;
-
-      // Commit — claim the HOPT now that the player picked a target.
-      ctx.hardOncePerTurn('rocky-slime-summon');
 
       if (target.type === 'hand') {
         // Validate the hand index still holds the expected card name —

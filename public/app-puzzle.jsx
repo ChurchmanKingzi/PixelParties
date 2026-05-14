@@ -1585,16 +1585,14 @@ function PuzzleCreator() {
                 {(p.surpriseZones[hi]||[]).length > 0 ? (() => {
                   const sName = p.surpriseZones[hi][0];
                   const usable = isSurpriseUsable(p, hi, sName);
-                  // Dim style applies to BOTH sides when the Surprise's
-                  // ability-school requirements aren't met by the
-                  // controlling Hero — was originally me-only because
-                  // the opp Surprise had no tooltip and showed only a
-                  // cardback (so the dim cue was invisible anyway).
-                  // Now that opp Surprises reveal their identity on
-                  // hover via `revealTooltipWhenFaceDown`, the dim
-                  // signal is meaningful for both sides too.
-                  return <BoardCard cardName={sName} faceDown={isOpp}
-                    revealTooltipWhenFaceDown={isOpp}
+                  // Both sides render face-up in the editor — the author
+                  // is placing them, so hiding the opponent's Surprises
+                  // serves no purpose. Parity with puzzle-mode play,
+                  // where opp Surprises are also face-up by design.
+                  // The dim style (ability-school requirements unmet)
+                  // applies uniformly to both sides since the identity
+                  // is now visible either way.
+                  return <BoardCard cardName={sName}
                     style={!usable ? { opacity: 0.45, filter: 'grayscale(0.7)' } : undefined} />;
                 })() : <div className="board-zone-empty">Surp</div>}
               </div>

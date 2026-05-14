@@ -358,10 +358,13 @@ function _getAdjacentFreeZones(ps, heroIdx) {
   if (heroIdx > 0) adjacent.push(heroIdx - 1);
   if (heroIdx < 2) adjacent.push(heroIdx + 1);
 
+  // Adjacent columns are valid destinations even when the column's
+  // Hero slot is empty or KO'd — Slippery Skates moves a Creature
+  // to a free Support Zone, and Creatures are independent of their
+  // Hero. Matches the rule applied across the Slippery / Dark Gear
+  // / Skeleton tutor families.
   const result = [];
   for (const hi of adjacent) {
-    const hero = ps.heroes?.[hi];
-    if (!hero?.name) continue;
     for (let zi = 0; zi < 3; zi++) {
       if (((ps.supportZones[hi] || [])[zi] || []).length === 0) {
         result.push({ heroIdx: hi, slotIdx: zi });

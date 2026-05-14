@@ -52,10 +52,11 @@ module.exports = {
         if (seen.has(name)) continue;
         const cd = cardDB[name];
         if (!cd || cd.cardType !== 'Creature') continue;
-        if ((cd.level || 0) > 1) continue;
+        const lvl = engine.effectiveCardLevel(cd, pi);
+        if (lvl > 1) continue;
         if (!isDeepseaCreature(name, engine)) continue;
         seen.add(name);
-        eligible.push({ name, source: 'discard', cost: cd.level || 0 });
+        eligible.push({ name, source: 'discard', cost: lvl });
       }
       if (eligible.length === 0) return;
 

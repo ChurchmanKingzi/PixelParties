@@ -305,6 +305,13 @@ async function returnSupportCreatureToHand(engine, inst, sourceName) {
   // fire via runHooks, so no engine edit is required.
   await engine.runHooks('onCardsReturnedToHand', {
     ownerIdx, returnedCards: [cardName], returnedInsts: [inst],
+    // Parallel arrays of origin coords — needed by listeners like
+    // Blood Moon under the Sea that filter on "returned from THIS
+    // hero's support zones". `inst.heroIdx` is still authoritative
+    // here (this function never resets the inst before firing the
+    // hook), but the explicit field keeps callsites uniform with the
+    // bounce-place / deepsea-swap paths where the inst IS reset first.
+    fromHeroIdxs: [heroIdx], fromZoneSlots: [slotIdx],
     by: sourceName, _skipReactionCheck: true,
   });
 
@@ -587,6 +594,7 @@ async function tryBouncePlace(ctx) {
   });
   await engine.runHooks('onCardsReturnedToHand', {
     ownerIdx: pi, returnedCards: [bouncedName], returnedInsts: [bouncedInst],
+    fromHeroIdxs: [bouncedHeroIdx], fromZoneSlots: [bouncedSlotIdx],
     by: `${cardName} (Bounce-Place)`, _skipReactionCheck: true,
   });
   engine._untrackCard(bouncedInst.id);
@@ -793,19 +801,23 @@ function eligibleSwapReplacements(engine, pi, excludeName, maxLevel) {
   const cardDB = engine._getCardDB();
   const seen = new Set();
   const out = [];
-  for (const n of (ps.hand || [])) {
+  for (let i = 0; i < (ps.hand || []).length; i++) {
+    const n = ps.hand[i];
     if (seen.has(n)) continue;
     if (n === excludeName) continue;
     const cd = cardDB[n];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
-    if ((cd.level || 0) > maxLevel) continue;
+    // Effective level — per-slot offsets + active `reduceCardLevel`
+    // hooks (Whoolmoth, etc.) flow through here.
+    const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
+    if (lvl > maxLevel) continue;
     // canSummon gate — e.g. Dragon Pilot / DDG's sacrifice-or-tribute
     // requirement. isCreatureSummonable returns true when no script
     // defines canSummon, so plain Creatures pass through untouched.
     if (typeof engine.isCreatureSummonable === 'function'
         && !engine.isCreatureSummonable(n, pi)) continue;
     seen.add(n);
-    out.push({ name: n, source: 'hand', cost: cd.level || 0 });
+    out.push({ name: n, source: 'hand', cost: lvl });
   }
   return out;
 }
@@ -933,6 +945,7 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   });
   await engine.runHooks('onCardsReturnedToHand', {
     ownerIdx: pi, returnedCards: [bouncedName], returnedInsts: [bouncedInst],
+    fromHeroIdxs: [bouncedHeroIdx], fromZoneSlots: [bouncedSlotIdx],
     by: sourceName, _skipReactionCheck: true,
   });
   engine._untrackCard(bouncedInst.id);

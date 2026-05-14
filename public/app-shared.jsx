@@ -669,10 +669,16 @@ const ZONE_ANIM_SFX = {
   overheal_shock_equip:    { name: 'damage' },
   pollution_place:         { name: 'placement' },
   goldify_transmute:       { name: 'buff' },
+  // Field Standard rally — closest match in the existing SFX library
+  // is `buff` (the positive-boost cue used for goldify, etc.). A
+  // bespoke trumpets-and-cheers audio file isn't in `public/sounds/`
+  // yet; if one is added later, swap `name` here.
+  field_standard_rally:    { name: 'buff' },
   // Silent — redundant with a log or purely decorative
   gold_sparkle:            null,
   heal_sparkle:            null,
   healing_hearts:          null,
+  slimy_heal_goo:          null,
   heart_burst:             null,
   steam_puff:              null,
   dark_gear_spin_cw:       null,

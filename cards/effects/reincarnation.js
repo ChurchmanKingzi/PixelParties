@@ -68,7 +68,11 @@ function getRestoreCandidates(ps, cardDB, engine, pi) {
   for (const name of (ps?.discardPile || [])) {
     const cd = cardDB[name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
-    if ((cd.level || 0) > MAX_CREATURE_LEVEL) continue;
+    // Effective level (Whoolmoth-style reducers etc.).
+    const lvl = engine?.effectiveCardLevel
+      ? engine.effectiveCardLevel(cd, pi)
+      : (cd.level || 0);
+    if (lvl > MAX_CREATURE_LEVEL) continue;
     if (engine && pi != null && !engine.isCreatureSummonable(name, pi)) continue;
     counts[name] = (counts[name] || 0) + 1;
   }

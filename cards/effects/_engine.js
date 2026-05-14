@@ -1195,6 +1195,18 @@ class GameEngine {
       return { cardName: cards[0].name, source: cards[0].source };
     }
 
+    if (type === 'birthdayPresentPick') {
+      // Birthday Present's opp picker — `cards` is an array of bare name
+      // strings (not the {name, source} objects cardGallery uses) because
+      // the client component reads names directly. Pick the first; the
+      // resolver's fallback already handles a missing/off-list pick by
+      // defaulting to revealed[0], so this matches that contract.
+      const cards = promptData.cards || [];
+      if (cards.length === 0) return null;
+      const first = typeof cards[0] === 'string' ? cards[0] : cards[0]?.name;
+      return first ? { cardName: first } : null;
+    }
+
     if (type === 'cardGalleryMulti') {
       const cards = promptData.cards || [];
       if (cards.length === 0) return { selectedCards: [], selectedIndices: [] };
@@ -1911,6 +1923,31 @@ class GameEngine {
       const d = this._describeHeapTripDiagnostics();
       throw new Error(`MAX_HOOKS_PER_TURN exceeded (${this._hooksFiredThisTurn}) at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} active p${this.gs?.activePlayer}. Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Recent trail: ${d.trail}. Hooks disabled for rest of this turn (incl. other rollouts). Likely infinite hook-firing loop.`);
     }
+    // ── CPU live-turn deadline (defense in depth) ──
+    // Sampled every 32 hooks (cheap) once we're past the live wall-clock
+    // cap. The CPU brain's phase-loop deadline checks (cpuPastDeadline)
+    // bail between sub-functions, but a single card script can chain
+    // many hooks within one onPlay before the next phase boundary —
+    // e.g. Heal Burn's Healing Melody → afterHeal × N → Lifeforce
+    // Howitzer afterHeal → actionDealDamage → afterDamage → Shield of
+    // Life afterDamage → actionHealHero → … Throwing here forces the
+    // script's hook chain to bail at the next runHooks call, which the
+    // standard MCTS-overload plumbing catches (rollouts fall through to
+    // heuristic; live turns surface the throw at the action call site
+    // so the phase loop can force-advance to End). Without this, a
+    // single in-flight chain could continue past MAX_CPU_TURN_MS even
+    // after every phase-level deadline check is firing true.
+    if ((this._hooksFiredThisTurn & 0x1F) === 0
+        && typeof this._cpuTurnDeadline === 'number'
+        && Date.now() >= this._cpuTurnDeadline) {
+      this._hookCapTrippedThisTurn = true;
+      this._turnHooksKilled = true;
+      this._mctsKilledThisTurn = true;
+      const err = new Error(`CPU live-turn deadline exceeded inside hook chain at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._hooksFiredThisTurn} hooks. Force-ending in-flight chain.`);
+      err._mctsOverload = true;
+      err._cpuDeadlineExceeded = true;
+      throw err;
+    }
     // Add engine reference and defaults to context
     hookCtx._engine = this;
     hookCtx._hookName = hookName;
@@ -1948,7 +1985,22 @@ class GameEngine {
       // Dead heroes and their abilities/supports don't fire hooks
       // Frozen/Stunned heroes' hero and ability effects are negated (but creature effects still work)
       // Negated heroes' hero + ability effects are silenced, but support/creature effects still work
-      if ((c.zone === 'hero' || c.zone === 'ability' || c.zone === 'support') && c.heroIdx >= 0) {
+      //
+      // Carve-out: support-zone Creatures and Tokens are INDEPENDENT
+      // of their slot's Hero. They persist past the Hero's death AND
+      // fire from empty Hero slots (e.g. those left over after
+      // Quetzahuitl's mass-delete). Only the creature-level CC
+      // filter below applies to them — the host-Hero gates here are
+      // skipped entirely.
+      let _isSupportCreatureOrToken = false;
+      if (c.zone === 'support' && c.heroIdx >= 0) {
+        const _cdSup = this.getEffectiveCardData(c) || this._getCardDB()[c.name];
+        if (_cdSup && (hasCardType(_cdSup, 'Creature') || hasCardType(_cdSup, 'Token'))) {
+          _isSupportCreatureOrToken = true;
+        }
+      }
+      if (!_isSupportCreatureOrToken
+          && (c.zone === 'hero' || c.zone === 'ability' || c.zone === 'support') && c.heroIdx >= 0) {
         const hero = this.gs.players[c.controller ?? c.owner]?.heroes?.[c.heroIdx];
         if (!hero || !hero.name) return false; // Empty hero slot
         // Dead-hero filter — script-level `bypassDeadHeroFilter` is an
@@ -2747,6 +2799,15 @@ class GameEngine {
           title: config.title || cardInstance.name,
           description: config.description || 'Select a zone.',
           cancellable: config.cancellable !== false,
+          // Optional override for the cancel button text — useful when
+          // cancelling means "end the multi-placement loop here" rather
+          // than "go back a step". Layn's Rally passes `cancelLabel: '✓ Done'`
+          // for placements 2+ since there's no previous step to return to.
+          // Read by the zonePick renderer in `app-board.jsx` (~L25420).
+          cancelLabel: config.cancelLabel,
+          // Optional preview card name — renders a CardMini above the
+          // prompt so the player sees what they're placing.
+          previewCardName: config.previewCardName,
         });
       },
 
@@ -2934,9 +2995,15 @@ class GameEngine {
         if (side === 'both') side = 'any';
         const types = config.types || ['hero', 'creature'];
 
-        // Auto-compute damage preview with hero-level bonuses
+        // Auto-compute damage preview with hero-level bonuses.
+        // `promptDamageTarget` always commits to exactly one target
+        // (`maxPerType: { hero: 1, equip: 1 }` + the single-pick selection
+        // below), so we surface that to the estimator — riders with
+        // single-target-only conditionals (Warhorse +50) can apply
+        // their bonus in the preview now that the picker has committed
+        // to single-target semantics.
         if (config.baseDamage != null && config.baseDamage > 0) {
-          const estDmg = engine.estimateDamage(pi, cardInstance.heroIdx, config.baseDamage, config.damageType || 'normal');
+          const estDmg = engine.estimateDamage(pi, cardInstance.heroIdx, config.baseDamage, config.damageType || 'normal', { isSingleTarget: true });
           if (estDmg !== config.baseDamage) {
             const base = String(config.baseDamage);
             const est = String(estDmg);
@@ -2963,9 +3030,10 @@ class GameEngine {
           const ps2 = gs.players[playerIdx];
           const cardDB = engine._getCardDB();
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
-            // Hero slot must exist, but dead heroes still have targetable
-            // creatures in their support zones (creatures persist on death).
-            if (!ps2.heroes[hi]?.name) continue;
+            // Iterate support zones regardless of host-Hero state.
+            // Creatures are independent of their Hero — they're
+            // targetable even when the slot's Hero is dead OR empty
+            // (e.g. an empty slot left by Quetzahuitl's mass-delete).
             for (let si = 0; si < (ps2.supportZones[hi] || []).length; si++) {
               const slot = (ps2.supportZones[hi] || [])[si] || [];
               if (slot.length === 0) continue;
@@ -3173,6 +3241,10 @@ class GameEngine {
           confirmLabel: config.confirmLabel || 'Attack!',
           confirmClass: config.confirmClass || 'btn-danger',
           cancellable: config.cancellable !== false,
+          // Optional override for the cancel button label. Used when
+          // cancelling means "step back" rather than "abort" — e.g.
+          // Brackle's "↩ Back" returns to the sacrifice picker.
+          cancelLabel: config.cancelLabel,
           exclusiveTypes: true,
           maxPerType: { hero: 1, equip: 1 },
           // Forward intent fields so the CPU's `cpuPickTargets` brain can
@@ -3344,9 +3416,10 @@ class GameEngine {
           const ps2 = gs.players[playerIdx];
           const cardDB = engine._getCardDB();
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
-            // Hero slot must exist, but dead heroes still have targetable
-            // creatures in their support zones (creatures persist on death).
-            if (!ps2.heroes[hi]?.name) continue;
+            // Iterate support zones regardless of host-Hero state.
+            // Creatures are independent of their Hero — they're
+            // targetable even when the slot's Hero is dead OR empty
+            // (e.g. an empty slot left by Quetzahuitl's mass-delete).
             for (let si = 0; si < (ps2.supportZones[hi] || []).length; si++) {
               const slot = (ps2.supportZones[hi] || [])[si] || [];
               if (slot.length === 0) continue;
@@ -6838,6 +6911,21 @@ class GameEngine {
       _isMove: true,
     });
 
+    // Permanent control change — fire the take-control hook so reaction
+    // cards (Very Special Prisoner) can respond. Distinct kind from the
+    // temporary `actionStealCreature` steal so listeners can discriminate
+    // if they need to. Inline `await` is safe here — the caller is async.
+    await this.runHooks('onTakeControl', {
+      controllerPi: toPlayerIdx,
+      originalOwnerPi: fromPlayerIdx,
+      targetType: 'creature',
+      targetName: cardName,
+      targetInst: inst,
+      heroIdx: destHeroIdx,
+      kind: 'transfer',
+      sourceName: opts.sourceName || 'Transfer',
+    });
+
     this.sync();
     return { success: true };
   }
@@ -7996,11 +8084,18 @@ class GameEngine {
   /**
    * Estimate effective damage from a source hero, including hero-level bonuses.
    * Used for damage preview in targeting prompts.
-   * Card effects can export estimateDamageBonus(engine, playerIdx, heroIdx, baseDamage, damageType)
+   * Card effects can export estimateDamageBonus(engine, playerIdx, heroIdx, baseDamage, damageType, opts)
    * to participate in the preview calculation.
+   *
+   * `opts.isSingleTarget` is set to true by `promptDamageTarget` so riders
+   * with single-target conditionals (Warhorse +50) can apply their bonus
+   * in the preview when the picker actually selects one target. Defaults
+   * to false / unset for callers that don't know — those riders should
+   * fall back to the conservative no-bonus estimate.
+   *
    * @returns {number} Estimated damage after source-side modifiers
    */
-  estimateDamage(playerIdx, heroIdx, baseDamage, damageType) {
+  estimateDamage(playerIdx, heroIdx, baseDamage, damageType, opts = {}) {
     let damage = baseDamage;
     for (const inst of this.cardInstances) {
       if (inst.owner !== playerIdx) continue;
@@ -8008,7 +8103,7 @@ class GameEngine {
       if (!inst.isActiveIn(inst.zone)) continue;
       const script = loadCardEffect(inst.name);
       if (script?.estimateDamageBonus) {
-        damage = script.estimateDamageBonus(this, playerIdx, heroIdx, damage, damageType);
+        damage = script.estimateDamageBonus(this, playerIdx, heroIdx, damage, damageType, opts);
       }
     }
     return damage;
@@ -8611,7 +8706,11 @@ class GameEngine {
    * Support-zone cards are inactive when:
    *   • face-down
    *   • negated/frozen/stunned (own counters)
-   *   • attached to a dead hero
+   *   • attached to a dead/empty hero, UNLESS the card is a Creature or
+   *     Token — those persist past Hero death AND fire from empty Hero
+   *     slots (per the engine-wide "Creatures are independent of their
+   *     Hero" rule). Non-creature support cards (Equipment, attached
+   *     Spells, etc.) still need a living Hero.
    *
    * Note: Frozen/stunned/negated *heroes* only suppress their own 'hero' and
    * 'ability' zone effects — their support-zone cards (creatures, equips,
@@ -8626,8 +8725,19 @@ class GameEngine {
     if (inst.faceDown) return false;
     if (inst.zone === ZONES.SUPPORT) {
       if (inst.counters?.negated || inst.counters?.nulled || inst.counters?.frozen || inst.counters?.stunned) return false;
-      const hero = this.gs.players[inst.controller ?? inst.owner]?.heroes?.[inst.heroIdx];
-      if (!hero?.name || hero.hp <= 0) return false;
+      // Creatures and Tokens are INDEPENDENT of their slot's Hero —
+      // they remain active even when the Hero is dead or the slot
+      // is empty (e.g. left over from Quetzahuitl's mass-delete).
+      // Non-creature support cards (Equipment, attached Spells, etc.)
+      // still require a living Hero — they're normally cleaned up by
+      // `handleHeroDeathCleanup` when the Hero dies, but the guard
+      // stays here as a defense against any stray inst.
+      const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst.name];
+      const isCreatureOrToken = cd && (hasCardType(cd, 'Creature') || hasCardType(cd, 'Token'));
+      if (!isCreatureOrToken) {
+        const hero = this.gs.players[inst.controller ?? inst.owner]?.heroes?.[inst.heroIdx];
+        if (!hero?.name || hero.hp <= 0) return false;
+      }
     }
     return true;
   }
@@ -9101,6 +9211,52 @@ class GameEngine {
         if ((playable.own[hiKey] || []).includes(cardName)) { anyOwnHost = true; break; }
       }
       if (anyOwnHost) out.add(cardName);
+    }
+    return Array.from(out);
+  }
+
+  /**
+   * Artifacts in `playerIdx`'s hand that drop onto the OPPONENT's
+   * board (Powder Keg etc.) — script declares `placesOnOpponentBoard: true`.
+   * Mirrors `getCrossSidePlayableCards`'s shape; the client uses the
+   * list to highlight opp Support Zones and Hero zones as drag/click
+   * targets when one of these cards is in flight, and the server's
+   * `doPlayArtifact` consults the same flag to route placement to the
+   * opp's side. Filter is intentionally permissive — a Hero with at
+   * least one free Support Zone on opp's side is enough, even if that
+   * Hero is dead / Frozen / Stunned (Powder Keg's text explicitly
+   * allows incapacitated hosts).
+   */
+  getCrossSidePlayableArtifacts(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+    const oppIdx = playerIdx === 0 ? 1 : 0;
+    const oppPs = this.gs.players[oppIdx];
+    if (!oppPs) return [];
+    // Need at least one opp Hero with a free Support Zone for ANY
+    // cross-side artifact play to be viable.
+    let oppHasFreeSlot = false;
+    for (let hi = 0; hi < (oppPs.heroes || []).length && !oppHasFreeSlot; hi++) {
+      const hero = oppPs.heroes[hi];
+      if (!hero?.name) continue;
+      const supZones = oppPs.supportZones?.[hi] || [];
+      for (let z = 0; z < 3; z++) {
+        if ((supZones[z] || []).length === 0) { oppHasFreeSlot = true; break; }
+      }
+    }
+    if (!oppHasFreeSlot) return [];
+
+    const cardDB = this._getCardDB();
+    const out = new Set();
+    const seen = new Set();
+    for (const cardName of (ps.hand || [])) {
+      if (seen.has(cardName)) continue;
+      seen.add(cardName);
+      const cd = cardDB[cardName];
+      if (!cd || cd.cardType !== 'Artifact') continue;
+      const script = loadCardEffect(cardName);
+      if (script?.placesOnOpponentBoard !== true) continue;
+      out.add(cardName);
     }
     return Array.from(out);
   }
@@ -10685,6 +10841,14 @@ class GameEngine {
     const hookCtx = { playerIdx, amount, cancelled: false };
     await this.runHooks(HOOKS.ON_RESOURCE_GAIN, hookCtx);
     if (hookCtx.cancelled) return;
+    // Opponent's Surprise window — Gold Trap (and any future
+    // surpriseResourceGainTrigger surprise) intercepts the gain.
+    // Fires AFTER own-side hooks so Golden Vermin's swap and
+    // Wealth / Treasure Huntress' +N adjustments have already
+    // settled — the surprise redirects the POST-hook amount, which
+    // matches the card text "you gain that Gold instead."
+    const surpriseResult = await this._checkSurpriseOnResourceGain(playerIdx, hookCtx.amount);
+    if (surpriseResult?.redirected) return;
     const gained = Math.max(0, hookCtx.amount);
     ps.gold = (ps.gold || 0) + gained;
     // ── SC tracking: cumulative gold earned ──
@@ -11114,6 +11278,20 @@ class GameEngine {
       stealer: gs.players[stealerPi]?.username,
       original: gs.players[heroOwnerPi]?.username,
     });
+    // Fire-and-forget — `actionStealHero` is sync, but the hook opens a
+    // reaction window (Very Special Prisoner). Schedule on a microtask
+    // so the caller's sync flow isn't blocked; the reaction window is
+    // async-safe and will resolve in order.
+    Promise.resolve().then(() => this.runHooks('onTakeControl', {
+      controllerPi: stealerPi,
+      originalOwnerPi: heroOwnerPi,
+      targetType: 'hero',
+      targetName: hero.name,
+      targetHero: hero,
+      heroIdx,
+      kind: 'charm',
+      sourceName: opts.sourceName || 'Charm',
+    }).catch(err => console.error('[onTakeControl charm]', err.message)));
     return true;
   }
 
@@ -11152,6 +11330,28 @@ class GameEngine {
       stealer: this.gs.players[stealerPi]?.username,
       original: this.gs.players[originalOwner]?.username,
     });
+    // Reaction-window hook — Very Special Prisoner triggers on this.
+    // Sync caller, async hook: same pattern as actionStealHero.
+    //
+    // `opts.skipTakeControlHook` opts callers out of the hook —
+    // Aligning Goals reuses this primitive for "you may use that
+    // Creature's active effect as if you controlled it", a permission
+    // grant that mechanically requires flipping `inst.controller` but
+    // doesn't count as "taking control" for reaction-trigger purposes.
+    // Effects that perform an actual take-over (Treacherous Crystal,
+    // Deepsea Succubus, etc.) leave the flag off.
+    if (!opts.skipTakeControlHook) {
+      Promise.resolve().then(() => this.runHooks('onTakeControl', {
+        controllerPi: stealerPi,
+        originalOwnerPi: originalOwner,
+        targetType: 'creature',
+        targetName: inst.name,
+        targetInst: inst,
+        heroIdx: inst.heroIdx,
+        kind: 'steal',
+        sourceName: opts.sourceName || 'Steal',
+      }).catch(err => console.error('[onTakeControl steal]', err.message)));
+    }
     return true;
   }
 
@@ -11314,23 +11514,39 @@ class GameEngine {
     return { inst };
   }
 
-  /** Enumerate free Support Zone descriptors for a player. */
+  /**
+   * Enumerate free Support Zone descriptors for a player.
+   *
+   * Default behaviour: include EVERY free Support Zone slot, regardless
+   * of whether the column's Hero is alive, dead, or absent — Creatures
+   * are independent of their Hero, so "place anywhere" effects (Dark
+   * Gear, Slippery moves, Skeleton Necromancer tutors, Deepsea Bats
+   * revive, …) should treat an empty/dead-Hero column's free slot as
+   * a legal destination.
+   *
+   * `opts.livingHeroesOnly: true` restricts to alive, named Heroes —
+   * for callers (e.g. summon-with-a-specific-Hero spells) that need
+   * the host to act as a real caster. `opts.namedHeroesOnly: true` is
+   * the looser legacy filter: dead Heroes allowed, empty slots
+   * excluded. Default is the new "all free slots" behaviour.
+   */
   getFreeSupportZones(playerIdx, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
     const livingOnly = !!opts.livingHeroesOnly;
+    const namedOnly  = !!opts.namedHeroesOnly;
     const zones = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
-      if (!hero?.name) continue;
-      if (livingOnly && hero.hp <= 0) continue;
+      if (livingOnly && (!hero?.name || hero.hp <= 0)) continue;
+      if (namedOnly && !hero?.name) continue;
       for (let si = 0; si < 3; si++) {
         const slot = (ps.supportZones[hi] || [])[si] || [];
         if (slot.length === 0) {
-          const label = hero.hp <= 0
-            ? `${hero.name} (KO) — Slot ${si + 1}`
-            : `${hero.name} — Slot ${si + 1}`;
-          zones.push({ heroIdx: hi, slotIdx: si, label });
+          const heroLabel = hero?.name
+            ? (hero.hp <= 0 ? `${hero.name} (KO)` : hero.name)
+            : `Column ${hi + 1}`;
+          zones.push({ heroIdx: hi, slotIdx: si, label: `${heroLabel} — Slot ${si + 1}` });
         }
       }
     }
@@ -11915,6 +12131,11 @@ class GameEngine {
           confirmLabel: config.confirmLabel || 'Confirm',
           confirmClass: config.confirmClass || 'btn-success',
           cancellable: config.cancellable !== undefined ? config.cancellable : true,
+          // Optional override for the cancel button text. Used when
+          // cancelling means "step back" rather than "abort the
+          // effect" — e.g. Brackle's target prompt cancel returns to
+          // the sacrifice picker, so the button reads "↩ Back".
+          cancelLabel: config.cancelLabel,
           exclusiveTypes: config.exclusiveTypes || false,
           maxPerType: config.maxPerType || {},
           maxTotal: config.maxTotal || undefined,
@@ -12851,6 +13072,34 @@ class GameEngine {
     });
     if (result?.redirect) return result.redirect;
     return null;
+  }
+
+  /**
+   * Check if the gainer's opponent has a Surprise that triggers on the
+   * gainer's Gold gain (Gold Trap and any future analog). Called from
+   * `actionGainGold` AFTER `ON_RESOURCE_GAIN` hooks have run, so the
+   * `amount` argument is the post-hook number that would actually land
+   * if the surprise doesn't fire. The trigger handler is responsible
+   * for paying out to itself (recursive `actionGainGold` is guarded
+   * against re-entry by `_inSurpriseResolution`).
+   *
+   * Returns the activated surprise's result. If `result.redirected` is
+   * truthy, `actionGainGold` aborts the original gain so the gold
+   * doesn't double-pay.
+   *
+   * @param {number} activatorIdx - The player whose Gold gain triggered this window
+   * @param {number} amount       - The post-hook Gold amount about to be applied
+   */
+  async _checkSurpriseOnResourceGain(activatorIdx, amount) {
+    if (this._inSurpriseResolution) return null;
+    if (!(amount > 0)) return null;
+    const opponentIdx = activatorIdx === 0 ? 1 : 0;
+    const activatorName = this.gs.players[activatorIdx]?.username || 'Opponent';
+    const triggerInfo = { activatorIdx, amount };
+    return this._scanSurpriseEntriesForPlayer(opponentIdx, 'surpriseResourceGainTrigger', triggerInfo, {
+      message: () => `${activatorName} is about to gain ${amount} Gold!`,
+      confirmLabel: '🪙 Activate Surprise!',
+    });
   }
 
   /**
@@ -14393,6 +14642,7 @@ class GameEngine {
       // Skip surprises that have their own dedicated trigger systems
       if (script.surpriseDrawTrigger || script.surpriseSummonTrigger || script.surpriseEquipTrigger ||
           script.surpriseStatusTrigger || script.surpriseHeroEffectTrigger || script.surpriseAbilityTrigger ||
+          script.surpriseResourceGainTrigger ||
           script.isDefendingGate) continue;
 
       // Build source info for the trigger check. `damageType` is the
@@ -15644,6 +15894,7 @@ class GameEngine {
     onCreatureSummoned: 'A creature was just summoned',
     onCardActivation: 'A card was activated',
     onReactionActivated: 'A reaction was activated',
+    onTakeControl: 'A target was taken control of',
   };
 
   /** Hooks that should NOT trigger reaction checks */
@@ -16535,12 +16786,11 @@ class GameEngine {
     const cardDB = this._getCardDB();
     const targets = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      // Hero slot must exist, but dead-hero columns still have targetable
-      // creatures — they persist past their host hero's death (matches the
-      // dead-hero creature-targeting rule enforced in promptDamageTarget /
-      // Cure / Acid Vial / Steam Dwarf Brewer / etc.).
-      if (!hero?.name) continue;
+      // Iterate support zones regardless of host-Hero state.
+      // Creatures persist past their host Hero's death AND remain
+      // targetable while the slot's Hero is empty (e.g. left over
+      // by Quetzahuitl's mass-delete) — creatures are independent
+      // of their Hero.
       for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
         const slot = (ps.supportZones[hi] || [])[si] || [];
         if (slot.length === 0) continue;
@@ -17299,9 +17549,13 @@ class GameEngine {
 
       for (let hi = 0; hi < (scanPs.heroes || []).length; hi++) {
         const hero = scanPs.heroes[hi];
-        if (!hero?.name) continue;
-        // If scanning charmed heroes, only include those charmed by playerIdx
-        if (charmedOwner != null && hero.charmedBy !== playerIdx) continue;
+        // Charmed scan requires a real Hero to scan from — an empty
+        // slot cannot be charmed, so it's not a valid source side.
+        if (charmedOwner != null && (!hero?.name || hero.charmedBy !== playerIdx)) continue;
+        // Note: for the OWN-side scan (charmedOwner == null), we
+        // do NOT skip empty/dead Hero slots. Creatures are
+        // independent of their Hero and remain activatable while
+        // sitting in a support zone whose Hero is dead or empty.
 
         for (let zi = 0; zi < (scanPs.supportZones[hi] || []).length; zi++) {
           const slot = (scanPs.supportZones[hi] || [])[zi] || [];
@@ -17334,8 +17588,12 @@ class GameEngine {
           // Blinded silences targeting creature effects. Either the
           // creature itself is blinded (a future card may apply that)
           // or its host hero is blinded — under "as if the Creature had
-          // no such targeting effect", we hide both cases.
-          if (script.requiresTarget === true && (inst.counters?.blinded || hero.statuses?.blinded)) continue;
+          // no such targeting effect", we hide both cases. With the
+          // dead/empty-Hero gates lifted upstream, `hero` may now be a
+          // placeholder with `name === null`; null-safe access keeps
+          // the check working in that case (an empty slot can't carry
+          // a `blinded` status anyway).
+          if (script.requiresTarget === true && (inst.counters?.blinded || hero?.statuses?.blinded)) continue;
 
           // Phase gate: free creature effects are Main-Phase-only;
           // action-cost creatures are Action Phase or Main Phase with
@@ -18449,8 +18707,10 @@ class GameEngine {
     // `reduceSpellLevel(cardData, abilityLevel, engine) → number`.
     const levelAfterAbility = this._applySpellLevelReductions(cardData, rawLevel, abZones);
     // Additional board-wide reductions — any tracked instance the player
-    // owns may contribute via `reduceCardLevel(cardData, engine, ownerIdx)`.
-    const level = this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx);
+    // owns may contribute via `reduceCardLevel(cardData, engine, ownerIdx,
+    // inst, heroIdx)`. `heroIdx` lets per-hero reducers (Taio's Sun-Fencer
+    // Destruction-Magic discount) gate on the casting Hero.
+    const level = this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx, heroIdx);
 
     const schools = [];
     if (cardData.spellSchool1) schools.push(cardData.spellSchool1);
@@ -18463,7 +18723,13 @@ class GameEngine {
     const blr = hero.bypassLevelReq;
     if (blr && level <= blr.maxLevel && blr.types.includes(cardData.cardType)) return true;
 
-    if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack') {
+    if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack' || cardData.cardType === 'Creature') {
+      // Gap-coverage applies to Spells, Attacks, AND Creature summons.
+      // Wisdom's `coverLevelGap` short-circuits on non-Spell types so
+      // it won't accidentally pay-down Creature summons; Divinity opts
+      // into Spell + Attack + Creature explicitly so it covers all
+      // three. Future paid-gap abilities can declare their own per-type
+      // coverage at the script level.
       const gap = this._spellLevelGap(cardData, level, abZones);
       if (gap > 0) {
         const cov = this._findLevelGapCoverage(cardData, gap, abZones);
@@ -18527,9 +18793,13 @@ class GameEngine {
 
   /**
    * Walk every tracked card instance owned by `playerIdx` and apply any
-   * `reduceCardLevel(cardData, engine, ownerIdx) → number` hook the
-   * card's script exports. Reductions are summed and subtracted from
-   * the supplied level — the engine never knows which cards participate.
+   * `reduceCardLevel(cardData, engine, ownerIdx, inst, heroIdx) → number`
+   * hook the card's script exports. Reductions are summed and subtracted
+   * from the supplied level — the engine never knows which cards
+   * participate. `heroIdx` is the casting Hero (undefined for caller
+   * sites that don't know it, e.g. CPU lookahead paths) — reducers that
+   * gate by casting Hero (Taio's Sun-Fencer "spells IT uses" clause)
+   * should bail when the arg is missing or mismatched.
    *
    * Generic sibling of `_applySpellLevelReductions`. Differences:
    *   - Scoped to the entire player side, not a single hero's ability
@@ -18553,9 +18823,11 @@ class GameEngine {
    * @param {number} rawLevel - Level after per-card overrides + ability
    *                            reductions.
    * @param {number} playerIdx - Player whose side contributes reducers.
+   * @param {number} [heroIdx] - Casting Hero (optional — for per-hero
+   *                             reducers that gate on who is casting).
    * @returns {number} effective level (≥ 0).
    */
-  _applyCardLevelReductions(cardData, rawLevel, playerIdx) {
+  _applyCardLevelReductions(cardData, rawLevel, playerIdx, heroIdx) {
     if (!cardData || rawLevel <= 0) return rawLevel;
     let total = 0;
     for (const inst of this.cardInstances) {
@@ -18567,11 +18839,11 @@ class GameEngine {
       const script = loadCardEffect(inst.name);
       if (typeof script?.reduceCardLevel !== 'function') continue;
       try {
-        // Pass the contributing instance as a 4th arg so per-zone /
-        // per-instance restrictions are possible. Cards that don't
-        // need it (Elven Forager etc.) ignore the extra arg —
-        // backwards-compatible.
-        const r = Number(script.reduceCardLevel(cardData, this, playerIdx, inst)) || 0;
+        // Pass the contributing instance as a 4th arg + the casting Hero's
+        // heroIdx as a 5th arg so per-instance / per-hero restrictions
+        // are possible. Cards that don't need either (Elven Forager etc.)
+        // ignore the extras — backwards-compatible.
+        const r = Number(script.reduceCardLevel(cardData, this, playerIdx, inst, heroIdx)) || 0;
         if (r > 0) total += r;
       } catch { /* card threw — ignore, no reduction */ }
     }
@@ -18586,6 +18858,93 @@ class GameEngine {
       }
     }
     return Math.max(0, rawLevel - total);
+  }
+
+  /**
+   * Public effective-level lookup used by every "summon a Creature with
+   * level ≤ N" / "cast a Spell with level ≤ N from your hand/deck/discard"
+   * card-script filter. Returns the level a card would WEAR at the moment
+   * of resolution — after every applicable reduction and increase the
+   * engine knows about — so external callers can compare against an
+   * absolute cap without re-implementing the math each time.
+   *
+   * Honours, in order:
+   *   1. Per-card hero override (`hero.levelOverrideCards[<name>]`) —
+   *      Sol Rym's "Chain Lightning is Lv0 for me" pattern. Only
+   *      applied when `opts.heroIdx` is supplied.
+   *   2. Per-hand-position offsets (`ps._handLevelOffsets[handIdx]` and
+   *      the transient sibling). The most-negative offset for the named
+   *      card wins, matching `heroMeetsLevelReq`'s scan. Only consulted
+   *      when `opts.handIdx` is supplied — for card pickers that don't
+   *      know which hand slot a candidate came from, this contribution
+   *      is conservatively skipped.
+   *   3. Mana Absorbing Crystal's +1 to Spells while a copy sits in the
+   *      controller's hand (suppressed by Big Gwen Guard via
+   *      `selfRevealEffectsSuppressed`).
+   *   4. `reduceCardLevel(cardData, engine, ownerIdx, inst, heroIdx)`
+   *      hooks across every active tracked instance owned by the
+   *      controller (Slippery Whoolmoth, Phatnir, Kappa Sword Slash,
+   *      Cataclysm, Taio the Sun Fencer, …). `heroIdx` is forwarded so
+   *      per-hero reducers (Taio) gate correctly.
+   *
+   * Symmetric with the level math inside `heroMeetsLevelReq` — same
+   * sources, same precedence — but exported as a number rather than a
+   * boolean playability verdict.
+   *
+   * @param {object} cardData - Card data row from cards.json.
+   * @param {number} playerIdx - Controller of the candidate card.
+   * @param {object} [opts]
+   *   @param {number} [opts.heroIdx] - Specific hero, for per-hero
+   *     reducers and per-hero card overrides.
+   *   @param {number} [opts.handIdx] - Hand index of THIS specific copy,
+   *     for per-hand-position offsets (Rocky Slime / Sparkfly rebate).
+   * @returns {number} The effective level (≥ 0).
+   */
+  effectiveCardLevel(cardData, playerIdx, opts = {}) {
+    if (!cardData) return 0;
+    const heroIdx = opts.heroIdx;
+    const handIdx = opts.handIdx;
+    const ps = this.gs.players[playerIdx];
+    let raw = cardData.level || 0;
+
+    // (1) Per-card hero override.
+    if (heroIdx != null) {
+      const hero = ps?.heroes?.[heroIdx];
+      if (hero?.levelOverrideCards
+          && cardData.name
+          && hero.levelOverrideCards[cardData.name] != null) {
+        raw = hero.levelOverrideCards[cardData.name];
+      }
+    }
+
+    // (2) Per-hand-position offset (only when a specific slot is given).
+    if (handIdx != null && ps?.hand && cardData.name) {
+      const offA = ps._handLevelOffsets?.[handIdx];
+      const offB = ps._handLevelOffsetsTransient?.[handIdx];
+      let best = 0;
+      const scan = (map) => {
+        if (!map) return;
+        const k = String(handIdx);
+        if (ps.hand[handIdx] !== cardData.name) return;
+        const v = map[k] || 0;
+        if (v < best) best = v;
+      };
+      scan(ps._handLevelOffsets);
+      scan(ps._handLevelOffsetsTransient);
+      if (best < 0) raw = Math.max(0, raw + best);
+    }
+
+    // (3) Mana Absorbing Crystal — Spell only, suppressible.
+    if (cardData.cardType === 'Spell'
+        && (ps?.hand || []).includes('Mana Absorbing Crystal')) {
+      const { selfRevealEffectsSuppressed } = require('./_crystals-shared');
+      if (!selfRevealEffectsSuppressed(this, playerIdx)) {
+        raw += 1;
+      }
+    }
+
+    // (4) Generic per-instance reducer hooks.
+    return this._applyCardLevelReductions(cardData, raw, playerIdx, heroIdx);
   }
 
   /**
@@ -18741,7 +19100,7 @@ class GameEngine {
       : this._getCandidateAbilityZoneSets(playerIdx, heroIdx);
     let bestCost = -1; // -1 = not playable
     for (const abZones of candidates) {
-      const cost = this._wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx);
+      const cost = this._wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx, heroIdx);
       if (cost === 0) return 0;
       if (cost > 0 && (bestCost === -1 || cost < bestCost)) bestCost = cost;
     }
@@ -18749,9 +19108,9 @@ class GameEngine {
   }
 
   /** Per-zone-set Wisdom cost — extracted for the per-opponent walk. */
-  _wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx) {
+  _wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx, heroIdx) {
     const levelAfterAbility = this._applySpellLevelReductions(cardData, rawLevel, abZones);
-    const level = this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx);
+    const level = this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx, heroIdx);
 
     const gap = this._spellLevelGap(cardData, level, abZones);
     if (gap === 0) return 0;

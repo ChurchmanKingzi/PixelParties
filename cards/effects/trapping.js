@@ -26,13 +26,15 @@ module.exports = {
     const { hasSurpriseZone, hasBakhmSlot } = _getFreePlacementZones(ps, heroIdx, pi, engine);
     if (!hasSurpriseZone && !hasBakhmSlot) return false;
 
-    // Check for 1+ eligible Surprises in deck
+    // Check for 1+ eligible Surprises in deck (effective level —
+    // honours hand-active `reduceCardLevel` reducers, e.g. a Whoolmoth
+    // in hand reducing every Whoolmoth-named card by 5).
     const cardDB = engine._getCardDB();
     const onlyCreatures = !hasSurpriseZone && hasBakhmSlot;
     for (const cn of (ps.mainDeck || [])) {
       const cd = cardDB[cn];
       if (!cd || (cd.subtype || '').toLowerCase() !== 'surprise') continue;
-      if ((cd.level || 0) > level) continue;
+      if (engine.effectiveCardLevel(cd, pi) > level) continue;
       if (onlyCreatures && cd.cardType !== 'Creature') continue;
       return true; // At least one eligible surprise exists
     }
@@ -64,7 +66,7 @@ module.exports = {
       if (seen.has(cn)) continue;
       const cd = cardDB[cn];
       if (!cd || (cd.subtype || '').toLowerCase() !== 'surprise') continue;
-      if ((cd.level || 0) > level) continue;
+      if (engine.effectiveCardLevel(cd, pi) > level) continue;
       if (onlyCreatures && cd.cardType !== 'Creature') continue;
       seen.add(cn);
       galleryCards.push({ name: cn, source: 'deck' });

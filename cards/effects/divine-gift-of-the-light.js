@@ -106,44 +106,19 @@ module.exports = {
         });
       }
 
-      // Prompt the spell's controller to pick any target to heal
+      // Prompt the spell's controller to pick any target to heal.
+      // Heroes come from `getHeroTargets` (alive only); Creatures come
+      // from `getCreatureTargets` (every Support Zone regardless of
+      // host-Hero state — creatures are independent of their Hero).
+      // The trailing filter preserves the original Light-gift contract
+      // of healing pure Creatures only — Artifact-Creature hybrids
+      // (Powder Keg, Pollution Spewer, …) are excluded even though
+      // `getCreatureTargets` would otherwise include them.
+      const cardDB = engine._getCardDB();
       const targets = [];
       for (let p = 0; p < 2; p++) {
-        for (let hi = 0; hi < (gs.players[p].heroes || []).length; hi++) {
-          const h = gs.players[p].heroes[hi];
-          if (!h?.name || h.hp <= 0) continue;
-          targets.push({
-            id: `hero-${p}-${hi}`,
-            type: 'hero',
-            owner: p,
-            heroIdx: hi,
-            cardName: h.name,
-          });
-        }
-        // Creatures only (not Artifacts/Attachments) — creatures persist on
-        // dead heroes, so don't gate on host hero HP.
-        for (let hi = 0; hi < (gs.players[p].heroes || []).length; hi++) {
-          if (!gs.players[p].heroes[hi]?.name) continue;
-          for (let si = 0; si < (gs.players[p].supportZones[hi] || []).length; si++) {
-            const slot = (gs.players[p].supportZones[hi] || [])[si] || [];
-            if (slot.length === 0) continue;
-            const inst2 = engine.cardInstances.find(c =>
-              c.owner === p && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
-            );
-            if (!inst2) continue;
-            const cd = engine._getCardDB()[inst2.name];
-            if (!cd || cd.cardType !== 'Creature') continue;
-            targets.push({
-              id: `equip-${p}-${hi}-${si}`,
-              type: 'equip',
-              owner: p,
-              heroIdx: hi,
-              slotIdx: si,
-              cardName: slot[0],
-              cardInstance: inst2,
-            });
-          }
-        }
+        targets.push(...engine.getHeroTargets(p));
+        targets.push(...engine.getCreatureTargets(p).filter(t => cardDB[t.cardName]?.cardType === 'Creature'));
       }
 
       if (targets.length === 0) return;

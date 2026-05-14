@@ -27,20 +27,25 @@ const COST_PER_LEVEL = 10;
 const MAX_LEVEL  = 3;
 
 /** Build deduplicated gallery entries for eligible deck + hand creatures. */
-function buildCreatureGallery(ps, cardDB) {
+function buildCreatureGallery(ps, cardDB, engine, pi) {
   const entries = new Map(); // name → {name, source, level}
+  const effLvl = (cd) => (engine?.effectiveCardLevel
+    ? engine.effectiveCardLevel(cd, pi)
+    : (cd.level ?? 0));
 
   for (const cn of (ps.mainDeck || [])) {
     const cd = cardDB[cn];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
-    if ((cd.level ?? 0) > MAX_LEVEL) continue;
-    if (!entries.has(cn)) entries.set(cn, { name: cn, source: 'deck', level: cd.level ?? 0 });
+    const lvl = effLvl(cd);
+    if (lvl > MAX_LEVEL) continue;
+    if (!entries.has(cn)) entries.set(cn, { name: cn, source: 'deck', level: lvl });
   }
   for (const cn of (ps.hand || [])) {
     const cd = cardDB[cn];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
-    if ((cd.level ?? 0) > MAX_LEVEL) continue;
-    if (!entries.has(cn)) entries.set(cn, { name: cn, source: 'hand', level: cd.level ?? 0 });
+    const lvl = effLvl(cd);
+    if (lvl > MAX_LEVEL) continue;
+    if (!entries.has(cn)) entries.set(cn, { name: cn, source: 'hand', level: lvl });
   }
   return [...entries.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -77,7 +82,7 @@ module.exports = {
 
     // ── Step 1: pick a Creature from deck or hand ────────────────────────
 
-    const gallery = buildCreatureGallery(ps, cardDB);
+    const gallery = buildCreatureGallery(ps, cardDB, engine, pi);
     if (gallery.length === 0) return { aborted: true };
 
     const creaturePick = await engine.promptGeneric(pi, {
