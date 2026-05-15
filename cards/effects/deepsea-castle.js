@@ -38,8 +38,16 @@ const {
   eligibleSwapReplacements,
   atomicSwap,
 } = require('./_deepsea-shared');
+const { isAreaImmuneInst } = require('./_diver-helmet-shared');
 
 const CARD_NAME = 'Deepsea Castle';
+
+// Creatures the activator controls that Deepsea Castle may bounce —
+// excludes any in a Diver-Helmet Hero's Support Zones (those are
+// "unaffected by Areas").
+function swappableCreatures(engine, pi) {
+  return ownSupportCreatures(engine, pi).filter(inst => !isAreaImmuneInst(engine, inst));
+}
 
 module.exports = {
   // Active in 'hand' so the self-cast onPlay fires from hand, and in
@@ -63,7 +71,7 @@ module.exports = {
     // Player-wide summon lock: Castle's swap places a new Creature on
     // the board, so it's blocked by the same gate as a normal summon.
     if (engine.gs.players[activator]?.summonLocked) return false;
-    const creatures = ownSupportCreatures(engine, activator);
+    const creatures = swappableCreatures(engine, activator);
     if (creatures.length === 0) return false;
     const cardDB = engine._getCardDB();
     for (const inst of creatures) {
@@ -96,7 +104,8 @@ module.exports = {
     const promptCtx = engine._createContext(pseudoInst, {});
 
     // ── Step 1: pick which own Creature to bounce ─────────────────
-    const creatures = ownSupportCreatures(engine, activator);
+    // Diver-Helmet-protected Creatures are unaffected by Areas.
+    const creatures = swappableCreatures(engine, activator);
     if (creatures.length === 0) return false;
     // Only offer creatures that have at least one valid replacement —
     // otherwise the second prompt would dead-end with no options.

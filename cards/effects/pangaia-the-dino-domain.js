@@ -16,6 +16,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { isAreaImmuneInst } = require('./_diver-helmet-shared');
 
 const CARD_NAME = 'Pangaia, the Dino Domain';
 const LV_THRESHOLD = 3;
@@ -39,6 +40,9 @@ module.exports = {
       if (cd.cardType === 'Token') return;
       const level = cd.level || 0;
       if (level < LV_THRESHOLD) return;
+      // Diver Helmet: a Creature in the equipped Hero's Support Zones
+      // is unaffected by Areas — no +200 HP buff.
+      if (isAreaImmuneInst(engine, entering)) return;
 
       // The buff lands on the freshly-placed instance. `increaseMaxHp`
       // handles the creature path: bumps counters.maxHp and counters.currentHp

@@ -146,7 +146,27 @@
       "Bash(Select-Object -ExpandProperty Count)",
       "Bash(Find-Item -Path \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\" -Filter \"*.js\" -Name \"*break*\",\"*shatter*\",\"*seal*\",\"*trap*\",\"*bind*\")",
       "Bash(Select-String \"Heal Burn\")",
-      "Bash(findstr /i \"divine-gift\")"
+      "Bash(findstr /i \"divine-gift\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('scripts:', json.dumps\\(d.get\\('scripts',{}\\),indent=2\\)\\); print\\('deps:', list\\(d.get\\('dependencies',{}\\).keys\\(\\)\\)\\); print\\('devDeps:', list\\(d.get\\('devDependencies',{}\\).keys\\(\\)\\)\\)\")",
+      "Bash(python -)",
+      "Bash(python -c \"import json;d=json.load\\(open\\('data/cards.json'\\)\\);c=next\\(x for x in d if x['name']=='Lunar Eclipse'\\);print\\(c['cardType'],c.get\\('subtype'\\),'::',c['effect']\\)\")",
+      "Bash(ls idej-sword*.js lunatic*.js)",
+      "Bash(grep -l \"Cost becomes 0\\\\|costBecomesZero\\\\|_handCostReductions\\\\|equip.*cost.*reduc\\\\|canEquipToHero\" idej*.js)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('data/cards.json'\\)\\); print\\('cards.json OK', len\\(d\\), 'cards'\\)\")",
+      "Bash(sed -n '6340,6352p' server.js)",
+      "Bash(sed -n '1998,2010p' server.js)",
+      "Bash(python -c \"import json;d=json.load\\(open\\('data/cards.json'\\)\\);c=next\\(x for x in d if x['name']=='Lunatic Cycle - New Moon'\\);print\\(repr\\(c['effect']\\)\\)\")",
+      "Bash(python -c \"import json;d=json.load\\(open\\('data/cards.json'\\)\\);print\\('cards.json OK',len\\(d\\)\\); c=next\\(x for x in d if x['name']=='Lunatic Cycle - New Moon'\\); print\\('New Moon text:', c['effect'][-60:]\\)\")",
+      "Bash(python -c \"import json;d=json.load\\(open\\('data/cards.json'\\)\\);c=next\\(\\(x for x in d if x['name']=='Leadership'\\),None\\);print\\(c['cardType'],c.get\\('subtype'\\),'::',c['effect']\\) if c else print\\('NOT FOUND'\\)\")",
+      "Bash(grep -n \"_isEquip\\\\|isEquip: true\\\\|_csppIsEquip\\\\|_csppSlotIsEquip\\\\|_csppHeroEligible\\\\|destination?._isEquip\\\\|setCrossSidePlayPick\\({ cardName, handIndex: idx, card, isEquip: true }\\)\" public/app-board.jsx)",
+      "Bash(sed -n '22075,22078p' public/app-board.jsx)",
+      "Bash(sed -n '14648,14654p' public/app-board.jsx)",
+      "Bash(grep -n \"socket.on\\('play_artifact'\\\\|async function doPlayArtifact\\\\|doPlayArtifact\\(room, pi, params\\)\\\\|doPlayArtifact\\(room, pi, {\" server.js)",
+      "Bash(sed -n '3391,3399p' server.js)",
+      "Bash(sed -n '8865,8880p' server.js)",
+      "Bash(Select-Object Name)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Select-Object FullName)"
     ]
   }
 }

@@ -52,7 +52,10 @@ module.exports = {
   // ── Batch-level (consolidated multi-target prompt) ──────────────
   isPostTargetReaction: true,
 
-  postTargetCondition(gs, pi, _engine, targetedTargets /*, sourceCard, opts */) {
+  postTargetCondition(gs, pi, _engine, targetedTargets, sourceCard, opts) {
+    // "when a Hero you control would take DAMAGE ≥ their max HP" —
+    // never chain to non-damage targeting. See Spectral Armor.
+    if (opts && opts.dealsDamage === false) return false;
     if (_alreadyPrompted(gs, pi)) return false;
     // Relaxed eligibility: any of the activator's alive Heroes in the
     // target list qualifies. The strict ≥ maxHp check happens at mark-

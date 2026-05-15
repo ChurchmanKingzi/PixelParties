@@ -82,7 +82,10 @@ module.exports = {
   // ── Batch-level (consolidated multi-target prompt) ──────────────
   isPostTargetReaction: true,
 
-  postTargetCondition(gs, pi, _engine, targetedTargets /*, sourceCard, opts */) {
+  postTargetCondition(gs, pi, _engine, targetedTargets, sourceCard, opts) {
+    // "when a Hero would take ANY DAMAGE" — never chain to non-damage
+    // targeting (Disruption Ray, Icy Slime, …). See Spectral Armor.
+    if (opts && opts.dealsDamage === false) return false;
     if (_alreadyPrompted(gs, pi)) return false;
     if (_hoptUsed(gs, pi)) return false;
     const eligible = _collectOwnedHeroTargets(gs, pi, targetedTargets).length > 0;

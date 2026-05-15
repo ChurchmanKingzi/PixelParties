@@ -73,14 +73,36 @@ const SECOND_ACTION_BUFF_KEY = 'second_action_grant';
 const SECOND_ACTION_TYPE_PREFIX = 'second_action:';
 
 /**
- * True iff `inst.counters.additionalActionType` resolves to a registered
- * additional-action config flagged `isSecondActionGrant: true`.
+ * The grant typeIds on `inst` that are second-action grants. With the
+ * multi-grant model a single inst (Lunatic Hawk: tier-4 + tier-5) can
+ * carry several grants — these helpers isolate ONLY the second-action
+ * ones so lifecycle/cleanup never touches a co-resident non-SA grant.
+ * `activeOnly` restricts to grants with avail > 0.
+ */
+function secondActionTypeIds(engine, inst, activeOnly) {
+  const out = [];
+  const types = engine?._additionalActionTypes || {};
+  const g = inst?.counters?.aaGrants;
+  if (g && typeof g === 'object') {
+    for (const [tid, v] of Object.entries(g)) {
+      if (activeOnly && !(v > 0)) continue;
+      if (types[tid]?.isSecondActionGrant) out.push(tid);
+    }
+    return out;
+  }
+  // Legacy scalar fallback (pre-migration / externally-stamped inst).
+  const tid = inst?.counters?.additionalActionType;
+  if (tid && types[tid]?.isSecondActionGrant
+      && (!activeOnly || inst.counters.additionalActionAvail > 0)) out.push(tid);
+  return out;
+}
+
+/**
+ * True iff `inst` carries ANY second-action grant (regardless of
+ * avail — so post-consume cleanup hooks still recognize it).
  */
 function isSecondActionGrant(engine, inst) {
-  const typeId = inst?.counters?.additionalActionType;
-  if (!typeId) return false;
-  const config = engine?._additionalActionTypes?.[typeId];
-  return !!config?.isSecondActionGrant;
+  return secondActionTypeIds(engine, inst, false).length > 0;
 }
 
 /**
@@ -96,8 +118,7 @@ function heroHasOtherActiveSecondActionGrant(engine, playerIdx, heroIdx, exclude
     if (inst.owner !== playerIdx) continue;
     if (inst.heroIdx !== heroIdx) continue;
     if (excludeInstId != null && inst.id === excludeInstId) continue;
-    if (!inst.counters?.additionalActionAvail) continue;
-    if (!isSecondActionGrant(engine, inst)) continue;
+    if (secondActionTypeIds(engine, inst, true).length === 0) continue;
     return true;
   }
   return false;
@@ -129,9 +150,18 @@ function clearBadgeIfNoOtherGrants(engine, playerIdx, heroIdx, excludeInstId) {
  *   allowedCategories:     Optional override of the action-category list
  *                          the grant covers. Defaults to all standard
  *                          play categories.
+ *   heroRestricted:        Whether ONLY the host Hero (the one this
+ *                          card sits on) may cash in the second Action.
+ *                          Defaults to TRUE (Soul Shard Ba's "this
+ *                          Hero gets a 2nd Action" semantics). Pass
+ *                          FALSE for "you may take a 2nd Action with
+ *                          ANY Hero" (Lunatic Hawk tier 5) — the
+ *                          engine's `findAdditionalActionForCard`
+ *                          drops the per-Hero match when this is false.
  */
 async function secondActionGrant(ctx, opts = {}) {
   const { sourceLabel, animationType, allowedCategories } = opts;
+  const heroRestricted = opts.heroRestricted !== false;
   const engine = ctx._engine;
   const gs = engine.gs;
   const inst = ctx.card;
@@ -147,11 +177,16 @@ async function secondActionGrant(ctx, opts = {}) {
   // each card's grant is its own provider entry in `cardInstances`, with
   // its own `additionalActionAvail` counter.
   const typeId = `${SECOND_ACTION_TYPE_PREFIX}${inst.id}`;
+  // Idempotent: if THIS inst's second-action grant is already live
+  // (unconsumed), don't re-register / re-animate / re-log. Lets
+  // callers re-invoke freely (e.g. Lunatic Hawk's onTurnStart) without
+  // a mirror-based guard, and without clobbering a co-resident grant.
+  if (inst.counters?.aaGrants?.[typeId] > 0) return true;
   engine.registerAdditionalActionType(typeId, {
     label: hostHero.name,
     allowedCategories: allowedCategories
       || ['creature', 'spell', 'attack', 'ability_activation', 'hero_effect_activation'],
-    heroRestricted: true,
+    heroRestricted,
     isSecondActionGrant: true,
     sourceLabel: sourceLabel || inst.name,
   });
@@ -208,19 +243,23 @@ const secondActionHooks = {
     if (!ps) return;
     const actionsPlayed = ps._actionsPlayedThisPhase || 0;
 
+    const saActive = secondActionTypeIds(engine, inst, true);
+
     // Action 1 just resolved + grant alive → keep the player in Action
     // Phase so the bonus second action stays reachable.
-    if (actionsPlayed === 1 && inst.counters?.additionalActionAvail) {
+    if (actionsPlayed === 1 && saActive.length > 0) {
       gs._preventPhaseAdvance = true;
       return;
     }
 
     // Action 2+ resolved with the grant still unconsumed → the
     // player's single second-action slot was spent on a different
-    // path (different Hero / different provider). Fizzle.
-    if (actionsPlayed >= 2 && inst.counters?.additionalActionAvail) {
-      const config = engine._additionalActionTypes?.[inst.counters?.additionalActionType];
-      engine.expireAdditionalAction(inst);
+    // path (different Hero / different provider). Fizzle — but ONLY
+    // the second-action grant(s); a co-resident non-SA grant on the
+    // same inst (Hawk tier-4) is untouched.
+    if (actionsPlayed >= 2 && saActive.length > 0) {
+      const config = engine._additionalActionTypes?.[saActive[0]];
+      for (const tid of saActive) engine.expireAdditionalActionType(inst, tid);
       clearBadgeIfNoOtherGrants(engine, ctx.cardOwner, inst.heroIdx);
       engine.log('second_action_fizzle', {
         player: ps.username,
@@ -235,7 +274,8 @@ const secondActionHooks = {
     const engine = ctx._engine;
     const inst = ctx.card;
     if (!isSecondActionGrant(engine, inst)) return;
-    if (inst.counters?.additionalActionAvail) return; // not yet drained
+    // Still a live second-action grant on this inst → not yet drained.
+    if (secondActionTypeIds(engine, inst, true).length > 0) return;
     clearBadgeIfNoOtherGrants(engine, inst.owner, inst.heroIdx);
     engine.sync();
   },
@@ -245,8 +285,10 @@ const secondActionHooks = {
     const engine = ctx._engine;
     const inst = ctx.card;
     if (!isSecondActionGrant(engine, inst)) return;
-    if (inst.counters?.additionalActionAvail) {
-      engine.expireAdditionalAction(inst);
+    // Expire only the SECOND-ACTION grant(s); a co-resident non-SA
+    // grant (Hawk tier-4) survives the Action-Phase teardown.
+    for (const tid of secondActionTypeIds(engine, inst, true)) {
+      engine.expireAdditionalActionType(inst, tid);
     }
     clearBadgeIfNoOtherGrants(engine, inst.owner, inst.heroIdx);
     engine.sync();

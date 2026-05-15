@@ -2,13 +2,15 @@
 //  CARD EFFECT: "Cooldin, King of Coolness"
 //  Hero — Activated effect, once per turn.
 //
-//  Choose a level 3 or lower Area from your HAND or
-//  DECK and play it as an additional Action, regardless
-//  of its level. Immediately end your turn afterwards.
+//  Choose a level 3 or lower Area (Spell OR Attack)
+//  from your HAND or DECK and play it as an additional
+//  Action, regardless of its level. Immediately end
+//  your turn afterwards.
 //
 //  Flow:
-//    1. Build the eligible pool — all Area subtype
-//       Spells with level ≤ 3 in hand and deck.
+//    1. Build the eligible pool — all Area-subtype
+//       Spells AND Area Attacks (e.g. Blood Rock) with
+//       level ≤ 3 in hand and deck.
 //    2. Gallery prompt: player picks one (with source
 //       badge so "from deck" is clear).
 //    3. If the pick came from the deck, splice it out
@@ -42,7 +44,9 @@ function collectAreasFromSource(names, cardDB, source, engine, pi) {
     const name = names[i];
     const cd = cardDB[name];
     if (!cd) continue;
-    if (cd.cardType !== 'Spell') continue;
+    // Areas come in BOTH subtypes: Area Spells AND Area Attacks
+    // (e.g. Blood Rock). Cooldin tutors either.
+    if (cd.cardType !== 'Spell' && cd.cardType !== 'Attack') continue;
     if ((cd.subtype || '').toLowerCase() !== 'area') continue;
     // Effective level (honours Cataclysm's `reduceCardLevel` for Area
     // Spells in play, Mana Absorbing Crystal +1 in hand, etc.).
@@ -87,11 +91,18 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   const handIndex = ps.hand.lastIndexOf(cardName);
   if (handIndex < 0) return false;
 
+  // Real card type — Area Attacks (Blood Rock) must chain as 'Attack'
+  // so reaction cards that gate on Spell-vs-Attack and the chain UI
+  // read correctly. (Placement still works either way: every Area's
+  // onPlay routes through placeArea, which sets _spellPlacedOnBoard.)
+  const _cd = engine._getCardDB()[cardName];
+  const areaCardType = _cd?.cardType === 'Attack' ? 'Attack' : 'Spell';
+
   // Step B: Reaction chain. Gives the opponent a window to negate (The
   // Master's Plan, Anti Magic Shield, etc.). If negated, the Area is
   // discarded — Cooldin's hero effect still counts as "used".
   const chainResult = await engine.executeCardWithChain({
-    cardName, owner: pi, heroIdx, cardType: 'Spell', goldCost: 0,
+    cardName, owner: pi, heroIdx, cardType: areaCardType, goldCost: 0,
   });
   if (chainResult.negated) {
     ps.hand.splice(handIndex, 1);

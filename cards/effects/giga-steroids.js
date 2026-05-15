@@ -23,8 +23,13 @@
 //  Spell / Attack / Creature plays from hand are
 //  intentionally NOT covered.
 //
+//  NOT usable in Main Phase 2 — that phase comes
+//  AFTER the Action Phase, so the bonus Action
+//  could never be spent that turn. `canActivate`
+//  rejects it there (server + client gray-out).
+//
 //  Wiring:
-//    • Plays in Main Phase (the engine's
+//    • Plays in Main Phase 1 (the engine's
 //      `doUseArtifactEffect` path). The grant is
 //      registered against THIS instance and
 //      flagged `isSecondActionGrant: true`, so
@@ -193,10 +198,17 @@ module.exports = {
   // See header — both zones cover the inst's hand → discard transit.
   activeIn: ['hand', 'discard'],
 
-  canActivate(/* gs, pi */) {
-    // Always activatable — the grant alone is the value, even if the
-    // player has nothing to spend it on right now (the 6-gold cost is
-    // theirs to evaluate).
+  canActivate(gs /*, pi, engine */) {
+    // Grants a SECOND action for the Action Phase. Main Phase 2 comes
+    // AFTER the Action Phase, so a grant made there is dead on arrival
+    // (it could never be spent this turn). Disallow it entirely in
+    // Main Phase 2 — the server rejects the play and the client grays
+    // the card out via getUnactivatableArtifacts. Main Phase 1 (the
+    // intended setup window) and any other context stay allowed.
+    if (gs && gs.currentPhase === 4) return false; // PHASES.MAIN2
+    // Otherwise always activatable — the grant alone is the value,
+    // even if the player has nothing to spend it on right now (the
+    // 6-gold cost is theirs to evaluate).
     return true;
   },
 
@@ -258,14 +270,13 @@ module.exports = {
     // fizzle / expire by `_recomputeOnSteroidsFlag` calls below.
     _recomputeOnSteroidsFlag(engine, pi);
 
-    // If the grant lands while the controller is already at action 1
-    // of their Action Phase (e.g. Giga Steroids was used in Main
-    // Phase 2 BETWEEN the lone Action and the auto-advance), the
-    // engine's post-action auto-advance would otherwise kick them out
-    // before the bonus is reachable. The shared onActionUsed hook
-    // re-asserts this every action 1 for the rest of the phase, but
-    // we set it pre-emptively here for the Main-Phase-2 path where
-    // the artifact resolves between action 1 and the phase advance.
+    // Defensive: if a grant somehow lands while the controller is
+    // already at action 1 of their Action Phase, keep them parked so
+    // the bonus stays reachable (the shared onActionUsed hook also
+    // re-asserts this each action 1). With Main Phase 2 plays now
+    // blocked this is effectively a no-op on the normal Main-Phase-1
+    // setup path (`_actionsPlayedThisPhase` is 0 there), but it's
+    // kept as a cheap safety net.
     if ((ps._actionsPlayedThisPhase || 0) === 1) {
       gs._preventPhaseAdvance = true;
     }

@@ -51,6 +51,7 @@
 // ═══════════════════════════════════════════
 
 const { ownSupportCreatures } = require('./_deepsea-shared');
+const { isAreaImmuneInst } = require('./_diver-helmet-shared');
 
 const CARD_NAME = 'Slippery Ice';
 
@@ -86,6 +87,9 @@ function destinationsFor(engine, pi, inst) {
 /** True when at least one own Creature has at least one legal destination. */
 function hasAnyLegalMove(engine, pi) {
   for (const inst of ownSupportCreatures(engine, pi)) {
+    // Diver Helmet: Creatures in the equipped Hero's Support Zones are
+    // unaffected by Areas — Slippery Ice can't move them.
+    if (isAreaImmuneInst(engine, inst)) continue;
     if (destinationsFor(engine, pi, inst).length > 0) return true;
   }
   return false;
@@ -187,6 +191,8 @@ module.exports = {
       // Re-collect each iteration — previous moves change the board.
       const candidates = ownSupportCreatures(engine, activator).filter(inst => {
         if (movedInstIds.has(inst.id)) return false;
+        // Diver Helmet: protected Creatures are unaffected by Areas.
+        if (isAreaImmuneInst(engine, inst)) return false;
         return destinationsFor(engine, activator, inst).length > 0;
       });
       if (candidates.length === 0) break;

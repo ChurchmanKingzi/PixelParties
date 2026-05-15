@@ -569,6 +569,12 @@ async function runActionPhase(engine, helpers) {
       if (hadPlan) delete engine._mctsTargetPlan;
     }
 
+    // The play handler fully unwound (resolution locks released) → run
+    // any reaction-deferred actions (e.g. a human Lunar Eclipse that
+    // negated this CPU card grants the CPU a replacement Action).
+    // Self-gated, so it no-ops unless the board is actually idle.
+    await engine._runPostChainActions();
+
     const shrank = ps.hand.length < handLenBefore;
     const phaseChanged = engine.gs.currentPhase !== 3;
     const hoptClaimed = abilityHoptKey

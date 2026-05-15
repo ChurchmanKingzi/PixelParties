@@ -60,7 +60,12 @@ module.exports = {
   // ── Batch-level (consolidated multi-target prompt) ──────────────
   isPostTargetReaction: true,
 
-  postTargetCondition(gs, pi, engine, targetedTargets /*, sourceCard, opts */) {
+  postTargetCondition(gs, pi, engine, targetedTargets, sourceCard, opts) {
+    // Spectral Armor's text is strictly "when a target you control
+    // would take ANY DAMAGE". The post-target hub also fires for pure
+    // non-damage targeting (Disruption Ray, Icy Slime, …); bail there
+    // so it never chains to a Spell/effect that deals no damage.
+    if (opts && opts.dealsDamage === false) return false;
     if (_alreadyPrompted(gs, pi)) return false;
     const eligible = _collectOwnedHeroTargets(gs, pi, targetedTargets).length > 0;
     if (eligible) {

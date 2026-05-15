@@ -137,15 +137,19 @@ module.exports = {
 
     if (!costsAction) return;
 
-    // Grant opponent an immediate Action with any hero — optional, they may
-    // cancel to skip (the replacement is a "may", not a "must").
+    // Grant opponent an immediate Action with any hero — optional, they
+    // may cancel to skip. DEFERRED to after the chain fully resolves:
+    // running it inline (mid-chain resolve) prompts while the reaction
+    // lock still blocks card plays, so the highlighted cards couldn't
+    // actually be played. The engine drains this post-chain.
     const oppIdx = targetLink.owner;
-    await engine.performImmediateActionAnyHero(oppIdx, {
-      title: "The Master's Plan",
-      description: 'Your card was negated. You may perform a different Action with any Hero — or skip.',
-      cancellable: true,
+    engine.queuePostChainAction(async () => {
+      await engine.performImmediateActionAnyHero(oppIdx, {
+        title: "The Master's Plan",
+        description: 'Your card was negated. You may perform a different Action with any Hero — or skip.',
+        cancellable: true,
+      });
+      engine.sync();
     });
-
-    engine.sync();
   },
 };

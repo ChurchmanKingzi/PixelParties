@@ -5,14 +5,25 @@
 //
 //  Blinded silences targeted Attacks / Spells /
 //  effects but lets full-AoE plays through.
-//  Duration is wired with the standard
-//  `expiresAtTurn` / `expiresForPlayer` mechanism
-//  (see cards/effects/cloud-pillow.js for the
-//  reference implementation): expires at the
-//  start of the caster's turn-after-next, which
-//  lines up with "end of caster's next turn"
-//  since no opponent turn falls between those
-//  two moments.
+//  Duration is "until the end of the caster's
+//  next turn". Buff/status expiry runs at
+//  TURN-START only (_processBuffExpiry), and
+//  gs.turn increments per player-turn, so with
+//  cast=T → opp T+1 → caster's next turn T+2 →
+//  opp T+3, the Blinded must survive through ALL
+//  of T+2 and be gone by T+3. It therefore
+//  expires at the START of T+3 — the first
+//  turn-start AFTER the end of the caster's next
+//  turn: expiresAtTurn = gs.turn + 3,
+//  expiresForPlayer = opponent (the active
+//  player at T+3).
+//
+//  (Previously this used the "+2 / caster"
+//  pattern, which actually expires at the START
+//  of the caster's next turn — i.e. "until the
+//  START of your next turn". Corrected to the
+//  literal card text; Disruption Ray uses the
+//  same convention.)
 //
 //  Visual: thick gray smoke clouds enveloping
 //  ALL three opponent hero slots — including
@@ -36,8 +47,9 @@ module.exports = {
     const oppPs = gs.players[oi];
     if (!oppPs) return;
 
-    // Caster's turn-after-next start = end of caster's next turn.
-    const expiresTurn = gs.turn + 2;
+    // Start of the opponent's turn that follows the caster's next turn
+    // = just after the end of the caster's next turn. See header.
+    const expiresTurn = gs.turn + 3;
 
     // Smoke envelops all three opponent hero slots regardless of
     // alive/dead/immune state — the visual is part of the play, not the
@@ -57,7 +69,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) continue;
       await engine.addHeroStatus(oi, hi, 'blinded', {
         expiresAtTurn: expiresTurn,
-        expiresForPlayer: pi,
+        expiresForPlayer: oi,
         appliedBy: pi,
         source: 'Smoke Vial',
       });

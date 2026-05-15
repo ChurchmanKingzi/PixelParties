@@ -100,17 +100,24 @@ async function doSacrifice(engine, pi) {
   });
   await engine._delay(700);
 
-  // Step 4: Kill the sacrificed hero
-  sacHero.hp = 0;
-  sacHero.diedOnTurn = gs.turn;
-  engine.log('hero_ko', { hero: sacHero.name, source: 'Divine Gift of Sacrifice' });
-  await engine.runHooks('onHeroKO', { hero: sacHero, source: { name: 'Divine Gift of Sacrifice', owner: pi }, _bypassDeadHeroFilter: true });
-
-  if (sacHero.hp <= 0 && !sacHero._koProcessed) {
-    sacHero._koProcessed = true;
-    await engine.handleHeroDeathCleanup(sacHero);
-    await engine.checkAllHeroesDead();
-  }
+  // Step 4: Defeat the sacrificed Hero — the shared NON-damage KO path
+  // (same engine action Lunatic Golem tier-5 uses). A sacrifice is a
+  // VOLUNTARY self-defeat the controller chose, so it must not be
+  // vetoable by any protection — `respectFirstTurnProtection:false`
+  // waives even the absolute game-start grace shield (the only gate a
+  // non-damage defeat respects; it never touches the damage pipeline,
+  // so Resistance / damage-immunity / negation can't block it either).
+  // It STILL runs ON_HERO_KO + the generic `_extraLife` net, so a
+  // Guardian Angel (or Trial of Coolness) on the sacrificed Hero
+  // revives it — the sacrifice still "resolves" (its max HP was already
+  // captured in `sacMaxHp`), the buff below still lands, and the Hero
+  // comes back. We deliberately do NOT gate the rest of the effect on
+  // the return value: a revived sacrifice is still a completed Gift.
+  await engine.actionDefeatHero(
+    { name: 'Divine Gift of Sacrifice', owner: pi },
+    sacHero,
+    { reason: 'Divine Gift of Sacrifice', respectFirstTurnProtection: false }
+  );
 
   // If game ended from all heroes dead, stop
   if (gs.result) return true;

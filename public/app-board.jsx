@@ -508,7 +508,7 @@ function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardNa
 //   of the three cards. Activator-side renders the same cards with
 //   `pointer-events: none` so they just watch.
 function BirthdayPresentReveal({ state, interactive, onPick }) {
-  const { cards, cardbackUrl, chosen, flights, sourceX, sourceY } = state;
+  const { cards, cardbackUrl, chosen, flights, sourceX, sourceY, castMode } = state;
   return (
     <>
       {cards.map((cardName, i) => {
@@ -520,7 +520,11 @@ function BirthdayPresentReveal({ state, interactive, onPick }) {
         const slotIdx = i - 1;
         const cls = ['bday-present-reveal-card'];
         if (interactive && !chosen) cls.push('clickable');
-        if (isChosen) cls.push('chosen');
+        // Timeless King Zi: the chosen Spell grows + slow-fades as it's
+        // cast (`tk-casting`) instead of Birthday Present's hand-bound
+        // highlight (`chosen`). `castMode` is Zi-only — Birthday Present
+        // never sets it, so its path is unchanged.
+        if (isChosen) cls.push(castMode ? 'tk-casting' : 'chosen');
         if (flight) cls.push('flying-out');
         const handleClick = (interactive && !chosen && onPick)
           ? () => onPick(cardName) : undefined;
@@ -609,16 +613,20 @@ function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl
   );
 }
 
-function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest }) {
+function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay }) {
   const dx = endX - startX;
   const dy = endY - startY;
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
   const isDeleted = dest === 'deleted';
   const isDeckReturn = dest === 'deck';
+  // `delay` (ms) staggers a simultaneous multi-card batch. The flight
+  // keyframes have no backwards fill, so during the delay the card
+  // simply sits at its board slot (start position) and then flies —
+  // exactly the "wait your turn, then go" cascade we want.
   return (
     <div className={'discard-anim-card' + (isDeleted ? ' discard-anim-deleted' : '') + (isDeckReturn ? ' discard-anim-deck-return' : '')}
-      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px' }}>
+      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px', animationDelay: delay ? delay + 'ms' : undefined }}>
       <div className="board-card" style={{ width: '100%', height: '100%' }}>
         {imgUrl ? <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
         : <div className="board-card-text">{cardName || '?'}</div>}
@@ -1431,6 +1439,160 @@ function FirstCircleOfHellOverlay() {
           15%  { opacity: var(--ashOpacity, 1); }
           90%  { opacity: var(--ashOpacity, 1); }
           100% { transform: translate(var(--drift, 0), -120vh); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// Blood Rock — a grimy cobblestone courtyard soaked in blood. A
+// brick-offset grid of rounded stones (seeded jitter so the masonry
+// reads as hand-laid, not tiled), dark blood pooling into the grout
+// lines, irregular splatter blotches with a slow wet sheen, and a
+// red ambient vignette. Static masonry (no per-frame animation) keeps
+// it cheap; only the blood sheen pulses.
+function BloodRockOverlay() {
+  // Brick-offset stone grid. Odd rows are shifted half a cell so the
+  // seams stagger like real cobblestone. Each stone carries its own
+  // shade / size / tilt jitter, frozen once per mount.
+  const COLS = 11;
+  const ROWS = 8;
+  const stones = useMemo(() => {
+    const out = [];
+    for (let r = 0; r < ROWS; r++) {
+      const offset = (r % 2) * (50 / COLS); // half-cell shift on odd rows
+      for (let c = 0; c < COLS; c++) {
+        const shade = 38 + Math.floor(Math.random() * 26); // gray-brown range
+        out.push({
+          x: (c * (100 / COLS)) + offset + (Math.random() * 2 - 1),
+          y: (r * (100 / ROWS)) + (Math.random() * 2 - 1),
+          w: (100 / COLS) * (0.86 + Math.random() * 0.16),
+          h: (100 / ROWS) * (0.82 + Math.random() * 0.2),
+          tilt: -7 + Math.random() * 14,
+          // Warm grimy stone with a faint red staining baked in.
+          tone: `rgb(${shade + 6}, ${shade}, ${shade - 4})`,
+          radius: 38 + Math.random() * 22,
+        });
+      }
+    }
+    return out;
+  }, []);
+  // Large soft blood pools that sink into the masonry (multiply blend).
+  const pools = useMemo(() => Array.from({ length: 6 }, () => ({
+    x: 8 + Math.random() * 84,
+    y: 24 + Math.random() * 68,
+    r: 70 + Math.random() * 130,
+    a: 0.5 + Math.random() * 0.35,
+  })), []);
+  // Irregular splatter blotches — jagged clip-path shapes, bright at
+  // the core fading to dark, each with a ring of droplet specks.
+  const splatters = useMemo(() => Array.from({ length: 13 }, (_, i) => ({
+    x: Math.random() * 100,
+    y: 18 + Math.random() * 78,
+    s: 26 + Math.random() * 60,
+    rot: Math.random() * 360,
+    delay: -Math.random() * 4,
+    dur: 3 + Math.random() * 2.5,
+    shape: i % 3,
+    drops: Array.from({ length: 5 + Math.floor(Math.random() * 5) }, () => ({
+      a: Math.random() * Math.PI * 2,
+      d: 0.6 + Math.random() * 0.7,
+      sz: 2 + Math.random() * 4,
+    })),
+  })), []);
+  const clipFor = (shape) => shape === 0
+    ? 'polygon(50% 0%, 68% 22%, 100% 38%, 74% 58%, 86% 100%, 50% 74%, 16% 100%, 26% 58%, 0% 36%, 32% 22%)'
+    : shape === 1
+      ? 'polygon(48% 4%, 80% 12%, 96% 46%, 78% 70%, 92% 96%, 54% 80%, 22% 98%, 8% 62%, 18% 28%)'
+      : 'polygon(50% 2%, 72% 18%, 98% 30%, 82% 52%, 100% 82%, 64% 70%, 44% 100%, 30% 66%, 2% 54%, 22% 24%)';
+  return (
+    <div className="blood-rock-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
+    }}>
+      {/* Layer 1: grimy stone ground base — the grout/mortar showing
+          through the gaps between cobbles. */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background:
+          'linear-gradient(180deg, rgba(34,28,26,0.97) 0%, rgba(24,19,18,0.98) 55%, rgba(14,10,10,0.99) 100%)',
+      }} />
+      {/* Layer 2: the cobblestones. */}
+      {stones.map((s, i) => (
+        <div key={'cob' + i} style={{
+          position: 'absolute',
+          left: s.x + '%', top: s.y + '%',
+          width: s.w + '%', height: s.h + '%',
+          transform: 'rotate(' + s.tilt + 'deg)',
+          background: s.tone,
+          borderRadius: s.radius + '%',
+          boxShadow:
+            'inset 0 2px 3px rgba(255,235,225,0.07), '
+            + 'inset 0 -3px 5px rgba(0,0,0,0.6), '
+            + '0 2px 4px rgba(0,0,0,0.55)',
+        }} />
+      ))}
+      {/* Layer 3: blood pooling into the masonry (multiply so it
+          stains the stones rather than sitting on top). */}
+      <div style={{
+        position: 'absolute', inset: 0, mixBlendMode: 'multiply',
+      }}>
+        {pools.map((p, i) => (
+          <div key={'pool' + i} style={{
+            position: 'absolute',
+            left: p.x + '%', top: p.y + '%',
+            width: p.r + 'px', height: (p.r * 0.7) + 'px',
+            transform: 'translate(-50%, -50%)',
+            background:
+              'radial-gradient(ellipse, rgba(120,4,10,' + p.a + ') 0%, '
+              + 'rgba(78,2,8,' + (p.a * 0.7) + ') 45%, rgba(40,0,4,0) 78%)',
+            borderRadius: '50%',
+          }} />
+        ))}
+      </div>
+      {/* Layer 4: splatter blotches with a wet sheen + droplet specks. */}
+      {splatters.map((sp, i) => (
+        <div key={'spl' + i} style={{
+          position: 'absolute',
+          left: sp.x + '%', top: sp.y + '%',
+          width: sp.s + 'px', height: sp.s + 'px',
+          transform: 'translate(-50%, -50%) rotate(' + sp.rot + 'deg)',
+        }}>
+          <div style={{
+            position: 'absolute', inset: 0,
+            background:
+              'radial-gradient(circle at 42% 38%, rgba(190,18,30,0.95) 0%, '
+              + 'rgba(130,6,16,0.9) 38%, rgba(70,2,8,0.82) 100%)',
+            clipPath: clipFor(sp.shape),
+            boxShadow: '0 0 6px rgba(120,0,8,0.5)',
+            animation: 'bloodRockSheen ' + sp.dur + 's ease-in-out ' + sp.delay + 's infinite',
+          }} />
+          {sp.drops.map((d, j) => (
+            <div key={'drp' + j} style={{
+              position: 'absolute',
+              left: '50%', top: '50%',
+              width: d.sz + 'px', height: (d.sz * 1.25) + 'px',
+              transform: 'translate('
+                + (Math.cos(d.a) * sp.s * d.d) + 'px, '
+                + (Math.sin(d.a) * sp.s * d.d) + 'px) translate(-50%, -50%)',
+              background: 'radial-gradient(circle at 38% 30%, #c41020, #6e0410)',
+              borderRadius: '50% 50% 50% 50% / 42% 42% 58% 58%',
+              boxShadow: '0 0 3px rgba(110,0,8,0.55)',
+            }} />
+          ))}
+        </div>
+      ))}
+      {/* Layer 5: red ambient vignette — darkens the edges and casts a
+          faint blood glow toward the center for mood. */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background:
+          'radial-gradient(ellipse at 50% 55%, rgba(90,0,8,0.12) 0%, '
+          + 'rgba(40,0,4,0.0) 45%, rgba(10,0,2,0.45) 100%)',
+      }} />
+      <style>{`
+        @keyframes bloodRockSheen {
+          0%, 100% { filter: brightness(0.92) saturate(1.05); }
+          50%      { filter: brightness(1.18) saturate(1.25); }
         }
       `}</style>
     </div>
@@ -3692,6 +3854,63 @@ const ANIM_REGISTRY = {
     };
   })(),
   explosion: ExplosionEffect,
+  // Disruption Ray impact — a sickly-green toxic burst (flash + two
+  // expanding rings + lime shrapnel). Reuses the shared
+  // `.anim-explosion-particle` class for the shrapnel so it stays lean;
+  // the flash/rings are self-contained with locally-scoped keyframes.
+  disruption_impact: (function () {
+    return function DisruptionImpactEffect({ x, y, opacity }) {
+      const particles = useMemo(() => Array.from({ length: 22 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 22 + Math.random() * 52;
+        return {
+          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+          size: 3 + Math.random() * 7,
+          color: ['#9ad13c', '#7ec428', '#bfe06a', '#5fa01e', '#d4f08a', '#eaffc0'][Math.floor(Math.random() * 6)],
+          delay: Math.random() * 70, dur: 360 + Math.random() * 380,
+        };
+      }), []);
+      const wrapperOpacity = (typeof opacity === 'number' && opacity >= 0 && opacity <= 1) ? opacity : 1;
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, opacity: wrapperOpacity }}>
+          <div style={{
+            position: 'absolute', left: -46, top: -46, width: 92, height: 92, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(170,230,70,.85) 0%, rgba(120,196,40,.5) 40%, rgba(80,150,20,0) 75%)',
+            boxShadow: '0 0 26px rgba(150,214,60,.8), 0 0 50px rgba(110,180,40,.5)',
+            animation: 'disruptImpactFlash 620ms ease-out forwards',
+          }} />
+          <div style={{
+            position: 'absolute', left: -20, top: -20, width: 40, height: 40, borderRadius: '50%',
+            border: '3px solid rgba(180,235,90,.9)',
+            animation: 'disruptImpactRing 700ms ease-out forwards',
+          }} />
+          <div style={{
+            position: 'absolute', left: -20, top: -20, width: 40, height: 40, borderRadius: '50%',
+            border: '2px solid rgba(140,205,55,.7)',
+            animation: 'disruptImpactRing 900ms ease-out 120ms forwards',
+          }} />
+          {particles.map((p, i) => (
+            <div key={i} className="anim-explosion-particle" style={{
+              '--dx': p.dx + 'px', '--dy': p.dy + 'px', '--size': p.size + 'px',
+              '--color': p.color, animationDelay: p.delay + 'ms', animationDuration: p.dur + 'ms',
+            }} />
+          ))}
+          <style>{`
+            @keyframes disruptImpactFlash {
+              0%   { opacity: 0; transform: scale(0.3); }
+              30%  { opacity: 1; transform: scale(1.05); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+            @keyframes disruptImpactRing {
+              0%   { opacity: 0;   transform: scale(0.3); }
+              25%  { opacity: .95; }
+              100% { opacity: 0;   transform: scale(3.4); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   shield_bubble: ShieldBubbleEffect,
   stun_strike: StunStrikeEffect,
   niu_powerup: NiuPowerUpEffect,
@@ -5795,6 +6014,78 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // Lunar Eclipse — same structure/keyframes as `blood_moon_pulse`
+  // but recoloured to Lunatic Golem's pale yellow-white moonlight
+  // palette (core rgba(255,252,236) / glow rgba(244,240,205)), so the
+  // whole Lunatic archetype shares one moon-light identity. Kept as a
+  // SEPARATE effect so Blood Moon under the Sea's red pulse is
+  // untouched. Reuses the bloodMoon* keyframes (colour-agnostic
+  // transforms/opacity) — only the colour strings differ.
+  lunar_eclipse_pulse: (() => {
+    return function LunarEclipsePulseEffect({ x, y, w, h }) {
+      const drops = useMemo(() => Array.from({ length: 14 }, () => ({
+        xOff: -30 + Math.random() * 60,
+        startY: -30 + Math.random() * 10,
+        endY: 70 + Math.random() * 30,
+        delay: 120 + Math.random() * 320,
+        dur: 650 + Math.random() * 300,
+        size: 3 + Math.random() * 4,
+      })), []);
+      const rays = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+        angle: -45 + i * 15 + (Math.random() * 6 - 3),
+        len: 70 + Math.random() * 30,
+        delay: Math.random() * 150,
+        dur: 700 + Math.random() * 250,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Pale moonlight halo behind the card */}
+          <div style={{
+            position: 'absolute', left: -55, top: -55, width: 110, height: 110,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,252,236,.55) 0%, rgba(244,240,205,.35) 40%, transparent 80%)',
+            boxShadow: '0 0 22px rgba(255,252,236,.75), inset 0 0 14px rgba(244,240,205,.55)',
+            animation: 'bloodMoonHalo 1100ms ease-out forwards',
+            opacity: 0,
+          }} />
+          {/* Pale eclipse moon orb drifting in above */}
+          <div style={{
+            position: 'absolute', left: -18, top: -74, width: 36, height: 36,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle at 35% 30%, #fffdf2, #f4f0cd 55%, #d8d2a0 100%)',
+            boxShadow: '0 0 22px rgba(255,252,236,.85), 0 0 36px rgba(244,240,205,.6)',
+            animation: 'bloodMoonOrb 1000ms ease-out forwards',
+            opacity: 0,
+          }} />
+          {/* Moonlight rays lancing downward */}
+          {rays.map((r, i) => (
+            <div key={'ler'+i} style={{
+              position: 'absolute', left: 0, top: -58,
+              width: 3, height: r.len,
+              background: 'linear-gradient(to bottom, rgba(255,252,236,.9), rgba(244,240,205,.5) 60%, transparent)',
+              borderRadius: 3,
+              transform: `rotate(${r.angle}deg) scaleY(0)`,
+              transformOrigin: 'center top',
+              animation: `bloodMoonRay ${r.dur}ms ease-out ${r.delay}ms forwards`,
+              boxShadow: '0 0 6px rgba(255,252,236,.75)',
+            }} />
+          ))}
+          {/* Pale moonlight motes trickling down past the card */}
+          {drops.map((d, i) => (
+            <div key={'led'+i} style={{
+              position: 'absolute', left: d.xOff, top: d.startY,
+              width: d.size, height: d.size * 1.4, borderRadius: '50% 50% 50% 50% / 40% 40% 60% 60%',
+              background: 'radial-gradient(circle at 40% 30%, #fffdf2, #e8e2b0)',
+              boxShadow: '0 0 5px rgba(255,252,236,.8)',
+              animation: `bloodMoonDrop ${d.dur}ms ease-in ${d.delay}ms forwards`,
+              opacity: 0,
+              '--bmEndY': d.endY + 'px',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
   // Rain of Spores — full-board yellow particle shower. Reuses the
   // `deepseaSporeFall` keyframes (same top-to-bottom drift), but with
   // a saturated yellow / gold palette so it reads as the titular
@@ -7276,6 +7567,53 @@ const ANIM_REGISTRY = {
               opacity: 0,
             }}>{p.char}</div>
           ))}
+        </div>
+      );
+    };
+  })(),
+  // Trial of Dominance — a ring of blood-red hearts blooms around the
+  // doomed Creature, then fades as it's deleted. Uses the ♥ text glyph
+  // (U+2665) so the colour is fully controllable (emoji hearts can't
+  // be recoloured to true blood-red). Self-contained keyframes.
+  blood_hearts: (() => {
+    return function BloodHeartsEffect({ x, y }) {
+      const hearts = useMemo(() => Array.from({ length: 12 }, (_, i) => {
+        const ang = (i / 12) * Math.PI * 2 + (Math.random() * 0.4 - 0.2);
+        const rad = 30 + Math.random() * 16;
+        return {
+          dx: Math.cos(ang) * rad,
+          dy: Math.sin(ang) * rad,
+          size: 13 + Math.random() * 12,
+          delay: Math.random() * 220,
+          dur: 620 + Math.random() * 320,
+          shade: ['#b3001b', '#8b0010', '#c61026', '#7a0010', '#9b0014'][Math.floor(Math.random() * 5)],
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Dark blood flash behind the Creature. */}
+          <div className="anim-gold-flash" style={{
+            background: 'radial-gradient(circle, rgba(150,0,15,.6) 0%, rgba(90,0,10,.3) 45%, transparent 72%)',
+          }} />
+          {hearts.map((h, i) => (
+            <div key={'bh' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: h.size + 'px', lineHeight: 1,
+              color: h.shade,
+              textShadow: '0 0 6px rgba(150,0,18,.9), 0 0 12px rgba(90,0,10,.6)',
+              ['--bhx']: h.dx + 'px', ['--bhy']: h.dy + 'px',
+              animation: `bloodHeartsBloom ${h.dur}ms ease-out ${h.delay}ms forwards`,
+              opacity: 0,
+            }}>♥</div>
+          ))}
+          <style>{`
+            @keyframes bloodHeartsBloom {
+              0%   { opacity: 0; transform: translate(0,0) scale(0.2); }
+              35%  { opacity: 1; transform: translate(calc(var(--bhx) * .6), calc(var(--bhy) * .6)) scale(1.15); }
+              70%  { opacity: 1; transform: translate(var(--bhx), var(--bhy)) scale(1); }
+              100% { opacity: 0; transform: translate(calc(var(--bhx) * 1.25), calc(var(--bhy) * 1.25 - 14px)) scale(.7); }
+            }
+          `}</style>
         </div>
       );
     };
@@ -13401,6 +13739,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return r ? { x: r.left + r.width / 2 - 32, y: r.top + r.height / 2 - 45 } : null;
   };
 
+  // Minor per-card stagger so that when 2+ board cards (e.g. Creatures
+  // wiped simultaneously by Trial of Dominance / an AoE) fly to the
+  // same pile in ONE diff detection, they cascade one-by-one like a
+  // mass-discard instead of all moving at once. A single card gets
+  // delay 0 (unchanged behaviour).
+  const PILE_FLIGHT_STAGGER_MS = 130;
+
   // Helper: create anims from board rects for unmatched pile entries
   const animsFromBoard = (entries, boardRects, dest, destSelector) => {
     const target = getPileCenter(destSelector);
@@ -13421,7 +13766,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       if (!positions || positions.length === 0) continue;
       const sr = positions.shift();
-      anims.push({ id: Date.now() + Math.random(), cardName, startX: sr.left, startY: sr.top, endX: target.x, endY: target.y, dest });
+      anims.push({
+        id: Date.now() + Math.random(), cardName,
+        startX: sr.left, startY: sr.top, endX: target.x, endY: target.y, dest,
+        // anims.length BEFORE this push == this card's index in the
+        // batch → 0, 130ms, 260ms, … Single-card batches stay at 0.
+        delay: anims.length * PILE_FLIGHT_STAGGER_MS,
+      });
     }
     return anims;
   };
@@ -13434,11 +13785,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (dc > 0) setDiscardHidden(prev => prev + dc);
     if (dl > 0) setDeletedHidden(prev => prev + dl);
     setDiscardAnims(prev => [...prev, ...newAnims]);
+    // Cleanup must outlast the LAST (most-delayed) card's flight, or a
+    // staggered batch's tail cards get yanked mid-air and the pile-
+    // hidden counter lifts before they land. 500ms already buffers the
+    // ~400ms flight; add the max per-card stagger delay on top.
+    const maxDelay = newAnims.reduce((m, a) => Math.max(m, a.delay || 0), 0);
     setTimeout(() => {
       setDiscardAnims(prev => prev.filter(a => !newAnims.some(n => n.id === a.id)));
       if (dc > 0) setDiscardHidden(prev => Math.max(0, prev - dc));
       if (dl > 0) setDeletedHidden(prev => Math.max(0, prev - dl));
-    }, 500);
+    }, 500 + maxDelay);
   };
 
   // Helper: capture board card positions into boardCardRectsRef
@@ -13565,8 +13921,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const card = CARDS_BY_NAME[a.cardName];
           if (card?.cardType === 'Creature') {
             const id = Date.now() + Math.random();
-            setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
-            setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
+            // Match the card's staggered fly-out: poof when THIS card
+            // begins its flight, not all at once up front.
+            const _deathDelay = a.delay || 0;
+            setTimeout(() => {
+              setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
+              setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
+            }, _deathDelay);
           }
         }
         scheduleAnims(newAnims, setMyDiscardHidden, setMyDeletedHidden);
@@ -13758,8 +14119,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const card = CARDS_BY_NAME[a.cardName];
         if (card?.cardType === 'Creature') {
           const id = Date.now() + Math.random();
-          setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
-          setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
+          // Match the card's staggered fly-out: poof when THIS card
+          // begins its flight, not all at once up front.
+          const _deathDelay = a.delay || 0;
+          setTimeout(() => {
+            setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
+            setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
+          }, _deathDelay);
         }
       }
 
@@ -13927,8 +14293,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const card = CARDS_BY_NAME[a.cardName];
         if (card?.cardType === 'Creature') {
           const id = Date.now() + Math.random();
-          setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
-          setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
+          // Match the card's staggered fly-out: poof when THIS card
+          // begins its flight, not all at once up front.
+          const _deathDelay = a.delay || 0;
+          setTimeout(() => {
+            setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
+            setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
+          }, _deathDelay);
         }
       }
 
@@ -14609,6 +14980,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // same-side destinations so the engine can place onto the chosen
   // summoner's slot first and then relocate to the dropped slot.
   const routeCrossSideSummon = (cardName, handIndex, card, destination) => {
+    // Equip click-to-place reuses this pick flow but dispatches a
+    // play_artifact onto the chosen own-side Hero's Support Zone
+    // (no cross-side summoner routing).
+    if (destination?._isEquip) {
+      if (window.playSFX) window.playSFX('ui_click');
+      // `clickPlaced` → server echoes the hand→Support-Zone fly back to
+      // us (no drag happened, so we need the visual movement too).
+      socket.emit('play_artifact', {
+        roomId: gameState.roomId, cardName, handIndex,
+        heroIdx: destination.heroIdx, zoneSlot: destination.slotIdx,
+        clickPlaced: true,
+        // Chosen host side (rendered side's player index). Own-side
+        // clicks send the caster's own index (server treats as own);
+        // a free-side equip clicked on an opp Hero pins the opp index.
+        targetOwner: destination.ownerIdx,
+      });
+      return;
+    }
     const eligible = getEligibleSummoners(cardName);
     if (eligible.length === 0) return;
     if (eligible.length === 1) {
@@ -15228,25 +15617,42 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // the card text, so the alive-and-not-frozen gate is lifted
         // for those.
         const isCrossSideEquip = (gameState.crossSidePlayableArtifacts || []).includes(cardName);
-        const dropOwner = isCrossSideEquip ? oppIdx : myIdx;
-        const dropPs = isCrossSideEquip ? opp : me;
-        const dropOwnerTag = isCrossSideEquip ? 'opp' : 'me';
-        let targetHero = -1, targetSlot = -1;
+        // Free-side equip: no inherent canEquipToHero restriction →
+        // droppable on EITHER side's eligible Hero (server-published).
+        const isFreeSideEquip = (gameState.freeSideEquipArtifacts || []).includes(cardName);
+        // Resolve which side a drop element belongs to. Free-side
+        // equips accept BOTH sides (player picks own or opp Hero);
+        // cross-side equips (Powder Keg) are opp-only; normal equips
+        // are own-only.
+        const sideFor = (tag) => {
+          if (isFreeSideEquip) {
+            if (tag === 'me') return { ps: me, owner: myIdx };
+            if (tag === 'opp') return { ps: opp, owner: oppIdx };
+            return null;
+          }
+          const wantTag = isCrossSideEquip ? 'opp' : 'me';
+          if (tag !== wantTag) return null;
+          return isCrossSideEquip ? { ps: opp, owner: oppIdx } : { ps: me, owner: myIdx };
+        };
+        // Dead/Frozen hosts only allowed under Powder-Keg cross-side
+        // text; free-side & normal equips need an alive host (the
+        // server's equip gate also enforces this).
+        const hostAliveNeeded = !isCrossSideEquip;
+        let targetHero = -1, targetSlot = -1, targetOwner;
         // Check hero zones first (auto-place in first free base support zone)
         const heroEls = document.querySelectorAll('[data-hero-zone]');
         for (const el of heroEls) {
           const r = el.getBoundingClientRect();
           if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
-            if (el.dataset.heroOwner === dropOwnerTag) {
+            const side = sideFor(el.dataset.heroOwner);
+            if (side) {
               const hi = parseInt(el.dataset.heroIdx);
-              const hero = dropPs?.heroes?.[hi];
-              // Cross-side: dead/Frozen hosts allowed (Powder Keg text).
-              // Standard equip: alive only.
-              const hostOk = hero && hero.name && (isCrossSideEquip || hero.hp > 0);
+              const hero = side.ps?.heroes?.[hi];
+              const hostOk = hero && hero.name && (!hostAliveNeeded || hero.hp > 0);
               if (hostOk) {
-                const supZones = dropPs.supportZones?.[hi] || [];
+                const supZones = side.ps.supportZones?.[hi] || [];
                 for (let z = 0; z < 3; z++) {
-                  if ((supZones[z] || []).length === 0) { targetHero = hi; targetSlot = -1; break; }
+                  if ((supZones[z] || []).length === 0) { targetHero = hi; targetSlot = -1; targetOwner = side.owner; break; }
                 }
               }
             }
@@ -15260,14 +15666,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
               const hi = parseInt(el.dataset.supportHero);
               const si = parseInt(el.dataset.supportSlot);
-              const isCorrectSide = el.dataset.supportOwner === dropOwnerTag;
+              const side = sideFor(el.dataset.supportOwner);
               const isIsland = el.dataset.supportIsland === 'true';
-              if (isCorrectSide && !isIsland && si < 3) { // Can only equip to base zones
-                const hero = dropPs?.heroes?.[hi];
-                const hostOk = hero && hero.name && (isCrossSideEquip || hero.hp > 0);
+              if (side && !isIsland && si < 3) { // Can only equip to base zones
+                const hero = side.ps?.heroes?.[hi];
+                const hostOk = hero && hero.name && (!hostAliveNeeded || hero.hp > 0);
                 if (hostOk) {
-                  const slotCards = (dropPs.supportZones?.[hi] || [])[si] || [];
-                  if (slotCards.length === 0) { targetHero = hi; targetSlot = si; }
+                  const slotCards = (side.ps.supportZones?.[hi] || [])[si] || [];
+                  if (slotCards.length === 0) { targetHero = hi; targetSlot = si; targetOwner = side.owner; }
                 }
               }
             }
@@ -15276,12 +15682,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setPlayDrag({
           idx, cardName, card, mouseX: mx, mouseY: my,
           targetHero, targetSlot, isEquip: true,
-          // `targetOwner` is consumed by the drop handler (~L15970) and
-          // forwarded to the server as the host-side hint. Standard
-          // equip drags omit it (own-side play); cross-side drags pin
-          // the opp's player index.
-          targetOwner: isCrossSideEquip ? dropOwner : undefined,
+          // `targetOwner` is forwarded to the server as the chosen
+          // host side. Cross-side (Powder Keg) and free-side equips
+          // pin it; a normal own-side equip leaves it undefined →
+          // server defaults placement to the caster.
+          targetOwner: (isCrossSideEquip || isFreeSideEquip) ? targetOwner : undefined,
           isCrossSideEquip,
+          isFreeSideEquip,
         });
       } else if (isSurprisePlayable && !isPlayable) {
         // Surprise drag — target hero zones (hero must be alive with empty surprise zone)
@@ -15598,6 +16005,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx });
           } else if (card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment') {
             socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx });
+          } else if (isEquipPlayable && card.cardType === 'Artifact') {
+            // Click-to-equip — same UX as click-to-summon a Creature:
+            // enter board placement-pick mode (reuses the
+            // `crossSidePlayPick` highlight/click/cancel machinery, but
+            // own-side only and dispatched as `play_artifact`). Eligible
+            // Heroes (alive, not Frozen, ≥1 free base Support Zone) and
+            // their free Zones light up; click a Hero → its left-most
+            // free Zone; click a Zone → that Zone.
+            const _cspFreeSide = (gameState.freeSideEquipArtifacts || []).includes(cardName);
+            const _hostFree = (sidePs) => [0, 1, 2].some(hi => {
+              const h = sidePs?.heroes?.[hi];
+              if (!h || !h.name || h.hp <= 0 || h.statuses?.frozen) return false;
+              const sz = sidePs.supportZones?.[hi] || [];
+              for (let z = 0; z < 3; z++) if ((sz[z] || []).length === 0) return true;
+              return false;
+            });
+            // Free-side equips also light up the opponent's eligible
+            // Heroes (no inherent canEquipToHero restriction).
+            const anyTarget = _hostFree(me) || (_cspFreeSide && _hostFree(opp));
+            if (anyTarget) {
+              setCrossSidePlayPick({ cardName, handIndex: idx, card, isEquip: true, isFreeSideEquip: _cspFreeSide });
+            }
+            setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
+            return;
           } else if ((card.cardType === 'Spell' || card.cardType === 'Attack') && isPlayable) {
             // Hero-locked heroAction (Coffee, Trample Sounds, Body Swap,
             // Victory Phoenix Tackle, …). Prompt config bakes a specific
@@ -16022,6 +16453,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             handIndex: prev.idx,
             heroIdx: prev.targetHero,
             zoneSlot: prev.targetSlot, // -1 means auto-place
+            // Chosen host side (cross-side / free-side equips); omitted
+            // for normal own-side equips → server defaults to caster.
+            targetOwner: prev.targetOwner,
           });
           return null;
         });
@@ -16495,7 +16929,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }, 400);
     };
-    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, color, duration, thickness, miss, impactOpacity }) => {
+    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, color, duration, thickness, miss, impactOpacity, glow, impactAnim }) => {
       if (window.playSFX) window.playSFX('laser', { dedupe: 60, category: 'effect' });
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
@@ -16529,6 +16963,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       setBeamAnims(prev => [...prev, {
         id, color: color || '#ff2222',
+        glow: glow || null,
         thickness: typeof thickness === 'number' && thickness > 0 ? thickness : 1,
         duration: dur,
         x1: sr.left + sr.width / 2, y1: sr.top + sr.height / 2,
@@ -16545,9 +16980,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // and a full-opacity burst per target visually swamps the
         // board.
         const impactOpts = (typeof impactOpacity === 'number') ? { opacity: impactOpacity } : {};
+        // `impactAnim` (opt-in) swaps the default generic explosion for
+        // a themed burst — Disruption Ray passes 'disruption_impact'.
+        const impactType = impactAnim || 'explosion';
         setTimeout(() => {
-          playAnimation('explosion', tgtEl, { duration: Math.max(dur - 200, 600), ...impactOpts });
-          setTimeout(() => playAnimation('explosion', tgtEl, { duration: 800, ...impactOpts }), Math.max(dur * 0.45, 350));
+          playAnimation(impactType, tgtEl, { duration: Math.max(dur - 200, 600), ...impactOpts });
+          setTimeout(() => playAnimation(impactType, tgtEl, { duration: 800, ...impactOpts }), Math.max(dur * 0.45, 350));
         }, 220);
       }
       setTimeout(() => setBeamAnims(prev => prev.filter(a => a.id !== id)), dur);
@@ -20058,6 +20496,60 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('kassaran_reveal_flip', onKassaranFlip);
 
+    // Chaos Magic reveal — reuses the Kassaran flip card/CSS. Each
+    // revealed card flies from the deck pile to viewport centre face-
+    // down, flips face-up, holds big, then shrinks away in place
+    // (`end` == centre) to read as "revealed, then deleted". The
+    // engine sequences one of these per reveal and awaits the full
+    // 2000ms before mutating state, so no extra suppressor is needed.
+    const onChaosMagicReveal = ({ owner, cardName }) => {
+      const isMe = owner === myIdx;
+      // This Kassaran-flip (deck → centre → deleted) IS the authoritative
+      // visual for the revealed-then-deleted card. Pre-register it in the
+      // deleted-pile pending bucket (same shape `play_pile_transfer`'s
+      // `to:'deleted'` path uses) so the deleted-pile diff-detector
+      // SUPPRESSES its own board→deleted flight — otherwise it name-
+      // matches this card to a same-named card already on the board
+      // (e.g. an Ability sitting in an Ability Zone) and wrongly flies
+      // it from there. Window must outlast Chaos Magic's REVEAL_MS
+      // (2000ms server-side) before the deletedPile push + sync fires.
+      const _pileRef = isMe ? handToPilePendingMeRef : handToPilePendingOppRef;
+      const _cmEnt = { cardName };
+      _pileRef.current.deleted.push(_cmEnt);
+      setTimeout(() => {
+        const i = _pileRef.current.deleted.indexOf(_cmEnt);
+        if (i >= 0) _pileRef.current.deleted.splice(i, 1);
+      }, 2600);
+      const deckEl = document.querySelector(isMe ? '[data-my-deck]' : '[data-opp-deck]');
+      if (!deckEl) return;
+      const dr = deckEl.getBoundingClientRect();
+      const sx = dr.left;
+      const sy = dr.top;
+      const cx = window.innerWidth / 2 - 32;
+      const cy = window.innerHeight / 2 - 45;
+      // Every revealed card — eligible AND ineligible — flips face-up
+      // at centre, then visibly flies on to the deleted pile (all
+      // revealed cards are deleted by Chaos Magic). Fall back to a
+      // centre fade if the deleted-pile element isn't mounted.
+      let ex = cx, ey = cy;
+      const delEl = document.querySelector(isMe ? '[data-my-deleted]' : '[data-opp-deleted]');
+      if (delEl) {
+        const delR = delEl.getBoundingClientRect();
+        ex = delR.left;
+        ey = delR.top;
+      }
+      const id = Date.now() + Math.random();
+      const cardbackUrl = isMe ? me.cardback : opp.cardback;
+      setKassaranFlips(prev => [...prev, {
+        id, startX: sx, startY: sy, centerX: cx, centerY: cy,
+        endX: ex, endY: ey, cardName, cardbackUrl,
+      }]);
+      setTimeout(() => {
+        setKassaranFlips(prev => prev.filter(a => a.id !== id));
+      }, 2000);
+    };
+    socket.on('chaos_magic_reveal', onChaosMagicReveal);
+
     // ── Brackle catapult — load (slow) → hold on Brackle → fire ──────────
     // Single event carries source/Brackle/target coords + phase durations.
     // Renders a flying Creature card that lifts off its slot, lands on
@@ -20314,6 +20806,40 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }, cleanupMs);
     };
     socket.on('birthday_present_pick_resolved', onBdayPresentResolved);
+
+    // ── Timeless King Zi: dismiss the centre reveal after the pick ──
+    // Reuses the Birthday-Present reveal (`birthday_present_reveal_start`
+    // + `birthdayPresentPick`). Unlike Birthday Present the chosen Spell
+    // is performed by the Hero (not flown to a hand) and the others are
+    // deleted, so there's no hand fly-out — just glow the opponent's
+    // pick (200ms via the `.chosen` class), then unmount the floats.
+    const onTimelessKingRevealClear = ({ chosen, ownerIdx, others }) => {
+      // Non-chosen Spells fly one-by-one to the ACTIVATOR's Deleted
+      // pile; the chosen Spell grows + slow-fades (`castMode` → the
+      // `.tk-casting` treatment in BirthdayPresentReveal). The Deleted
+      // pile is the activator's: `[data-my-deleted]` if the activator
+      // is this client, else `[data-opp-deleted]`.
+      const delSel = ownerIdx === myIdx ? '[data-my-deleted]' : '[data-opp-deleted]';
+      const delEl = document.querySelector(delSel);
+      let tx = window.innerWidth / 2, ty = window.innerHeight / 2;
+      if (delEl) {
+        const r = delEl.getBoundingClientRect();
+        // Reveal cards are 110×154 — centre the flying card on the pile.
+        tx = r.left + r.width / 2 - 55;
+        ty = r.top + r.height / 2 - 77;
+      }
+      const otherNames = Array.isArray(others) ? others : [];
+      // 450ms stagger so the two losers leave "one by one".
+      const flights = otherNames.map((cardName, i) => ({
+        cardName, toX: tx, toY: ty, delay: i * 450,
+      }));
+      setBdayPresent(prev => prev ? { ...prev, chosen, castMode: true, flights } : prev);
+      // Clear once the slowest visual is done: chosen grow+fade
+      // (~1400ms) vs last loser's flight (last delay + 700ms).
+      const maxFlight = flights.reduce((m, f) => Math.max(m, f.delay), 0) + 700;
+      setTimeout(() => setBdayPresent(null), Math.max(1500, maxFlight + 120));
+    };
+    socket.on('timeless_king_reveal_clear', onTimelessKingRevealClear);
 
     // ── Colored Snow Potion reveal (two-phase) ──
     // Phase 1 (`colored_snow_reveal_start`): spawn a flying card at
@@ -21375,9 +21901,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('discard_to_deck_animation', onDiscardToDeck);
       socket.off('play_pile_transfer', onPileTransfer);
       socket.off('kassaran_reveal_flip', onKassaranFlip);
+      socket.off('chaos_magic_reveal', onChaosMagicReveal);
       socket.off('play_brackle_catapult', onBrackleCatapult);
       socket.off('birthday_present_reveal_start', onBdayPresentStart);
       socket.off('birthday_present_pick_resolved', onBdayPresentResolved);
+      socket.off('timeless_king_reveal_clear', onTimelessKingRevealClear);
       socket.off('colored_snow_reveal_start', onColoredSnowRevealStart);
       socket.off('colored_snow_reveal_end', onColoredSnowRevealEnd);
       socket.off('side_deck_appear', onSideDeckAppear);
@@ -22961,7 +23489,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
             return !canHeroReceiveAbility(p, i, abilityDrag.cardName);
           })();
-          const equipIneligible = !isOpp && playDrag && playDrag.isEquip && (() => {
+          const equipIneligible = (!isOpp || playDrag?.isFreeSideEquip) && playDrag && playDrag.isEquip && (() => {
             const hero = heroes[i];
             if (!hero || !hero.name || hero.hp <= 0) return true;
             if (hero.statuses?.frozen) return true; // Can't equip to frozen heroes
@@ -23081,7 +23609,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Hero-row equip target highlight. Cross-side equip drags
           // (Powder Keg etc.) light up the OPP's row instead of own.
           const equipTarget = playDrag && playDrag.isEquip && playDrag.targetHero === i && playDrag.targetSlot === -1
-            && (playDrag.isCrossSideEquip ? isOpp : !isOpp);
+            && (playDrag.isFreeSideEquip
+                  ? (playDrag.targetOwner === (isOpp ? oppIdx : myIdx))
+                  : (playDrag.isCrossSideEquip ? isOpp : !isOpp));
           const spellTarget = playDrag && playDrag.isSpell && playDrag.targetHero === i && (playDrag.charmedOwner != null ? isOpp : !isOpp) && !(playDrag.creatureCasterSlot >= 0);
           const pi = isOpp ? oppIdx : myIdx;
           const heroTargetId = `hero-${pi}-${i}`;
@@ -23126,7 +23656,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // qualifying own Hero (validation surface) plus `crossSideHost`.
           // Requires an alive host with at least one free slot.
           const _csppHeroSide = isOpp ? opp : me;
-          const _csppHeroFreeSlot = !!crossSidePlayPick && hero?.hp > 0
+          // Equip click-to-place (`crossSidePlayPick.isEquip`) is OWN-side
+          // only and excludes Frozen Heroes (server rejects equipping to
+          // Frozen); cross-side Creature picks keep the both-sides rule.
+          const _csppIsEquip = !!crossSidePlayPick?.isEquip;
+          const _csppIsFreeSideEquip = !!crossSidePlayPick?.isFreeSideEquip;
+          const _csppHeroEligible = !!crossSidePlayPick && hero?.hp > 0
+            && (!_csppIsEquip || ((!isOpp || _csppIsFreeSideEquip) && !hero?.statuses?.frozen));
+          const _csppHeroFreeSlot = _csppHeroEligible
             ? (() => {
                 const zones = _csppHeroSide.supportZones?.[i] || [];
                 for (let z = 0; z < 3; z++) {
@@ -23142,6 +23679,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 setCrossSidePlayPick(null);
                 routeCrossSideSummon(cspp.cardName, cspp.handIndex, cspp.card, {
                   ownerIdx: pi, heroIdx: i, slotIdx: _csppHeroFreeSlot,
+                  _isEquip: cspp.isEquip,
                 });
               }
             : attachPickEligibleHero
@@ -23670,7 +24208,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // row instead of own — flip the side gate to `isOpp` when
               // the drag is flagged cross-side.
               const _equipDragSideMatch = playDrag?.isEquip
-                && (playDrag.isCrossSideEquip ? isOpp : !isOpp);
+                && (playDrag.isFreeSideEquip
+                      ? (playDrag.targetOwner === (isOpp ? oppIdx : myIdx))
+                      : (playDrag.isCrossSideEquip ? isOpp : !isOpp));
               const isPlayTarget = (_equipDragSideMatch && playDrag.targetHero === i && playDrag.targetSlot === z)
                 || (!isOpp && playDrag && !playDrag.isEquip && playDrag.targetHero === i && (playDrag.targetSlot === z || playDrag.creatureCasterSlot === z));
               const isAutoTarget = _equipDragSideMatch && playDrag.targetHero === i && playDrag.targetSlot === -1 && z === autoSlot;
@@ -23776,11 +24316,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 && !!opp.heroes?.[i]?.name
                 && !isIsland
                 && z < 3;
+              // Free-side equip drag onto the OPP side: every empty base
+              // Support Zone of an alive, non-Frozen opp Hero is a valid
+              // drop target (server enforces the same alive/not-Frozen
+              // gate). Own-side free-side equips use the normal equip
+              // highlight path (_equipDragSideMatch) like any equip.
+              const isOppFreeSideEquipValid = isOpp && !!playDrag?.isFreeSideEquip
+                && playDrag.targetOwner === oppIdx
+                && cards.length === 0
+                && !!opp.heroes?.[i]?.name && opp.heroes[i].hp > 0
+                && !opp.heroes[i].statuses?.frozen
+                && !isIsland
+                && z < 3;
               const isDragValidZone = (isDraggingCreature || isDraggingAttachment)
                 && cards.length === 0 && emptyCanPlayHere
                 && z < ((me.supportZones[i] || []).length || 3)
                 && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
-              const isDragValidZoneAny = isDragValidZone || isOppCrossSideValid || isOppCrossSideEquipValid;
+              const isDragValidZoneAny = isDragValidZone || isOppCrossSideValid || isOppCrossSideEquipValid || isOppFreeSideEquipValid;
               const isDragInvalidZone = (isDraggingCreature || isDraggingAttachment || _isCrossSideCreatureDrag) && !isDragValidZoneAny && !isBouncePlaceTarget;
               // heroAction: dim zones for non-Coffee heroes
               const isHeroActionZoneDimmed = heroActionActive && !isDraggingCreature && !isDraggingAttachment && i !== heroActionHeroIdx;
@@ -23834,10 +24386,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Support Zone on an alive Hero (either side) lights up
               // and is clickable while `crossSidePlayPick` is active.
               const _csppSide = isOpp ? opp : me;
+              // Equip click-to-place is OWN-side only and skips Frozen
+              // Heroes; cross-side Creature picks keep the both-sides rule.
+              const _csppSlotIsEquip = !!crossSidePlayPick?.isEquip;
+              const _csppSlotIsFreeSideEquip = !!crossSidePlayPick?.isFreeSideEquip;
               const isCsppEmptySlot = !!crossSidePlayPick
                 && cards.length === 0
                 && (_csppSide.heroes?.[i]?.hp > 0)
-                && z < ((_csppSide.supportZones?.[i] || []).length || 3);
+                && z < ((_csppSide.supportZones?.[i] || []).length || 3)
+                && (!_csppSlotIsEquip || ((!isOpp || _csppSlotIsFreeSideEquip) && !_csppSide.heroes?.[i]?.statuses?.frozen && z < 3));
               // Creature-originated ram (Bear Rider's dash, etc.) —
               // hide the Creature inside this Support Zone for the
               // duration of the flight so the player only sees ONE
@@ -23868,6 +24425,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     setCrossSidePlayPick(null);
                     routeCrossSideSummon(cspp.cardName, cspp.handIndex, cspp.card, {
                       ownerIdx: pi, heroIdx: i, slotIdx: z,
+                      _isEquip: cspp.isEquip,
                     });
                   } : isPendingBounceTarget ? () => {
                     // Click-to-swap: dispatches play_creature as if the
@@ -24514,6 +25072,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {(((gameState.areaZones?.[0] || []).includes('The Cosmic Depths')) || ((gameState.areaZones?.[1] || []).includes('The Cosmic Depths'))) && <CosmicDepthsOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Graveyard of Limited Power')) || ((gameState.areaZones?.[1] || []).includes('Graveyard of Limited Power'))) && <GraveyardOfLimitedPowerOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('The First Circle of Hell')) || ((gameState.areaZones?.[1] || []).includes('The First Circle of Hell'))) && <FirstCircleOfHellOverlay />}
+            {(((gameState.areaZones?.[0] || []).includes('Blood Rock')) || ((gameState.areaZones?.[1] || []).includes('Blood Rock'))) && <BloodRockOverlay />}
             {(((gameState.areaZones?.[0] || []).includes("Tarleinn's Floating Island")) || ((gameState.areaZones?.[1] || []).includes("Tarleinn's Floating Island"))) && <FloatingIslandOverlay />}
             {(() => {
               // Gathering Storm is an Attachment Spell — it lives in a
@@ -25212,7 +25771,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Floating discard animation cards */}
       {discardAnims.map(anim => (
         <DiscardAnimCard key={anim.id} cardName={anim.cardName} dest={anim.dest}
-          startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY} />
+          startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY}
+          delay={anim.delay} />
       ))}
 
       {/* Floating drag card (outside game-layout to avoid overflow clip) */}
@@ -25292,8 +25852,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // the beam.
               const durStyle = { '--beamDur': dur + 'ms' };
               const ringR = 18 * k; // base ring birth radius
+              // Optional themed halo: when a caller passes `glow` (only
+              // Disruption Ray today), drive every red-default CSS var
+              // on this <g> to the themed color. Children inherit the
+              // vars. Callers that omit `glow` add NO style here, so
+              // their beam renders exactly as before (CSS red fallbacks).
+              const glowVars = b.glow ? {
+                '--bg-core-1': b.glow, '--bg-core-2': b.glow,
+                '--bg-line-glow': b.glow, '--bg-line-outer': b.glow,
+                '--bg-flash-1': b.glow, '--bg-flash-2': b.glow,
+                '--bg-shock': b.glow,
+              } : undefined;
               return (
-                <g key={b.id}>
+                <g key={b.id} style={glowVars}>
                   <line className="beam-line-outer" x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} style={k !== 1 ? { strokeWidth: 24 * k } : undefined} />
                   <line className="beam-line-glow"  x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} style={k !== 1 ? { strokeWidth: 12 * k } : undefined} />
                   <line className="beam-line-core"  x1={b.x1} y1={b.y1} x2={b.x2} y2={b.y2} style={{ stroke: b.color, ...(k !== 1 ? { strokeWidth: 3 * k } : {}) }} />

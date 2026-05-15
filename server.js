@@ -2001,7 +2001,15 @@ function sendGameState(room, playerIdx, extra) {
       // client renders an effective-cost badge on each tagged hand
       // card, and the play-from-hand path uses the same map to compute
       // what the owner actually pays.
-      handCostReductions: pi === playerIdx ? { ...(ps._handCostReductions || {}) } : {},
+      handCostReductions: pi === playerIdx ? (() => {
+        // Per-hand-index reduction the client renders/affordability-
+        // checks against = the per-turn map (Play Money) PLUS the
+        // permanent map (New Moon's searched card), summed per index.
+        const merged = { ...(ps._handCostReductions || {}) };
+        const perm = ps._handCostReductionsPermanent || {};
+        for (const k of Object.keys(perm)) merged[k] = (merged[k] || 0) + (perm[k] || 0);
+        return merged;
+      })() : {},
       supportSpellLocked: ps.supportSpellLocked || false,
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       heroesActedThisTurn: ps.heroesActedThisTurn || [],
@@ -2401,6 +2409,11 @@ function sendGameState(room, playerIdx, extra) {
     // drag UX, and the server's `doPlayArtifact` consults the same
     // flag to route placement onto the opp's side.
     crossSidePlayableArtifacts: room.engine ? room.engine.getCrossSidePlayableArtifacts(playerIdx) : [],
+    // Equipment Artifacts with no inherent `canEquipToHero` restriction
+    // — equippable to EITHER side's eligible Hero. The client uses this
+    // to also light up OPPONENT Hero/Support zones as drag/click equip
+    // targets; `doPlayArtifact` honors the chosen `targetOwner`.
+    freeSideEquipArtifacts: room.engine ? room.engine.getFreeSideEquipArtifacts(playerIdx) : [],
     bouncePlacementTargets: room.engine ? room.engine.getBouncePlacementTargets(playerIdx) : {},
     bakhmSurpriseSlots: room.engine ? (() => {
       const result = [];
@@ -2683,6 +2696,7 @@ function sendSpectatorGameState(room) {
     heroPlayableCards: { own: {}, charmed: {} },
     crossSidePlayableCards: [],
     crossSidePlayableArtifacts: [],
+    freeSideEquipArtifacts: [],
     bouncePlacementTargets: {},
     bakhmSurpriseSlots: [],
     ushabtiSummonable: [],
@@ -3133,13 +3147,21 @@ function cleanupRoom(roomId) {
 // excluded per product spec — they use their own central reveal flow.
 // Payload is intentionally semantic (not CSS selectors) so the client can
 // decide how to render the animation.
-function broadcastHandToBoard(room, ownerIdx, payload) {
+function broadcastHandToBoard(room, ownerIdx, payload, forceOwnerAnim = false) {
   if (room.engine?._fastMode) return;
   if (!room?.gameState) return;
   const oppIdx = ownerIdx === 0 ? 1 : 0;
   const oppSid = room.gameState.players[oppIdx]?.socketId;
   if (oppSid) io.to(oppSid).emit('hand_to_board_fly', { ownerIdx, ...payload });
   sendToSpectators(room, 'hand_to_board_fly', { ownerIdx, ...payload });
+  // Normally the owner sees their own drag animation, so we don't echo
+  // the fly back to them. For click-placed plays there's no drag —
+  // `forceOwnerAnim` opts the owner in (the client's `onHandToBoard`
+  // honours `_forceOwnerAnim`, same path Kassaran / Raptoren use).
+  if (forceOwnerAnim) {
+    const ownSid = room.gameState.players[ownerIdx]?.socketId;
+    if (ownSid) io.to(ownSid).emit('hand_to_board_fly', { ownerIdx, ...payload, _forceOwnerAnim: true });
+  }
 }
 
 // ─── Action helpers (shared between socket handlers and the CPU brain) ───
@@ -3252,7 +3274,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot 
       // Foreign-origin abilities (Magic Lamp gifts etc.) discard to
       // the ORIGINAL owner's pile when negated.
       const negatedAbilityOwner = room.engine._consumeHandCardOrigin(pi, cardName);
-      gs.players[negatedAbilityOwner].discardPile.push(cardName);
+      await room.engine.routeNegatedInitialCard(negatedAbilityOwner, cardName, chainResult);
       // Refund whichever slot was consumed (regular vs Skill bonus).
       if (_consumedBonusSlot) {
         if (!ps._bonusAbilityAttachments) ps._bonusAbilityAttachments = {};
@@ -3288,7 +3310,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot 
   return true;
 }
 
-async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot }) {
+async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot, clickPlaced, targetOwner }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
@@ -3325,8 +3347,22 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // Player-wide next-artifact discount (Shu'Chaku) AND per-hand-index
   // discounts (Play Money) both stack, capped at 0.
   const playerReduction = ps._nextArtifactCostReduction || 0;
-  const handReduction = ps._handCostReductions?.[handIndex] || 0;
-  const costReduction = playerReduction + handReduction;
+  const handReduction = (ps._handCostReductions?.[handIndex] || 0)
+    + (ps._handCostReductionsPermanent?.[handIndex] || 0);
+  // Target-Hero equip discount: a Hero script may export
+  // `equipCostReduction(gs, pi, heroIdx, cardData, engine)` to discount
+  // Artifacts equipped ONTO it (Tsu'Ki: Lunatic Cycle cards −10).
+  // Additive + backward-compatible — no Hero exports it by default.
+  let heroEquipReduction = 0;
+  {
+    const _eqOwner = _isCrossSideArtifact ? (pi === 0 ? 1 : 0) : pi;
+    const _eqHero = gs.players[_eqOwner]?.heroes?.[heroIdx];
+    const _eqHeroScript = _eqHero?.name ? loadCardEffect(_eqHero.name) : null;
+    if (typeof _eqHeroScript?.equipCostReduction === 'function') {
+      heroEquipReduction = _eqHeroScript.equipCostReduction(gs, pi, heroIdx, cardData, room.engine) || 0;
+    }
+  }
+  const costReduction = playerReduction + handReduction + heroEquipReduction;
   const cost = Math.max(0, rawCost - costReduction);
   if ((ps.gold || 0) < cost) return false;
 
@@ -3335,7 +3371,24 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // from opp's `ps` so existence and placement checks line up with
   // the actual placement target. Standard (own-side) artifacts keep
   // the original `ps.heroes[heroIdx]` semantics.
-  const placementOwner = _isCrossSideArtifact ? (pi === 0 ? 1 : 0) : pi;
+  //
+  // FREE-SIDE EQUIP: a pure Equipment Artifact with NO inherent
+  // `canEquipToHero` restriction may be equipped to EITHER side's
+  // eligible Hero. The client sends the chosen side as `targetOwner`.
+  // Such an equip becomes OWNED by the host Hero's controller (the
+  // Powder-Keg ownership model — `inst.owner` = host side so that
+  // side triggers its effects; `inst.originalOwner` re-stamped to the
+  // caster below for discard/return routing). Restricted equips
+  // (canEquipToHero present) and cross-side artifacts ignore
+  // `targetOwner` and keep their fixed side.
+  const _subLowerEarly = (cardData.subtype || '').toLowerCase();
+  const _isFreeSideEquip = _subLowerEarly === 'equipment'
+    && !_isCrossSideArtifact
+    && typeof _script?.canEquipToHero !== 'function'
+    && (targetOwner === 0 || targetOwner === 1);
+  const placementOwner = _isCrossSideArtifact
+    ? (pi === 0 ? 1 : 0)
+    : (_isFreeSideEquip ? targetOwner : pi);
   const placementPs = gs.players[placementOwner];
   if (!placementPs) return false;
   const hero = placementPs.heroes[heroIdx];
@@ -3356,23 +3409,26 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       if (ps._oncePerGameUsed?.has(opgKey)) return false;
     }
 
-    if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
+    // Placement zones belong to the HOST side (`placementPs`), which is
+    // the caster for own-side / restricted equips and the opponent for
+    // a free-side equip targeting their Hero.
+    if (!placementPs.supportZones[heroIdx]) placementPs.supportZones[heroIdx] = [[], [], []];
     let finalSlot = zoneSlot;
     if (finalSlot < 0) {
       for (let z = 0; z < 3; z++) {
-        if ((ps.supportZones[heroIdx][z] || []).length === 0) { finalSlot = z; break; }
+        if ((placementPs.supportZones[heroIdx][z] || []).length === 0) { finalSlot = z; break; }
       }
       if (finalSlot < 0) return false;
     }
     if (finalSlot < 0 || finalSlot >= 3) return false;
-    if ((ps.supportZones[heroIdx][finalSlot] || []).length > 0) return false;
+    if ((placementPs.supportZones[heroIdx][finalSlot] || []).length > 0) return false;
 
     ps.hand.splice(handIndex, 1);
     if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
 
     room.engine.log('artifact_equipped', { player: ps.username, card: cardName, hero: hero.name, cost });
     room.engine._trackTerrorResolvedEffect(pi, cardName);
-    broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'support', heroIdx, slotIdx: finalSlot });
+    broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'support', heroIdx, slotIdx: finalSlot, destOwner: placementOwner }, !!clickPlaced);
 
     try {
       const oi = pi === 0 ? 1 : 0;
@@ -3397,13 +3453,20 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
             delete ps._nextArtifactCostReduction;
             delete ps._nextArtifactCostReductionTurn;
           }
-          const result = room.engine.safePlaceInSupport(cardName, pi, heroIdx, finalSlot);
+          const result = room.engine.safePlaceInSupport(cardName, placementOwner, heroIdx, finalSlot);
           if (!result) {
             ps.discardPile.push(cardName);
             room.engine.log('equip_fizzle', { card: cardName, reason: 'zone_occupied_by_chain' });
             return true;
           }
           const { inst, actualSlot } = result;
+          // Free-side equip onto the opponent's Hero: the equip is now
+          // OWNED/controlled by that Hero's side (so THEY trigger its
+          // effects and assign its heal/damage), but the physical card
+          // belongs to the caster — re-stamp `originalOwner` so it
+          // routes to the caster's discard/return pile (same model
+          // Powder Keg uses for cross-side Artifact-Creatures).
+          if (placementOwner !== pi && inst) inst.originalOwner = pi;
           await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualSlot });
           await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
           if (equipScript?.oncePerGame) {
@@ -3415,7 +3478,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         },
       });
 
-      if (chainResult.negated) ps.discardPile.push(cardName);
+      if (chainResult.negated) await room.engine.routeNegatedInitialCard(pi, cardName, chainResult);
     } catch (err) {
       console.error('[Engine] doPlayArtifact (equip) error:', err.message);
     }
@@ -3502,7 +3565,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         },
       });
 
-      if (chainResult.negated) ps.discardPile.push(cardName);
+      if (chainResult.negated) await room.engine.routeNegatedInitialCard(pi, cardName, chainResult);
     } catch (err) {
       console.error('[Engine] doPlayArtifact (creature) error:', err.message);
     }
@@ -3671,7 +3734,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   const paidHeroCost = await room.engine.payHeroActionCost(pi, heroIdx);
   if (!paidHeroCost) {
     if (additionalConsumed && consumedInst) {
-      consumedInst.counters.additionalActionAvail = 1;
+      room.engine.restoreAdditionalAction(consumedInst);
     }
     if (actionCounterIncrementedHere) {
       ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
@@ -3747,7 +3810,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // ORIGINAL owner's discard pile, not the caster's. Falls back
       // to `pi` when the card has no foreign-origin tag.
       const discardOwner = room.engine._consumeHandCardOrigin(pi, cardName);
-      gs.players[discardOwner].discardPile.push(cardName);
+      // `hi` = the pre-splice hand slot; the client hasn't synced the
+      // splice yet, so the slot still renders → flight starts there.
+      await room.engine.routeNegatedInitialCard(discardOwner, cardName, chainResult, hi);
       room.engine._untrackCard(inst.id);
       // Wisdom cost is paid IMMEDIATELY after the spell leaves hand,
       // BEFORE any phase-advance / turn-end mechanics can interrupt.
@@ -3759,7 +3824,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         });
       }
       if (additionalConsumed && consumedInst) {
-        consumedInst.counters.additionalActionAvail = 1;
+        room.engine.restoreAdditionalAction(consumedInst);
       }
       if (cardData.cardType === 'Attack') {
         ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
@@ -3815,7 +3880,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // gate hide every isSecondActionGrant provider (those require
       // actionsPlayed===1) — the player can't retry their second action.
       if (additionalConsumed && consumedInst) {
-        consumedInst.counters.additionalActionAvail = 1;
+        room.engine.restoreAdditionalAction(consumedInst);
       }
       if (actionCounterIncrementedHere) {
         ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
@@ -3845,7 +3910,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     const becameFreeAction = gs._spellFreeAction === true;
     delete gs._spellFreeAction;
     if (becameFreeAction && additionalConsumed && consumedInst) {
-      consumedInst.counters.additionalActionAvail = 1;
+      room.engine.restoreAdditionalAction(consumedInst);
       additionalConsumed = false;
     }
 
@@ -3867,6 +3932,16 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     if (hero._maxActionsPerTurn) hero._actionsThisTurn = (hero._actionsThisTurn || 0) + 1;
 
     if (!gs._spellNegatedByEffect) {
+      // Per-player, whole-game record of Spell names whose effect has
+      // successfully resolved (negated Spells are excluded — we're
+      // inside the not-negated branch). Read by Chaos Magic to skip
+      // Spells the player has already resolved this game. Lazy-init so
+      // it's empty per fresh game state; deduped by name. Attacks also
+      // route through doPlaySpell, so gate strictly on Spell.
+      if (cardData.cardType === 'Spell') {
+        if (!ps._spellsResolvedThisGame) ps._spellsResolvedThisGame = [];
+        if (!ps._spellsResolvedThisGame.includes(cardName)) ps._spellsResolvedThisGame.push(cardName);
+      }
       await room.engine.runHooks('afterSpellResolved', {
         spellName: cardName, spellCardData: cardData, heroIdx, casterIdx: pi,
         damageTargets: uniqueTargets, isSecondCast: !!gs._bartasSecondCast,
@@ -3943,7 +4018,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
     if (cardData.cardType === 'Spell' && cardData.spellSchool1 === 'Support Magic') {
       ps.supportSpellUsedThisTurn = true;
-      if (additionalConsumed && consumedInst?.counters?.additionalActionType?.startsWith('friendship_support')) {
+      if (additionalConsumed && consumedInst?.counters?._aaLastConsumed?.startsWith('friendship_support')) {
         // Read ability zones from the HERO OWNER's side — for charmed
         // casts this differs from the acting player. Using ps.abilityZones
         // here would give the wrong level when the hero is on the opponent.
@@ -4193,8 +4268,14 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   const instCtrlForCD = inst.controller ?? inst.owner;
   const chillyDogLiftsForCreature = instCtrlForCD === pi
     && room.engine._isChillyDogActiveFor(pi);
-  if (inst.counters?.stunned || inst.counters?.negated || inst.counters?.nulled) return false;
-  if (inst.counters?.frozen && !chillyDogLiftsForCreature) return false;
+  // Universal negative-status immunity (Lunatic Golem 2+) negates the
+  // EFFECT of CC it still carries — it can fire its effect despite
+  // Frozen / Stunned / Negated / Nulled. Mirrors the engine-side
+  // getActivatableCreatures gate so a valid click isn't rejected here.
+  if (!room.engine._creatureNegStatusImmune(inst)) {
+    if (inst.counters?.stunned || inst.counters?.negated || inst.counters?.nulled) return false;
+    if (inst.counters?.frozen && !chillyDogLiftsForCreature) return false;
+  }
 
   if (charmedOwner != null
       && hero.charmedBy !== pi && hero.controlledBy !== pi
@@ -4357,7 +4438,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       delete gs._pendingCardReveal;
       delete gs._pendingPlayLog;
       if (consumedAdditionalCreatureInst) {
-        consumedAdditionalCreatureInst.counters.additionalActionAvail = 1;
+        room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
       }
       if (!gs.hoptUsed) gs.hoptUsed = {};
       gs.hoptUsed[hoptKey] = gs.turn;
@@ -4426,7 +4507,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
         // Standard cancel — refund the additional-action provider
         // consumed upfront. The action-counter increment / heroesActedThisTurn
         // push live in the success branch above, so they don't need rollback.
-        consumedAdditionalCreatureInst.counters.additionalActionAvail = 1;
+        room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
       }
     }
     await room.engine._flushSurpriseDrawChecks();
@@ -4818,7 +4899,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   if (!paidHeroCost) {
     ps._resolvingCard = null;
     if (additionalConsumed && consumedInst) {
-      consumedInst.counters.additionalActionAvail = 1;
+      room.engine.restoreAdditionalAction(consumedInst);
     }
     if (actionCounterIncrementedHere) {
       ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
@@ -4844,14 +4925,17 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       // marked Potion in hand).
       await room.engine.refundHeroActionCost(pi, heroIdx);
       _heroCostFinalized = true;
-      commitHandRemoval();
+      // `commitHandRemoval()` returns the pre-splice hand slot; the
+      // client hasn't synced the splice yet, so that slot still
+      // renders → the delete flight starts from the card's real spot.
+      const _negHi = commitHandRemoval();
       // Foreign-origin Creatures (Magic Lamp gifts etc.) discard to
       // the ORIGINAL owner's pile when negated before placement.
       // Once the Creature is on the board, the death path already
       // routes via `inst.originalOwner` (see processCreatureDamageBatch),
       // so we only need the override here on the negate-from-hand path.
       const negatedDiscardOwner = room.engine._consumeHandCardOrigin(pi, cardName);
-      gs.players[negatedDiscardOwner].discardPile.push(cardName);
+      await room.engine.routeNegatedInitialCard(negatedDiscardOwner, cardName, chainResult, _negHi);
       room.engine.log('creature_negated', { card: cardName, player: ps.username });
       // Mark the casting Hero as having spent their Action — same gate
       // as the spell/attack path. A negated Creature still consumes the
@@ -4891,7 +4975,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       // resolved (beforeSummon cancelled the play), so the Action
       // resource wasn't actually spent.
       if (additionalConsumed && consumedInst) {
-        consumedInst.counters.additionalActionAvail = 1;
+        room.engine.restoreAdditionalAction(consumedInst);
       }
       if (actionCounterIncrementedHere) {
         ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
@@ -4916,7 +5000,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       delete gs._summonModeUpgradedToInherent;
       if (!isInherentAction) {
         if (additionalConsumed && consumedInst) {
-          consumedInst.counters.additionalActionAvail = 1;
+          room.engine.restoreAdditionalAction(consumedInst);
           additionalConsumed = false;
         }
         if (actionCounterIncrementedHere) {
@@ -4949,7 +5033,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         // Roll back action-economy bookkeeping — the Creature couldn't
         // be placed, so the Action resource wasn't actually spent.
         if (additionalConsumed && consumedInst) {
-          consumedInst.counters.additionalActionAvail = 1;
+          room.engine.restoreAdditionalAction(consumedInst);
         }
         if (actionCounterIncrementedHere) {
           ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
@@ -5189,7 +5273,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
   const paidHeroCost = await room.engine.payHeroActionCost(heroOwner, heroIdx);
   if (!paidHeroCost) {
     if (consumedAdditionalInst) {
-      consumedAdditionalInst.counters.additionalActionAvail = 1;
+      room.engine.restoreAdditionalAction(consumedAdditionalInst);
     }
     if (actionCounterIncrementedHere) {
       actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
@@ -5294,7 +5378,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
         // stuck at 2 (which makes the engine hide isSecondActionGrant
         // providers) and the consumed additional-action provider lost.
         if (consumedAdditionalInst) {
-          consumedAdditionalInst.counters.additionalActionAvail = 1;
+          room.engine.restoreAdditionalAction(consumedAdditionalInst);
         }
         if (actionCounterIncrementedHere) {
           actingPs._actionsPlayedThisPhase = Math.max(0, (actingPs._actionsPlayedThisPhase || 0) - 1);
@@ -5572,7 +5656,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       if (!isActionCost) return;
       const actingPs = gs.players[pi];
       if (consumedAdditionalHeroInst) {
-        consumedAdditionalHeroInst.counters.additionalActionAvail = 1;
+        room.engine.restoreAdditionalAction(consumedAdditionalHeroInst);
         consumedAdditionalHeroInst = null;
       }
       if (actionCounterIncrementedHere) {
@@ -5998,7 +6082,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     const pileOwner = room.engine._consumeHandCardOrigin(pi, potionName);
     const pilePs = gs.players[pileOwner];
     if (chainResult.negated) {
-      pilePs.discardPile.push(potionName);
+      await room.engine.routeNegatedInitialCard(pileOwner, potionName, chainResult);
     } else if (gs._spellPlacedOnBoard) {
       // Targeting Artifact-Creatures (Powder Keg etc.) — the script's
       // resolve placed the card itself onto the board as a tracked
@@ -6258,7 +6342,7 @@ async function doUsePotion(room, pi, { cardName, handIndex }) {
       const pileOwner = room.engine._consumeHandCardOrigin(pi, cardName);
       const pilePs = gs.players[pileOwner];
       if (chainResult.negated) {
-        pilePs.discardPile.push(cardName);
+        await room.engine.routeNegatedInitialCard(pileOwner, cardName, chainResult);
       } else if (chainResult.resolveResult?.placed) {
         checkPotionLock(ps, gs, pi);
       } else {
@@ -6321,7 +6405,8 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
   // Same stacked discount as the equip path: Shu'Chaku's next-artifact
   // reduction + Play Money's per-hand-index reduction, capped at 0.
   const playerReduction = ps._nextArtifactCostReduction || 0;
-  const handReduction = ps._handCostReductions?.[handIndex] || 0;
+  const handReduction = (ps._handCostReductions?.[handIndex] || 0)
+    + (ps._handCostReductionsPermanent?.[handIndex] || 0);
   const costReduction = playerReduction + handReduction;
   const cost = Math.max(0, rawCost - costReduction);
 
@@ -6441,7 +6526,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
       } else {
         ps.hand.splice(currentIdx, 1);
         if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
-        if (chainResult.negated) ps.discardPile.push(cardName);
+        if (chainResult.negated) await room.engine.routeNegatedInitialCard(pi, cardName, chainResult);
         else if (gs._spellPlacedOnBoard) {
           // Area Artifacts (Smuggler's Pier, etc.) and any future
           // "card stays on the board after resolve" Artifact route
@@ -8627,7 +8712,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doActivateAbility(room, pi, params).catch(err => console.error('[activate_ability]', err.message));
+    doActivateAbility(room, pi, params).catch(err => console.error('[activate_ability]', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // Activate a free-activation ability (no action cost, Main Phase only)
@@ -8786,6 +8871,10 @@ io.on('connection', (socket) => {
         if (room.gameState?._chillyWizardHint) {
           delete room.gameState._chillyWizardHint[pi];
         }
+        // Handler fully unwound (locks released) → run any reaction-
+        // deferred actions (Lunar Eclipse / Master's Plan replacement
+        // Action). Self-gated: no-ops if the board isn't idle yet.
+        room.engine?._runPostChainActions?.();
       });
   });
 
@@ -8797,7 +8886,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doPlaySpell(room, pi, params).catch(err => console.error('[play_spell] error:', err.message));
+    doPlaySpell(room, pi, params).catch(err => console.error('[play_spell] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // Play an artifact from hand
@@ -8807,7 +8896,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doPlayArtifact(room, pi, params).catch(err => console.error('[play_artifact] error:', err.message));
+    doPlayArtifact(room, pi, params).catch(err => console.error('[play_artifact] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // ── Potion system ──
@@ -8819,7 +8908,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doUsePotion(room, pi, params).catch(err => console.error('[use_potion] error:', err.message));
+    doUsePotion(room, pi, params).catch(err => console.error('[use_potion] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // Use a non-equip artifact from hand (targeting mode)
@@ -8829,7 +8918,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doUseArtifactEffect(room, pi, params).catch(err => console.error('[use_artifact_effect] error:', err.message));
+    doUseArtifactEffect(room, pi, params).catch(err => console.error('[use_artifact_effect] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // Confirm potion/artifact targeting selection

@@ -815,3 +815,48 @@ module.exports = {
   },
 };
 ```
+
+### Areas — respect "Diver Helmet" (MANDATORY for every Area)
+
+> **Diver Helmet** (Artifact / Equipment): *"The equipped Hero and all
+> cards in its Support Zones are unaffected by Areas."*
+
+Diver Helmet is **passive** — it has no behaviour of its own. The rule
+is enforced *by every Area*. When you author or modify ANY Area card
+(or engine-level Area rule) that **directly affects a Hero or a
+Creature** — damage, status, stat changes, HP buffs, forced movement,
+control changes, healing locks, being chosen/targeted by the Area's
+own optional action, etc. — you **must** skip every Hero / Creature
+protected by a Diver Helmet. Areas that only touch hands, decks, gold,
+levels, piles, or global rules need no guard.
+
+Use the shared helper — never re-implement the lookup:
+
+```js
+const {
+  heroHasDiverHelmet,   // (engine, playerIdx, heroIdx) -> bool
+  isAreaImmuneInst,     // (engine, cardInstance) -> bool  (Creature/support card)
+  isAreaImmuneHeroObject, // (engine, heroObj) -> bool
+} = require('./_diver-helmet-shared');
+
+// Hero-damage Area (e.g. via ctx.aoeHit): exclude protected Heroes —
+// no effect AND no animation on them.
+await ctx.aoeHit({
+  side, types: ['hero'], damage: 100, /* … */,
+  heroFilter: (hero, hi, tpi) => !heroHasDiverHelmet(ctx._engine, tpi, hi),
+});
+
+// Creature-affecting Area: skip protected Creatures.
+for (const inst of myCreatures) {
+  if (isAreaImmuneInst(engine, inst)) continue;
+  // … apply the Area's effect …
+}
+
+// beforeDamage-style hero modifier:
+const hi = (engine.gs.players[ownerIdx]?.heroes || []).indexOf(target);
+if (hi >= 0 && heroHasDiverHelmet(engine, ownerIdx, hi)) return;
+```
+
+Engine-level Area rules delegate via `this._isDiverHelmetProtectedTarget(target)`
+(accepts a Hero object OR a support-zone CardInstance) — see the
+Stinky Stables poison-heal-lock sites in `_engine.js` for the pattern.

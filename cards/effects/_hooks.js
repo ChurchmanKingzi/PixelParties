@@ -267,6 +267,13 @@ const BUFF_EFFECTS = {
   // True damage (`actionDealTrueDamage` — Acid Vial, Rockfall, etc.)
   // bypasses this multiplier by design, matching the card text.
   damage_immune: { label: 'Damage Immune', icon: '💠', tooltip: 'Takes no damage from any sources.', damageMultiplier: 0 },
+  // Disruption Ray — target takes DOUBLE damage from every source for
+  // the duration of the buff. `damageMultiplier: 2` is read by the
+  // engine's standard buff-multiplier pass on both hero & creature
+  // damage (≥1 multipliers apply even through a `cannotBeReduced`
+  // lock). True damage (`actionDealTrueDamage`) bypasses the
+  // multiplier pass by design, same as Cloudy / Damage Immune.
+  disrupted: { label: 'Disrupted', icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.', damageMultiplier: 2 },
 };
 
 // ═══════════════════════════════════════════

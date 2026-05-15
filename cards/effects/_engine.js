@@ -348,6 +348,27 @@ class GameEngine {
     // `_flushSurpriseDrawChecks`).
     this._deferredReactionSummons = [];
 
+    // Actions a reaction deferred to run AFTER the whole chain has
+    // resolved and the reaction UI-lock is released. A reaction's
+    // `resolve` runs mid-`_resolveReactionChain`; anything that needs
+    // the player to then interact with the board (e.g. Lunar Eclipse /
+    // The Master's Plan granting a replacement Action) must wait until
+    // the chain is over and the play lock released. Drained by
+    // `_runPostChainActions`, invoked ONLY from the play socket
+    // handlers' `.finally` and the CPU action dispatcher — i.e. after
+    // the whole play handler has fully unwound. (Deliberately NOT from
+    // executeCardWithChain / _checkReactionCards: draining from those
+    // arbitrary hook/chain points froze the End Phase via a CPU
+    // live-turn-deadline trip.)
+    this._postChainActions = [];
+
+    // Surprise cards that activated AS a chain reaction (Lunar
+    // Eclipse). They stay face-up IN their Surprise Zone for the
+    // whole chain; this list is drained at the very end of
+    // `_resolveReactionChain` (after the negated card has been
+    // processed) to send each to discard, visually leaving the zone.
+    this._pendingSurpriseReactionCleanup = [];
+
     // Chain state
     this.chain = [];           // Current chain links
     this.chainDepth = 0;       // Nested chain counter
@@ -530,6 +551,15 @@ class GameEngine {
     // Cleared at turn start by the per-turn cleanup block alongside
     // Luna Kiai's `_revealedHandIndices`.
     this.registerHandIndexedField('_handCostReductions', { kind: 'value' });
+    // PERMANENT per-instance cost reductions (Lunatic Cycle - New
+    // Moon's searched card "Cost becomes 4 while it remains in your
+    // hand"). Same lookup/remap semantics as `_handCostReductions` —
+    // follows the physical copy through hand splices/reorders and
+    // drops the entry the moment the card leaves hand — but it is NOT
+    // in the per-turn cleanup block, so it survives turn boundaries
+    // (Bamboo Shield's `_permanentlyRevealedHandIndices` is the
+    // boolean analogue of this value field).
+    this.registerHandIndexedField('_handCostReductionsPermanent', { kind: 'value' });
     // Transient sibling of `_handLevelOffsets`. Same lookup semantics
     // (negative numbers reduce level), but DELIBERATELY no
     // `onCardSummonedFromHand` callback — the offset is purely an
@@ -1915,6 +1945,38 @@ class GameEngine {
     // the looping hook is obvious — ONCE.
     this._hooksFiredThisTurn++;
     this._hookHistogramThisTurn[hookName] = (this._hookHistogramThisTurn[hookName] || 0) + 1;
+    // ── Stale CPU-deadline guard (CRITICAL) ──
+    // `_cpuTurnDeadline` is set at the CPU's turn start (_cpu.js) and
+    // was NEVER cleared. On the HUMAN's turn it's therefore a stale
+    // past timestamp, so the deadline check below would force-kill any
+    // human hook chain that reached 32 hooks — silently aborting
+    // Cooldin's Area placement, Leadership's redraw, the End Phase,
+    // etc. Lazily clear it whenever it's a REAL (non-sim) turn that
+    // isn't the CPU's. Left intact during MCTS rollouts (`_inMctsSim`),
+    // where the deadline must still bound a runaway rollout even though
+    // the sim's `activePlayer` cycles through future turns.
+    if (typeof this._cpuTurnDeadline === 'number'
+        && !this._inMctsSim
+        && this.gs?.activePlayer !== this._cpuPlayerIdx) {
+      this._cpuTurnDeadline = null;
+    }
+
+    // ── CPU-turn progress breadcrumb (debug) ──
+    // Periodic timeline during a REAL CPU turn (not MCTS sims) so a
+    // runaway / slow hook chain shows its escalation + dominant
+    // hook/card BEFORE the deadline trip, and we can see exactly which
+    // phase it stalls in. Throttled every 200 hooks (a normal CPU turn
+    // fires a few hundred total → 1-2 lines; a runaway prints a clear
+    // climbing sequence naming the looping card). Grep `[CPU-DBG]`.
+    if (typeof this._cpuTurnDeadline === 'number'
+        && !this._inMctsSim && !this._fastMode
+        && this._hooksFiredThisTurn % 200 === 0) {
+      try {
+        const d = this._describeHeapTripDiagnostics();
+        const msLeft = this._cpuTurnDeadline - Date.now();
+        console.log(`[CPU-DBG] t${this.gs?.turn} ph${this.gs?.currentPhase} ap${this.gs?.activePlayer} hooks=${this._hooksFiredThisTurn} curHook=${hookName} msToDeadline=${msLeft} | topHooks: ${d.topHooks} | topCards: ${d.topFiringCards} | trail: ${d.trail}`);
+      } catch (e) { /* never let debug logging break the turn */ }
+    }
     if (this._hooksFiredThisTurn > MAX_HOOKS_PER_TURN) {
       this._hookCapTrippedThisTurn = true;
       this._turnHooksKilled = true; // stick for the whole real turn
@@ -1943,7 +2005,17 @@ class GameEngine {
       this._hookCapTrippedThisTurn = true;
       this._turnHooksKilled = true;
       this._mctsKilledThisTurn = true;
-      const err = new Error(`CPU live-turn deadline exceeded inside hook chain at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._hooksFiredThisTurn} hooks. Force-ending in-flight chain.`);
+      // Full diagnostic dump (mirrors the MAX_HOOKS path). Previously
+      // this throw was bare — useless for finding the looping card.
+      // Now it names the dominant hooks / cards / recent trail so a
+      // frozen End-Phase points straight at the culprit.
+      let _d;
+      try { this._dumpOverloadDiagnostics('cpu-deadline'); } catch (e) { /* diag best-effort */ }
+      try { _d = this._describeHeapTripDiagnostics(); } catch (e) { _d = null; }
+      const _diag = _d
+        ? ` Top hooks: ${_d.topHooks}. Top instances: ${_d.topNames}. Top firing cards: ${_d.topFiringCards}. Recent trail: ${_d.trail}.`
+        : '';
+      const err = new Error(`CPU live-turn deadline exceeded inside hook chain at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} active p${this.gs?.activePlayer} after ${this._hooksFiredThisTurn} hooks (curHook=${hookName}).${_diag} Force-ending in-flight chain.`);
       err._mctsOverload = true;
       err._cpuDeadlineExceeded = true;
       throw err;
@@ -2976,6 +3048,12 @@ class GameEngine {
        *   types: ['hero','creature'] (default both),
        *   condition: (target) => bool (optional filter),
        *   damageType: string (e.g. 'destruction_spell', 'attack', 'creature', 'status', 'artifact', 'other'),
+       *   dealsDamage: bool (optional explicit override) — set FALSE for a
+       *     targeted effect that deals NO damage (insta-kill / "defeat" /
+       *     "destroy"); pure damage-mitigation post-target reactions
+       *     (Spectral Armor, Bamboo Shield, …) then don't fire, since
+       *     halving/negating a non-damage defeat is a no-op. Defaults to
+       *     the usual baseDamage>0 / concrete-damageType inference.
        *   title, description, confirmLabel, confirmClass, cancellable
        * }
        * @returns {object|null} { id, type, owner, heroIdx, slotIdx?, cardName } or null
@@ -2994,6 +3072,23 @@ class GameEngine {
         if (side === 'own') side = 'my';
         if (side === 'both') side = 'any';
         const types = config.types || ['hero', 'creature'];
+
+        // ── Single "does this picker deal damage?" signal ──
+        // Drives the post-target reaction gate so pure damage-mitigation
+        // reactions (Spectral Armor halve, damage negation, Bamboo
+        // Shield, …) opt out of NON-damage targeting. An explicit
+        // `config.dealsDamage:false` (insta-kill / "defeat" / "destroy"
+        // — Lunatic Golem tier-5) forces it off regardless of
+        // damageType; otherwise the canonical inference applies
+        // (`baseDamage>0`; a concrete damageType is the fallback, since
+        // Pyroblast & co. set baseDamage but no damageType). Computed
+        // once here from static config and used at BOTH
+        // `_checkPostTargetHandReactions` sites (single + multi paths)
+        // so they can't drift. Mirrors promptMultiTarget's gate.
+        const _ptDealsDamage = config.dealsDamage === false ? false : (
+          (typeof config.baseDamage === 'number' && config.baseDamage > 0) ||
+          (!!config.damageType && config.damageType !== 'status' && config.damageType !== 'none')
+        );
 
         // Auto-compute damage preview with hero-level bonuses.
         // `promptDamageTarget` always commits to exactly one target
@@ -3325,8 +3420,18 @@ class GameEngine {
         // damage that's "treated as a Spell" (Alice the Puppeteer Girl, …)
         // alongside the source card's static cardType.
         if (selected && !config._skipPostTargetReactions) {
+          // Single-target path has ALWAYS defaulted dealsDamage=true
+          // (the hub treats absent as true). Preserve that for every
+          // existing caller — only honor an EXPLICIT opt-out so a
+          // declared non-damage targeted effect (Golem tier-5
+          // insta-kill) suppresses pure damage-mitigation reactions.
+          // (The multi-target path keeps its long-standing baseDamage/
+          // damageType inference via `_ptDealsDamage`.)
           const ptResult = await engine._checkPostTargetHandReactions(
-            [selected], cardInstance, { damageType: config.damageType },
+            [selected], cardInstance, {
+              damageType: config.damageType,
+              dealsDamage: config.dealsDamage === false ? false : true,
+            },
           );
 
           // Effect fully negated (Invisibility Cloak)
@@ -3600,9 +3705,28 @@ class GameEngine {
         }
 
         // ── Post-target hand reaction check (Invisibility Cloak, etc.) ──
+        // `dealsDamage` lets pure damage-mitigation reactions (Spectral
+        // Armor, Bamboo Shield, Homerun!, Sculpture Guards, Cloud in a
+        // Bottle — all "when a target would take damage") opt out of
+        // non-damage targeting like Disruption Ray / Icy Slime. The
+        // canonical "this picker deals damage" signal is
+        // `baseDamage > 0` (Pyroblast & co. set baseDamage but NOT
+        // damageType, so damageType alone is insufficient); a concrete
+        // damageType is accepted as a fallback. Targeting reactions
+        // that key on Attack/Spell *type* rather than damage (e.g.
+        // Invisibility Cloak) ignore this flag and still fire.
         if (!config._skipPostTargetReactions) {
+          // Local to promptMultiTarget (the shared `_ptDealsDamage`
+          // lives in promptDamageTarget's scope). Same rule: an
+          // explicit `config.dealsDamage:false` (non-damage targeted
+          // effect) forces it off; otherwise `baseDamage>0` or a
+          // concrete non-status damageType means "deals damage".
+          const _ptDealsDamage = config.dealsDamage === false ? false : (
+            (typeof config.baseDamage === 'number' && config.baseDamage > 0) ||
+            (!!config.damageType && config.damageType !== 'status' && config.damageType !== 'none')
+          );
           const ptResult = await engine._checkPostTargetHandReactions(
-            result, cardInstance, { damageType: config.damageType },
+            result, cardInstance, { damageType: config.damageType, dealsDamage: _ptDealsDamage },
           );
           if (ptResult?.effectNegated) {
             gs._spellNegatedByEffect = true;
@@ -4663,6 +4787,98 @@ class GameEngine {
     return { dealt: 0 };
   }
 
+  /**
+   * Non-damage hero defeat. "Instantly defeats" effects (Lunatic Golem
+   * tier 5, and any future insta-kill) route through here INSTEAD of
+   * dealing a huge hit, so the KO is genuinely NOT damage:
+   *   • no BEFORE_DAMAGE / AFTER_DAMAGE hooks fire
+   *   • no "would take damage" reaction prompts (nothing took damage)
+   *   • no damage reduction / negation / immunity (Cloudy,
+   *     damage_immune, medusa_petrified, Shield of Life, Lunatic
+   *     Golem's own tier-4 host-damage negation, …) — every one of
+   *     those gates on the damage pipeline, which this never enters
+   * ALWAYS honored (these are death REPLACEMENT, not damage protection):
+   *   • ON_HERO_KO + the generic `_extraLife` death-replacement net, so
+   *     Guardian Angel / Trial of Coolness still get their save — for an
+   *     OFFENSIVE insta-kill AND a voluntary self-sacrifice alike.
+   * Honored BY DEFAULT, waivable via opts:
+   *   • firstTurnProtectedPlayer — the absolute game-start grace shield.
+   *     An offensive insta-kill (Golem tier-5, like Eraser Beam) must
+   *     respect it. A VOLUNTARY self-sacrifice (Divine Gift of
+   *     Sacrifice) must NOT be blockable by it — the player chose to
+   *     give the Hero up — so it passes `respectFirstTurnProtection:
+   *     false`. Nothing else can block a defeat (it never enters the
+   *     damage pipeline), so this is the only gate that needs a waiver.
+   * Bookkeeping (diedOnTurn, _heroKOContext, handleHeroDeathCleanup,
+   * win check, idempotent `_koProcessed`) mirrors the damage-path KO so
+   * every downstream system sees an ordinary defeat.
+   *
+   * @param {object} source - { name, owner, heroIdx, controller? }
+   * @param {object} target - Hero object (has .hp / .maxHp)
+   * @param {object} [opts] - { reason, respectFirstTurnProtection = true }
+   *                          `reason` is log attribution only. Set
+   *                          `respectFirstTurnProtection:false` for a
+   *                          voluntary self-sacrifice that must land
+   *                          even under the game-start grace shield.
+   * @returns {Promise<{ defeated: boolean }>}
+   */
+  async actionDefeatHero(source, target, opts = {}) {
+    if (!target || target.hp === undefined || target.hp <= 0) return { defeated: false };
+
+    const targetOwner = this._findHeroOwner(target);
+
+    // The game-start grace shield blocks EVERYTHING — defeat included —
+    // for offensive insta-kills. A voluntary self-sacrifice opts out
+    // (`respectFirstTurnProtection:false`): the controller deliberately
+    // gave the Hero up, so no protection (Resistance-style or the grace
+    // shield) may veto their own choice.
+    if (opts.respectFirstTurnProtection !== false
+        && targetOwner >= 0 && this.gs.firstTurnProtectedPlayer === targetOwner) {
+      this.log('damage_blocked', { target: this._heroLabel(target), reason: 'shielded' });
+      return { defeated: false };
+    }
+
+    target.hp = 0;
+    target.diedOnTurn = this.gs.turn;
+    this.log('hero_ko', { hero: this._heroLabel(target), source: source?.name || opts.reason || 'defeat' });
+
+    this.gs._heroKOContext = {
+      hero: target, source, heroOwner: targetOwner,
+      killerOwner: source?.owner ?? source?.controller ?? -1,
+    };
+    await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, _bypassDeadHeroFilter: true });
+    delete this.gs._heroKOContext;
+
+    // Generic extra-life net (Trial of Coolness, etc.) — AFTER onHeroKO
+    // so Guardian Angel keeps priority. Mirrors the damage-path KO.
+    if (target.hp <= 0 && target._extraLife) {
+      const lifeMark = target._extraLife;
+      delete target._extraLife;
+      target.hp = target.maxHp || 400;
+      const ownerIdx = targetOwner >= 0
+        ? targetOwner
+        : this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
+      const heroIdx = ownerIdx >= 0 ? this.gs.players[ownerIdx].heroes.indexOf(target) : -1;
+      if (ownerIdx >= 0 && heroIdx >= 0) {
+        this._broadcastEvent('play_zone_animation', {
+          type: 'holy_revival', owner: ownerIdx, heroIdx, zoneSlot: -1,
+        });
+      }
+      this.log('extra_life_hero', { hero: target.name, by: lifeMark?.by || 'Extra Life' });
+    }
+
+    if (target.hp > 0) {
+      delete target.diedOnTurn;
+      return { defeated: false };
+    }
+    if (!target._koProcessed) {
+      target._koProcessed = true;
+      await this.handleHeroDeathCleanup(target);
+      await this.checkAllHeroesDead();
+    }
+    return { defeated: true };
+  }
+
   async actionHealHero(source, target, amount) {
     const depth = ++this._actionRecursionDepth;
     this._actionRecursionTrace.push({
@@ -4734,7 +4950,8 @@ class GameEngine {
 
     // Stinky Stables: poisoned heroes cannot be healed while the Area
     // is in play (either side).
-    if (target.statuses?.poisoned && this._isPoisonHealLocked()) {
+    if (target.statuses?.poisoned && this._isPoisonHealLocked()
+        && !this._isDiverHelmetProtectedTarget(target)) {
       this.log('heal_blocked', { target: this._heroLabel(target), reason: 'Stinky Stables' });
       return;
     }
@@ -4815,7 +5032,8 @@ class GameEngine {
     if (!target || !target.counters) return;
     if (target.faceDown) return; // Face-down surprises cannot be healed
     // Stinky Stables: poisoned creatures can't be healed while the Area is up.
-    if (target.counters.poisoned && this._isPoisonHealLocked()) {
+    if (target.counters.poisoned && this._isPoisonHealLocked()
+        && !this._isDiverHelmetProtectedTarget(target)) {
       this.log('heal_blocked', { target: target.name, reason: 'Stinky Stables' });
       return;
     }
@@ -7817,7 +8035,8 @@ class GameEngine {
   cleanseHeroStatuses(hero, playerIdx, heroIdx, statusKeys, source) {
     if (!hero?.statuses) return [];
     const removed = [];
-    const poisonLocked = this._isPoisonHealLocked();
+    const poisonLocked = this._isPoisonHealLocked()
+      && !this._isDiverHelmetProtectedTarget(hero);
     for (const key of statusKeys) {
       if (!hero.statuses[key]) continue;
       if (hero.statuses[key]?.unhealable) continue;
@@ -7874,7 +8093,8 @@ class GameEngine {
   cleanseCreatureStatuses(inst, statusKeys, source) {
     if (!inst) return [];
     const removed = [];
-    const poisonLocked = this._isPoisonHealLocked();
+    const poisonLocked = this._isPoisonHealLocked()
+      && !this._isDiverHelmetProtectedTarget(inst);
     for (const key of statusKeys) {
       if (!inst.counters[key]) continue;
       // Creature unhealable: stored as separate counter flag
@@ -8519,9 +8739,32 @@ class GameEngine {
     const statusDef = STATUS_EFFECTS[statusName];
     const immuneKey = statusDef?.immuneKey || (statusName + '_immune');
     if (inst.counters[immuneKey]) return false;
+    // Universal negative-status immunity — creature parity with the
+    // hero-side `negative_status_immune` buff (see addHeroStatus). A
+    // creature carrying the `negative_status_immune` buff in
+    // `counters.buffs` can't receive ANY negative status (Lunatic
+    // Golem tier 2+, and any future creature granting it).
+    if (statusDef?.negative && inst.counters?.buffs?.negative_status_immune) return false;
     // Monia-style creature protection (synchronous check via _moniaShieldActive)
     if (this.gs._moniaShieldActive != null && inst.owner === this.gs._moniaShieldActive) return false;
     return true;
+  }
+
+  /**
+   * True iff a creature carries the universal negative-status immunity
+   * buff (Lunatic Golem tier 2+, and any future creature granting it).
+   *
+   * `canApplyCreatureStatus` already stops a NEW negative status from
+   * landing on such a creature. This helper is the companion gate for
+   * the OTHER half of "immune to negative status effects": the EFFECTS
+   * of any negative status it somehow still carries are negated too —
+   * no Poison/Burn tick damage, and the CC bucket (Frozen / Stunned /
+   * Negated / Nulled) does NOT silence its own activated effect. Used
+   * by processPoison/BurnDamage and the creature-effect activation
+   * gates here + server-side doActivateCreatureEffect.
+   */
+  _creatureNegStatusImmune(inst) {
+    return !!inst?.counters?.buffs?.negative_status_immune;
   }
 
   /**
@@ -9262,6 +9505,57 @@ class GameEngine {
   }
 
   /**
+   * Hand Equipment Artifacts that may be equipped to EITHER side's
+   * Hero. The rule: a pure Equipment subtype with NO inherent
+   * `canEquipToHero` restriction is side-free (the 6 generic equips —
+   * Shield of Life/Death, Bamboo Staff, Diver Helmet, Sacred Hammer,
+   * Blood Moon under the Sea — plus any future unrestricted equip).
+   * Cards that DO export `canEquipToHero` (one-per-Hero blockers, the
+   * Lunatic Cycle chain, …) keep their existing own-side behavior and
+   * are deliberately excluded. `placesOnOpponentBoard` cards (Powder
+   * Keg) route through the dedicated cross-side path instead.
+   *
+   * Published per-player as `freeSideEquipArtifacts`; the client uses
+   * it to let the player target an own OR opponent Hero (drag or
+   * click). Returns [] when no legal host Hero exists on either side.
+   */
+  getFreeSideEquipArtifacts(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+    // A Hero is a legal equip host iff alive, not Frozen, not Charmed,
+    // with ≥1 free base Support Zone (z<3) — server's equip gate.
+    const sideHasHost = (sidePs) => {
+      if (!sidePs) return false;
+      for (let hi = 0; hi < (sidePs.heroes || []).length; hi++) {
+        const h = sidePs.heroes[hi];
+        if (!h?.name || h.hp <= 0) continue;
+        if (h.statuses?.frozen || h.statuses?.charmed) continue;
+        const sz = sidePs.supportZones?.[hi] || [];
+        for (let z = 0; z < 3; z++) if ((sz[z] || []).length === 0) return true;
+      }
+      return false;
+    };
+    const oppIdx = playerIdx === 0 ? 1 : 0;
+    if (!sideHasHost(ps) && !sideHasHost(this.gs.players[oppIdx])) return [];
+
+    const cardDB = this._getCardDB();
+    const out = new Set();
+    const seen = new Set();
+    for (const cardName of (ps.hand || [])) {
+      if (seen.has(cardName)) continue;
+      seen.add(cardName);
+      const cd = cardDB[cardName];
+      if (!cd || cd.cardType !== 'Artifact') continue;
+      if ((cd.subtype || '').toLowerCase() !== 'equipment') continue; // pure Equipment only
+      const script = loadCardEffect(cardName);
+      if (typeof script?.canEquipToHero === 'function') continue;     // restricted → own-side only
+      if (script?.placesOnOpponentBoard === true) continue;           // Powder-Keg cross-side path
+      out.add(cardName);
+    }
+    return Array.from(out);
+  }
+
+  /**
    * Shared validation for playing action cards (Spell, Attack, Creature) from hand.
    * Covers: phase check, hand validation, card data lookup, hero validation,
    * spell school/level, combo lock, once-per-game, canPlayCard hero restrictions,
@@ -9787,6 +10081,23 @@ class GameEngine {
     if (!ps) return { played: false };
     const cardDB = this._getCardDB();
 
+    // Re-prompt loop: if the player picks a card but then cancels out
+    // of THAT card's own target/back button, they return here ("choose
+    // the bonus Action you want to take") instead of the immediate
+    // Action being consumed. ONLY the heroAction prompt's own cancel
+    // (Back) or actually resolving an Action exits this loop.
+    //
+    // Hard iteration cap — a CPU answering a NON-cancellable prompt
+    // can otherwise loop forever if every card it picks has no legal
+    // target (its picker auto-cancels → `continue` → re-prompt →
+    // same pick …). 24 ≫ any human's realistic re-tries; on exhaustion
+    // bail as "skipped" so the turn can't hang on a runaway re-prompt.
+    let _repromptGuard = 0;
+    while (true) {
+      if (++_repromptGuard > 24) {
+        this.log('immediate_action_reprompt_capped', { by: config.title });
+        return { played: false };
+      }
     // Collect eligible cards across ALL alive heroes. Also build a
     // per-card → eligible-hero-indices map so the client knows which
     // Heroes can cast each highlighted card without re-deriving action-
@@ -9917,9 +10228,18 @@ class GameEngine {
           delete ps._placementConsumedByCard;
           this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title, selfPlaced: true });
         } else {
+          // Glow back into the player's OWN hand (see Spell/Attack
+          // branch — same-slot pile-transfer suppresses the wrong
+          // "slid in from opponent's hand" auto-animation).
+          const _retIdx = ps.hand.length;
+          this._broadcastEvent('play_pile_transfer', {
+            owner: playerIdx, cardName, from: 'hand', to: 'hand',
+            fromHandIdx: _retIdx, toHandIdx: _retIdx,
+          });
           ps.hand.push(cardName);
           this.log('creature_fizzle', { card: cardName, reason: 'beforeSummon_or_placement_failed', by: config.title });
-          return { played: false };
+          this.sync();
+          continue; // cancelled its own picker → re-prompt the bonus-Action chooser
         }
       } else {
         const { actualSlot } = placeResult;
@@ -9932,9 +10252,31 @@ class GameEngine {
       const inst = this._trackCard(cardName, playerIdx, 'hand', responseHeroIdx, -1);
       this.gs._immediateActionContext = true;
       if (config.excludeTargets) this.gs._spellExcludeTargets = config.excludeTargets;
+      // Fresh cancel flag so we can tell if the player backed out of
+      // THIS Spell/Attack's own picker (vs. it resolving/being negated).
+      this.gs._spellCancelled = false;
       await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx: responseHeroIdx, _skipReactionCheck: true });
       if (config.excludeTargets) delete this.gs._spellExcludeTargets;
       delete this.gs._immediateActionContext;
+      // Player cancelled the chosen Spell/Attack via its OWN back/
+      // cancel (not negated by an effect) → DON'T consume the bonus
+      // Action: refund the card and re-open the chooser.
+      if (this.gs._spellCancelled && !this.gs._spellNegatedByEffect) {
+        this.gs._spellCancelled = false;
+        // Card just reappears in the player's OWN hand with a glow —
+        // a same-slot `play_pile_transfer` (src ≈ dst) suppresses the
+        // hand-diff auto-animation (which would otherwise wrongly
+        // slide it in from the opponent's hand) and shows the glow.
+        const _retIdx = ps.hand.length;
+        this._broadcastEvent('play_pile_transfer', {
+          owner: playerIdx, cardName, from: 'hand', to: 'hand',
+          fromHandIdx: _retIdx, toHandIdx: _retIdx,
+        });
+        ps.hand.push(cardName);
+        this._untrackCard(inst.id);
+        this.sync();
+        continue;
+      }
       ps.discardPile.push(cardName);
       this._untrackCard(inst.id);
       this.log('immediate_action', { hero: hero.name, card: cardName, cardType: cardData.cardType, by: config.title });
@@ -9951,6 +10293,7 @@ class GameEngine {
     }
 
     return { played: true, cardName, cardType: cardData.cardType };
+    } // end re-prompt while-loop
   }
 
   // ─── TURN / PHASE MANAGEMENT ───────────────
@@ -10493,11 +10836,12 @@ class GameEngine {
         }
         for (const inst of this.cardInstances) {
           if (inst.owner !== playerIdx) continue;
-          if (!inst.counters?.additionalActionAvail) continue;
-          const config = this._additionalActionTypes?.[inst.counters?.additionalActionType];
-          if (config?.isSecondActionGrant) {
-            this.sync();
-            return true; // Stay in Action Phase — second-action grant is reachable
+          for (const [typeId] of this._instAAEntries(inst)) {
+            const config = this._additionalActionTypes?.[typeId];
+            if (config?.isSecondActionGrant) {
+              this.sync();
+              return true; // Stay in Action Phase — second-action grant is reachable
+            }
           }
         }
       }
@@ -10757,8 +11101,14 @@ class GameEngine {
   }
 
   /**
-   * Get spell/attack cards in hand that are blocked from being played.
-   * Checks scripts with spellPlayCondition(gs, playerIdx) returning false.
+   * Cards in hand that are blocked from being played by an INHERENT
+   * restriction — the client greys these out (general rule: a card
+   * unplayable due to its own rule must always look unplayable).
+   * Covers: once-per-game already used, Support-Spell / Attack-Spell
+   * locks, `spellPlayCondition` false, AND Equipment Artifacts whose
+   * `canEquipToHero` is false for EVERY Hero the player controls (e.g.
+   * a Lunatic Cycle equip whose required previous-cycle card isn't on
+   * the board yet).
    * Returns array of blocked card names.
    */
   getBlockedSpells(playerIdx) {
@@ -10796,7 +11146,24 @@ class GameEngine {
         }
       }
       if (script?.spellPlayCondition) {
-        if (!script.spellPlayCondition(this.gs, playerIdx, this)) blocked.push(cardName);
+        if (!script.spellPlayCondition(this.gs, playerIdx, this)) { blocked.push(cardName); continue; }
+      }
+      // Equipment Artifacts: blocked when their inherent `canEquipToHero`
+      // gate rejects EVERY Hero the player controls (no Hero it could
+      // legally attach to right now — e.g. the Lunatic Cycle chain's
+      // "need ≥1 <previous moon> on the board" precondition unmet).
+      const cdEq = allCards[cardName];
+      if (cdEq && cdEq.cardType === 'Artifact'
+          && (cdEq.subtype || '').toLowerCase() === 'equipment'
+          && typeof script?.canEquipToHero === 'function') {
+        let anyHero = false;
+        for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+          if (!ps.heroes[hi]?.name) continue;
+          let ok = false;
+          try { ok = !!script.canEquipToHero(this.gs, playerIdx, hi, this); } catch {}
+          if (ok) { anyHero = true; break; }
+        }
+        if (!anyHero) { blocked.push(cardName); continue; }
       }
     }
     return blocked;
@@ -11853,6 +12220,24 @@ class GameEngine {
     if (!gs?.areaZones) return false;
     return (gs.areaZones[0] || []).includes('Stinky Stables')
         || (gs.areaZones[1] || []).includes('Stinky Stables');
+  }
+
+  /**
+   * Diver Helmet ("equipped Hero and all cards in its Support Zones are
+   * unaffected by Areas"). Returns true if `target` — a Hero object OR
+   * a Creature/support CardInstance — is protected, so engine-level
+   * Area rules (Stinky Stables poison-heal lock, future ones) skip it.
+   * Card-script Areas use `_diver-helmet-shared.js` directly.
+   */
+  _isDiverHelmetProtectedTarget(target) {
+    if (!target) return false;
+    const dh = require('./_diver-helmet-shared');
+    // Creature / support-zone instance: carries counters + a zone tag.
+    if (target.counters && target.zone !== undefined) {
+      return dh.isAreaImmuneInst(this, target);
+    }
+    // Otherwise treat as a Hero object (resolved by reference).
+    return dh.isAreaImmuneHeroObject(this, target);
   }
 
   async placeArea(playerIdx, cardInstance, opts = {}) {
@@ -15170,6 +15555,14 @@ class GameEngine {
     // via the 6th positional arg so existing scripts that don't read
     // it stay compatible.
     const damageType = opts.damageType;
+    // Whether the source actually deals damage to the targeted list.
+    // Defaults to TRUE when the caller doesn't specify (every existing
+    // hub call — promptDamageTarget, aoeHit, preDamageMultiTargetWindow,
+    // creature-batch — is a damage path, so omitting it preserves
+    // today's behavior). Only `promptMultiTarget` computes a real
+    // value, so pure non-damage targeting (Disruption Ray, Icy Slime)
+    // arrives as `false` and damage-only reactions can bail.
+    const dealsDamage = opts.dealsDamage !== false;
 
     // Check both players, defender (targeted player) first
     const targetOwners = [...new Set(targetedHeroes.map(t => t.owner))];
@@ -15212,7 +15605,7 @@ class GameEngine {
         // damage tag so reactions can detect Hero-effect damage that
         // is "treated as a Spell" (Alice the Puppeteer Girl, …).
         if (script.postTargetCondition &&
-            !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, { damageType })) continue;
+            !script.postTargetCondition(this.gs, pi, this, targetedHeroes, sourceCard, { damageType, dealsDamage })) continue;
 
         // Spell/Attack reactions: at least 1 hero must be able to cast it
         // Artifacts: skip hero check (only need gold). `spellInHand: true`
@@ -15340,7 +15733,7 @@ class GameEngine {
         let resolveResult = null;
         try {
           if (script.postTargetResolve) {
-            resolveResult = await script.postTargetResolve(this, pi, targetedHeroes, sourceCard, { damageType });
+            resolveResult = await script.postTargetResolve(this, pi, targetedHeroes, sourceCard, { damageType, dealsDamage });
           }
         } finally {
           this._inPostTargetReaction = false;
@@ -15935,6 +16328,7 @@ class GameEngine {
       resolveResult: null,
     };
 
+    let result;
     this._inReactionCheck = true;
     try {
       const eventDesc = `${cardName} was activated`;
@@ -15945,14 +16339,17 @@ class GameEngine {
         this._inReactionCheck = false;
         let resolveResult = null;
         if (resolve) resolveResult = await resolve();
-        return { negated: false, chainFormed: false, resolveResult };
+        result = { negated: false, chainFormed: false, resolveResult, negatedToDeleted: false };
+      } else {
+        result = {
+          negated: initialLink.negated,
+          chainFormed: true,
+          resolveResult: initialLink.resolveResult || null,
+          // Lunar Eclipse flags a negated card for deletion instead of
+          // discard — server play paths route via routeNegatedInitialCard.
+          negatedToDeleted: !!initialLink._negatedToDeleted,
+        };
       }
-
-      return {
-        negated: initialLink.negated,
-        chainFormed: true,
-        resolveResult: initialLink.resolveResult || null,
-      };
     } finally {
       this._inReactionCheck = false;
       // Flush pending surprise draws ONLY if this card actually resolved
@@ -15968,6 +16365,16 @@ class GameEngine {
         await this._flushSurpriseDrawChecks();
       }
     }
+    // Post-chain deferred actions (Lunar Eclipse / The Master's Plan
+    // replacement Action) are NOT drained here: this still runs nested
+    // inside the play handler (which holds _spellResolutionDepth /
+    // _resolvingCard), so the board-idle gate would no-op anyway. They
+    // are drained by the play socket handlers' `.finally` and the CPU
+    // action dispatcher — i.e. once the whole handler has unwound and
+    // the play lock is released. Draining from arbitrary hook/chain
+    // points (esp. End-Phase turn-end chains) caused a frozen-turn
+    // CPU-deadline trip.
+    return result;
   }
 
   /**
@@ -16009,6 +16416,17 @@ class GameEngine {
     } finally {
       this._inReactionCheck = false;
     }
+    // NOTE: deliberately NO `_runPostChainActions()` here.
+    // `_checkReactionCards` runs from `runHooks` for nearly every
+    // hook — including End-Phase / turn-end chains. Draining a
+    // deferred action (which opens an interactive prompt + its own
+    // hook chain) from such an arbitrary point tripped the CPU
+    // live-turn deadline and froze the game in the End Phase. The
+    // play socket handlers' `.finally` + the CPU action dispatcher
+    // are the authoritative drain points (after the full handler
+    // unwinds); Lunar Eclipse / The Master's Plan are play-chain
+    // reactions (executeCardWithChain), never hook-chain reactions,
+    // so this path never needed to drain them.
   }
 
   /**
@@ -16144,6 +16562,34 @@ class GameEngine {
         countByName.set(cardName, (countByName.get(cardName) || 0) + 1);
       }
 
+      // ── Face-down Surprise reactions ──────────────────────────────
+      // A Surprise whose script is ALSO a chain reaction (isSurprise +
+      // isReaction + reactionCondition) participates in this same
+      // window straight from its face-down Surprise Zone — identical
+      // chain semantics to a hand Reaction, but it stays hidden until
+      // the owner chooses to flip it. (Lunar Eclipse is the first such
+      // card.) Additive: the hand scan above is untouched.
+      for (let shi = 0; shi < (ps.surpriseZones || []).length; shi++) {
+        const sz = ps.surpriseZones[shi] || [];
+        if (sz.length === 0) continue;
+        const sName = sz[0];
+        if (eligibleByName.has(sName)) continue; // a hand copy already offered
+        const sScript = loadCardEffect(sName);
+        if (!sScript?.isSurprise || !sScript?.isReaction) continue;
+        if (sScript.reactionCondition
+            && !sScript.reactionCondition(this.gs, pi, this, chainCtx)) continue;
+        if (!this._canHeroActivateSurprise(pi, shi, sName)) continue;
+        const sData = allCards[sName];
+        const sWisdom = sData?.cardType === 'Spell'
+          ? this.getWisdomDiscardCost(pi, shi, sData) : 0;
+        eligibleByName.set(sName, {
+          handIdx: -1, cost: 0, script: sScript, cardData: sData, cardName: sName,
+          eligibleHeroIdxs: [shi], wisdomCost: sWisdom,
+          fromSurprise: { heroIdx: shi }, source: 'surprise',
+        });
+        countByName.set(sName, 1);
+      }
+
       if (eligibleByName.size === 0) continue;
 
       // ── Prompt the player ─────────────────────────────────────────
@@ -16169,7 +16615,7 @@ class GameEngine {
           .sort((a, b) => a.localeCompare(b))
           .map(name => ({
             name,
-            source: 'hand',
+            source: eligibleByName.get(name)?.source || 'hand',
             count: countByName.get(name) || 1,
           }));
         const picked = await this.promptGeneric(pi, {
@@ -16190,6 +16636,74 @@ class GameEngine {
       if (!info) continue;
       const { cost, script, cardData } = info;
       const eligibleHeroIdxs = info.eligibleHeroIdxs || [];
+
+      // ── Surprise-sourced reaction activation ──────────────────────
+      // Self-contained so the hand-Reaction path below is byte-for-
+      // byte unchanged. The Surprise's host Hero is fixed (its zone),
+      // so there is no multi-Hero caster picker.
+      if (info.fromSurprise) {
+        const sHeroIdx = info.fromSurprise.heroIdx;
+        // Activation cost (Lunar Eclipse: send a "Lunatic Cycle" from
+        // your board to discard). `false` → couldn't pay / declined →
+        // treat as "no reaction" (the Surprise stays face-down).
+        if (typeof script.payActivationCost === 'function') {
+          const paid = await script.payActivationCost(this, pi);
+          if (paid === false) continue;
+        }
+        // Flip the Surprise FACE-UP but leave it IN its Surprise Zone
+        // (still tracked). It stays visible there for the whole chain;
+        // `_resolveReactionChain`'s end-of-chain cleanup sends it to
+        // discard — visually leaving the zone — only AFTER the card it
+        // negated has been processed. The card's `skipPostResolveDiscard`
+        // suppresses the chain's own mid-resolve discard so it isn't
+        // pulled early.
+        const sInst = this.cardInstances.find(c =>
+          c.owner === pi && c.zone === ZONES.SURPRISE
+          && c.heroIdx === sHeroIdx && c.name === chosenName);
+        if (sInst) sInst.faceDown = false;
+        this._broadcastEvent('surprise_flip', { owner: pi, heroIdx: sHeroIdx, cardName: chosenName });
+        this._broadcastEvent('card_reveal', { cardName: chosenName });
+        this.log('reaction_activated', { card: chosenName, player: ps.username, chainPosition: chain.length });
+        if (!this._pendingSurpriseReactionCleanup) this._pendingSurpriseReactionCleanup = [];
+        this._pendingSurpriseReactionCleanup.push({
+          pi, heroIdx: sHeroIdx, cardName: chosenName, instId: sInst?.id,
+        });
+
+        const engine = this;
+        const reactionOwner = pi;
+        const sWisdom = info.wisdomCost || 0;
+        const link = {
+          id: uuidv4().substring(0, 12),
+          cardName: chosenName, owner: pi,
+          cardType: cardData?.cardType || 'Unknown',
+          casterHeroIdx: sHeroIdx, heroIdx: sHeroIdx,
+          goldCost: 0, wisdomCost: sWisdom,
+          isInitialCard: false, negated: false, chainClosed: false,
+          resolve: script.resolve
+            ? async (ch, idx) => {
+                if (sWisdom > 0) {
+                  await engine.actionPromptForceDiscard(reactionOwner, sWisdom, {
+                    title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+                  });
+                }
+                return await script.resolve(engine, reactionOwner, null, null, ch, idx);
+              }
+            : null,
+          script,
+        };
+        chain.push(link);
+        if (chain.length >= 2) this._broadcastChainUpdate(chain);
+        await this.runHooks('onReactionActivated', {
+          reactionCardName: chosenName, reactionOwner: pi, chain,
+          _skipReactionCheck: true, _isReaction: true,
+        });
+        if (script.onChainAdd) {
+          await script.onChainAdd(this, pi, chain, link);
+          if (chain.length >= 2) this._broadcastChainUpdate(chain);
+        }
+        this.sync();
+        return true;
+      }
 
       // Hero pick — when 2+ Heroes can legally cast this Spell /
       // Attack reaction, the choice is meaningful (Nao's overheal,
@@ -16325,10 +16839,28 @@ class GameEngine {
         this.log('card_negated', { card: link.cardName, owner: link.owner });
         await this._delay(600);
 
-        // Negated non-initial cards go to discard
-        if (!link.isInitialCard) {
+        // Negated non-initial cards go to discard — or the deleted
+        // pile when the negator flagged deletion (Lunar Eclipse).
+        // `skipPostResolveDiscard` cards (surprise reactions that
+        // remain in their zone until end-of-chain) are routed by the
+        // post-chain cleanup instead, so skip them here.
+        if (!link.isInitialCard
+            && !loadCardEffect(link.cardName)?.skipPostResolveDiscard) {
           const ps = this.gs.players[link.owner];
-          if (ps) ps.discardPile.push(link.cardName);
+          if (ps) {
+            const pile = link._negatedToDeleted ? 'deletedPile' : 'discardPile';
+            if (link._negatedToDeleted) {
+              this._broadcastEvent('play_pile_transfer', {
+                owner: link.owner, cardName: link.cardName,
+                from: 'hand', to: 'deleted',
+              });
+              // Defer the push so the card lands in the deleted pile
+              // at the END of the flight, not the start.
+              await this._delay(650);
+            }
+            if (!ps[pile]) ps[pile] = [];
+            ps[pile].push(link.cardName);
+          }
         }
       } else {
         // Resolve glow
@@ -16411,6 +16943,29 @@ class GameEngine {
 
     this._broadcastEvent('reaction_chain_done', {});
     await this._delay(400);
+
+    // Surprise reactions (Lunar Eclipse) stayed face-up in their
+    // Surprise Zone for the entire chain. NOW — after the negated
+    // card has been processed — each leaves its zone for discard,
+    // using the same surprise→discard visual every other Surprise
+    // uses (zone empties on the next sync).
+    if (this._pendingSurpriseReactionCleanup?.length) {
+      const pending = this._pendingSurpriseReactionCleanup;
+      this._pendingSurpriseReactionCleanup = [];
+      for (const ent of pending) {
+        const ps = this.gs.players[ent.pi];
+        if (!ps) continue;
+        const sZone = ps.surpriseZones?.[ent.heroIdx] || [];
+        const szi = sZone.indexOf(ent.cardName);
+        if (szi >= 0) sZone.splice(szi, 1);
+        if (ent.instId != null) this._untrackCard(ent.instId);
+        if (!ps.discardPile) ps.discardPile = [];
+        ps.discardPile.push(ent.cardName);
+        this.log('surprise_reaction_discarded', { card: ent.cardName, owner: ent.pi });
+        this.sync();
+        await this._delay(450);
+      }
+    }
   }
 
   /**
@@ -16421,6 +16976,105 @@ class GameEngine {
     if (linkIndex >= 0 && linkIndex < chain.length) {
       chain[linkIndex].negated = true;
       if (opts.negationStyle) chain[linkIndex].negationStyle = opts.negationStyle;
+      // `deleteCard` → the negated card is removed from the game
+      // (deleted pile) instead of going to its owner's discard pile.
+      // Surfaced for the initial card via executeCardWithChain's
+      // `negatedToDeleted`; honored for non-initial links in
+      // _resolveReactionChain. Used by Lunar Eclipse.
+      if (opts.deleteCard) chain[linkIndex]._negatedToDeleted = true;
+    }
+  }
+
+  /**
+   * Route a negated INITIAL from-hand card to the correct pile: the
+   * owner's deletedPile when the negator flagged it for deletion
+   * (Lunar Eclipse — `chainResult.negatedToDeleted`), otherwise the
+   * owner's discardPile (the default for every other negation).
+   * Centralizes the per-play-path negation routing in server.js.
+   */
+  async routeNegatedInitialCard(ownerIdx, cardName, chainResult, fromHandIdx) {
+    const ps = this.gs.players[ownerIdx];
+    if (!ps) return;
+    const toDeleted = !!chainResult?.negatedToDeleted;
+    const pile = toDeleted ? 'deletedPile' : 'discardPile';
+    if (toDeleted) {
+      // `fromHandIdx` (when provided & still rendered — the negated
+      // card hasn't synced out of hand yet) makes the flight start
+      // from the card's ACTUAL hand slot instead of the hand-container
+      // centre. Omitted → handler falls back to the hand container.
+      const _fhi = Number.isInteger(fromHandIdx) && fromHandIdx >= 0
+        ? fromHandIdx : undefined;
+      // Lunar Eclipse's "negate AND delete": the negated card visibly
+      // flies from its owner's hand (negated initial cards never reach
+      // the board) to the deleted pile. There is no client-side
+      // "hide pile card until it lands" for pile destinations, so the
+      // push MUST be deferred until the flight has visually arrived —
+      // otherwise the card pops into the deleted pile at flight START.
+      // Broadcast → wait out the ~700ms flight → THEN push + sync so it
+      // lands at the END. The handler also pre-suppresses the
+      // deleted-pile diff so it doesn't double-animate.
+      this._broadcastEvent('play_pile_transfer', {
+        owner: ownerIdx, cardName, from: 'hand', to: 'deleted',
+        fromHandIdx: _fhi,
+      });
+      await this._delay(650);
+      if (!ps[pile]) ps[pile] = [];
+      ps[pile].push(cardName);
+      this.sync();
+      return;
+    }
+    // Normal discard negation — unchanged, immediate, no flight.
+    if (!ps[pile]) ps[pile] = [];
+    ps[pile].push(cardName);
+  }
+
+  /**
+   * Queue an async fn to run AFTER the current reaction chain fully
+   * resolves and the reaction lock is released. Use from a reaction's
+   * `resolve` for anything that needs the player to interact with the
+   * board afterwards (granting a replacement Action, etc.) — doing it
+   * inline would prompt while the chain still holds the UI/play lock,
+   * so the player can't actually act on it.
+   */
+  queuePostChainAction(fn) {
+    if (typeof fn === 'function') this._postChainActions.push(fn);
+  }
+
+  /** Drain the post-chain action queue (sequentially). Snapshots +
+   *  clears first so a queued action that itself opens a chain doesn't
+   *  re-enter / double-run. No-op when empty or already draining. */
+  async _runPostChainActions() {
+    if (this._runningPostChain) return;
+    if (!this._postChainActions || this._postChainActions.length === 0) return;
+    // Board-idle gate. A deferred action (e.g. Lunar Eclipse's
+    // replacement-Action prompt) must only run when the triggering
+    // play handler has FULLY unwound — otherwise its still-held
+    // resolution locks (`_spellResolutionDepth`, `_resolvingCard`,
+    // the reaction lock, a pending Surprise) keep the client's
+    // play UI locked and the granted Action can't be acted on.
+    // Self-gating makes this method safe to call from ANY point
+    // (executeCardWithChain tail, server-handler end, CPU loop) —
+    // it simply no-ops until the next call where the board is idle.
+    const gs = this.gs;
+    if (this._inReactionCheck) return;
+    if (gs?.surprisePending) return;
+    if ((gs?._spellResolutionDepth || 0) > 0) return;
+    if ((gs?.players || []).some(p => p && p._resolvingCard)) return;
+    this._runningPostChain = true;
+    try {
+      // Drain the CURRENT batch exactly once (snapshot + clear). A
+      // deferred action that itself queues another is intentionally
+      // NOT re-looped here — that's picked up at the next legitimate
+      // drain point (next play socket `.finally` / CPU dispatcher).
+      // An unbounded `while` risked an infinite re-queue hang.
+      const batch = this._postChainActions;
+      this._postChainActions = [];
+      for (const fn of batch) {
+        try { await fn(); }
+        catch (err) { console.error('[Engine] post-chain action failed:', err.message); }
+      }
+    } finally {
+      this._runningPostChain = false;
     }
   }
 
@@ -16450,20 +17104,85 @@ class GameEngine {
     this._additionalActionTypes[typeId] = config;
   }
 
-  /**
-   * Grant an additional action from a specific card instance.
-   * Sets counters on the card to track availability.
-   */
-  grantAdditionalAction(cardInstance, typeId) {
-    cardInstance.counters.additionalActionType = typeId;
-    cardInstance.counters.additionalActionAvail = 1;
+  // ── Multi-grant additional-action model ──────────────────────────
+  // Canonical store: `inst.counters.aaGrants` = { [typeId]: avail }.
+  // ONE card instance can carry SEVERAL independent grants (e.g.
+  // Lunatic Hawk's tier-4 Lunatic-summon grant AND its tier-5
+  // second-Action grant at the same time). The legacy scalar fields
+  // `additionalActionType` / `additionalActionAvail` are kept as
+  // synced MIRRORS only — `additionalActionAvail` = total avail
+  // across all grants (so the client's ⚡ creature badge still
+  // works), `additionalActionType` = a representative key. Engine
+  // logic always reads `aaGrants` via `_instAAEntries`.
+
+  /** [[typeId, avail>0], …] for an inst. Falls back to the legacy
+   *  scalar pair so any pre-migration / externally-stamped inst still
+   *  resolves to its single grant. */
+  _instAAEntries(inst) {
+    const g = inst?.counters?.aaGrants;
+    if (g && typeof g === 'object') {
+      return Object.entries(g).filter(([, v]) => v > 0);
+    }
+    const t = inst?.counters?.additionalActionType;
+    const a = inst?.counters?.additionalActionAvail;
+    return (t && a > 0) ? [[t, a]] : [];
+  }
+
+  /** Re-derive the legacy scalar mirrors from the canonical map. */
+  _syncAAMirror(inst) {
+    if (!inst?.counters) return;
+    const g = inst.counters.aaGrants || {};
+    let total = 0, primary = '';
+    for (const [tid, v] of Object.entries(g)) {
+      if (v > 0) { total += v; if (!primary) primary = tid; }
+    }
+    inst.counters.additionalActionAvail = total;
+    inst.counters.additionalActionType = primary;
   }
 
   /**
-   * Expire (remove) the additional action from a specific card instance.
+   * Grant an additional action from a specific card instance.
+   * ADDITIVE — never clobbers other grants already on the inst.
+   */
+  grantAdditionalAction(cardInstance, typeId) {
+    if (!cardInstance?.counters) return;
+    if (!cardInstance.counters.aaGrants) cardInstance.counters.aaGrants = {};
+    cardInstance.counters.aaGrants[typeId] = 1;
+    this._syncAAMirror(cardInstance);
+  }
+
+  /**
+   * Expire ALL additional actions on a specific card instance.
+   * Back-compat for single-grant cards (legendary-sword, mana-beacon,
+   * lizbeth, deepsea — one grant per inst, so "all" == "theirs"). For
+   * a multi-grant inst use `expireAdditionalActionType` instead.
    */
   expireAdditionalAction(cardInstance) {
-    cardInstance.counters.additionalActionAvail = 0;
+    if (!cardInstance?.counters) return;
+    const g = cardInstance.counters.aaGrants;
+    if (g) for (const k of Object.keys(g)) g[k] = 0;
+    this._syncAAMirror(cardInstance);
+  }
+
+  /** Expire ONLY the given grant typeId on an inst (other grants on
+   *  the same inst survive — used by _second-action-shared so a
+   *  tier-5 cleanup doesn't also kill a tier-4 grant). */
+  expireAdditionalActionType(cardInstance, typeId) {
+    const g = cardInstance?.counters?.aaGrants;
+    if (g && g[typeId] != null) { g[typeId] = 0; this._syncAAMirror(cardInstance); }
+  }
+
+  /** Restore (un-consume) a grant on an inst. With no typeId, restores
+   *  the grant most recently consumed FROM this inst (server rollback
+   *  paths after a cancelled play — `_aaLastConsumed` is stamped by
+   *  `consumeAdditionalAction`). */
+  restoreAdditionalAction(cardInstance, typeId) {
+    if (!cardInstance?.counters) return;
+    const tid = typeId || cardInstance.counters._aaLastConsumed;
+    if (!tid) return;
+    if (!cardInstance.counters.aaGrants) cardInstance.counters.aaGrants = {};
+    cardInstance.counters.aaGrants[tid] = 1;
+    this._syncAAMirror(cardInstance);
   }
 
   /**
@@ -16471,9 +17190,9 @@ class GameEngine {
    */
   expireAllAdditionalActions(playerIdx, typeId) {
     for (const inst of this.cardInstances) {
-      if (inst.owner === playerIdx && inst.counters.additionalActionType === typeId && inst.counters.additionalActionAvail) {
-        inst.counters.additionalActionAvail = 0;
-      }
+      if (inst.owner !== playerIdx) continue;
+      const g = inst.counters?.aaGrants;
+      if (g && g[typeId] > 0) { g[typeId] = 0; this._syncAAMirror(inst); }
     }
   }
 
@@ -16502,21 +17221,22 @@ class GameEngine {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
 
-    // Group providers by typeId
+    // Group providers by typeId. Each inst may contribute MULTIPLE
+    // grant typeIds (multi-grant model).
     const byType = {};
     for (const inst of this.cardInstances) {
       if (inst.owner !== playerIdx) continue;
-      if (!inst.counters.additionalActionType || !inst.counters.additionalActionAvail) continue;
-      const typeId = inst.counters.additionalActionType;
-      const config = this._additionalActionTypes[typeId];
-      if (!config) continue;
-      // Second-action grants only fire as the actual second action of
-      // the Action Phase — hide them outside the action-1 → action-2
-      // window so the bonus can't be spent as a third action, fired
-      // mid-Main-Phase, etc.
-      if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
-      if (!byType[typeId]) byType[typeId] = { typeId, label: config.label, allowedCategories: config.allowedCategories || [], heroRestricted: !!config.heroRestricted, providers: [], eligibleHandCards: [] };
-      byType[typeId].providers.push({ cardId: inst.id, cardName: inst.name, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
+      for (const [typeId] of this._instAAEntries(inst)) {
+        const config = this._additionalActionTypes[typeId];
+        if (!config) continue;
+        // Second-action grants only fire as the actual second action of
+        // the Action Phase — hide them outside the action-1 → action-2
+        // window so the bonus can't be spent as a third action, fired
+        // mid-Main-Phase, etc.
+        if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
+        if (!byType[typeId]) byType[typeId] = { typeId, label: config.label, allowedCategories: config.allowedCategories || [], heroRestricted: !!config.heroRestricted, providers: [], eligibleHandCards: [] };
+        byType[typeId].providers.push({ cardId: inst.id, cardName: inst.name, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
+      }
     }
 
     // For each type, compute eligible hand cards
@@ -16547,11 +17267,18 @@ class GameEngine {
   consumeAdditionalAction(playerIdx, typeId, providerCardId) {
     for (const inst of this.cardInstances) {
       if (inst.owner !== playerIdx) continue;
-      if (inst.counters.additionalActionType !== typeId) continue;
-      if (!inst.counters.additionalActionAvail) continue;
       if (providerCardId && inst.id !== providerCardId) continue;
-      inst.counters.additionalActionAvail = Math.max(0, (inst.counters.additionalActionAvail || 1) - 1);
-      this.log('additional_action_used', { typeId, provider: inst.name, remaining: inst.counters.additionalActionAvail, player: this.gs.players[playerIdx]?.username });
+      const g = inst.counters?.aaGrants;
+      const avail = g ? g[typeId] : (inst.counters?.additionalActionType === typeId ? inst.counters.additionalActionAvail : 0);
+      if (!(avail > 0)) continue;
+      if (!inst.counters.aaGrants) inst.counters.aaGrants = {};
+      inst.counters.aaGrants[typeId] = Math.max(0, avail - 1);
+      // Remember which grant THIS inst last gave up, so server-side
+      // rollback after a cancelled play can restore exactly it without
+      // having to thread the typeId back through every cancel branch.
+      inst.counters._aaLastConsumed = typeId;
+      this._syncAAMirror(inst);
+      this.log('additional_action_used', { typeId, provider: inst.name, remaining: inst.counters.aaGrants[typeId], player: this.gs.players[playerIdx]?.username });
       // Fire onConsume callback if defined
       const config = this._additionalActionTypes[typeId];
       if (config?.onConsume) config.onConsume(this, playerIdx, inst);
@@ -16659,11 +17386,12 @@ class GameEngine {
       if (inst.owner !== playerIdx) continue;
       if (inst.zone !== 'support') continue;
       if (inst.faceDown) continue;
-      if (!inst.counters?.additionalActionType) continue;
-      if (!inst.counters?.additionalActionAvail) continue;
-      const config = this._additionalActionTypes[inst.counters.additionalActionType];
-      if (!config?.bypassesCasterRequirement) continue;
-      if (!config.allowedCategories?.includes('spell')) continue;
+      let config = null;
+      for (const [tid] of this._instAAEntries(inst)) {
+        const c = this._additionalActionTypes[tid];
+        if (c?.bypassesCasterRequirement && c.allowedCategories?.includes('spell')) { config = c; break; }
+      }
+      if (!config) continue;
 
       // Compute eligible hand cards by walking hand × the type's filter.
       // Mirrors the per-type computation in `getAdditionalActions`.
@@ -16700,20 +17428,20 @@ class GameEngine {
 
     for (const inst of this.cardInstances) {
       if (inst.owner !== playerIdx) continue;
-      if (!inst.counters.additionalActionType || !inst.counters.additionalActionAvail) continue;
-      const typeId = inst.counters.additionalActionType;
-      const config = this._additionalActionTypes[typeId];
-      if (!config) continue;
-      // Second-action grants are only available as the actual second
-      // action of the Action Phase — see `_isSecondActionGrantAvailable`.
-      if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
-      // Hero-restricted: provider must be on the same hero as the spell caster
-      if (config.heroRestricted && heroIdx != null && inst.heroIdx !== heroIdx) continue;
-      // Check category
-      if (config.allowedCategories && !config.allowedCategories.includes(category)) continue;
-      // Check specific filter
-      if (config.filter && !config.filter(cardData)) continue;
-      return typeId;
+      for (const [typeId] of this._instAAEntries(inst)) {
+        const config = this._additionalActionTypes[typeId];
+        if (!config) continue;
+        // Second-action grants are only available as the actual second
+        // action of the Action Phase — see `_isSecondActionGrantAvailable`.
+        if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
+        // Hero-restricted: provider must be on the same hero as the spell caster
+        if (config.heroRestricted && heroIdx != null && inst.heroIdx !== heroIdx) continue;
+        // Check category
+        if (config.allowedCategories && !config.allowedCategories.includes(category)) continue;
+        // Check specific filter
+        if (config.filter && !config.filter(cardData)) continue;
+        return typeId;
+      }
     }
     return null;
   }
@@ -16814,19 +17542,20 @@ class GameEngine {
   hasAdditionalActionForCategory(playerIdx, category) {
     for (const inst of this.cardInstances) {
       if (inst.owner !== playerIdx) continue;
-      if (!inst.counters.additionalActionType || !inst.counters.additionalActionAvail) continue;
-      const config = this._additionalActionTypes[inst.counters.additionalActionType];
-      if (!config) continue;
-      // Second-action grants (Ba, Reiza, …) only fire as the actual
-      // second Action of the Action Phase — must mirror the same gate
-      // every other consumer applies (`findAdditionalActionForCategory`,
-      // `findAdditionalActionForCard`, `getAdditionalActions`). Without
-      // this, the UI lights up Action-cost abilities (Adventurousness)
-      // and creature effects (`creatureActionCost`) during Main Phase
-      // while a second-Action grant is active; clicks then fizzle on
-      // the consume-side gate.
-      if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
-      if (config?.allowedCategories?.includes(category)) return true;
+      for (const [typeId] of this._instAAEntries(inst)) {
+        const config = this._additionalActionTypes[typeId];
+        if (!config) continue;
+        // Second-action grants (Ba, Reiza, …) only fire as the actual
+        // second Action of the Action Phase — must mirror the same gate
+        // every other consumer applies (`findAdditionalActionForCategory`,
+        // `findAdditionalActionForCard`, `getAdditionalActions`). Without
+        // this, the UI lights up Action-cost abilities (Adventurousness)
+        // and creature effects (`creatureActionCost`) during Main Phase
+        // while a second-Action grant is active; clicks then fizzle on
+        // the consume-side gate.
+        if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
+        if (config?.allowedCategories?.includes(category)) return true;
+      }
     }
     return false;
   }
@@ -16847,14 +17576,14 @@ class GameEngine {
   findAdditionalActionForCategory(playerIdx, category, heroIdx) {
     for (const inst of this.cardInstances) {
       if (inst.owner !== playerIdx) continue;
-      if (!inst.counters.additionalActionType || !inst.counters.additionalActionAvail) continue;
-      const typeId = inst.counters.additionalActionType;
-      const config = this._additionalActionTypes[typeId];
-      if (!config) continue;
-      if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
-      if (config.heroRestricted && heroIdx != null && inst.heroIdx !== heroIdx) continue;
-      if (!config.allowedCategories?.includes(category)) continue;
-      return typeId;
+      for (const [typeId] of this._instAAEntries(inst)) {
+        const config = this._additionalActionTypes[typeId];
+        if (!config) continue;
+        if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
+        if (config.heroRestricted && heroIdx != null && inst.heroIdx !== heroIdx) continue;
+        if (!config.allowedCategories?.includes(category)) continue;
+        return typeId;
+      }
     }
     return null;
   }
@@ -17576,8 +18305,13 @@ class GameEngine {
           const instCtrlForCD = inst.controller ?? inst.owner;
           const chillyDogLiftsCreatureFrozen = instCtrlForCD === playerIdx
             && this._isChillyDogActiveFor(playerIdx);
-          if (inst.counters?.stunned || inst.counters?.negated || inst.counters?.nulled) continue;
-          if (inst.counters?.frozen && !chillyDogLiftsCreatureFrozen) continue;
+          // Universal negative-status immunity (Lunatic Golem 2+) negates
+          // the EFFECT of CC it still carries — it stays activatable
+          // despite Frozen / Stunned / Negated / Nulled.
+          if (!this._creatureNegStatusImmune(inst)) {
+            if (inst.counters?.stunned || inst.counters?.negated || inst.counters?.nulled) continue;
+            if (inst.counters?.frozen && !chillyDogLiftsCreatureFrozen) continue;
+          }
 
           const cd = this.getEffectiveCardData(inst) || cardDB[creatureName];
           if (!cd || !hasCardType(cd, 'Creature')) continue;
@@ -17681,8 +18415,11 @@ class GameEngine {
         // CC-locked stolen creatures: same gate as the own-creature loop
         // above. Slimer / Null Zone debuffs apply regardless of whose
         // turn the creature is being fired on.
-        if (inst.counters?.frozen || inst.counters?.stunned
-            || inst.counters?.negated || inst.counters?.nulled) continue;
+        // Universal negative-status immunity (Lunatic Golem 2+) keeps
+        // the creature activatable despite the CC it still carries.
+        if (!this._creatureNegStatusImmune(inst)
+            && (inst.counters?.frozen || inst.counters?.stunned
+                || inst.counters?.negated || inst.counters?.nulled)) continue;
 
         const cd = this.getEffectiveCardData(inst) || cardDB[inst.name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
@@ -19350,7 +20087,8 @@ class GameEngine {
     // a heal/cleanse from saving a poisoned target, but a Resistance
     // intercept that absorbs the poison before it ticks once isn't a
     // heal.
-    if (statusName === 'poisoned' && !opts.bypassUnhealable && this._isPoisonHealLocked()) {
+    if (statusName === 'poisoned' && !opts.bypassUnhealable && this._isPoisonHealLocked()
+        && !this._isDiverHelmetProtectedTarget(hero)) {
       this.log('poison_remove_blocked', { target: hero.name, reason: 'Stinky Stables' });
       return;
     }
@@ -20510,6 +21248,9 @@ class GameEngine {
       if (inst.owner !== ap || inst.zone !== 'support') continue;
       if (inst.faceDown) continue; // Face-down surprises are immune
       if (!inst.counters.burned) continue;
+      // Universal negative-status immunity negates the EFFECT of a
+      // status it still carries — no Burn tick damage (Lunatic Golem 2+).
+      if (this._creatureNegStatusImmune(inst)) continue;
       const cd = this.getEffectiveCardData(inst) || burnCardDB[inst.name];
       if (!cd || !hasCardType(cd, 'Creature')) continue;
       burnedCreatures.push(inst);
@@ -20572,6 +21313,9 @@ class GameEngine {
     for (const inst of this.cardInstances) {
       if (inst.owner !== ap || inst.zone !== 'support') continue;
       if (!inst.counters.poisoned) continue;
+      // Universal negative-status immunity negates the EFFECT of a
+      // status it still carries — no Poison tick damage (Lunatic Golem 2+).
+      if (this._creatureNegStatusImmune(inst)) continue;
       const cd = this.getEffectiveCardData(inst) || poisonCardDB[inst.name];
       if (!cd || !hasCardType(cd, 'Creature')) continue;
       const stacks = inst.counters.poisonStacks || 1;

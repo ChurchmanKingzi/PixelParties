@@ -86,7 +86,10 @@ module.exports = {
   // ── Batch-level (multi-target / AoE) ─────────────────────────────
   isPostTargetReaction: true,
 
-  postTargetCondition(gs, pi, engine, targetedTargets /*, sourceCard, opts */) {
+  postTargetCondition(gs, pi, engine, targetedTargets, sourceCard, opts) {
+    // "when a Frozen target you control would take ANY DAMAGE" — never
+    // chain to non-damage targeting. See Spectral Armor.
+    if (opts && opts.dealsDamage === false) return false;
     if (_alreadyPrompted(gs, pi)) return false;
     const eligible = _collectFrozenOwnedTargets(gs, pi, engine, targetedTargets).length > 0;
     if (eligible) {

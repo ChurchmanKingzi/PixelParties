@@ -2,19 +2,54 @@
 //  CARD EFFECT: "Learning"
 //  Ability — Triggered free effect.
 //
-//  Once per turn, after this Hero used a Spell,
-//  search the deck for a different Spell that
-//  this Hero can actually use and immediately
-//  cast it as an additional Action with this
-//  Hero. Filters mirror the in-hand grayout —
-//  Surprises and Reactions-without-proactivePlay
-//  are excluded, level / Wisdom / hero-restriction
-//  / spellPlayCondition gates are honored.
+//  Once per turn, during the player's own Action
+//  Phase, after this Hero used a Spell, choose a
+//  different Spell from the player's hand that this
+//  Hero can actually use and immediately cast it as
+//  an additional Action with this Hero. Filters
+//  mirror the in-hand grayout — Surprises and
+//  Reactions-without-proactivePlay are excluded,
+//  level / Wisdom / hero-restriction /
+//  spellPlayCondition gates are honored.
 //
 //  Tier behavior (cards.json text):
-//   1) trigger = Magic Arts; search = Magic Arts.
-//   2) trigger = Magic Arts; search = any school.
-//   3) trigger = any;        search = any school.
+//   1) trigger = Magic Arts; choose = Magic Arts.
+//   2) trigger = Magic Arts; choose = any school.
+//   3) trigger = any;        choose = any school.
+//
+//  Action Phase restriction (added 2026-05-15):
+//   The hook short-circuits unless `gs.currentPhase`
+//   is PHASES.ACTION (3). Main Phase 1/2 casts no
+//   longer trigger Learning. Because the chained
+//   Spell is dispatched through the standard
+//   `onAdditionalActionUsed` hook, it counts as the
+//   player's next Action of the Action Phase —
+//   "extra Action this Action Phase" grants from
+//   cards like Torchure are spent on the chained
+//   Spell rather than being saved for a fresh cast.
+//
+//  Hand-source rewrite (2026-05-15):
+//   The chosen Spell now comes from the casting
+//   player's HAND, not their deck. No deck-search
+//   helper, no reveal modal, no shuffle. The
+//   triggering Spell is excluded by both name AND
+//   physical hand index — even with multiple copies
+//   of the trigger's name in hand, only the still-
+//   resolving instance is removed from the pool, and
+//   any other instance is filtered by the "different
+//   name" rule. Wisdom math is tightened: the chosen
+//   Spell itself leaves hand to resolve before its
+//   own Wisdom is paid, so the affordability gate is
+//   `effHand - 1 >= wisdomCost`.
+//
+//  Direct-hand picker (2026-05-15):
+//   The selection UI is the engine's `pickHandCard`
+//   prompt — eligible hand slots are highlighted and
+//   directly clickable, everything else (including
+//   the still-resolving triggering Spell) is dimmed.
+//   The only opt-out is the Cancel button; there is
+//   no modal gallery and no single-Spell confirm
+//   sub-prompt.
 //
 //  Implementation notes:
 //  • Hooks into `afterSpellResolved` and matches
@@ -22,16 +57,18 @@
 //  • HOPT key per (player, hero, abilitySlot) so
 //    two Learning instances on different heroes
 //    fire independently each turn.
-//  • Drives the searched Spell exactly the way
-//    Cooldin's Area-tutor does: pull deck → hand
-//    via the canonical helper (fires
-//    ON_CARD_ADDED_TO_HAND), pay Wisdom cost
-//    (Archibald-style — committed before chain),
-//    open the reaction window, run onPlay +
-//    afterSpellResolved synthetically. Discard
-//    fallback if the Spell didn't place itself.
+//  • Drives the chosen Spell synthetically: locate
+//    its hand instance, open the reaction window
+//    (Anti Magic Shield etc. can still negate),
+//    run onPlay + afterSpellResolved, then splice
+//    and discard / leave on board (Areas, Forbidden
+//    Zone, …). Wisdom is paid AFTER the splice so
+//    the chosen Spell can't pay for itself, with
+//    the triggering Spell's hand index excluded
+//    from the eligible-fodder pool so it stays
+//    intact for the outer doPlaySpell handler.
 //  • Re-entry guarded — nested afterSpellResolved
-//    from the searched Spell can't re-trigger
+//    from the chained Spell can't re-trigger
 //    Learning thanks to both the HOPT and the
 //    `_learningCasting` flag.
 // ═══════════════════════════════════════════
@@ -92,65 +129,96 @@ function effectiveHandSize(engine, ps, pi, heroIdx, triggeringName, triggeringCd
 }
 
 /**
- * Build the deduped gallery of Spells in the player's deck that this
- * Hero could legally cast right now, excluding the triggering Spell's
- * name. School filter only applies at Lv1 (Magic Arts only). Wisdom
- * affordability is checked against the effective hand size AFTER the
- * triggering Spell finishes resolving (see `effectiveHandSize`).
+ * Hand index of the still-resolving triggering Spell, so it's
+ * excluded from both the picker's eligible-slot list and the
+ * Wisdom-fodder pool. Returns -1 when the triggering Spell isn't
+ * currently in hand (defensive — shouldn't happen at
+ * `afterSpellResolved` time but keeps the iterators safe).
  */
-function getEligibleDeckSpells(engine, ps, pi, heroIdx, level, triggeringName, triggeringCd) {
+function triggeringHandIndex(ps, triggeringName) {
+  return (ps._resolvingCard?.name === triggeringName)
+    ? (ps.hand || []).indexOf(triggeringName)
+    : -1;
+}
+
+/**
+ * Per-name eligibility test — pulled out of the index scan below so a
+ * hand with duplicates only re-evaluates each distinct name once.
+ * Returns true iff a hand copy of `name` is a legal Learning chain
+ * target for this hero, with `wisdomPool` cards available to pay its
+ * own discard cost.
+ */
+function isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicArts, wisdomPool, heroScript, cardDB) {
+  const cd = cardDB[name];
+  if (!cd) return false;
+  if (cd.cardType !== 'Spell') return false;
+  if (requireMagicArts && !isMagicArts(cd)) return false;
+
+  const script = loadCardEffect(name);
+  if (!isProactivelyCastable(cd, script)) return false;
+
+  if (!engine.heroMeetsLevelReq(pi, heroIdx, cd)) return false;
+
+  const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cd);
+  if (wisdomCost > 0 && wisdomPool < wisdomCost) return false;
+
+  // Hero-level play restriction (e.g. Archibald's per-name dupe ban,
+  // Bartas' attack restriction, …).
+  if (heroScript?.canPlayCard
+      && !heroScript.canPlayCard(engine.gs, pi, heroIdx, cd, engine)) return false;
+
+  // Spell-side custom play condition (Flame Avalanche needs targets,
+  // Forbidden Zone needs a free area zone, …).
+  if (typeof script?.spellPlayCondition === 'function') {
+    try {
+      if (!script.spellPlayCondition(engine.gs, pi)) return false;
+    } catch (err) {
+      console.error(`[Learning] spellPlayCondition for ${name}:`, err.message);
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Hand indices the player is allowed to click during the Learning
+ * pick prompt. Each eligible slot is highlighted in the hand UI;
+ * dimmed slots include the still-resolving triggering Spell, any
+ * same-name copies of the trigger, non-Spell cards, and Spells the
+ * Hero can't legally cast right now. School filter only applies at
+ * Lv1 (Magic Arts only). Wisdom affordability is checked against the
+ * effective hand size AFTER the triggering Spell finishes resolving
+ * (see `effectiveHandSize`), minus one for the chosen Spell itself
+ * (which leaves hand before paying its own cost).
+ */
+function getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, triggeringCd) {
   const cardDB = engine._getCardDB();
   const hero = ps.heroes?.[heroIdx];
   const heroScript = hero?.name ? loadCardEffect(hero.name) : null;
 
   const requireMagicArts = level <= 1;
   const effHand = effectiveHandSize(engine, ps, pi, heroIdx, triggeringName, triggeringCd);
+  // `effHand` already subtracts the still-resolving triggering Spell
+  // and its Wisdom cost. The chosen Spell itself will leave hand to
+  // resolve BEFORE its own Wisdom is paid, so it can't fund its own
+  // discard — that's the extra `-1` baked into the per-name gate.
+  const wisdomPool = Math.max(0, effHand - 1);
+  const triggerIdx = triggeringHandIndex(ps, triggeringName);
 
-  const seen = new Set();
+  const cache = new Map();
   const out = [];
 
-  for (const name of (ps.mainDeck || [])) {
-    if (seen.has(name)) continue;
+  for (let i = 0; i < (ps.hand || []).length; i++) {
+    if (i === triggerIdx) continue;
+    const name = ps.hand[i];
     if (name === triggeringName) continue;
-    const cd = cardDB[name];
-    if (!cd) continue;
-    if (cd.cardType !== 'Spell') continue;
-    if (requireMagicArts && !isMagicArts(cd)) continue;
-
-    const script = loadCardEffect(name);
-    if (!isProactivelyCastable(cd, script)) continue;
-
-    if (!engine.heroMeetsLevelReq(pi, heroIdx, cd)) continue;
-
-    // Wisdom affordability gate. After the triggering Spell finishes,
-    // the player has `effHand` cards left. Learning's flow then pulls
-    // the searched Spell from deck → hand → splice (so the searched
-    // Spell itself can't pay its own wisdom) → pay wisdom → resolve.
-    // So the wisdom-payable pool size is exactly `effHand`.
-    const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cd);
-    if (wisdomCost > 0 && effHand < wisdomCost) continue;
-
-    // Hero-level play restriction (e.g. Archibald's per-name dupe ban,
-    // Bartas' attack restriction, …).
-    if (heroScript?.canPlayCard
-        && !heroScript.canPlayCard(engine.gs, pi, heroIdx, cd, engine)) continue;
-
-    // Spell-side custom play condition (Flame Avalanche needs targets,
-    // Forbidden Zone needs a free area zone, …).
-    if (typeof script?.spellPlayCondition === 'function') {
-      try {
-        if (!script.spellPlayCondition(engine.gs, pi)) continue;
-      } catch (err) {
-        console.error(`[Learning] spellPlayCondition for ${name}:`, err.message);
-        continue;
-      }
+    let ok = cache.get(name);
+    if (ok === undefined) {
+      ok = isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicArts, wisdomPool, heroScript, cardDB);
+      cache.set(name, ok);
     }
-
-    seen.add(name);
-    out.push({ name, source: 'deck' });
+    if (ok) out.push(i);
   }
-  // Stable alphabetical order for the gallery.
-  out.sort((a, b) => a.name.localeCompare(b.name));
   return out;
 }
 
@@ -176,11 +244,11 @@ function wisdomPayableIndices(ps, triggeringName) {
 }
 
 /**
- * Drive the searched Spell through chain → onPlay → afterSpellResolved.
+ * Drive the chosen hand Spell through chain → onPlay → afterSpellResolved.
  * Mirrors `doPlaySpell` ordering: spell stays in hand through the
  * reaction chain and onPlay (so effects that read `ps.hand` see it),
  * then splice → discard → pay Wisdom. Wisdom is paid AFTER the
- * searched Spell leaves hand so it can't be self-discarded, AND with
+ * chosen Spell leaves hand so it can't be self-discarded, AND with
  * the triggering Spell's hand index excluded so it can't be siphoned
  * away from the outer handler that owns its lifecycle.
  */
@@ -191,20 +259,46 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   const cd = cardDB[cardName];
   if (!cd) return false;
 
-  // ── Step 1: pull from deck → hand (canonical helper, fires
-  // ON_CARD_ADDED_TO_HAND, deck-search reveal modal to opp). ──
-  if ((ps.mainDeck || []).indexOf(cardName) < 0) return false;
-  const ok = await engine.actionAddCardFromDeckToHand(pi, cardName, {
-    source: CARD_NAME,
-    reveal: true,
-    shuffle: true,
-  });
-  if (!ok) return false;
-  if (ps.hand.lastIndexOf(cardName) < 0) return false;
+  // ── Locate the chosen Spell in hand ──
+  // Skip the triggering Spell's hand position so a same-name copy of
+  // the trigger (which the eligibility filter already excludes by
+  // name) can never be silently grabbed in its place. Iterate forward
+  // so multi-copy hands consume the first available instance — order
+  // doesn't matter functionally, but it keeps animations predictable.
+  const triggerIdx = triggeringHandIndex(ps, triggeringName);
+  let handIdx = -1;
+  for (let i = 0; i < ps.hand.length; i++) {
+    if (i === triggerIdx) continue;
+    if (ps.hand[i] === cardName) { handIdx = i; break; }
+  }
+  if (handIdx < 0) return false;
 
-  // The helper tracked an instance for us — find the LATEST tracked
-  // copy (cardInstances appends, so iterate in reverse to grab the
-  // freshly added one even if the player already held a same-name copy).
+  // ── Action-Phase action-counter bookkeeping ──
+  // Learning is gated to the Action Phase, so the chained Spell is
+  // the player's next Action of the phase. Mirror the increment the
+  // server's `doPlaySpell` performs for normal Action-Phase casts:
+  // bump `_actionsPlayedThisPhase` and, when this bump crosses into
+  // slot #2, consume any pending `_bonusMainActions` (Torchure's
+  // grant). That makes the chained Spell occupy the second-Action
+  // slot — Torchure's bonus is spent on Learning's cast rather than
+  // being saved for an extra free cast later in the phase.
+  // Done AFTER the hand-locate succeeds: same commit timing as the
+  // server (post-hero-cost, pre-chain) — once we've claimed the card
+  // the cast is committed and counts even if the reaction chain negates.
+  if (gs.currentPhase === 3) {
+    ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
+    if (ps._actionsPlayedThisPhase === 2 && (ps._bonusMainActions || 0) > 0) {
+      ps._bonusMainActions = 0;
+    }
+  }
+
+  // Locate the engine's tracked instance for the chosen Spell. The
+  // chosen card has been in hand since it was dealt, so a hand
+  // instance already exists; we just need to bind it to the casting
+  // hero for `ctx.cardHeroIdx` reads inside the Spell's onPlay
+  // (Burning Finger, etc.). The eligibility filter already required
+  // `cardName !== triggeringName`, so the triggering Spell's tracked
+  // instance can't collide here — name match is unambiguous.
   let handInst = null;
   for (let i = engine.cardInstances.length - 1; i >= 0; i--) {
     const c = engine.cardInstances[i];
@@ -213,12 +307,10 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
       break;
     }
   }
-  // Anchor the searched copy to the casting hero. `actionAddCardFromDeckToHand`
-  // tracks with `heroIdx = -1`, but spells that read `ctx.cardHeroIdx` in
-  // their `onPlay` (Burning Finger, etc.) need the casting hero's index —
-  // matching how `doPlaySpell` tracks normal hand-played spells.
-  // Without this, those spells short-circuit on `ps.heroes[-1] = undefined`
-  // and silently fizzle while still costing Wisdom.
+  // Anchor the chosen copy to the casting hero. Without this, Spells
+  // that read `ctx.cardHeroIdx` short-circuit on
+  // `ps.heroes[-1] = undefined` and silently fizzle while still
+  // costing Wisdom.
   if (handInst) handInst.heroIdx = heroIdx;
 
   // ── Flash on Learning's slot before resolution. ──
@@ -234,7 +326,20 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
 
   const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cd);
 
-  /** Pay Wisdom for the searched Spell, excluding the resolving
+  /** Find the chosen Spell's current hand position, skipping the
+   *  triggering Spell's slot so a same-name copy of the trigger is
+   *  never accidentally spliced. Returns -1 when the chosen Spell
+   *  has already left hand (placed itself via onPlay, etc.). */
+  const findChosenInHand = () => {
+    const tIdx = triggeringHandIndex(ps, triggeringName);
+    for (let i = 0; i < (ps.hand || []).length; i++) {
+      if (i === tIdx) continue;
+      if (ps.hand[i] === cardName) return i;
+    }
+    return -1;
+  };
+
+  /** Pay Wisdom for the chosen Spell, excluding the resolving
    *  triggering Spell from the eligible pool. Mirrors doPlaySpell's
    *  "pay AFTER spell leaves hand" rule. */
   const paySearchedWisdom = async () => {
@@ -252,7 +357,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   };
 
   if (chainResult.negated) {
-    const i = ps.hand.lastIndexOf(cardName);
+    const i = findChosenInHand();
     if (i >= 0) ps.hand.splice(i, 1);
     ps.discardPile.push(cardName);
     if (handInst) engine._untrackCard(handInst.id);
@@ -265,7 +370,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
 
   // ── Step 3: run onPlay / afterSpellResolved. The spell is still
   // physically in hand here (mirrors doPlaySpell). The hand-tracked
-  // instance from Step 1 is the synth instance the hooks operate on. ──
+  // instance located above is the synth instance the hooks operate on. ──
   gs._immediateActionContext = true;
   gs._learningCasting = pi;
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
@@ -309,7 +414,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   delete gs._spellCancelled;
   delete gs._spellPlacedOnBoard;
 
-  const ix = ps.hand.lastIndexOf(cardName);
+  const ix = findChosenInHand();
   if (ix >= 0) ps.hand.splice(ix, 1);
 
   if (placed) {
@@ -324,7 +429,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   } else {
     // Cancelled mid-prompt — Archibald-style: HOPT was already claimed
     // when the gallery confirmed, treat it as a fizzled cast and send
-    // the searched Spell to discard so the deck-search isn't refunded.
+    // the chosen Spell to discard so the play isn't refunded.
     ps.discardPile.push(cardName);
     if (handInst) engine._untrackCard(handInst.id);
   }
@@ -368,6 +473,16 @@ module.exports = {
       if (ctx.heroIdx !== heroIdx) return;
       if (gs._spellNegatedByEffect) return;
 
+      // Action Phase restriction — Learning only triggers off Spells
+      // cast in the player's own Action Phase (currentPhase === 3).
+      // Main Phase 1/2 Spell casts (Reaction-subtype proactives,
+      // Wisdom-cost-zero pre-action utility, …) no longer chain.
+      // Casts inside another card's `_immediateActionContext` (e.g.
+      // a Learning chain itself, performImmediateAction Spell, etc.)
+      // already get filtered out by the `_learningCasting` re-entry
+      // guard below.
+      if (gs.currentPhase !== 3) return;
+
       // Re-entry guard — Learning's own cast machinery sets this so
       // the inner spell's afterSpellResolved can't re-trigger Learning
       // mid-resolution. The flag is the caster's player index (0 is
@@ -395,60 +510,43 @@ module.exports = {
       const hoptKey = `learning:${pi}:${heroIdx}:${abilityZoneSlot}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
 
-      const eligible = getEligibleDeckSpells(engine, ps, pi, heroIdx, level, triggeringName, sd);
-      if (eligible.length === 0) return;
+      const eligibleIndices = getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, sd);
+      if (eligibleIndices.length === 0) return;
 
       // Claim HOPT BEFORE the prompt — when Learning is stacked in this
       // slot, every copy is its own listener and would otherwise re-prompt
-      // after the player cancelled the first gallery (claiming HOPT only
+      // after the player cancelled the first picker (claiming HOPT only
       // on confirm meant "cancel" had to be pressed once per stack copy).
       // Claiming up-front means a cancel is final for the slot this turn,
       // matching the player's intuition that one cancel = one decline.
       if (!gs.hoptUsed) gs.hoptUsed = {};
       gs.hoptUsed[hoptKey] = gs.turn;
 
-      // Confirm prompt — single confirm if 1 eligible, gallery if 2+.
-      let pickedName = null;
-      if (eligible.length === 1) {
-        const onlyName = eligible[0].name;
-        const confirmed = await engine.promptGeneric(pi, {
-          type: 'confirm',
-          title: CARD_NAME,
-          message: `Search your deck for ${onlyName} and cast it as an additional Action with ${hero.name}?`,
-          showCard: onlyName,
-          confirmLabel: '📚 Cast!',
-          cancelLabel: 'No',
-          cancellable: true,
-        });
-        if (confirmed) pickedName = onlyName;
-      } else {
-        const result = await engine.promptGeneric(pi, {
-          type: 'cardGallery',
-          cards: eligible,
-          title: CARD_NAME,
-          description: `Search your deck for a Spell to cast as an additional Action with ${hero.name}.`,
-          confirmLabel: '📚 Cast!',
-          cancellable: true,
-        });
-        if (result && !result.cancelled && result.cardName) pickedName = result.cardName;
-      }
+      // Direct hand-click picker — eligible hand slots are highlighted
+      // and clickable; everything else is dimmed. Cancel button is the
+      // opt-out. No modal gallery / single-Spell confirm — the player
+      // picks straight from their actual hand.
+      const result = await engine.promptGeneric(pi, {
+        type: 'pickHandCard',
+        title: CARD_NAME,
+        description: `Choose a Spell from your hand to cast as an additional Action with ${hero.name}.`,
+        eligibleIndices,
+        cancellable: true,
+      });
+      if (!result || result.cancelled || result.handIndex == null) return;
 
+      const pickedName = result.cardName || ps.hand[result.handIndex];
       if (!pickedName) return;
 
-      // Re-validate against live state (the prompt is async — Wisdom
-      // hand could have shrunk, name could have left the deck via a
-      // chained reaction, etc.). Wisdom check uses the same effective
-      // hand size the eligibility filter used.
-      if ((ps.mainDeck || []).indexOf(pickedName) < 0) return;
-      const cardDB = engine._getCardDB();
-      const cd = cardDB[pickedName];
-      if (!cd || cd.cardType !== 'Spell') return;
-      if (level <= 1 && !isMagicArts(cd)) return;
-      if (pickedName === triggeringName) return;
-      if (!engine.heroMeetsLevelReq(pi, heroIdx, cd)) return;
-      const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cd);
-      const effHand = effectiveHandSize(engine, ps, pi, heroIdx, triggeringName, sd);
-      if (wisdomCost > 0 && effHand < wisdomCost) return;
+      // Re-validate against live state (the prompt is async — the
+      // chosen Spell could have left hand via a chained reaction,
+      // Wisdom fodder could have shrunk, etc.). Recompute the eligible
+      // set and confirm the picked Spell is still in it; this catches
+      // both "slot vanished" and "Wisdom no longer affordable" with
+      // one check and stays in sync with the picker's filter logic.
+      const liveEligible = getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, sd);
+      const stillEligible = liveEligible.some(i => ps.hand[i] === pickedName);
+      if (!stillEligible) return;
 
       await castLearningSpell(engine, pi, heroIdx, hero, pickedName, abilityZoneSlot, triggeringName);
     },

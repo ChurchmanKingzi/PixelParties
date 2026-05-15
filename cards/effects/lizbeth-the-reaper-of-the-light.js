@@ -332,8 +332,8 @@ function setupBorrowedFriendship(ctx) {
     // Drop any previously-granted action if borrow no longer applies.
     const lizbethInst = engine.cardInstances.find(c =>
       c.zone === 'hero' && c.owner === pi && c.heroIdx === heroIdx && c.name === CARD_NAME);
-    if (lizbethInst?.counters?.additionalActionType === FRIENDSHIP_TYPE_ID) {
-      engine.expireAdditionalAction(lizbethInst);
+    if (lizbethInst?.counters?.aaGrants?.[FRIENDSHIP_TYPE_ID] != null) {
+      engine.expireAdditionalActionType(lizbethInst, FRIENDSHIP_TYPE_ID);
     }
     return;
   }
