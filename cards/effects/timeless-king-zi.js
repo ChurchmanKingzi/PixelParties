@@ -84,6 +84,39 @@ function uniqueDeckSpells(engine, pi) {
   return out;
 }
 
+/**
+ * Offensive = direct-damage Spell. Destruction Magic is the game's
+ * damage school — the same proxy Zi's opponent-pick heuristic already
+ * uses for "damage at us". (Reusing the existing criterion rather than
+ * inventing a new one.)
+ */
+function isOffensiveSpell(cd) {
+  return !!cd && (cd.spellSchool1 === 'Destruction Magic'
+    || cd.spellSchool2 === 'Destruction Magic');
+}
+
+/**
+ * Spells the ACTIVATOR may reveal. Identical to `uniqueDeckSpells`,
+ * EXCEPT: when the CPU activates Zi while its opponent still holds
+ * game-start turn-1 full protection (`gs.firstTurnProtectedPlayer ===
+ * oppIdx`), every offensive Spell Zi could perform is wasted (the
+ * shielded opponent takes no damage). Per user spec the CPU must then
+ * treat ONLY non-offensive Spells as eligible — and if that leaves no
+ * legal trio, Zi simply isn't usable turn 1 (canActivate returns
+ * false). CPU-only: a human activator may still knowingly reveal
+ * anything (the card's wording is unchanged for them).
+ */
+function activatorEligibleSpells(engine, pi) {
+  const all = uniqueDeckSpells(engine, pi);
+  const gs = engine.gs;
+  const oppIdx = pi === 0 ? 1 : 0;
+  const cpuTurnOneShielded = pi === engine._cpuPlayerIdx
+    && gs.firstTurnProtectedPlayer === oppIdx;
+  if (!cpuTurnOneShielded) return all;
+  const cardDB = engine._getCardDB();
+  return all.filter(s => !isOffensiveSpell(cardDB[s.name]));
+}
+
 /** Does ANY trio of different-named deck Spells total ≤ 6? */
 function hasLegalTrio(spells) {
   if (spells.length < PICK_COUNT) return false;
@@ -127,8 +160,7 @@ module.exports = {
     const scoreOf = (n) => {
       const cd = cardDB[n] || {};
       const lvl = (typeof cd.level === 'number') ? cd.level : 0;
-      const isDmg = (cd.spellSchool1 === 'Destruction Magic'
-        || cd.spellSchool2 === 'Destruction Magic') ? 1 : 0;
+      const isDmg = isOffensiveSpell(cd) ? 1 : 0;
       return [lvl, isDmg, n];
     };
     let best = names[0];
@@ -145,8 +177,9 @@ module.exports = {
 
   canActivateHeroEffect(ctx) {
     const hero = ctx.attachedHero;
+    const pi = ctx.cardOwner;
     if (!hero?.name || hero.hp <= 0) return false;
-    return hasLegalTrio(uniqueDeckSpells(ctx._engine, ctx.cardOwner));
+    return hasLegalTrio(activatorEligibleSpells(ctx._engine, pi));
   },
 
   async onHeroEffect(ctx) {
@@ -159,7 +192,7 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     if (!ps || !oppPs) return false;
 
-    const spells = uniqueDeckSpells(engine, pi);
+    const spells = activatorEligibleSpells(engine, pi);
     if (!hasLegalTrio(spells)) return false; // defensive (gated by canActivate)
 
     // ── Step 1: activator picks exactly 3 (Σlevel ≤ 6) ──
@@ -198,6 +231,16 @@ module.exports = {
       });
       return false;
     }
+
+    // Zi's resolution is a long, deliberate sequence (reveal animation
+    // + opponent pick + reveal-clear + the performed sub-cast). On the
+    // CPU's own turn that wall-clock can push past the live-turn
+    // deadline; the runHooks deadline check would then throw mid-
+    // sub-cast and force-end Zi's performed Spell. Grant that
+    // intentional animation/sub-cast time back to the budget so Zi
+    // resolves fully (the rest of the turn stays bounded by the
+    // extended deadline; MAX_HOOKS_PER_TURN still guards a runaway).
+    engine.extendCpuTurnDeadline?.(REVEAL_ANIM_MS + 6000);
 
     // ── Step 2: remove one copy of each chosen Spell from the deck ──
     for (const name of chosen) {

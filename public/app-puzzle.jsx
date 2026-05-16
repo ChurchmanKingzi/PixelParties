@@ -1372,17 +1372,44 @@ function PuzzleCreator() {
     window.addEventListener('keydown', h, true); return () => window.removeEventListener('keydown', h, true);
   }, [editTarget, puzzleGameState, viewPile, debuffMenuOpen, removePopupPos, mobileSelected]);
 
-  // ── Surprise eligibility: check if hero has abilities matching the surprise's spell schools ──
+  // ── Surprise eligibility: can the host Hero actually cast this
+  //    Surprise (a Spell)? Mirrors the main board's canHeroPlayCard
+  //    school+level rule, including ability-side gap coverage:
+  //      • a matching spell-school stacked to >= the card's level, OR
+  //      • Divinity (free) / Wisdom (paid) stacks covering the gap.
+  //    Both Divinity AND Wisdom count here because Surprises are
+  //    Spells (the board's drop-highlight excludes Wisdom only because
+  //    that path also covers Creatures, which Wisdom can't). ──
   const isSurpriseUsable = useCallback((p, hi, cardName) => {
     const hero = p.heroes[hi];
     if (!hero) return false;
     const c = getCard(cardName);
     if (!c) return false;
-    const schools = [c.spellSchool1, c.spellSchool2].filter(Boolean);
-    if (schools.length === 0) return true; // no school requirement
-    // Collect hero's ability names across all 3 slots
-    const heroAbilities = (p.abilityZones[hi] || []).flat();
-    return schools.some(s => heroAbilities.includes(s));
+    // No spell-school requirement → any Hero can use it.
+    if (!c.spellSchool1 && !c.spellSchool2) return true;
+    const level = (typeof c.level === 'number') ? c.level : 0;
+    // Count stacked copies of an ability across the Hero's 3 slots.
+    const abZones = p.abilityZones[hi] || [];
+    const countAbility = (name) => {
+      let n = 0;
+      for (const slot of abZones) {
+        if (!slot) continue;
+        for (const ab of slot) if (ab === name) n++;
+      }
+      return n;
+    };
+    // Direct: a matching spell-school stacked to >= the card's level.
+    if (c.spellSchool1 && countAbility(c.spellSchool1) >= level) return true;
+    if (c.spellSchool2 && countAbility(c.spellSchool2) >= level) return true;
+    // Gap coverage: Divinity (free) + Wisdom (paid) stacks act as
+    // wildcard level contributors toward either declared school —
+    // matches the engine's combined coverage semantics.
+    const cover = countAbility('Divinity') + countAbility('Wisdom');
+    if (cover > 0) {
+      if (c.spellSchool1 && countAbility(c.spellSchool1) + cover >= level) return true;
+      if (c.spellSchool2 && countAbility(c.spellSchool2) + cover >= level) return true;
+    }
+    return false;
   }, [getCard]);
 
   // ── Status effect and buff constants ──

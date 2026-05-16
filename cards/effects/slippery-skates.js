@@ -302,6 +302,15 @@ module.exports = {
     inst.heroIdx = destHeroIdx;
     inst.zoneSlot = destSlot;
 
+    // Balancing rule: a Creature can only be moved by the effect of
+    // "Slippery Skates" ONCE PER TURN — across ALL copies of Skates,
+    // not once per copy. Stamp the turn on the Creature instance; it
+    // self-expires when gs.turn advances and is excluded from every
+    // Skates copy's movable-creature list this turn (see
+    // _getCreaturesOnHero). Snapshot/restore preserves own props, so
+    // MCTS rollouts honor it too.
+    inst._slipperySkatesMovedTurn = gs.turn;
+
     engine.sync();
 
     // Fire onCardEnterZone WITHOUT `_onlyCard` so host-hero listeners
@@ -344,6 +353,13 @@ function _getCreaturesOnHero(ps, heroIdx, engine) {
       c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zi && c.name === name
     );
     if (!inst || inst.faceDown) continue;
+    // Balancing rule: a Creature already moved by a "Slippery Skates"
+    // effect THIS turn is ineligible for ANY Skates copy's move this
+    // turn. The marker self-expires when gs.turn advances, so no reset
+    // is needed. Filtering here covers every consumer in one place:
+    // canActivateEquipEffect (gray-out / gate), the activation prompt's
+    // creature list, and the CPU's cpuCanActivateEquip check.
+    if (inst._slipperySkatesMovedTurn === engine.gs.turn) continue;
     result.push({ name, zoneSlot: zi, inst });
   }
   return result;

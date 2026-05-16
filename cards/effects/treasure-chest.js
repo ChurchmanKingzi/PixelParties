@@ -18,7 +18,17 @@ module.exports = {
   // ×0.2 excess). Interference effects (Hammer Throw etc.) get caught by
   // the recon eval naturally — the extra hand-card cost shows up in the
   // delta and the gate skips.
-  cpuMeta: { handValueAsGoldGain: 10 },
+  // `handValueAsGoldGain` keeps the IN-HAND worth honest (so hand-count
+  // eval isn't fooled). But on its own it made the apply-vs-skip delta
+  // ~0 (in-hand worth ≈ the gold it grants) so the gate never committed
+  // — the "CPU won't play Treasure Chest" bug. `evaluateThroughTurnEnd`
+  // lets the gate's recon play the rest of the turn, where the realized
+  // +10 gold actually gets SPENT (an extra Artifact/effect this turn) —
+  // that surfaces as a positive delta exactly when the gold is useful.
+  // `activationGateThreshold: 0` → commit on any strictly-positive
+  // rollout (a 0-cost pure-gold card is ~never bad; genuine
+  // interference still shows as a negative delta and the gate skips).
+  cpuMeta: { handValueAsGoldGain: 10, evaluateThroughTurnEnd: true, activationGateThreshold: 0 },
 
   resolve: async (engine, pi) => {
     // Coin shower animation on the gold counter

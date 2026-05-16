@@ -78,12 +78,23 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   // Cooldin's Area-tutor flow). `reveal: false` skips the helper's
   // reveal modal — the Area is about to land on the board anyway, so
   // the modal would just delay the play with no extra disclosure.
+  //
+  // `_bypassHandLock`: Cooldin tutors the Area deck→hand→board as ONE
+  // motion — the hand is only a 1-tick staging step (spliced + played on
+  // the very next lines). The generic hand-lock exists to stop draws /
+  // hand-additions the player KEEPS; it must not block Cooldin's
+  // terraform, whose text is "activate a lv≤3 Area Attack/Spell from
+  // your hand or DECK". Same bypass precedent as Kassaran's draw clause.
+  // Without it, a player that hand-locked itself earlier in the turn
+  // (Kazena, etc.) could no longer use Cooldin (the CPU "Blood Rock
+  // does nothing" bug).
   if (fromDeck) {
     if (ps.mainDeck.indexOf(cardName) < 0) return false;
     const ok = await engine.actionAddCardFromDeckToHand(pi, cardName, {
       source: 'Cooldin, King of Coolness',
       reveal: false,
       shuffle: true,
+      _bypassHandLock: true,
     });
     if (!ok) return false;
   }
@@ -132,11 +143,22 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
     delete gs._immediateActionContext;
   }
 
-  // Step D: If the Area didn't place itself on the board (unexpected —
-  // every Area's onPlay routes through placeArea which sets this flag),
-  // fall back to discarding. If it did place itself, _spellPlacedOnBoard
-  // is set; clear it so future plays aren't affected.
-  if (!gs._spellPlacedOnBoard) {
+  // Step D: did the Area actually land on the board?
+  //
+  // We must NOT rely solely on `gs._spellPlacedOnBoard`: `placeArea`
+  // only sets that flag when `ps._resolvingCard` is unset OR equals
+  // the area's name. Cooldin sub-plays the Area via a hero effect
+  // (doActivateHeroEffect never sets `_resolvingCard`), so when some
+  // unrelated `_resolvingCard` is lingering the flag is never set even
+  // though `placeArea` DID move the card to the Area zone — Cooldin
+  // would then wrongly discard a successfully-placed Area (Blood Rock
+  // "vanishing", for human AND CPU). The authoritative signal is the
+  // instance itself: `placeArea` sets `inst.zone='area'` and pushes
+  // the name into `gs.areaZones[pi]`. Treat EITHER as "placed".
+  const placedOnBoard = !!gs._spellPlacedOnBoard
+    || inst.zone === 'area'
+    || (gs.areaZones?.[pi] || []).includes(cardName);
+  if (!placedOnBoard) {
     ps.discardPile.push(cardName);
     engine._untrackCard(inst.id);
     engine.log('cooldin_area_fizzle', { player: ps.username, card: cardName });
@@ -218,6 +240,15 @@ module.exports = {
     const picked = all.find(a => a.name === result.cardName && a.source === result.source)
       || all.find(a => a.name === result.cardName);
     if (!picked) return false;
+
+    // Cooldin's resolution is a deliberate, bounded ~2.4s sequence
+    // (terraform wave 1200ms + Area chain ~950ms + onPlay/placeArea).
+    // On the CPU's own turn that wall-clock can push past the live-
+    // turn deadline; the runHooks deadline check would then throw
+    // mid-placeArea and Cooldin would discard the Area instead of
+    // placing it (Blood Rock vanishing). Grant the budget back — the
+    // turn ends immediately after this anyway.
+    engine.extendCpuTurnDeadline?.(8000);
 
     // ── Battlefield-wide terraforming wave — Cooldin reshapes reality ──
     engine._broadcastEvent('cooldin_terraform', {

@@ -33,6 +33,30 @@ module.exports = {
   // delta in its own hooks instead.
   disableLizbethMirror: true,
 
+  cpuMeta: {
+    // CPU host preference for attaching Fighting. Fighting purely
+    // boosts the host Hero's ATK, so it's worth most on whichever Hero
+    // hits hardest. `scoreAbilityPlacement` sums this onto the
+    // placement score; for a non-school ability like Fighting the
+    // other terms are ~0, so the highest-ATK eligible Hero wins (ties
+    // broken at random by the caller) — covering the "no Hero has
+    // Fighting yet → give it to the highest-ATK Hero" case as well as
+    // stacking onto the biggest attacker.
+    //
+    // Thorad, Strength of Coolness gets a flat +160: his Attacks scale
+    // with the Coolness Stack, which grows every turn, so his raw
+    // 80 ATK badly understates his true attacking value. The bonus
+    // makes him very likely to be seen as the most valuable Fighting
+    // host.
+    attachmentBonus(engine, pi, heroIdx) {
+      const hero = engine?.gs?.players?.[pi]?.heroes?.[heroIdx];
+      if (!hero?.name || (hero.hp || 0) <= 0) return 0;
+      let atk = hero.atk || 0;
+      if (hero.name === 'Thorad, Strength of Coolness') atk += 160;
+      return atk;
+    },
+  },
+
   hooks: {
     /**
      * When played during the game, grant ATK based on zone level.

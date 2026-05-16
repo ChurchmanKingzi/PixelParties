@@ -41,6 +41,16 @@ module.exports = {
   // 'hand' for the self-cast onPlay; 'area' for the passive turn hook.
   activeIn: ['hand', 'area'],
 
+  // CPU valuation hint. Blood Rock deals 100 at the end of EVERY turn
+  // to all Heroes the turn player controls — a symmetric recurring
+  // Area. The CPU's MCTS rollout stops before the opponent's turn, so
+  // it only ever sees the placer's own first self-tick and would never
+  // play Cooldin→Blood Rock. `recurringSymmetricAreaDamage` lets
+  // evaluateState credit the matching (unsimulated) opponent-side tick
+  // so the play is judged on its true net symmetry. See the
+  // "Recurring symmetric Area payoff correction" block in _cpu.js.
+  cpuMeta: { recurringSymmetricAreaDamage: 100 },
+
   hooks: {
     onPlay: async (ctx) => {
       if (ctx.cardZone !== 'hand') return;

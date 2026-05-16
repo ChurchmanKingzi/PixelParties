@@ -823,6 +823,35 @@ class GameEngine {
   }
 
   /** Format the most recent N trail entries as a one-line summary. */
+  /**
+   * Push the CPU live-turn deadline out by `ms`. Cards with long,
+   * INTENTIONAL animation/resolution sequences (Cooldin's terraform +
+   * Area sub-cast, Timeless King Zi's reveal + performed Spell) call
+   * this at the start of their effect so their own deliberate
+   * `_delay()`s don't count against the CPU's action budget — without
+   * it the deadline check in runHooks throws mid-resolution and
+   * force-ends the chain (e.g. Blood Rock discarded instead of placed).
+   * No-op when no deadline is set (human turn / already cleared / PvP)
+   * or in fast mode (sims skip real delays). The MAX_HOOKS_PER_TURN
+   * cap still guards against a genuine runaway, independent of this.
+   */
+  extendCpuTurnDeadline(ms) {
+    // CRITICAL: never extend inside an MCTS rollout or fast mode. Sims
+    // skip real `_delay()`s (there is no animation wall-clock to give
+    // back), and `_cpuTurnDeadline` is NOT part of snapshot()/restore()
+    // — so an extension applied during a rollout would leak permanently
+    // into the live turn. A CPU deck heavy in Cooldin/Timeless King Zi
+    // (e.g. the Bloody King Zi structure deck) re-simulates those cards
+    // across dozens of rollouts; each leaked +8s blows the 90s
+    // MAX_CPU_TURN_MS cap into the thousands, defeating the only
+    // total-turn safety net and freezing the CPU's turn (event loop
+    // fully blocked → server appears down).
+    if (this._inMctsSim || this._fastMode) return;
+    if (typeof this._cpuTurnDeadline === 'number' && ms > 0) {
+      this._cpuTurnDeadline += ms;
+    }
+  }
+
   _recentTrail(n = 16) {
     if (!this._actionTrail || this._actionTrail.length === 0) return '(empty)';
     const tail = this._actionTrail.slice(-n);
@@ -1255,11 +1284,39 @@ class GameEngine {
         pickN = Math.min(promptData.minSelect != null ? promptData.minSelect : 1, cards.length);
         if (pickN <= 0) pickN = 1;
       }
+      // Budget-aware selection. When the gallery enforces a spend cap
+      // (`maxBudget` + `costKey` — e.g. Timeless King Zi's "3 Spells,
+      // Σlevel ≤ 6" or Magic Lamp), picking the first `pickN` by
+      // gallery order can blow the budget, so the consuming card's
+      // own validation rejects it and the effect aborts — which made
+      // MCTS think the whole hero effect was worthless and the CPU
+      // never used it. Instead pick the `pickN` LOWEST-cost cards
+      // (minimises the sum, mirroring Zi's `hasLegalTrio`); only if
+      // even that cheapest combo exceeds the cap is there genuinely no
+      // legal selection. No cap → original gallery-order behaviour.
       const indices = [];
       const names = [];
-      for (let i = 0; i < pickN && i < cards.length; i++) {
-        indices.push(i);
-        names.push(cards[i].name);
+      const _costKey = promptData.costKey;
+      const _maxBudget = promptData.maxBudget;
+      if (_costKey && typeof _maxBudget === 'number') {
+        const order = cards
+          .map((c, i) => ({ i, cost: Number(c?.[_costKey]) || 0 }))
+          .sort((a, b) => a.cost - b.cost);
+        let sum = 0;
+        for (let k = 0; k < pickN && k < order.length; k++) {
+          sum += order[k].cost;
+          indices.push(order[k].i);
+          names.push(cards[order[k].i].name);
+        }
+        if (names.length < pickN || sum > _maxBudget) {
+          // Cheapest legal combo still over budget → no valid pick.
+          return { selectedCards: [], selectedIndices: [] };
+        }
+      } else {
+        for (let i = 0; i < pickN && i < cards.length; i++) {
+          indices.push(i);
+          names.push(cards[i].name);
+        }
       }
       return { selectedCards: names, selectedIndices: indices };
     }
@@ -5935,7 +5992,7 @@ class GameEngine {
     }
     // Defending the Gate: protect support zone cards
     if (!opts.ignoreGateShield && targetCard.zone === 'support') {
-      await this._triggerGateCheck(targetCard.controller ?? targetCard.owner);
+      await this._triggerGateCheck(targetCard.controller ?? targetCard.owner, source?.name || opts.sourceName || null);
       if (this._isGateShielded(targetCard.controller ?? targetCard.owner)) {
         this.log('destroy_blocked', { card: targetCard.name, reason: 'Defending the Gate' });
         return;
@@ -6002,7 +6059,8 @@ class GameEngine {
       return;
     }
     if (!opts.ignoreGateShield && fromZone === 'support' && toZone !== 'support') {
-      await this._triggerGateCheck(cardInstance.controller ?? cardInstance.owner);
+      await this._triggerGateCheck(cardInstance.controller ?? cardInstance.owner,
+        opts.deathSource?.name || opts.source?.name || opts.sourceName || null);
       if (this._isGateShielded(cardInstance.controller ?? cardInstance.owner)) return;
     }
 
@@ -12581,6 +12639,36 @@ class GameEngine {
   }
 
   /**
+   * For LIVE CPU plays only: fire the pending card_reveal (the "stream
+   * the card image to centre" overlay) + play-log NOW, before the
+   * effect resolves — instead of the default deferral that only fires
+   * it on the player's first in-resolution prompt or after resolution.
+   *
+   * Why: when a human plays a card the reveal is intentionally held
+   * back so a card the human cancels mid-targeting isn't flashed to the
+   * opponent. The CPU has no such cancel-to-hide need, so for no-prompt
+   * CPU cards (e.g. Trade: delete 5 / gain gold) the deferred reveal
+   * would only land AFTER the effect already animated — the card
+   * appears to activate after its own consequences. Firing here makes
+   * the announcement lead; the client `card_reveal` overlay runs on its
+   * own independent timer (not tied to board game_state), so resolution
+   * proceeds immediately and visibly overlaps the still-playing reveal.
+   *
+   * Idempotent: `_firePendingCardReveal()` deletes `_pendingCardReveal`,
+   * so each helper's existing post-resolution
+   * `if (gs._pendingCardReveal) _firePendingCardReveal()` simply
+   * no-ops. Skipped for humans, PvP, and MCTS rollouts.
+   */
+  maybeFireCpuRevealEarly() {
+    if (this._inMctsSim) return false;
+    if (typeof this._cpuPlayerIdx !== 'number' || this._cpuPlayerIdx < 0) return false;
+    if (this.gs?.activePlayer !== this._cpuPlayerIdx) return false;
+    if (!this.gs?._pendingCardReveal) return false;
+    this._firePendingCardReveal();
+    return true; // caller may also surface its flash/announce early now
+  }
+
+  /**
    * Queue a log entry to fire when the card is revealed (on first confirmed prompt).
    * If no prompts occur, call _firePendingPlayLog() manually after resolution.
    */
@@ -13186,7 +13274,7 @@ class GameEngine {
    * Returns true if shield is active (existing or newly activated).
    * Call this from async contexts before opponent effects modify support zones.
    */
-  async _triggerGateCheck(targetOwnerIdx) {
+  async _triggerGateCheck(targetOwnerIdx, sourceName = null) {
     // Already shielded this resolution
     if (this.gs._gateShieldActive === targetOwnerIdx) return true;
     
@@ -13219,10 +13307,21 @@ class GameEngine {
     this.gs.surprisePending = true;
     try {
       const heroName = ps.heroes[gateHeroIdx]?.name || 'Hero';
+      // Name the triggering card/effect so the player isn't left
+      // guessing what they're defending against. Prefer the explicit
+      // source the caller passed; fall back to whatever card/effect is
+      // currently mid-resolution (the active player's pending play-log
+      // — set by the spell/creature/artifact/ability/hero-effect play
+      // handlers). Only a truly unknown source falls back to a generic.
+      const _pend = this.gs._pendingPlayLog?.data;
+      const _trigger = sourceName || _pend?.card || _pend?.effect || null;
+      const _msg = _trigger
+        ? `The opponent's "${_trigger}" is about to affect your Support Zone cards!`
+        : `An opponent effect is about to affect your Support Zone cards!`;
       const confirmed = await this.promptGeneric(targetOwnerIdx, {
         type: 'confirm',
         title: gateName,
-        message: `Your Support Zone cards are about to be affected! Activate ${gateName} on ${heroName} to protect them?`,
+        message: `${_msg} Activate ${gateName} on ${heroName} to protect them?`,
         showCard: gateName,
         confirmLabel: '🛡️ Defend!',
         cancelLabel: 'No',
@@ -13451,8 +13550,18 @@ class GameEngine {
     const statusInfo = { targetOwner: targetOwnerIdx, targetHeroIdx, statusName, opts };
     const targetName = this.gs.players[targetOwnerIdx]?.heroes?.[targetHeroIdx]?.name || 'Target';
     const statusLabel = STATUS_EFFECTS[statusName]?.label || statusName;
+    // Name the card/effect inflicting the status so the player isn't
+    // guessing what they're reacting to (mirrors _triggerGateCheck).
+    // `addHeroStatus` opts only carry `appliedBy` (a player index), not
+    // a card name, so prefer an explicit source if a caller passes one,
+    // then the card/effect currently mid-resolution (the active
+    // player's pending play-log), then a clearer generic.
+    const _pend = this.gs._pendingPlayLog?.data;
+    const _trigger = opts?.sourceName || opts?.source?.name
+      || _pend?.card || _pend?.effect || null;
+    const _src = _trigger ? `the opponent's "${_trigger}"` : 'an opponent effect';
     const result = await this._scanSurpriseEntriesForPlayer(targetOwnerIdx, 'surpriseStatusTrigger', statusInfo, {
-      message: () => `${targetName} is about to be ${statusLabel}!`,
+      message: () => `${targetName} is about to be ${statusLabel} by ${_src}!`,
       confirmLabel: '🌵 Activate Surprise!',
     });
     if (result?.redirect) return result.redirect;
@@ -20725,7 +20834,7 @@ class GameEngine {
       const controllerIdx = e.inst.controller ?? e.inst.owner;
       if (gateCheckedPlayers.has(controllerIdx)) continue;
       gateCheckedPlayers.add(controllerIdx);
-      await this._triggerGateCheck(controllerIdx);
+      await this._triggerGateCheck(controllerIdx, e.source?.name || null);
     }
     // Cancel entries for gate-shielded players
     for (const e of entries) {

@@ -3125,10 +3125,20 @@ body {
   pointer-events: auto;
   cursor: pointer;
 }
-.bday-present-reveal-card.clickable:hover .bday-present-reveal-inner {
+/* Hover affordance for the opponent's pick. MUST NOT touch
+   `.bday-present-reveal-inner` — it is `transform-style: preserve-3d`
+   and applying `filter`/`transform` there flattens the 3D flip,
+   exposing the back face (the card appears to flip face-DOWN on
+   hover). Instead: grow the outer (non-3D) card and glow the visible
+   front face only, so the offered Spell stays face-up. */
+.bday-present-reveal-card.clickable:hover {
+  transform: scale(1.06);
+  transition: transform 180ms ease-out;
+  z-index: 10110;
+}
+.bday-present-reveal-card.clickable:hover .bday-present-reveal-front {
   filter: brightness(1.18) drop-shadow(0 0 14px rgba(255,230,140,.85));
-  transform: rotateY(180deg) scale(1.06);
-  transition: transform 180ms ease-out, filter 180ms ease-out;
+  transition: filter 180ms ease-out;
 }
 .bday-present-reveal-inner {
   position: relative;

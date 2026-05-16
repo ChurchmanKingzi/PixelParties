@@ -12488,10 +12488,16 @@ function CardNamePickerPrompt({ ep, onRespond }) {
 // card name; the header shows "(filtered/total)" while a filter is
 // active so the player can quickly answer "how many of card X are
 // still in this pile?".
-function PileSearchModal({ title, cards, onClose }) {
+function PileSearchModal({ title, cards, onClose, preserveOrder = false }) {
   const [filter, setFilter] = useState('');
   const TYPE_ORDER = ['Hero', 'Creature', 'Spell', 'Attack', 'Artifact', 'Ability', 'Potion', 'Ascended Hero', 'Token'];
   const sorted = useMemo(() => {
+    // `preserveOrder` (Coolness Stack): show the cards in stacking
+    // order, TOP of the stack first (leftmost). The stack array stores
+    // the top at the LAST index (board renders coolnessStack[len-1] as
+    // the visible top), so reverse it — no type/alpha sort, no
+    // reordering, duplicates kept as-is.
+    if (preserveOrder) return [...(cards || [])].reverse();
     return [...(cards || [])].sort((a, b) => {
       const ca = CARDS_BY_NAME[a], cb = CARDS_BY_NAME[b];
       const ta = TYPE_ORDER.indexOf(ca?.cardType || '');
@@ -12499,7 +12505,7 @@ function PileSearchModal({ title, cards, onClose }) {
       if (ta !== tb) return ta - tb;
       return a.localeCompare(b);
     });
-  }, [cards]);
+  }, [cards, preserveOrder]);
   const trimmed = filter.trim().toLowerCase();
   const filtered = trimmed
     ? sorted.filter(n => n.toLowerCase().includes(trimmed))
@@ -25249,7 +25255,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <div data-opp-coolness="1"
                       className={'board-coolness-slot' + (isValidStackTarget ? ' potion-target-valid' : '') + (isSelectedStackTarget ? ' potion-target-selected' : '')}
                       onClick={isValidStackTarget ? () => togglePotionTarget(stackTargetId)
-                        : (stackLen > 0 ? () => setPileViewer({ title: 'Opponent Coolness Stack', cards: opp.coolnessStack }) : undefined)}
+                        : (stackLen > 0 ? () => setPileViewer({ title: 'Opponent Coolness Stack', cards: opp.coolnessStack, preserveOrder: true }) : undefined)}
                       onMouseEnter={() => topName && !fullyMasked && setHoveredPileCard && setHoveredPileCard(topName)}
                       onMouseLeave={() => setHoveredPileCard && setHoveredPileCard(null)}
                       style={isValidStackTarget ? { cursor: 'pointer' } : undefined}>
@@ -25330,7 +25336,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     ? () => togglePotionTarget(stackTargetId)
                     : canPlayFromStack
                       ? () => socket.emit('play_from_coolness_stack', { roomId: gameState.roomId })
-                      : (stackLen > 0 ? () => setPileViewer({ title: 'My Coolness Stack', cards: me.coolnessStack }) : undefined);
+                      : (stackLen > 0 ? () => setPileViewer({ title: 'My Coolness Stack', cards: me.coolnessStack, preserveOrder: true }) : undefined);
                   return (
                     <div data-my-coolness="1"
                       className={'board-coolness-slot'
@@ -26493,6 +26499,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <PileSearchModal
           title={pileViewer.title}
           cards={pileViewer.cards || []}
+          preserveOrder={pileViewer.preserveOrder}
           onClose={() => setPileViewer(null)}
         />
       )}

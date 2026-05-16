@@ -55,10 +55,15 @@ module.exports = {
       const pi = ctx.cardOwner;
       const heroIdx = ctx.card.heroIdx;
 
-      // Per-instance HOPT — "once per turn" applies to THIS Polar.
-      // claimHOPT keys per (key, playerIdx); add the inst id so two
-      // Polars on the same side don't share the lockout.
-      if (!engine.claimHOPT(`${HOPT_KEY}:${ctx.card.id}`, pi)) return;
+      // Per-instance "once per turn" — applies to THIS Polar (inst id
+      // in the key so two Polars on the same side don't share the
+      // lockout). PEEK only here: we must NOT consume the once-per-turn
+      // just for the trigger firing. `claimHOPT` derives the stored key
+      // as `${key}:${playerIdx}`, so mirror that for the read-only
+      // check, then claim it LATER — only if a Creature is actually
+      // summoned.
+      const hoptKey = `${HOPT_KEY}:${ctx.card.id}:${pi}`;
+      if (engine.gs.hoptUsed?.[hoptKey] === engine.gs.turn) return;
 
       const hostHero = gs.players[pi]?.heroes?.[heroIdx];
       if (!hostHero?.name || hostHero.hp <= 0) return;
@@ -72,13 +77,27 @@ module.exports = {
       // Route the bonus through the canonical immediate-action helper.
       // The host Hero locks the prompt; only Creatures from hand show
       // up; the helper's internal filter already enforces summoning
-      // requirements, free zone, canSummon, summonLock, etc.
-      await engine.performImmediateAction(pi, heroIdx, {
+      // requirements, free zone, canSummon, summonLock, etc. It returns
+      // `{ played: true }` ONLY when a Creature was actually summoned —
+      // `{ played: false }` for "no eligible Creature" (e.g. not enough
+      // Summoning Magic on the new host) or a declined/cancelled prompt
+      // (the card says "may").
+      const result = await engine.performImmediateAction(pi, heroIdx, {
         title: CARD_NAME,
         description: `${hostHero.name} may immediately summon a Creature from your hand as an additional Action.`,
         allowedCardTypes: ['Creature'],
         skipAbilities: true,
       });
+
+      // Consume the once-per-turn ONLY now, and ONLY if something was
+      // actually summoned. Nothing summoned (can't / declined) → the
+      // trigger stays available, so a later same-turn slip to a Hero
+      // that CAN summon still works. (claimHOPT re-derives the same
+      // `${HOPT_KEY}:${id}:${pi}` key checked above.)
+      if (result && result.played) {
+        engine.claimHOPT(`${HOPT_KEY}:${ctx.card.id}`, pi);
+        engine.sync();
+      }
     },
   },
 };

@@ -12,6 +12,11 @@
 //  hits the Creature (not its host Hero).
 // ═══════════════════════════════════════════
 
+// Shared source→creature resolution (same helper Fireshield uses) so
+// the "hit the attacking Creature, not its host Hero" routing has a
+// single source of truth and never diverges between retaliation cards.
+const { resolveSourceCreature, isCreatureSource } = require('./_hooks');
+
 module.exports = {
   isSurprise: true,
 
@@ -23,13 +28,9 @@ module.exports = {
   surpriseTrigger: (gs, ownerIdx, heroIdx, sourceInfo, engine) => {
     if (sourceInfo.owner < 0 || sourceInfo.heroIdx < 0) return false;
 
-    // Check if source is a creature
-    const srcInst = sourceInfo.cardInstance;
-    if (srcInst?.zone === 'support') {
-      // Creature source — check creature is still alive (currentHp may not be initialized yet)
-      const cd = engine._getCardDB()[srcInst.name];
-      const hp = srcInst.counters?.currentHp ?? cd?.hp ?? 1;
-      return hp > 0;
+    if (isCreatureSource(engine, sourceInfo)) {
+      // Creature source — only if the creature is still alive on board.
+      return !!resolveSourceCreature(engine, sourceInfo);
     }
 
     // Hero source (spell/attack) — check hero is alive
@@ -89,17 +90,18 @@ module.exports = {
       return null; // No effect negation in telekinesis mode (no source to negate)
     }
 
-    const srcInst = sourceInfo.cardInstance;
-    const isCreatureSource = srcInst?.zone === 'support';
+    // Shared resolution (same helper Fireshield uses): the LIVE
+    // attacking Creature instance, or null for a Hero (Spell/Attack)
+    // source. Using the live inst (not the possibly-stale
+    // sourceInfo.cardInstance) also drops the old manual snapshot
+    // handling.
+    const srcInst = resolveSourceCreature(engine, sourceInfo);
 
-    if (isCreatureSource) {
+    if (isCreatureSource(engine, sourceInfo)) {
       // ── Creature source: deal 100 damage to the creature ──
-      const cardDB = engine._getCardDB();
-      const creatureCd = cardDB[srcInst.name];
-      const creatureMaxHp = creatureCd?.hp || 0;
-      // currentHp is only initialized after first damage — use maxHp as fallback
-      const creatureHp = srcInst.counters?.currentHp ?? creatureMaxHp;
-      if (creatureHp <= 0) return null;
+      // Attacker creature already gone (resolved null) → nothing to
+      // hit, no negation (mirrors the prior creatureHp <= 0 guard).
+      if (!srcInst) return null;
 
       // Explosion animation on the creature's support zone slot
       engine._broadcastEvent('play_zone_animation', {

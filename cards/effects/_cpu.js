@@ -120,6 +120,39 @@ function cpuPastDeadline(engine) {
   return false;
 }
 
+// ── Live event-loop yield ───────────────────────────────────────────
+// CRITICAL for UX. MCTS rollouts run in fast mode, where engine._delay()
+// resolves as a MICROtask (Promise.resolve()). Node drains the entire
+// microtask queue before servicing any macrotask (HTTP request, socket
+// event, timer), so a heavy CPU planning pass — hundreds of rollouts on
+// a deck like Bloody King Zi — never lets the server process I/O. The
+// game then appears completely frozen: the player can't surrender, a
+// refresh does nothing, "as if the server was down", for the entire
+// planning budget (up to MAX_CPU_TURN_MS).
+//
+// The fix: between rollouts at the LIVE rank-loop level (where gs is the
+// real, snapshot-restored state — NOT mid-rollout), yield a real
+// macrotask via setImmediate. Node then services any queued socket
+// work (a surrender, a disconnect, a state request) before the next
+// rollout. This does NOT change rollout determinism or game state
+// (setImmediate mutates nothing) and does NOT relax any time/hook
+// budget — those are wall-clock based and still bound total planning.
+// Throttled by wall-clock so the added overhead is negligible (~one
+// yield per YIELD_INTERVAL_MS) while still guaranteeing the server
+// responds within ~that interval even while the CPU is "thinking".
+const YIELD_INTERVAL_MS = 120;
+let _lastEventLoopYieldT = 0;
+async function maybeYieldEventLoop(engine) {
+  // Never inside a rollout/sim: nested sim must stay atomic, and the
+  // mctsRankCandidates loops this is called from are already live-only
+  // (they bypass to heuristic when _inMctsSim). Defensive double-guard.
+  if (engine?._inMctsSim) return;
+  const now = Date.now();
+  if (now - _lastEventLoopYieldT < YIELD_INTERVAL_MS) return;
+  _lastEventLoopYieldT = now;
+  await new Promise(resolve => setImmediate(resolve));
+}
+
 /**
  * True when the CPU's current turn is gated by Flashbang — the first
  * Action they perform will end the turn immediately.
@@ -197,22 +230,30 @@ async function runCpuTurn(engine, helpers) {
   cpuLog(`→ Action Phase (currentPhase=${gs.currentPhase})`);
   await runActionPhase(engine, helpers);
 
-  // Combo continuation: if an action left the phase open (Ghuanjun-style
-  // bonus actions — ps.bonusActions.remaining > 0, allowedTypes gated by the
-  // hero's canPlayCard), keep firing Action-Phase plays until either the
-  // bonus is exhausted, no legal play remains, or the phase advances on its
-  // own. Safety-capped in case a mechanic somehow keeps the gate open
-  // forever without actually consuming cards.
-  let comboSafety = 6;
+  // Combo continuation: keep firing Action-Phase plays while the engine
+  // still owes the CPU another action this phase — either a Ghuanjun-
+  // style bonus action (ps.bonusActions.remaining) OR a second-action
+  // grant (Giga Steroids' isSecondActionGrant additional-action
+  // provider, redeemable only as action 2 on an effect activation like
+  // Adventurousness). Previously only bonusActions was checked, so
+  // after the CPU spent action 1 (e.g. Zi's hero effect) the Giga
+  // Steroids grant was abandoned and the phase force-advanced without
+  // ever using the second Action. Progress is detected via
+  // runActionPhase's own return value (an effect activation claims a
+  // HOPT but does NOT shrink the hand, so the old hand-shrink check
+  // wrongly stopped here). Stop when a pass performs no action, the
+  // phase advances, or the safety cap trips.
+  let comboSafety = 8;
   while (stillCpuTurn(engine, cpuIdx)
          && engine.gs.currentPhase === 3
-         && (gs.players[cpuIdx]?.bonusActions?.remaining || 0) > 0
-         && comboSafety-- > 0) {
-    cpuLog(`→ Action Phase (combo follow-up) bonus=${gs.players[cpuIdx].bonusActions.remaining}`);
-    const handBefore = gs.players[cpuIdx].hand.length;
-    await runActionPhase(engine, helpers);
-    if (gs.players[cpuIdx].hand.length >= handBefore) {
-      cpuLog('  (no combo Attack played — stopping loop)');
+         && comboSafety-- > 0
+         && (((gs.players[cpuIdx]?.bonusActions?.remaining || 0) > 0)
+             || hasSpendableSecondActionGrant(engine, cpuIdx))) {
+    const bonus = gs.players[cpuIdx]?.bonusActions?.remaining || 0;
+    cpuLog(`→ Action Phase (combo follow-up) bonus=${bonus} secondActionGrant=${hasSpendableSecondActionGrant(engine, cpuIdx)}`);
+    const did = await runActionPhase(engine, helpers);
+    if (!did) {
+      cpuLog('  (combo follow-up performed no action — stopping loop)');
       break;
     }
   }
@@ -263,6 +304,29 @@ async function runCpuTurn(engine, helpers) {
 // do anything in Main 1 anymore. It will then use the highest-level
 // Creature > Spell > Attack in its hand that it can use (Creature has highest
 // prio, Attack lowest, but higher level trumps type priority)."
+
+// True when the engine still owes `pi` a SECOND-action grant this
+// Action Phase that can be spent on an effect activation (Giga
+// Steroids' owner-wide `ability_activation` grant; also any hero-
+// restricted second-action grant). `findAdditionalActionForCategory`
+// already applies `_isSecondActionGrantAvailable` (the grant only
+// redeems as the actual 2nd action), so a truthy result means "there
+// is an additional action the CPU may still take right now". Giga
+// Steroids is `heroRestricted:false` → matches the heroIdx=-1 probe;
+// the per-hero probes cover hero-restricted variants.
+function hasSpendableSecondActionGrant(engine, pi) {
+  if (typeof engine.findAdditionalActionForCategory !== 'function') return false;
+  const ps = engine.gs?.players?.[pi];
+  if (!ps) return false;
+  if (engine.findAdditionalActionForCategory(pi, 'ability_activation', -1)) return true;
+  const heroes = ps.heroes || [];
+  for (let hi = 0; hi < heroes.length; hi++) {
+    const h = heroes[hi];
+    if (!h?.name || h.hp <= 0) continue;
+    if (engine.findAdditionalActionForCategory(pi, 'ability_activation', hi)) return true;
+  }
+  return false;
+}
 
 async function runActionPhase(engine, helpers) {
   const cpuIdx = engine._cpuPlayerIdx;
@@ -442,7 +506,9 @@ async function runActionPhase(engine, helpers) {
         if (!inst) continue;
         const ctx = engine._createContext(inst, { event: 'canHeroEffectCheck' });
         if (!script.canActivateHeroEffect(ctx)) continue;
-      } catch { continue; }
+      } catch (e) {
+        continue;
+      }
     }
     candidates.push({
       cardType: 'HeroEffectAction',
@@ -1413,6 +1479,15 @@ function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
   return { kind: 'useEffect', cardName, handIdx, isTargeted };
 }
 
+// Re-entrancy guard for the protective-toggle equip valuation. The
+// scoring it runs (mctsEnemyHeroDynamicValue → mctsEnemyHeroThreat →
+// planArtifactPlay) re-invokes pickHeroForEquip for the SAME Equip,
+// which would recurse forever (Bloody King Zi froze with Diver Helmet
+// in hand: the swallowed stack-overflow spun the event loop, no dump).
+// While true, the protective-toggle block takes a cheap, non-recursive
+// pick instead of re-running the MCTS hero valuation.
+let _inEquipHeroValuation = false;
+
 function pickHeroForEquip(engine, pi, cardName, cardData) {
   const gs = engine.gs;
   const ps = gs.players[pi];
@@ -1438,6 +1513,50 @@ function pickHeroForEquip(engine, pi, cardName, cardData) {
     if (hasFree) eligible.push(hi);
   }
   if (!eligible.length) return -1;
+
+  // Protective-toggle equips (Diver Helmet): binary ON/OFF protection —
+  // a 2nd copy on an already-protected Hero is pure waste. Per user
+  // spec: never double-equip the same Hero, and if NO eligible Hero is
+  // unprotected, don't play it at all (return -1 → planArtifactPlay
+  // skips the play). Among unprotected eligible Heroes, send it to the
+  // most valuable one, using the SAME hero-value criteria the MCTS
+  // evaluator uses to rank the opponent's most valuable Hero
+  // (`mctsEnemyHeroDynamicValue`) — applied here to our OWN side, so
+  // "most valuable Hero to protect" stays consistent with the search's
+  // own notion of Hero worth. Ties broken at random.
+  if (script?.cpuMeta?.protectiveToggleEquip) {
+    const hasNamedEquip = (hi) => (engine.cardInstances || []).some(c =>
+      c && c.name === cardName && c.zone === 'support' && !c.faceDown
+      && c.heroIdx === hi
+      && (c.owner === pi || (c.controller ?? c.owner) === pi));
+    const unprotected = eligible.filter(hi => !hasNamedEquip(hi));
+    if (unprotected.length === 0) return -1;
+    // Re-entrant call (we got here THROUGH the scoreOf valuation
+    // below: mctsEnemyHeroDynamicValue → mctsEnemyHeroThreat →
+    // planArtifactPlay → pickHeroForEquip). Do NOT recurse into the
+    // MCTS valuation again — that's the infinite loop. A re-entrant
+    // call only needs to answer "is there a legal Hero for this
+    // Equip?" for the threat estimate, so return a cheap deterministic
+    // pick (highest-HP unprotected eligible Hero).
+    if (_inEquipHeroValuation) {
+      let pickHi = unprotected[0];
+      for (const hi of unprotected) {
+        if ((ps.heroes[hi]?.hp || 0) > (ps.heroes[pickHi]?.hp || 0)) pickHi = hi;
+      }
+      return pickHi;
+    }
+    const teamMax = mctsTeamMaxSchoolLvl(gs, pi);
+    const scoreOf = (hi) => {
+      _inEquipHeroValuation = true;
+      try { return mctsEnemyHeroDynamicValue(engine, pi, hi, teamMax); }
+      catch { return 0; }
+      finally { _inEquipHeroValuation = false; }
+    };
+    let bestV = -Infinity;
+    for (const hi of unprotected) bestV = Math.max(bestV, scoreOf(hi));
+    const top = unprotected.filter(hi => scoreOf(hi) === bestV);
+    return top[Math.floor(Math.random() * top.length)];
+  }
 
   // Ascension priority: if one of the eligible heroes needs this equipment
   // for their ascension (Arthor's Sword/Circle, Layn's Hammer, etc.), send
@@ -2754,6 +2873,49 @@ function mctsValidateGenericEntry(entry, promptData) {
   return false;
 }
 
+// ── cardGalleryMulti exact-count plan (CPU sim/branch) ──────────────
+// Some multi-pick prompts demand an EXACT count via `validCounts`
+// (Timeless King Zi: validCounts:[3], maxBudget:6, costKey:'level').
+// The old sim/branch logic only understood `selectCount`/single-pick,
+// so it always returned 1 card → Zi's own 3-card validation rejected
+// it in EVERY rollout → MCTS scored Zi as a wasted Action and the CPU
+// never used it. These helpers compute the required count + a
+// guaranteed-valid combo so Zi's rollout actually resolves.
+function cpuGalleryMultiPlan(promptData) {
+  const cards = promptData.cards || [];
+  const n = cards.length;
+  const vc = Array.isArray(promptData.validCounts) && promptData.validCounts.length
+    ? promptData.validCounts.slice().sort((a, b) => a - b)
+    : null;
+  let need;
+  if (vc) need = vc.find(c => c <= n);
+  else if (promptData.selectCount) need = promptData.selectCount;
+  else if (promptData.minSelect) need = promptData.minSelect;
+  else need = 1;
+  return {
+    need: need || 0,
+    hardCount: !!vc,                 // validCounts ⇒ EXACT count required
+    costKey: promptData.costKey || null,
+    maxBudget: (typeof promptData.maxBudget === 'number') ? promptData.maxBudget : null,
+  };
+}
+
+// Cheapest `need`-card name combo (minimises Σcost). Returns null when
+// no combo fits the budget — mirrors Timeless King Zi's `hasLegalTrio`
+// (the N smallest costs ARE the minimum achievable sum, so if that
+// exceeds the cap, no legal selection exists).
+function cpuCheapestGalleryCombo(cards, need, costKey, maxBudget) {
+  if (!need || need <= 0 || (cards || []).length < need) return null;
+  const order = cards
+    .map(c => ({ name: c.name, cost: costKey ? (Number(c[costKey]) || 0) : 0 }))
+    .sort((a, b) => a.cost - b.cost);
+  let sum = 0;
+  const out = [];
+  for (let k = 0; k < need; k++) { sum += order[k].cost; out.push(order[k].name); }
+  if (maxBudget != null && sum > maxBudget) return null;
+  return out;
+}
+
 // Enumerate alternative values for a branchable generic prompt. Returns an
 // array of { value, label } entries usable as plan values.
 function mctsEnumerateGenericAlternatives(promptData, cpuIdxForBias) {
@@ -2798,10 +2960,41 @@ function mctsEnumerateGenericAlternatives(promptData, cpuIdxForBias) {
     }));
   }
   if (type === 'cardGalleryMulti') {
-    // Single-pick variations only (combinatorial explosion otherwise).
-    // Same gallery-score ordering as the single-select path above.
     const cards = (promptData.cards || []).slice();
     cards.sort((a, b) => (b._galleryScore || -Infinity) - (a._galleryScore || -Infinity));
+    const plan = cpuGalleryMultiPlan(promptData);
+    if (plan.hardCount && plan.need > 1) {
+      // EXACT-count prompt (Timeless King Zi: 3 Spells, Σlevel ≤ 6).
+      // Single-card branches are ALWAYS invalid here, so emit valid
+      // `need`-card combos instead: the cheapest combo guarantees ≥1
+      // resolvable branch (so Zi's rollout succeeds and MCTS can value
+      // it); a highest-score combo within budget gives MCTS a "best
+      // trio" alternative to compare.
+      const branches = [];
+      const cheap = cpuCheapestGalleryCombo(cards, plan.need, plan.costKey, plan.maxBudget);
+      if (cheap) {
+        branches.push({ value: { selectedCards: cheap.slice() }, label: `cheapest${plan.need}` });
+      }
+      const top = [];
+      let sum = 0;
+      for (const c of cards) {
+        if (top.length >= plan.need) break;
+        const cost = plan.costKey ? (Number(c[plan.costKey]) || 0) : 0;
+        if (plan.maxBudget != null && sum + cost > plan.maxBudget) continue;
+        top.push(c.name);
+        sum += cost;
+      }
+      if (top.length === plan.need) {
+        const tKey = top.slice().sort().join('|');
+        const cKey = cheap ? cheap.slice().sort().join('|') : '';
+        if (tKey !== cKey) {
+          branches.push({ value: { selectedCards: top.slice() }, label: `top${plan.need}` });
+        }
+      }
+      return branches;
+    }
+    // Soft / single-count multi-pick — single-pick variations only
+    // (combinatorial explosion otherwise). Same gallery-score ordering.
     return cards.map(c => ({
       value: { selectedCards: [c.name] },
       label: `pickOne=${c.name}`,
@@ -3610,6 +3803,18 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     // `mctsBuildVariationsFromRecord` gets the same `_galleryScore`
     // order it relies on for variation exploration.
     pickBestGalleryCard(engine, cpuIdx, cards); // stamps `_galleryScore` on each
+    const plan = cpuGalleryMultiPlan(promptData);
+    if (plan.hardCount) {
+      // EXACT-count prompt (Timeless King Zi). The greedy top-score
+      // loop below can grab high-score cards that blow the budget and
+      // then fail to reach `need`, yielding an invalid pick the
+      // consuming card rejects. The cheapest `need`-combo is the only
+      // thing guaranteed valid whenever a legal selection exists.
+      const combo = cpuCheapestGalleryCombo(cards, plan.need, plan.costKey, plan.maxBudget);
+      return { selectedCards: combo || [] };
+    }
+    // Soft multi-pick ("pick up to N you can afford"): greedy top-score
+    // up to the cap, respecting any budget. Unchanged behaviour.
     const cap = Math.max(1, promptData.selectCount || 1);
     const costKey = promptData.costKey || 'cost';
     let budgetRemaining = promptData.maxBudget != null
@@ -5381,6 +5586,30 @@ function pickBestGalleryCard(engine, pi, cards) {
   return pick;
 }
 
+// True when `pi` still has Kazena, the Storming Rebel's draw-up-to-7
+// hero effect AVAILABLE and USABLE this turn. While that's the case,
+// every card held in hand is one card Kazena WON'T draw (she draws
+// UNTIL 7), so holding cards actively wastes her refill — the CPU
+// should dump as many as possible (play them, trade them for gold via
+// Treasure Chest, Play Money, etc.) BEFORE activating her. Cheap scan
+// (≤3 heroes), no context allocation, safe to call per hand card.
+const KAZENA_NAME = 'Kazena, the Storming Rebel';
+function kazenaDrawAvailable(engine, pi) {
+  const gs = engine.gs;
+  const ps = gs?.players?.[pi];
+  if (!ps || ps.handLocked) return false;          // canActivateHeroEffect: hand not locked
+  if ((ps.hand || []).length >= 7) return false;   // canActivateHeroEffect: < 7 in hand
+  const heroes = ps.heroes || [];
+  for (let hi = 0; hi < heroes.length; hi++) {
+    const h = heroes[hi];
+    if (!h?.name || h.hp <= 0 || h.name !== KAZENA_NAME) continue;
+    if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.negated) continue;
+    if (gs.hoptUsed?.[`hero-effect:${KAZENA_NAME}:${pi}:${hi}`] === gs.turn) continue;
+    return true; // a usable Kazena whose effect hasn't fired this turn
+  }
+  return false;
+}
+
 function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
   const cardDB = engine._getCardDB();
   const cd = cardDB[cardName];
@@ -5477,6 +5706,19 @@ function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
       return hand.includes('Cosmic Manipulation');
     })();
     if (partnerInHand) base += 25;
+  }
+  // ── Kazena draw-engine override ──────────────────────────────────
+  // If Kazena's "draw until 7" is still available + usable for `pi`
+  // this turn, a held card is a WASTED Kazena draw. Flip the inherent
+  // value of generic hand cards NEGATIVE so the evaluator pushes the
+  // CPU to empty its hand (play cards, trade them for gold via
+  // Treasure Chest / Play Money, …) before activating her — she then
+  // refills to 7 fresh cards. The `< 50` guard means cards already
+  // floored as genuinely critical (ascension pieces ≥60, Cardinal
+  // Beasts ≥100) keep their high value — we never want to pitch those
+  // to a random redraw, only the generic chaff the user wants dumped.
+  if (base < 50 && kazenaDrawAvailable(engine, pi)) {
+    base = -10;
   }
   if (seenCount >= 1) base *= 0.5;
   return base;
@@ -5891,6 +6133,40 @@ function evaluateState(engine, cpuIdx) {
   // Phase, and that's what eval is projecting toward).
   for (const h of (ps.heroes || [])) if (isDeadForEval(h)) score -= 500;
   for (const h of (opp.heroes || [])) if (isDeadForEval(h)) score += 500;
+
+  // ── Recurring symmetric Area payoff correction ───────────────────
+  // Areas like Blood Rock deal `D` damage at the END of EVERY turn to
+  // all Heroes the *turn player* controls. The rollout plays this turn
+  // through End Phase but deliberately stops before the opponent's
+  // turn, so it APPLIES the placer's own first self-tick (real HP loss,
+  // counted in the ownHp / dead terms above) but NEVER simulates the
+  // matching tick the Area deals to the OTHER side on their turn —
+  // making such Areas (and the Cooldin tutor that fetches them) look
+  // purely self-harmful and never get played. A card opts in with:
+  //   cpuMeta: { recurringSymmetricAreaDamage: <D> }
+  // We credit exactly ONE projected opponent-side tick per such Area
+  // (symmetric to the single self-tick the rollout did count — bounded,
+  // not extrapolated over many uncertain future turns) so the play is
+  // valued on its true net symmetry, not the rollout's half view.
+  for (const inst of (engine.cardInstances || [])) {
+    if (!inst || inst.zone !== 'area') continue;
+    let aScript = null;
+    try { aScript = loadCardEffect(inst.name); } catch { aScript = null; }
+    const D = aScript?.cpuMeta?.recurringSymmetricAreaDamage;
+    if (typeof D !== 'number' || D <= 0) continue;
+    const ctrl = inst.controller ?? inst.owner;
+    if (ctrl == null || ctrl < 0) continue;
+    const victimIdx = ctrl === 0 ? 1 : 0;        // the Area's controller's opponent
+    const victims = gs.players[victimIdx];
+    let projected = 0;
+    for (const h of (victims?.heroes || [])) if (isAliveForEval(h)) projected += D;
+    if (projected === 0) continue;
+    // HP-equivalent weight 1.0 — same scale as the ownHp/oppWeightedHp
+    // term that already booked the placer's own tick, so the two
+    // halves cancel to the Area's true net value.
+    if (ctrl === cpuIdx) score += projected;
+    else score -= projected;
+  }
 
   // ── Support zone occupancy (creatures + equips) ──────────────────
   // Per-zone base value is +30. Each card's own death may have
@@ -7290,6 +7566,16 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   try {
 
   const cpuIdx = engine._cpuPlayerIdx;
+  // Keep the live server responsive across this gate's rollout
+  // sequence. mctsGatedActivation runs a skip-baseline rollout + a
+  // recon rollout + one rest-of-turn rollout PER gallery variation;
+  // for `evaluateThroughTurnEnd` cards with a big gallery (Magnetic
+  // Glove = every distinct deck card) that is many seconds of fast-
+  // mode (microtask-only) work that would otherwise never let Node
+  // service a surrender / refresh. Yield here and at each rollout
+  // boundary below (gs is the real, non-snapshot state at all these
+  // points). Bounds are unchanged — cpuPastDeadline still caps it.
+  await maybeYieldEventLoop(engine);
   // ── Skip baseline ──
   // Default: immediate-state score with the activation NOT played.
   // When `evaluateThroughTurnEnd` is on, the recon below ALSO plays
@@ -7330,6 +7616,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   }
 
   // ── Recon rollout ──
+  await maybeYieldEventLoop(engine); // keep server responsive (see note above)
   const snap = engine.snapshot();
   const prevInSim = engine._inMctsSim;
   const prevRolloutStartT = engine._mctsRolloutStartT;
@@ -7376,6 +7663,11 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   if (extras.length > 0) {
     for (const variation of variations) {
       if (variation.plan === null) continue;
+      // A surrender / disconnect serviced during a yield, or the
+      // turn/rollout deadline, must stop the gate promptly instead of
+      // grinding every remaining variation's rest-of-turn rollout.
+      if (engine.gs?.result || engine._mctsKilledThisTurn || cpuPastDeadline(engine)) break;
+      await maybeYieldEventLoop(engine); // keep server responsive (see note above)
       const snap2 = engine.snapshot();
       const prevInSim2 = engine._inMctsSim;
       const prevRolloutStartT2 = engine._mctsRolloutStartT;
@@ -7604,6 +7896,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
       break;
     }
     if (engine._mctsKilledThisTurn) break;
+    await maybeYieldEventLoop(engine); // keep server responsive to surrender/refresh
     gcBetweenCandidates();
     const recon = await mctsRunOneRollout(engine, helpers, candidate, { record: true });
     totalRollouts++;
@@ -7639,6 +7932,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
       break;
     }
     if (engine._mctsKilledThisTurn) break;
+    await maybeYieldEventLoop(engine); // keep server responsive to surrender/refresh
     const r = await mctsRunOneRollout(engine, helpers, arm.candidate, { plan: arm.variation.plan });
     totalRollouts++;
     if (r.completed) {
@@ -7670,6 +7964,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
       if (ucb > bestUCB) { bestUCB = ucb; bestArm = arm; }
     }
     if (!bestArm) break;
+    await maybeYieldEventLoop(engine); // keep server responsive to surrender/refresh
     const r = await mctsRunOneRollout(engine, helpers, bestArm.candidate, { plan: bestArm.variation.plan });
     totalRollouts++;
     if (r.completed) {
@@ -7714,6 +8009,7 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
     // down fastest. Ties on visits → first one (deterministic).
     cluster.sort((a, b) => a.visits - b.visits);
     const target = cluster[0];
+    await maybeYieldEventLoop(engine); // keep server responsive to surrender/refresh
     const r = await mctsRunOneRollout(engine, helpers, target.candidate, { plan: target.variation.plan });
     totalRollouts++;
     extensionPulls++;

@@ -57,6 +57,59 @@ function _eligibleArtifactIndices(ps, cardDB, resolvingHandIdx) {
 module.exports = {
   activeIn: ['hand'],
 
+  // CPU brain hints. Play Money's payoff is indirect: it makes ANOTHER
+  // Artifact cost 0 (saves up to COST_REDUCTION gold), which only shows
+  // up when that discounted Artifact is actually played. The immediate-
+  // state gate can't see that (estimateHandCardValueFor reads the card's
+  // base cost, not _handCostReductions), so evaluate the rest of the
+  // turn — the rollout plays the now-cheaper Artifact and the saved gold
+  // / extra play surfaces in the eval. Modest gate threshold: it costs 4
+  // gold + a hand card, so demand a clear net benefit.
+  cpuMeta: { evaluateThroughTurnEnd: true, activationGateThreshold: 5 },
+
+  // Only bother if there's a DIFFERENT Artifact worth discounting — a
+  // big-cost target makes the saving (and the spent card + 4 gold)
+  // worthwhile. A 2nd Play Money copy (cost 4) is not a worthwhile
+  // target, so exclude the card's own name from the check.
+  cpuShouldPlay(engine, pi) {
+    const ps = engine.gs.players?.[pi];
+    if (!ps) return false;
+    const cardDB = engine._getCardDB();
+    let best = 0;
+    for (const name of (ps.hand || [])) {
+      if (name === CARD_NAME) continue;
+      const cd = cardDB[name];
+      if (!cd || cd.cardType !== 'Artifact') continue;
+      const c = cd.cost || 0;
+      if (c > best) best = c;
+    }
+    return best >= 8;
+  },
+
+  // Target selection for the CPU: pick the eligible Artifact that saves
+  // the MOST gold (the reduction floors at 0, so saving = min(cost,
+  // COST_REDUCTION)). Without this the generic brain picks a RANDOM
+  // eligible hand card and the discount lands on something trivial.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type !== 'pickHandCard') return undefined;
+    if (promptData?.title !== CARD_NAME) return undefined;
+    const pi = engine._cpuPlayerIdx;
+    const ps = engine.gs.players?.[pi];
+    if (!ps?.hand?.length) return undefined;
+    const eligible = promptData.eligibleIndices || [];
+    if (!eligible.length) return undefined;
+    const cardDB = engine._getCardDB();
+    let bestIdx = -1, bestSave = -1;
+    for (const i of eligible) {
+      const cd = cardDB[ps.hand[i]];
+      const save = Math.min(cd?.cost || 0, COST_REDUCTION);
+      if (save > bestSave) { bestSave = save; bestIdx = i; }
+    }
+    if (bestIdx < 0) return undefined;
+    return { cardName: ps.hand[bestIdx], handIndex: bestIdx };
+  },
+
   canActivate(gs, pi) {
     const ps = gs.players[pi];
     if (!ps) return false;

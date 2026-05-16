@@ -3857,6 +3857,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     }
 
     if (attachmentZoneSlot != null && attachmentZoneSlot >= 0) gs._attachmentZoneSlot = attachmentZoneSlot;
+    // For a live CPU cast: stream the card to centre BEFORE its effect
+    // resolves (no-op for humans / PvP / MCTS sim). Idempotent — the
+    // post-resolution _firePendingCardReveal below then no-ops.
+    room.engine.maybeFireCpuRevealEarly();
     await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
     delete gs._attachmentZoneSlot;
     await room.engine._flushSurpriseDrawChecks();
@@ -4722,6 +4726,16 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
     gs._pendingCardReveal = { cardName: abilityName, ownerIdx: pi };
     room.engine._setPendingPlayLog('ability_activated', { player: gs.players[pi].username, card: abilityName, hero: hero.name, level });
 
+    // Live CPU: stream the Ability AND play its activation flash BEFORE
+    // its effect resolves (Trade/Leadership were resolving first, then
+    // flashing). Humans/PvP/sim are unchanged — maybeFireCpuRevealEarly
+    // returns false for them, so the flash + reveal stay deferred to
+    // post-resolution (so a cancelled activation isn't shown early).
+    const _cpuEarlyAnnounced = room.engine.maybeFireCpuRevealEarly();
+    if (_cpuEarlyAnnounced && !script.noDefaultFlash) {
+      room.engine._broadcastEvent('ability_activated', { owner: heroOwner, heroIdx, zoneIdx });
+    }
+
     const ctx = room.engine._createContext(inst, {});
     const resolved = await script.onFreeActivate(ctx, level);
     await room.engine._flushSurpriseDrawChecks();
@@ -4742,7 +4756,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
       hoptReserved = false;
       if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
       else room.engine._firePendingPlayLog();
-      if (!script.noDefaultFlash) {
+      if (!_cpuEarlyAnnounced && !script.noDefaultFlash) {
         room.engine._broadcastEvent('ability_activated', { owner: heroOwner, heroIdx, zoneIdx });
       }
       // Force-end-of-turn rider — Premonition sets this on its
@@ -5337,6 +5351,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
       inst.heroOwner = pi;
     }
 
+    // Live CPU: announce the ability before its effect resolves
+    // (no-op for humans / PvP / MCTS sim; idempotent below).
+    room.engine.maybeFireCpuRevealEarly();
     const ctx = room.engine._createContext(inst, {});
     const result = await script.onActivate(ctx, level);
 
@@ -5716,6 +5733,9 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     }
 
     gs._pendingCardReveal = { cardName: chosen.name, ownerIdx: pi };
+    // Live CPU: stream the Hero card before its effect resolves
+    // (no-op for humans / PvP / MCTS sim; idempotent below).
+    room.engine.maybeFireCpuRevealEarly();
     const ctx = room.engine._createContext(chosen.inst, {});
     const resolved = await chosen.script.onHeroEffect(ctx);
     await room.engine._flushSurpriseDrawChecks();
@@ -5882,6 +5902,9 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
 
   try {
     gs._pendingCardReveal = { cardName, ownerIdx: pi };
+    // Live CPU: stream the equip before its effect resolves
+    // (no-op for humans / PvP / MCTS sim; idempotent below).
+    room.engine.maybeFireCpuRevealEarly();
     const ctx = room.engine._createContext(inst, {});
     const resolved = await script.onEquipEffect(ctx);
     if (resolved !== false) {
@@ -5999,6 +6022,10 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     sendToSpectators(room, 'potion_resolved', { destroyedIds: selectedIds, animationType });
   } : null;
 
+  // Live CPU: for deferReveal cards, stream the card before its effect
+  // resolves (no-op for humans / PvP / MCTS sim and for the immediate-
+  // broadcast else-branch above which set no pending reveal).
+  room.engine.maybeFireCpuRevealEarly();
   let chainResult;
   try {
     chainResult = await room.engine.executeCardWithChain({
@@ -6470,6 +6497,10 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
       gs._pendingCardReveal = { cardName, ownerIdx: pi };
     }
     room.engine._setPendingPlayLog('card_played', { player: ps.username, card: cardName, cardType: 'Artifact', cost: cost || 0 });
+
+    // Live CPU: stream the Artifact before its effect resolves
+    // (no-op for humans / PvP / MCTS sim; idempotent below).
+    room.engine.maybeFireCpuRevealEarly();
 
     if (ps.itemLocked && (ps.hand || []).length > 0) {
       if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
@@ -10034,46 +10065,89 @@ io.on('connection', (socket) => {
         try { return shouldMulliganStartingHand(room.engine, 1); }
         catch (err) { console.error('[CPU mulligan] check threw:', err.message); return false; }
       })();
-      room.gameState.mulliganDecisions[1] = mull;
-      if (mull) {
-        // Apply the swap synchronously — no animation needed since the CPU's
-        // opening hand isn't visible to the human.
-        const ps = room.gameState.players[1];
-        const cardDB = getCardDB();
-        const handSize = ps.hand.length;
-        let potionCount = 0;
-        for (const card of ps.hand) {
-          const cd = cardDB[card];
-          if (cd?.cardType === 'Potion') {
-            ps.potionDeck.push(card);
-            potionCount++;
-          } else {
-            ps.mainDeck.push(card);
+
+      // Show the mulligan prompt to the human immediately (their own
+      // hand + the CPU as opponent). The CPU's swap is then ANIMATED in
+      // the background — cards fly back to the deck, then new ones are
+      // drawn — exactly like a human opponent's mulligan, instead of
+      // the old instant synchronous swap.
+      for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+
+      // Race-free start: we deliberately do NOT set mulliganDecisions[1]
+      // until the animation finishes, so the human's mulligan_decision
+      // handler can't fire startGame() while the CPU hand is mid-swap.
+      // Whichever side finishes last triggers the start (mirrors the
+      // human handler's checkBothReady, incl. its single-fire guard).
+      const maybeStartAfterCpuMulligan = () => {
+        const gs = room.gameState;
+        if (!gs || !gs.mulliganDecisions) return; // already started, or aborted
+        if (gs.mulliganDecisions[0] === null || gs.mulliganDecisions[1] === null) return;
+        console.log(`[SP trace] mulligan both decided — activePlayer=${gs.activePlayer}, calling engine.startGame()`);
+        gs.mulliganPending = false;
+        delete gs.mulliganDecisions;
+        for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+        room.engine.startGame()
+          .then(() => console.log('[SP trace] engine.startGame() resolved'))
+          .catch(err => console.error('[Engine] startGame error:', err.message));
+      };
+
+      (async () => {
+        try {
+          if (mull) {
+            const ps = room.gameState.players[1];
+            const cardDB = getCardDB();
+            const handSize = ps.hand.length;
+            let potionCount = 0;
+            const shuffleArr = (arr) => {
+              for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+              }
+            };
+            // Return cards to deck one-by-one (reverse-draw animation),
+            // broadcasting per card with the same cadence as the human
+            // mulligan handler so the client's opponent-mulligan
+            // animation triggers identically.
+            for (let i = 0; i < handSize; i++) {
+              if (!room.gameState) return;
+              const card = ps.hand.shift();
+              const cd = cardDB[card];
+              if (cd?.cardType === 'Potion') { ps.potionDeck.push(card); potionCount++; }
+              else { ps.mainDeck.push(card); }
+              for (let p = 0; p < 2; p++) sendGameState(room, p); sendSpectatorGameState(room);
+              await new Promise(r => setTimeout(r, 180));
+            }
+            await new Promise(r => setTimeout(r, 1000));
+            shuffleArr(ps.mainDeck);
+            shuffleArr(ps.potionDeck);
+            const mainToDraw = handSize - potionCount;
+            for (let i = 0; i < mainToDraw; i++) {
+              if (!room.gameState || ps.mainDeck.length === 0) break;
+              ps.hand.push(ps.mainDeck.shift());
+              for (let p = 0; p < 2; p++) sendGameState(room, p); sendSpectatorGameState(room);
+              await new Promise(r => setTimeout(r, 200));
+            }
+            for (let i = 0; i < potionCount; i++) {
+              if (!room.gameState || ps.potionDeck.length === 0) break;
+              ps.hand.push(ps.potionDeck.shift());
+              for (let p = 0; p < 2; p++) sendGameState(room, p); sendSpectatorGameState(room);
+              await new Promise(r => setTimeout(r, 200));
+            }
+            console.log(`[SP trace] CPU mulligan accepted — new hand size=${ps.hand.length}`);
           }
-        }
-        ps.hand.length = 0;
-        const shuffleArr = (arr) => {
-          for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
+        } catch (err) {
+          console.error('[CPU mulligan] animation threw:', err.message);
+        } finally {
+          if (room.gameState?.mulliganDecisions) {
+            room.gameState.mulliganDecisions[1] = mull;
+            console.log(`[SP trace] CPU mulligan decided — decisions=${JSON.stringify(room.gameState.mulliganDecisions)}`);
           }
-        };
-        shuffleArr(ps.mainDeck);
-        shuffleArr(ps.potionDeck);
-        const mainToDraw = handSize - potionCount;
-        for (let i = 0; i < mainToDraw; i++) {
-          if (ps.mainDeck.length === 0) break;
-          ps.hand.push(ps.mainDeck.shift());
+          maybeStartAfterCpuMulligan();
         }
-        for (let i = 0; i < potionCount; i++) {
-          if (ps.potionDeck.length === 0) break;
-          ps.hand.push(ps.potionDeck.shift());
-        }
-        console.log(`[SP trace] CPU mulligan accepted — new hand size=${ps.hand.length}`);
-      }
+      })();
+    } else {
+      for (let i = 0; i < 2; i++) sendGameState(room, i);
     }
-    console.log(`[SP trace] CPU mulligan decided — decisions=${JSON.stringify(room.gameState.mulliganDecisions)}`);
-    for (let i = 0; i < 2; i++) sendGameState(room, i);
   }
 
   // Debug: snapshot → mutate heavily → restore → compare. Verifies the

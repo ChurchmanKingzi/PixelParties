@@ -27,4 +27,12 @@
 module.exports = {
   isEquip: true,
   activeIn: ['support'],
+
+  // CPU: Diver Helmet is a binary ON/OFF protection toggle, not a
+  // stackable stat stick. `protectiveToggleEquip` tells the CPU equip
+  // planner (pickHeroForEquip in _cpu.js) to (a) never put a 2nd one on
+  // an already-protected Hero, (b) skip playing it entirely when every
+  // eligible Hero is already protected, and (c) otherwise send it to
+  // the most valuable Hero by the engine's own MCTS hero-value criteria.
+  cpuMeta: { protectiveToggleEquip: true },
 };

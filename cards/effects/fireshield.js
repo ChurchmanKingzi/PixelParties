@@ -5,53 +5,42 @@
 //  Attack/Spell/Creature effect and survives,
 //  deal half damage back as recoil (full at
 //  Destruction Magic Lv3).
+//
+//  Recoil routing: a Creature attacker takes the
+//  recoil ITSELF (not its host Hero); a Hero
+//  attacker (Spell/Attack) takes it on the Hero.
+//  Source→creature resolution is the shared
+//  `_hooks` helper (same one Booby Trap uses) so
+//  the routing never diverges between cards.
 // ═══════════════════════════════════════════
+
+const { resolveSourceCreature, isCreatureSource } = require('./_hooks');
 
 module.exports = {
   isAfterDamageReaction: true,
 
   /**
-   * Only triggers for Attack/Spell/Creature damage types (not artifacts, potions, poison, etc.)
-   * The source must have a valid hero or creature attacker to receive recoil.
+   * Triggers on opponent combat damage (Attack/Spell/Creature effect)
+   * when there's a valid recoil target left alive: the attacking
+   * Creature itself, or — for Hero-cast Spells/Attacks — the Hero.
    */
   afterDamageCondition(gs, pi, engine, target, targetHeroIdx, source, amount, type) {
-    // Must be combat-related damage (from attacks, spells, creature effects)
-    // Exclude: poison, burn, status, artifact, potion, trap, other
-    const validTypes = ['normal', 'destruction_spell', 'attack', 'creature_effect'];
-    // Also accept undefined/null type as normal combat
-    const effectiveType = type || 'normal';
-    // Be permissive: allow anything that comes from a hero or creature source
     if (source?.owner == null || source.owner < 0) return false;
     if (source.owner === pi) return false; // Only opponent damage
-
-    // Source must be a hero (spell/attack) or creature
     const srcPs = gs.players[source.owner];
     if (!srcPs) return false;
 
-    const srcHeroIdx = source.heroIdx ?? -1;
-    if (srcHeroIdx < 0) return false;
-
-    // Detect creature source. Creature-effect callers pass a wrapper
-    // object `{ name, owner, heroIdx, cardInstance }` — no `zone` field
-    // — so checking only `source.zone === 'support'` (the legacy direct-
-    // instance shape) misses the standard wrapper case and the recoil
-    // wrongly falls through to the hero branch. Honour both shapes.
-    const srcInst = source.cardInstance
-      || (source.zone === 'support' ? source : null);
-    if (srcInst) {
-      // Look up the live instance — `source.cardInstance` may be a
-      // stale snapshot if the creature has moved/died since the
-      // damage was queued.
-      const liveInst = engine.cardInstances.find(c => c.id === srcInst.id);
-      if (!liveInst || liveInst.zone !== 'support') return false;
-      const creatureHp = liveInst.counters?.currentHp ?? engine._getCardDB()[liveInst.name]?.hp ?? 0;
-      return creatureHp > 0;
+    if (isCreatureSource(engine, source)) {
+      // Creature attacker — only if its live instance is still on the
+      // board to receive the recoil.
+      return !!resolveSourceCreature(engine, source);
     }
 
-    // Hero source: check hero is alive (to receive recoil)
+    // Hero source (Spell / Attack): need a living attacker Hero.
+    const srcHeroIdx = source.heroIdx ?? -1;
+    if (srcHeroIdx < 0) return false;
     const srcHero = srcPs.heroes?.[srcHeroIdx];
     if (!srcHero || srcHero.hp <= 0) return false;
-
     return true;
   },
 
@@ -77,36 +66,26 @@ module.exports = {
     engine._broadcastEvent('fireshield_corona', { owner: pi, heroIdx: targetHeroIdx });
     await engine._delay(600);
 
-    // Determine recoil target: creature source → hit the creature;
-    // hero source → hit the hero. Same detection logic as
-    // `afterDamageCondition` above — honour both the
-    // `{ ..., cardInstance }` wrapper passed by every creature script
-    // and the legacy direct-instance shape.
-    const srcOwner = source.owner;
-    const srcHeroIdx = source.heroIdx;
-    const srcInstHint = source.cardInstance
-      || (source.zone === 'support' ? source : null);
-
-    if (srcInstHint) {
-      // Creature source — deal recoil to the creature itself, NOT to
-      // its host hero. Look up the live inst by id so a stale snapshot
-      // never lands the recoil on the wrong target.
-      const srcInst = engine.cardInstances.find(c => c.id === srcInstHint.id) || srcInstHint;
-      const creatureHp = srcInst.counters?.currentHp ?? engine._getCardDB()[srcInst.name]?.hp ?? 0;
-      if (srcInst.zone === 'support' && creatureHp > 0) {
+    if (isCreatureSource(engine, source)) {
+      // Creature attacker — recoil hits the CREATURE itself, never its
+      // host Hero. (No live creature → attacker already gone, no
+      // recoil; condition normally prevents reaching here.)
+      const rc = resolveSourceCreature(engine, source);
+      if (rc) {
         await engine.actionDealCreatureDamage(
           { name: 'Fireshield', owner: pi, heroIdx: targetHeroIdx },
-          srcInst, recoil, 'other',
+          rc, recoil, 'other',
           { sourceOwner: pi, canBeNegated: false },
         );
       }
       engine.log('fireshield_recoil', {
         player: ps.username, hero: target.name,
-        attacker: srcInst.name || '?', recoil, fullDamage: dmLevel >= 3,
+        attacker: rc?.name || source?.name || '?',
+        recoil, fullDamage: dmLevel >= 3, vsCreature: true,
       });
     } else {
-      // Hero source — deal recoil to the attacker's hero
-      const srcHero = gs.players[srcOwner]?.heroes?.[srcHeroIdx];
+      // Hero source — recoil the attacking Hero.
+      const srcHero = gs.players[source.owner]?.heroes?.[source.heroIdx];
       if (srcHero && srcHero.hp > 0) {
         await engine.actionDealDamage(
           { name: 'Fireshield', owner: pi, heroIdx: targetHeroIdx },

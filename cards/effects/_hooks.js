@@ -348,10 +348,99 @@ function isCreatureNegated(inst) {
   return !!(c?.negated || c?.nulled);
 }
 
+/**
+ * Resolve the live Creature CardInstance that a damage SOURCE
+ * represents, or `null` when the source is a Hero (Spell/Attack) or no
+ * matching live creature is on the board.
+ *
+ * Single source of truth for "retaliation/recoil should hit the
+ * attacking Creature itself, not its host Hero" — shared by Fireshield,
+ * Booby Trap, and any future retaliation card so the routing never
+ * diverges again. Handles EVERY source shape the damage / surprise
+ * pipelines produce:
+ *   • a real CardInstance (legacy direct shape — has `.zone` / `.id`),
+ *   • the `{ ..., cardInstance }` wrapper (creature-effect scripts and
+ *     the engine surprise-window `sourceInfo`),
+ *   • the MINIMAL `{ name, owner, heroIdx }` wrapper many generic
+ *     creature-damage helpers pass (NO `.zone`, NO `.cardInstance`).
+ * Card names are unique → exactly one card type, so the card DB tells
+ * us whether `source.name` is a Creature; we then locate its live
+ * support-zone instance (re-resolved by id so a stale snapshot never
+ * lands the hit on the wrong target).
+ */
+function resolveSourceCreature(engine, source) {
+  if (!source || !engine) return null;
+  const cardDB = engine._getCardDB();
+  const aliveSupport = (inst) => {
+    if (!inst || inst.zone !== 'support') return null;
+    const hp = inst.counters?.currentHp ?? cardDB[inst.name]?.hp ?? 0;
+    return hp > 0 ? inst : null;
+  };
+
+  // AUTHORITATIVE type check. Card names are unique → exactly one card
+  // type, so if we can name the source and it is NOT a Creature it's a
+  // Hero-cast Spell/Attack (whose `cardInstance` is the SPELL's inst —
+  // present but not a creature). Only the support-zone-hint fallback
+  // applies when the name has no DB entry (rare tokens).
+  const name = source.cardInstance?.name || source.name;
+  const cd = name ? cardDB[name] : null;
+  const looksCreature = cd
+    ? hasCardType(cd, 'Creature')
+    : (source.zone === 'support' || source.cardInstance?.zone === 'support');
+  if (!looksCreature) return null;
+
+  // 1. Resolve the live instance by id (cardInstance hint, or a direct
+  //    support-zone instance) — re-resolved so a stale snapshot can't
+  //    land the hit on a wrong/old target. Fall through on a miss: the
+  //    id may be stale; a name match below still finds the live one.
+  const hint = source.cardInstance
+    || (source.zone === 'support' && source.id != null ? source : null);
+  if (hint?.id != null) {
+    const byId = engine.cardInstances.find(c => c.id === hint.id);
+    const live = aliveSupport(byId)
+      || (hint.zone === 'support' ? aliveSupport(hint) : null);
+    if (live) return live;
+  }
+
+  // 2. Locate by name + owner + (host hero) among live support cards.
+  const owner = source.owner ?? source.cardInstance?.owner;
+  const hi = source.heroIdx ?? source.cardInstance?.heroIdx;
+  for (const c of engine.cardInstances) {
+    if (c.zone !== 'support' || c.name !== name) continue;
+    if (owner != null && (c.controller ?? c.owner) !== owner) continue;
+    if (hi != null && hi >= 0 && c.heroIdx !== hi) continue;
+    const alive = aliveSupport(c);
+    if (alive) return alive;
+  }
+  return null;
+}
+
+/**
+ * True when a damage SOURCE originated from a Creature (any shape).
+ * Pairs with `resolveSourceCreature`: a creature source whose instance
+ * is already gone (`isCreatureSource` true, `resolveSourceCreature`
+ * null) means "the attacking Creature is no longer a valid target" —
+ * NOT "fall back to hitting a Hero".
+ */
+function isCreatureSource(engine, source) {
+  if (!source) return false;
+  // Type the source by its card name (unique → one card type). A
+  // Hero-cast Spell/Attack carries a `cardInstance` too (the spell's
+  // inst), so presence of `cardInstance` alone must NOT count as a
+  // creature — only a Creature-typed name does.
+  const name = source.cardInstance?.name || source.name;
+  const cd = (name && engine) ? engine._getCardDB()[name] : null;
+  if (cd) return hasCardType(cd, 'Creature');
+  // Unknown name (rare token / no DB entry): a support-zone hint is
+  // the only remaining creature signal.
+  return source.zone === 'support' || source.cardInstance?.zone === 'support';
+}
+
 module.exports = {
   SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES,
   STATUS_EFFECTS, getNegativeStatuses, getCleansableStatuses,
   getParalysisStatuses, getTargetingBlockingStatuses, getStatusDamageSourceNames, BUFF_EFFECTS,
   hasCardType, isArtifactCreature, hasNumericCreatureLevel, isCreatureNegated,
+  resolveSourceCreature, isCreatureSource,
   POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,
 };

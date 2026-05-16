@@ -19466,7 +19466,7 @@
     "hp": null,
     "atk": null,
     "cost": 4,
-    "effect": "Equip this card to a Hero you control. You may once per turn move a Creature in one of the equipped Hero's Support Zones into the free Support Zone of an adjacent Hero.",
+    "effect": "Equip this card to a Hero you control. You may once per turn move a Creature in one of the equipped Hero's Support Zones into the free Support Zone of an adjacent Hero. A Creature can only be moved by the effect of \"Slippery Skates\" once per turn.",
     "archetype": "Slippery",
     "setID": "PP MBS1",
     "banned": "",
