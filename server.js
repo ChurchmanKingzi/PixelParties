@@ -2050,6 +2050,22 @@ function sendGameState(room, playerIdx, extra) {
         const s = loadCardEffect(cn);
         if (s?.customPlacement) names.add(cn);
       }
+      // Effect-driven attach prompts (Pressed Skill, Alex's deck
+      // tutor, …) can attach an Ability pulled from deck / discard —
+      // i.e. NOT in hand — so the hand scan above misses its
+      // customPlacement flag. Without this the client treats
+      // Performance as a normal Ability and (wrongly) offers empty
+      // ability zones; Performance must ONLY stack onto an existing
+      // Lv1/2 Ability. Fold in the active abilityAttachTarget
+      // prompt's card for this player. Generic — no card-name
+      // hardcode; any future customPlacement Ability is covered.
+      const ep = gs.effectPrompt;
+      if (ep && ep.type === 'abilityAttachTarget'
+          && ep.ownerIdx === playerIdx && ep.cardName
+          && !names.has(ep.cardName)) {
+        const eps = loadCardEffect(ep.cardName);
+        if (eps?.customPlacement) names.add(ep.cardName);
+      }
       return [...names];
     })(),
     // Cards whose script declares `usesCustomHostPick: true` — the

@@ -24,6 +24,7 @@ module.exports = {
         side: 'enemy',
         types: ['hero'],
         damageType: null,
+        dealsDamage: false, // control only — no damage; don't wake damage-mitigation Reactions (Spectral Armor)
         title: 'Controlled Attack',
         description: 'Choose an opponent\'s Hero to control its Abilities and active effect this turn.',
         confirmLabel: '🔮 Control!',

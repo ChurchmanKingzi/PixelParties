@@ -175,7 +175,17 @@
       "Bash(grep -rn \"actionDealDamage\\(\\\\s*{\\\\|owner:.*heroIdx:.*}\\\\s*,.*amount\\\\|{ name:.*owner:.*heroIdx:.*}\\\\|creature.*attack.*hero\\\\|attackHero\\\\|_resolveCreatureAttack\\\\|creatureAttacksHero\" cards/effects/_engine.js cards/effects/_creature-shared.js cards/effects/_arrows-shared.js)",
       "Bash(Select-Object -First 20 FullName)",
       "Bash(grep -n \"message:.*Activate\\\\|message:\\\\s*\\\\`\\\\|message: \\(\\) =>\" \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\cards\\\\effects\\\\_engine.js\")",
-      "Bash(grep -n \"is about to be \\\\${statusLabel}\\\\|_checkSurpriseOnStatus\\\\|async _checkSurpriseOnStatus\\\\|surpriseStatusTrigger\" cards/effects/_engine.js)"
+      "Bash(grep -n \"is about to be \\\\${statusLabel}\\\\|_checkSurpriseOnStatus\\\\|async _checkSurpriseOnStatus\\\\|surpriseStatusTrigger\" cards/effects/_engine.js)",
+      "Bash(grep -iv \"//\")",
+      "Bash(read f *)",
+      "Bash(grep -n \"async executeCardWithChain\\\\|executeCardWithChain\\(.*{$\\\\|resolveResult\\\\|config.resolve\\\\|\\\\.resolve\\(\\)\\\\|negated.*resolve\\\\|if \\(.*negated\\)\" _engine.js)",
+      "Bash(grep -n \"PressedSkillRainEffect\\\\|pressed_skill_rain:\\\\|  }\\)\\(\\),\\\\$\\\\|explosion: ExplosionEffect,\" app-board.jsx)",
+      "Bash(grep -A1 '\"name\": \"__TRACKED_VAR__\"' data/cards.json)",
+      "Bash(sed -n '1,60p' timeless-king-zi.js)",
+      "Bash(sed -n '170,300p' timeless-king-zi.js)",
+      "Read(//c/Users/kingz/.claude/projects/C--Pixel-Parties-WEB-PixelPartiesWeb/memory/**)",
+      "Bash(cat project_reusable_card_patterns.md project_cpu_mcts_prompt_contracts.md)",
+      "Bash(grep -n \"sendToDiscard\\\\|discardByName\\\\|removeAllCopies\\\\|allCopiesToDiscard\\\\|actionDiscardSpecific\\\\|discardSpecific\\\\|sendCardsToPile\\\\|millSpecific\\\\|banishAllCopies\\\\|async actionMillCards\\\\|deck_to_discard_animation', {\" _engine.js)"
     ]
   }
 }

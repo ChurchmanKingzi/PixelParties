@@ -62,7 +62,8 @@ module.exports = {
       const target = await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
-        damageType: null,
+        damageType: 'status',
+        dealsDamage: false, // Freeze only — no damage; don't wake damage-mitigation Reactions (Spectral Armor)
         title: 'Cold Coffin',
         description: 'Freeze a target. Heroes: Frozen for 3 turns. Creatures: Frozen permanently (cannot be thawed).',
         confirmLabel: '❄️ Entomb!',

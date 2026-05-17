@@ -72,7 +72,8 @@ module.exports = {
     const target = await ctx.promptDamageTarget({
       side: 'any',
       types: ['hero', 'creature'],
-      damageType: null,
+      damageType: 'status',
+      dealsDamage: false, // Burn only — no damage; don't wake damage-mitigation Reactions (Spectral Armor)
       title: CARD_NAME,
       description: 'Choose an unburned target to Burn permanently.',
       confirmLabel: '🔥 Burn!',

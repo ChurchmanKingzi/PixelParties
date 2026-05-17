@@ -73,7 +73,8 @@ module.exports = {
     const target = await ctx.promptDamageTarget({
       side: 'any',
       types: ['hero', 'creature'],
-      damageType: null,
+      damageType: 'status',
+      dealsDamage: false, // Poison only — no damage; don't wake damage-mitigation Reactions (Spectral Armor)
       title: CARD_NAME,
       description: 'Choose a target to inflict 1 Poison Stack.',
       confirmLabel: '☠️ Poison! (+1 Stack)',

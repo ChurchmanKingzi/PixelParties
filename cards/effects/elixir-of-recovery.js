@@ -36,8 +36,9 @@ function getTargetStatuses(target, engine) {
       c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
     );
     if (!inst) return [];
-    return getCleansableStatuses()
-      .filter(k => inst.counters[k])
+    // Instance-aware: also includes per-instance-cleansable negation
+    // (Unwanted Audience) on top of the global cleansable set.
+    return engine.getCleansableCreatureStatusKeys(inst)
       .map(k => ({ key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon }));
   }
   return [];
@@ -68,7 +69,9 @@ function getOwnTargetsWithStatuses(gs, pi, engine) {
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
     if (!inst.counters) continue;
-    if (!negKeys.some(k => inst.counters[k])) continue;
+    // Instance-aware: also includes per-instance-cleansable negation
+    // (Unwanted Audience) on top of the global cleansable set.
+    if (engine.getCleansableCreatureStatusKeys(inst).length === 0) continue;
     targets.push({
       id: `equip-${pi}-${inst.heroIdx}-${inst.zoneSlot}`,
       type: 'equip',

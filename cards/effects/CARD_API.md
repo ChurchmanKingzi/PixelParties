@@ -860,3 +860,67 @@ if (hi >= 0 && heroHasDiverHelmet(engine, ownerIdx, hi)) return;
 Engine-level Area rules delegate via `this._isDiverHelmetProtectedTarget(target)`
 (accepts a Hero object OR a support-zone CardInstance) — see the
 Stinky Stables poison-heal-lock sites in `_engine.js` for the pattern.
+
+---
+
+### Removing a *chosen* board card to a pile — anchor the flight by ZONE, not name (MANDATORY)
+
+> **The bug:** the client's diff-based board→discard/deleted fly-out
+> animator (`animsFromBoard` / `captureBoardRects` in `app-board.jsx`)
+> resolves the flight's **source by card NAME** and takes the *first*
+> captured rect. With duplicate-named cards on the board (same Creature
+> in two Support slots, same Ability on two Heroes, a `?` for multiple
+> face-down opp Surprises, …) it animates from the **left-most** one —
+> the wrong slot.
+
+Any card/effect that lets a player **pick a specific board card and
+move it off the board** (destroy → discard/deleted, bounce → deck,
+steal → hand, etc.) **must broadcast an explicit zone-anchored
+`play_pile_transfer` for that exact instance BEFORE the move** (so the
+source slot is still rendered). `actionMoveCard` only auto-emits this
+for support→hand and area→discard — a generic fix there is unsafe
+because cards that own a custom corpse flight (Brackle's catapult)
+would double-animate.
+
+```js
+// BEFORE engine.actionDestroyCard(...) / the manual splice.
+const tz = targetInst.zone; // 'support' | 'ability' | 'surprise'
+if (tz === 'support' || tz === 'ability' || tz === 'surprise') {
+  engine._broadcastEvent('play_pile_transfer', {
+    owner: targetInst.owner,          // or fromOwner/toOwner for cross-side
+    cardName: targetInst.name,
+    from: tz, to: 'discard',          // 'deleted' | 'deck' | 'hand'
+    fromHeroIdx: targetInst.heroIdx,
+    fromSlotIdx: targetInst.zoneSlot, // omit for surprise; use fromPermId for permanents
+  });
+}
+await engine.actionDestroyCard(source, targetInst);
+```
+
+Scope / exclusions:
+- **area** → `actionMoveCard` already broadcasts `area→discard`
+  (owner-scoped, one Area per side — no name ambiguity). Don't double it.
+- **coolnessStackTop** → flies via `actionPopCoolnessStackTo`.
+- **permanent** → not captured by the diff animator; pass `fromPermId`
+  instead of `fromSlotIdx` if you do animate it.
+
+The frontend's `onPileTransfer` pre-suppression bucket covers
+`from ∈ {hand, support, ability, surprise}` → `{discard, deleted}` so
+the duplicate name-keyed diff flight is dropped and only the
+zone-anchored flight plays. `to: 'hand'` / `to: 'deck'` have their own
+handled paths.
+
+Reference implementations:
+- **Ralzish**, **The Yeeting** — destroy→discard; emit the broadcast
+  above before `actionDestroyCard` (scoped to support/ability/surprise).
+- **Sparkfly Worker** (`_sparkfly-shared.stealBoardCardToHand`) and
+  **Tengu Windstorm** (`_bounceToDeck`) — already correct: they emit a
+  zone-anchored `play_pile_transfer` (`to: 'hand'` / `to: 'deck'`,
+  `fromOwner`/`toOwner`, `fromPermId` for permanents).
+- **Dive Bomblebee** — already correct via a different route: it plays
+  a zone-anchored *impact* animation (`bomblebee_dive` keyed to
+  owner/heroIdx/zoneSlot) and never resolves a source by name (the card
+  just leaves on the next sync; no flight), so the bug can't occur.
+
+When in doubt: if the player *chose* the card and it *leaves the
+board*, send the zone-anchored `play_pile_transfer` yourself.

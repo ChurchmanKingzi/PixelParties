@@ -4148,6 +4148,54 @@ class GameEngine {
     }
   }
 
+  /**
+   * Generic "this Hero takes ZERO damage from every source" probe.
+   *
+   * A Hero whose own effect script exports `heroSelfDamageImmune`
+   * (boolean `true`, or a `(engine, ownerIdx, heroIdx) → bool`
+   * predicate) nullifies ALL incoming damage to itself — normal,
+   * status (burn / poison), AND true damage that "could normally not
+   * be reduced or negated" (Acid Vial / Rockfall tier). This is the
+   * engine hook behind Carris, the Time Keeper: it sits BESIDE the
+   * other absolute hero protections (firstTurnProtectedPlayer, Charme
+   * Lv3, Baihu petrify) so true-damage callers respect it too.
+   *
+   * Deliberately NOT gated on Frozen / Stunned / Negated — Carris's
+   * card text says the damage-prevention "cannot be negated", so the
+   * immunity stays absolute regardless of the Hero's status (matches
+   * the `bypassStatusFilter` contract its hook-side effects use).
+   * Non-damage defeats (instant-defeat effects that never enter the
+   * damage pipeline) are intentionally unaffected — the card only
+   * zeroes DAMAGE.
+   */
+  _isHeroSelfDamageImmune(target) {
+    if (!target || target.hp === undefined) return false;
+    const owner = this._findHeroOwner(target);
+    if (owner < 0) return false;
+    const heroIdx = (this.gs.players[owner]?.heroes || []).indexOf(target);
+    if (heroIdx < 0) return false;
+    const script = loadCardEffect(target.name);
+    const flag = script?.heroSelfDamageImmune;
+    if (!flag) return false;
+    if (typeof flag === 'function') {
+      try { return !!flag(this, owner, heroIdx); }
+      catch { return false; }
+    }
+    return flag === true;
+  }
+
+  /** Surface a red "0" floater on a Hero whose incoming damage was
+   *  fully blocked (HP didn't change, so the diff-based damage-number
+   *  detector wouldn't otherwise fire). */
+  _flashHeroDamageZero(target) {
+    const owner = this._findHeroOwner?.(target);
+    if (typeof owner !== 'number' || owner < 0) return;
+    const hi = (this.gs.players[owner]?.heroes || []).indexOf(target);
+    if (hi >= 0) {
+      this._broadcastEvent('play_damage_zero', { owner, heroIdx: hi, zoneSlot: -1 });
+    }
+  }
+
   async _actionDealDamageImpl(source, target, amount, type, opts) {
     // ── Per-damage-call heap check ──
     // A recursive damage cascade (Prophecy of Tempeste redirect →
@@ -4207,6 +4255,20 @@ class GameEngine {
     // is always true. Creatures use a separate damage path.
     if (target && target.hp !== undefined && target.hp <= 0) {
       return { dealt: 0, cancelled: true, targetAlreadyDead: true };
+    }
+
+    // ── Absolute self-damage immunity (Carris, the Time Keeper) ──
+    // "Any damage this Hero would take becomes 0, including damage that
+    // could normally not be reduced or negated." Checked here, BEFORE
+    // the Anti Magic / Surprise windows and BEFORE_DAMAGE — nothing
+    // happens to the Hero at all, so no would-take-damage side effects
+    // fire. The matching guard in actionDealTrueDamage covers the
+    // true-damage path.
+    if (target && target.hp !== undefined && amount > 0
+        && this._isHeroSelfDamageImmune(target)) {
+      this.log('damage_blocked', { target: this._heroLabel(target), reason: 'self_damage_immune' });
+      this._flashHeroDamageZero(target);
+      return { dealt: 0, cancelled: true };
     }
 
     // ── Anti Magic Enchantment shield ──
@@ -4744,6 +4806,16 @@ class GameEngine {
       // not a reducible defense. Acid Vial already respected this.
       if (targetOwner >= 0 && this.gs.firstTurnProtectedPlayer === targetOwner) {
         this.log('damage_blocked', { target: this._heroLabel(target), reason: 'shielded' });
+        return { dealt: 0 };
+      }
+
+      // Absolute self-damage immunity (Carris, the Time Keeper) — the
+      // card's "including damage that could normally not be reduced or
+      // negated" carve-out explicitly covers true damage. Sits beside
+      // first-turn protection as a non-reducible, non-negatable wall.
+      if (this._isHeroSelfDamageImmune(target)) {
+        this.log('damage_blocked', { target: this._heroLabel(target), reason: 'self_damage_immune' });
+        this._flashHeroDamageZero(target);
         return { dealt: 0 };
       }
 
@@ -8159,14 +8231,20 @@ class GameEngine {
       if (inst.counters[key + 'Unhealable']) continue;
       // Hard engine-level block on non-cleansable statuses (negated,
       // nulled). Keeps Dark Gear / Diplomacy / Necromancy negation
-      // permanent regardless of which card is trying to cleanse.
-      if (STATUS_EFFECTS[key]?.cleansable === false) continue;
+      // permanent regardless of which card is trying to cleanse —
+      // UNLESS the applier explicitly stamped a per-instance
+      // `<key>Cleansable` override (Unwanted Audience), which opts
+      // THIS instance's status into Beer / Juice-style healing while
+      // leaving every other negation uncleansable.
+      if (STATUS_EFFECTS[key]?.cleansable === false
+          && !inst.counters[key + 'Cleansable']) continue;
       // Stinky Stables: poison stays while the Area is up.
       if (key === 'poisoned' && poisonLocked) continue;
       delete inst.counters[key];
       delete inst.counters[key + 'Stacks'];
       delete inst.counters[key + 'AppliedBy'];
       delete inst.counters[key + 'Duration'];
+      delete inst.counters[key + 'Cleansable'];
       this.log('status_remove', { target: inst.name, status: key, by: source });
       removed.push(key);
     }
@@ -8355,7 +8433,33 @@ class GameEngine {
     return negativeKeys.filter(key =>
       inst.counters[key]
       && !inst.counters[key + 'Unhealable']
-      && STATUS_EFFECTS[key]?.cleansable !== false
+      // Globally-cleansable, OR this instance carries the per-instance
+      // `<key>Cleansable` override (Unwanted Audience's negation).
+      && (STATUS_EFFECTS[key]?.cleansable !== false
+          || inst.counters[key + 'Cleansable'])
+    );
+  }
+
+  /**
+   * The negative status keys a creature instance currently has that
+   * Beer / Juice-style cleansers may remove. Identical to the static
+   * `getCleansableStatuses()` list, PLUS any normally-uncleansable
+   * status (negated / nulled) this specific instance opted into via
+   * the per-instance `<key>Cleansable` companion flag (Unwanted
+   * Audience). Generic — any future card that negates with
+   * `actionNegateCreature(... { cleansable: true })` is covered with
+   * no further changes here or in Beer / Juice.
+   * @param {object} inst - Card instance
+   * @returns {string[]} status counter keys present on `inst`
+   */
+  getCleansableCreatureStatusKeys(inst) {
+    if (!inst?.counters) return [];
+    const negativeKeys = getNegativeStatuses();
+    return negativeKeys.filter(key =>
+      inst.counters[key]
+      && !inst.counters[key + 'Unhealable']
+      && (STATUS_EFFECTS[key]?.cleansable !== false
+          || inst.counters[key + 'Cleansable'])
     );
   }
 
@@ -8668,6 +8772,14 @@ class GameEngine {
     if (CARDINAL_NAMES.includes(inst.name)) return;
     const statusKey = opts.statusKey || 'negated';
     inst.counters[statusKey] = 1;
+    // Per-instance cleansable override (Unwanted Audience). Normally
+    // `negated` / `nulled` are uncleansable (STATUS_EFFECTS), keeping
+    // Dark Gear / Diplomacy permanent — `opts.cleansable` opts THIS
+    // instance's status into Beer / Juice healing via the companion
+    // `<statusKey>Cleansable` flag (read by cleanseCreatureStatuses /
+    // getCleansableCreatureStatusKeys). Cleared on natural expiry too
+    // (added to clearCountersOnExpire below).
+    if (opts.cleansable) inst.counters[statusKey + 'Cleansable'] = 1;
     // Fire ON_STATUS_APPLIED so listeners observe creature negation
     // (Bear Rider's hand-level recompute, Chilly Wizard's mirror,
     // future status-aware Creatures). Deferred to a microtask in non-
@@ -8696,7 +8808,9 @@ class GameEngine {
     inst.counters.buffs[buffKey] = {
       expiresAtTurn: opts.expiresAtTurn,
       expiresForPlayer: opts.expiresForPlayer,
-      clearCountersOnExpire: [statusKey],
+      clearCountersOnExpire: opts.cleansable
+        ? [statusKey, statusKey + 'Cleansable']
+        : [statusKey],
       source,
       // Mirror hero post-cleanse immunity: when this buff expires
       // naturally (start of expiresForPlayer's turn), the creature
@@ -10050,6 +10164,18 @@ class GameEngine {
         this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title });
       }
 
+      // Universal action-resolved hook for the immediate-action creature
+      // summon — parity with server.js doPlayCreature so hero passives
+      // that react to "this Hero summoned a Creature" (Pharaoh's Divinity
+      // Counter, etc.) fire for immediate / additional summons too.
+      // Reached only when a Creature was actually summoned (the refund
+      // path returns earlier).
+      await this.runHooks('onAnyActionResolved', {
+        actionType: 'creature', playerIdx, cardName, heroIdx,
+        isAdditional: true, isInherent: false, isFree: false,
+        _skipReactionCheck: true,
+      });
+
     } else {
       // Spell or Attack
       ps.hand.splice(handIndex, 1);
@@ -10083,10 +10209,14 @@ class GameEngine {
         if (config.excludeTargets) delete this.gs._spellExcludeTargets;
         delete this.gs._immediateActionContext;
 
-        // Fire afterSpellResolved for Spells — parity with the normal spell-
-        // play path in server.js so hero passives like Bartas (Bomb Berserker),
-        // Andras, Beato, Luck, etc. trigger off immediate-action spells too.
-        if (cardData.cardType === 'Spell' && !this.gs._spellNegatedByEffect) {
+        // Fire afterSpellResolved for Spells AND Attacks — parity with
+        // the normal spell-play path in server.js so hero passives like
+        // Bartas (Bomb Berserker), Andras, Beato, Luck, Pharaoh's
+        // Divinity Counter, etc. trigger off immediate-action Spells
+        // AND Attacks too (was Spell-only, which silently dropped
+        // immediate-action Attacks).
+        if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack')
+            && !this.gs._spellNegatedByEffect) {
           const uniqueTargets = [];
           const seenIds = new Set();
           for (const t of (this.gs._spellDamageLog || [])) {
@@ -10304,6 +10434,17 @@ class GameEngine {
         this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx: responseHeroIdx, zoneSlot: actualSlot, cardName });
         this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title });
       }
+
+      // Universal action-resolved hook for the immediate-action creature
+      // summon — parity with server.js doPlayCreature so hero passives
+      // that react to "this Hero summoned a Creature" (Pharaoh's Divinity
+      // Counter, etc.) fire here too. Reached only when a Creature was
+      // actually summoned (the refund path `continue`s above).
+      await this.runHooks('onAnyActionResolved', {
+        actionType: 'creature', playerIdx, cardName, heroIdx: responseHeroIdx,
+        isAdditional: true, isInherent: false, isFree: false,
+        _skipReactionCheck: true,
+      });
     } else {
       // Spell or Attack
       ps.hand.splice(handIndex, 1);
@@ -10313,27 +10454,60 @@ class GameEngine {
       // Fresh cancel flag so we can tell if the player backed out of
       // THIS Spell/Attack's own picker (vs. it resolving/being negated).
       this.gs._spellCancelled = false;
-      await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx: responseHeroIdx, _skipReactionCheck: true });
-      if (config.excludeTargets) delete this.gs._spellExcludeTargets;
-      delete this.gs._immediateActionContext;
-      // Player cancelled the chosen Spell/Attack via its OWN back/
-      // cancel (not negated by an effect) → DON'T consume the bonus
-      // Action: refund the card and re-open the chooser.
-      if (this.gs._spellCancelled && !this.gs._spellNegatedByEffect) {
-        this.gs._spellCancelled = false;
-        // Card just reappears in the player's OWN hand with a glow —
-        // a same-slot `play_pile_transfer` (src ≈ dst) suppresses the
-        // hand-diff auto-animation (which would otherwise wrongly
-        // slide it in from the opponent's hand) and shows the glow.
-        const _retIdx = ps.hand.length;
-        this._broadcastEvent('play_pile_transfer', {
-          owner: playerIdx, cardName, from: 'hand', to: 'hand',
-          fromHandIdx: _retIdx, toHandIdx: _retIdx,
-        });
-        ps.hand.push(cardName);
-        this._untrackCard(inst.id);
-        this.sync();
-        continue;
+      // Fresh damage log so afterSpellResolved sees this play's targets
+      // (parity with the hero-locked variant + server.js doPlaySpell).
+      const hadPriorLog = this.gs._spellDamageLog !== undefined;
+      if (!hadPriorLog) this.gs._spellDamageLog = [];
+      this.gs._spellResolutionDepth = (this.gs._spellResolutionDepth || 0) + 1;
+      try {
+        await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx: responseHeroIdx, _skipReactionCheck: true });
+        if (config.excludeTargets) delete this.gs._spellExcludeTargets;
+        delete this.gs._immediateActionContext;
+        // Player cancelled the chosen Spell/Attack via its OWN back/
+        // cancel (not negated by an effect) → DON'T consume the bonus
+        // Action: refund the card and re-open the chooser.
+        if (this.gs._spellCancelled && !this.gs._spellNegatedByEffect) {
+          this.gs._spellCancelled = false;
+          // Card just reappears in the player's OWN hand with a glow —
+          // a same-slot `play_pile_transfer` (src ≈ dst) suppresses the
+          // hand-diff auto-animation (which would otherwise wrongly
+          // slide it in from the opponent's hand) and shows the glow.
+          const _retIdx = ps.hand.length;
+          this._broadcastEvent('play_pile_transfer', {
+            owner: playerIdx, cardName, from: 'hand', to: 'hand',
+            fromHandIdx: _retIdx, toHandIdx: _retIdx,
+          });
+          ps.hand.push(cardName);
+          this._untrackCard(inst.id);
+          if (!hadPriorLog) delete this.gs._spellDamageLog;
+          this.sync();
+          continue;
+        }
+        // Fire afterSpellResolved for Spells AND Attacks — parity with
+        // the hero-locked variant + server.js so hero passives like
+        // Bartas, Andras, Pharaoh's Divinity Counter, etc. trigger off
+        // immediate-action-ANY-hero plays (Lunar Eclipse / The Master's
+        // Plan replacement Actions). Was previously absent here, so
+        // those replacement Spells/Attacks silently skipped the hook.
+        if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack')
+            && !this.gs._spellNegatedByEffect) {
+          const uniqueTargets = [];
+          const seenIds = new Set();
+          for (const t of (this.gs._spellDamageLog || [])) {
+            if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
+          }
+          await this.runHooks('afterSpellResolved', {
+            spellName: cardName, spellCardData: cardData,
+            heroIdx: responseHeroIdx, casterIdx: playerIdx,
+            damageTargets: uniqueTargets,
+            isSecondCast: !!this.gs._bartasSecondCast,
+            _skipReactionCheck: true,
+          });
+        }
+        if (!hadPriorLog) delete this.gs._spellDamageLog;
+        delete this.gs._spellNegatedByEffect;
+      } finally {
+        this.gs._spellResolutionDepth = Math.max(0, (this.gs._spellResolutionDepth || 1) - 1);
       }
       ps.discardPile.push(cardName);
       this._untrackCard(inst.id);
@@ -13277,7 +13451,18 @@ class GameEngine {
   async _triggerGateCheck(targetOwnerIdx, sourceName = null) {
     // Already shielded this resolution
     if (this.gs._gateShieldActive === targetOwnerIdx) return true;
-    
+
+    // Already asked AND DECLINED for this player during the current
+    // effect resolution. A multi-target effect (Shu'Chaku, etc.) hits
+    // each Support-Zone card via a SEPARATE actionDestroyCard /
+    // actionMoveCard call, so without this the gate would re-prompt
+    // once PER target. The accept case is already deduped by
+    // `_gateShieldActive` above; this handles the decline case so the
+    // whole batch gets exactly ONE prompt. Both flags are cleared
+    // together in `_flushSurpriseDrawChecks` (the effect-resolution
+    // boundary), so a genuinely new effect can prompt again.
+    if (this.gs._gateDeclined?.[targetOwnerIdx]) return false;
+
     if (this._inGateCheck) return false;
     
     const ps = this.gs.players[targetOwnerIdx];
@@ -13328,8 +13513,15 @@ class GameEngine {
         cancellable: true,
       });
       
-      if (!confirmed) return false;
-      
+      if (!confirmed) {
+        // Remember the decline for the rest of THIS effect resolution
+        // so the remaining targets of a multi-target effect don't
+        // re-prompt (mirrors `_gateShieldActive`'s per-resolution scope).
+        if (!this.gs._gateDeclined) this.gs._gateDeclined = {};
+        this.gs._gateDeclined[targetOwnerIdx] = true;
+        return false;
+      }
+
       // Use centralized _activateSurprise — handles flip, logging, hooks (Bakhm), discard
       const script = loadCardEffect(gateName);
       await this._activateSurprise(targetOwnerIdx, gateHeroIdx, gateName, {}, script);
@@ -13619,8 +13811,11 @@ class GameEngine {
    * produce only ONE surprise prompt with the total count.
    */
   async _flushSurpriseDrawChecks() {
-    // Clear Defending the Gate shield at end of effect resolution
+    // Clear Defending the Gate shield + per-resolution decline memory
+    // at end of effect resolution (one batched prompt per effect; a
+    // new effect can prompt again).
     delete this.gs._gateShieldActive;
+    delete this.gs._gateDeclined;
 
     if (this._pendingSurpriseDraws && !this._inSurpriseResolution) {
       const pending = this._pendingSurpriseDraws;

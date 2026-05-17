@@ -31,7 +31,8 @@ module.exports = {
       const target = await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
-        damageType: null,
+        damageType: 'status',
+        dealsDamage: false, // Freeze only — no damage; don't wake damage-mitigation Reactions (Spectral Armor)
         title: 'Divine Gift of Biseria',
         description: 'Choose any target to Freeze for 3 turns.',
         confirmLabel: '❄️ Freeze!',

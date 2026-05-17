@@ -63,6 +63,7 @@ module.exports = {
         side: 'my',
         types: ['hero', 'creature'],
         damageType: null,
+        dealsDamage: false, // HP buff only — no damage; don't wake damage-mitigation Reactions (Spectral Armor)
         title: 'Maya, the Nature Fairy',
         description: `A Creature was summoned! Choose a friendly target to increase its HP by ${HP_BOOST}.`,
         confirmLabel: `🌿 +${HP_BOOST} HP`,

@@ -31,7 +31,8 @@ module.exports = {
       const target = await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
-        damageType: null,
+        damageType: 'status',
+        dealsDamage: false, // Poison only — no damage; don't wake damage-mitigation Reactions (Spectral Armor)
         title: 'Venom Infusion',
         description: 'Apply 1 stack of Poison to a Hero or Creature.',
         confirmLabel: '☠️ Infuse!',

@@ -33,11 +33,18 @@ module.exports = {
       const combinedLevel = decayLevel + perfLevel;
       const stacks = combinedLevel >= 3 ? 4 : combinedLevel >= 2 ? 2 : 1;
 
-      // Prompt for target — only unpoisoned heroes/creatures
+      // Prompt for target — only unpoisoned heroes/creatures.
+      // This effect deals NO damage (Poison only), so it must NOT
+      // wake damage-mitigation post-target Reactions like Spectral
+      // Armor ("when a target you control would take damage").
+      // `dealsDamage:false` is the load-bearing signal the single-
+      // target post-target reaction gate honours; `damageType:'status'`
+      // is the documented convention for status-application pickers.
       const target = await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
-        damageType: null,
+        damageType: 'status',
+        dealsDamage: false,
         title: "The Warlord's Bite",
         description: `Inflict ${stacks} Poison Stack${stacks > 1 ? 's' : ''} to an unpoisoned target.`,
         confirmLabel: `🐍 Bite! (${stacks} stack${stacks > 1 ? 's' : ''})`,

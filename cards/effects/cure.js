@@ -40,7 +40,9 @@ function getValidTargets(gs, engine, excludeHeroKey) {
     for (const t of engine.getCreatureTargets(pi)) {
       const inst = t.cardInstance;
       if (!inst) continue;
-      if (negKeys.some(k => inst.counters?.[k])) targets.push(t);
+      // Instance-aware: also includes per-instance-cleansable
+      // negation (Unwanted Audience) on top of the global set.
+      if (engine.getCleansableCreatureStatusKeys(inst).length > 0) targets.push(t);
     }
   }
   return targets;
@@ -100,8 +102,11 @@ async function doCure(engine, pi, target, casterHeroIdx) {
     });
     await engine._delay(400);
 
-    // Remove all negative statuses from creature (centralized — skips unhealable)
-    const removedCreatureKeys = engine.cleanseCreatureStatuses(inst, negKeys, 'Cure');
+    // Remove all negative statuses from creature (centralized — skips
+    // unhealable). Instance-aware key set so a per-instance-cleansable
+    // negation (Unwanted Audience) is included alongside the globals.
+    const removedCreatureKeys = engine.cleanseCreatureStatuses(
+      inst, engine.getCleansableCreatureStatusKeys(inst), 'Cure');
     removed += removedCreatureKeys.length;
 
     // Heal creature 100 × removed

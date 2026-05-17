@@ -23,8 +23,9 @@ function getTargetStatuses(target, engine) {
       c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
     );
     if (!inst) return [];
-    return getCleansableStatuses()
-      .filter(k => inst.counters[k])
+    // Instance-aware: includes any per-instance-cleansable negation
+    // (Unwanted Audience) on top of the globally-cleansable set.
+    return engine.getCleansableCreatureStatusKeys(inst)
       .map(k => ({ key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon }));
   }
   return [];
@@ -41,7 +42,7 @@ function getValidTargets(gs, engine) {
     });
     const creatures = engine.getCreatureTargets(pi).filter(t => {
       const inst = t.cardInstance;
-      return inst && negKeys.some(k => inst.counters[k]);
+      return inst && engine.getCleansableCreatureStatusKeys(inst).length > 0;
     });
     targets.push(...heroes, ...creatures);
   }

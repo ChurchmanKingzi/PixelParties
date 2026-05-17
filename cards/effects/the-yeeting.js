@@ -322,6 +322,26 @@ module.exports = {
           return true;
         }
       }
+      // Zone-anchored board→discard flight. Without this the client's
+      // diff-based fly-out resolves the source by CARD NAME and always
+      // animates from the LEFT-MOST same-named card (wrong slot when
+      // duplicates exist). Fired BEFORE the destroy (source slot still
+      // rendered); the frontend's pending-bucket suppresses the
+      // duplicate name-keyed diff animation. Area has its own engine
+      // area→discard broadcast; Coolness-Stack tops fly via
+      // actionPopCoolnessStackTo; Permanents aren't name-captured — so
+      // scope to support / ability / surprise only. See
+      // cards/effects/CARD_API.md "Removing a board card to a pile".
+      const _tz = targetInst.zone;
+      if (_tz === 'support' || _tz === 'ability' || _tz === 'surprise') {
+        engine._broadcastEvent('play_pile_transfer', {
+          owner: targetInst.owner,
+          cardName: targetInst.name,
+          from: _tz, to: 'discard',
+          fromHeroIdx: targetInst.heroIdx,
+          fromSlotIdx: targetInst.zoneSlot,
+        });
+      }
       await engine.actionDestroyCard(dmgSource, targetInst);
     }
 

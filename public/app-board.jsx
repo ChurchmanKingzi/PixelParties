@@ -3853,6 +3853,154 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // Pressed Skill — golden, glittering rain falling down upon the
+  // target Hero as the Ability is pressed onto it. Thin gold streaks
+  // rain from above the card and fade as they pass it, a scatter of
+  // bright 4-point glints twinkle on the way down, and a warm gold
+  // shimmer pools over the Hero where the rain "lands".
+  pressed_skill_rain: (function () {
+    return function PressedSkillRainEffect({ x, y, w, h }) {
+      const W = w || 72;
+      const H = h || 100;
+      const drops = useMemo(() => Array.from({ length: 30 }, () => ({
+        lx:    (Math.random() - 0.5) * (W * 1.1),
+        startY: -(H / 2) - 26 - Math.random() * 40,
+        fall:  H + 70 + Math.random() * 36,
+        len:   7 + Math.random() * 9,
+        wid:   2 + Math.random() * 1.5,
+        delay: Math.random() * 560,
+        dur:   620 + Math.random() * 280,
+        sway:  (Math.random() - 0.5) * 14,
+      })), [W, H]);
+      const glints = useMemo(() => Array.from({ length: 12 }, () => ({
+        lx:    (Math.random() - 0.5) * (W * 1.05),
+        startY: -(H / 2) - 14 - Math.random() * 36,
+        fall:  H + 50 + Math.random() * 30,
+        size:  5 + Math.random() * 4,
+        delay: Math.random() * 620,
+        dur:   680 + Math.random() * 260,
+        sway:  (Math.random() - 0.5) * 12,
+      })), [W, H]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Falling gold streaks */}
+          {drops.map((d, i) => (
+            <div key={'d' + i} style={{
+              position: 'absolute',
+              left: d.lx + 'px', top: d.startY + 'px',
+              width: d.wid + 'px', height: d.len + 'px',
+              borderRadius: d.wid + 'px',
+              background: 'linear-gradient(to bottom, rgba(255,250,210,0.95) 0%, rgba(255,205,90,0.85) 55%, rgba(255,180,60,0) 100%)',
+              boxShadow: '0 0 6px rgba(255,210,110,0.85), 0 0 2px rgba(255,240,190,0.95)',
+              opacity: 0,
+              animation: `pskill-rain-fall ${d.dur}ms linear ${d.delay}ms forwards`,
+              '--pf': d.fall + 'px',
+              '--psway': d.sway + 'px',
+            }} />
+          ))}
+          {/* Twinkling 4-point glitter glints */}
+          {glints.map((g, i) => (
+            <div key={'g' + i} style={{
+              position: 'absolute',
+              left: g.lx + 'px', top: g.startY + 'px',
+              width: g.size + 'px', height: g.size + 'px',
+              background: 'radial-gradient(circle, #fffbe6 0%, #ffd86a 45%, rgba(255,190,70,0) 70%)',
+              clipPath: 'polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%)',
+              opacity: 0,
+              animation: `pskill-rain-glint ${g.dur}ms ease-in ${g.delay}ms forwards`,
+              '--pf': g.fall + 'px',
+              '--psway': g.sway + 'px',
+            }} />
+          ))}
+          {/* Warm gold shimmer pooling over the Hero (the rain landing) */}
+          <div style={{
+            position: 'absolute',
+            left: -(W * 0.55), top: (H * 0.10),
+            width: W * 1.1, height: H * 0.5,
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse at center, rgba(255,230,150,0.55) 0%, rgba(255,200,80,0.30) 45%, transparent 75%)',
+            filter: 'blur(1px)',
+            opacity: 0,
+            animation: 'pskill-rain-pool 1500ms ease-out forwards',
+          }} />
+          <style>{`
+            @keyframes pskill-rain-fall {
+              0%   { opacity: 0; transform: translate(0, 0); }
+              14%  { opacity: 1; }
+              80%  { opacity: 0.95; }
+              100% { opacity: 0; transform: translate(var(--psway), var(--pf)); }
+            }
+            @keyframes pskill-rain-glint {
+              0%   { opacity: 0; transform: translate(0,0) scale(0.5) rotate(0deg); }
+              20%  { opacity: 1; transform: translate(calc(var(--psway) * 0.25), calc(var(--pf) * 0.25)) scale(1.15) rotate(35deg); }
+              45%  { opacity: 0.35; }
+              65%  { opacity: 1; transform: translate(calc(var(--psway) * 0.65), calc(var(--pf) * 0.65)) scale(0.9) rotate(80deg); }
+              100% { opacity: 0; transform: translate(var(--psway), var(--pf)) scale(0.4) rotate(120deg); }
+            }
+            @keyframes pskill-rain-pool {
+              0%   { opacity: 0; transform: scale(0.6); }
+              35%  { opacity: 1; transform: scale(1.05); }
+              70%  { opacity: 0.8; transform: scale(1.12); }
+              100% { opacity: 0; transform: scale(1.2); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // Unwanted Audience — a cartoony "Z z z" sleeping effect drifting
+  // up off the negated Creature. Two trailing trios of bold Z glyphs
+  // rise, grow and fade with a gentle wobble (classic snooze).
+  unwanted_audience_zzz: (function () {
+    return function UnwantedAudienceZzzEffect({ x, y, w, h }) {
+      const W = w || 72;
+      const H = h || 100;
+      // 6 Z's = two staggered trios. Within a trio the Z's grow
+      // (small → big) and trail; the second trio is a delayed echo.
+      const zs = useMemo(() => Array.from({ length: 6 }, (_, i) => {
+        const k = i % 3;            // 0,1,2 within a trio
+        const wave = Math.floor(i / 3); // 0 or 1
+        return {
+          size: 13 + k * 7,
+          startLeft: 2 + k * 5,
+          startTop: -(H * 0.30) - k * 6,
+          delay: wave * 780 + k * 210,
+          dur: 1000,
+          drift: 20 + k * 6,
+          rise: 46 + k * 10,
+          tilt: (k % 2 === 0 ? -1 : 1) * (8 + k * 3),
+        };
+      }), [H]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {zs.map((z, i) => (
+            <div key={'z' + i} style={{
+              position: 'absolute',
+              left: z.startLeft + 'px', top: z.startTop + 'px',
+              fontFamily: "'Pixel Intv', 'Press Start 2P', Georgia, serif",
+              fontWeight: 'bold',
+              fontSize: z.size + 'px',
+              color: '#dbe9ff',
+              textShadow: '0 0 6px rgba(120,170,255,0.85), 1px 2px 0 rgba(40,60,110,0.9)',
+              opacity: 0,
+              animation: `ua-zzz-float ${z.dur}ms ease-out ${z.delay}ms forwards`,
+              '--uaRise': (-z.rise) + 'px',
+              '--uaDrift': z.drift + 'px',
+              '--uaTilt': z.tilt + 'deg',
+            }}>Z</div>
+          ))}
+          <style>{`
+            @keyframes ua-zzz-float {
+              0%   { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.5); }
+              20%  { opacity: 1; transform: translate(calc(var(--uaDrift) * 0.25), calc(var(--uaRise) * 0.22)) rotate(calc(var(--uaTilt) * 0.5)) scale(0.9); }
+              60%  { opacity: 1; transform: translate(calc(var(--uaDrift) * 0.65), calc(var(--uaRise) * 0.62)) rotate(var(--uaTilt)) scale(1.05); }
+              100% { opacity: 0; transform: translate(var(--uaDrift), var(--uaRise)) rotate(0deg) scale(1.15); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   explosion: ExplosionEffect,
   // Disruption Ray impact — a sickly-green toxic burst (flash + two
   // expanding rings + lime shrapnel). Reuses the shared
@@ -13531,6 +13679,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // catapult and a ram on different slots can coexist without
   // interfering with each other's masking.
   const [brackleSourceHidden, setBrackleSourceHidden] = useState(new Set());
+  // Pusher: while the rammed Creature is "flung off-screen", mask its
+  // real slot render so only the airborne fling overlay is visible
+  // (same `[data-support-ramming]` CSS hide as a Creature ram /
+  // Brackle). Keyed `${owner}-${heroIdx}-${slot}`; cleared when the
+  // fling lands. Self-contained — see the `play_pusher_fling` handler.
+  const [pusherFlungHidden, setPusherFlungHidden] = useState(new Set());
   // Dedicated suppression bucket for Brackle catapult's discard-fly
   // phase. Keyed `${owner}-${cardName}` → pending count. The catapult's
   // third animation phase OWNS the corpse's flight from target → discard
@@ -17531,6 +17685,75 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => { fist.remove(); ring.remove(); }, 500);
     };
     socket.on('punch_impact', onPunchImpact);
+    // Pusher: the rammed Creature is violently flung off the top of
+    // the screen, hangs a beat, then plops back down into its Support
+    // Zone. Self-contained (raw DOM, like onPunchImpact) plus a
+    // React-state slot-mask so the real card stays hidden across the
+    // re-renders that happen mid-flight (damage application etc.).
+    const onPusherFling = ({ owner, heroIdx, zoneSlot, cardName, duration }) => {
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const sel = `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`;
+      const el = document.querySelector(sel);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const dur = duration || 700;
+      // How far up to launch so the card clears the top of the
+      // viewport entirely (its own height + slot's top offset + pad).
+      const up = Math.round(r.top + r.height + 120);
+      const hideKey = `${owner}-${heroIdx}-${zoneSlot}`;
+
+      // Inject keyframes once.
+      if (!document.getElementById('pusher-fling-keyframes')) {
+        const st = document.createElement('style');
+        st.id = 'pusher-fling-keyframes';
+        st.textContent = `
+          @keyframes pusherFling {
+            0%   { transform: translate(0,0) rotate(0deg) scale(1); opacity: 1; }
+            16%  { transform: translate(34px, calc(-1 * var(--pfUp))) rotate(360deg) scale(1.12); opacity: 1; }
+            50%  { transform: translate(-22px, calc(-1 * var(--pfUp) - 50px)) rotate(680deg) scale(1.06); opacity: 1; }
+            82%  { transform: translate(0, 20px) rotate(940deg) scale(1.14, 0.86); opacity: 1; }
+            92%  { transform: translate(0, -6px) rotate(948deg) scale(0.94, 1.08); opacity: 1; }
+            100% { transform: translate(0,0) rotate(948deg) scale(1); opacity: 1; }
+          }
+        `;
+        document.head.appendChild(st);
+      }
+
+      // Mask the real slot render for the whole flight.
+      setPusherFlungHidden(prev => { const n = new Set(prev); n.add(hideKey); return n; });
+
+      const card = document.createElement('div');
+      card.className = 'card-flight';
+      const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
+      card.style.cssText = [
+        'position:fixed',
+        `left:${r.left + r.width / 2 - 32}px`, `top:${r.top + r.height / 2 - 44}px`,
+        'width:64px', 'height:88px', 'z-index:10210', 'pointer-events:none',
+        'border-radius:4px', 'overflow:hidden',
+        'box-shadow:0 0 14px rgba(255,150,60,0.8),0 0 5px rgba(255,90,30,0.6)',
+        `--pfUp:${up}px`,
+        `animation:pusherFling ${dur}ms cubic-bezier(.34,.02,.5,1) forwards`,
+      ].join(';');
+      if (imgUrl) {
+        const img = document.createElement('img');
+        img.src = imgUrl;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+        img.draggable = false;
+        card.appendChild(img);
+      } else {
+        card.style.background = 'linear-gradient(135deg,#3a1a0a,#5a2a0a)';
+        card.innerHTML = `<div style="color:#ffb070;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardName}</div>`;
+      }
+      document.body.appendChild(card);
+      setTimeout(() => {
+        card.remove();
+        setPusherFlungHidden(prev => {
+          if (!prev.has(hideKey)) return prev;
+          const n = new Set(prev); n.delete(hideKey); return n;
+        });
+      }, dur + 60);
+    };
+    socket.on('play_pusher_fling', onPusherFling);
     const onBaihuPetrify = ({ owner, heroIdx }) => {
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
@@ -20150,15 +20373,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (tgtIsMe) pileTransferToHandPendingMeRef.current  += 1;
         else         pileTransferToHandPendingOppRef.current += 1;
       }
-      // Pre-register hand → pile AND support → pile transfers so the
-      // diff-based fly-out detector below suppresses its duplicate
-      // animation. (See `handToPilePendingMeRef` block for the full
-      // rationale — the bucket pre-consumes by name, so adding
-      // support-source transfers here makes the slot-specific
-      // creature-death broadcast win over the diff-detector's name-
-      // keyed FIFO rect lookup, which always picks the leftmost rect
-      // when multiple same-named creatures are on the board.)
-      if ((from === 'hand' || from === 'support') && (to === 'discard' || to === 'deleted') && cardName) {
+      // Pre-register hand / support / ability / surprise → pile
+      // transfers so the diff-based fly-out detector below suppresses
+      // its duplicate animation. (See `handToPilePendingMeRef` block
+      // for the full rationale — the bucket pre-consumes by name, so
+      // adding board-source transfers here makes the slot-specific
+      // broadcast win over the diff-detector's name-keyed FIFO rect
+      // lookup, which always picks the leftmost rect when multiple
+      // same-named cards are on the board. Ability / surprise sources
+      // are captured by `captureBoardRects` too, so they need the
+      // same suppression — Wall Breaker General Ralzish emits an
+      // explicit zone-anchored broadcast for those.)
+      if ((from === 'hand' || from === 'support' || from === 'ability' || from === 'surprise')
+          && (to === 'discard' || to === 'deleted') && cardName) {
         const ref = srcIsMe ? handToPilePendingMeRef : handToPilePendingOppRef;
         const bucket = ref.current[to];
         const entry = { cardName };
@@ -21867,6 +22094,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('dark_control', onDarkControl);
       socket.off('burning_finger_slash', onBurningFingerSlash);
       socket.off('punch_impact', onPunchImpact);
+      socket.off('play_pusher_fling', onPusherFling);
       socket.off('baihu_petrify', onBaihuPetrify);
       socket.off('cardinal_beast_win', onCardinalBeastWin);
       socket.off('qinglong_lightning', onQinglongLightning);
@@ -22876,8 +23104,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [slipperySelected, setSlipperySelected] = useState(null); // selected instId or null
   const slipperyCreatureSet = new Set();
   const slipperyDestSet = new Set();
+  const slipperySwapSet = new Set(); // valid swap-partner slot keys (Guard Change)
   let slipperySelectedEntry = null;
-  if (isMyEffectPrompt && ep.type === 'slipperyMove') {
+  // The Slippery archetype's start-phase mover AND "Guard Change"
+  // share this render path. Guard Change is the broader variant:
+  // destinations aren't neighbour-restricted (handled server-side —
+  // it just sends a fuller `dests` list) and each Creature also
+  // carries a `swaps` list of instIds it may exchange zones with.
+  if (isMyEffectPrompt && (ep.type === 'slipperyMove' || ep.type === 'guardChangeMove')) {
     for (const c of (ep.creatures || [])) {
       slipperyCreatureSet.add(`${myIdx}-${c.heroIdx}-${c.zoneSlot}`);
     }
@@ -22885,6 +23119,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (slipperySelectedEntry) {
       for (const d of (slipperySelectedEntry.dests || [])) {
         slipperyDestSet.add(`${myIdx}-${d.heroIdx}-${d.slotIdx}`);
+      }
+      // Guard Change: highlight the selected Creature's swap partners
+      // (Slippery never sends `swaps`, so this stays empty for it).
+      for (const sid of (slipperySelectedEntry.swaps || [])) {
+        const partner = (ep.creatures || []).find(c => c.instId === sid);
+        if (partner) slipperySwapSet.add(`${myIdx}-${partner.heroIdx}-${partner.zoneSlot}`);
       }
     }
   }
@@ -22931,7 +23171,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // selected Creature is no longer eligible (e.g. Pengu chained it
   // and the new prompt no longer lists this instId).
   useEffect(() => {
-    if (!isMyEffectPrompt || ep?.type !== 'slipperyMove') {
+    if (!isMyEffectPrompt || (ep?.type !== 'slipperyMove' && ep?.type !== 'guardChangeMove')) {
       setSlipperySelected(null);
       return;
     }
@@ -23776,6 +24016,33 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onMouseLeave={hideGameTooltip}
                   >🧟</div>
                 )}
+                {/* ── Lethe self-lock badge (cannot perform Actions) ── */}
+                {hero?.name && hero.hp > 0 && hero._letheActionLocked === gameState.turn && (
+                  <div
+                    className="lethe-actionlock-badge"
+                    style={{
+                      position: 'absolute', left: 'calc(2px * var(--board-scale))',
+                      bottom: 'calc(2px * var(--board-scale))',
+                      minWidth: 'calc(18px * var(--board-scale))',
+                      height: 'calc(18px * var(--board-scale))',
+                      padding: '0 calc(3px * var(--board-scale))',
+                      borderRadius: 'calc(9px * var(--board-scale))',
+                      background: 'radial-gradient(circle at 30% 30%, #ff8a7a, #7a0e0e)',
+                      color: '#ffecec',
+                      fontFamily: 'Pixel Intv, monospace',
+                      fontSize: 'calc(10px * var(--board-scale))',
+                      fontWeight: 'bold', lineHeight: 1,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 0 calc(5px * var(--board-scale)) #ff5a4a, inset 0 0 calc(2px * var(--board-scale)) #ffd0c8',
+                      border: 'calc(1.5px * var(--board-scale)) solid #2a0505',
+                      zIndex: 6, pointerEvents: 'auto', cursor: 'help',
+                    }}
+                    onMouseEnter={e => showGameTooltip(e, `${hero.name.split(',')[0]} cannot perform Actions this turn: a target you control was defeated since the end of your last turn.`)}
+                    onMouseLeave={hideGameTooltip}
+                  >
+                    🚫
+                  </div>
+                )}
                 {hero?.name && hero.buffs && <BuffColumn buffs={hero.buffs} cardName={hero.name} />}
                 {/* ── Deepsea Counter badge (Siphem) ── */}
                 {hero?.name && (hero.deepseaCounters || 0) > 0 && (
@@ -23802,6 +24069,60 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onMouseLeave={hideGameTooltip}
                   >
                     🌊{hero.deepseaCounters}
+                  </div>
+                )}
+                {/* ── Time Counter badge (Carris, the Time Keeper) ── */}
+                {hero?.name && (hero._timeCounters || 0) > 0 && (
+                  <div
+                    className="time-counter-badge"
+                    style={{
+                      position: 'absolute', top: '6%', right: '6%',
+                      minWidth: 'calc(18px * var(--board-scale))',
+                      height: 'calc(18px * var(--board-scale))',
+                      padding: '0 calc(3px * var(--board-scale))',
+                      borderRadius: 'calc(9px * var(--board-scale))',
+                      background: 'radial-gradient(circle at 30% 30%, #ffe9a8, #8a5a0b)',
+                      color: '#fff7e0',
+                      fontFamily: 'Pixel Intv, monospace',
+                      fontSize: 'calc(9px * var(--board-scale))',
+                      fontWeight: 'bold', lineHeight: 1,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      gap: 'calc(1px * var(--board-scale))',
+                      boxShadow: '0 0 calc(5px * var(--board-scale)) #ffcb45, inset 0 0 calc(2px * var(--board-scale)) #ffeec2',
+                      border: 'calc(1.5px * var(--board-scale)) solid #2a1505',
+                      zIndex: 6, pointerEvents: 'auto', cursor: 'help',
+                    }}
+                    onMouseEnter={e => showGameTooltip(e, `Time Counters: ${hero._timeCounters}. At the end of each of your turns Carris gains 1; at 4 or more, you lose the game.`)}
+                    onMouseLeave={hideGameTooltip}
+                  >
+                    ⏳{hero._timeCounters}
+                  </div>
+                )}
+                {/* ── Divinity Counter badge (Pharaoh, the Lone Living Being) ── */}
+                {hero?.name && (hero._divinityCounters || 0) > 0 && (
+                  <div
+                    className="divinity-counter-badge"
+                    style={{
+                      position: 'absolute', top: '6%', right: '6%',
+                      minWidth: 'calc(18px * var(--board-scale))',
+                      height: 'calc(18px * var(--board-scale))',
+                      padding: '0 calc(3px * var(--board-scale))',
+                      borderRadius: 'calc(9px * var(--board-scale))',
+                      background: 'radial-gradient(circle at 30% 30%, #fff1b0, #b58900)',
+                      color: '#fffbe6',
+                      fontFamily: 'Pixel Intv, monospace',
+                      fontSize: 'calc(9px * var(--board-scale))',
+                      fontWeight: 'bold', lineHeight: 1,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      gap: 'calc(1px * var(--board-scale))',
+                      boxShadow: '0 0 calc(6px * var(--board-scale)) #ffd34d, inset 0 0 calc(2px * var(--board-scale)) #fff3bf',
+                      border: 'calc(1.5px * var(--board-scale)) solid #4a3300',
+                      zIndex: 6, pointerEvents: 'auto', cursor: 'help',
+                    }}
+                    onMouseEnter={e => showGameTooltip(e, `Divinity Counters: ${hero._divinityCounters}. At the end of your turn, Pharaoh sacrifices a target you control, removes 1 counter and you draw 2 cards.`)}
+                    onMouseLeave={hideGameTooltip}
+                  >
+                    ☥{hero._divinityCounters}
                   </div>
                 )}
                 {/* ── Change Counters (Cosmic Depths) ── */}
@@ -24376,6 +24697,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 && slipperyInstHere
                 && slipperySelected === slipperyInstHere.instId;
               const isSlipperyDest = slipperyDestSet.has(`${pi}-${i}-${z}`);
+              // Guard Change swap partner: a Creature the currently-
+              // selected one may exchange zones with (empty for the
+              // Slippery archetype, which never sends `swaps`).
+              const isSlipperySwap = slipperySwapSet.has(`${pi}-${i}-${z}`);
               // Chain target pick for creatures
               const creatureChainId = `equip-${pi}-${i}-${z}`;
               const isChainPickCreatureValid = chainPickValidIds.has(creatureChainId);
@@ -24419,9 +24744,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 ramAnims.some(r =>
                   r.srcOwner === pi && r.srcHeroIdx === i && r.srcZoneSlot === z,
                 )
-                || brackleSourceHidden.has(`${pi}-${i}-${z}`);
+                || brackleSourceHidden.has(`${pi}-${i}-${z}`)
+                || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   onClick={isCsppEmptySlot ? () => {
                     // Click-pick destination chosen → route through the
@@ -24461,6 +24787,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   } : isSlipperyCreature ? () => {
                     const instId = slipperyInstHere?.instId;
                     if (instId == null) return;
+                    // Guard Change swap: a Creature is already selected
+                    // and THIS one is a valid swap partner of it →
+                    // exchange their zones (Slippery sends no `swaps`,
+                    // so this never fires for the archetype).
+                    if (slipperySelected != null && slipperySelected !== instId
+                        && slipperySelectedEntry
+                        && (slipperySelectedEntry.swaps || []).includes(instId)) {
+                      respondToPrompt({ instId: slipperySelected, swapWithInstId: instId });
+                      setSlipperySelected(null);
+                      return;
+                    }
                     setSlipperySelected(prev => prev === instId ? null : instId);
                   } : isSlipperyDest ? () => {
                     if (slipperySelected == null) return;
@@ -26817,6 +27154,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </DraggablePanel>
       )}
 
+      {/* ── Effect Prompt: Guard Change movement ── */}
+      {isMyEffectPrompt && ep.type === 'guardChangeMove' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#9ad27f' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#9ad27f', marginBottom: 8 }}>🛡️ {ep.title || 'Guard Change'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>
+            {ep.description || 'Reposition your Creatures.'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .8, marginBottom: 10 }}>
+            {slipperySelected != null
+              ? 'Now click a highlighted free Support Zone to move it there, or a highlighted Creature to swap them.'
+              : 'Click one of your Creatures to select it. Each Creature can be moved or swapped once.'}
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            {slipperySelected != null && (
+              <button className="btn" style={{ padding: '6px 14px', fontSize: 11 }}
+                onClick={() => setSlipperySelected(null)}>↩ Deselect</button>
+            )}
+            <button className="btn btn-danger" style={{ padding: '6px 16px', fontSize: 11 }}
+              onClick={() => { setSlipperySelected(null); respondToPrompt({ done: true }); }}>{ep.doneLabel || '✓ Done'}</button>
+          </div>
+        </DraggablePanel>
+      )}
+
       {/* ── Effect Prompt: Status Select (Beer, etc.) ── */}
       {isMyEffectPrompt && ep.type === 'statusSelect' && (
         <StatusSelectPrompt key={ep.title} ep={ep} onRespond={respondToPrompt} />
@@ -26880,6 +27240,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'zonePick' ? 'Waiting for opponent to select a zone...' :
              ep.type === 'skatesMove' ? 'Waiting for opponent to move a creature...' :
              ep.type === 'slipperyMove' ? 'Waiting for opponent to slide their Slippery Creatures...' :
+             ep.type === 'guardChangeMove' ? 'Waiting for opponent to reposition their Creatures...' :
              ep.type === 'pengueAbilityMove' ? 'Waiting for opponent to move an Ability...' :
              ep.type === 'chainTargetPick' ? 'Waiting for opponent to select targets...' :
              ep.type === 'heroAction' ? 'Waiting for opponent to play a card...' :

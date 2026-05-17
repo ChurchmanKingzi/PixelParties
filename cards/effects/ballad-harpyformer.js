@@ -75,6 +75,7 @@ module.exports = {
       side: 'own',
       types: ['hero', 'creature'],
       damageType: null,
+      dealsDamage: false, // heal only — no damage; don't wake damage-mitigation Reactions (Spectral Armor)
       title: CARD_NAME,
       description: 'Choose a friendly target to heal 100 HP.',
       confirmLabel: '💚 Heal 100',

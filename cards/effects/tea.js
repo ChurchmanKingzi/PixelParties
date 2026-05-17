@@ -28,8 +28,9 @@ function getTargetStatuses(target, engine) {
       c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
     );
     if (!inst) return [];
-    return getCleansableStatuses()
-      .filter(k => inst.counters[k])
+    // Instance-aware: also includes per-instance-cleansable negation
+    // (Unwanted Audience) on top of the global cleansable set.
+    return engine.getCleansableCreatureStatusKeys(inst)
       .map(k => {
         const s = { key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon };
         if (k === 'poisoned') s.stacks = inst.counters.poisonStacks || 1;
@@ -50,7 +51,7 @@ function getOwnStatusedTargets(gs, pi, engine) {
 
   const creatures = engine.getCreatureTargets(pi).filter(t => {
     const inst = t.cardInstance;
-    return inst && negKeys.some(k => inst.counters[k]);
+    return inst && engine.getCleansableCreatureStatusKeys(inst).length > 0;
   });
 
   return [...heroes, ...creatures];
@@ -212,16 +213,29 @@ module.exports = {
     if (removedStatuses.length === 0) return; // Everything selected was unhealable/locked — full fizzle
     if (!removedStatuses.includes('poisoned')) poisonStacks = 0;
 
-    // Play tea steam on first target
+    // Play tea steam on first target (the cure already applied above)
     const zs1 = firstTarget.type === 'equip' ? firstTarget.slotIdx : -1;
     engine._broadcastEvent('play_zone_animation', { type: 'tea_steam', owner: firstTarget.owner, heroIdx: firstTarget.heroIdx, zoneSlot: zs1 });
     engine.sync();
     await engine._delay(500);
 
+    // Only GLOBALLY-cleansable statuses are carried to the second
+    // target. A per-instance-cleansable negation (Unwanted Audience —
+    // globally `cleansable:false`) is CURED off the first target but
+    // NOT transferred: re-applying it would create a permanent,
+    // uncleansable creature negation via applyCreatureStatus.
+    const transferStatuses = removedStatuses.filter(
+      k => STATUS_EFFECTS[k]?.cleansable !== false);
+    if (!transferStatuses.includes('poisoned')) poisonStacks = 0;
+    if (transferStatuses.length === 0) {
+      engine.log('tea_cure_no_transfer', { removedStatuses });
+      return; // Pure cure (e.g. only an Unwanted Audience negation) — nothing to pass on
+    }
+
     // Step 3: Find eligible second targets
-    const secondTargets = getSecondTargets(engine.gs, engine, firstTarget, removedStatuses, poisonStacks);
+    const secondTargets = getSecondTargets(engine.gs, engine, firstTarget, transferStatuses, poisonStacks);
     if (secondTargets.length === 0) {
-      engine.log('tea_no_second_target', { removedStatuses });
+      engine.log('tea_no_second_target', { removedStatuses: transferStatuses });
       return; // No eligible targets — effect is done
     }
 
@@ -245,7 +259,7 @@ module.exports = {
     const statusDataMap = {};
     for (const s of statuses) statusDataMap[s.key] = s.statusData || {};
 
-    for (const key of removedStatuses) {
+    for (const key of transferStatuses) {
       if (secondTarget.type === 'hero') {
         if (key === 'poisoned') {
           await engine.addHeroStatus(secondTarget.owner, secondTarget.heroIdx, 'poisoned', { stacks: poisonStacks, appliedBy: pi });

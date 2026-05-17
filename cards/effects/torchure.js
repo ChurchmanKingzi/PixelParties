@@ -34,7 +34,8 @@ module.exports = {
       const target = await ctx.promptDamageTarget({
         side: 'my',
         types: ['hero'],
-        damageType: null,
+        damageType: 'status',
+        dealsDamage: false, // Poison only — no damage; don't wake damage-mitigation Reactions (Spectral Armor)
         title: 'Torchure',
         description: 'Choose one of your Heroes to Poison (2 stacks, permanent).',
         confirmLabel: '\u2620\uFE0F Torchure!',
