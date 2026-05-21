@@ -9156,6 +9156,15 @@ body:has(.textbox-overlay) .tooltip {
   gap: 12px;
 }
 
+/* ═══ Daily challenge button ═══ */
+@keyframes daily-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(255,215,0,.55), 0 0 16px rgba(255,215,0,.25); border-color: #ffd700; }
+  50%      { box-shadow: 0 0 18px rgba(255,215,0,.95), 0 0 32px rgba(255,215,0,.45); border-color: #fff2a8; }
+}
+.menu-daily-btn { transition: transform .15s, filter .15s; }
+.menu-daily-btn:hover { transform: scale(1.04); filter: brightness(1.15); }
+.menu-daily-btn.is-available { animation: daily-glow 1.6s ease-in-out infinite; }
+
 @media (max-height: 500px) {
   /* Landscape mobile — reorganize menu to horizontal */
   .main-menu-screen { flex-direction: row !important; gap: 0 !important; padding: 10px 24px !important; justify-content: center !important; }

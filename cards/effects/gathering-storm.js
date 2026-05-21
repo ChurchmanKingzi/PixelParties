@@ -307,7 +307,10 @@ module.exports = {
 
       // Pre-damage post-target hand-reaction window — one consolidated
       // prompt per Gathering Storm tick for Sculpture Guards etc.
-      await engine.preDamageMultiTargetWindow(source, chosen);
+      // A full-negate reaction (Storm Ring / Invisibility Cloak) bails
+      // this tick entirely — no animation, no damage, no side effects.
+      const _negR = await engine.preDamageMultiTargetWindow(source, chosen);
+      if (_negR?.effectNegated) return;
 
       // ── Animate + damage each picked target ──
       // Dedicated `gathering_storm_strike` event so the client can

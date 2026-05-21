@@ -53,7 +53,7 @@ function applyCrystalCostMods(me, cardName, baseCost) {
   return baseCost * 2;
 }
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, revealTooltipWhenFaceDown, abilities }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, revealTooltipWhenFaceDown, abilities, effectiveLevel, stampBonus, showLevelBadge }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
@@ -82,12 +82,17 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   const tooltipTarget = (() => {
     if (!tooltipBase) return null;
     const hasLiveAbilities = Array.isArray(abilities) && abilities.length > 0;
-    if (hp == null && maxHp == null && atk == null && (!inheritedEffects || inheritedEffects.length === 0) && !hasLiveAbilities) return tooltipBase;
+    if (hp == null && maxHp == null && atk == null && effectiveLevel == null && (!inheritedEffects || inheritedEffects.length === 0) && !hasLiveAbilities) return tooltipBase;
     return {
       ...tooltipBase,
       _liveHp:    hp    != null ? hp    : tooltipBase._liveHp,
       _liveMaxHp: maxHp != null ? maxHp : tooltipBase._liveMaxHp,
       _liveAtk:   atk   != null ? atk   : tooltipBase._liveAtk,
+      // Lethe pile-stamp aware level — feeds CardTooltipContent's
+      // stats line so the hover preview shows the effective Lv (with
+      // a "(+N)" suffix when the bonus is non-zero).
+      _liveLevel: effectiveLevel != null ? effectiveLevel : tooltipBase._liveLevel,
+      _stampBonus: stampBonus != null ? stampBonus : tooltipBase._stampBonus,
       _inheritedEffects: (inheritedEffects && inheritedEffects.length > 0)
         ? inheritedEffects
         : tooltipBase._inheritedEffects,
@@ -140,6 +145,24 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
         <div className="board-card-text">{cardName || '?'}</div>
       )}
       {label && <div className="board-card-label">{label}</div>}
+      {/* Pile-level badge — only shown when the caller opts in via
+          `showLevelBadge` (BoardZone for discard / deleted does so).
+          Support-zone Creatures suppress this and use the existing
+          `.creature-level` badge below the board grid, which already
+          accounts for `actionChangeLevel` deltas and Lethe bonuses.
+          Purple-tinted + glow when `stampBonus > 0`. */}
+      {showLevelBadge && effectiveLevel != null && !faceDown && (
+        <div style={{
+          position: 'absolute', top: 3, left: 3,
+          background: 'rgba(0,0,0,.85)',
+          color: stampBonus > 0 ? '#c4a8ff' : '#fff',
+          padding: '2px 6px', borderRadius: 4,
+          fontSize: 11, fontWeight: 700,
+          border: '1px solid ' + (stampBonus > 0 ? '#a288ff' : 'rgba(255,255,255,0.3)'),
+          pointerEvents: 'none', zIndex: 4,
+          boxShadow: stampBonus > 0 ? '0 0 6px rgba(162,136,255,.6)' : 'none',
+        }}>Lv {effectiveLevel}{stampBonus > 0 ? ` (+${stampBonus})` : ''}</div>
+      )}
       {hp != null && maxHp != null && hp > maxHp && (
         <div className="board-card-overheal-barrier" />
       )}
@@ -173,23 +196,47 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   );
 }
 
-function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style, className, dataAttrs }) {
+function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style, className, dataAttrs, ownerLetheStamps }) {
   const cls = 'board-zone board-zone-' + type + (className ? ' ' + className : '') + ((cards?.length > 0) ? ' zone-has-card' : '');
   const topCardName = cards && cards.length > 0 && !faceDown ? cards[cards.length - 1] : null;
   const suppressChildTooltip = !!onClick && !!onHoverCard;
+  // For discard/deleted zones, the top card's effective level is the
+  // base printed level plus the max Lethe stamp on any copy of that
+  // name in the owner's combined piles. The same value `effectiveCardLevel`
+  // uses, so the player sees exactly what the revival gates will see.
+  const topLevelInfo = (() => {
+    if (!topCardName || (type !== 'discard' && type !== 'deleted')) return null;
+    const cd = CARDS_BY_NAME[topCardName];
+    if (!cd || cd.cardType !== 'Creature' || cd.level == null) return null;
+    const arr = ownerLetheStamps?.[topCardName];
+    let stamp = 0;
+    if (Array.isArray(arr)) for (const v of arr) if (v > stamp) stamp = v;
+    return { effectiveLevel: (cd.level || 0) + stamp, stampBonus: stamp };
+  })();
+  // BoardZone-level hover dispatch. The shared pile-hover tooltip
+  // (rendered at the page root) accepts EITHER a bare card-name string
+  // OR an enriched `{ name, effectiveLevel, stampBonus }` object so it
+  // can render the Lethe-stamped level without re-reading the player
+  // state. Pile/stack hovers without stamp info fall through to the
+  // string form — the tooltip handles both shapes.
+  const hoverPayload = topCardName == null ? null : (topLevelInfo
+    ? { name: topCardName, effectiveLevel: topLevelInfo.effectiveLevel, stampBonus: topLevelInfo.stampBonus }
+    : topCardName);
   return (
     <div className={cls + (onClick && cards?.length > 0 ? ' board-zone-clickable' : '')}
       style={style}
       {...(dataAttrs || {})}
       onClick={onClick && cards?.length > 0 ? onClick : undefined}
-      onMouseEnter={() => topCardName && onHoverCard && !window.activeDragData && !window.deckDragState && onHoverCard(topCardName)}
+      onMouseEnter={() => hoverPayload && onHoverCard && !window.activeDragData && !window.deckDragState && onHoverCard(hoverPayload)}
       onMouseLeave={() => onHoverCard && onHoverCard(null)}>
       {cards && cards.length > 0 ? (
         cards.length === 1 ? (
-          <BoardCard cardName={cards[0]} faceDown={faceDown} flipped={flipped} label={stackLabel} noTooltip={suppressChildTooltip} />
+          <BoardCard cardName={cards[0]} faceDown={faceDown} flipped={flipped} label={stackLabel} noTooltip={suppressChildTooltip}
+            effectiveLevel={topLevelInfo?.effectiveLevel} stampBonus={topLevelInfo?.stampBonus} showLevelBadge={topLevelInfo != null} />
         ) : (
           <div className="board-stack">
-            <BoardCard cardName={cards[cards.length - 1]} faceDown={faceDown} flipped={flipped} label={stackLabel || (cards.length + '')} noTooltip={suppressChildTooltip} />
+            <BoardCard cardName={cards[cards.length - 1]} faceDown={faceDown} flipped={flipped} label={stackLabel || (cards.length + '')} noTooltip={suppressChildTooltip}
+              effectiveLevel={topLevelInfo?.effectiveLevel} stampBonus={topLevelInfo?.stampBonus} showLevelBadge={topLevelInfo != null} />
           </div>
         )
       ) : children || (
@@ -11346,6 +11393,13 @@ const ANIM_REGISTRY = {
       const startY = -240;
       const endX   = vw / 2;
       const endY   = vh / 2;
+      // Travel vector (down-left, from top-right → centre). The whole
+      // meteor group is rotated to this angle so the rock HEAD points
+      // along the direction of motion and the fiery tail trails BEHIND
+      // it. (Previously the ☄️ emoji just spun 0°→180°, so it was never
+      // aligned to the path.)
+      const travelDeg = Math.atan2(endY - startY, endX - startX) * 180 / Math.PI;
+      const ROCK = 150, ROCK_R = ROCK / 2, TAIL_LEN = 460, TAIL_H = 64;
       const sparks = useMemo(() => Array.from({ length: 40 }, () => {
         const angle = Math.random() * Math.PI * 2;
         const speed = 80 + Math.random() * 200;
@@ -11372,17 +11426,11 @@ const ANIM_REGISTRY = {
       return (
         <div style={{ position: 'fixed', left: 0, top: 0, width: '100vw', height: '100vh',
                        pointerEvents: 'none', zIndex: 10200, overflow: 'hidden' }}>
-          {/* Meteor — falls from top-right to centre over 1.3s, then explodes */}
-          <div style={{
-            position: 'absolute',
-            left: startX + 'px', top: startY + 'px',
-            fontSize: '180px',
-            filter: 'drop-shadow(0 0 30px #ff5500) drop-shadow(0 0 60px #ff2200) drop-shadow(0 0 90px #ff0000)',
-            '--cataDx': (endX - startX) + 'px',
-            '--cataDy': (endY - startY) + 'px',
-            animation: 'cataclysmFall 1300ms cubic-bezier(0.4, 0.0, 0.6, 1) forwards',
-          }}>☄️</div>
-          {/* Trail behind meteor */}
+          {/* Meteor — flies from top-right to centre over 1.3s, then
+              explodes. Outer div = the moving anchor (TRANSLATE only,
+              no spin). Inner group is rotated to the travel angle, so
+              local +X = direction of motion: the rock head leads, the
+              fiery tail trails directly behind it. */}
           <div style={{
             position: 'absolute',
             left: startX + 'px', top: startY + 'px',
@@ -11392,35 +11440,75 @@ const ANIM_REGISTRY = {
             animation: 'cataclysmFall 1300ms cubic-bezier(0.4, 0.0, 0.6, 1) forwards',
           }}>
             <div style={{
-              position: 'absolute',
-              left: '20px', top: '40px',
-              width: '380px', height: '12px',
-              borderRadius: '6px',
-              background: 'linear-gradient(90deg, transparent, rgba(255,90,0,.4) 30%, rgba(255,200,0,.85) 70%, #fff)',
-              filter: 'blur(8px)',
-              transformOrigin: '100% 50%',
-              transform: `rotate(${Math.atan2(endY - startY, endX - startX) * 180 / Math.PI + 180}deg)`,
-            }} />
+              position: 'absolute', left: 0, top: 0,
+              transform: `rotate(${travelDeg}deg)`,
+              transformOrigin: '0 0',
+              // Rock + tail vanish the instant they touch down (delay
+              // matches the 1300ms fall / the explosion), so the comet
+              // is consumed by the blast instead of sitting at centre
+              // while the explosion fades. Opacity-only keyframe — the
+              // static travel-angle rotate above is preserved.
+              opacity: 1,
+              animation: 'cataclysmVanish 120ms linear 1300ms forwards',
+            }}>
+
+              {/* Fiery tail — extends BACKWARD (local -X), so it always
+                  trails behind the rock opposite the travel direction.
+                  Hot/white at the rock end, fading to nothing far back. */}
+              <div style={{
+                position: 'absolute',
+                left: (-TAIL_LEN) + 'px', top: (-TAIL_H / 2) + 'px',
+                width: TAIL_LEN + 'px', height: TAIL_H + 'px',
+                borderRadius: TAIL_H + 'px',
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,60,0,.35) 22%, rgba(255,140,0,.7) 55%, rgba(255,210,80,.92) 82%, #fff 100%)',
+                filter: 'blur(9px)',
+              }} />
+              {/* Rock head — charred boulder with a molten leading edge.
+                  Centred on the moving anchor (local 0,0) so it's the
+                  foremost point in the direction of travel. */}
+              <div style={{
+                position: 'absolute',
+                left: (-ROCK_R) + 'px', top: (-ROCK_R) + 'px',
+                width: ROCK + 'px', height: ROCK + 'px',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle at 62% 50%, #fff2c0 0%, #ffae2e 14%, #ff6a00 32%, #b32d00 56%, #571800 78%, #2a0c00 100%)',
+                boxShadow: 'inset -14px 0 26px rgba(0,0,0,.55), inset 16px 0 30px rgba(255,180,60,.5)',
+                filter: 'drop-shadow(0 0 26px #ff5500) drop-shadow(0 0 52px #ff2200) drop-shadow(0 0 84px #ff0000)',
+              }} />
+            </div>
           </div>
-          {/* Impact flash — bright white-yellow shockwave */}
+          {/* ENORMOUS impact explosion — a screen-engulfing fireball
+              centred where the meteor lands. 220vmax guarantees full
+              coverage on any aspect ratio even with an off-centre
+              impact. Fires the instant the meteor touches down (delay
+              matches the 1300ms fall). */}
           <div style={{
             position: 'absolute',
-            left: endX - 250 + 'px', top: endY - 250 + 'px',
-            width: '500px', height: '500px',
+            left: endX + 'px', top: endY + 'px',
+            width: '220vmax', height: '220vmax',
+            marginLeft: '-110vmax', marginTop: '-110vmax',
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,200,.9) 0%, rgba(255,180,0,.7) 25%, rgba(255,80,0,.4) 55%, transparent 80%)',
+            background: 'radial-gradient(circle, #ffffff 0%, rgba(255,246,205,.98) 8%, rgba(255,193,46,.95) 20%, rgba(255,110,0,.85) 38%, rgba(200,40,0,.6) 58%, rgba(90,12,0,.28) 75%, transparent 88%)',
             opacity: 0,
-            animation: 'cataclysmFlash 900ms ease-out 1300ms forwards',
+            animation: 'cataclysmFlash 1150ms ease-out 1300ms forwards',
           }} />
-          {/* Outer shockwave */}
+          {/* Blinding full-viewport whiteout at the moment of impact */}
+          <div style={{
+            position: 'fixed', left: 0, top: 0,
+            width: '100vw', height: '100vh',
+            background: '#fff', opacity: 0,
+            animation: 'cataclysmWhiteout 620ms ease-out 1300ms forwards',
+          }} />
+          {/* Massive expanding shockwave ring */}
           <div style={{
             position: 'absolute',
-            left: endX - 50 + 'px', top: endY - 50 + 'px',
-            width: '100px', height: '100px',
-            border: '8px solid rgba(255,140,0,.8)',
+            left: endX - 60 + 'px', top: endY - 60 + 'px',
+            width: '120px', height: '120px',
+            border: '14px solid rgba(255,160,40,.85)',
             borderRadius: '50%',
             opacity: 0,
-            animation: 'cataclysmShockwave 1100ms ease-out 1300ms forwards',
+            boxShadow: '0 0 60px rgba(255,120,0,.7), inset 0 0 40px rgba(255,170,0,.6)',
+            animation: 'cataclysmShockwave 1250ms ease-out 1300ms forwards',
           }} />
           {/* Lingering flames at impact */}
           {flames.map((f, i) => (
@@ -11450,17 +11538,35 @@ const ANIM_REGISTRY = {
           ))}
           <style>{`
             @keyframes cataclysmFall {
-              0%   { transform: translate(0, 0) rotate(0deg); }
-              100% { transform: translate(var(--cataDx), var(--cataDy)) rotate(180deg); }
+              /* TRANSLATE only — the rock's orientation is a fixed
+                 rotate() on the inner group set to the travel angle,
+                 so it stays locked pointing along its path (no spin). */
+              0%   { transform: translate(0, 0); }
+              100% { transform: translate(var(--cataDx), var(--cataDy)); }
+            }
+            @keyframes cataclysmVanish {
+              0%   { opacity: 1; }
+              100% { opacity: 0; }
             }
             @keyframes cataclysmFlash {
-              0%   { opacity: 0; transform: scale(0.2); }
-              25%  { opacity: 1; transform: scale(1); }
-              100% { opacity: 0; transform: scale(1.5); }
+              /* Screen-engulfing fireball: punches out from the impact
+                 point, holds opaque while it covers the board, then
+                 fades. */
+              0%   { opacity: 0;   transform: scale(0.04); }
+              10%  { opacity: 1;   transform: scale(0.45); }
+              30%  { opacity: 1;   transform: scale(1); }
+              60%  { opacity: 0.92; transform: scale(1.04); }
+              100% { opacity: 0;   transform: scale(1.12); }
+            }
+            @keyframes cataclysmWhiteout {
+              0%   { opacity: 0; }
+              12%  { opacity: 0.92; }
+              38%  { opacity: 0.5; }
+              100% { opacity: 0; }
             }
             @keyframes cataclysmShockwave {
-              0%   { opacity: 0.9; transform: scale(0.4); border-width: 8px; }
-              100% { opacity: 0;   transform: scale(8);   border-width: 1px; }
+              0%   { opacity: 0.95; transform: scale(0.3); border-width: 14px; }
+              100% { opacity: 0;    transform: scale(16);  border-width: 1px; }
             }
             @keyframes cataclysmEmber {
               0%   { opacity: 0; transform: scale(0.3); }
@@ -12636,7 +12742,7 @@ function CardNamePickerPrompt({ ep, onRespond }) {
 // card name; the header shows "(filtered/total)" while a filter is
 // active so the player can quickly answer "how many of card X are
 // still in this pile?".
-function PileSearchModal({ title, cards, onClose, preserveOrder = false }) {
+function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLetheStamps = null }) {
   const [filter, setFilter] = useState('');
   const TYPE_ORDER = ['Hero', 'Creature', 'Spell', 'Attack', 'Artifact', 'Ability', 'Potion', 'Ascended Hero', 'Token'];
   const sorted = useMemo(() => {
@@ -12698,7 +12804,38 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false }) {
               {filtered.map((name, i) => {
                 const card = CARDS_BY_NAME[name];
                 if (!card) return null;
-                return <CardMini key={name + '-' + i} card={card} onClick={() => {}} style={{ width: '100%', height: 120 }} />;
+                // Lethe per-pile stamp lookup — when the modal was
+                // opened on a pile, the caller threads the owner's
+                // `letheStamps` map. Max stamp on any current
+                // occurrence of this name is what `effectiveCardLevel`
+                // uses, so the badge matches the engine's gates.
+                const isCreature = card.cardType === 'Creature' && card.level != null;
+                let stamp = 0;
+                if (isCreature && ownerLetheStamps) {
+                  const arr = ownerLetheStamps[name];
+                  if (Array.isArray(arr)) for (const v of arr) if (v > stamp) stamp = v;
+                }
+                const effectiveLevel = isCreature ? (card.level || 0) + stamp : null;
+                const displayCard = stamp > 0
+                  ? { ...card, level: effectiveLevel, _liveLevel: effectiveLevel, _stampBonus: stamp }
+                  : card;
+                return (
+                  <div key={name + '-' + i} style={{ position: 'relative', width: '100%', height: 120 }}>
+                    <CardMini card={displayCard} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                    {effectiveLevel != null && (
+                      <div style={{
+                        position: 'absolute', top: 2, left: 2,
+                        background: 'rgba(0,0,0,.85)',
+                        color: stamp > 0 ? '#c4a8ff' : '#fff',
+                        padding: '2px 6px', borderRadius: 4,
+                        fontSize: 11, fontWeight: 700,
+                        border: '1px solid ' + (stamp > 0 ? '#a288ff' : 'rgba(255,255,255,0.3)'),
+                        pointerEvents: 'none', zIndex: 5,
+                        boxShadow: stamp > 0 ? '0 0 6px rgba(162,136,255,.6)' : 'none',
+                      }}>Lv {effectiveLevel}{stamp > 0 ? ` (+${stamp})` : ''}</div>
+                    )}
+                  </div>
+                );
               })}
             </div>
           </div>
@@ -24984,7 +25121,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                             tooltipCardOverride={tooltipOverride}
                           />;
                         }
-                        return <BoardCard cardName={cards[0]} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={creatureStyle} tooltipCardOverride={tooltipOverride} inheritedEffects={cc?._inheritedEffects} />;
+                        // Tooltip-only effective level: printed +
+                        // `cc.level` delta + Lethe stamp bonus. Passed
+                        // via the `effectiveLevel` / `stampBonus` props
+                        // so CardTooltipContent's hover preview shows
+                        // the bumped Lv (with the purple "(+N)" suffix
+                        // when the bonus is non-zero). `showLevelBadge`
+                        // stays false — the on-card creature-level
+                        // badge below already renders the same number.
+                        const _cardLvl = (cc?._cardDataOverride?.level != null
+                          ? cc._cardDataOverride.level
+                          : (CARDS_BY_NAME[cards[0]]?.level || 0));
+                        const _delta = cc?.level || 0;
+                        const _letheBonus = cc?._letheLevelBonus || 0;
+                        const _effLvl = CARDS_BY_NAME[cards[0]]?.level != null || cc?._cardDataOverride?.level != null
+                          ? _cardLvl + _delta + _letheBonus
+                          : null;
+                        return <BoardCard cardName={cards[0]} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={creatureStyle} tooltipCardOverride={tooltipOverride} inheritedEffects={cc?._inheritedEffects}
+                          effectiveLevel={_effLvl} stampBonus={_letheBonus} />;
                       })()
                     ) : (
                       <div className="board-stack">
@@ -24994,25 +25148,37 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     {(() => {
                       // `cc.level` is the DELTA from base (engine's
                       // `actionChangeLevel` accumulates here). Show the
-                      // effective level — base + delta — so a Field
-                      // Cannon (base 3) reduced by 1 reads "Lv2" not
-                      // "Lv-1", and a Lv0 slime that's gained 2 levels
-                      // still reads "Lv2" (0 + 2). For tokens whose
+                      // effective level — base + delta + Lethe stamp —
+                      // so a Field Cannon (base 3) reduced by 1 reads
+                      // "Lv2" not "Lv-1", a Lv0 slime that's gained 2
+                      // levels still reads "Lv2" (0 + 2), and a Necro-
+                      // revived Creature carrying a `_letheLevelBonus`
+                      // shows its stamped level too. For tokens whose
                       // base level is set per-instance via
                       // `_cardDataOverride.level` (Biomancy Token
                       // mirroring its Biomancy ability's level), prefer
                       // the override over the static DB level and show
                       // the badge unconditionally — those tokens
-                      // wouldn't display a level otherwise (delta is 0
-                      // and the static DB entry has `level: null`).
+                      // wouldn't display a level otherwise.
                       const delta = cc?.level || 0;
+                      const letheBonus = cc?._letheLevelBonus || 0;
                       const overrideLvl = cc?._cardDataOverride?.level;
-                      if (delta === 0 && overrideLvl == null) return null;
+                      if (delta === 0 && letheBonus === 0 && overrideLvl == null) return null;
                       const topName = cards[cards.length - 1];
                       const baseLvl = overrideLvl != null
                         ? overrideLvl
                         : (CARDS_BY_NAME[topName]?.level || 0);
-                      return <div className="creature-level">Lv{baseLvl + delta}</div>;
+                      const total = baseLvl + delta + letheBonus;
+                      return (
+                        <div className="creature-level"
+                          style={letheBonus > 0 ? {
+                            color: '#c4a8ff',
+                            textShadow: '0 0 6px rgba(162,136,255,.8)',
+                            borderColor: '#a288ff',
+                          } : undefined}>
+                          Lv{total}{letheBonus > 0 ? ` (+${letheBonus})` : ''}
+                        </div>
+                      );
                     })()}
                     {cc?.headCounter > 0 ? (
                       <div className="head-counter-badge"
@@ -25326,15 +25492,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           })()}
           <div className="board-util board-util-left">
             <div className="board-util-side">
-              <div data-opp-discard="1"><BoardZone type="discard" cards={oppDiscardHidden > 0 ? opp.discardPile.slice(0, -oppDiscardHidden) : opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} /></div>
-              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} /></div>
+              <div data-opp-discard="1"><BoardZone type="discard" cards={oppDiscardHidden > 0 ? opp.discardPile.slice(0, -oppDiscardHidden) : opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} ownerLetheStamps={opp.letheStamps} /></div>
+              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} ownerLetheStamps={opp.letheStamps} /></div>
               <div className="board-util-spacer" />
             </div>
             <div className="board-util-mid" />
             <div className="board-util-side">
               <div className="board-util-spacer" />
-              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} /></div>
-              <div data-my-discard="1"><BoardZone type="discard" cards={myDiscardHidden > 0 ? me.discardPile.slice(0, -myDiscardHidden) : me.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} /></div>
+              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} ownerLetheStamps={me.letheStamps} /></div>
+              <div data-my-discard="1"><BoardZone type="discard" cards={myDiscardHidden > 0 ? me.discardPile.slice(0, -myDiscardHidden) : me.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} ownerLetheStamps={me.letheStamps} /></div>
             </div>
           </div>
 
@@ -26436,12 +26602,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </div>
       )}
 
-      {/* Pile hover tooltip (rendered at top level to escape overflow clipping) */}
-      {hoveredPileCard && CARDS_BY_NAME[hoveredPileCard] && (() => {
-        const card = CARDS_BY_NAME[hoveredPileCard];
+      {/* Pile hover tooltip (rendered at top level to escape overflow clipping).
+          Accepts either a bare card-name string (Coolness Stack hover,
+          legacy callers) or an enriched `{ name, effectiveLevel,
+          stampBonus }` object (discard/deleted BoardZone) so the Lethe-
+          stamped level shows here too. */}
+      {hoveredPileCard && (() => {
+        const hoverName = typeof hoveredPileCard === 'string' ? hoveredPileCard : hoveredPileCard?.name;
+        const hoverEffLvl = typeof hoveredPileCard === 'string' ? null : hoveredPileCard?.effectiveLevel;
+        const hoverStamp = typeof hoveredPileCard === 'string' ? 0 : (hoveredPileCard?.stampBonus || 0);
+        const card = hoverName ? CARDS_BY_NAME[hoverName] : null;
+        if (!card) return null;
         const imgUrl = cardImageUrl(card.name);
         const foilType = card.foil || null;
         const isFoil = foilType === 'secret_rare' || foilType === 'diamond_rare';
+        const shownLevel = hoverEffLvl != null ? hoverEffLvl : card.level;
         return (
           <div className="board-tooltip">
             {imgUrl && (
@@ -26460,7 +26635,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {card.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {card.hp}</span>}
                 {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {card.atk}</span>}
                 {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {card.cost}</span>}
-                {card.level != null && <span>Lv{card.level}</span>}
+                {shownLevel != null && (
+                  <span style={hoverStamp > 0 ? { color: '#c4a8ff', fontWeight: 700 } : undefined}>
+                    Lv {shownLevel}{hoverStamp > 0 ? ` (+${hoverStamp})` : ''}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -26831,12 +27010,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         />
       )}
 
-      {/* Pile viewer (own/opp discard or deleted) — searchable */}
+      {/* Pile viewer (own/opp discard or deleted) — searchable.
+          `ownerLetheStamps` is forwarded only for discard/deleted
+          piles (Coolness Stack views set no ownerIdx) so the modal
+          can render Lethe per-pile level badges. */}
       {pileViewer && (
         <PileSearchModal
           title={pileViewer.title}
           cards={pileViewer.cards || []}
           preserveOrder={pileViewer.preserveOrder}
+          ownerLetheStamps={pileViewer.ownerIdx != null
+            ? (gameState.players?.[pileViewer.ownerIdx]?.letheStamps || null)
+            : null}
           onClose={() => setPileViewer(null)}
         />
       )}
@@ -26963,6 +27148,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Effect Prompt: Card Gallery Picker ── */}
       {isMyEffectPrompt && ep.type === 'cardGallery' && (() => {
         const cards = ep.cards || [];
+        // Lethe per-pile stamps — when gallery entries are sourced from
+        // the prompted player's own discard / deleted, show the stamped
+        // effective level on each Creature so picks reflect the actual
+        // revival cost. Source is `entry.source`; ownership is implicit
+        // (own piles only — every live caller passes the activator's
+        // side). Stamps are Creature-only by spec.
+        const myStamps = (gameState?.players?.[myIdx]?.letheStamps) || {};
+        const stampForEntry = (entry, cardData) => {
+          if (!cardData || cardData.cardType !== 'Creature') return 0;
+          if (entry.source !== 'discard' && entry.source !== 'deleted') return 0;
+          const arr = myStamps[entry.name];
+          if (!arr || !arr.length) return 0;
+          let m = 0;
+          for (const v of arr) if (v > m) m = v;
+          return m;
+        };
+        const effectiveLevelFor = (entry, cardData) => {
+          if (!cardData || cardData.cardType !== 'Creature' || cardData.level == null) return null;
+          return (cardData.level || 0) + stampForEntry(entry, cardData);
+        };
         return (
           <div className="modal-overlay" onClick={ep.cancellable !== false ? () => respondToPrompt({ cancelled: true }) : undefined}>
             <DraggablePanel className="modal animate-in deck-viewer-modal" style={{ maxWidth: 600 }}>
@@ -26980,11 +27185,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {cards.map((entry, i) => {
                   const card = CARDS_BY_NAME[entry.name];
                   if (!card) return null;
+                  const stamp = stampForEntry(entry, card);
+                  const effLvl = effectiveLevelFor(entry, card);
+                  const displayCard = stamp > 0 && effLvl != null
+                    ? { ...card, level: effLvl, _liveLevel: effLvl, _stampBonus: stamp }
+                    : card;
                   return (
                     <div key={entry.name + '-' + entry.source + '-' + i} style={{ position: 'relative' }}>
-                      <CardMini card={card}
+                      <CardMini card={displayCard}
                         onClick={() => { if (window.playSFX) window.playSFX('ui_click'); respondToPrompt({ cardName: entry.name, source: entry.source }); }}
                         style={{ width: '100%', height: 120, cursor: 'pointer' }} />
+                      {effLvl != null && (
+                        <div style={{
+                          position: 'absolute', top: 2, left: 2,
+                          background: 'rgba(0,0,0,.85)',
+                          color: stamp > 0 ? '#c4a8ff' : '#fff',
+                          padding: '2px 6px', borderRadius: 4,
+                          fontSize: 11, fontWeight: 700,
+                          border: '1px solid ' + (stamp > 0 ? '#a288ff' : 'rgba(255,255,255,0.3)'),
+                          pointerEvents: 'none', zIndex: 5,
+                          boxShadow: stamp > 0 ? '0 0 6px rgba(162,136,255,.6)' : 'none',
+                        }}>Lv {effLvl}{stamp > 0 ? ` (+${stamp})` : ''}</div>
+                      )}
                       {entry.count != null && (
                         <div style={ep.emphasizeCount ? {
                           // Loud variant — used by cards where the discard /

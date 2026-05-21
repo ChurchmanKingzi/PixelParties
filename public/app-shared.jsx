@@ -1986,7 +1986,19 @@ function CardTooltipContent({ card, children, imageUrl }) {
             <span style={{ color: '#ffaa44' }}>⚔ ATK {card._liveAtk != null ? card._liveAtk : card.atk}</span>
           )}
           {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {card.cost}</span>}
-          {card.level != null && <span>Lv{card.level}</span>}
+          {/* Lv — prefer live `_liveLevel` (BoardCard threads the pile-
+              stamped value for discard/deleted top cards) over the
+              cards.json base. A non-zero `_stampBonus` paints the badge
+              purple + adds a "(+N)" suffix so the player can see at a
+              glance that this is a stamp-bumped read, not the printed
+              level. */}
+          {(card._liveLevel != null || card.level != null) && (() => {
+            const eff = card._liveLevel != null ? card._liveLevel : card.level;
+            const bonus = card._stampBonus || 0;
+            return <span style={bonus > 0 ? { color: '#c4a8ff', fontWeight: 700 } : undefined}>
+              Lv {eff}{bonus > 0 ? ` (+${bonus})` : ''}
+            </span>;
+          })()}
         </div>
         {/* Abilities row. When BoardCard threads the LIVE
             `abilityZones[heroIdx]` shape via `_liveAbilities`, render

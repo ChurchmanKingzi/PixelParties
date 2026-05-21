@@ -52,7 +52,7 @@ module.exports = {
         if (seen.has(name)) continue;
         const cd = cardDB[name];
         if (!cd || cd.cardType !== 'Creature') continue;
-        const lvl = engine.effectiveCardLevel(cd, pi);
+        const lvl = engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' });
         if (lvl > 1) continue;
         if (!isDeepseaCreature(name, engine)) continue;
         seen.add(name);

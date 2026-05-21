@@ -121,10 +121,14 @@ module.exports = {
             heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name,
           });
         }
-        await engine.preDamageMultiTargetWindow(
+        const _negR = await engine.preDamageMultiTargetWindow(
           { name: CARD_NAME, owner: pi, heroIdx },
           allTgts,
         );
+        // Full-negate reaction (Storm Ring / Invisibility Cloak): bail
+        // BEFORE damage, the Bound lockout, and creature negation so
+        // the whole Spell is negated with no side effects.
+        if (_negR?.effectNegated) return;
       }
 
       // ── Step 3: deal damage + apply lockout to every alive opp Hero ──

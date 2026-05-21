@@ -185,7 +185,24 @@
       "Bash(sed -n '170,300p' timeless-king-zi.js)",
       "Read(//c/Users/kingz/.claude/projects/C--Pixel-Parties-WEB-PixelPartiesWeb/memory/**)",
       "Bash(cat project_reusable_card_patterns.md project_cpu_mcts_prompt_contracts.md)",
-      "Bash(grep -n \"sendToDiscard\\\\|discardByName\\\\|removeAllCopies\\\\|allCopiesToDiscard\\\\|actionDiscardSpecific\\\\|discardSpecific\\\\|sendCardsToPile\\\\|millSpecific\\\\|banishAllCopies\\\\|async actionMillCards\\\\|deck_to_discard_animation', {\" _engine.js)"
+      "Bash(grep -n \"sendToDiscard\\\\|discardByName\\\\|removeAllCopies\\\\|allCopiesToDiscard\\\\|actionDiscardSpecific\\\\|discardSpecific\\\\|sendCardsToPile\\\\|millSpecific\\\\|banishAllCopies\\\\|async actionMillCards\\\\|deck_to_discard_animation', {\" _engine.js)",
+      "Bash(grep -v '\\\\.png$')",
+      "Bash(grep -n \"^  [a-zA-Z_].*{$\\\\|^  async [a-zA-Z_].*{$\\\\|canPlayCardWithHero\\\\|_canHeroPlay\\\\|getPlayableHeroes\\\\|playableHeroesFor\" cards/effects/_engine.js)",
+      "Bash(grep -n \"ON_CREATURE_DEATH, {\\\\|AFTER_CREATURE_DAMAGE_BATCH, {\\\\|runHooks\\(HOOKS.ON_CREATURE_DEATH\\\\|runHooks\\(HOOKS.AFTER_CREATURE_DAMAGE_BATCH\\\\|BEFORE_CREATURE_DAMAGE_BATCH, {\" cards/effects/_engine.js)",
+      "Bash(grep -rn \"type: 'explosion'\\\\|play_zone_animation', {\" cards/effects/_engine.js)",
+      "Bash(sed -n '1,15p')",
+      "Bash(sed -n '1,60p' cards/effects/cloud-in-a-bottle.js)",
+      "Bash(sed -n '113,150p' cards/effects/cataclysm.js)",
+      "Bash(sed -n '98,140p' cards/effects/chain-lightning.js)",
+      "Bash(sed -n '120,150p' cards/effects/forbidden-zone.js)",
+      "Bash(sed -n '210,245p' cards/effects/laser-volley.js)",
+      "Bash(sed -n '305,340p' cards/effects/gathering-storm.js)",
+      "Bash(python -c ' *)",
+      "Bash([ -f \"cards/$f.png\" ])",
+      "Bash(python -c \"import json; d=json.load\\(open\\('data/cards.json'\\)\\); print\\(type\\(d\\)\\); print\\(len\\(d\\) if isinstance\\(d,list\\) else list\\(d.keys\\(\\)\\)[:5]\\)\")",
+      "Bash(python \"C:\\\\Users\\\\kingz\\\\AppData\\\\Local\\\\Temp\\\\cards_lint.py\")",
+      "Bash(python \"C:\\\\Users\\\\kingz\\\\AppData\\\\Local\\\\Temp\\\\cards_grammar.py\")",
+      "Bash(python \"C:\\\\Users\\\\kingz\\\\AppData\\\\Local\\\\Temp\\\\cards_fix.py\")"
     ]
   }
 }

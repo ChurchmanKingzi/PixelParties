@@ -78,9 +78,11 @@ function getEligibleCreatures(gs, pi, engine = null) {
   // per-card overrides, Mana Absorbing Crystal +1 on Spells, and the
   // generic reducer hooks. Falls back to raw level when no engine
   // ref is supplied (defensive — every live call site passes one).
-  const effLvl = (cd) =>
+  // `source` is forwarded so the discard branch picks up Lethe per-pile
+  // +1 stamps via `pileSide`; hand reads stay unstamped.
+  const effLvl = (cd, source) =>
     engine?.effectiveCardLevel
-      ? engine.effectiveCardLevel(cd, pi)
+      ? engine.effectiveCardLevel(cd, pi, source === 'discard' ? { pileSide: 'discard' } : {})
       : (cd.level || 0);
 
   const checkSource = (list, source) => {
@@ -88,7 +90,7 @@ function getEligibleCreatures(gs, pi, engine = null) {
       if (seen.has(name + ':' + source)) continue;
       const cd = cardDB[name];
       if (!cd || !hasCardType(cd, 'Creature')) continue;
-      if (effLvl(cd) > 3) continue;
+      if (effLvl(cd, source) > 3) continue;
       if (summonBlocked.includes(name)) continue;
       // Check if ANY living hero with free zones can summon this
       let canSummon = false;
@@ -142,15 +144,18 @@ module.exports = {
       const seen = new Set();
       const summonBlocked = gs.summonBlocked || [];
 
-      // Same effective-level helper as `getEligibleCreatures`.
-      const effLvl = (cd) => engine.effectiveCardLevel(cd, pi);
+      // Same effective-level helper as `getEligibleCreatures` —
+      // pile reads pick up Lethe per-pile stamps.
+      const effLvl = (cd, source) => engine.effectiveCardLevel(
+        cd, pi, source === 'discard' ? { pileSide: 'discard' } : {}
+      );
 
       const checkSrc = (list, source) => {
         for (const name of list) {
           if (seen.has(name + ':' + source)) continue;
           const cd = cardDB[name];
           if (!cd || !hasCardType(cd, 'Creature')) continue;
-          if (effLvl(cd) > 3) continue;
+          if (effLvl(cd, source) > 3) continue;
           if (summonBlocked.includes(name)) continue;
           let canSummon = false;
           for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -220,6 +225,7 @@ module.exports = {
       await engine._delay(100);
 
       // Execute: remove from source, place into support zone
+      let _letheBonus = 0;
       if (creatureSource === 'hand') {
         const idx = ps.hand.indexOf(creatureName);
         if (idx < 0) return { cancelled: true };
@@ -228,6 +234,7 @@ module.exports = {
         const idx = ps.discardPile.indexOf(creatureName);
         if (idx < 0) return { cancelled: true };
         ps.discardPile.splice(idx, 1);
+        _letheBonus = engine.consumeLetheStamp(pi, creatureName);
       }
 
       const hi = zone.heroIdx;
@@ -238,6 +245,7 @@ module.exports = {
       // Track card instance
       const inst = engine._trackCard(creatureName, pi, 'support', hi, si);
       inst.counters.isPlacement = 1;
+      if (_letheBonus > 0) inst.counters._letheLevelBonus = _letheBonus;
 
       engine.log('placement', { card: creatureName, by: 'Monster in a Bottle', from: creatureSource, heroIdx: hi, zoneSlot: si });
 

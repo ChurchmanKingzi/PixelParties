@@ -8054,15 +8054,15 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '') + (pt?.config?.redSelect ? ' sacrifice-targeting' : '')}>
           <div className="board-util board-util-left">
             <div className="board-util-side">
-              <div data-opp-discard="1"><BoardZone type="discard" cards={oppDiscardHidden > 0 ? opp.discardPile.slice(0, -oppDiscardHidden) : opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} /></div>
-              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} /></div>
+              <div data-opp-discard="1"><BoardZone type="discard" cards={oppDiscardHidden > 0 ? opp.discardPile.slice(0, -oppDiscardHidden) : opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} /></div>
+              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} /></div>
               <div className="board-util-spacer" />
             </div>
             <div className="board-util-mid" />
             <div className="board-util-side">
               <div className="board-util-spacer" />
-              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} /></div>
-              <div data-my-discard="1"><BoardZone type="discard" cards={myDiscardHidden > 0 ? me.discardPile.slice(0, -myDiscardHidden) : me.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} /></div>
+              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} /></div>
+              <div data-my-discard="1"><BoardZone type="discard" cards={myDiscardHidden > 0 ? me.discardPile.slice(0, -myDiscardHidden) : me.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} /></div>
             </div>
           </div>
 
@@ -8534,6 +8534,21 @@ function GameBoard({ gameState, lobby, onLeave }) {
           if (ta !== tb) return ta - tb;
           return a.localeCompare(b);
         });
+        // Lethe per-pile stamps — the owner-side player state carries a
+        // `_letheStamps[name] = [...occurrenceCounts]` map. Max stamp per
+        // name is what `effectiveCardLevel` uses for revival gates, so
+        // we display that as the +N badge on each rendered Creature.
+        const owner = pileViewer.ownerIdx != null
+          ? gameState.players?.[pileViewer.ownerIdx]
+          : null;
+        const stampsByName = (owner?.letheStamps || {});
+        const maxStampFor = (name) => {
+          const arr = stampsByName[name];
+          if (!arr || !arr.length) return 0;
+          let m = 0;
+          for (const v of arr) if (v > m) m = v;
+          return m;
+        };
         return (
           <div className="modal-overlay" onClick={() => setPileViewer(null)}>
             <DraggablePanel className="modal animate-in deck-viewer-modal">
@@ -8548,7 +8563,32 @@ function GameBoard({ gameState, lobby, onLeave }) {
                   {sorted.map((name, i) => {
                     const card = CARDS_BY_NAME[name];
                     if (!card) return null;
-                    return <CardMini key={name + '-' + i} card={card} onClick={() => {}} style={{ width: '100%', height: 120 }} />;
+                    const stamp = card.cardType === 'Creature' ? maxStampFor(name) : 0;
+                    const isCreature = card.cardType === 'Creature' && card.level != null;
+                    const effectiveLevel = isCreature ? (card.level || 0) + stamp : null;
+                    // Stamped Creatures get a synthetic card so the
+                    // tooltip and any inner Lv text on CardMini also
+                    // reflect the bumped value, not just the corner badge.
+                    const displayCard = stamp > 0 && isCreature
+                      ? { ...card, level: effectiveLevel, _liveLevel: effectiveLevel, _stampBonus: stamp }
+                      : card;
+                    return (
+                      <div key={name + '-' + i} style={{ position: 'relative', width: '100%', height: 120 }}>
+                        <CardMini card={displayCard} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                        {effectiveLevel != null && (
+                          <div style={{
+                            position: 'absolute', top: 2, left: 2,
+                            background: 'rgba(0,0,0,.85)',
+                            color: stamp > 0 ? '#c4a8ff' : '#fff',
+                            padding: '2px 6px', borderRadius: 4,
+                            fontSize: 11, fontWeight: 700,
+                            border: '1px solid ' + (stamp > 0 ? '#a288ff' : 'rgba(255,255,255,0.3)'),
+                            pointerEvents: 'none', zIndex: 5,
+                            boxShadow: stamp > 0 ? '0 0 6px rgba(162,136,255,.6)' : 'none',
+                          }}>Lv {effectiveLevel}{stamp > 0 ? ` (+${stamp})` : ''}</div>
+                        )}
+                      </div>
+                    );
                   })}
                 </div>
               ) : (

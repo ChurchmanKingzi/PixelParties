@@ -134,6 +134,50 @@ module.exports = {
   // blocks activating the effect while CC'd).
   bypassStatusFilter: true,
 
+  // ── CPU / MCTS state valuation ───────────────────────────────────
+  // Ralzish's "send any non-Hero board card to the discard pile" is
+  // gated on EXACTLY 2 Creatures in his Support Zones. We make the
+  // MCTS evaluator treat that board STATE as enormously desirable —
+  // close to the value of killing an enemy Hero (the evaluator's
+  // discrete hero-kill swing is ±500) — and grade the off-peak
+  // counts so the score strictly climbs as Ralzish approaches 2.
+  //
+  // This is intentionally a pure `evaluateState` term (read generically
+  // by the engine's per-instance `cpuMeta.cpuInstBonus` loop — no card
+  // name hard-coded in the CPU brain, no action heuristic). MCTS then
+  // discovers the behaviour on its own: when it expands a "summon a
+  // Creature" move, the child state where the Creature landed in
+  // Ralzish's Support Zone (0→1, 1→2) scores higher than landing it
+  // elsewhere, so the search prefers it; and 2→3 scores far LOWER than
+  // 2 (Ralzish loses the effect), so MCTS protects the exact-2 state
+  // and won't over-summon onto him. The bonus is scoped to Ralzish's
+  // OWN Support Zone count (`inst.heroIdx`), so summoning onto a
+  // different Hero never perturbs it — the CPU stays free to develop
+  // the rest of its board normally.
+  //
+  // Symmetry is automatic: the eval subtracts this for an opponent's
+  // Ralzish, so the CPU also values denying / breaking the opponent's
+  // exact-2 state.
+  cpuMeta: {
+    cpuInstBonus(engine, inst, ownerIdx) {
+      // Only the live Ralzish Hero instance contributes.
+      if (!inst || inst.zone !== 'hero') return 0;
+      const hero = engine.gs.players?.[ownerIdx]?.heroes?.[inst.heroIdx];
+      if (!hero?.name || hero.hp <= 0) return 0;
+
+      const n = creaturesInSupport(engine, ownerIdx, inst.heroIdx);
+      // Peak at exactly 2 (effect online) ≈ a hero kill. Graded so the
+      // MCTS gradient points monotonically toward 2 from below, and
+      // drops off a cliff past it so over-summoning is self-punishing.
+      switch (n) {
+        case 2:  return 450;   // effect ONLINE — almost a hero kill
+        case 1:  return 150;   // one summon away — strong pull to finish
+        case 3:  return 50;    // overshot: effect OFFLINE, far below 2
+        default: return 0;     // 0, or 4+ (badly overshot)
+      }
+    },
+  },
+
   /**
    * Gate: exactly 2 Creatures in Ralzish's Support Zones AND at least
    * one legal (non-Hero, non-recent-Creature) board target exists.

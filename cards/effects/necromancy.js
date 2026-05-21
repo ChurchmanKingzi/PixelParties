@@ -16,6 +16,11 @@
  * Count a hero's ability level for a given spell school.
  * Mirrors the standard server-side summoning eligibility check.
  * Performance copies count toward the base ability's school.
+ * Kept ONLY for the cpuMeta attachment-scoring branch below — the
+ * live activation path now defers to `engine.heroMeetsLevelReq`, which
+ * applies the full gap-coverage stack (Divinity, Wisdom paid coverage,
+ * per-hero overrides, MAC, Lethe stamps via `pileSide`, …) instead of
+ * the strict school count this helper used to perform.
  */
 function countAbilityLevel(ps, heroIdx, school) {
   let count = 0;
@@ -28,16 +33,6 @@ function countAbilityLevel(ps, heroIdx, school) {
     }
   }
   return count;
-}
-
-/**
- * Check if a hero can summon a creature based on spell school requirements.
- */
-function heroCanSummon(ps, heroIdx, creatureData) {
-  const level = creatureData.level || 0;
-  if (creatureData.spellSchool1 && countAbilityLevel(ps, heroIdx, creatureData.spellSchool1) < level) return false;
-  if (creatureData.spellSchool2 && countAbilityLevel(ps, heroIdx, creatureData.spellSchool2) < level) return false;
-  return true;
 }
 
 /**
@@ -79,9 +74,21 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel) {
     // reason.
     if (!cd || cd.cardType !== 'Creature') continue;
     // Effective level (Whoolmoth-style rebates + any future
-    // hand-active reducer that keys on card name).
-    if (engine.effectiveCardLevel(cd, pi) > necromancyLevel) continue;
-    if (!heroCanSummon(ps, heroIdx, cd)) continue;
+    // hand-active reducer that keys on card name). `pileSide: 'discard'`
+    // picks up Lethe's per-pile +1 stamps applied to Creatures present
+    // during prior Lethe-Necromancy resolutions — the +1 stacks against
+    // BOTH the Necromancy level cap (here) and the school requirement
+    // (`heroMeetsLevelReq` below, which is also stamp-aware).
+    const effLvl = engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' });
+    if (effLvl > necromancyLevel) continue;
+    // Full Hero-summon eligibility — defers to the centralized engine
+    // gate (Divinity-free / Wisdom-paid gap coverage, per-hero
+    // overrides, MAC, etc.), matching every other Creature-revival
+    // path. The local strict "school count ≥ printed level" check that
+    // used to live here predated Divinity / Wisdom on Creatures and
+    // silently blocked perfectly legal high-level revivals from any
+    // Hero whose host abilities relied on gap coverage to cast.
+    if (!engine.heroMeetsLevelReq(pi, heroIdx, cd, { pileSide: 'discard' })) continue;
     // Per-card summoning condition (canSummon). Without this, per-turn
     // summon limits ("you can only summon 1 Deepsea Primordium per
     // turn"), uniqueness gates (Cute Phoenix), and sacrifice tributes
@@ -191,6 +198,17 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
     const ps = ctx.players[pi];
     if (!ps) return false;
+    // Per-hero Necromancy lock — once a Hero with a per-turn limit
+    // override (Lethe, 3/turn) has used Necromancy this turn, it is
+    // pinned to that Hero for the rest of the turn. Other Necromancy
+    // Heroes on the same side are silenced even though `clearHOPT` has
+    // released the global slot. Stored as a `{ turn, heroName }` so it
+    // auto-expires when the turn ticks.
+    const lock = ps._necromancyLockedToHero;
+    if (lock && lock.turn === engine.gs.turn) {
+      const hostName = ps.heroes?.[heroIdx]?.name;
+      if (hostName && lock.heroName && hostName !== lock.heroName) return false;
+    }
     if (getFreeZones(ps, heroIdx).length === 0) return false;
     return getEligibleCreatures(engine, pi, heroIdx, level).length > 0;
   },
@@ -259,6 +277,11 @@ module.exports = {
     const discardIdx = ps.discardPile.indexOf(creatureName);
     if (discardIdx < 0) return false; // Safety — card no longer in discard
     ps.discardPile.splice(discardIdx, 1);
+    // Capture the highest Lethe pile-stamp for this name BEFORE the
+    // reconcile that the next stamp read would trigger, so the bonus
+    // follows the Creature onto the board instead of being silently
+    // dropped from the per-name occurrence array.
+    const _letheBonus = engine.consumeLetheStamp(pi, creatureName);
 
     // Place into support zone
     const hi = chosenZone.heroIdx;
@@ -268,6 +291,10 @@ module.exports = {
 
     // Track card instance
     const inst = engine._trackCard(creatureName, pi, 'support', hi, si);
+    if (_letheBonus > 0) {
+      inst.counters = inst.counters || {};
+      inst.counters._letheLevelBonus = _letheBonus;
+    }
 
     // Tick the per-turn summon counter. Other "summon from outside the
     // board" paths (Raise the Minions, Skeleton Necromancer, Thep, Soul
@@ -365,6 +392,32 @@ module.exports = {
     await engine.runHooks('onAdditionalActionUsed', {
       actionType: 'creature', source: 'Necromancy', playerIdx: pi,
       cardName: creatureName, heroIdx: hi,
+      _skipReactionCheck: true,
+    });
+
+    // Generic Necromancy lock — pin this turn's Necromancy slot to the
+    // activating Hero. Default HOPT already prevents a second Necromancy
+    // on the same player this turn; this lock only matters if a Hero
+    // script chooses to clear that HOPT (Lethe — 3 uses/turn). The lock
+    // then enforces "only the same Hero may re-activate" via
+    // `canFreeActivate` above. Stamped with `turn` so it auto-expires.
+    const _hostHero = ps.heroes?.[heroIdx];
+    if (_hostHero?.name) {
+      ps._necromancyLockedToHero = { turn: gs.turn, heroName: _hostHero.name };
+    }
+
+    // Generic per-Necromancy-resolution hook. Cards that extend or
+    // alter Necromancy (Lethe — 3 uses/turn + stamp wave) listen here
+    // so they don't have to be referenced by name from this file.
+    // `hostHeroName` is deliberately NOT named `heroName` — the engine's
+    // hook ctx already exposes a same-named METHOD (returns the LISTENER's
+    // own hero name) and it would shadow this payload field on spread.
+    await engine.runHooks('onNecromancyResolved', {
+      playerIdx: pi,
+      hostHeroIdx: heroIdx,
+      hostHeroName: _hostHero?.name || null,
+      level,
+      summonedCreature: creatureName,
       _skipReactionCheck: true,
     });
 

@@ -68,9 +68,10 @@ function getRestoreCandidates(ps, cardDB, engine, pi) {
   for (const name of (ps?.discardPile || [])) {
     const cd = cardDB[name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
-    // Effective level (Whoolmoth-style reducers etc.).
+    // Effective level (Whoolmoth-style reducers etc. + Lethe's
+    // per-pile +1 stamps via `pileSide: 'discard'`).
     const lvl = engine?.effectiveCardLevel
-      ? engine.effectiveCardLevel(cd, pi)
+      ? engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' })
       : (cd.level || 0);
     if (lvl > MAX_CREATURE_LEVEL) continue;
     if (engine && pi != null && !engine.isCreatureSummonable(name, pi)) continue;
@@ -257,6 +258,7 @@ module.exports = {
       // Remove one copy of the chosen creature from the discard pile.
       const discardIdx = ps.discardPile.indexOf(creatureName);
       if (discardIdx >= 0) ps.discardPile.splice(discardIdx, 1);
+      const _letheBonus = engine.consumeLetheStamp(pi, creatureName);
 
       // Revival animation on the placement site.
       engine._broadcastEvent('play_zone_animation', {
@@ -266,9 +268,13 @@ module.exports = {
 
       // Summon with full lifecycle so ETB hooks fire; level/school gate is
       // naturally bypassed because this path doesn't go through normal play.
-      await engine.summonCreatureWithHooks(creatureName, pi, destZone.heroIdx, destZone.slotIdx, {
+      const summonRes = await engine.summonCreatureWithHooks(creatureName, pi, destZone.heroIdx, destZone.slotIdx, {
         source: 'Reincarnation',
       });
+      if (summonRes?.inst && _letheBonus > 0) {
+        summonRes.inst.counters = summonRes.inst.counters || {};
+        summonRes.inst.counters._letheLevelBonus = _letheBonus;
+      }
 
       // Now pay the Pollution cost into the remaining free zones.
       await placePollutionTokens(engine, pi, 2, 'Reincarnation', { promptCtx: ctx });

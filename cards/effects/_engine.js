@@ -2719,6 +2719,10 @@ class GameEngine {
 
       // ── Player input (async — pauses until client responds) ──
       async promptTarget(validTargets, config) {
+        // ── Truth-Seeing Eye ── (see _sourceHasTruthSeeingEye)
+        if (engine._sourceHasTruthSeeingEye(cardInstance)) {
+          config = { ...config, ignoreUntargetable: true, cannotBeRedirected: true, _truthSeeingEye: true };
+        }
         // Auto-filter: remove non-Creature support zone targets unless explicitly allowed
         let targets = validTargets;
         if (!config?.allowNonCreatureEquips) {
@@ -3130,6 +3134,24 @@ class GameEngine {
         if (side === 'both') side = 'any';
         const types = config.types || ['hero', 'creature'];
 
+        // ── Truth-Seeing Eye ──
+        // When this Attack / Spell's casting Hero has a Truth-Seeing
+        // Eye equipped, it "can choose any target ... negating all
+        // effects that would prevent those targets from being chosen,
+        // and [its] Attacks and Spells cannot be redirected."
+        // `ignoreUntargetable` is the engine's existing master switch
+        // for the untargetable-status / untargetable_by_opponent /
+        // Perfect Disguise soft / Great Wall non-damage filters; the
+        // dedicated `_truthSeeingEye` flag additionally bypasses the
+        // forced-targeting (taunt) and spell-exclude filters; and
+        // `cannotBeRedirected` skips `_checkTargetRedirect` (Challenge /
+        // Martyry / Anti-Magnet). Post-target NEGATION reactions
+        // (Invisibility Cloak / Storm Ring) are deliberately NOT
+        // suppressed — they still resolve normally.
+        if (engine._sourceHasTruthSeeingEye(cardInstance)) {
+          config = { ...config, ignoreUntargetable: true, cannotBeRedirected: true, _truthSeeingEye: true };
+        }
+
         // ── Single "does this picker deal damage?" signal ──
         // Drives the post-target reaction gate so pure damage-mitigation
         // reactions (Spectral Armor halve, damage negation, Bamboo
@@ -3379,11 +3401,17 @@ class GameEngine {
         // heroes on its side remain untargetable iff Clown is only a
         // creature-type match. "If possible" => if Clown's not a legal
         // target type (e.g. source targets heroes only), no filtering.
-        _applyForcesTargetingFilter(engine, targets, pi);
-        if (targets.length === 0) return null;
+        // Truth-Seeing Eye skips the forced-targeting (taunt) filter and
+        // the spell-exclude list (Invisibility Cloak's post-negation
+        // lockout, Bartas second-cast) — both "prevent a target from
+        // being chosen", which the Eye negates for its Hero's casts.
+        if (!config._truthSeeingEye) {
+          _applyForcesTargetingFilter(engine, targets, pi);
+          if (targets.length === 0) return null;
+        }
 
         // Filter out excluded targets (Bartas second-cast, etc.)
-        const excludeIds = gs._spellExcludeTargets || [];
+        const excludeIds = config._truthSeeingEye ? [] : (gs._spellExcludeTargets || []);
         const filteredTargets = excludeIds.length > 0 ? targets.filter(t => !excludeIds.includes(t.id)) : targets;
         if (filteredTargets.length === 0) return null;
 
@@ -3563,6 +3591,11 @@ class GameEngine {
         if (side === 'both') side = 'any';
         const types = config.types || ['hero', 'creature'];
 
+        // ── Truth-Seeing Eye ── (see promptDamageTarget for rationale)
+        if (engine._sourceHasTruthSeeingEye(cardInstance)) {
+          config = { ...config, ignoreUntargetable: true, cannotBeRedirected: true, _truthSeeingEye: true };
+        }
+
         const addHeroes = (playerIdx) => {
           const ps2 = gs.players[playerIdx];
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
@@ -3698,9 +3731,12 @@ class GameEngine {
 
         // ── Forced-target filter (Deepsea Horror Clown) ──
         // Mirror of the filter in promptDamageTarget. See that site for
-        // full documentation.
-        _applyForcesTargetingFilter(engine, targets, pi);
-        if (targets.length === 0) return [];
+        // full documentation. Truth-Seeing Eye negates it for its
+        // Hero's Attacks / Spells (same as the single-target path).
+        if (!config._truthSeeingEye) {
+          _applyForcesTargetingFilter(engine, targets, pi);
+          if (targets.length === 0) return [];
+        }
 
         // Single-target attack restriction (e.g. Toras, Master of all Weapons).
         // When the caster's heroFlag singleTargetAttack is set, cap selection to 1.
@@ -4257,6 +4293,28 @@ class GameEngine {
       return { dealt: 0, cancelled: true, targetAlreadyDead: true };
     }
 
+    // ── Spell negated by a post-target reaction (Storm Ring,
+    //    Invisibility Cloak, …) ──
+    // The post-target hubs (incl. preDamageMultiTargetWindow) stamp
+    // `_spellNegatedByEffect` when a reaction fully negates the
+    // triggering Spell. The flag lives ONLY for that Spell's
+    // resolution (deleted at its end), and within that window the
+    // single-threaded turn loop is running nothing but the negated
+    // Spell's own onPlay continuation — so any damage attempt here is
+    // the negated Spell's. Void it (no HP change, no AME / surprise
+    // window, no animation): "Negate that Spell" must mean the Spell
+    // does nothing — including for manual-loop multi-target Spells
+    // (Cataclysm, Chain Lightning, …) that compute their own targets
+    // and never saw the negation return value.
+    // Scoped to an ACTIVE spell resolution: `_spellResolutionDepth` is
+    // decremented in the resolution `finally`, so even if a thrown
+    // onPlay skipped the `delete _spellNegatedByEffect` line, depth is
+    // back to 0 and this guard stays inert — it can NEVER void damage
+    // outside the negated Spell's own resolution.
+    if (this.gs._spellNegatedByEffect && (this.gs._spellResolutionDepth || 0) > 0) {
+      return { dealt: 0, cancelled: true, spellNegated: true };
+    }
+
     // ── Absolute self-damage immunity (Carris, the Time Keeper) ──
     // "Any damage this Hero would take becomes 0, including damage that
     // could normally not be reduced or negated." Checked here, BEFORE
@@ -4661,10 +4719,20 @@ class GameEngine {
     const { applyArrowsAfterDamage } = require('./_arrows-shared');
     await applyArrowsAfterDamage(this, source, target, realDealt, hookCtx.amount, type);
 
-    // ── After-damage hand reaction check (Fireshield, etc.) ──
-    // Only fires if target survived and damage was actually dealt
-    if (actualAmount > 0 && target && target.hp > 0 && target.hp !== undefined) {
-      await this._checkAfterDamageHandReactions(target, source, actualAmount, type);
+    // ── After-damage hand reaction check (Fireshield, Spiky Armor…) ──
+    // Fires on any hit that actually removed HP. SURVIVOR case: every
+    // after-damage reaction is eligible (unchanged). LETHAL case: only
+    // cards that opt in via `firesOnLethalDamage` are offered — the hub
+    // skips the rest, so Fireshield / Cloud in a Bottle / Punch in the
+    // Box stay survival-only (their text requires the target to live).
+    // `realDealt` (HP actually lost, capped at pre-hit HP) is passed so
+    // a "deal the same amount as recoil" card uses the true HP loss,
+    // never overkill; it equals `actualAmount` whenever the target
+    // survived, so existing cards see identical numbers.
+    if (realDealt > 0 && target && target.hp !== undefined) {
+      await this._checkAfterDamageHandReactions(
+        target, source, realDealt, type, { defeated: target.hp <= 0 },
+      );
     }
 
     // ── SC tracking ──
@@ -12009,6 +12077,13 @@ class GameEngine {
       if (idx < 0) return null;
       ps.discardPile.splice(idx, 1);
     }
+    // Lethe per-pile stamp carries onto the new board instance — only
+    // for `source === 'discard'` (or future `'deleted'`) placements;
+    // hand placements never carry stamps. Consume here so the bonus
+    // doesn't get dropped by the next stamp reconciliation.
+    const _letheBonus = (source === 'discard' || source === 'deleted')
+      ? this.consumeLetheStamp(playerIdx, cardName)
+      : 0;
 
     if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
     ps.supportZones[heroIdx][slotIdx] = [cardName];
@@ -12017,6 +12092,7 @@ class GameEngine {
     inst.counters = inst.counters || {};
     inst.counters.isPlacement = 1;
     inst.turnPlayed = gs.turn || 0;
+    if (_letheBonus > 0) inst.counters._letheLevelBonus = _letheBonus;
 
     if (opts.negateEffects) {
       inst.counters.negated = 1;
@@ -13082,9 +13158,88 @@ class GameEngine {
   // ─── TARGET REDIRECT (Challenge, etc.) ────────
 
   /**
-   * Check if the selected target's owner has a redirect card (Challenge, etc.).
-   * Called by promptDamageTarget after target selection.
-   * If a redirect is activated, returns the new target. Otherwise null.
+   * Truth-Seeing Eye (Equipment): "The equipped Hero can choose any
+   * target with Attacks and Spells, negating all effects that would
+   * prevent those targets from being chosen, and the equipped Hero's
+   * Attacks and Spells cannot be redirected."
+   *
+   * Returns true iff `sourceCard` is an actual Attack or Spell CARD
+   * being cast by a Hero that currently has a face-up, non-negated
+   * "Truth-Seeing Eye" Equipment in one of its Support Zones. Used to
+   * (a) flip the targeting-prevention master switches in the target
+   * pickers (`ignoreUntargetable` + `_truthSeeingEye`) and (b) short-
+   * circuit the redirect system.
+   *
+   * Deliberately scoped to Attack / Spell sources ONLY — a Creature
+   * effect from the same Hero is NOT the Hero's "Attack or Spell", so
+   * Anti-Magnet / Shield of Wisdom can still redirect a Creature
+   * effect even from an Eye-equipped Hero (matches the card text).
+   */
+  _sourceHasTruthSeeingEye(sourceCard) {
+    if (!sourceCard) return false;
+    const owner = sourceCard.controller ?? sourceCard.owner ?? -1;
+    const heroIdx = sourceCard.heroIdx ?? -1;
+    if (owner < 0 || heroIdx < 0) return false;
+    // Source must be an actual Attack or Spell card — not a Creature /
+    // Artifact / Hero effect (effective data handles type overrides;
+    // fall back to the static DB by name).
+    const cd = (this.getEffectiveCardData ? this.getEffectiveCardData(sourceCard) : null)
+      || (sourceCard.name ? this._getCardDB()[sourceCard.name] : null);
+    if (!cd || !(hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) return false;
+    // The casting Hero must have a live Truth-Seeing Eye equipped.
+    for (const inst of this.cardInstances) {
+      if (inst.name !== 'Truth-Seeing Eye') continue;
+      if (inst.zone !== 'support') continue;
+      if ((inst.controller ?? inst.owner) !== owner) continue;
+      if (inst.heroIdx !== heroIdx) continue;
+      if (inst.faceDown) continue;
+      if (inst.counters?.negated) continue;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Public entry point — runs the redirect window for the chosen
+   * target's owner, then CHAINS: a redirect produces a new target
+   * whose owner gets their OWN redirect window, and so on. This is
+   * what lets e.g. Anti-Magnet redirect an opponent's Creature effect
+   * onto one of your Heroes that has Shield of Wisdom face-down — the
+   * Shield (a surprise-redirect, excluded from the generic surprise
+   * window) then gets its activation window on the new target.
+   *
+   * Hand and surprise redirects consume their card, so a chain
+   * naturally terminates; the depth cap is a backstop against a
+   * pathological hero-redirect (non-consuming) loop.
+   *
+   * @param {number} targetOwnerIdx - Owner of the (current) selected target
+   * @param {object} selected - The selected target { id, type, owner, heroIdx, cardName, ... }
+   * @param {Array} validTargets - All valid targets for the effect
+   * @param {object} config - The targeting config from promptDamageTarget
+   * @param {CardInstance} sourceCard - The card that initiated the targeting
+   * @param {number} [_depth] - Internal recursion guard
+   * @returns {object|null} Final redirected target, or null if none fired
+   */
+  async _checkTargetRedirect(targetOwnerIdx, selected, validTargets, config, sourceCard, _depth = 0) {
+    const redirected = await this._checkTargetRedirectOnce(
+      targetOwnerIdx, selected, validTargets, config, sourceCard
+    );
+    if (!redirected) return null;
+    if (_depth >= 8) return redirected; // backstop — see header
+    // The NEW target's owner may also redirect (Anti-Magnet → Shield
+    // of Wisdom, Challenge → opponent's Martyry, …). Recurse on the
+    // redirected target; return the deepest result.
+    const next = await this._checkTargetRedirect(
+      redirected.owner, redirected, validTargets, config, sourceCard, _depth + 1
+    );
+    return next || redirected;
+  }
+
+  /**
+   * ONE redirect window for `targetOwnerIdx`: scans their hand
+   * (`isTargetRedirect`), Heroes (`heroRedirect`) and Surprise Zones
+   * (`isSurpriseRedirect`). Returns the new target, or null. The
+   * chaining wrapper above re-invokes this for the new target's owner.
    *
    * @param {number} targetOwnerIdx - Owner of the selected target
    * @param {object} selected - The selected target { id, type, owner, heroIdx, cardName, ... }
@@ -13093,13 +13248,22 @@ class GameEngine {
    * @param {CardInstance} sourceCard - The card that initiated the targeting
    * @returns {object|null} Redirected target, or null
    */
-  async _checkTargetRedirect(targetOwnerIdx, selected, validTargets, config, sourceCard) {
+  async _checkTargetRedirectOnce(targetOwnerIdx, selected, validTargets, config, sourceCard) {
     const ps = this.gs.players[targetOwnerIdx];
     if (!ps) return null;
 
     // Turn-1 lockout: the first-turn-protected player cannot activate any
     // hand cards during the opening turn (no interaction allowed).
     if (this.gs.firstTurnProtectedPlayer === targetOwnerIdx) return null;
+
+    // Truth-Seeing Eye: "the equipped Hero's Attacks and Spells cannot
+    // be redirected." Belt-and-suspenders with the
+    // `config.cannotBeRedirected` the pickers also set — guarantees no
+    // hand / hero / surprise redirect is offered, and covers any future
+    // caller. The helper is Attack/Spell-scoped, so an opponent's
+    // Creature effect (even from the same Eye Hero) still flows through
+    // to the Anti-Magnet / Shield of Wisdom scans below.
+    if (this._sourceHasTruthSeeingEye(sourceCard)) return null;
 
     // Scan hand for redirect cards
     const seen = new Set();
@@ -13213,6 +13377,66 @@ class GameEngine {
       });
 
       return result.redirectTo;
+    }
+
+    // ── Surprise-zone redirects (Shield of Wisdom) ──
+    // A face-down Surprise whose script is `isSurpriseRedirect` may
+    // redirect an effect that chose the Surprise's host Hero OR a
+    // Creature in that Hero's Support Zones. The Surprise itself owns
+    // the trigger gate (`canSurpriseRedirect`) and the new-target pick
+    // (`onSurpriseActivate` → `{ redirectTo }`). `_activateSurprise`
+    // handles the flip / reveal / hooks / discard and returns that
+    // result, which we propagate up exactly like a hand/hero redirect.
+    for (let shi = 0; shi < (ps.heroes || []).length; shi++) {
+      const sHero = ps.heroes[shi];
+      if (!sHero?.name || sHero.hp <= 0) continue;
+      const sz = ps.surpriseZones?.[shi] || [];
+      if (sz.length === 0) continue;
+      const sName = sz[0];
+      const sScript = loadCardEffect(sName);
+      if (!sScript?.isSurprise || !sScript.isSurpriseRedirect || !sScript.canSurpriseRedirect) continue;
+
+      // Surprise instance must still be face-down in the zone.
+      const sInst = this.cardInstances.find(c =>
+        c.owner === targetOwnerIdx && c.zone === ZONES.SURPRISE
+        && c.heroIdx === shi && c.name === sName);
+      if (!sInst || !sInst.faceDown) continue;
+
+      if (!sScript.canSurpriseRedirect(this.gs, targetOwnerIdx, shi, selected, validTargets, config, sourceCard, this)) continue;
+      if (!this._canHeroActivateSurprise(targetOwnerIdx, shi, sName)) continue;
+
+      const attackerName = config.title || sourceCard?.name || 'an effect';
+      const confirmed = await this.promptGeneric(targetOwnerIdx, {
+        type: 'confirm',
+        title: sName,
+        message: `Your ${selected.cardName} was chosen by ${attackerName}! Activate ${sName}?`,
+        showCard: sourceCard?.name || null,
+        confirmLabel: `🛡️ ${sName}!`,
+        cancelLabel: 'No',
+        cancellable: true,
+        gerrymanderEligible: true, // True "you may" — opt-in redirect.
+      });
+      if (!confirmed) continue;
+
+      const sInfo = {
+        cardName: sourceCard?.name,
+        owner: sourceCard?.controller ?? sourceCard?.owner ?? -1,
+        heroIdx: sourceCard?.heroIdx ?? -1,
+        cardInstance: sourceCard,
+        damageType: config.damageType,
+        // Redirect-mode extras the Surprise's onSurpriseActivate reads.
+        selected, validTargets, _redirectMode: true,
+      };
+      const sResult = await this._activateSurprise(targetOwnerIdx, shi, sName, sInfo, sScript);
+      if (!sResult?.redirectTo) continue; // Declined / cancelled inside
+
+      this.log('target_redirect', {
+        redirectCard: sName,
+        originalTarget: selected.cardName,
+        newTarget: sResult.redirectTo.cardName,
+        player: ps.username,
+      });
+      return sResult.redirectTo;
     }
 
     return null; // No redirect
@@ -14578,8 +14802,14 @@ class GameEngine {
     return false;
   }
 
-  async _checkAfterDamageHandReactions(target, source, amount, type) {
+  async _checkAfterDamageHandReactions(target, source, amount, type, opts = {}) {
     if (this._inAfterDamageReaction) return;
+    // When the triggering hit DEFEATED the target, only cards that
+    // explicitly opt in (`firesOnLethalDamage`) may react. Survival-
+    // only reactions (Fireshield "is not defeated by it", Cloud in a
+    // Bottle, Punch in the Box) have no such flag and are filtered
+    // below — preserving their long-standing semantics.
+    const _defeated = !!opts.defeated;
 
     const srcOwner = source?.owner ?? source?.controller ?? -1;
     const targetOwner = this.gs.players.findIndex(ps => (ps.heroes || []).includes(target));
@@ -14604,6 +14834,7 @@ class GameEngine {
 
       const script = loadCardEffect(cardName);
       if (!script?.isAfterDamageReaction) continue;
+      if (_defeated && !script.firesOnLethalDamage) continue;
 
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
@@ -14702,6 +14933,146 @@ class GameEngine {
       // the hand splice above.)
       this.sync();
       return; // Only one after-damage reaction per damage instance
+    }
+  }
+
+  /**
+   * Creature-target sibling of `_checkAfterDamageHandReactions`. Fires
+   * when a Creature took damage (and survived) so a hand reaction that
+   * keys on "a target you control takes damage" can cover Creatures,
+   * not just Heroes — the hero hub never sees creature damage. ADDITIVE
+   * + OPT-IN: dispatches ONLY to scripts exporting
+   * `isAfterCreatureDamageReaction`, so every existing
+   * `isAfterDamageReaction` card (Fireshield, Cloud in a Bottle, Punch
+   * in the Box) is completely unaffected — they keep their Hero-only
+   * behaviour. Spiky Armor opts into BOTH flags to span the full
+   * "a target you control" wording.
+   *
+   * Mirrors the hero hub's animation/ordering (zone-anchored
+   * hand→pile flight before the splice, sync before resolve, reveal,
+   * Spell `afterSpellResolved`) and the creature-hub owner resolution
+   * (`controller ?? owner`, no hero-activation gate — creature-target
+   * reactions aren't bound to a single casting Hero, matching
+   * `_checkCreaturePreDefeatHandReactions`).
+   *
+   * Script contract:
+   *   isAfterCreatureDamageReaction: true,
+   *   afterCreatureDamageCondition?(gs, ownerIdx, engine, inst, source, amount, type) → bool,
+   *   afterCreatureDamageResolve(engine, ownerIdx, inst, source, amount, type) → void
+   */
+  async _checkAfterCreatureDamageHandReactions(creatureInst, source, amount, type, opts = {}) {
+    if (this._inAfterCreatureDamageReaction) return;
+    if (!creatureInst) return;
+    // Lethal-hit gate — mirrors the hero hub: a defeated Creature only
+    // triggers reactions that opt in via `firesOnLethalDamage`.
+    const _defeated = !!opts.defeated;
+
+    const ownerIdx = creatureInst.controller ?? creatureInst.owner;
+    const ps = this.gs.players[ownerIdx];
+    if (!ps) return;
+
+    // Opening-turn lockout — same as every other hand-reaction window.
+    if (this.gs.firstTurnProtectedPlayer === ownerIdx) return;
+
+    const allCards = this._getCardDB();
+    const seen = new Set();
+    for (let hi = 0; hi < ps.hand.length; hi++) {
+      const cardName = ps.hand[hi];
+      if (seen.has(cardName)) continue;
+      seen.add(cardName);
+
+      const script = loadCardEffect(cardName);
+      if (!script?.isAfterCreatureDamageReaction) continue;
+      if (_defeated && !script.firesOnLethalDamage) continue;
+
+      const cardData = allCards[cardName];
+      const cost = cardData?.cost || 0;
+      if (cost > 0 && (ps.gold || 0) < cost) continue;
+
+      if (script.oncePerGame || script.oncePerGameKey) {
+        const opgKey = script.oncePerGameKey || cardName;
+        if (ps._oncePerGameUsed?.has(opgKey)) continue;
+      }
+
+      if (script.afterCreatureDamageCondition &&
+          !script.afterCreatureDamageCondition(this.gs, ownerIdx, this, creatureInst, source, amount, type)) continue;
+
+      const srcName = source?.name || 'An effect';
+      const tgtName = creatureInst.name || 'Creature';
+      const confirmed = await this.promptGeneric(ownerIdx, {
+        type: 'confirm',
+        title: cardName,
+        message: `${tgtName} took ${amount} damage from ${srcName}! Activate ${cardName}?`,
+        showCard: cardName,
+        confirmLabel: '🔥 Activate!',
+        cancelLabel: 'No',
+        cancellable: true,
+      });
+      if (!confirmed) continue;
+
+      const actualIdx = ps.hand.indexOf(cardName);
+      if (actualIdx < 0) continue;
+
+      // Hand → discard/deleted flight (broadcast before the splice so
+      // the source slot is still rendered; index-anchored).
+      const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
+        ? 'deleted' : 'discard';
+      this._broadcastEvent('play_pile_transfer', {
+        owner: ownerIdx, cardName,
+        from: 'hand', to: destPile,
+        fromHandIdx: actualIdx,
+      });
+      ps.hand.splice(actualIdx, 1);
+      if (destPile === 'deleted') ps.deletedPile.push(cardName);
+      else ps.discardPile.push(cardName);
+      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
+
+      if (script.oncePerGame || script.oncePerGameKey) {
+        if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+        ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
+      }
+
+      // Push state NOW so hand + pile re-render in one diff cycle
+      // while the pile-transfer flight is still airborne.
+      this.sync();
+
+      this._broadcastEvent('card_reveal', { cardName, playerIdx: ownerIdx });
+      await this._delay(300);
+      this.log('after_creature_damage_reaction', {
+        card: cardName, player: ps.username, target: creatureInst.name,
+      });
+
+      this._inAfterCreatureDamageReaction = true;
+      try {
+        if (script.afterCreatureDamageResolve) {
+          await script.afterCreatureDamageResolve(this, ownerIdx, creatureInst, source, amount, type);
+        }
+      } catch (err) {
+        console.error(`[AfterCreatureDamageReaction] ${cardName} threw:`, err.message);
+      } finally {
+        this._inAfterCreatureDamageReaction = false;
+      }
+
+      // Spell-type reactions fire afterSpellResolved so cast-completion
+      // hero passives compose (mirrors the hero after-damage hub).
+      if (cardData?.cardType === 'Spell') {
+        try {
+          await this.runHooks('afterSpellResolved', {
+            spellName: cardName,
+            spellCardData: cardData,
+            heroIdx: -1, casterIdx: ownerIdx,
+            damageTargets: [],
+            isSecondCast: false,
+            _skipReactionCheck: true,
+          });
+        } catch (err) {
+          console.error('[Engine] afterSpellResolved (after-creature-damage) error:', err.message);
+        }
+      }
+
+      this.sync();
+      return; // Only one after-creature-damage reaction per instance
     }
   }
 
@@ -15332,6 +15703,7 @@ class GameEngine {
       if (script.surpriseDrawTrigger || script.surpriseSummonTrigger || script.surpriseEquipTrigger ||
           script.surpriseStatusTrigger || script.surpriseHeroEffectTrigger || script.surpriseAbilityTrigger ||
           script.surpriseResourceGainTrigger ||
+          script.isSurpriseRedirect ||
           script.isDefendingGate) continue;
 
       // Build source info for the trigger check. `damageType` is the
@@ -15825,7 +16197,22 @@ class GameEngine {
         cardName: t.cardName,
       };
     });
-    await this._checkPostTargetHandReactions(normalized, source, {});
+    const ptResult = await this._checkPostTargetHandReactions(normalized, source, {});
+    // CRITICAL: unlike promptDamageTarget / promptMultiTarget /
+    // actionAoeHit (which set `_spellNegatedByEffect` and return an
+    // empty target list so the caster's onPlay deals nothing), the
+    // manual-loop spells that call THIS helper (Cataclysm, Chain
+    // Lightning, Laser Volley, Forbidden Zone, Gathering Storm, …)
+    // compute their own targets and deal damage in a loop — they never
+    // saw the negation, so a Storm Ring / Invisibility Cloak that
+    // negates here was silently ignored and the spell still resolved
+    // (e.g. a Spectral-Armor-halved target STILL took the halved hit).
+    // Stamp the canonical negation flag so the central guard in
+    // `_actionDealDamageImpl` / `processCreatureDamageBatch` voids the
+    // negated spell's damage, and RETURN the result so callers can also
+    // bail explicitly if they have non-damage side effects.
+    if (ptResult?.effectNegated) this.gs._spellNegatedByEffect = true;
+    return ptResult;
   }
 
   /**
@@ -16455,17 +16842,37 @@ class GameEngine {
       }
     }
 
-    // Fire onSurpriseActivated hook
-    await this.runHooks('onSurpriseActivated', {
+    // Fire onSurpriseActivated hook. A hand reaction (Boots of Hermes)
+    // may negate the Surprise AS it activates by setting
+    // `_surpriseNegated` on the hook ctx (via ctx.setFlag). A negated
+    // Surprise's effect never resolves, no Creature is placed, and the
+    // card is consumed to the discard pile — exactly like a negated
+    // Spell. Any cost the owner already paid at activation (e.g. the
+    // Wisdom level-gap discard above) stays paid, matching the engine's
+    // standard negation philosophy.
+    const surpriseHookCtx = {
       surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
       sourceInfo, _skipReactionCheck: true,
-    });
+    };
+    await this.runHooks('onSurpriseActivated', surpriseHookCtx);
+    const surpriseNegated = !!surpriseHookCtx._surpriseNegated;
 
-    // Execute the surprise's effect
+    // Execute the surprise's effect (unless negated)
     let result = null;
-    if (script.onSurpriseActivate && inst) {
+    if (!surpriseNegated && script.onSurpriseActivate && inst) {
       const ctx = this._createContext(inst, { sourceInfo });
       result = await script.onSurpriseActivate(ctx, sourceInfo);
+    }
+
+    if (surpriseNegated) {
+      await this.runHooks(HOOKS.ON_EFFECT_NEGATED, {
+        negatedCard: inst || { name: cardName, owner: playerIdx },
+        _skipReactionCheck: true,
+      });
+      this.log('surprise_negated', {
+        card: cardName, player: ps.username,
+        by: surpriseHookCtx._surpriseNegatedBy || 'a reaction',
+      });
     }
 
     // Fire afterSpellResolved for Spell-type surprises (Toxic Trap, Magic
@@ -16475,7 +16882,7 @@ class GameEngine {
     // Creature-type surprises (Bakhm flips, Jumpscare, etc.) are not
     // spells and naturally skip this.
     const cardDataForDelay = this._getCardDB()[cardName];
-    if (cardDataForDelay?.cardType === 'Spell') {
+    if (!surpriseNegated && cardDataForDelay?.cardType === 'Spell') {
       try {
         await this.runHooks('afterSpellResolved', {
           spellName: cardName,
@@ -16500,8 +16907,17 @@ class GameEngine {
     await this._delay(isCreatureSurprise ? 500 : 150);
 
     if (isBakhmSlot) {
+      if (surpriseNegated) {
+        // Negated Bakhm-slot Surprise: the face-down Creature never
+        // flips up — pull it out of the Support Zone and discard it.
+        if (inst) {
+          const bz = ps.supportZones?.[heroIdx];
+          if (bz && bz[bakhmZoneSlot]) bz[bakhmZoneSlot] = [];
+          ps.discardPile.push(cardName);
+          this._untrackCard(inst.id);
+        }
+      } else if (inst) {
       // Bakhm slot: creature is already in the support zone — just stays face-up
-      if (inst) {
         inst.turnPlayed = this.gs.turn || 0; // Enforce summoning sickness on flip
         this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: bakhmZoneSlot, cardName });
         this._broadcastEvent('play_zone_animation', {
@@ -16519,9 +16935,11 @@ class GameEngine {
     const szIdx = surpriseZone.indexOf(cardName);
     if (szIdx >= 0) surpriseZone.splice(szIdx, 1);
 
-    // After resolution: place creature or discard
+    // After resolution: place creature or discard. A negated Surprise
+    // is consumed without resolving — its Creature is never placed; it
+    // falls through to the discard branch below.
     const cardData = this._getCardDB()[cardName];
-    if (hasCardType(cardData, 'Creature')) {
+    if (!surpriseNegated && hasCardType(cardData, 'Creature')) {
       // Place face-up as permanent creature in first free support zone
       const placed = this.safePlaceInSupport(cardName, playerIdx, heroIdx, -1);
       if (placed && inst) {
@@ -19635,9 +20053,14 @@ class GameEngine {
    * @param {number} playerIdx
    * @param {number} heroIdx
    * @param {object} cardData - Card data from cards.json (needs level, spellSchool1, spellSchool2, cardType)
+   * @param {object} [opts]
+   *   @param {'discard'|'deleted'} [opts.pileSide] - When the candidate
+   *     is being summoned/revived from a pile, the Lethe per-pile +1
+   *     stamps push the requirement up exactly like a printed-level
+   *     bump (gap coverage via Divinity / Wisdom still applies).
    * @returns {boolean}
    */
-  heroMeetsLevelReq(playerIdx, heroIdx, cardData) {
+  heroMeetsLevelReq(playerIdx, heroIdx, cardData, opts = {}) {
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name) return false;
@@ -19713,6 +20136,15 @@ class GameEngine {
       if (!selfRevealEffectsSuppressed(this, playerIdx)) {
         rawLevel += 1;
       }
+    }
+    // Lethe per-pile stamp — bumps the effective level for Creature
+    // revivals out of discard/deleted (callers iterating those piles
+    // pass `opts.pileSide`). Stacks across the standard gap-coverage
+    // walk below — same as if the printed level were higher, so
+    // Divinity / Wisdom can still pay it off.
+    if (opts.pileSide && cardData.cardType === 'Creature' && cardData.name) {
+      const bonus = this._getLetheStampBonus(playerIdx, cardData.name);
+      if (bonus > 0) rawLevel += bonus;
     }
     if (rawLevel <= 0 && !cardData.spellSchool1) return true;
 
@@ -19939,12 +20371,20 @@ class GameEngine {
    *     reducers and per-hero card overrides.
    *   @param {number} [opts.handIdx] - Hand index of THIS specific copy,
    *     for per-hand-position offsets (Rocky Slime / Sparkfly rebate).
+   *   @param {'discard'|'deleted'} [opts.pileSide] - When the candidate
+   *     is being read from one of `playerIdx`'s piles (revival
+   *     iterators), this picks up the Lethe per-occurrence +1 stamps
+   *     that Lethe's Necromancy applies to all Creatures present in
+   *     the pile at the moment of resolution. Stamps stack and survive
+   *     discard↔deleted moves (the helper reads both sides), and only
+   *     wipe when a card leaves both piles for hand / deck / board.
    * @returns {number} The effective level (≥ 0).
    */
   effectiveCardLevel(cardData, playerIdx, opts = {}) {
     if (!cardData) return 0;
     const heroIdx = opts.heroIdx;
     const handIdx = opts.handIdx;
+    const pileSide = opts.pileSide;
     const ps = this.gs.players[playerIdx];
     let raw = cardData.level || 0;
 
@@ -19984,8 +20424,123 @@ class GameEngine {
       }
     }
 
-    // (4) Generic per-instance reducer hooks.
+    // (4) Lethe per-pile stamp — pile-only opt-in (callers pass any
+    // truthy `opts.pileSide` from their discard/deleted iterators).
+    // The stamp store is UNIFIED across discard + deleted so a Creature
+    // moving between the two piles keeps its stamps (per the card
+    // text: stamps wipe only on move-to-hand/deck). Returns the highest
+    // stamp on any current occupant of `cardName` across both piles.
+    if (pileSide && cardData.cardType === 'Creature' && cardData.name && ps) {
+      const bonus = this._getLetheStampBonus(playerIdx, cardData.name);
+      if (bonus > 0) raw += bonus;
+    }
+
+    // (5) Generic per-instance reducer hooks.
     return this._applyCardLevelReductions(cardData, raw, playerIdx, heroIdx);
+  }
+
+  // ─── LETHE PILE LEVEL STAMPS ─────────────────
+  /**
+   * Reconcile `ps._letheStamps` against the COMBINED contents of both
+   * piles (discard + deleted). Per-name arrays are resized to the
+   * total occurrence count across both piles — keeping the highest
+   * stamps when shrinking (player-friendly: the unstamped occurrence
+   * is treated as the one that left) and padding with `0` when
+   * growing. Non-Creature pile entries are ignored entirely (per the
+   * card text: Creatures only). Called lazily from every stamp read/
+   * write so we don't have to intercept every pile mutation across
+   * the codebase. The unified model is what lets stamps survive a
+   * discard↔deleted move: the total occupancy count is unchanged, so
+   * no shrink fires.
+   *
+   * @param {object} ps - Player state.
+   */
+  _reconcileLetheStamps(ps) {
+    if (!ps) return;
+    if (!ps._letheStamps) ps._letheStamps = {};
+    const cardDB = this._getCardDB();
+    const counts = {};
+    const piles = [ps.discardPile || [], ps.deletedPile || []];
+    for (const pile of piles) {
+      for (const name of pile) {
+        const cd = cardDB[name];
+        if (!cd || cd.cardType !== 'Creature') continue;
+        counts[name] = (counts[name] || 0) + 1;
+      }
+    }
+    const stamps = ps._letheStamps;
+    for (const name of Object.keys(stamps)) {
+      const want = counts[name] || 0;
+      if (want === 0) { delete stamps[name]; continue; }
+      if (stamps[name].length > want) {
+        // Keep highest-stamp entries when shrinking.
+        stamps[name].sort((a, b) => b - a);
+        stamps[name] = stamps[name].slice(0, want);
+      }
+    }
+    for (const name of Object.keys(counts)) {
+      if (!stamps[name]) stamps[name] = [];
+      while (stamps[name].length < counts[name]) stamps[name].push(0);
+    }
+  }
+
+  /**
+   * Highest stamp on any current pile occurrence of `cardName` across
+   * either of `playerIdx`'s piles. Returns 0 when there is none.
+   */
+  _getLetheStampBonus(playerIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !cardName) return 0;
+    if (!ps._letheStamps) return 0;
+    this._reconcileLetheStamps(ps);
+    const arr = ps._letheStamps[cardName];
+    if (!arr || arr.length === 0) return 0;
+    let best = 0;
+    for (const v of arr) if (v > best) best = v;
+    return best;
+  }
+
+  /**
+   * Consume one Lethe stamp on `cardName` for `playerIdx`. Called by
+   * every revival path (Necromancy, Forceful Revival, Reincarnation,
+   * Xuanwu, …) AFTER it splices the Creature out of its pile but
+   * BEFORE reconciliation. The HIGHEST stamp leaves with the revived
+   * Creature so the player gets the value they see on the badge, and
+   * the remaining same-named copies in the piles keep their (lower or
+   * equal) stamps intact. Returns the consumed stamp (or 0 if none).
+   * Caller is responsible for stashing the return value onto the new
+   * board instance (`inst.counters._letheLevelBonus = stamp`) so the
+   * bonus follows the Creature onto the board.
+   */
+  consumeLetheStamp(playerIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !cardName) return 0;
+    if (!ps._letheStamps) return 0;
+    const arr = ps._letheStamps[cardName];
+    if (!Array.isArray(arr) || arr.length === 0) return 0;
+    // Pop the highest entry — the revival took the most-stamped copy.
+    arr.sort((a, b) => b - a);
+    const consumed = arr.shift() || 0;
+    if (arr.length === 0) delete ps._letheStamps[cardName];
+    return consumed;
+  }
+
+  /**
+   * Apply a Lethe stamp wave: +1 to every existing Creature occurrence
+   * across BOTH of `playerIdx`'s piles. Fired by Lethe after each of
+   * her own Necromancy resolutions. Reconciles first so newly-arrived
+   * Creatures (without stamps yet) start at 0 and then receive their
+   * first +1 from this wave.
+   */
+  applyLetheStampWave(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return;
+    if (!ps._letheStamps) ps._letheStamps = {};
+    this._reconcileLetheStamps(ps);
+    const stamps = ps._letheStamps;
+    for (const name of Object.keys(stamps)) {
+      for (let i = 0; i < stamps[name].length; i++) stamps[name][i] += 1;
+    }
   }
 
   /**
@@ -20823,6 +21378,14 @@ class GameEngine {
     entries = entries.filter(e => !e.inst?.faceDown);
     if (entries.length === 0) return;
 
+    // Spell negated by a post-target reaction (Storm Ring, Invisibility
+    // Cloak, …) — mirror the hero-damage guard in `_actionDealDamageImpl`.
+    // A negated Spell deals nothing, including to Creatures (manual-loop
+    // mass Spells route their Creature damage here). Flag lifecycle is
+    // scoped to the negated Spell's own resolution (depth>0 guard, same
+    // as the hero path) so a leaked flag can't void unrelated damage.
+    if (this.gs._spellNegatedByEffect && (this.gs._spellResolutionDepth || 0) > 0) return;
+
     // Per-call heap check (matches the hero damage path). Damage
     // batches are the OTHER recursive entry point — Tempeste's
     // creature-redirect, multi-target spells with chain reactions,
@@ -21497,6 +22060,32 @@ class GameEngine {
     }
 
     await this.runHooks(HOOKS.AFTER_CREATURE_DAMAGE_BATCH, { entries, _skipReactionCheck: true });
+
+    // ── After-creature-damage hand reactions (Spiky Armor, etc.) ──
+    // Mirrors the hero path's post-AFTER_DAMAGE reaction window. Fires
+    // per surviving creature that actually took damage so an
+    // `isAfterCreatureDamageReaction` hand card can react. Survived +
+    // realDealt>0 gate matches the hero hub's call-site condition
+    // (`actualAmount > 0 && target.hp > 0`); a dead creature's inst is
+    // already untracked/zone-cleared so it's skipped here. The card's
+    // own `afterCreatureDamageCondition` does the damage-type ('attack')
+    // and opponent-source filtering — the hub stays type-agnostic like
+    // its hero sibling. `_inAfterCreatureDamageReaction` (set during
+    // resolve) prevents a recoil-spawned nested batch from re-entering.
+    if (!this._inAfterCreatureDamageReaction) {
+      for (const e of entries) {
+        if (!e.inst || (e.realDealt || 0) <= 0) continue;
+        // Survivor → all after-creature-damage reactions eligible.
+        // Defeated → only `firesOnLethalDamage` opt-ins (the hub
+        // filters); `e.inst` is a now-detached object but still
+        // carries name/owner/controller for the prompt + recoil
+        // routing (the recoil hits the ATTACKER, not the dead inst).
+        const defeated = (e.inst.counters?.currentHp ?? 0) <= 0;
+        await this._checkAfterCreatureDamageHandReactions(
+          e.inst, e.source, e.realDealt, e.type, { defeated },
+        );
+      }
+    }
 
     // Reactive hand-limit enforcement: if any creature that affected the
     // owner's hand cap died (most notably Royal Corgi, whose -3 reduction

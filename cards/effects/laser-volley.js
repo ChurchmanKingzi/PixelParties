@@ -212,7 +212,10 @@ module.exports = {
           .map(t => t.kind === 'hero'
             ? { type: 'hero', owner: oi, heroIdx: t.heroIdx, cardName: t.cardName }
             : { type: 'creature', owner: oi, heroIdx: t.heroIdx, slotIdx: t.slotIdx, cardName: t.cardName });
-        await engine.preDamageMultiTargetWindow(source, allUnspared);
+        const _negR = await engine.preDamageMultiTargetWindow(source, allUnspared);
+        // Full-negate reaction (Storm Ring / Invisibility Cloak): bail
+        // before any damage so the whole Spell is negated.
+        if (_negR?.effectNegated) return;
       }
 
       // Deal 200 to every unspared target. Skip-reaction-check so a

@@ -51,8 +51,9 @@ function _eligibleCreatureNames(engine, ps, maxLevel, pi) {
     // Effective level — Whoolmoth-style `reduceCardLevel` rebates
     // / Phatnir's Cool-Stack discount push the printed level down,
     // letting otherwise-out-of-range Creatures fall within the
-    // Fighting cap.
-    const lvl = engine.effectiveCardLevel(cd, pi);
+    // Fighting cap. `pileSide: 'discard'` picks up Lethe per-pile
+    // stamps so stamped Creatures correctly require more Fighting.
+    const lvl = engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' });
     if (lvl > maxLevel) continue;
     seen.add(cn);
     out.push({ name: cn, source: 'discard', level: lvl });
@@ -136,7 +137,7 @@ module.exports = {
       // Re-validate (state may have shifted during the prompt).
       const cardDB = engine._getCardDB();
       const cd = cardDB[chosenName];
-      if (!cd || !hasCardType(cd, 'Creature') || engine.effectiveCardLevel(cd, pi) > lvl) {
+      if (!cd || !hasCardType(cd, 'Creature') || engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' }) > lvl) {
         gs._spellCancelled = true;
         return;
       }
@@ -146,6 +147,8 @@ module.exports = {
 
       // ── Pop from discard and summon onto the user hero ───────────
       ps.discardPile.splice(dpIdx, 1);
+      // Lethe pile-stamp carries over onto the revived instance.
+      const _letheBonus = engine.consumeLetheStamp(pi, chosenName);
 
       const summonRes = await engine.summonCreatureWithHooks(
         chosenName, pi, heroIdx, -1,
@@ -172,6 +175,7 @@ module.exports = {
       // fresh summon.
       if (!inst.counters) inst.counters = {};
       inst.counters._hasHaste = true;
+      if (_letheBonus > 0) inst.counters._letheLevelBonus = _letheBonus;
 
       engine._broadcastEvent('summon_effect', {
         owner: pi, heroIdx, zoneSlot: actualSlot, cardName: chosenName,

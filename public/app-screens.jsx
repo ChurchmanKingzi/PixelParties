@@ -110,6 +110,69 @@ function MainMenu() {
   const puzzleAttemptRoom = useRef(null);
   const [scFloat, setScFloat] = useState(null); // { amount, id }
 
+  // ── Daily challenge ──
+  // null = not loaded; otherwise the /api/daily payload.
+  const [daily, setDaily] = useState(null);
+  const [dailyOpen, setDailyOpen] = useState(false);
+  const [dailyStarting, setDailyStarting] = useState(false);
+  const [dailyTick, setDailyTick] = useState(0); // forces re-render of the countdown
+
+  const loadDaily = useCallback(() => {
+    api('/daily').then(setDaily).catch(() => {});
+  }, []);
+
+  useEffect(() => { loadDaily(); }, [loadDaily]);
+
+  // Re-poll once the next 12:00 CET reset is reached so the button
+  // re-highlights without requiring a page refresh.
+  useEffect(() => {
+    if (!daily?.nextResetTs) return;
+    const nowMs = Date.now();
+    const fireAt = (daily.nextResetTs * 1000) - (daily.nowTs * 1000 - nowMs);
+    const ms = Math.max(0, fireAt - nowMs) + 1500;
+    // Cap at a 24h timer so an absurdly off clock doesn't disable polling.
+    const t = setTimeout(loadDaily, Math.min(ms, 24 * 60 * 60 * 1000));
+    return () => clearTimeout(t);
+  }, [daily?.nextResetTs, daily?.nowTs, loadDaily]);
+
+  // Tick the countdown inside the modal once per second.
+  useEffect(() => {
+    if (!dailyOpen || !daily?.active) return;
+    const t = setInterval(() => setDailyTick(x => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [dailyOpen, daily?.active]);
+
+  const openDaily = async () => {
+    setDailyOpen(true);
+    if (daily?.available && !dailyStarting) {
+      setDailyStarting(true);
+      try {
+        const data = await api('/daily/start', { method: 'POST' });
+        setDaily(data);
+      } catch (e) {
+        notify(e.message || 'Failed to start daily challenge', 'error');
+        // Refresh in case the server now disagrees about availability.
+        loadDaily();
+      }
+      setDailyStarting(false);
+    }
+  };
+
+  const closeDaily = () => setDailyOpen(false);
+
+  // Escape to close the daily modal.
+  useEffect(() => {
+    if (!dailyOpen) return;
+    const h = (e) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        setDailyOpen(false);
+      }
+    };
+    window.addEventListener('keydown', h, true);
+    return () => window.removeEventListener('keydown', h, true);
+  }, [dailyOpen]);
+
   // Tutorial state
   const [tutorialBrowserOpen, setTutorialBrowserOpen] = useState(false);
   const [tutorialList, setTutorialList] = useState(null);
@@ -342,6 +405,24 @@ function MainMenu() {
            // grow the menu downward.
            ...(menuTopPad !== null && { justifyContent: 'flex-start', paddingTop: menuTopPad }),
          }}>
+      <div style={{ position: 'absolute', top: 12, left: 16, display: 'flex', alignItems: 'center', gap: 8, zIndex: 5 }}>
+        <button
+          className={'btn menu-daily-btn' + (daily?.available ? ' is-available' : '')}
+          style={{
+            padding: '6px 18px',
+            fontSize: 12,
+            borderColor: '#ffd700',
+            color: '#ffd700',
+            background: daily?.available ? 'rgba(255,215,0,.18)' : 'rgba(255,215,0,.06)',
+            fontWeight: 700,
+            letterSpacing: 1.5,
+          }}
+          onClick={openDaily}
+          title="Daily Challenge"
+        >
+          ★ DAILY{daily?.active && daily?.claimedBig ? ' ✓' : ''}
+        </button>
+      </div>
       <div style={{ position: 'absolute', top: 12, right: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
         <button className="btn menu-logout-btn" style={{ padding: '4px 16px', fontSize: 10 }} onClick={logout}>LOGOUT</button>
         <VolumeControl />
@@ -382,6 +463,75 @@ function MainMenu() {
           </div>
         </div>
       </div>
+
+      {/* ── Daily Challenge Modal ── */}
+      {dailyOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeDaily(); }}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid #ffd700', borderRadius: 8, width: 560, maxWidth: '92vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,215,0,.25)', position: 'relative' }}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 className="orbit-font" style={{ fontSize: 16, color: '#ffd700', margin: 0 }}>★ DAILY CHALLENGE</h3>
+              <button className="btn" onClick={closeDaily} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
+            </div>
+            <div style={{ padding: '18px 22px 22px', overflowY: 'auto' }}>
+              {(dailyStarting || daily === null) ? (
+                <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>Loading…</div>
+              ) : (daily.active && daily.heroes?.length === 3) ? (
+                <>
+                  <div style={{ color: 'var(--text1)', fontSize: 13, lineHeight: 1.55, marginBottom: 14 }}>
+                    Win a game today with <b style={{ color: '#ffd700' }}>2 of these Heroes</b> in your deck to earn{' '}
+                    <b style={{ color: '#ffd700' }}>10 bonus SC</b>, or <b style={{ color: '#ffd700' }}>all 3 for 20 bonus SC</b>!
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+                    {daily.heroes.map((name) => {
+                      const card = CARDS_BY_NAME[name];
+                      return (
+                        <div key={name} style={{ width: 150, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                          {card ? (
+                            <CardMini card={card} onClick={() => {}}
+                              style={{ width: 150, height: 210, cursor: 'default', borderColor: '#ffd700', boxShadow: '0 0 12px rgba(255,215,0,.25)' }} />
+                          ) : (
+                            <div style={{ width: 150, height: 210, borderRadius: 6, border: '1px solid #ffd700', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text2)', fontSize: 11, textAlign: 'center', padding: 8 }}>{name}</div>
+                          )}
+                          <div style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>{name}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {(() => {
+                    const _ = dailyTick; // re-render hook for the live countdown
+                    const nowMs = Date.now();
+                    // Time remaining in seconds, measured against the wallclock
+                    // delta since the /api/daily fetch (handles any client/server
+                    // clock skew).
+                    const remainSec = Math.max(0, Math.floor((daily.expiresTs - daily.nowTs) - (nowMs - daily.nowTs * 1000) / 1000));
+                    const h = Math.floor(remainSec / 3600);
+                    const m = Math.floor((remainSec % 3600) / 60);
+                    const s = remainSec % 60;
+                    const tStr = (h > 0 ? `${h}h ` : '') + `${m}m ${String(s).padStart(2, '0')}s`;
+                    return (
+                      <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text2)' }}>
+                        {daily.claimedBig ? (
+                          <div style={{ color: '#33ff88', marginBottom: 6 }}>
+                            ✓ Big bonus claimed (+{daily.claimedBig} SC) — extra wins with 2+ Heroes now give <b>+1 SC</b> each.
+                          </div>
+                        ) : (
+                          <div style={{ marginBottom: 6 }}>Big bonus still available.</div>
+                        )}
+                        <div>Time remaining: <span style={{ color: '#ffd700' }}>{tStr}</span></div>
+                      </div>
+                    );
+                  })()}
+                </>
+              ) : (
+                <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 20, fontSize: 13 }}>
+                  No active daily challenge. Close and re-open to roll a new one.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Puzzle Browser Modal ── */}
       {puzzleBrowserOpen && (

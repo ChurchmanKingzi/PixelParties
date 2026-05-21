@@ -32,11 +32,12 @@ module.exports = {
     const cardDB = engine._getCardDB();
 
     // Must have 1+ lv3-or-lower Creature in discard (effective level
-    // so Whoolmoth-style reducers / Phatnir's Cool-Stack rebate count).
+    // so Whoolmoth-style reducers / Phatnir's Cool-Stack rebate count;
+    // `pileSide: 'discard'` picks up Lethe's per-pile +1 stamps too).
     const hasEligible = (ps.discardPile || []).some(cn => {
       const cd = cardDB[cn];
       return cd && cd.cardType === 'Creature'
-          && engine.effectiveCardLevel(cd, pi) <= 3;
+          && engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' }) <= 3;
     });
     if (!hasEligible) return false;
 
@@ -67,7 +68,7 @@ module.exports = {
       if (seen.has(cn)) continue;
       const cd = cardDB[cn];
       if (!cd || cd.cardType !== 'Creature') continue;
-      if (engine.effectiveCardLevel(cd, pi) > 3) continue;
+      if (engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' }) > 3) continue;
       seen.add(cn);
       galleryCards.push({ name: cn, source: 'discard' });
     }
@@ -127,6 +128,7 @@ module.exports = {
 
     // Place the creature
     ps.discardPile.splice(discardIdx, 1);
+    const _letheBonus = engine.consumeLetheStamp(pi, chosenName);
     if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
     ps.supportZones[destHeroIdx][destSlot] = [chosenName];
     const inst = engine._trackCard(chosenName, pi, 'support', destHeroIdx, destSlot);
@@ -135,6 +137,7 @@ module.exports = {
     inst.counters.currentHp = 1;
     inst.counters.maxHp = 1;
     inst.counters._xuanwuRevived = true; // Visual indicator (blue tint)
+    if (_letheBonus > 0) inst.counters._letheLevelBonus = _letheBonus;
 
     // Track creature summon
     ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;

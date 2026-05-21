@@ -75,27 +75,29 @@ module.exports = {
       // Anchored to the caster's hero element so playAnimation has a
       // valid DOM target — the Cataclysm React component itself ignores
       // the (x,y) position and renders to the full viewport.
+      //
+      // `duration: 3000` is CRITICAL: play_zone_animation defaults the
+      // component lifetime to 1000ms (`onZoneAnim` → playAnimation),
+      // which unmounts the component mid-fall — the meteor vanished and
+      // the impact (every impact sub-animation is keyed `delay: 1300ms`)
+      // never rendered at all. The full sequence is fall (1300ms) +
+      // screen-engulfing explosion / shockwave / embers (~1450ms more);
+      // 3000ms keeps it mounted through the whole thing with margin.
       engine._broadcastEvent('play_zone_animation', {
         type: 'cataclysm', owner: pi,
         heroIdx: Math.max(0, heroIdx), zoneSlot: -1,
+        duration: 3000,
       });
-      // The meteor needs ~1.4s to travel across the screen before impact.
-      await engine._delay(1400);
-
-      // Burst flame on every hero target (heroes + creatures)
-      for (const ht of heroTargets) {
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'flame_avalanche', owner: ht.owner,
-          heroIdx: ht.heroIdx, zoneSlot: -1,
-        });
-      }
-      for (const inst of creatureTargets) {
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'flame_avalanche', owner: inst.owner,
-          heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
-        });
-      }
-      await engine._delay(450);
+      // The meteor takes ~1.3s to reach the centre; the `cataclysm`
+      // component then detonates a screen-engulfing explosion at the
+      // impact point. We do NOT fire per-target flame bursts anymore —
+      // the one giant blast IS the impact, and the old per-target loop
+      // + extra delay is exactly what made the meteor-touchdown→effect
+      // gap feel so long. Wait for touchdown, give the blast a beat to
+      // bloom over the whole board, then resolve damage so the
+      // explosion reads as dealing it.
+      await engine._delay(1300);
+      await engine._delay(260);
 
       // ── Resolve damage ──
       const source = { name: CARD_NAME, owner: pi, heroIdx };
@@ -114,7 +116,14 @@ module.exports = {
           cardName: inst.name,
         })),
       ];
-      await engine.preDamageMultiTargetWindow(source, allTargets);
+      // A post-target reaction (Storm Ring / Invisibility Cloak) may
+      // fully negate this Spell here. `preDamageMultiTargetWindow` now
+      // returns the result + sets `_spellNegatedByEffect`; bail BEFORE
+      // any damage AND before the Area wipe so the WHOLE Spell is
+      // negated (no side effects) — the play handler routes the card to
+      // discard as negated.
+      const _negR = await engine.preDamageMultiTargetWindow(source, allTargets);
+      if (_negR?.effectNegated) return;
 
       // Heroes — sequential dealDamage so afterDamage hooks fire cleanly per target.
       for (const ht of heroTargets) {

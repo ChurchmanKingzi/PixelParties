@@ -99,10 +99,13 @@ module.exports = {
 
       // Pre-damage post-target hand-reaction window — single
       // consolidated prompt for Sculpture Guards / Spectral Armor.
-      await engine.preDamageMultiTargetWindow(
+      // A full-negate reaction (Storm Ring / Invisibility Cloak) bails
+      // the whole Spell here — no bolts, no damage, no side effects.
+      const _negR = await engine.preDamageMultiTargetWindow(
         { name: 'Chain Lightning', owner: pi, heroIdx: ctx.cardHeroIdx },
         selectedTargets,
       );
+      if (_negR?.effectNegated) return;
 
       // Chain lightning animation + damage
       let prevOwner = selectedTargets[0].owner;

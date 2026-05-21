@@ -96,6 +96,107 @@ function getCardArray() {
   return _cachedCardArray;
 }
 
+// ===== DAILY CHALLENGE =====
+// The most recent 12:00 Europe/Berlin (CET/CEST), as Unix-seconds ≤ nowSec.
+function mostRecentNoonCETSec(nowSec = Math.floor(Date.now() / 1000)) {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Berlin', hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
+  });
+  const parse = (ts) => {
+    const o = {};
+    for (const p of fmt.formatToParts(new Date(ts * 1000))) {
+      if (p.type !== 'literal') o[p.type] = parseInt(p.value, 10);
+    }
+    return o;
+  };
+  let { year: y, month: m, day: d, hour } = parse(nowSec);
+  // If we're before noon Berlin today, the most recent noon was yesterday.
+  if (hour < 12) {
+    const yest = new Date(Date.UTC(y, m - 1, d) - 86400000);
+    y = yest.getUTCFullYear(); m = yest.getUTCMonth() + 1; d = yest.getUTCDate();
+  }
+  // Find Unix-seconds whose Berlin clock reads y-m-d 12:00. Start with the
+  // UTC noon candidate and shift by the Berlin-UTC offset (±1h or ±2h).
+  let candSec = Math.floor(Date.UTC(y, m - 1, d, 12, 0, 0) / 1000);
+  for (let i = 0; i < 4; i++) {
+    const c = parse(candSec);
+    if (c.year === y && c.month === m && c.day === d && c.hour === 12) return candSec;
+    let shift = (c.hour - 12) * 3600;
+    if (c.day !== d) shift += (c.day > d ? -24 : 24) * 3600;
+    candSec -= shift;
+  }
+  return candSec;
+}
+
+// Cache the pool of legal hero names for the daily roll. Filters to
+// non-banned Heroes that have a card image in /cards (i.e. the same pool
+// the deckbuilder shows). Computed lazily on first use after boot.
+let _cachedDailyHeroPool = null;
+function getDailyHeroPool() {
+  if (!_cachedDailyHeroPool) {
+    const cardsDir = path.join(__dirname, 'cards');
+    const haveImage = new Set();
+    try {
+      const exts = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
+      const stripped = {};
+      getCardArray().forEach(c => { stripped[c.name.replace(/[^a-zA-Z0-9 ]/g, '')] = c.name; });
+      for (const f of fs.readdirSync(cardsDir)) {
+        if (!exts.has(path.extname(f).toLowerCase())) continue;
+        const stem = path.basename(f, path.extname(f));
+        const real = stripped[stem.replace(/[^a-zA-Z0-9 ]/g, '')] || stem;
+        haveImage.add(real);
+      }
+    } catch {}
+    _cachedDailyHeroPool = getCardArray()
+      .filter(c => c?.cardType === 'Hero' && !c.banned && haveImage.has(c.name))
+      .map(c => c.name);
+  }
+  return _cachedDailyHeroPool;
+}
+
+function rollDailyHeroes() {
+  const pool = getDailyHeroPool().slice();
+  // Fisher-Yates partial shuffle for 3 unique picks.
+  const out = [];
+  for (let i = 0; i < 3 && pool.length > 0; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    out.push(pool[idx]);
+    pool.splice(idx, 1);
+  }
+  return out;
+}
+
+const DAILY_CHALLENGE_DURATION_SEC = 24 * 60 * 60;
+
+// The next 12:00 Europe/Berlin strictly after `ts` (Unix seconds).
+function nextNoonCETAfter(ts) {
+  // Probe ~25h ahead so we cross at least one noon even across DST jumps,
+  // then snap to the most-recent-noon at the probe.
+  const probe = mostRecentNoonCETSec(ts + 25 * 3600);
+  return probe > ts ? probe : ts + DAILY_CHALLENGE_DURATION_SEC;
+}
+
+// Returns the active challenge for a user-row, or null if expired / never started.
+// "Active" means: started after the most recent 12:00 CET tick AND within 24h.
+function getActiveDaily(userRow, nowSec = Math.floor(Date.now() / 1000)) {
+  if (!userRow) return null;
+  const startTs = userRow.daily_start_ts || 0;
+  if (!startTs) return null;
+  const lastReset = mostRecentNoonCETSec(nowSec);
+  if (startTs < lastReset) return null;
+  if (nowSec - startTs >= DAILY_CHALLENGE_DURATION_SEC) return null;
+  let heroes = [];
+  try { heroes = JSON.parse(userRow.daily_heroes || '[]'); } catch {}
+  if (!Array.isArray(heroes) || heroes.length === 0) return null;
+  return {
+    heroes,
+    startTs,
+    claimedBig: userRow.daily_claimed_big || 0,
+    expiresTs: Math.min(startTs + DAILY_CHALLENGE_DURATION_SEC, nextNoonCETAfter(startTs)),
+  };
+}
+
 // Surface silent async failures — self-play batches will otherwise hang
 // indefinitely on a rejected Promise that nobody handled, with no trace
 // whatsoever in the log. This at least tells us what threw.
@@ -201,6 +302,14 @@ async function initDatabase() {
   // Tracks which sample deck (starter or structure) the user has pinned as
   // their default. Null when the default is a custom deck from `decks`.
   try { await db.execute("ALTER TABLE users ADD COLUMN default_sample_deck_id TEXT DEFAULT NULL"); } catch {}
+  // Daily Challenge — 3 random Heroes the player must win with for SC bonuses.
+  // Resets every 12:00 Europe/Berlin (CET/CEST) globally, or 24h after the
+  // player's last `start`, whichever comes first.
+  try { await db.execute("ALTER TABLE users ADD COLUMN daily_heroes TEXT DEFAULT NULL"); } catch {}
+  try { await db.execute("ALTER TABLE users ADD COLUMN daily_start_ts INTEGER DEFAULT 0"); } catch {}
+  // 0 = unclaimed, 10 or 20 = big bonus already paid out (subsequent
+  // 2+/3 wins during the same challenge only pay 1 SC each).
+  try { await db.execute("ALTER TABLE users ADD COLUMN daily_claimed_big INTEGER DEFAULT 0"); } catch {}
 
   await db.execute(`CREATE TABLE IF NOT EXISTS hero_stats (
     user_id TEXT NOT NULL,
@@ -745,6 +854,64 @@ app.get('/api/profile/hero-stats', authMiddleware, async (req, res) => {
     winRate: r.wins + r.losses > 0 ? Math.round((r.wins / (r.wins + r.losses)) * 100) : 0
   }));
   res.json({ heroes: top });
+});
+
+// ===== DAILY CHALLENGE =====
+app.get('/api/daily', authMiddleware, async (req, res) => {
+  try {
+    const user = await db.get('SELECT daily_heroes, daily_start_ts, daily_claimed_big FROM users WHERE id = ?', [req.user.userId]);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const active = getActiveDaily(user, nowSec);
+    const lastResetTs = mostRecentNoonCETSec(nowSec);
+    const nextResetTs = nextNoonCETAfter(nowSec);
+    res.json({
+      active: !!active,
+      available: !active, // button is highlighted when the player has no active challenge
+      heroes: active ? active.heroes : [],
+      startTs: active ? active.startTs : 0,
+      expiresTs: active ? active.expiresTs : 0,
+      claimedBig: active ? active.claimedBig : 0,
+      lastResetTs,
+      nextResetTs,
+      nowTs: nowSec,
+    });
+  } catch (err) {
+    console.error('[daily/get] error:', err.message);
+    res.status(500).json({ error: 'Failed to load daily challenge' });
+  }
+});
+
+app.post('/api/daily/start', authMiddleware, async (req, res) => {
+  try {
+    const user = await db.get('SELECT daily_heroes, daily_start_ts, daily_claimed_big FROM users WHERE id = ?', [req.user.userId]);
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (getActiveDaily(user, nowSec)) {
+      return res.status(409).json({ error: 'A daily challenge is already active' });
+    }
+    const heroes = rollDailyHeroes();
+    if (heroes.length < 3) {
+      return res.status(500).json({ error: 'Hero pool exhausted' });
+    }
+    await db.run(
+      'UPDATE users SET daily_heroes = ?, daily_start_ts = ?, daily_claimed_big = 0 WHERE id = ?',
+      [JSON.stringify(heroes), nowSec, req.user.userId]
+    );
+    const nextResetTs = nextNoonCETAfter(nowSec);
+    res.json({
+      active: true,
+      available: false,
+      heroes,
+      startTs: nowSec,
+      expiresTs: Math.min(nowSec + DAILY_CHALLENGE_DURATION_SEC, nextResetTs),
+      claimedBig: 0,
+      lastResetTs: mostRecentNoonCETSec(nowSec),
+      nextResetTs,
+      nowTs: nowSec,
+    });
+  } catch (err) {
+    console.error('[daily/start] error:', err.message);
+    res.status(500).json({ error: 'Failed to start daily challenge' });
+  }
 });
 
 // ===== AVAILABLE CARDS (based on ./cards folder) =====
@@ -1630,6 +1797,72 @@ async function evaluateSCRewards(room, winnerIdx, reason) {
   return results;
 }
 
+// ===== DAILY CHALLENGE BONUS (PvP wins) =====
+// Awards bonus SC to a winner whose deck contains 2+ of their active daily
+// challenge Heroes. Big bonus (10 SC for 2, 20 SC for 3) pays out once per
+// challenge; subsequent qualifying wins during the same challenge pay 1 SC.
+// Applies the same anti-farm gates as evaluateSCRewards.
+async function awardDailyChallengeBonus(room, winnerIdx, reason) {
+  const gs = room?.gameState;
+  if (!gs) return null;
+  const winner = gs.players?.[winnerIdx];
+  if (!winner?.userId) return null;
+  // Both sides must be human (skip CPU / bot games).
+  if (!gs.players?.[winnerIdx === 0 ? 1 : 0]?.userId) return null;
+
+  // Anti-farm gates mirroring evaluateSCRewards.
+  const ip0 = gs._playerIPs?.[0] || 'unknown';
+  const ip1 = gs._playerIPs?.[1] || 'unknown';
+  if (ip0 !== 'unknown' && ip0 === ip1) return null;
+  if (reason === 'disconnect_timeout') return null;
+
+  const tracking = gs._scTracking || { 0: {}, 1: {} };
+  const startTime = gs._gameStartTime || Date.now();
+  if (Date.now() - startTime < SC_MIN_GAME_DURATION_MS) return null;
+  if ((gs.turn || 0) < SC_MIN_TURNS) return null;
+  if ((tracking[0]?.cardsPlayedFromHand || 0) < SC_MIN_CARDS_PLAYED) return null;
+  if ((tracking[1]?.cardsPlayedFromHand || 0) < SC_MIN_CARDS_PLAYED) return null;
+  if (reason === 'surrender') {
+    const anyDamage = gs.players.some(ps => (ps.heroes || []).some(h => h.name && h.hp < h.maxHp));
+    if (!anyDamage) return null;
+  }
+
+  const userRow = await db.get(
+    'SELECT daily_heroes, daily_start_ts, daily_claimed_big FROM users WHERE id = ?',
+    [winner.userId]
+  );
+  const active = getActiveDaily(userRow);
+  if (!active) return null;
+
+  const winnerHeroNames = new Set((winner.heroes || []).filter(h => h?.name).map(h => h.name));
+  const matched = active.heroes.filter(n => winnerHeroNames.has(n)).length;
+  if (matched < 2) return null;
+
+  let amount = 0;
+  let newClaimed = active.claimedBig;
+  if (active.claimedBig === 0) {
+    amount = matched >= 3 ? 20 : 10;
+    newClaimed = amount;
+  } else {
+    amount = 1;
+  }
+
+  await db.run(
+    'UPDATE users SET sc = sc + ?, daily_claimed_big = ? WHERE id = ?',
+    [amount, newClaimed, winner.userId]
+  );
+
+  return {
+    matched,
+    amount,
+    claimedBig: newClaimed,
+    title: matched >= 3
+      ? 'Daily Challenge — 3/3 Heroes!'
+      : (active.claimedBig === 0 ? 'Daily Challenge — 2 Heroes' : 'Daily Challenge — repeat win'),
+    description: `${matched} of your 3 daily Heroes`,
+  };
+}
+
 // ===== GAME ROOMS (Socket.io) =====
 const rooms = new Map();
 const activeGames = new Map(); // userId -> roomId
@@ -1904,6 +2137,13 @@ function sendGameState(room, playerIdx, extra) {
       })(),
       potionDeckCards: pi === playerIdx ? ps.potionDeck : [], potionDeckCount: ps.potionDeck.length,
       discardPile: ps.discardPile, deletedPile: ps.deletedPile,
+      // Lethe per-pile +1 stamps — `{ [cardName]: [stampCount, ...] }`
+      // sized to combined discard+deleted occurrences. Forwarded to the
+      // client so pile-viewer / cardGallery / BoardCard renderings can
+      // surface the effective level on stamped Creatures. Shared with
+      // both sides (no hidden-info concern: stamps are derived from
+      // public actions — every Lethe Necromancy resolution is logged).
+      letheStamps: ps._letheStamps || {},
       disconnected: ps.disconnected || false, left: ps.left || false,
       // Gold display can be temporarily frozen for cost-bypass flows
       // (Swagdri's free-play of an X-cost Artifact bumps gold by a
@@ -2562,6 +2802,7 @@ function sendSpectatorGameState(room) {
       })(),
       potionDeckCards: [], potionDeckCount: ps.potionDeck.length,
       discardPile: ps.discardPile, deletedPile: ps.deletedPile,
+      letheStamps: ps._letheStamps || {},
       disconnected: ps.disconnected || false, left: ps.left || false,
       // Gold display can be temporarily frozen for cost-bypass flows
       // (Swagdri's free-play of an X-cost Artifact bumps gold by a
@@ -2793,6 +3034,24 @@ async function endGame(room, winnerIdx, reason) {
   // ── SC reward evaluation ──
   try {
     const scResults = await evaluateSCRewards(room, winnerIdx, reason);
+    // Daily challenge bonus for the winner (merged into the standard payout
+    // so the client shows one combined sc_earned toast).
+    try {
+      const dailyBonus = await awardDailyChallengeBonus(room, winnerIdx, reason);
+      if (dailyBonus) {
+        const entry = scResults[winnerIdx] || { rewards: [], total: 0 };
+        entry.rewards.push({
+          id: 'daily_challenge',
+          title: dailyBonus.title,
+          amount: dailyBonus.amount,
+          description: dailyBonus.description,
+        });
+        entry.total += dailyBonus.amount;
+        scResults[winnerIdx] = entry;
+      }
+    } catch (err) {
+      console.error('[Daily] bonus error:', err.message);
+    }
     for (let pi = 0; pi < 2; pi++) {
       if (scResults[pi] && scResults[pi].total > 0) {
         const sid = gs.players[pi]?.socketId;

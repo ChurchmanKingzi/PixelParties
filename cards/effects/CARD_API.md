@@ -863,6 +863,104 @@ Stinky Stables poison-heal-lock sites in `_engine.js` for the pattern.
 
 ---
 
+### Targeting / redirect effects — respect "Truth-Seeing Eye" (MANDATORY)
+
+> **Truth-Seeing Eye** (Artifact / Equipment): *"The equipped Hero can
+> choose any target with Attacks and Spells, negating all effects that
+> would prevent those targets from being chosen, and the equipped
+> Hero's Attacks and Spells cannot be redirected."*
+
+Like Diver Helmet, Truth-Seeing Eye is **passive** — it has no
+behaviour of its own. The rule is enforced *by every effect that
+restricts target selection or redirects something*. When you author or
+modify ANY card or engine rule that **(a) makes a target impossible /
+harder to choose** (a new untargetable-style status, a per-instance
+"can't be chosen by opp" flag, a taunt / forced-targeting filter, a
+target-exclusion list, a side-wide targeting shield, an
+insta-fizzle-on-selection, …) **or (b) redirects an Attack / Spell /
+effect** (a new `isTargetRedirect` / `isSurprise`+`isSurpriseRedirect`
+/ `heroRedirect` card, a post-target reaction returning `newTargets`,
+or any bespoke "the effect now hits a different target" path) — you
+**must** make it a no-op when the source is an Attack / Spell cast by a
+Hero wearing a Truth-Seeing Eye.
+
+The single source of truth is the engine helper:
+
+```js
+// true iff `sourceCard` is an actual Attack OR Spell CARD being cast
+// by a Hero with a live (face-up, non-negated) Truth-Seeing Eye in a
+// Support Zone. Scoped to Attack/Spell ONLY — a Creature effect from
+// the same Hero is NOT its "Attack or Spell" and is still
+// restrictable / redirectable.
+engine._sourceHasTruthSeeingEye(sourceCard) → bool
+```
+
+**You usually get this for free.** The three core pickers
+(`promptDamageTarget`, `promptMultiTarget`, `promptTarget`) already
+call the helper and, when it matches, set on the live `config`:
+
+* `ignoreUntargetable: true` — the long-standing master switch every
+  built-in "can't be chosen" filter is already gated on (`if
+  (!config.ignoreUntargetable) { … }`: untargetable status, Golden
+  Wings `untargetable_by_opponent`, Perfect Disguise soft-untargetable,
+  The Great Wall of Deri non-damage shield).
+* `_truthSeeingEye: true` — gates the filters that are NOT covered by
+  `ignoreUntargetable`: the forced-targeting / taunt filter
+  (`_applyForcesTargetingFilter`) and the `gs._spellExcludeTargets`
+  exclusion list (Invisibility Cloak's post-negation lockout, Bartas
+  second-cast).
+* `cannotBeRedirected: true` — the existing gate the redirect call
+  sites honour; `_checkTargetRedirect` *also* early-returns `null` on
+  the helper directly.
+
+So: **if your new "can't be chosen" filter is gated on
+`!config.ignoreUntargetable`, and your damage/effect routes through one
+of the three pickers, you are already compliant.** Anything else MUST
+add an explicit guard:
+
+```js
+// (a) A NEW target-selection filter inside a picker — gate it like the
+//     built-ins, OR additionally honour the dedicated flag if it isn't
+//     an `ignoreUntargetable`-class restriction:
+if (!config.ignoreUntargetable && !config._truthSeeingEye) {
+  // …remove the now-unchooseable targets…
+}
+
+// (b) An ENGINE-LEVEL chokepoint or an AUTO-TRIGGERED restriction /
+//     redirect that never sees a picker `config` (server-side
+//     targeting, a reaction that swaps the target, a bespoke
+//     "redirect" path) — consult the helper directly:
+if (engine._sourceHasTruthSeeingEye(sourceCard)) return;          // don't restrict
+if (engine._sourceHasTruthSeeingEye(sourceCard)) return null;     // don't redirect
+```
+
+Canonical redirect paths are already compliant — `_checkTargetRedirect`
+guards at the top (covers `isTargetRedirect` Challenge / Martyry /
+Anti-Magnet, `heroRedirect`, and the `isSurpriseRedirect` Shield of
+Wisdom scan). A NEW redirect mechanism that does **not** flow through
+`_checkTargetRedirect` (e.g. a post-target reaction returning
+`newTargets`) must add the `engine._sourceHasTruthSeeingEye(sourceCard)`
+check itself before swapping the target.
+
+**Scope / non-goals (do NOT over-apply):**
+- Attack / Spell sources **only**. A Creature effect (even from the
+  same Eye Hero) is still restrictable and redirectable.
+- It does **not** suppress post-target *negation* reactions
+  (Invisibility Cloak fully negating, Storm Ring negating a
+  multi-target Spell) — those still resolve. The Eye governs which
+  targets can be *chosen* and that the cast can't be *redirected*,
+  nothing else.
+- `submerged` is a damage / status immunity, not a target-list filter
+  — leave it alone (the Eye doesn't make submerged targets take
+  damage).
+
+Reference implementations: the helper + picker injection + filter gates
+in `_engine.js`; the passive equip script `truth-seeing-eye.js`; the
+redirect cards `anti-magnet.js` (`isTargetRedirect`) and
+`shield-of-wisdom.js` (`isSurpriseRedirect`).
+
+---
+
 ### Removing a *chosen* board card to a pile — anchor the flight by ZONE, not name (MANDATORY)
 
 > **The bug:** the client's diff-based board→discard/deleted fly-out
