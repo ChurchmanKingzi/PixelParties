@@ -146,12 +146,14 @@ module.exports = {
       const cardDB = engine._getCardDB();
 
       // Predicate: could THIS host summon `cd` right now (post-attach)?
-      // Mirrors `heroCanSummon` from the live activation path: each
-      // declared spell school must be covered by the Hero's stack of
-      // that school (Performance copies count via the engine helper).
-      // The level cap from Necromancy is applied separately below.
-      const heroCanSummon = (cd) => {
-        const cLvl = cd.level || 0;
+      // Uses the EFFECTIVE level so Whoolmoth-style reducers and Lethe
+      // pile stamps stay consistent with the live activation path
+      // (which routes through `engine.heroMeetsLevelReq` at line 91).
+      // Each declared spell school must be covered by the Hero's stack
+      // (Performance copies count via the engine helper).
+      const heroCanSummon = (cd, source) => {
+        const opts = source === 'discard' ? { pileSide: 'discard' } : {};
+        const cLvl = engine.effectiveCardLevel(cd, pi, opts);
         if (cd.spellSchool1) {
           if (engine.countAbilitiesForSchool(cd.spellSchool1, abZones) < cLvl) return false;
         }
@@ -162,14 +164,14 @@ module.exports = {
       };
 
       // Effective level applies — Whoolmoth-style reducers may push
-      // a printed Lv5 card to 0 and make it summonable.
-      const effLvl = (cd) => engine.effectiveCardLevel(cd, pi);
+      // a printed Lv5 card to 0 and make it summonable. Discard reads
+      // pick up Lethe per-pile stamps via the pileSide opt-in.
       let summonable = 0;
       for (const name of (ps.discardPile || [])) {
         const cd = cardDB[name];
         if (!cd || cd.cardType !== 'Creature') continue;
-        if (effLvl(cd) > necroLevel) continue;
-        if (!heroCanSummon(cd)) continue;
+        if (engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' }) > necroLevel) continue;
+        if (!heroCanSummon(cd, 'discard')) continue;
         summonable++;
       }
 
@@ -178,8 +180,8 @@ module.exports = {
         for (const name of ps.mainDeck) {
           const cd = cardDB[name];
           if (!cd || cd.cardType !== 'Creature') continue;
-          if (effLvl(cd) > necroLevel) continue;
-          if (!heroCanSummon(cd)) continue;
+          if (engine.effectiveCardLevel(cd, pi) > necroLevel) continue;
+          if (!heroCanSummon(cd, 'deck')) continue;
           latent++;
         }
       }
@@ -332,7 +334,7 @@ module.exports = {
     }
     if (!skipNegate && !vacarnBypass) {
       // Current turn = gs.turn (pi's turn), next pi turn = gs.turn + 2
-      engine.actionNegateCreature(inst, 'Necromancy', {
+      await engine.actionNegateCreature(inst, 'Necromancy', {
         expiresAtTurn: gs.turn + 2,
         expiresForPlayer: pi,
         selfInflicted: true,

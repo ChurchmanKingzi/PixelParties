@@ -128,14 +128,14 @@ module.exports = {
   },
 
   /**
-   * Only one copy of Slippery Skates per Hero. Prevents the CPU (and any
-   * future scripted flow using this hook) from stacking duplicates.
+   * No per-Hero copy limit — multiple Slippery Skates may be equipped to
+   * the same Hero (each grants its own once-per-turn move). Function is
+   * kept (returning `true`) so the engine still treats Skates as an
+   * own-side-only equip: removing it entirely would make Skates appear
+   * in `getFreeSideEquipArtifacts` and let it be equipped onto opp Heroes.
    */
   canEquipToHero(gs, pi, hi, engine) {
-    return !engine.cardInstances.some(c =>
-      c.owner === pi && c.zone === 'support' &&
-      c.heroIdx === hi && c.name === CARD_NAME
-    );
+    return true;
   },
 
   /**

@@ -121,6 +121,20 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   const fromZoneSlot = targetInst.zoneSlot;
   const cardName = targetInst.name;
 
+  // Defending the Gate: support-zone targets only (ability-zone displacement
+  // is outside the gate's scope, which protects Support Zone cards).
+  if (fromZone === 'support') {
+    await engine._triggerGateCheck(targetInst.controller ?? targetInst.owner, CARD_NAME);
+    if (engine._isGateShielded(targetInst.controller ?? targetInst.owner)) {
+      engine.log('dive_bomblebee_blocked', {
+        player: gs.players[pi]?.username,
+        target: cardName, reason: 'Defending the Gate',
+      });
+      engine.sync();
+      return;
+    }
+  }
+
   // Cosmic Depths "removal of own CD Creature" hand-reaction window —
   // gives the target's owner a chance to negate the deck-bottom move
   // via Cosmic Malfunction. The helper returns `true` if cancelled.

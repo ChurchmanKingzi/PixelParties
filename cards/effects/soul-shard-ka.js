@@ -215,7 +215,7 @@ module.exports = {
       // Negate the placed Creature's effects until end of THIS turn —
       // expires when opp's next turn starts.
       const oi = pi === 0 ? 1 : 0;
-      engine.actionNegateCreature(placeRes.inst, CARD_NAME, {
+      await engine.actionNegateCreature(placeRes.inst, CARD_NAME, {
         expiresAtTurn: gs.turn + 1,
         expiresForPlayer: oi,
         buffKey: 'soul_shard_ka_negated',

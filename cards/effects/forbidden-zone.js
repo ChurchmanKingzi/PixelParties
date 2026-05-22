@@ -165,7 +165,7 @@ module.exports = {
         // canApplyCreatureStatus respects _cardinalImmune + faceDown +
         // gate-shield, so this doesn't need its own immunity guard.
         if (!engine.canApplyCreatureStatus(stillOn, 'negated')) continue;
-        engine.actionNegateCreature(stillOn, CARD_NAME, {
+        await engine.actionNegateCreature(stillOn, CARD_NAME, {
           expiresAtTurn,
           expiresForPlayer,
         });

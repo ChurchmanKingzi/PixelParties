@@ -202,7 +202,17 @@
       "Bash(python -c \"import json; d=json.load\\(open\\('data/cards.json'\\)\\); print\\(type\\(d\\)\\); print\\(len\\(d\\) if isinstance\\(d,list\\) else list\\(d.keys\\(\\)\\)[:5]\\)\")",
       "Bash(python \"C:\\\\Users\\\\kingz\\\\AppData\\\\Local\\\\Temp\\\\cards_lint.py\")",
       "Bash(python \"C:\\\\Users\\\\kingz\\\\AppData\\\\Local\\\\Temp\\\\cards_grammar.py\")",
-      "Bash(python \"C:\\\\Users\\\\kingz\\\\AppData\\\\Local\\\\Temp\\\\cards_fix.py\")"
+      "Bash(python \"C:\\\\Users\\\\kingz\\\\AppData\\\\Local\\\\Temp\\\\cards_fix.py\")",
+      "Bash(measure-object -line)",
+      "Bash(grep -n 'grantAtk\\\\|Atk\\\\|atk' cards/effects/__TRACKED_VAR__.js)",
+      "Bash(sed -n '90,210p' cards/effects/homerun.js)",
+      "Bash(cat cards/effects/sculpture-guards.js)",
+      "Bash(cat cards/effects/blade-of-the-swamp-witch.js)",
+      "Bash(sed -n '1,50p' cards/effects/_second-action-shared.js)",
+      "Bash(grep -v '\\\\.\\\\|//')",
+      "Bash(npx babel *)",
+      "Bash(sed -n '3825,3870p' public/app-board.jsx)",
+      "Bash(sed -n '12600,12685p' public/app-board.jsx)"
     ]
   }
 }

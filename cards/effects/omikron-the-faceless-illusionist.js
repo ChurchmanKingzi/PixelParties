@@ -116,7 +116,7 @@ module.exports = {
 
     // Negate until the start of Omikron owner's NEXT turn
     // expiresAtTurn = gs.turn + 1 when expiresForPlayer === pi
-    engine.actionNegateCreature(inst, CARD_NAME, {
+    await engine.actionNegateCreature(inst, CARD_NAME, {
       expiresAtTurn:    gs.turn + 1,
       expiresForPlayer: pi,
       buffKey:          'omikron_negated',

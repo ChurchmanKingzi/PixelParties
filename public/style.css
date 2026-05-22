@@ -6401,6 +6401,134 @@ body:has(.game-hand-me) .board-tooltip {
   100% { opacity: 1; transform: scale(1.15); }
 }
 
+/* ===== ROCKET FIST PROJECTILE (Rocket Fist) ===== */
+/* A directional rocket-engine exhaust streaming BEHIND the fist. The
+   flight-path rotation `--projAngle` is set on `.projectile-anim` and
+   inherits down here; we rotate to it, then push the flame back along
+   that same axis so it always trails the fist (rather than haloing it
+   like the symmetric `.projectile-flame-trail`). */
+.rocket-fist-trail {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 78px;
+  height: 22px;
+  z-index: -1; /* render behind the fist */
+  transform-origin: 50% 50%;
+  transform: translate(-50%, -50%) rotate(var(--projAngle, 0deg)) translateX(-42px);
+  border-radius: 50%;
+  /* White-hot at the nozzle (right, by the fist) → orange → out. */
+  background: linear-gradient(to left,
+    rgba(255,255,235,.95) 0%,
+    rgba(255,214,96,.92) 24%,
+    rgba(255,132,24,.70) 52%,
+    rgba(255,58,0,.34)   76%,
+    transparent          100%);
+  filter: blur(2px) drop-shadow(0 0 8px rgba(255,140,32,.8));
+  animation: rocketFistFlame 64ms ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes rocketFistFlame {
+  0%   { opacity: .72; filter: blur(2.4px) brightness(1)    drop-shadow(0 0 7px rgba(255,140,32,.7)); }
+  100% { opacity: 1;   filter: blur(1.6px) brightness(1.35) drop-shadow(0 0 13px rgba(255,165,45,.95)); }
+}
+
+/* ===== IDEJ PROJECTION — damage-absorb hologram ===== */
+/* A green holographic dome flares over the Projection's slot — it
+   "ate" the hit in the Hero's place — then dissolves as the
+   Projection flies off to the discard pile. Scanlines on the dome
+   sell the hologram look. */
+.anim-idej-absorb-dome {
+  position: absolute;
+  border-radius: 50%;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(150,255,190,.28) 3px 5px),
+    radial-gradient(circle, rgba(170,255,205,.9) 0%, rgba(48,232,128,.6) 42%, rgba(20,170,86,.22) 70%, transparent 86%);
+  border: 2px solid rgba(170,255,205,.95);
+  box-shadow: 0 0 34px rgba(60,255,140,.95), inset 0 0 34px rgba(130,255,185,.8);
+  animation: idejAbsorbDome 880ms cubic-bezier(.18,.72,.3,1) forwards;
+  pointer-events: none;
+}
+@keyframes idejAbsorbDome {
+  0%   { transform: scale(.18); opacity: 0; }
+  22%  { transform: scale(1.18); opacity: 1; }
+  50%  { transform: scale(.98); opacity: 1; }
+  100% { transform: scale(1.3);  opacity: 0; }
+}
+.anim-idej-absorb-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 3px solid rgba(95,255,155,.85);
+  box-shadow: 0 0 18px rgba(60,255,140,.8), inset 0 0 12px rgba(120,255,180,.5);
+  animation: idejAbsorbRing 900ms ease-out forwards;
+  pointer-events: none;
+}
+@keyframes idejAbsorbRing {
+  0%   { transform: scale(.12); opacity: 0; }
+  18%  { opacity: .95; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+.anim-idej-absorb-flash {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232,255,242,.97) 0%, rgba(130,255,180,.62) 36%, transparent 72%);
+  animation: idejAbsorbFlash 340ms ease-out forwards;
+  pointer-events: none;
+}
+@keyframes idejAbsorbFlash {
+  0%   { transform: scale(.3);  opacity: 0; }
+  35%  { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+.anim-idej-absorb-glyph {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  color: #b6ffce;
+  filter: drop-shadow(0 0 10px rgba(70,255,150,.95)) drop-shadow(0 0 20px rgba(40,220,110,.7));
+  animation: idejAbsorbGlyph 880ms cubic-bezier(.2,.8,.3,1) forwards;
+  pointer-events: none;
+}
+@keyframes idejAbsorbGlyph {
+  0%   { transform: scale(.3) translateY(4px); opacity: 0; }
+  28%  { transform: scale(1.15) translateY(0); opacity: 1; }
+  60%  { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(1.1); opacity: 0; }
+}
+
+/* ===== CAPTURE NET (Capture Net) ===== */
+/* A rope-mesh net plummets from the top of the screen onto the
+   targeted Creature, squashing on impact before it fades as the
+   Creature is hauled into the capturer's hand. The crossed
+   repeating-linear-gradients form the diamond mesh; the border is the
+   net's edge rope. `animation-duration` is set inline by the
+   CaptureNetEffect component (from the broadcast `duration`). */
+.anim-capture-net {
+  position: absolute;
+  border: 3px solid #7a5526;
+  border-radius: 16px;
+  background:
+    repeating-linear-gradient(45deg,  transparent 0 8px, rgba(214,182,120,.95) 8px 11px),
+    repeating-linear-gradient(-45deg, transparent 0 8px, rgba(214,182,120,.95) 8px 11px);
+  box-shadow: 0 4px 14px rgba(0,0,0,.55), inset 0 0 22px rgba(90,60,20,.5);
+  transform-origin: 50% 100%;
+  animation-name: captureNetDrop;
+  animation-timing-function: cubic-bezier(.55,.06,.78,.13); /* gravity ease-in */
+  animation-fill-mode: forwards;
+  pointer-events: none;
+}
+@keyframes captureNetDrop {
+  0%   { transform: translateY(-115vh) scaleY(1.25) scaleX(.9); opacity: 0; }
+  10%  { opacity: 1; }
+  58%  { transform: translateY(0) scaleY(1) scaleX(1);          opacity: 1; }
+  68%  { transform: translateY(0) scaleY(.78) scaleX(1.14);     opacity: 1; } /* impact squash */
+  79%  { transform: translateY(0) scaleY(1.06) scaleX(.97);     opacity: 1; }
+  88%  { transform: translateY(0) scaleY(1) scaleX(1);          opacity: 1; }
+  100% { transform: translateY(0) scaleY(1) scaleX(1);          opacity: 0; }
+}
+
 /* ===== DARK ENERGY DELETION ANIMATION ===== */
 
 .discard-anim-deleted {

@@ -3967,12 +3967,24 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   // additional action regardless of phase, so the play never counts
   // as the host hero's main action even when they had a free slot.
   const forceAdditional = _viaCreature != null;
+  // Match an additional-action provider up front. A type flagged
+  // `preferOverMainAction` (Idej Sword - Muras's free first Attack)
+  // is used EVEN when the Hero's main turn-Action is still available
+  // — being the free extra is its whole point. Other providers
+  // (Friendship, Wolflesia, second-action grants, …) are only
+  // consulted when an additional action is genuinely needed
+  // (Main Phase / after the Hero has acted).
+  const matchedAddlType = isReactionSubtype
+    ? null
+    : room.engine.findAdditionalActionForCard(pi, cardName, heroIdx);
+  const matchedPrefersAddl = !!matchedAddlType
+    && !!room.engine._additionalActionTypes?.[matchedAddlType]?.preferOverMainAction;
   const needsAdditional = !isReactionSubtype
-    && (forceAdditional || (isMainPhase && !isInherentAction) || actionAlreadyUsed);
+    && (forceAdditional || (isMainPhase && !isInherentAction) || actionAlreadyUsed || matchedPrefersAddl);
   let additionalConsumed = false;
   let consumedInst = null;
   if (needsAdditional) {
-    const typeId = room.engine.findAdditionalActionForCard(pi, cardName, heroIdx);
+    const typeId = matchedAddlType;
     if (!typeId) {
       // Clean up the spell-caster override we set above before bailing,
       // otherwise the next spell cast in this turn could pick it up.
@@ -4267,6 +4279,16 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     if (resolveHi >= 0) { ps.hand.splice(resolveHi, 1); if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++; }
     if (gs._spellPlacedOnBoard) {
       delete gs._spellPlacedOnBoard;
+    } else if (gs._spellReturnToHand) {
+      // Rocket Fist etc. — the resolved Spell/Attack returns to its
+      // caster's hand instead of going to the discard pile. Origin
+      // tracking is consumed so a re-play routes its piles correctly.
+      delete gs._spellReturnToHand;
+      if (resolveHi >= 0) {
+        room.engine._consumeHandCardOrigin(pi, cardName);
+        ps.hand.push(cardName);
+      }
+      room.engine._untrackCard(inst.id);
     } else {
       if (resolveHi >= 0) {
         // Foreign-origin cards (Magic Lamp etc.) discard to their

@@ -37,15 +37,26 @@ const {
 
 const CARD_NAME = 'Shapeshift';
 
+/** Effective level of a board Creature instance, factoring in active
+ *  reducer hooks (Whoolmoth's rebate when every alive own Hero has a
+ *  Creature in support, etc.). Read from the inst's controller's side
+ *  — that's whose board state contributes the reducers. */
+function _instLevel(engine, inst) {
+  const cardDB = engine._getCardDB();
+  const cd = cardDB[inst.name];
+  if (!cd) return 0;
+  const owner = inst.controller ?? inst.owner;
+  return engine.effectiveCardLevel(cd, owner, { heroIdx: inst.heroIdx });
+}
+
 /** Count own creatures on board whose turnPlayed predates the current turn. */
 function _hasOldCreatureWithReplacement(engine, pi) {
   const gs = engine.gs;
   const turn = gs.turn || 0;
   const creatures = ownSupportCreatures(engine, pi);
-  const cardDB = engine._getCardDB();
   for (const inst of creatures) {
     if ((inst.turnPlayed || 0) >= turn) continue;
-    const lvl = cardDB[inst.name]?.level ?? 0;
+    const lvl = _instLevel(engine, inst);
     if (eligibleSwapReplacements(engine, pi, inst.name, lvl).length > 0) return true;
   }
   return false;
@@ -54,9 +65,8 @@ function _hasOldCreatureWithReplacement(engine, pi) {
 /** True if ANY own creature has an eligible replacement (no turn filter). */
 function _hasAnySwappable(engine, pi) {
   const creatures = ownSupportCreatures(engine, pi);
-  const cardDB = engine._getCardDB();
   for (const inst of creatures) {
-    const lvl = cardDB[inst.name]?.level ?? 0;
+    const lvl = _instLevel(engine, inst);
     if (eligibleSwapReplacements(engine, pi, inst.name, lvl).length > 0) return true;
   }
   return false;
@@ -115,7 +125,7 @@ module.exports = {
       // Only offer creatures that actually have at least one valid
       // replacement — otherwise the hand-pick prompt would dead-end.
       const pickable = creatures.filter(inst => {
-        const lvl = cardDB[inst.name]?.level ?? 0;
+        const lvl = _instLevel(engine, inst);
         return eligibleSwapReplacements(engine, pi, inst.name, lvl).length > 0;
       });
       if (pickable.length === 0) { gs._spellCancelled = true; return; }
@@ -123,7 +133,7 @@ module.exports = {
       // ── Step 1: pick which own Creature to bounce ─────────────────
       const zones = pickable.map(inst => {
         const hero = ps.heroes[inst.heroIdx];
-        const lvl = cardDB[inst.name]?.level ?? 0;
+        const lvl = _instLevel(engine, inst);
         return {
           heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
           label: `${hero?.name || 'Hero'} — ${inst.name} (Lv${lvl}, Slot ${inst.zoneSlot + 1})`,
@@ -142,7 +152,7 @@ module.exports = {
       );
       if (!chosenInst) { gs._spellCancelled = true; return; }
       const chosenName = chosenInst.name;
-      const chosenLevel = cardDB[chosenName]?.level ?? 0;
+      const chosenLevel = _instLevel(engine, chosenInst);
       const bouncedWasThisTurn = (chosenInst.turnPlayed || 0) >= turn;
 
       // ── Step 2: pick the replacement in hand via pickHandCard ─────
@@ -164,7 +174,14 @@ module.exports = {
       if (!rpick || rpick.cancelled) { gs._spellCancelled = true; return; }
       const newName = rpick.cardName;
       if (!newName) { gs._spellCancelled = true; return; }
-      const newLevel = cardDB[newName]?.level ?? 0;
+      // Read the replacement's effective level from its hand index when
+      // available (so per-slot offsets like Rocky Slime count). Falls
+      // back to a pi-scoped read otherwise.
+      const newHandIdx = (ps.hand || []).indexOf(newName);
+      const newLevel = engine.effectiveCardLevel(
+        cardDB[newName], pi,
+        newHandIdx >= 0 ? { handIdx: newHandIdx } : {},
+      );
       if (newLevel > chosenLevel || newName === chosenName) {
         gs._spellCancelled = true; return;
       }

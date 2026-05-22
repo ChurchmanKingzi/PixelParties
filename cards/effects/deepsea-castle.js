@@ -49,6 +49,19 @@ function swappableCreatures(engine, pi) {
   return ownSupportCreatures(engine, pi).filter(inst => !isAreaImmuneInst(engine, inst));
 }
 
+// Effective level of a board Creature instance, with all live reducer
+// hooks (Whoolmoth's 0-level rebate, etc.) factored in. The bounce
+// cap and the replacement gate both read this so a Whoolmoth rebated
+// to Lv0 only allows a Lv0 replacement — consistent with what the
+// player sees in the gallery / on the card.
+function _instLevel(engine, inst) {
+  const cardDB = engine._getCardDB();
+  const cd = cardDB[inst.name];
+  if (!cd) return 0;
+  const owner = inst.controller ?? inst.owner;
+  return engine.effectiveCardLevel(cd, owner, { heroIdx: inst.heroIdx });
+}
+
 module.exports = {
   // Active in 'hand' so the self-cast onPlay fires from hand, and in
   // 'area' so board-state hooks stay live once placed.
@@ -73,10 +86,9 @@ module.exports = {
     if (engine.gs.players[activator]?.summonLocked) return false;
     const creatures = swappableCreatures(engine, activator);
     if (creatures.length === 0) return false;
-    const cardDB = engine._getCardDB();
     for (const inst of creatures) {
-      const lvl = cardDB[inst.name]?.level ?? 0;
-      if (eligibleSwapReplacements(engine, activator,inst.name, lvl).length > 0) return true;
+      const lvl = _instLevel(engine, inst);
+      if (eligibleSwapReplacements(engine, activator, inst.name, lvl).length > 0) return true;
     }
     return false;
   },
@@ -93,6 +105,8 @@ module.exports = {
     // socket handler still reaches this path directly.
     if (ps.summonLocked) return false;
     const cardDB = engine._getCardDB();
+    // ^ kept for places we need raw card-DB lookups (animation labels
+    // etc.) — every level read flows through `_instLevel` now.
 
     // Synthetic ctx so prompts route to the activator (which may not be
     // the Castle's owner — Castle is activatable from both sides).
@@ -110,13 +124,13 @@ module.exports = {
     // Only offer creatures that have at least one valid replacement —
     // otherwise the second prompt would dead-end with no options.
     const pickable = creatures.filter(inst => {
-      const lvl = cardDB[inst.name]?.level ?? 0;
-      return eligibleSwapReplacements(engine, activator,inst.name, lvl).length > 0;
+      const lvl = _instLevel(engine, inst);
+      return eligibleSwapReplacements(engine, activator, inst.name, lvl).length > 0;
     });
     if (pickable.length === 0) return false;
     const zones = pickable.map(inst => {
       const hero = ps.heroes[inst.heroIdx];
-      const lvl = cardDB[inst.name]?.level ?? 0;
+      const lvl = _instLevel(engine, inst);
       return {
         heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         label: `${hero?.name || 'Hero'} — ${inst.name} (Lv${lvl}, Slot ${inst.zoneSlot + 1})`,
@@ -133,7 +147,7 @@ module.exports = {
     );
     if (!chosenInst) return false;
     const chosenName = chosenInst.name;
-    const chosenLevel = cardDB[chosenName]?.level ?? 0;
+    const chosenLevel = _instLevel(engine, chosenInst);
 
     // ── Step 2: pick the replacement (level ≤ bounced creature's level) ──
     //
@@ -165,7 +179,12 @@ module.exports = {
 
     // Sanity re-verify the replacement's level + name gate (guards
     // against stale state if anything raced in between prompts).
-    const newLevel = cardDB[newName]?.level ?? 0;
+    // Effective level via hand index so per-slot offsets are respected.
+    const newHandIdx = (ps.hand || []).indexOf(newName);
+    const newLevel = engine.effectiveCardLevel(
+      cardDB[newName], activator,
+      newHandIdx >= 0 ? { handIdx: newHandIdx } : {},
+    );
     if (newLevel > chosenLevel) return false;
     if (newName === chosenName) return false;
 

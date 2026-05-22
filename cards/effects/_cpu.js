@@ -3813,6 +3813,36 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       const combo = cpuCheapestGalleryCombo(cards, plan.need, plan.costKey, plan.maxBudget);
       return { selectedCards: combo || [] };
     }
+    // Typed multi-pick — "up to N of type X and up to M of type Y"
+    // (the Idej Lord start-of-game attach/equip gallery). That gallery
+    // deliberately lists several same-named entries (e.g. 3 "Idej
+    // Projection" copies), so the name-dedup in the soft path below
+    // would wrongly collapse them to a single pick. For these prompts
+    // "up to" means "as many as possible": fill every type to its
+    // `typeLimits` cap, bounded only by `selectCount`. Same-named
+    // entries ARE allowed here — selection is by gallery slot, not name.
+    if (promptData.typeLimits && typeof promptData.typeLimits === 'object') {
+      const cardTypes = promptData.cardTypes || {};
+      const typeLimits = promptData.typeLimits;
+      const typedCap = Math.max(1, promptData.selectCount || cards.length);
+      const entries = cards
+        .map((c, idx) => ({
+          name: c.name, type: cardTypes[idx],
+          score: c._galleryScore || -Infinity,
+        }))
+        .sort((a, b) => b.score - a.score);
+      const typeUsed = {};
+      const typedPicks = [];
+      for (const e of entries) {
+        if (typedPicks.length >= typedCap) break;
+        const limit = (e.type != null && typeLimits[e.type] != null)
+          ? typeLimits[e.type] : Infinity;
+        if ((typeUsed[e.type] || 0) >= limit) continue;
+        typeUsed[e.type] = (typeUsed[e.type] || 0) + 1;
+        typedPicks.push(e.name);
+      }
+      return { selectedCards: typedPicks };
+    }
     // Soft multi-pick ("pick up to N you can afford"): greedy top-score
     // up to the cap, respecting any budget. Unchanged behaviour.
     const cap = Math.max(1, promptData.selectCount || 1);

@@ -111,6 +111,72 @@ function adjacentFreeUndefeatedZones(engine, pi, fromHeroIdx) {
 module.exports = {
   activeIn: ['support'],
 
+  // ── MCTS partner picker for the rider's promptTarget ──
+  // Default `_getCpuTargetResponse` declines cancellable target prompts,
+  // which meant Pengu's rider silently never fired for the CPU. Here we
+  // intercept that prompt, build one option per eligible partner
+  // Creature (each scored by snapshot → simulated move → rollout →
+  // `evaluateState`), and pick whichever scores highest. The MCTS
+  // naturally highlights Whoolmoth (120 dmg) and other high-impact
+  // payoffs over neutral Slipperies; user spec: "use MCTS to find the
+  // most valuable other Slippery to move (which will almost always be
+  // Whoolmoth for its 120 damage)."
+  //
+  // Inside an outer rollout (`_inMctsSim`) the picker can't recurse —
+  // we return the first option deterministically so the outer MCTS
+  // still sees Pengu's bonus value land (a `return undefined` here
+  // would fall through to the engine default's cancellable-decline,
+  // making the rollout underestimate Pengu).
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'effectTarget') return undefined;
+    const config = payload?.config;
+    if (config?.title !== CARD_NAME) return undefined;
+    const validTargets = payload.validTargets || [];
+    if (validTargets.length === 0) return [];
+    if (validTargets.length === 1) return [validTargets[0].id];
+
+    const cpuIdx = engine._cpuPlayerIdx;
+    if (cpuIdx == null || cpuIdx < 0) return [validTargets[0].id];
+
+    // Lazy require so card-script load doesn't depend on _cpu init.
+    let mctsPick;
+    try { ({ mctsPickFromOptions: mctsPick } = require('./_cpu')); }
+    catch { mctsPick = null; }
+
+    // Inside an outer rollout: deterministic first-option pick so the
+    // outer MCTS still captures the value of Pengu's bonus move.
+    if (engine._inMctsSim || typeof mctsPick !== 'function') {
+      return [validTargets[0].id];
+    }
+
+    return (async () => {
+      const apply = async (eng, opt) => {
+        const liveInst = eng.cardInstances.find(c => c.id === opt.cardInstance?.id);
+        if (!liveInst || liveInst.zone !== 'support') return false;
+        const ctrl = liveInst.controller ?? liveInst.owner;
+        if (ctrl !== cpuIdx) return false;
+        // Proxy the opp's destination pick by moving to the first legal
+        // adjacent-undefeated free zone — same default the engine uses
+        // for an opp CPU's zonePick response. The relative VALUE between
+        // partners (Whoolmoth's 120 dmg etc.) dominates the destination
+        // choice, so this proxy preserves the ranking we care about.
+        const dests = adjacentFreeUndefeatedZones(eng, cpuIdx, liveInst.heroIdx);
+        if (dests.length === 0) return false;
+        const dest = dests[0];
+        const ok = await moveSlipperyCreature(
+          eng, cpuIdx, liveInst, dest.heroIdx, dest.slotIdx,
+          { skipSlipperyMovedMark: true },
+        );
+        return ok !== false;
+      };
+      try {
+        const best = await mctsPick(engine, validTargets, apply);
+        if (best?.id) return [best.id];
+      } catch { /* fall through */ }
+      return [validTargets[0].id];
+    })();
+  },
+
   hooks: {
     onTurnStart: onSlipperyTurnStart,
 
@@ -186,7 +252,13 @@ module.exports = {
       );
       if (!stillLegal) return;
 
-      const ok = await moveSlipperyCreature(engine, pi, liveInst, dest.heroIdx, dest.slotIdx);
+      // Pengu's rider grants a SEPARATE move on top of the target's
+      // own inherent turn-start auto-slide — don't stamp `_slipperyMovedTurn`,
+      // so the target stays eligible in the Start Phase picker.
+      const ok = await moveSlipperyCreature(
+        engine, pi, liveInst, dest.heroIdx, dest.slotIdx,
+        { skipSlipperyMovedMark: true },
+      );
       if (!ok) return;
 
       engine.log('slippery_pengu_force_move', {

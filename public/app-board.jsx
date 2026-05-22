@@ -3823,6 +3823,144 @@ function CannibalismChompEffect({ x, y }) {
 }
 
 const ANIM_REGISTRY = {
+  // Idej Projection — green holographic damage-absorb burst. The
+  // Projection "ate" the hit in the Hero's place: a green hologram
+  // dome flares over its slot (flash + scanlined dome + expanding
+  // rings + a shield glyph) just before the Projection flies off to
+  // the discard pile.
+  idej_projection_absorb: (function () {
+    return function IdejProjectionAbsorbEffect({ x, y, w }) {
+      const base = Math.max(w || 72, 60);
+      const rings = useMemo(() => [base * 1.7, base * 2.3, base * 2.9], [base]);
+      const domeSz = base * 1.9;
+      const flashSz = base * 2.2;
+      const glyphSz = base * 1.1;
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10130 }}>
+          {rings.map((s, i) => (
+            <div key={i} className="anim-idej-absorb-ring" style={{
+              width: s, height: s, left: -s / 2, top: -s / 2,
+              animationDelay: (i * 110) + 'ms',
+            }} />
+          ))}
+          <div className="anim-idej-absorb-flash" style={{
+            width: flashSz, height: flashSz, left: -flashSz / 2, top: -flashSz / 2,
+          }} />
+          <div className="anim-idej-absorb-dome" style={{
+            width: domeSz, height: domeSz, left: -domeSz / 2, top: -domeSz / 2,
+          }} />
+          <div className="anim-idej-absorb-glyph" style={{
+            width: glyphSz, height: glyphSz, left: -glyphSz / 2, top: -glyphSz / 2,
+          }}>🛡</div>
+        </div>
+      );
+    };
+  })(),
+  // Capture Net — a rope-mesh net plummets from the top of the screen
+  // onto the targeted Creature and squashes on impact, then fades as
+  // the Creature is hauled away (the support→hand flight follows).
+  // `w` is the target zone's width; the net is sized a touch larger so
+  // it visibly drapes over the Creature card.
+  capture_net: (function () {
+    return function CaptureNetEffect({ x, y, w, duration }) {
+      const size = Math.round(Math.max(w || 80, 64) * 1.3);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10115 }}>
+          <div className="anim-capture-net" style={{
+            width: size, height: size,
+            left: -size / 2, top: -size / 2,
+            animationDuration: (duration || 1900) + 'ms',
+          }} />
+        </div>
+      );
+    };
+  })(),
+  // Corpse Explosion — ONE colossal, screen-engulfing fireball
+  // centred on the dying target. A core fireball punches out to cover
+  // the whole viewport (230vmax guarantees full coverage on any aspect
+  // ratio even off-centre), a blinding full-viewport whiteout flashes
+  // at detonation, a massive shockwave ring races outward, and charred
+  // embers / skulls fly off. Deliberately a single board-wide blast —
+  // the card plays NO per-target animations.
+  corpse_explosion: (function () {
+    return function CorpseExplosionEffect({ x, y }) {
+      const embers = useMemo(() => Array.from({ length: 20 }, () => {
+        const ang = Math.random() * Math.PI * 2;
+        const dist = 130 + Math.random() * 560;
+        return {
+          dx: Math.cos(ang) * dist, dy: Math.sin(ang) * dist,
+          size: 14 + Math.random() * 32,
+          char: ['🔥', '💥', '☠️', '🦴', '🔥'][Math.floor(Math.random() * 5)],
+          dur: 720 + Math.random() * 620, delay: Math.random() * 180,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10140 }}>
+          {/* Core screen-engulfing fireball */}
+          <div style={{
+            position: 'absolute', left: 0, top: 0,
+            width: '230vmax', height: '230vmax',
+            marginLeft: '-115vmax', marginTop: '-115vmax',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, #ffffff 0%, rgba(255,246,205,.98) 9%, rgba(255,170,40,.95) 22%, rgba(255,90,0,.88) 40%, rgba(150,20,0,.62) 60%, rgba(50,8,0,.30) 78%, transparent 90%)',
+            opacity: 0,
+            animation: 'corpseExplodeFlash 1300ms ease-out forwards',
+          }} />
+          {/* Blinding full-viewport whiteout at detonation */}
+          <div style={{
+            position: 'fixed', left: 0, top: 0,
+            width: '100vw', height: '100vh',
+            background: '#fff', opacity: 0,
+            animation: 'corpseExplodeWhiteout 560ms ease-out forwards',
+          }} />
+          {/* Massive expanding shockwave ring */}
+          <div style={{
+            position: 'absolute', left: -70, top: -70,
+            width: 140, height: 140,
+            border: '16px solid rgba(255,140,30,.85)',
+            borderRadius: '50%', opacity: 0,
+            boxShadow: '0 0 70px rgba(255,110,0,.75), inset 0 0 50px rgba(255,170,0,.6)',
+            animation: 'corpseExplodeShockwave 1150ms ease-out forwards',
+          }} />
+          {/* Charred embers / skulls flung outward */}
+          {embers.map((e, i) => (
+            <div key={i} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: e.size + 'px', opacity: 0,
+              filter: 'drop-shadow(0 0 7px #ff4400)',
+              '--ceDx': e.dx + 'px', '--ceDy': e.dy + 'px',
+              animation: `corpseExplodeEmber ${e.dur}ms ease-out ${e.delay}ms forwards`,
+            }}>{e.char}</div>
+          ))}
+          <style>{`
+            @keyframes corpseExplodeFlash {
+              0%   { opacity: 0;   transform: scale(0.03); }
+              12%  { opacity: 1;   transform: scale(0.5); }
+              34%  { opacity: 1;   transform: scale(1); }
+              62%  { opacity: 0.9; transform: scale(1.05); }
+              100% { opacity: 0;   transform: scale(1.14); }
+            }
+            @keyframes corpseExplodeWhiteout {
+              0%   { opacity: 0; }
+              14%  { opacity: 0.9; }
+              40%  { opacity: 0.45; }
+              100% { opacity: 0; }
+            }
+            @keyframes corpseExplodeShockwave {
+              0%   { opacity: 0.95; transform: scale(0.3); border-width: 16px; }
+              70%  { opacity: 0.4; }
+              100% { opacity: 0;   transform: scale(13); border-width: 2px; }
+            }
+            @keyframes corpseExplodeEmber {
+              0%   { opacity: 0; transform: translate(0,0) scale(0.4) rotate(0deg); }
+              18%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--ceDx), var(--ceDy)) scale(1.1) rotate(220deg); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   // Golden-light cleanse burst — Johanna, Crusader of Light. Fires
   // on each ally Hero whose negative statuses are stripped when
   // Johanna becomes un-incapacitated. Layered: a soft warm glow halo,
@@ -12872,6 +13010,12 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
     : (ep.minSelect != null ? ep.minSelect : (ep.maxBudget != null ? 1 : maxSelect));
   const maxBudget = ep.maxBudget;
   const costKey = ep.costKey || 'cost';
+  // Optional per-type caps — `cardTypes` maps a gallery index to a
+  // type string, `typeLimits` maps each type to its max selected
+  // count. A card whose type is already at its cap greys out (mirrors
+  // the handPick prompt's cardTypes / typeLimits).
+  const galleryCardTypes = ep.cardTypes || null;
+  const galleryTypeLimits = ep.typeLimits || null;
   // Track selections by gallery INDEX rather than card name so duplicate
   // names (e.g. Spontaneous Reappearance showing 3 copies of the same
   // card in the discard pile) can be checked / unchecked independently.
@@ -12971,6 +13115,15 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
         const entryCost = cards[idx]?.[costKey] || 0;
         const currentTotal = prev.reduce((sum, i) => sum + (cards[i]?.[costKey] || 0), 0);
         if (currentTotal + entryCost > maxBudget) return prev;
+      }
+      // Per-type cap check.
+      if (galleryCardTypes && galleryTypeLimits) {
+        const t = galleryCardTypes[idx];
+        if (t && galleryTypeLimits[t] !== undefined) {
+          let ofType = 0;
+          for (const i of prev) { if (galleryCardTypes[i] === t) ofType++; }
+          if (ofType >= galleryTypeLimits[t]) return prev;
+        }
       }
       if (window.playSFX) window.playSFX('ui_click');
       return [...prev, idx];
@@ -13073,6 +13226,16 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
               const isSel = selected.includes(i);
               const entryCost = entry[costKey] || 0;
               const wouldExceedBudget = maxBudget != null && !isSel && totalCost + entryCost > maxBudget;
+              // Per-type cap: grey out a card once its type's limit is
+              // fully selected (Idej Lords picking Projections + Blades).
+              const wouldExceedTypeCap = (() => {
+                if (isSel || !galleryCardTypes || !galleryTypeLimits) return false;
+                const t = galleryCardTypes[i];
+                if (!t || galleryTypeLimits[t] === undefined) return false;
+                let ofType = 0;
+                for (const si of selected) { if (galleryCardTypes[si] === t) ofType++; }
+                return ofType >= galleryTypeLimits[t];
+              })();
               const atMax = !isSel && selected.length >= maxSelect;
               // Late-stage unique-floor gate dims any card that isn't
               // a new contribution to the unique-name floor (Zhu's
@@ -13080,7 +13243,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
               // Already-selected cards are exempt so the player can
               // still toggle them off if they made a mistake.
               const blockedByUniqueGate = onlyNewUniqueAllowed && !isSel && !isNewUniqueContribution(i);
-              const dimmed = wouldExceedBudget || atMax || blockedByUniqueGate;
+              const dimmed = wouldExceedBudget || atMax || blockedByUniqueGate || wouldExceedTypeCap;
               // Pile-side badge for Guardian Beast deletion pickers:
               // entries from the activator's discard pile carry
               // `pileSide: 'own'`, opp's pile entries `pileSide: 'opp'`.
@@ -20489,7 +20652,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Generic pile-to-pile flying card animation. Used for moves the
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
-    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, flightStyle }) => {
+    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, flightStyle }) => {
       // Backward-compatible: when only `owner` is supplied the source AND
       // destination both belong to that player (Mass Multiplication's
       // discard→deleted, the Deepsea bounce-place hand-swap, etc.). Cross-
@@ -20567,27 +20730,33 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // state mutation, so the new slot won't render until the
             // next sync. Project a synthetic rect for where the new
             // slot WILL render. The hand uses `justify-content:
-            // center`, so growing it shifts every existing card LEFT
-            // by ~half a card-width and the new slot lands ~half a
-            // card-width RIGHT of the old last slot's center —
-            // i.e., its left edge sits at `lastRect.right -
-            // halfCardWidth`. Older code projected at `lastRect.
-            // right` (zero shift), which made the flight overshoot
-            // by half a card width on a centered hand. Half-shift
-            // here aligns the flight with the eventual centered
-            // position; on overflow-compressed hands the difference
-            // is small either way.
+            // center`, so adding cards re-centres the WHOLE row — a
+            // new slot's final left edge depends on the FINAL hand
+            // size, not just "old last slot + half a card". When one
+            // effect returns several cards at once (Onima returns up
+            // to 2 Abilities) every flight is emitted before the sync,
+            // so each must project against the SAME final size — else
+            // each lands half a card-width off. `finalHandSize`
+            // carries that; it falls back to oldCount+1, which
+            // reproduces the exact single-add projection.
             const slots = document.querySelectorAll(`${base} .hand-slot, ${base} [data-hand-idx]`);
             if (slots.length > 0) {
               const lastRect = slots[slots.length - 1].getBoundingClientRect();
-              const halfW = lastRect.width / 2;
-              const projLeft = lastRect.right - halfW;
+              const cardW = lastRect.width;
+              const oldCount = slots.length;
+              const finalCount = Math.max(
+                extras.finalHandSize || 0, extras.handIdx + 1, oldCount + 1);
+              // Old hand spans [C - oldCount*cardW/2, C + oldCount*cardW/2];
+              // the old last slot's right edge gives the centre C. The
+              // final slot `handIdx` then sits at the centred offset.
+              const C = lastRect.right - (oldCount * cardW) / 2;
+              const projLeft = C - (finalCount * cardW) / 2 + extras.handIdx * cardW;
               const projected = {
                 left:  projLeft,
                 top:   lastRect.top,
-                width: lastRect.width,
+                width: cardW,
                 height: lastRect.height,
-                right: projLeft + lastRect.width,
+                right: projLeft + cardW,
                 bottom: lastRect.bottom,
               };
               return { getBoundingClientRect: () => projected };
@@ -20598,7 +20767,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         return null;
       };
       const srcEl = elementFor(from, srcIsMe, { heroIdx: fromHeroIdx, slotIdx: fromSlotIdx, handIdx: fromHandIdx, permId: fromPermId });
-      const tgtEl = elementFor(to,   tgtIsMe, { handIdx: toHandIdx, heroIdx: toHeroIdx, slotIdx: toSlotIdx });
+      const tgtEl = elementFor(to,   tgtIsMe, { handIdx: toHandIdx, finalHandSize, heroIdx: toHeroIdx, slotIdx: toSlotIdx });
       if (!srcEl || !tgtEl) return;
 
       // Hide the landing hand slot until the flying card arrives so both

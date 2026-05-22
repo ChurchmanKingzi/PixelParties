@@ -80,12 +80,14 @@ function buildReplacementGallery(engine, ps, pi, maxLevel, excludeName) {
 
 /**
  * `inst` is bounceable iff there's at least one different-named Creature
- * in the player's deck/hand at level ≤ inst's level. Used by both the
- * play-time gate and the bounce-target picker filter.
+ * in the player's deck/hand at level ≤ inst's CURRENT level. Used by
+ * both the play-time gate and the bounce-target picker filter.
  */
 function hasValidReplacement(engine, ps, pi, inst) {
   const cardDB = engine._getCardDB();
-  const bouncedLevel = cardDB[inst.name]?.level ?? 0;
+  const cd = cardDB[inst.name];
+  if (!cd) return false;
+  const bouncedLevel = engine.effectiveCardLevel(cd, pi, { heroIdx: inst.heroIdx });
   return buildReplacementGallery(engine, ps, pi, bouncedLevel, inst.name).length > 0;
 }
 
@@ -154,7 +156,9 @@ module.exports = {
       const bouncedInst = bouncedT.cardInstance;
       const bouncedHeroIdx = bouncedInst.heroIdx;
       const bouncedSlot = bouncedInst.zoneSlot;
-      const bouncedLevel = cardDB[bouncedInst.name]?.level ?? 0;
+      const bouncedLevel = engine.effectiveCardLevel(
+        cardDB[bouncedInst.name], pi, { heroIdx: bouncedHeroIdx },
+      );
 
       // ── Step 2: bounce ──
       const bounceRes = await returnSupportCreatureToHand(
@@ -198,7 +202,8 @@ module.exports = {
         return;
       }
       const repCd = cardDB[repName];
-      if (!repCd || !hasCardType(repCd, 'Creature') || (repCd.level ?? 0) > bouncedLevel) {
+      if (!repCd || !hasCardType(repCd, 'Creature')
+          || engine.effectiveCardLevel(repCd, pi) > bouncedLevel) {
         engine.sync();
         return;
       }

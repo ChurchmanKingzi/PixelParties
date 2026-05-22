@@ -153,6 +153,11 @@ module.exports = {
           c.owner === t.owner && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx && c.name === t.cardName
         );
         if (inst) {
+          await engine._triggerGateCheck(inst.controller ?? inst.owner, 'Fire Bomb');
+          if (engine._isGateShielded(inst.controller ?? inst.owner)) {
+            engine.log('destroy_blocked', { card: t.cardName, reason: 'Defending the Gate' });
+            continue;
+          }
           await engine.runHooks('onCardLeaveZone', { _onlyCard: inst, card: inst, fromZone: 'support', fromHeroIdx: t.heroIdx });
           // Remove from zone
           const zone = (ps.supportZones[t.heroIdx] || [])[t.slotIdx] || [];

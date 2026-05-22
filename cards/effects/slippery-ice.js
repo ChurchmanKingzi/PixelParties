@@ -52,6 +52,7 @@
 
 const { ownSupportCreatures } = require('./_deepsea-shared');
 const { isAreaImmuneInst } = require('./_diver-helmet-shared');
+const { _runMctsSlipperyLoop } = require('./_slippery-shared');
 
 const CARD_NAME = 'Slippery Ice';
 
@@ -186,6 +187,39 @@ module.exports = {
 
     const movedInstIds = new Set();
     let moved = 0;
+
+    // ── CPU path: MCTS-driven multi-move planner ──
+    // Each step picks the (creature, dest) pair that scores highest
+    // under a snapshot/rollout, so the plan naturally avoids clogging
+    // adjacent zones and routes high-impact Creatures (Whoolmoth's
+    // 120 damage, Snowman's freeze, etc.) onto productive columns.
+    // Mirrors the per-activation "each Creature moves at most once"
+    // rule via the shared movedInstIds set, threaded through the
+    // helper's onLiveMove callback.
+    if (engine.isCpuPlayer(activator)) {
+      const collectIce = () => {
+        const out = [];
+        for (const inst of ownSupportCreatures(engine, activator)) {
+          if (movedInstIds.has(inst.id)) continue;
+          if (isAreaImmuneInst(engine, inst)) continue;
+          const dests = destinationsFor(engine, activator, inst);
+          if (dests.length === 0) continue;
+          out.push({ inst, dests });
+        }
+        return out;
+      };
+      await _runMctsSlipperyLoop(engine, activator, collectIce, {
+        // Slippery Ice runs in main phase (after the Start Phase
+        // auto-slide has already locked in this turn's archetype
+        // moves), so stamping `_slipperyMovedTurn` here is a no-op —
+        // skip it for parity with the existing Slippery Ice mover.
+        moveOpts: { skipSlipperyMovedMark: true },
+        onLiveMove: (inst) => { movedInstIds.add(inst.id); moved++; },
+      });
+      if (moved === 0) return false;
+      engine.log('slippery_ice_move', { player: ps.username, moved });
+      return true;
+    }
 
     while (true) {
       // Re-collect each iteration — previous moves change the board.

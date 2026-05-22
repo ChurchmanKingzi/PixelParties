@@ -125,10 +125,14 @@ function _buildReplacementGallery(engine, pi, heroIdx, maxLevel, excludeName) {
 
 /** True iff the deck contains at least one different-named Creature
  *  of level ≤ this candidate's level AND legal to summon at this
- *  candidate's heroIdx. */
+ *  candidate's heroIdx. Sacrifice candidate's level is read via
+ *  `engine.effectiveCardLevel` so live reducers (Whoolmoth-style)
+ *  affect the cap consistently. */
 function _hasReplacement(engine, pi, candidateInst) {
   const cardDB = engine._getCardDB();
-  const lvl = cardDB[candidateInst.name]?.level ?? 0;
+  const cd = cardDB[candidateInst.name];
+  if (!cd) return false;
+  const lvl = engine.effectiveCardLevel(cd, pi, { heroIdx: candidateInst.heroIdx });
   return _buildReplacementGallery(
     engine, pi, candidateInst.heroIdx, lvl, candidateInst.name,
   ).length > 0;
@@ -245,7 +249,11 @@ module.exports = {
       if (sacInst.turnPlayed === gs.turn) continue;
       if (sacInst.faceDown) continue;
 
-      const sacLevel    = cardDB[sacInst.name]?.level ?? 0;
+      // Sacrificed Creature's CURRENT level — Whoolmoth-style reducers
+      // can lower it, in which case the replacement cap follows suit.
+      const sacLevel    = engine.effectiveCardLevel(
+        cardDB[sacInst.name], pi, { heroIdx: sacInst.heroIdx },
+      );
       const sacName     = sacInst.name;
       const sacHeroIdx  = sacInst.heroIdx;
       const sacZoneSlot = sacInst.zoneSlot;
@@ -271,7 +279,8 @@ module.exports = {
       const repName = repPick.cardName;
       if (repName === sacName) continue;
       const repCd = cardDB[repName];
-      if (!repCd || !hasCardType(repCd, 'Creature') || (repCd.level ?? 0) > sacLevel) continue;
+      if (!repCd || !hasCardType(repCd, 'Creature')
+          || engine.effectiveCardLevel(repCd, pi) > sacLevel) continue;
       if ((ps.mainDeck || []).indexOf(repName) < 0) continue;
       // Defensive canSummon re-check — gallery filter ran at picker
       // render; an interleaved effect could have flipped the gate

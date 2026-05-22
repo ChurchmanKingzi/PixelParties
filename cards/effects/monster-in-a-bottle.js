@@ -17,30 +17,27 @@ const path = require('path');
 
 /**
  * Check if a specific hero can summon a specific creature.
- * Validates spell school / level requirements with Performance support.
+ *
+ * Delegates the level/school math to `engine.heroMeetsLevelReq`, which
+ * already accounts for every reduction path the local copy was missing:
+ *   • Generic `reduceCardLevel` hooks  (Slippery Whoolmoth's 0-level
+ *     rebate when every alive own Hero has a Creature; Phatnir; …)
+ *   • Per-card hero overrides  (Sol Rym)
+ *   • Per-hand-position offsets  (Rocky Slime / Sparkfly rebate)
+ *   • Mana Absorbing Crystal +1 on Spells
+ *   • Lethe per-pile stamps  (passed via `source === 'discard'`)
+ *   • Hard Negation suppressing ability zones, and Lizbeth-style borrows
+ *
+ * Pre-gates (alive + not Frozen/Stunned) stay here — the engine helper's
+ * dead-hero branch is `canBypassLevelReq`-aware and the Frozen/Stunned
+ * gate isn't strictly a "level req," so we keep them explicit.
  */
-function canHeroSummon(ps, heroIdx, creatureData) {
+function canHeroSummon(engine, ps, pi, heroIdx, creatureData, source) {
   const hero = ps.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
-  const level = creatureData.level || 0;
-  if (level === 0 && !creatureData.spellSchool1) return true;
-  const abZones = ps.abilityZones[heroIdx] || [];
-  const countAb = (school) => {
-    let c = 0;
-    for (const s of abZones) {
-      if (!s || s.length === 0) continue;
-      const base = s[0];
-      for (const a of s) {
-        if (a === school) c++;
-        else if (a === 'Performance' && base === school) c++;
-      }
-    }
-    return c;
-  };
-  if (creatureData.spellSchool1 && countAb(creatureData.spellSchool1) < level) return false;
-  if (creatureData.spellSchool2 && countAb(creatureData.spellSchool2) < level) return false;
-  return true;
+  const opts = source === 'discard' ? { pileSide: 'discard' } : {};
+  return engine.heroMeetsLevelReq(pi, heroIdx, creatureData, opts);
 }
 
 /**
@@ -95,7 +92,7 @@ function getEligibleCreatures(gs, pi, engine = null) {
       // Check if ANY living hero with free zones can summon this
       let canSummon = false;
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (!canHeroSummon(ps, hi, cd)) continue;
+        if (engine && !canHeroSummon(engine, ps, pi, hi, cd, source)) continue;
         if (!hasFreeZone(ps, hi)) continue;
         if (engine && !engine.isCreatureSummonable(name, pi, hi, { _bypassBeforeSummon: true })) continue;
         canSummon = true;
@@ -159,7 +156,7 @@ module.exports = {
           if (summonBlocked.includes(name)) continue;
           let canSummon = false;
           for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-            if (!canHeroSummon(ps, hi, cd)) continue;
+            if (!canHeroSummon(engine, ps, pi, hi, cd, source)) continue;
             if (!hasFreeZone(ps, hi)) continue;
             if (!engine.isCreatureSummonable(name, pi, hi, { _bypassBeforeSummon: true })) continue;
             canSummon = true;
@@ -194,7 +191,7 @@ module.exports = {
       // Step 2: Pick a support zone on an eligible hero
       const freeZones = [];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (!canHeroSummon(ps, hi, cd)) continue;
+        if (!canHeroSummon(engine, ps, pi, hi, cd, creatureSource)) continue;
         if (!engine.isCreatureSummonable(creatureName, pi, hi, { _bypassBeforeSummon: true })) continue;
         const hero = ps.heroes[hi];
         const supZones = ps.supportZones[hi] || [];

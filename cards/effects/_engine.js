@@ -1269,6 +1269,33 @@ class GameEngine {
     if (type === 'cardGalleryMulti') {
       const cards = promptData.cards || [];
       if (cards.length === 0) return { selectedCards: [], selectedIndices: [] };
+      // Typed multi-pick — "up to N of type X and up to M of type Y"
+      // (the Idej Lord start-of-game attach/equip gallery). That
+      // gallery lists several same-named entries (e.g. 3 "Idej
+      // Projection" copies); the single-card default below — which
+      // keys off `minSelect` (passed as 0 here) — would attach only
+      // one. For these prompts "up to" means "as many as possible":
+      // fill every type to its `typeLimits` cap, bounded only by
+      // `selectCount`. Selection is by gallery slot, so same-named
+      // entries are all valid picks.
+      if (promptData.typeLimits && typeof promptData.typeLimits === 'object') {
+        const galleryTypes = promptData.cardTypes || {};
+        const limits = promptData.typeLimits;
+        const typedCap = Math.max(1, promptData.selectCount || cards.length);
+        const typeUsed = {};
+        const typedNames = [];
+        const typedIndices = [];
+        for (let gi = 0; gi < cards.length; gi++) {
+          if (typedNames.length >= typedCap) break;
+          const gt = galleryTypes[gi];
+          const lim = (gt != null && limits[gt] != null) ? limits[gt] : Infinity;
+          if ((typeUsed[gt] || 0) >= lim) continue;
+          typeUsed[gt] = (typeUsed[gt] || 0) + 1;
+          typedIndices.push(gi);
+          typedNames.push(cards[gi].name);
+        }
+        return { selectedCards: typedNames, selectedIndices: typedIndices };
+      }
       // If `validCounts` is set, pick the smallest achievable valid
       // count (cheap path for deletion costs, lets MCTS rollouts
       // resolve quickly). Otherwise fall back to single-card pick.
@@ -2688,7 +2715,7 @@ class GameEngine {
        * @param {object} opts - { expiresAtTurn, expiresForPlayer, buffKey?, removeAnim? }
        */
       async negateCreature(inst, source, opts) {
-        return engine.actionNegateCreature(inst, source, opts);
+        return await engine.actionNegateCreature(inst, source, opts);
       },
 
       /**
@@ -2780,6 +2807,18 @@ class GameEngine {
       lockSummons() {
         const ps = gs.players[cardInstance.controller];
         if (ps) ps.summonLocked = true;
+        engine.sync();
+      },
+
+      /**
+       * Partial summon lock for the card's controller — blocks every
+       * Creature summon (hand play + effect placement) for the rest of
+       * this turn EXCEPT "Greatmaw" Creatures. Greatmaw Remora's
+       * additional-Action penalty.
+       */
+      lockSummonsExceptGreatmaw() {
+        const ps = gs.players[cardInstance.controller];
+        if (ps) ps.summonLockExceptGreatmaw = true;
         engine.sync();
       },
 
@@ -3455,6 +3494,30 @@ class GameEngine {
           gs._spellDamageLog.push({ ...selected });
         }
 
+        // ── Caller commit hook ──
+        // Runs AFTER the target is chosen but BEFORE any reaction
+        // window (redirect / surprise / post-target) opens. The caller
+        // commits irreversible costs here — e.g. Infected Greatmaw
+        // pays its sacrifice — so the opponent can never spend
+        // Reactions / resources on an effect the player then backs
+        // out of. Returning false aborts the targeting cleanly:
+        // nothing has been committed by the picker, no reaction fired.
+        if (selected && typeof config.onTargetChosen === 'function') {
+          const proceed = await config.onTargetChosen(selected);
+          if (!proceed) {
+            if (!config.noSpellCancel) gs._spellCancelled = true;
+            return null;
+          }
+        }
+
+        // Source the reaction windows attribute the targeting to.
+        // `config.attackerSourceOverride` lets an effect that is
+        // "treated as a Hero's Attack" (Infected Greatmaw) have
+        // redirect / surprise / post-target reactions — and the
+        // retaliation routing they drive — see that Hero as the
+        // attacker instead of the activating card.
+        const reactionSource = config.attackerSourceOverride || cardInstance;
+
         // ── Target redirect check (Challenge, etc.) ──
         // After target is selected, check if the target's owner has a redirect card.
         // Skipped if config explicitly disables redirection.
@@ -3463,7 +3526,7 @@ class GameEngine {
           const tgtOwner = selected.owner;
           if (tgtOwner >= 0) {
             const redirected = await engine._checkTargetRedirect(
-              tgtOwner, selected, filteredTargets, config, cardInstance
+              tgtOwner, selected, filteredTargets, config, reactionSource
             );
             if (redirected) {
               // Update the spell damage log to reflect the new target
@@ -3484,7 +3547,7 @@ class GameEngine {
           if (!gs._surpriseCheckedHeroes) gs._surpriseCheckedHeroes = new Set();
           gs._surpriseCheckedHeroes.add(`${selected.owner}-${selected.heroIdx}`);
           const surpriseResult = await engine._checkSurpriseWindow(
-            [selected], cardInstance, { damageType: config.damageType }
+            [selected], reactionSource, { damageType: config.damageType }
           );
           if (surpriseResult?.effectNegated) {
             // Effect fully negated by surprise — don't set _spellCancelled (spell is consumed)
@@ -3513,7 +3576,7 @@ class GameEngine {
           // (The multi-target path keeps its long-standing baseDamage/
           // damageType inference via `_ptDealsDamage`.)
           const ptResult = await engine._checkPostTargetHandReactions(
-            [selected], cardInstance, {
+            [selected], reactionSource, {
               damageType: config.damageType,
               dealsDamage: config.dealsDamage === false ? false : true,
             },
@@ -8388,6 +8451,14 @@ class GameEngine {
     const sourceObj = typeof opts.source === 'string'
       ? { name: opts.source }
       : (opts.source || (opts.sourceCard || undefined));
+    // Defending the Gate: support-zone status applies (Frozen / Stunned /
+    // Burned / Poisoned / Negated …) get the same shield prompt as damage
+    // and destroys. canApplyCreatureStatus already reads the shield flag
+    // — we just need to surface the trigger here so the gate offers a
+    // prompt instead of silently letting the status land.
+    if (!opts.ignoreGateShield && inst.zone === ZONES.SUPPORT) {
+      await this._triggerGateCheck(inst.controller ?? inst.owner, sourceObj?.name || null);
+    }
     const canApply = this.canApplyCreatureStatus(inst, statusName, sourceObj);
     // Play the source's intended animation BEFORE the immunity bail,
     // so omni-immune Creatures (Cardinal Beasts, Golden-Wings wearers,
@@ -8610,7 +8681,10 @@ class GameEngine {
     // argument, so we can't distinguish own-side beneficial buffs (which
     // must reach an Attendant-protected Queen normally) from opp-applied
     // negative buffs. Lenient default keeps own-side buffs working.
-    if (!opts.ignoreGateShield && this._isGateShielded(inst.controller ?? inst.owner)) return false; // Defending the Gate
+    if (!opts.ignoreGateShield) {
+      await this._triggerGateCheck(inst.controller ?? inst.owner, opts.source?.name || opts.sourceName || null);
+      if (this._isGateShielded(inst.controller ?? inst.owner)) return false;
+    }
     if (!inst.counters.buffs) inst.counters.buffs = {};
     const buffDef = BUFF_EFFECTS[buffName] || {};
     inst.counters.buffs[buffName] = {
@@ -8703,6 +8777,31 @@ class GameEngine {
           if (filterEarly === false && buffData.expiresBeforeStatusDamage) continue;
           await this.actionRemoveBuff(hero, pi, hi, buffName);
           expired = true;
+        }
+      }
+    }
+
+    // Temporary hero ATK grants (Greatmaw Shark, etc.) — decoupled
+    // from any source card; expire on the same turn/player keying as
+    // buffs. Treated as non-early (ATK has no status-damage interplay),
+    // so they expire in the normal / legacy passes only.
+    if (filterEarly !== true) {
+      for (let pi = 0; pi < 2; pi++) {
+        const ps = this.gs.players[pi];
+        for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+          const hero = ps.heroes[hi];
+          if (!Array.isArray(hero?._tempAtkGrants) || hero._tempAtkGrants.length === 0) continue;
+          const keep = [];
+          for (const g of hero._tempAtkGrants) {
+            if (g.expiresAtTurn === currentTurn && g.expiresForPlayer === activePlayer) {
+              hero.atk = Math.max(0, (hero.atk || 0) - (g.amount || 0));
+              this._broadcastEvent('fighting_atk_change', { owner: pi, heroIdx: hi, amount: -(g.amount || 0) });
+              expired = true;
+            } else {
+              keep.push(g);
+            }
+          }
+          hero._tempAtkGrants = keep;
         }
       }
     }
@@ -8823,10 +8922,18 @@ class GameEngine {
    *   was JUST forcibly CC'd by an opponent from getting re-locked the next
    *   turn, which doesn't apply when the negation was your own card's cost.
    */
-  actionNegateCreature(inst, source, opts = {}) {
+  async actionNegateCreature(inst, source, opts = {}) {
     if (!inst) return;
     if (inst.faceDown) return; // Face-down surprises cannot be negated
-    if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner)) return; // Defending the Gate
+    // Defending the Gate: trigger for opp-applied negations only.
+    // `selfInflicted` negations are the negating player's own cost
+    // (Necromancy / Dark Gear / Diplomacy / Soul Shard Ka / Omikron /
+    // Loyal Shepherd / Cosmic Depths), so the gate doesn't apply.
+    if (!opts.ignoreGateShield && !opts.selfInflicted && inst.zone === 'support') {
+      const srcName = typeof source === 'string' ? source : (source?.name || null);
+      await this._triggerGateCheck(inst.controller ?? inst.owner, srcName);
+      if (this._isGateShielded(inst.controller ?? inst.owner)) return; // Defending the Gate
+    }
     // Cardinal Beasts (and anything else picking up `_cardinalImmune`)
     // are immune to ALL negation paths — Forbidden Zone, Dark Gear,
     // Necromancy, Diplomacy, Null Zone, etc. The name-list fallback
@@ -8936,6 +9043,36 @@ class GameEngine {
     hero.atk = Math.max(0, (hero.atk || 0) - granted);
     this._broadcastEvent('fighting_atk_change', { owner: ownerIdx, heroIdx, amount: -granted });
     this.log('atk_revoke', { hero: hero.name, amount: granted, source: cardInst.name });
+    this.sync();
+  }
+
+  /**
+   * Grant TEMPORARY ATK to a Hero, decoupled from any source card.
+   * Unlike `actionGrantAtk` (which tracks the grant on the granting
+   * card instance and is auto-revoked when that card leaves its zone),
+   * this records the grant on the Hero itself and lets the standard
+   * `_processBuffExpiry` turn sweep revoke it — so the buff persists
+   * for its full duration even if the card that granted it (e.g.
+   * Greatmaw Shark, sacrificed for Infected Greatmaw) leaves the
+   * board first.
+   *
+   * `opts.expiresAtTurn` / `opts.expiresForPlayer` use the same
+   * turn/player keying as hero buffs (see `_processBuffExpiry`):
+   * "until the end of this turn" = `gs.turn + 1` / opponent.
+   */
+  grantTempHeroAtk(pi, heroIdx, amount, opts = {}) {
+    const hero = this.gs.players[pi]?.heroes?.[heroIdx];
+    if (!hero || !amount) return;
+    hero.atk = (hero.atk || 0) + amount;
+    if (!Array.isArray(hero._tempAtkGrants)) hero._tempAtkGrants = [];
+    hero._tempAtkGrants.push({
+      amount,
+      expiresAtTurn: opts.expiresAtTurn,
+      expiresForPlayer: opts.expiresForPlayer,
+      source: opts.source || null,
+    });
+    this._broadcastEvent('fighting_atk_change', { owner: pi, heroIdx, amount });
+    this.log('temp_atk_grant', { hero: hero.name, amount, source: opts.source || null });
     this.sync();
   }
 
@@ -10755,6 +10892,7 @@ class GameEngine {
     for (const ps of this.gs.players) {
       if (ps) {
         ps.summonLocked = false;
+        ps.summonLockExceptGreatmaw = false; // Greatmaw Remora partial lock
         ps.handLocked = false;
         ps.damageLocked = false;
         ps.goldLocked = false;
@@ -10983,6 +11121,16 @@ class GameEngine {
       }
 
       case PHASES.END:
+        // Wait for any in-flight target picker, generic prompt, hero
+        // effect, or mid-resolution card to settle BEFORE running End
+        // Phase work. Without this gate, a Terror-forced advance (or
+        // any other end-of-turn trigger) that fires while e.g. Slippery
+        // Whoolmoth is still picking its same-column damage target
+        // would race the player: discard-down + switchTurn would run
+        // alongside the open picker, leaving the picker visible on the
+        // opponent's turn. Polled wait — the natural prompt-resolution
+        // path will clear the flags as the player responds.
+        await this._waitForPromptsToClear();
         // Automatic phase — process status expiry, hooks, then switch turn
         await this.processStatusExpiry('END');
         await this.runHooks(HOOKS.ON_PHASE_END, { phase: phaseName, phaseIndex: phase });
@@ -10994,6 +11142,46 @@ class GameEngine {
         await this.enforceHandLimit(this.gs.activePlayer);
         await this.switchTurn();
         break;
+    }
+  }
+
+  /**
+   * Sync-helper: is the engine currently mid-prompt or mid-effect?
+   * Mirrors the gate the Terror force-end-turn handler uses so the
+   * two paths can't disagree about what counts as "still in flight".
+   */
+  _isMidPromptOrEffect() {
+    if (this._pendingPrompt || this._pendingGenericPrompt) return true;
+    if (this._inReactionCheck) return true;
+    const gs = this.gs;
+    if (gs?._heroEffectInProgress
+        && Object.values(gs._heroEffectInProgress).some(v => v)) return true;
+    if ((gs?.players || []).some(p => p?._resolvingCard)) return true;
+    return false;
+  }
+
+  /**
+   * Block until every open target picker, generic prompt, hero effect,
+   * or mid-resolution card has settled. Polled at 100 ms (cheap; the
+   * normal case clears in 0 iterations and the worst case is a player
+   * deliberating their pick). MCTS rollouts / fast mode skip the wait
+   * because the simulated engine has no real prompts to drain.
+   *
+   * Used at the start of the End Phase (see `runPhase(PHASES.END)`) so
+   * Terror-style forced-end-turn paths can't run discard-down /
+   * switchTurn while a same-column on-move damage picker (Slippery
+   * Whoolmoth etc.) is still open.
+   */
+  async _waitForPromptsToClear() {
+    if (this._fastMode || this._inMctsSim) return;
+    // Generous safety cap — 10 minutes of player deliberation is well
+    // beyond any realistic prompt latency, and the surrounding sockets
+    // disconnect long before that.
+    const MAX_ITER = 6000;
+    let iter = 0;
+    while (this._isMidPromptOrEffect() && iter < MAX_ITER) {
+      await this._delay(100);
+      iter++;
     }
   }
 
@@ -11388,7 +11576,81 @@ class GameEngine {
         }
       }
     }
+    // Greatmaw Remora's penalty — "you cannot summon Creatures for the
+    // rest of the turn afterwards, except Greatmaw Creatures". While
+    // the partial lock is set, every non-Greatmaw Creature in hand is
+    // blocked; Greatmaw Creatures stay summonable. Same hand-aura
+    // pattern as Grinning Cat above, so this covers both the UI
+    // grey-out and the server-side doPlayCreature validation.
+    if (ps.summonLockExceptGreatmaw) {
+      const { isGreatmawCreature } = require('./_greatmaw-shared');
+      const cardDB = this._getCardDB();
+      const seen = new Set(blocked);
+      for (const cardName of (ps.hand || [])) {
+        if (seen.has(cardName)) continue;
+        const cd = cardDB[cardName];
+        if (cd && hasCardType(cd, 'Creature') && !isGreatmawCreature(cardName, this)) {
+          blocked.push(cardName);
+          seen.add(cardName);
+        }
+      }
+    }
     return blocked;
+  }
+
+  /**
+   * Could `pi` spend a real (non-inherent) Action on a Creature summon
+   * by `heroIdx` RIGHT NOW? — the main turn Action (ONLY during the
+   * Action Phase, before any Hero has acted), a bonus main Action, or
+   * an additional-Action provider. In a Main Phase with no provider
+   * the answer is false: a Creature can only be summoned there as an
+   * inherent additional Action, so there is nothing to choose between.
+   * Greatmaw Remora reads this to decide between defaulting to the
+   * inherent additional summon (auto-lock, no prompt) and prompting
+   * the player.
+   */
+  hasSpendableActionFor(pi, heroIdx) {
+    const ps = this.gs.players[pi];
+    if (!ps) return false;
+    // The main turn Action is only a "right now" option DURING the
+    // Action Phase (currentPhase 3). In MAIN1 it is a future phase;
+    // by MAIN2 it is spent or forfeit — either way not spendable here.
+    const isActionPhase = (this.gs.currentPhase || 0) === 3;
+    if (isActionPhase && (ps.heroesActedThisTurn || []).length === 0) return true;
+    if ((ps._bonusMainActions || 0) > 0) return true;
+    if (this.findAdditionalActionForCard(pi, 'Greatmaw Remora', heroIdx)) return true;
+    return false;
+  }
+
+  /**
+   * Consume one real Action for `pi` — the player chose to pay an
+   * Action rather than take a free additional-Action play. Spends, in
+   * priority order: the main turn Action (ONLY during the Action
+   * Phase, before acting — marks the Hero as having acted), a bonus
+   * main Action, or an additional-Action provider. Returns true iff
+   * something was consumed. Mirrors `hasSpendableActionFor`.
+   */
+  consumeRealActionFor(pi, heroIdx) {
+    const ps = this.gs.players[pi];
+    if (!ps) return false;
+    const isActionPhase = (this.gs.currentPhase || 0) === 3;
+    if (isActionPhase && (ps.heroesActedThisTurn || []).length === 0) {
+      if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
+      if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+      this.sync();
+      return true;
+    }
+    if ((ps._bonusMainActions || 0) > 0) {
+      ps._bonusMainActions = 0;
+      this.sync();
+      return true;
+    }
+    const typeId = this.findAdditionalActionForCard(pi, 'Greatmaw Remora', heroIdx);
+    if (typeId) {
+      const consumed = this.consumeAdditionalAction(pi, typeId, null);
+      if (consumed) { this.sync(); return true; }
+    }
+    return false;
   }
 
   /**
@@ -12056,6 +12318,20 @@ class GameEngine {
       return null;
     }
 
+    // Greatmaw Remora's partial summon lock — non-Greatmaw Creatures
+    // cannot be summoned (this includes effect placements), Greatmaw
+    // Creatures still can.
+    if (ps.summonLockExceptGreatmaw && !opts._bypassSummonLock) {
+      const { isGreatmawCreature } = require('./_greatmaw-shared');
+      if (!isGreatmawCreature(cardName, this)) {
+        this.log('placement_blocked', {
+          card: cardName, by: opts.sourceName || 'Placement',
+          reason: 'summonLockExceptGreatmaw',
+        });
+        return null;
+      }
+    }
+
     const source = opts.source || 'hand';
     const sourceName = opts.sourceName || 'Placement';
 
@@ -12449,6 +12725,16 @@ class GameEngine {
       }
       picked = chosen;
       break;
+    }
+
+    // Optional rider: inspect / mutate the chosen tributes AFTER the
+    // picker resolves but BEFORE any of them are sacrificed (i.e.
+    // before ON_CREATURE_SACRIFICED fires and before the destroy).
+    // Greatmaw Siren uses this to negate fresh non-Greatmaw tributes
+    // so their on-death / on-sacrifice triggers are suppressed.
+    if (spec.onTributesChosen) {
+      try { await spec.onTributesChosen(ctx, picked); }
+      catch (err) { console.error(`[${ctx.cardName}] sacrifice onTributesChosen rider failed:`, err.message); }
     }
 
     // Per-sacrifice victim animation. Defaults to the knife-plunge
@@ -14819,120 +15105,151 @@ class GameEngine {
     if (targetHeroIdx < 0) return;
 
     const allCards = this._getCardDB();
-    const ps = this.gs.players[targetOwner];
-    if (!ps) return;
 
-    // Turn-1 lockout: the first-turn-protected player cannot activate any
-    // hand cards during the opening turn (no interaction allowed).
-    if (this.gs.firstTurnProtectedPlayer === targetOwner) return;
+    // Whose hand may hold a reaction to this Hero's damage / defeat:
+    //  • the damaged Hero's owner — always (the long-standing behaviour
+    //    for every after-damage reaction);
+    //  • that owner's OPPONENT — but ONLY for cards that opt in via
+    //    `firesForOpponentDefeat`, and ONLY when that opponent is a
+    //    HUMAN. CPUs are deliberately never offered the opponent-defeat
+    //    trigger (they would just self-damage — see Corpse Explosion).
+    const _adOppIdx = targetOwner === 0 ? 1 : 0;
+    const _adCheckOrder = [targetOwner];
+    if (!this.isCpuPlayer(_adOppIdx)) _adCheckOrder.push(_adOppIdx);
 
-    const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
-      if (seen.has(cardName)) continue;
-      seen.add(cardName);
+    for (const reactorIdx of _adCheckOrder) {
+      const isOpponentPass = reactorIdx !== targetOwner;
+      const ps = this.gs.players[reactorIdx];
+      if (!ps) continue;
 
-      const script = loadCardEffect(cardName);
-      if (!script?.isAfterDamageReaction) continue;
-      if (_defeated && !script.firesOnLethalDamage) continue;
+      // Turn-1 lockout: the first-turn-protected player cannot activate
+      // any hand cards during the opening turn (no interaction allowed).
+      if (this.gs.firstTurnProtectedPlayer === reactorIdx) continue;
 
-      const cardData = allCards[cardName];
-      const cost = cardData?.cost || 0;
-      if (cost > 0 && (ps.gold || 0) < cost) continue;
+      const seen = new Set();
+      for (let hi = 0; hi < ps.hand.length; hi++) {
+        const cardName = ps.hand[hi];
+        if (seen.has(cardName)) continue;
+        seen.add(cardName);
 
-      // Check condition
-      if (script.afterDamageCondition &&
-          !script.afterDamageCondition(this.gs, targetOwner, this, target, targetHeroIdx, source, amount, type)) continue;
+        const script = loadCardEffect(cardName);
+        if (!script?.isAfterDamageReaction) continue;
+        // The opponent-of-owner pass only ever sees opt-in cards.
+        if (isOpponentPass && !script.firesForOpponentDefeat) continue;
+        if (_defeated && !script.firesOnLethalDamage) continue;
 
-      // Check hero can cast this card
-      if (!this._canHeroActivateSurprise(targetOwner, targetHeroIdx, cardName)) continue;
+        const cardData = allCards[cardName];
+        const cost = cardData?.cost || 0;
+        if (cost > 0 && (ps.gold || 0) < cost) continue;
 
-      // Prompt
-      const srcName = source?.name || 'An effect';
-      const heroName = target.name || 'Hero';
-      const confirmed = await this.promptGeneric(targetOwner, {
-        type: 'confirm',
-        title: cardName,
-        message: `${heroName} took ${amount} damage from ${srcName}! Activate ${cardName}?`,
-        showCard: cardName,
-        confirmLabel: '🔥 Activate!',
-        cancelLabel: 'No',
-        cancellable: true,
-      });
+        // Check condition
+        if (script.afterDamageCondition &&
+            !script.afterDamageCondition(this.gs, reactorIdx, this, target, targetHeroIdx, source, amount, type)) continue;
 
-      if (!confirmed) continue;
+        // Hero-can-cast gate. Normally the (surviving) damaged Hero
+        // must itself be able to cast. But on a LETHAL hit that Hero
+        // is dead — and the opponent pass never owns it — so a
+        // firesOnLethalDamage reaction is cast by ANY living Hero of
+        // the activating player instead.
+        const canCast = (reactorIdx === targetOwner && !_defeated)
+          ? this._canHeroActivateSurprise(targetOwner, targetHeroIdx, cardName)
+          : this._anyHeroCanActivateSurprise(reactorIdx, cardName);
+        if (!canCast) continue;
 
-      // Activate: remove from hand, deduct gold
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
-      // Hand → discard/deleted flight animation (broadcast before splice).
-      {
-        const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
-          ? 'deleted' : 'discard';
-        this._broadcastEvent('play_pile_transfer', {
-          owner: targetOwner, cardName,
-          from: 'hand', to: destPile,
-          fromHandIdx: actualIdx,
+        // Prompt
+        const srcName = source?.name || 'An effect';
+        const heroName = target.name || 'Hero';
+        const confirmed = await this.promptGeneric(reactorIdx, {
+          type: 'confirm',
+          title: cardName,
+          message: `${heroName} took ${amount} damage from ${srcName}! Activate ${cardName}?`,
+          showCard: cardName,
+          confirmLabel: '🔥 Activate!',
+          cancelLabel: 'No',
+          cancellable: true,
         });
-      }
-      ps.hand.splice(actualIdx, 1);
-      // Route to destination pile alongside the splice.
-      if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
-        ps.deletedPile.push(cardName);
-      } else {
-        ps.discardPile.push(cardName);
-      }
-      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
-      if (this.gs._scTracking && targetOwner >= 0 && targetOwner < 2) this.gs._scTracking[targetOwner].cardsPlayedFromHand++;
 
-      // Push state NOW so the hand and pile both re-render in one
-      // diff cycle while the pile-transfer flight is still in the air.
-      this.sync();
+        if (!confirmed) continue;
 
-      // Reveal
-      this._broadcastEvent('card_reveal', { cardName, playerIdx: targetOwner });
-      await this._delay(300);
-
-      this.log('after_damage_reaction', { card: cardName, player: ps.username });
-
-      this._inAfterDamageReaction = true;
-      try {
-        if (script.afterDamageResolve) {
-          await script.afterDamageResolve(this, targetOwner, target, targetHeroIdx, source, amount, type);
-        }
-      } finally {
-        this._inAfterDamageReaction = false;
-      }
-
-      // Fire afterSpellResolved for Spell-type after-damage reactions
-      // (Fireshield, Anti Magic Shield, etc.) so hero passives that
-      // listen on cast completion (Beato's orb collector, Zsos'Ssar's
-      // Poison cost, Andras, Luck, etc.) treat reactive Spell casts
-      // the same as normal plays. Without this, Beato casting
-      // Fireshield as a recoil reaction would fail to tick her
-      // Destruction Magic orb because the cast skips
-      // `executeCardWithChain`'s normal afterSpellResolved fire.
-      // Mirrors the same fix already in place for surprise activations
-      // (~line 11400) and reaction-chain Spells (~line 10999).
-      if (cardData?.cardType === 'Spell') {
-        try {
-          await this.runHooks('afterSpellResolved', {
-            spellName: cardName,
-            spellCardData: cardData,
-            heroIdx: targetHeroIdx, casterIdx: targetOwner,
-            damageTargets: [],
-            isSecondCast: false,
-            _skipReactionCheck: true,
+        // Activate: remove from hand, deduct gold
+        const actualIdx = ps.hand.indexOf(cardName);
+        if (actualIdx < 0) continue;
+        // Hand → discard/deleted flight animation (broadcast before splice).
+        {
+          const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
+            ? 'deleted' : 'discard';
+          this._broadcastEvent('play_pile_transfer', {
+            owner: reactorIdx, cardName,
+            from: 'hand', to: destPile,
+            fromHandIdx: actualIdx,
           });
-        } catch (err) {
-          console.error('[Engine] afterSpellResolved (after-damage) error:', err.message);
         }
-      }
+        ps.hand.splice(actualIdx, 1);
+        // Route to destination pile alongside the splice.
+        if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
+          ps.deletedPile.push(cardName);
+        } else {
+          ps.discardPile.push(cardName);
+        }
+        if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+        if (this.gs._scTracking && reactorIdx >= 0 && reactorIdx < 2) this.gs._scTracking[reactorIdx].cardsPlayedFromHand++;
 
-      // (Card was already routed to its destination pile alongside
-      // the hand splice above.)
-      this.sync();
-      return; // Only one after-damage reaction per damage instance
+        // Push state NOW so the hand and pile both re-render in one
+        // diff cycle while the pile-transfer flight is still in the air.
+        this.sync();
+
+        // Reveal
+        this._broadcastEvent('card_reveal', { cardName, playerIdx: reactorIdx });
+        await this._delay(300);
+
+        this.log('after_damage_reaction', { card: cardName, player: ps.username });
+
+        this._inAfterDamageReaction = true;
+        try {
+          if (script.afterDamageResolve) {
+            await script.afterDamageResolve(this, reactorIdx, target, targetHeroIdx, source, amount, type);
+          }
+        } finally {
+          this._inAfterDamageReaction = false;
+        }
+
+        // Fire afterSpellResolved for Spell-type after-damage reactions
+        // (Fireshield, Anti Magic Shield, etc.) so hero passives that
+        // listen on cast completion (Beato's orb collector, Zsos'Ssar's
+        // Poison cost, Andras, Luck, etc.) treat reactive Spell casts
+        // the same as normal plays. Without this, Beato casting
+        // Fireshield as a recoil reaction would fail to tick her
+        // Destruction Magic orb because the cast skips
+        // `executeCardWithChain`'s normal afterSpellResolved fire.
+        // Mirrors the same fix already in place for surprise activations
+        // (~line 11400) and reaction-chain Spells (~line 10999).
+        // `heroIdx` is the casting Hero only for the survived own-Hero
+        // case; on a defeat / opponent reaction there is none (-1).
+        if (cardData?.cardType === 'Spell') {
+          try {
+            await this.runHooks('afterSpellResolved', {
+              spellName: cardName,
+              spellCardData: cardData,
+              heroIdx: (reactorIdx === targetOwner && !_defeated) ? targetHeroIdx : -1,
+              casterIdx: reactorIdx,
+              damageTargets: [],
+              isSecondCast: false,
+              _skipReactionCheck: true,
+            });
+          } catch (err) {
+            console.error('[Engine] afterSpellResolved (after-damage) error:', err.message);
+          }
+        }
+
+        // (Card was already routed to its destination pile alongside
+        // the hand splice above.)
+        this.sync();
+        // One reaction per PLAYER — `break` (not `return`) so the
+        // outer player loop still offers the other side its own pass.
+        // A `firesForOpponentDefeat` card (Corpse Explosion) can thus
+        // be chained by BOTH players to one Hero's defeat.
+        break;
+      }
     }
   }
 
@@ -14967,112 +15284,133 @@ class GameEngine {
     // triggers reactions that opt in via `firesOnLethalDamage`.
     const _defeated = !!opts.defeated;
 
-    const ownerIdx = creatureInst.controller ?? creatureInst.owner;
-    const ps = this.gs.players[ownerIdx];
-    if (!ps) return;
-
-    // Opening-turn lockout — same as every other hand-reaction window.
-    if (this.gs.firstTurnProtectedPlayer === ownerIdx) return;
-
+    const defeatedControllerIdx = creatureInst.controller ?? creatureInst.owner;
     const allCards = this._getCardDB();
-    const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
-      const cardName = ps.hand[hi];
-      if (seen.has(cardName)) continue;
-      seen.add(cardName);
 
-      const script = loadCardEffect(cardName);
-      if (!script?.isAfterCreatureDamageReaction) continue;
-      if (_defeated && !script.firesOnLethalDamage) continue;
+    // Whose hand may hold a reaction to this Creature's defeat:
+    //  • the defeated Creature's controller — always (the long-standing
+    //    behaviour for every after-creature-damage reaction);
+    //  • that controller's OPPONENT — but ONLY for cards that opt in via
+    //    `firesForOpponentDefeat`, and ONLY when that opponent is a
+    //    HUMAN. CPUs are deliberately never offered the opponent-defeat
+    //    trigger (they would just self-damage — see Corpse Explosion).
+    const _ocOppIdx = defeatedControllerIdx === 0 ? 1 : 0;
+    const _ocCheckOrder = [defeatedControllerIdx];
+    if (!this.isCpuPlayer(_ocOppIdx)) _ocCheckOrder.push(_ocOppIdx);
 
-      const cardData = allCards[cardName];
-      const cost = cardData?.cost || 0;
-      if (cost > 0 && (ps.gold || 0) < cost) continue;
+    for (const ownerIdx of _ocCheckOrder) {
+      const isOpponentPass = ownerIdx !== defeatedControllerIdx;
+      const ps = this.gs.players[ownerIdx];
+      if (!ps) continue;
 
-      if (script.oncePerGame || script.oncePerGameKey) {
-        const opgKey = script.oncePerGameKey || cardName;
-        if (ps._oncePerGameUsed?.has(opgKey)) continue;
-      }
+      // Opening-turn lockout — same as every other hand-reaction window.
+      if (this.gs.firstTurnProtectedPlayer === ownerIdx) continue;
 
-      if (script.afterCreatureDamageCondition &&
-          !script.afterCreatureDamageCondition(this.gs, ownerIdx, this, creatureInst, source, amount, type)) continue;
+      const seen = new Set();
+      for (let hi = 0; hi < ps.hand.length; hi++) {
+        const cardName = ps.hand[hi];
+        if (seen.has(cardName)) continue;
+        seen.add(cardName);
 
-      const srcName = source?.name || 'An effect';
-      const tgtName = creatureInst.name || 'Creature';
-      const confirmed = await this.promptGeneric(ownerIdx, {
-        type: 'confirm',
-        title: cardName,
-        message: `${tgtName} took ${amount} damage from ${srcName}! Activate ${cardName}?`,
-        showCard: cardName,
-        confirmLabel: '🔥 Activate!',
-        cancelLabel: 'No',
-        cancellable: true,
-      });
-      if (!confirmed) continue;
+        const script = loadCardEffect(cardName);
+        if (!script?.isAfterCreatureDamageReaction) continue;
+        // The opponent-of-controller pass only ever sees opt-in cards.
+        if (isOpponentPass && !script.firesForOpponentDefeat) continue;
+        if (_defeated && !script.firesOnLethalDamage) continue;
 
-      const actualIdx = ps.hand.indexOf(cardName);
-      if (actualIdx < 0) continue;
+        const cardData = allCards[cardName];
+        const cost = cardData?.cost || 0;
+        if (cost > 0 && (ps.gold || 0) < cost) continue;
 
-      // Hand → discard/deleted flight (broadcast before the splice so
-      // the source slot is still rendered; index-anchored).
-      const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
-        ? 'deleted' : 'discard';
-      this._broadcastEvent('play_pile_transfer', {
-        owner: ownerIdx, cardName,
-        from: 'hand', to: destPile,
-        fromHandIdx: actualIdx,
-      });
-      ps.hand.splice(actualIdx, 1);
-      if (destPile === 'deleted') ps.deletedPile.push(cardName);
-      else ps.discardPile.push(cardName);
-      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
-      if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
-
-      if (script.oncePerGame || script.oncePerGameKey) {
-        if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
-        ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
-      }
-
-      // Push state NOW so hand + pile re-render in one diff cycle
-      // while the pile-transfer flight is still airborne.
-      this.sync();
-
-      this._broadcastEvent('card_reveal', { cardName, playerIdx: ownerIdx });
-      await this._delay(300);
-      this.log('after_creature_damage_reaction', {
-        card: cardName, player: ps.username, target: creatureInst.name,
-      });
-
-      this._inAfterCreatureDamageReaction = true;
-      try {
-        if (script.afterCreatureDamageResolve) {
-          await script.afterCreatureDamageResolve(this, ownerIdx, creatureInst, source, amount, type);
+        if (script.oncePerGame || script.oncePerGameKey) {
+          const opgKey = script.oncePerGameKey || cardName;
+          if (ps._oncePerGameUsed?.has(opgKey)) continue;
         }
-      } catch (err) {
-        console.error(`[AfterCreatureDamageReaction] ${cardName} threw:`, err.message);
-      } finally {
-        this._inAfterCreatureDamageReaction = false;
-      }
 
-      // Spell-type reactions fire afterSpellResolved so cast-completion
-      // hero passives compose (mirrors the hero after-damage hub).
-      if (cardData?.cardType === 'Spell') {
+        if (script.afterCreatureDamageCondition &&
+            !script.afterCreatureDamageCondition(this.gs, ownerIdx, this, creatureInst, source, amount, type)) continue;
+
+        const srcName = source?.name || 'An effect';
+        const tgtName = creatureInst.name || 'Creature';
+        const confirmed = await this.promptGeneric(ownerIdx, {
+          type: 'confirm',
+          title: cardName,
+          message: `${tgtName} took ${amount} damage from ${srcName}! Activate ${cardName}?`,
+          showCard: cardName,
+          confirmLabel: '🔥 Activate!',
+          cancelLabel: 'No',
+          cancellable: true,
+        });
+        if (!confirmed) continue;
+
+        const actualIdx = ps.hand.indexOf(cardName);
+        if (actualIdx < 0) continue;
+
+        // Hand → discard/deleted flight (broadcast before the splice so
+        // the source slot is still rendered; index-anchored).
+        const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
+          ? 'deleted' : 'discard';
+        this._broadcastEvent('play_pile_transfer', {
+          owner: ownerIdx, cardName,
+          from: 'hand', to: destPile,
+          fromHandIdx: actualIdx,
+        });
+        ps.hand.splice(actualIdx, 1);
+        if (destPile === 'deleted') ps.deletedPile.push(cardName);
+        else ps.discardPile.push(cardName);
+        if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+        if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
+
+        if (script.oncePerGame || script.oncePerGameKey) {
+          if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+          ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
+        }
+
+        // Push state NOW so hand + pile re-render in one diff cycle
+        // while the pile-transfer flight is still airborne.
+        this.sync();
+
+        this._broadcastEvent('card_reveal', { cardName, playerIdx: ownerIdx });
+        await this._delay(300);
+        this.log('after_creature_damage_reaction', {
+          card: cardName, player: ps.username, target: creatureInst.name,
+        });
+
+        this._inAfterCreatureDamageReaction = true;
         try {
-          await this.runHooks('afterSpellResolved', {
-            spellName: cardName,
-            spellCardData: cardData,
-            heroIdx: -1, casterIdx: ownerIdx,
-            damageTargets: [],
-            isSecondCast: false,
-            _skipReactionCheck: true,
-          });
+          if (script.afterCreatureDamageResolve) {
+            await script.afterCreatureDamageResolve(this, ownerIdx, creatureInst, source, amount, type);
+          }
         } catch (err) {
-          console.error('[Engine] afterSpellResolved (after-creature-damage) error:', err.message);
+          console.error(`[AfterCreatureDamageReaction] ${cardName} threw:`, err.message);
+        } finally {
+          this._inAfterCreatureDamageReaction = false;
         }
-      }
 
-      this.sync();
-      return; // Only one after-creature-damage reaction per instance
+        // Spell-type reactions fire afterSpellResolved so cast-completion
+        // hero passives compose (mirrors the hero after-damage hub).
+        if (cardData?.cardType === 'Spell') {
+          try {
+            await this.runHooks('afterSpellResolved', {
+              spellName: cardName,
+              spellCardData: cardData,
+              heroIdx: -1, casterIdx: ownerIdx,
+              damageTargets: [],
+              isSecondCast: false,
+              _skipReactionCheck: true,
+            });
+          } catch (err) {
+            console.error('[Engine] afterSpellResolved (after-creature-damage) error:', err.message);
+          }
+        }
+
+        this.sync();
+        // One reaction per PLAYER — `break` (not `return`) so the
+        // outer player loop still offers the other side its own pass.
+        // A `firesForOpponentDefeat` card (Corpse Explosion) can thus
+        // be chained by BOTH players to one Creature's death.
+        break;
+      }
     }
   }
 
@@ -16598,6 +16936,21 @@ class GameEngine {
 
       return; // Only one Ascension reaction fires per Ascension
     }
+  }
+
+  /**
+   * True iff ANY of `playerIdx`'s Heroes can currently activate the
+   * named hand card. Used by the after-damage hero hub for reactions
+   * to a Hero's DEFEAT: the defeated Hero itself can't be the caster
+   * (it's dead), so any living Hero of the activating player qualifies.
+   */
+  _anyHeroCanActivateSurprise(playerIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return false;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      if (this._canHeroActivateSurprise(playerIdx, hi, cardName)) return true;
+    }
+    return false;
   }
 
   /**

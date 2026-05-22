@@ -85,11 +85,14 @@ function destinationsFor(engine, pi, inst) {
  *
  * Marks the moved inst with `_slipperyMovedTurn = gs.turn` if it is a
  * Slippery archetype Creature, so the Start Phase sub-mode picker can
- * exclude it for the rest of the turn (one auto-slide per Slippery
- * per turn — same rule applies whether the move came from the picker
- * itself, from Pengu's rider, from Slippery Ice, or from Skates).
+ * exclude it for the rest of the turn (one inherent auto-slide per
+ * Slippery per turn). External movers that conceptually grant a SEPARATE
+ * move (Pengu's rider, etc.) pass `opts.skipSlipperyMovedMark: true` so
+ * the target's own inherent turn-start move is preserved. Slippery Ice
+ * and Slippery Skates have their own move paths and don't go through
+ * this helper at all, so they're naturally unaffected.
  */
-async function moveSlipperyCreature(engine, pi, inst, destHeroIdx, destSlot) {
+async function moveSlipperyCreature(engine, pi, inst, destHeroIdx, destSlot, opts = {}) {
   const ps = engine.gs.players[pi];
   if (!ps) return false;
   const srcHeroIdx = inst.heroIdx;
@@ -133,7 +136,10 @@ async function moveSlipperyCreature(engine, pi, inst, destHeroIdx, destSlot) {
   // Phase picker excludes them from its eligible set. Non-Slippery
   // Creatures (e.g. a Pengu rider moving a non-Slippery target) are
   // untouched — they have no archetype turn-start clause to gate.
-  if (isSlipperyCard(inst.name, engine)) {
+  // Callers granting a SEPARATE move (Pengu's rider) pass
+  // `skipSlipperyMovedMark: true` so the target still gets its own
+  // inherent turn-start move afterward.
+  if (!opts.skipSlipperyMovedMark && isSlipperyCard(inst.name, engine)) {
     inst._slipperyMovedTurn = engine.gs.turn;
   }
 
@@ -148,6 +154,86 @@ async function moveSlipperyCreature(engine, pi, inst, destHeroIdx, destSlot) {
   });
 
   return true;
+}
+
+/**
+ * MCTS-driven CPU loop for any Slippery-style "pick a Creature and move
+ * it to an adjacent free Support Zone" sub-mode. Used by the Start Phase
+ * auto-slide AND Slippery Ice (and any future card with the same shape).
+ *
+ * Behavior:
+ *   • At each step, enumerate ALL (creatureInst, destZone) pairs from
+ *     `collect()` — a caller-supplied function returning an array of
+ *     `{ inst, dests: [{heroIdx, slotIdx}, ...] }` entries.
+ *   • If only one option exists (or we're already inside an outer MCTS
+ *     rollout, where mctsPickFromOptions falls through anyway), just
+ *     apply it without paying the snapshot/rollout cost.
+ *   • Otherwise call `mctsPickFromOptions` so each option is scored by
+ *     snapshot → apply → rolloutRestOfTurn → evaluateState. The MCTS
+ *     score naturally rewards plans that don't clog adjacent zones
+ *     (subsequent Slipperies still get to move) AND that route the
+ *     highest-value Slippery (Whoolmoth's 120-damage payoff, Snowman's
+ *     freeze, etc.) onto a productive column.
+ *   • Loop until `collect()` returns empty.
+ *
+ * `opts.moveOpts` is forwarded to every `moveSlipperyCreature` call
+ * (e.g. `skipSlipperyMovedMark` for Pengu's rider path).
+ *
+ * `opts.onLiveMove(inst)` fires once per LIVE commit (not on the
+ * snapshot-applies inside rollouts) so callers can track per-activation
+ * state — Slippery Ice uses this to enforce "each Creature moves at
+ * most once per Slippery Ice activation".
+ */
+async function _runMctsSlipperyLoop(engine, pi, collect, opts = {}) {
+  const moveOpts   = opts.moveOpts || {};
+  const onLiveMove = opts.onLiveMove || null;
+
+  let mctsPick;
+  try { ({ mctsPickFromOptions: mctsPick } = require('./_cpu')); }
+  catch { mctsPick = null; }
+
+  for (let iter = 0; iter < 64; iter++) {
+    const list = collect();
+    if (list.length === 0) return;
+
+    // Flatten (inst, dest) pairs into a single option list.
+    const options = [];
+    for (const entry of list) {
+      for (const dest of entry.dests) {
+        options.push({
+          instId: entry.inst.id,
+          destHeroIdx: dest.heroIdx,
+          destSlot: dest.slotIdx,
+        });
+      }
+    }
+    if (options.length === 0) return;
+
+    let best;
+    if (options.length === 1 || engine._inMctsSim || typeof mctsPick !== 'function') {
+      // Single option, nested rollout (mctsPickFromOptions would no-op
+      // anyway), or _cpu unavailable — use the first option directly.
+      best = options[0];
+    } else {
+      best = await mctsPick(engine, options, async (eng, opt) => {
+        const inst = eng.cardInstances.find(c => c.id === opt.instId);
+        if (!inst) return false;
+        const ok = await moveSlipperyCreature(
+          eng, pi, inst, opt.destHeroIdx, opt.destSlot, moveOpts,
+        );
+        return ok !== false;
+      });
+      if (!best) best = options[0];
+    }
+
+    const inst = engine.cardInstances.find(c => c.id === best.instId);
+    if (!inst) return;
+    const ok = await moveSlipperyCreature(
+      engine, pi, inst, best.destHeroIdx, best.destSlot, moveOpts,
+    );
+    if (!ok) return;
+    if (onLiveMove) onLiveMove(inst);
+  }
 }
 
 /**
@@ -235,16 +321,18 @@ async function _runSlipperySubMode(engine, pi) {
     _collectMovableSlipperies(engine, pi).filter(e => initialIds.has(e.inst.id));
 
   if (engine.isCpuPlayer(pi)) {
-    for (let iter = 0; iter < 64; iter++) {
-      const list = collect();
-      if (list.length === 0) return;
-      const entry = list[0];
-      const dest = entry.dests[0];
-      await moveSlipperyCreature(engine, pi, entry.inst, dest.heroIdx, dest.slotIdx);
-    }
+    await _runMctsSlipperyLoop(engine, pi, collect);
     return;
   }
   for (let iter = 0; iter < 64; iter++) {
+    // Defensive — if a nested move's on-enter effect (Pengu's rider
+    // moving Whoolmoth, Whoolmoth's same-column damage picker, etc.)
+    // is still mid-prompt, don't open the next Slippery Movement
+    // picker on top of it. Mirrors the End-Phase guard in
+    // `runPhase(PHASES.END)`. Normal flow clears immediately.
+    if (typeof engine._waitForPromptsToClear === 'function') {
+      await engine._waitForPromptsToClear();
+    }
     const list = collect();
     if (list.length === 0) return;
     const result = await engine.promptGeneric(pi, {
@@ -331,4 +419,5 @@ module.exports = {
   onSlipperyTurnStart,
   slipperyOnMoveGate,
   isSlipperyCard,
+  _runMctsSlipperyLoop,
 };

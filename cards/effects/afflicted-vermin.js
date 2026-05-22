@@ -86,6 +86,9 @@ module.exports = {
     const tInst = target.cardInstance;
     const tPs = gs.players[tOwner];
 
+    await engine._triggerGateCheck(tOwner, 'Afflicted Vermin');
+    if (engine._isGateShielded(tOwner)) return null;
+
     // Mushroom spore animation on the target
     engine._broadcastEvent('play_zone_animation', {
       type: 'mushroom_spore', owner: tOwner,

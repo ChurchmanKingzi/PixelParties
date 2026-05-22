@@ -56,7 +56,11 @@ function freeSlots(ps, heroIdx) {
   return out;
 }
 
-/** Every Cute-Creature copy in hand then discard → gallery entries. */
+/** Every Cute-Creature copy in hand then discard → gallery entries.
+ *  Budget cost uses `engine.effectiveCardLevel` so reducer hooks
+ *  (Whoolmoth-style, etc.) and Lethe per-pile stamps both bite the
+ *  cap honestly — a Lv5 Cute card rebated to 0 costs 0 budget, a
+ *  Lv2 card with a +1 Lethe stamp in discard costs 3. */
 function cuteGallery(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
@@ -64,11 +68,17 @@ function cuteGallery(engine, pi) {
   const out = [];
   for (const name of (ps.hand || [])) {
     const cd = cardDB[name];
-    if (isCuteCreature(cd)) out.push({ name, level: cd.level ?? 0, source: 'hand' });
+    if (isCuteCreature(cd)) {
+      const level = engine.effectiveCardLevel(cd, pi);
+      out.push({ name, level, source: 'hand' });
+    }
   }
   for (const name of (ps.discardPile || [])) {
     const cd = cardDB[name];
-    if (isCuteCreature(cd)) out.push({ name, level: cd.level ?? 0, source: 'discard' });
+    if (isCuteCreature(cd)) {
+      const level = engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' });
+      out.push({ name, level, source: 'discard' });
+    }
   }
   return out;
 }
@@ -135,9 +145,16 @@ module.exports = {
 
       // Defensive re-validation (mirror Timeless King Zi / Magic Lamp):
       // every pick is a Cute Creature, Σlevel ≤ cap, count ≤ free zones.
+      // Re-use the gallery's per-entry `level` (which already factors in
+      // reducer hooks + Lethe pile stamps via `engine.effectiveCardLevel`)
+      // so the cap check matches what the picker enforced. `selectedIndices`
+      // disambiguates duplicate-name entries across hand vs discard.
       const chosen = result.selectedCards.filter(n =>
         typeof n === 'string' && isCuteCreature(cardDB[n]));
-      const totalLvl = chosen.reduce((s, n) => s + (cardDB[n].level ?? 0), 0);
+      const selectedIndices = Array.isArray(result.selectedIndices) ? result.selectedIndices : null;
+      const totalLvl = selectedIndices
+        ? selectedIndices.reduce((s, i) => s + (gallery[i]?.level || 0), 0)
+        : chosen.reduce((s, n) => s + (engine.effectiveCardLevel(cardDB[n], pi) || 0), 0);
       if (chosen.length === 0 || totalLvl > cap || chosen.length > free.length) {
         engine.log('army_of_the_cute_invalid_pick', {
           player: ps.username, sent: result.selectedCards, accepted: chosen,

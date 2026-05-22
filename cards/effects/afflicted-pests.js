@@ -95,6 +95,9 @@ module.exports = {
     const tInst = target.cardInstance;
     const tPs = gs.players[tOwner];
 
+    await engine._triggerGateCheck(tOwner, 'Afflicted Pests');
+    if (engine._isGateShielded(tOwner)) return null;
+
     // Dark purple swarm animation on the target
     engine._broadcastEvent('play_zone_animation', {
       type: 'dark_swarm', owner: tOwner,

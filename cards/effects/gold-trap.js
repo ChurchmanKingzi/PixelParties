@@ -114,7 +114,15 @@ module.exports = {
       if (picked && picked.length > 0) {
         const target = targets.find(t => t.id === picked[0]);
         if (target?.cardInstance) {
-          await _bounceCreatureToHand(engine, target.cardInstance, pi);
+          const tCtrl = target.cardInstance.controller ?? target.cardInstance.owner;
+          await engine._triggerGateCheck(tCtrl, CARD_NAME);
+          if (engine._isGateShielded(tCtrl)) {
+            engine.log('gold_trap_bounce_blocked', {
+              card: target.cardInstance.name, reason: 'Defending the Gate',
+            });
+          } else {
+            await _bounceCreatureToHand(engine, target.cardInstance, pi);
+          }
         }
       }
     }

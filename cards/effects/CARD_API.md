@@ -680,6 +680,7 @@ back to the server's play handler:
 | `gs._spellCancelled = true` | Spell/Attack `onPlay` | Spell returns to hand (player cancelled target selection). Overridden by `_spellNegatedByEffect` — negated spells always go to discard. |
 | `gs._spellFreeAction = true` | Spell/Attack `onPlay` | This spell didn't consume the action — grant another |
 | `gs._spellPlacedOnBoard = true` | Spell/Attack `onPlay` | Don't send to discard after resolution (card placed itself) |
+| `gs._spellReturnToHand = true` | Spell/Attack `onPlay` | After resolution, return the card to its caster's hand instead of the discard pile (Rocket Fist). Distinct from `_spellCancelled` — the effect DID resolve. |
 | `gs._preventPhaseAdvance = true` | Any hook | Keep the current phase open (e.g. bonus actions) |
 
 ---
@@ -958,6 +959,61 @@ Reference implementations: the helper + picker injection + filter gates
 in `_engine.js`; the passive equip script `truth-seeing-eye.js`; the
 redirect cards `anti-magnet.js` (`isTargetRedirect`) and
 `shield-of-wisdom.js` (`isSurpriseRedirect`).
+
+---
+
+### Support-Zone effects — respect "Defending the Gate" (MANDATORY)
+
+> **Defending the Gate** (Artifact / Surprise): a face-down Surprise
+> that, once activated, shields **every card in the activating
+> player's Support Zones** — Creatures, Equipment, and Attachments —
+> from being destroyed, moved, stolen, or otherwise removed from the
+> board by an opponent's card or effect for the rest of the turn.
+
+When you author or modify ANY card or effect that **removes or
+relocates a card in a Support Zone** — destroy → discard/deleted,
+steal-to-hand, bounce-to-deck/hand, control transfer, an opponent's
+forced sacrifice, a bespoke "pull this Creature off the board" path,
+etc. — it **must** give the card's controller a chance to raise
+Defending the Gate, and abort if that side is shielded.
+
+The single source of truth is the engine pair:
+
+```js
+await engine._triggerGateCheck(side, sourceName); // async — opens the activation window
+engine._isGateShielded(side) → bool                // true once that side raised it
+```
+
+**You usually get this for free.** The engine chokepoints already
+trigger + honour it — `actionDestroyCard`, `actionMoveCard`
+(support → anywhere), `actionTransferCreature`, the Fire Bomb /
+ability-removal paths. If your card routes its Support-Zone removal
+through one of those, you are already compliant.
+
+Anything that does **raw Support-Zone manipulation** — splicing a
+card out of `supportZones` directly instead of going through a
+chokepoint (`_sparkfly-shared.stealBoardCardToHand`, Tengu Windstorm's
+bounce, …) — MUST trigger + check the gate itself:
+
+```js
+const gateSide = targetInst.controller ?? targetInst.owner;
+await engine._triggerGateCheck(gateSide, sourceName);
+if (engine._isGateShielded(gateSide)) return; // shielded — abort the removal
+```
+
+Defending the Gate is a **face-down Surprise** — unknown at targeting
+time — so a card CANNOT gray itself out / pre-filter gate-protected
+targets. Trigger the check at **resolution** (as Fire Bomb and Capture
+Net do): the effect targets normally, then fizzles cleanly if the gate
+goes up. The card and its cost are still spent.
+
+Scope: `_isGateShielded` is keyed to the side whose Support card you
+are affecting — your own gate, untriggered against your own effects,
+never blocks you. Damage to Support-Zone Creatures is governed by the
+damage pipeline, not this rule.
+
+Reference: `_isGateShielded` / `_triggerGateCheck` in `_engine.js`;
+`fire-bomb.js`; `capture-net.js` (via `stealBoardCardToHand`).
 
 ---
 

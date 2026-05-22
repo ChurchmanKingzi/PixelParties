@@ -247,7 +247,7 @@ module.exports = {
     await engine._delay(1500);
 
     // ── Apply un-removable effect negation ──
-    engine.actionNegateCreature(inst, 'Dark Gear', {
+    await engine.actionNegateCreature(inst, 'Dark Gear', {
       expiresAtTurn: gs.turn + 1,
       expiresForPlayer: pi === 0 ? 1 : 0, // expires at start of OPPONENT's next turn (= end of this turn cycle)
       selfInflicted: true,

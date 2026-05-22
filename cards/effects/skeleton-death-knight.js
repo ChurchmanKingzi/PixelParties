@@ -132,7 +132,7 @@ module.exports = {
         && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx,
       );
       if (inst) {
-        engine.actionNegateCreature(inst, CARD_NAME, {
+        await engine.actionNegateCreature(inst, CARD_NAME, {
           expiresAtTurn: gs.turn + 2,
           expiresForPlayer: pi,
         });

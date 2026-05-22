@@ -29,7 +29,10 @@ module.exports = {
       maxTotal: 1,
     });
 
-    if (!selectedIds || selectedIds.length === 0) return false;
+    // Player cancelled the target prompt — abort the activation entirely so
+    // doUseArtifactEffect skips the hand-splice / gold-charge / discard
+    // disposition (the `cancelled: true` flag is the documented contract).
+    if (!selectedIds || selectedIds.length === 0) return { cancelled: true };
 
     const target = targets.find(t => t.id === selectedIds[0]);
     if (!target) return false;
@@ -42,6 +45,9 @@ module.exports = {
     const ps = gs.players[heroOwner];
 
     if ((ps.surpriseZones?.[heroIdx] || []).length > 0) return false;
+
+    await engine._triggerGateCheck(heroOwner, 'Ushabti of the Great Pharaoh');
+    if (engine._isGateShielded(heroOwner)) return false;
 
     engine._broadcastEvent('play_zone_animation', {
       type: 'sand_reset', owner: heroOwner, heroIdx, zoneSlot: slotIdx,

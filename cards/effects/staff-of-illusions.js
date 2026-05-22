@@ -98,7 +98,9 @@ module.exports = {
 
     const chosenName = creaturePick.cardName;
     const chosenCd   = cardDB[chosenName];
-    const level      = chosenCd?.level ?? 0;
+    // Effective level — matches what the gallery shows the player (a
+    // rebated Whoolmoth presented as Lv0 should also cost 0 gold).
+    const level      = chosenCd ? engine.effectiveCardLevel(chosenCd, pi) : 0;
     const goldCost   = level * COST_PER_LEVEL;
 
     // Verify the player can afford it

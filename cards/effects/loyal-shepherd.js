@@ -192,7 +192,7 @@ module.exports = {
       // at the start of OUR next turn), turn+1 if opp is active (so it
       // lifts when we become active for our next turn).
       const expiresAtTurn = gs.turn + (gs.activePlayer === pi ? 2 : 1);
-      engine.actionNegateCreature(placed.inst, CARD_NAME, {
+      await engine.actionNegateCreature(placed.inst, CARD_NAME, {
         expiresAtTurn,
         expiresForPlayer: pi,
         selfInflicted: true,

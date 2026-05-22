@@ -61,9 +61,9 @@ function creatureHasActiveEffect(engine, inst) {
  * negation actually stuck (not Cardinal/Gate-immune) — play the Zzz.
  * @param {number} ownerPi - the Unwanted Audience controller (drives expiry)
  */
-function sleepCreature(engine, inst, ownerPi) {
+async function sleepCreature(engine, inst, ownerPi) {
   if (!inst || inst.counters?.negated) return;
-  engine.actionNegateCreature(inst, CARD_NAME, {
+  await engine.actionNegateCreature(inst, CARD_NAME, {
     // Current turn is the OPPONENT's; it ends when ownerPi's next
     // turn starts (gs.turn + 1 / expiresForPlayer = ownerPi). Same
     // arithmetic Jump in the River uses for its turn-scoped buff.
@@ -173,7 +173,7 @@ module.exports = {
           for (const cInst of [...engine.cardInstances]) {
             if ((cInst.controller ?? cInst.owner) !== oppIdx) continue;
             if (!creatureHasActiveEffect(engine, cInst)) continue;
-            sleepCreature(engine, cInst, pi);
+            await sleepCreature(engine, cInst, pi);
           }
           engine.log('unwanted_audience', {
             player: ps.username, target: gs.players[oppIdx]?.username,
@@ -215,7 +215,7 @@ module.exports = {
       if ((inst.controller ?? inst.owner) !== ua.player) return;  // opponent's side only
       if (inst.counters?.negated) return;            // already asleep (idempotent vs. dup copies)
       if (!creatureHasActiveEffect(engine, inst)) return;
-      sleepCreature(engine, inst, ua.owner);
+      await sleepCreature(engine, inst, ua.owner);
       engine.sync();
     },
 

@@ -115,8 +115,11 @@ module.exports = {
       // texts overlap. Pushing one sync first (so the client mounts the
       // GameBoard and the announcement starts ticking down), then
       // waiting for it to clear, lets Bill's prompt land cleanly after.
+      // Puzzle mode shows NO opening announcement (app-board.jsx skips
+      // it for isPuzzle), so the 3.8s wait is pure dead air there —
+      // skip it (matches Hel / Sid).
       engine.sync();
-      await engine._delay(3800);
+      if (!engine.isPuzzle) await engine._delay(3800);
 
       // Signal opponent that Bill's effect is resolving
       gs.heroEffectPending = { ownerIdx: pi, heroName: 'Bill, the Angry Auctioneer' };

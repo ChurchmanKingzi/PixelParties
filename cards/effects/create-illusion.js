@@ -59,14 +59,19 @@ module.exports = {
       );
       const maxLevel = Math.max(1, Math.min(magicArtsLevel, 3));
 
-      // Build deduplicated gallery from deck
+      // Build deduplicated gallery from deck. Filter by EFFECTIVE level
+      // — Whoolmoth-style `reduceCardLevel` hooks and any future
+      // reducer that fires from the board side can push a printed Lv5
+      // Creature down to ≤ maxLevel, and the cap should respect that.
+      // Deck reads don't get Lethe stamps (those only apply to discard /
+      // deleted piles), so no `pileSide` here.
       const seen = new Set();
       const galleryCards = [];
       for (const cn of (ps.mainDeck || [])) {
         if (seen.has(cn)) continue;
         const cd = cardDB[cn];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
-        if ((cd.level ?? 0) > maxLevel) continue;
+        if (engine.effectiveCardLevel(cd, pi) > maxLevel) continue;
         seen.add(cn);
         galleryCards.push({ name: cn, source: 'deck' });
       }
@@ -96,7 +101,10 @@ module.exports = {
 
       const chosenName = creaturePick.cardName;
       const chosenCd   = cardDB[chosenName];
-      const level      = chosenCd?.level ?? 0;
+      // Effective level — matches what the gallery cap allowed AND what
+      // the opp will draw on return ("draw cards equal to the Creature's
+      // level"). A rebated Whoolmoth (Lv 0) yields 0 opp draws.
+      const level      = chosenCd ? engine.effectiveCardLevel(chosenCd, pi) : 0;
 
       // ── Step 2: pick a free support zone ────────────────────────────
       //

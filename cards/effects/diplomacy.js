@@ -82,7 +82,11 @@ function getEligibleCreatures(engine, pi, maxCreatureLevel) {
     if (engine.isCreatureImmune(inst, 'control_immune')) continue;
     const cd = cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
-    if ((cd.level || 0) > maxCreatureLevel) continue;
+    // Compare against the target's CURRENT level — Whoolmoth-style
+    // reducers fire from opp's own board state, so a rebated Whoolmoth
+    // (Lv0) becomes a legal Diplomacy target. Level is read from opp's
+    // perspective (the controller of the Creature).
+    if (engine.effectiveCardLevel(cd, oppIdx, { heroIdx: inst.heroIdx }) > maxCreatureLevel) continue;
     targets.push({
       id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
       type: 'equip',
@@ -224,7 +228,7 @@ module.exports = {
     if (!transferResult.success) return false;
 
     // Apply negation until end of turn (same as Dark Gear)
-    engine.actionNegateCreature(inst, 'Diplomacy', {
+    await engine.actionNegateCreature(inst, 'Diplomacy', {
       expiresAtTurn: gs.turn + 1,
       expiresForPlayer: pi === 0 ? 1 : 0,
       selfInflicted: true,

@@ -282,6 +282,35 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   const ownerPs = gs.players[owner];
   if (!ownerPs) return false;
 
+  // Omni-immune Creatures (Cardinal Beasts, and anything carrying
+  // `_cardinalImmune` / `_omniImmune`) are unaffected by ALL effects —
+  // the steal-to-hand silently fizzles. Mirrors the same guard in
+  // actionTransferCreature / actionDestroyCard / the Deepsea
+  // return-to-hand helper. Callers treat `false` as "didn't move".
+  if (engine.isOmniImmune?.(targetInst)) {
+    engine.log('cardinal_immune_block', {
+      card: cardName, by: sourceName, action: 'steal_to_hand',
+    });
+    return false;
+  }
+
+  // Defending the Gate — the Surprise that shields a side's Support
+  // Zone cards. Any effect that moves a Support-Zone card off the
+  // board must trigger + honour it (the engine's actionDestroyCard /
+  // actionMoveCard chokepoints do; this helper does raw zone splices,
+  // so it must check explicitly). Trigger the window for the card's
+  // controller, then bail if that side is shielded.
+  const gateSide = targetInst.controller ?? targetInst.owner;
+  if (engine._triggerGateCheck) {
+    await engine._triggerGateCheck(gateSide, sourceName);
+    if (engine._isGateShielded?.(gateSide)) {
+      engine.log('steal_to_hand_blocked', {
+        card: cardName, by: sourceName, reason: 'Defending the Gate',
+      });
+      return false;
+    }
+  }
+
   // Remove from its source zone.
   if (zone === 'support') {
     if (ownerPs.supportZones?.[heroIdx]) {

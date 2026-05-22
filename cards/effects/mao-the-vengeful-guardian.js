@@ -165,7 +165,7 @@ module.exports = {
     // The buffKey is `mao_negated` so the status badge / hover-tooltip
     // surfaces as "Mao-Negated" (matches the BUFF_ICONS entry in
     // app-shared.jsx).
-    engine.actionNegateCreature(inst, CARD_NAME, {
+    await engine.actionNegateCreature(inst, CARD_NAME, {
       expiresAtTurn: gs.turn + 1,
       expiresForPlayer: pi,
       buffKey: 'mao_negated',
