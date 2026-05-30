@@ -88,6 +88,10 @@ module.exports = {
         if (e.type !== 'attack') continue;
         if ((e.source?.heroIdx ?? -1) !== heroIdx) continue;
         if ((e.source?.owner ?? -1) !== pi) continue;
+        // Full negation (Idej Projection, Spectral Armor zero-cap,
+        // Anti Magic void, future similar) → skip the poison rider
+        // per "and all associated effects".
+        if (e.cancelled) continue;
         if (!e.inst || e.inst.zone !== 'support') continue;
 
         await engine.actionApplyCreaturePoison(

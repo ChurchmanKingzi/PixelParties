@@ -264,6 +264,25 @@ module.exports = {
     // transition and runs the END phase (status expiry, switchTurn, etc.).
     // If the game has already ended (e.g. negated effect killed a hero),
     // gs.result is set and advance is a no-op.
+    //
+    // CRITICAL: clear our own `_heroEffectInProgress` slot BEFORE
+    // advancing into END. The server's doActivateHeroEffect set
+    // `gs._heroEffectInProgress[`${pi}:${heroIdx}`] = true` before
+    // invoking us and only clears it in its own `finally` (i.e. AFTER
+    // we return). The END phase calls `_waitForPromptsToClear`, which
+    // polls `_isMidPromptOrEffect` — and that helper treats ANY truthy
+    // entry in `_heroEffectInProgress` as "still mid-effect". Without
+    // clearing here, the END phase would spin for the full 10-minute
+    // MAX_ITER waiting for Cooldin's own in-progress slot to clear,
+    // which only happens AFTER advanceToPhase returns. Classic
+    // deadlock — observed as the game freezing for ~10 minutes after
+    // ANY Cooldin Area play, with any deck. Clearing here is safe:
+    // the server's finally still runs (delete is idempotent), and no
+    // further Cooldin-side work depends on the flag.
+    if (gs._heroEffectInProgress) {
+      delete gs._heroEffectInProgress[`${pi}:${heroIdx}`];
+    }
+
     if (!gs.result) {
       const currentPhase = gs.currentPhase;
       if (currentPhase === 2 || currentPhase === 3 || currentPhase === 4) {

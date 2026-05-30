@@ -26,9 +26,12 @@ module.exports = {
       const hero = ps?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
-      // Determine combined Decay Magic + Performance level
+      // Determine combined Decay Magic + Performance level. Decay
+      // Magic is caster-aware (Demon's Gate sets a "as if Decay Magic 3"
+      // override) — Performance is read from the actual host hero's
+      // ability zones, never overridden.
+      const decayLevel = engine.effectiveSchoolLevelForCaster('Decay Magic', pi, heroIdx);
       const abZones = ps.abilityZones[heroIdx] || [];
-      const decayLevel = engine.countAbilitiesForSchool('Decay Magic', abZones);
       const perfLevel = engine.countAbilitiesForSchool('Performance', abZones);
       const combinedLevel = decayLevel + perfLevel;
       const stacks = combinedLevel >= 3 ? 4 : combinedLevel >= 2 ? 2 : 1;

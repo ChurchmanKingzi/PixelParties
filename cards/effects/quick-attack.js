@@ -51,6 +51,13 @@ module.exports = {
       const tgtHeroIdx = target.heroIdx;
       const tgtZoneSlot = target.type === 'hero' ? undefined : target.slotIdx;
 
+      // Pre-resolution hook (Doq's guess, future "when this Hero
+      // attacks" effects) fires AFTER target pick but BEFORE the
+      // animation + damage. Listeners may mutate the about-to-deal
+      // damage.
+      const attackSource = { name: 'Quick Attack', owner: pi, heroIdx, controller: pi };
+      const finalDmg = await engine._fireAttackDeclare(attackSource, target, baseAtk);
+
       // Fast ram animation
       engine._broadcastEvent('play_ram_animation', {
         sourceOwner: pi, sourceHeroIdx: heroIdx,
@@ -68,13 +75,11 @@ module.exports = {
       });
       await engine._delay(100);
 
-      // Deal base ATK damage
-      const attackSource = { name: 'Quick Attack', owner: pi, heroIdx, controller: pi };
-
+      // Deal base ATK damage (post-declare modifications)
       if (target.type === 'hero') {
         const targetHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
         if (targetHero && targetHero.hp > 0) {
-          await engine.actionDealDamage(attackSource, targetHero, baseAtk, 'attack');
+          await engine.actionDealDamage(attackSource, targetHero, finalDmg, 'attack');
         }
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -83,7 +88,7 @@ module.exports = {
         );
         if (inst) {
           await engine.actionDealCreatureDamage(
-            attackSource, inst, baseAtk, 'attack',
+            attackSource, inst, finalDmg, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
         }
@@ -94,7 +99,7 @@ module.exports = {
 
       engine.log('quick_attack', {
         player: ps.username, hero: hero.name,
-        target: target.cardName, damage: baseAtk,
+        target: target.cardName, damage: finalDmg,
       });
       engine.sync();
     },

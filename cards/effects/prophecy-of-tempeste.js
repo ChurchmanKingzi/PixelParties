@@ -119,6 +119,20 @@ module.exports = {
       }
       if (destSlot < 0) { gs._spellCancelled = true; return; }
 
+      // ── Anti Magic gate ──
+      // Prophecy of Tempeste is Lv 3. A host Hero with
+      // `magic_immune.level >= 3` (Anti Magic Lv 3 attached) is
+      // immune to its effect — the attachment must NOT land. Bail
+      // BEFORE the support-zone push + `_spellPlacedOnBoard` flag so
+      // the server's standard post-resolve path routes the card to
+      // the caster's discard pile.
+      const destHeroObj = ps?.heroes?.[destHero];
+      if (destHeroObj && engine._isHeroSpellProtected(destHeroObj, CARD_NAME)) {
+        engine.log('equip_blocked', { card: CARD_NAME, target: destHeroObj.name, reason: 'magic_immune' });
+        engine._playAntiMagicBlockedAnim(destHeroObj);
+        return;
+      }
+
       // ── Place into the chosen Support Zone ──
       if (!ps.supportZones[destHero]) ps.supportZones[destHero] = [[], [], []];
       if (!ps.supportZones[destHero][destSlot]) ps.supportZones[destHero][destSlot] = [];

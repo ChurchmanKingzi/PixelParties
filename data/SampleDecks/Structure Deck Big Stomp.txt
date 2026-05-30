@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
 Name: Structure Deck: Big Stomp!
+Cover: Gigantisaur Chimera
 
 == HEROES ==
 Güldefaber, the King of Dwarfs

@@ -24,10 +24,11 @@
 
 const CARD_NAME = 'Draw';
 
-/** Casting Hero's Decay Magic level, clamped to [1, 3]. */
+/** Casting Hero's Decay Magic level, clamped to [1, 3]. Caster-aware so
+ *  an active `gs._castSchoolOverride` (Demon's Gate "as if Decay Magic 3")
+ *  wins over the host hero's actual stack count. */
 function decayLevel(engine, pi, heroIdx) {
-  const abZones = engine.gs.players[pi]?.abilityZones?.[heroIdx] || [];
-  const dm = engine.countAbilitiesForSchool('Decay Magic', abZones);
+  const dm = engine.effectiveSchoolLevelForCaster('Decay Magic', pi, heroIdx);
   return Math.max(1, Math.min(3, dm));
 }
 

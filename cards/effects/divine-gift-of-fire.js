@@ -21,8 +21,12 @@ module.exports = {
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
 
-      // Check Ida single-target override first
-      const heroFlags = gs.heroFlags?.[`${pi}-${heroIdx}`];
+      // Check Ida single-target override first — flag belongs to
+      // the Hero PERFORMING the cast (board side), so use
+      // cardHeroOwner. Diverges from cardOwner only under Love
+      // Shot, where the caster casts through an opp-side Hero;
+      // cardHeroOwner falls back to cardOwner for normal casts.
+      const heroFlags = gs.heroFlags?.[`${ctx.cardHeroOwner}-${heroIdx}`];
       if (heroFlags?.forcesSingleTarget) {
         // ── Ida mode: single-target burn via aoeHit ──
         const result = await ctx.aoeHit({

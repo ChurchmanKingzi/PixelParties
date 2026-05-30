@@ -45,6 +45,26 @@ module.exports = {
   // — the CPU brain reads it generically without per-card hard-codes.
   cpuMeta: {
     engineValue: 120,
+
+    // CPU ability-placement bias: prefer the middle Hero (heroIdx 1).
+    // The planner consults this per pass: if hero 1 is currently a
+    // legal placement target, every non-middle heroIdx is filtered
+    // out of the pass. Falls through (no bias) when hero 1 is dead /
+    // max-leveled / rejects the ability / has no slot.
+    cpuPlacementBias(engine, pi, helpers) {
+      const ps = engine.gs.players[pi];
+      const cardDB = engine._getCardDB();
+      const hi = 1;
+      const hero = ps.heroes?.[hi];
+      if (!hero?.name || hero.hp <= 0) return null;
+      if (ps.abilityGivenThisTurn?.[hi]) return null;
+      if (helpers.heroHasAbilityAtMaxLevel(ps, hi, 'Divinity')) return null;
+      const cd = cardDB['Divinity'];
+      if (!cd) return null;
+      if (helpers.heroRejectsAbility(engine, pi, hi, 'Divinity', cd)) return null;
+      if (helpers.resolveAbilitySlot(engine, pi, hi, 'Divinity') === null) return null;
+      return { allowedHeroes: new Set([1]) };
+    },
   },
 
   // Engine-side flag: refuses generic attachment paths

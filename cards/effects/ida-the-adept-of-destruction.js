@@ -76,8 +76,16 @@ module.exports = {
 
     /**
      * Effect 1 (hero damage): Destruction Spell damage dealt by Ida
-     * to heroes also cannot be negated. Sets a flag on the hookCtx
-     * for future negation systems to check.
+     * cannot be reduced OR negated, and ignores any effect that would
+     * make a target unaffected by it (Anti Magic etc.). Stamps both
+     * `cannotBeReduced` and `cannotBeNegated` via the engine's
+     * canonical mutators — `ctx.lockReduction()` writes to the
+     * underlying hookCtx (which the damage pipeline reads to skip the
+     * buff multiplier pass), and `ctx.setFlag('cannotBeNegated', true)`
+     * writes to the same hookCtx (the Anti Magic gate reads it to
+     * skip the void). Direct `ctx.foo = true` assignment doesn't
+     * propagate because `_createContext` spreads hookCtx into a fresh
+     * object — fixed here so the card text actually works.
      */
     beforeDamage: (ctx) => {
       if (ctx.type !== 'destruction_spell') return;
@@ -85,8 +93,8 @@ module.exports = {
       // Verify source belongs to same player as Ida
       const srcOwner = ctx.source?.owner ?? ctx.source?.controller ?? -1;
       if (srcOwner !== ctx.cardOwner) return;
-      // Mark as un-negatable for any future hero-damage-negation effects
-      ctx.cannotBeNegated = true;
+      ctx.lockReduction();
+      ctx.setFlag('cannotBeNegated', true);
     },
 
     /**

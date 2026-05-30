@@ -141,6 +141,14 @@ module.exports = {
         if (!_isAttackOrSpellType(e.type)) continue;
         if (!_isFromMolinda(e.source, ctx)) continue;
         if (e._immuneCreature) continue;
+        // Full negation (Idej Projection-style "and all associated
+        // effects") — even though Molinda's text counts hits on
+        // zero-damage Cardinal-immune Creatures, a full damage-event
+        // negation also negates the hit-counter rider per the unified
+        // engine rule. Cardinal Beast immunity stays distinct because
+        // it sets `e._immuneCreature` (visible damage zeroed, hit
+        // resolves) rather than `e.cancelled` (whole event negated).
+        if (e.cancelled) continue;
         const inst = e.inst;
         if (!inst || seen.has(inst)) continue;
         seen.add(inst);

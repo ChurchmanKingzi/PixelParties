@@ -67,6 +67,14 @@ module.exports = {
         return;
       }
 
+      // Pre-resolution hook (Doq's guess, future "when this Hero
+      // attacks" effects) fires AFTER target pick but BEFORE the
+      // projectile + impact + damage. Listeners may mutate the
+      // about-to-deal damage.
+      const baseDamage = Math.max(0, hero.atk || 0);
+      const source = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const damage = await engine._fireAttackDeclare(source, target, baseDamage);
+
       // ── Rocket Fist projectile ──
       // A fist with a rocket-engine exhaust launches from the casting
       // Hero and rams into the target.
@@ -93,9 +101,7 @@ module.exports = {
       });
       await engine._delay(180);
 
-      // ── Damage, equal to the attacker's Attack stat ──
-      const damage = Math.max(0, hero.atk || 0);
-      const source = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      // ── Damage, equal to the attacker's Attack stat (post-declare modifications) ──
       let defeated = false;
       if (tHero) {
         await engine.actionDealDamage(source, tHero, damage, 'attack');

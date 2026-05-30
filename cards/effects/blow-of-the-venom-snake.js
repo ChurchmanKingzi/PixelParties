@@ -48,6 +48,13 @@ module.exports = {
       const tgtHeroIdx = target.heroIdx;
       const tgtZoneSlot = target.type === 'hero' ? undefined : target.slotIdx;
 
+      // Pre-resolution hook (Doq's guess, future "when this Hero
+      // attacks" effects) fires AFTER target pick but BEFORE the
+      // animation + damage. Listeners may mutate the about-to-deal
+      // damage.
+      const attackSource = { name: 'Blow of the Venom Snake', owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const finalDmg = await engine._fireAttackDeclare(attackSource, target, baseAtk);
+
       // Ram animation
       engine._broadcastEvent('play_ram_animation', {
         sourceOwner: ctx.cardHeroOwner, sourceHeroIdx: heroIdx,
@@ -63,13 +70,18 @@ module.exports = {
       engine._broadcastEvent('play_zone_animation', { type: 'snake_impact', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactSlot });
       await engine._delay(200);
 
-      // Deal base ATK damage
-      const attackSource = { name: 'Blow of the Venom Snake', owner: pi, heroIdx, controller: pi };
-
+      // Deal base ATK damage. Capture cancellation so the poison
+      // rider below skips when the hit was fully negated (Idej
+      // Projection discard, Spectral Armor zero-cap, Anti Magic
+      // magic_immune void, Spider Silk Bridge redirect-to-nowhere,
+      // etc.). The "and all associated effects" clause on full-
+      // negation reactions covers riders attached to the same Attack.
+      let damageCancelled = false;
       if (target.type === 'hero') {
         const targetHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
         if (targetHero && targetHero.hp > 0) {
-          await engine.actionDealDamage(attackSource, targetHero, baseAtk, 'attack');
+          const r = await engine.actionDealDamage(attackSource, targetHero, finalDmg, 'attack');
+          damageCancelled = !!r?.cancelled;
         }
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -77,15 +89,24 @@ module.exports = {
           c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst) {
-          await engine.actionDealCreatureDamage(
-            attackSource, inst, baseAtk, 'attack',
+          const r = await engine.actionDealCreatureDamage(
+            attackSource, inst, finalDmg, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
+          damageCancelled = !!r?.cancelled;
         }
       }
 
       // Wait for ram return
       await engine._delay(500);
+
+      // Skip the poison rider when the damage was fully negated by a
+      // reaction — "negate that damage AND all associated effects".
+      if (damageCancelled) {
+        engine.log('venom_snake_rider_skipped', { reason: 'damage_cancelled' });
+        engine.sync();
+        return;
+      }
 
       // Poison the target if not already Poisoned
       if (target.type === 'hero') {

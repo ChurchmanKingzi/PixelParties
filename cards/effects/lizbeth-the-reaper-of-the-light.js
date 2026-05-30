@@ -159,11 +159,10 @@ function recomputeFighting(ctx) {
   const prevDelta = hero[FIGHTING_DELTA_KEY] || 0;
   if (desiredDelta === prevDelta) return;
   const diff = desiredDelta - prevDelta;
-  hero.atk = (hero.atk || 0) + diff;
+  // Canonical ATK delta helper — routes through the Curse
+  // suppression accumulator when the host is cursed.
+  engine._applyHeroAtkDelta(hero, pi, heroIdx, diff);
   hero[FIGHTING_DELTA_KEY] = desiredDelta;
-  engine._broadcastEvent('fighting_atk_change', {
-    owner: pi, heroIdx, amount: diff,
-  });
   engine.log('lizbeth_fighting_borrow', {
     delta: desiredDelta, prev: prevDelta, atk: hero.atk,
   });
@@ -485,6 +484,14 @@ module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
+  // Engine-level opt-in honoured by `_heroBorrowsAbilities`. The Hero
+  // borrows from opponent ability zones in both modes:
+  //   • 'passive' — opponent slots count toward this Hero's spell-
+  //     school / level requirements.
+  //   • 'active'  — opponent ability slots become activatable by this
+  //     Hero, sharing HOPT with own copies.
+  // Smugbeth's host borrows in ACTIVE mode only (see its own script).
+  borrowsAbilities: 'passive+active',
 
   hooks: {
     onTurnStart: (ctx) => {

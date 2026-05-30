@@ -84,20 +84,23 @@ module.exports = {
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {
-          await ctx.dealDamage(tgtHero, DAMAGE, 'destruction_spell');
-          if (tgtHero.hp > 0) {
+          // Capture cancellation so the Burn rider skips when the
+          // damage was fully negated (Idej Projection, Spectral Armor
+          // zero-cap, Anti Magic void) — "and all associated effects".
+          const r = await ctx.dealDamage(tgtHero, DAMAGE, 'destruction_spell');
+          if (!r?.cancelled && tgtHero.hp > 0) {
             await engine.addHeroStatus(target.owner, target.heroIdx, 'burned', {
               permanent: true, appliedBy: ctx.cardOwner, _skipReactionCheck: true,
             });
           }
         }
       } else if (target.cardInstance) {
-        await engine.actionDealCreatureDamage(
+        const r = await engine.actionDealCreatureDamage(
           { name: CARD_NAME, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx },
           target.cardInstance, DAMAGE, 'destruction_spell',
           { sourceOwner: ctx.cardOwner, canBeNegated: true }
         );
-        if ((target.cardInstance.counters?.currentHp ?? 1) > 0) {
+        if (!r?.cancelled && (target.cardInstance.counters?.currentHp ?? 1) > 0) {
           const applied = await engine.applyCreatureStatus(target.cardInstance, 'burned', {
             sourceOwner: ctx.cardOwner,
             source: CARD_NAME,
@@ -128,14 +131,17 @@ module.exports = {
       });
       await engine._delay(400);
 
-      await engine.actionDealCreatureDamage(
+      const creatureDmgResult = await engine.actionDealCreatureDamage(
         { name: CARD_NAME, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx },
         srcInst, DAMAGE, 'destruction_spell',
         { sourceOwner: ctx.cardOwner, canBeNegated: true }
       );
 
-      // Burn the creature if it survived
-      if ((srcInst.counters?.currentHp ?? 0) > 0) {
+      // Burn the creature if it survived AND the damage actually
+      // landed — a Spectral-Armor-style full cancellation also
+      // negates the Burn rider.
+      if (!creatureDmgResult?.cancelled
+          && (srcInst.counters?.currentHp ?? 0) > 0) {
         const applied = await engine.applyCreatureStatus(srcInst, 'burned', {
           sourceOwner: ctx.cardOwner,
           source: CARD_NAME,
@@ -161,10 +167,12 @@ module.exports = {
       });
       await engine._delay(400);
 
-      await ctx.dealDamage(attacker, DAMAGE, 'destruction_spell');
+      const heroDmgResult = await ctx.dealDamage(attacker, DAMAGE, 'destruction_spell');
 
-      // Burn if still alive
-      if (attacker.hp > 0) {
+      // Burn if still alive AND the damage actually landed — Idej
+      // Projection / Spectral Armor / Anti Magic void all skip the
+      // Burn rider via the same "and all associated effects" rule.
+      if (!heroDmgResult?.cancelled && attacker.hp > 0) {
         await engine.addHeroStatus(attackerOwner, attackerHeroIdx, 'burned', {
           permanent: true, appliedBy: ctx.cardOwner, _skipReactionCheck: true,
         });

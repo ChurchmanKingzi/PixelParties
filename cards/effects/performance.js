@@ -22,6 +22,37 @@ module.exports = {
   // spell school for spell-school requirement checks.
   isWildcardAbility: true,
 
+  cpuMeta: {
+    // CPU ability-placement bias: prefer Heroes that already have a
+    // Divinity stack (1-2 deep — full Lv3 zones aren't legal for
+    // Performance per its customPlacement gate). When such heroes
+    // exist, the planner restricts Performance placements to them
+    // and snaps the slot to the matching Divinity zone. Falls
+    // through (no bias) when no qualifying Hero exists.
+    cpuPlacementBias(engine, pi) {
+      const ps = engine.gs.players[pi];
+      const heroes = ps.heroes || [];
+      const allowedHeroes = new Set();
+      const slotByHero = new Map();
+      for (let hi = 0; hi < heroes.length; hi++) {
+        const hero = heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (ps.abilityGivenThisTurn?.[hi]) continue;
+        const abZones = ps.abilityZones?.[hi] || [];
+        for (let z = 0; z < 3; z++) {
+          const zoneArr = abZones[z] || [];
+          if (zoneArr.length === 0 || zoneArr.length >= 3) continue;
+          if (zoneArr[0] !== 'Divinity') continue;
+          allowedHeroes.add(hi);
+          slotByHero.set(hi, z);
+          break;
+        }
+      }
+      if (allowedHeroes.size === 0) return null;
+      return { allowedHeroes, slotByHero };
+    },
+  },
+
   // Custom placement rules — overrides standard ability placement.
   // Performance can ONLY go onto occupied ability zones with <3 cards.
   // It CANNOT go into empty zones, and it works on ANY ability type.

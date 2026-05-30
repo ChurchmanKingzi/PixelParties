@@ -298,6 +298,17 @@ module.exports = {
       inst.counters._letheLevelBonus = _letheBonus;
     }
 
+    // Permanently stamp this instance as "summoned by Necromancy" so
+    // Holy Selection (and any future card that gates on this) can
+    // identify Necromancy-revived Creatures on the board. The stamp
+    // lives on the inst.counters object — survives turn changes,
+    // control flips, status changes; dies only with the instance
+    // itself (a destroy / discard returns the Creature to its name in
+    // the pile, and a re-summon creates a fresh inst with no stamp,
+    // matching "the CURRENT body was Necromancy-summoned" semantics).
+    inst.counters = inst.counters || {};
+    inst.counters._summonedByNecromancy = true;
+
     // Tick the per-turn summon counter. Other "summon from outside the
     // board" paths (Raise the Minions, Skeleton Necromancer, Thep, Soul
     // Shard Khet) all route through `summonCreature` / `actionPlaceCreature

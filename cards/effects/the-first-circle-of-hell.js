@@ -138,6 +138,22 @@ module.exports = {
   // 'hand' for the self-cast onPlay; 'area' for the passive turn hooks.
   activeIn: ['hand', 'area'],
 
+  cpuMeta: {
+    // Hint consumed by `evaluateState` — when this Area is up, any
+    // player whose discard pile holds an ODD count of cards loses
+    // the whole pile at their next turn-start. The evaluator
+    // penalises own odd-parity discards (own loss bigger than opp's
+    // — opp can react during their own turn before the trigger).
+    activeAreaPenalty(engine, ownPs, oppPs) {
+      let score = 0;
+      const ownDpLen = ownPs?.discardPile?.length || 0;
+      if (ownDpLen > 0 && (ownDpLen % 2) === 1) score -= 4 * ownDpLen;
+      const oppDpLen = oppPs?.discardPile?.length || 0;
+      if (oppDpLen > 0 && (oppDpLen % 2) === 1) score += 2 * oppDpLen;
+      return score;
+    },
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       if (ctx.cardZone !== 'hand') return;

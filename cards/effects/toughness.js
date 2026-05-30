@@ -27,9 +27,13 @@ module.exports = {
   activeIn: ['ability'],
   // Lizbeth/Smugbeth: Toughness is explicitly excluded from ability
   // borrowing per spec — Lizbeth does NOT gain HP from opponent's
-  // Toughness. This flag is honoured by the engine's auto-mirror
-  // dispatch in `_fireLizbethMirrorIfApplicable`.
+  // Toughness. `disableLizbethMirror` is honoured by the engine's
+  // auto-mirror dispatch (`_fireLizbethMirrorIfApplicable`);
+  // `excludeFromAbilityBorrow` is honoured by the borrow-bundle
+  // filter in `_getCandidateAbilityZoneSets`, which decides what
+  // counts toward Lizbeth's spell-school/level requirements.
   disableLizbethMirror: true,
+  excludeFromAbilityBorrow: true,
 
   hooks: {
     /**

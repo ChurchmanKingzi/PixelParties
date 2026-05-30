@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
 Name: Structure Deck: Bloody King Zi
+Cover: Blood Rock
 
 == HEROES ==
 Cooldin, King of Coolness

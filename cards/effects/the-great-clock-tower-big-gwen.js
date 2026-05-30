@@ -72,6 +72,11 @@ module.exports = {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const BIG_GWEN = 'The Great Clock Tower "Big Gwen"';
+      // Don't queue from inside MCTS rollouts — the macrotask fires
+      // AFTER snapshot/restore, on the live state. Live leaves of Big
+      // Gwen schedule their own recheck. See CARD_API.md "Deferred
+      // side-effects".
+      if (engine._fastMode) return;
       setImmediate(() => {
         // Engine may have been torn down between when setImmediate was
         // scheduled and when it fires (self-play batch cleanup nulls

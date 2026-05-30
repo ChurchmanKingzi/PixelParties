@@ -31,17 +31,10 @@ module.exports = {
       const hero = ps.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
-      // Count Destruction Magic level on this hero (with Performance)
-      const abZones = ps.abilityZones[heroIdx] || [];
-      let dmLevel = 0;
-      for (const slot of abZones) {
-        if (!slot || slot.length === 0) continue;
-        const base = slot[0];
-        for (const ab of slot) {
-          if (ab === 'Destruction Magic') dmLevel++;
-          else if (ab === 'Performance' && base === 'Destruction Magic') dmLevel++;
-        }
-      }
+      // Destruction Magic level on the caster — caster-aware so an
+      // override (Demon's Gate "as if Destruction Magic 3") wins over
+      // the host hero's actual stack count.
+      const dmLevel = engine.effectiveSchoolLevelForCaster('Destruction Magic', pi, heroIdx);
 
       // Calculate damage: 100/200/300
       const damage = dmLevel >= 3 ? 300 : dmLevel >= 2 ? 200 : 100;

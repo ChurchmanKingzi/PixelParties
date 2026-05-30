@@ -24,6 +24,11 @@ module.exports = {
   isPotion: true,
   deferBroadcast: true,
   activeIn: ['permanent'],
+  // Engine-level opt-in honoured by `checkAllHeroesDead()`. While this
+  // permanent is on the owner's side, an all-heroes-dead state does
+  // NOT end the game on that side — the permanent's own death-collect
+  // path is responsible for handling the revive.
+  preventsAllHeroesDeadLoss: true,
 
   // CPU evaluation hint — Elixir's value is a multi-turn safety net
   // (waits for a future death to revive). The immediate post-play

@@ -201,6 +201,19 @@ module.exports = {
         return;
       }
 
+      // ── Anti Magic gate ──
+      // Gathering Storm is a Lv 3 Spell attaching to one of the
+      // caster's own Heroes. A host Hero with `magic_immune.level >= 3`
+      // (own Anti Magic Lv 3 attached) is immune to the effect — the
+      // attachment must NOT land. Bail BEFORE the support-zone push
+      // + `_spellPlacedOnBoard` flag so the server routes to discard.
+      const destHeroObj = ps?.heroes?.[destHero];
+      if (destHeroObj && engine._isHeroSpellProtected(destHeroObj, CARD_NAME)) {
+        engine.log('equip_blocked', { card: CARD_NAME, target: destHeroObj.name, reason: 'magic_immune' });
+        engine._playAntiMagicBlockedAnim(destHeroObj);
+        return;
+      }
+
       // ── Place into the chosen Support Zone ──
       if (!ps.supportZones[destHero]) ps.supportZones[destHero] = [[], [], []];
       if (!ps.supportZones[destHero][destSlot]) ps.supportZones[destHero][destSlot] = [];

@@ -35,6 +35,18 @@ module.exports = {
 
   attachableHeroes: [ATTACHABLE],
 
+  // Engine-level opt-in honoured by `_heroHasSmugbethBoost`. While
+  // this support instance is active AND its `predicate(inst)` returns
+  // true, the host Hero borrows opponent abilities in ACTIVE mode
+  // only. The predicate is consulted per-instance so future "while
+  // attached to X / while holding Y counter / etc." boosters can
+  // plug in without engine edits.
+  grantsActiveAbilityBorrowToHost: {
+    predicate(inst) {
+      return inst.counters?.attachedHero === ATTACHABLE;
+    },
+  },
+
   creatureEffect: true,
 
   canActivateCreatureEffect(ctx) {

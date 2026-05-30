@@ -240,14 +240,11 @@ function _grantAura(ctx, equipInst) {
   const hero = ctx.attachedHero;
   if (!hero || !hero.name) return;
   const engine = ctx._engine;
-  hero.atk = (hero.atk || 0) + ATK_PER_ARTIFACT;
+  // Canonical engine ATK delta helper — routes through Curse's
+  // suppression accumulator when Taio is cursed.
+  engine._applyHeroAtkDelta(hero, ctx.cardOwner, ctx.cardHeroIdx, ATK_PER_ARTIFACT);
   if (!equipInst.counters) equipInst.counters = {};
   equipInst.counters._taioAtkGranted = ATK_PER_ARTIFACT;
-  // Reuse Fighting's broadcast — same client handler animates the
-  // ATK number, no card-name discrimination is involved.
-  engine._broadcastEvent('fighting_atk_change', {
-    owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, amount: ATK_PER_ARTIFACT,
-  });
   engine.log('taio_aura_grant', {
     hero: hero.name, equipment: equipInst.name, amount: ATK_PER_ARTIFACT,
   });
@@ -261,11 +258,8 @@ function _revokeAura(ctx, equipInst) {
   const engine = ctx._engine;
   const amount = equipInst.counters._taioAtkGranted || 0;
   if (amount <= 0) return;
-  hero.atk = Math.max(0, (hero.atk || 0) - amount);
+  engine._applyHeroAtkDelta(hero, ctx.cardOwner, ctx.cardHeroIdx, -amount);
   delete equipInst.counters._taioAtkGranted;
-  engine._broadcastEvent('fighting_atk_change', {
-    owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, amount: -amount,
-  });
   engine.log('taio_aura_revoke', {
     hero: hero.name, equipment: equipInst.name, amount,
   });

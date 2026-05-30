@@ -133,6 +133,11 @@ module.exports = {
     // chain-negation reaction Spell (Anti Magic Shield, etc.) plus
     // a body on the board. Big swing piece.
     onDeathBenefit: 0,
+    // Generic Rebelliokai aggregate-scorer hook — per-card valuation
+    // when this card sits in hand (counted by `rebelScoreFor`). Kirin
+    // is the only Rebelliokai with reserve-value; others omit this
+    // field and contribute 0.
+    rebelliokaiHandReserveValue: 15,
   },
 
   /**

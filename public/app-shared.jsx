@@ -1080,6 +1080,12 @@ function isDeckLegal(deck) {
   // Main deck potions require Nicolas
   const mainPotions = (deck.mainDeck || []).filter(n => window.CARDS_BY_NAME[n]?.cardType === 'Potion');
   if (mainPotions.length > 0 && !hasNicolasHero(deck)) reasons.push('Main deck contains Potions but no Nicolas, the Hidden Alchemist');
+  // Combined Potion cap across main + Potion Deck — never more than 15
+  // total. With Nicolas in the team this is reachable by mixing the two
+  // sections; without Nicolas main-Potions are already rejected above
+  // and the Potion-Deck-only cap (5..15) covers the case.
+  const totalPotions = mainPotions.length + (deck.potionDeck || []).length;
+  if (totalPotions > 15) reasons.push('Combined Potions in Main + Potion Deck cannot exceed 15 (' + totalPotions + '/15)');
   return { legal: reasons.length === 0, reasons };
 }
 
@@ -1186,6 +1192,14 @@ function canAddCard(deck, cardName, section) {
   if (section === 'potion') {
     if (ct !== 'Potion') return false;
     if ((deck.potionDeck || []).length >= 15) return false;
+    // Combined cap across main + Potion Deck — Potions in the main deck
+    // (only possible with Nicolas) count against the same 15-Potion
+    // ceiling. The symmetric check in the 'main' branch above blocks
+    // adds there; this one blocks adds to the Potion Deck when the
+    // total is already at 15.
+    const totalPotions = (deck.mainDeck || []).filter(n => window.CARDS_BY_NAME[n]?.cardType === 'Potion').length
+      + (deck.potionDeck || []).length;
+    if (totalPotions >= 15) return false;
     if (countInDeck(deck, cardName) >= effMax) return false;
     return true;
   }
@@ -1781,6 +1795,27 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
     }
   }
   if (s.nulled || c.nulled) badges.push({ key: 'nulled', icon: '🔇', tooltip: (isHero ? 'Nulled: Cannot cast Spells.' : 'Nulled: Has its effects negated.') + dur(s.nulled || c.nulled) });
+  if (s.magic_silenced || c.magic_silenced) {
+    badges.push({
+      key: 'magic_silenced', icon: '🔕',
+      tooltip: (isHero
+        ? 'Magic Silenced: Cannot cast Spells. Attacks, Abilities, and Hero effects are unaffected.'
+        : 'Magic Silenced: Has its effects negated.')
+        + dur(s.magic_silenced || c.magic_silenced),
+    });
+  }
+  if (s.berserked) {
+    badges.push({
+      key: 'berserked', icon: '😡',
+      tooltip: 'Berserked: Cannot cast Spells or summon Creatures. Gets one free additional Attack per turn, but never more than 2 Attacks per turn total.',
+    });
+  }
+  if (s.cursed) {
+    badges.push({
+      key: 'cursed', icon: '🧿',
+      tooltip: 'Cursed: This Hero\'s Attack stat is forced to 0 (overrides every ATK-increasing effect).',
+    });
+  }
   if (s.bound) {
     // Skeleton Death Knight tags bound with `source = "Skeleton Death
     // Knight"`; render the badge as the "Silenced" variant in that
@@ -1805,6 +1840,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
   if (s.immune) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
   if (s.shielded) badges.push({ key: 'shielded', icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + durStart(s.shielded) });
   if (s.untargetable) badges.push({ key: 'untargetable', icon: '🦋', tooltip: 'Untargetable: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen.' });
+  if (s.invisible) badges.push({ key: 'invisible', icon: '👻', tooltip: 'Invisible: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen. (Shares pool with Untargetable.)' });
   if (s.healReversed) badges.push({ key: 'healReversed', icon: '💀', tooltip: 'Overheal Shock: Takes any healing as damage.' });
   // Extra Life — visual-only marker (Trial of Coolness, etc.). The mark
   // is stored OUTSIDE statuses (`hero._extraLife` / `inst.counters._extraLife`)
@@ -1862,12 +1898,21 @@ function BuffColumn({ buffs, cardName }) {
     let txt = `Blessed: This Hero can have up to ${remaining} more additional Abilities attached to it this turn!`;
     if (data?.locked) txt += ' But it cannot act this turn.';
     return txt;
-  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 100 and cannot be reduced or negated." }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' } };
+  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 100 and cannot be reduced or negated." }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' }, magic_immune: { icon: '🛡️', tooltip: (data) => `The Hero is immune to Spells up to level ${data?.level ?? '?'}.` } };
   // medusa_petrified is surfaced through the Stunned status badge (as the
   // "Petrified" variant), so don't also render it as a separate buff icon —
   // that would double-represent the same effect. null_zone_negated is the
   // expiry-timer buff paired with the 'nulled' status badge (same reason).
-  const BUFF_HIDDEN = new Set(['medusa_petrified', 'null_zone_negated']);
+  const BUFF_HIDDEN = new Set([
+    'medusa_petrified',
+    'null_zone_negated',
+    // Internal expiry-tracking buff stamped on Creatures by Anti
+    // Magic Zone (via `actionNegateCreature` with `buffKey:
+    // '_anti_magic_zone_silenced'`). The user-facing status is the
+    // `magic_silenced` badge rendered by StatusBadges on the LEFT
+    // side; this buff is bookkeeping only and shouldn't surface.
+    '_anti_magic_zone_silenced',
+  ]);
   // Same tooltip-bridge pattern as StatusBadges: buff icons are absolute-
   // positioned relative to the card and the cursor moving onto one fires
   // the card's mouseLeave, hiding the big preview. Re-assert the preview

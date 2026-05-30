@@ -238,6 +238,10 @@ module.exports = {
       for (const e of ctx.entries) {
         if (e.type !== 'attack') continue;
         if ((e.source?.heroIdx ?? -1) !== heroIdx || (e.source?.owner ?? -1) !== pi) continue;
+        // Full negation (Spectral Armor zero-cap, Anti Magic void
+        // on a Spell-typed attack, future similar) → no hit, no
+        // immortal grant per "and all associated effects".
+        if (e.cancelled) continue;
         const inst = e.inst;
         if (!inst || inst.zone !== 'support' || inst.counters?.buffs?.immortal) continue;
         if (!inst.counters.buffs) inst.counters.buffs = {};

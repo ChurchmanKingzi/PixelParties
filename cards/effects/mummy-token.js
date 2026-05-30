@@ -12,6 +12,11 @@ module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
+  // Opt-in honoured by `engine._isHeroMummified`: while a Support-Zone
+  // card carrying this flag is attached to a Hero, that Hero's
+  // passives + active effect are silenced (Mummy Token's own
+  // heroEffect replaces it via server.js doActivateHeroEffect).
+  mummifiesHost: true,
   heroEffect: 'Place a Mummy Token into the free Support Zone of a Hero your opponent controls that has no Mummy Tokens in its Support Zones yet.',
 
   canActivateHeroEffect(ctx) {

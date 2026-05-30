@@ -54,6 +54,13 @@ module.exports = {
       const tgtHeroIdx = target.heroIdx;
       const tgtZoneSlot = target.type === 'hero' ? undefined : target.slotIdx;
 
+      // Pre-resolution hook (Doq's guess, future "when this Hero
+      // attacks" effects) fires AFTER target pick but BEFORE the
+      // animation + damage. Listeners may mutate the about-to-deal
+      // damage.
+      const attackSource = { name: 'Ferocious Tiger Kick', owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const finalDmg = await engine._fireAttackDeclare(attackSource, target, baseAtk);
+
       // Ram animation: hero charges to target and back
       engine._broadcastEvent('play_ram_animation', {
         sourceOwner: ctx.cardHeroOwner, sourceHeroIdx: heroIdx,
@@ -69,15 +76,20 @@ module.exports = {
       engine._broadcastEvent('play_zone_animation', { type: 'tiger_impact', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: impactZoneSlot });
       await engine._delay(200);
 
-      // Deal base ATK damage with type 'attack' (equipment hooks fire)
-      const attackSource = { name: 'Ferocious Tiger Kick', owner: pi, heroIdx, controller: pi };
+      // Deal base ATK damage with type 'attack' (equipment hooks fire).
+      // Capture cancellation so the stun + heal riders both skip when
+      // the hit was fully negated (Idej Projection discard, Spectral
+      // Armor zero-cap, Anti Magic void) — "negate that damage AND all
+      // associated effects".
       let dealt = 0;
+      let damageCancelled = false;
 
       if (target.type === 'hero') {
         const targetHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
         if (targetHero && targetHero.hp > 0) {
-          const result = await engine.actionDealDamage(attackSource, targetHero, baseAtk, 'attack');
+          const result = await engine.actionDealDamage(attackSource, targetHero, finalDmg, 'attack');
           dealt = result?.dealt || 0;
+          damageCancelled = !!result?.cancelled;
         }
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -85,12 +97,19 @@ module.exports = {
           c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst) {
-          await engine.actionDealCreatureDamage(
-            attackSource, inst, baseAtk, 'attack',
+          const result = await engine.actionDealCreatureDamage(
+            attackSource, inst, finalDmg, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
-          dealt = baseAtk;
+          dealt = result?.dealt || 0;
+          damageCancelled = !!result?.cancelled;
         }
+      }
+
+      if (damageCancelled) {
+        engine.log('tiger_kick_rider_skipped', { reason: 'damage_cancelled' });
+        engine.sync();
+        return;
       }
 
       // 2nd Attack bonus: heal attacker for damage dealt

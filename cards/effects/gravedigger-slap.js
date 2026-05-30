@@ -82,17 +82,23 @@ module.exports = {
       const tgtHeroIdx = target.heroIdx;
       const impactSlot = target.type === 'hero' ? -1 : (target.slotIdx ?? -1);
 
+      // Pre-resolution hook (Doq's guess, future "when this Hero
+      // attacks" effects) fires AFTER target pick but BEFORE the
+      // animation + damage. Listeners may mutate the about-to-deal
+      // damage.
+      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
+      const finalDmg = await engine._fireAttackDeclare(attackSource, target, damage);
+
       engine._broadcastEvent('play_zone_animation', {
         type: 'red_cut', owner: tgtOwner,
         heroIdx: tgtHeroIdx, zoneSlot: impactSlot,
       });
       await engine._delay(250);
 
-      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
       if (target.type === 'hero') {
         const targetHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
         if (targetHero && targetHero.hp > 0) {
-          await engine.actionDealDamage(attackSource, targetHero, damage, 'attack');
+          await engine.actionDealDamage(attackSource, targetHero, finalDmg, 'attack');
         }
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -101,7 +107,7 @@ module.exports = {
         );
         if (inst) {
           await engine.actionDealCreatureDamage(
-            attackSource, inst, damage, 'attack',
+            attackSource, inst, finalDmg, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
         }
@@ -109,7 +115,7 @@ module.exports = {
 
       engine.log('gravedigger_slap', {
         player: ps.username, hero: hero.name,
-        target: target.cardName, damage, creaturesInDiscard: count,
+        target: target.cardName, damage: finalDmg, creaturesInDiscard: count,
       });
       engine.sync();
     },

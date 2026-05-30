@@ -81,6 +81,13 @@ module.exports = {
         && c.heroIdx === tgtHeroIdx && c.zoneSlot === tgtSlot
       );
 
+      // Pre-resolution hook (Doq's guess, future "when this Hero
+      // attacks" effects) fires AFTER target pick but BEFORE the
+      // animation + damage. Listeners may mutate the about-to-deal
+      // damage.
+      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const finalDmg = await engine._fireAttackDeclare(attackSource, target, atk);
+
       // ── Hero rams into the Creature (charge + return arc) ──
       engine._broadcastEvent('play_ram_animation', {
         sourceOwner: ctx.cardHeroOwner, sourceHeroIdx: heroIdx,
@@ -106,7 +113,7 @@ module.exports = {
       // ── Damage resolves as the Creature lands ──
       if (inst) {
         await engine.actionDealCreatureDamage(
-          { name: CARD_NAME, owner: pi, heroIdx }, inst, atk, 'attack',
+          attackSource, inst, finalDmg, 'attack',
           { sourceOwner: pi, canBeNegated: true },
         );
       }

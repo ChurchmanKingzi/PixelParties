@@ -70,10 +70,11 @@ function applyAtkBonus(ctx, excludeId) {
 
   if (delta === 0) return;
 
-  hero.atk = (hero.atk || 0) + delta;
+  // Engine ATK helper routes through Curse's suppression accumulator
+  // when Toras is cursed.
+  engine._applyHeroAtkDelta(hero, pi, heroIdx, delta);
   ctx.card.counters.torasAtkBonus = newBonus;
 
-  engine._broadcastEvent('fighting_atk_change', { owner: pi, heroIdx, amount: delta });
   engine.log('toras_atk_update', {
     hero: hero.name, artifacts: count, bonus: newBonus, delta,
   });

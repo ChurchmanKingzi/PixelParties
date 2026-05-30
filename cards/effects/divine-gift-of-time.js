@@ -58,6 +58,11 @@ function queueTimeRescue(engine, ps, pi, names) {
   for (const n of cleaned) ps._timeRescueQueue.push(n);
 
   if (ps._timeRescueScheduled) return;
+  // Don't queue from inside MCTS rollouts — the macrotask fires AFTER
+  // snapshot/restore on the live state, and the live state has its
+  // own discard events that will queue their own setTimeout. See
+  // CARD_API.md "Deferred side-effects".
+  if (engine._fastMode) return;
   ps._timeRescueScheduled = true;
   // setTimeout(0) defers past the remainder of the current engine
   // task — the discard-loop / mill batch / death cleanup completes

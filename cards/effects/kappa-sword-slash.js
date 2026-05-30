@@ -129,6 +129,13 @@ module.exports = {
         await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME });
       }
 
+      // Pre-resolution hook (Doq's guess, future "when this Hero
+      // attacks" effects) fires AFTER target pick + cost payment but
+      // BEFORE the animation + damage. Listeners may mutate the
+      // about-to-deal damage.
+      const attackSource = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, controller: pi };
+      const finalDmg = await engine._fireAttackDeclare(attackSource, target, SLASH_DMG);
+
       // Slash animation on the target.
       engine._broadcastEvent('play_zone_animation', {
         type:     'critical_slash',
@@ -141,14 +148,14 @@ module.exports = {
       if (target.type === 'hero') {
         const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (hero && hero.hp > 0) {
-          await ctx.dealDamage(hero, SLASH_DMG, 'attack');
+          await ctx.dealDamage(hero, finalDmg, 'attack');
         }
       } else if (target.cardInstance) {
         const inst = engine.cardInstances.find(c => c.id === target.cardInstance.id);
         if (inst && inst.zone === 'support') {
           await engine.actionDealCreatureDamage(
-            { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
-            inst, SLASH_DMG, 'attack',
+            attackSource,
+            inst, finalDmg, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
         }
@@ -228,7 +235,7 @@ module.exports = {
       engine.log('kappa_sword_slash', {
         player: ps.username,
         target: target.cardName || `hero-${target.heroIdx}`,
-        damage: SLASH_DMG,
+        damage: finalDmg,
       });
       engine.sync();
     },

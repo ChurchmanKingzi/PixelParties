@@ -36,6 +36,26 @@ const MAX_CPU_TURN_MS = 90000;
 // budget and extend the live turn past MAX_CPU_TURN_MS, since
 // cpuPastDeadline used to short-circuit inside MCTS sims.
 const MAX_ROLLOUT_MS = 8000;
+// Hard per-card-handling cap. Applied to a single mctsGatedActivation's
+// LIVE actionFn (and the bypass-path actionFn). When a card's resolution
+// involves nested MCTS — e.g. The Yeeting's two-prompt cpuResponse that
+// runs mctsPickFromOptions per option per prompt — the combined budget
+// can balloon well past the per-turn cap if the inner code stops yielding
+// (a tight sync chain inside an engine hook, or a Promise that never
+// resolves). The cap is enforced two ways: (a) `_cpuCardDeadline` makes
+// `cpuPastDeadline` true after this many ms so nested mctsPickFromOptions
+// / rolloutRestOfTurn loops self-cancel at their await boundaries; (b) a
+// Promise.race against the same timeout guarantees the OUTER awaiter
+// returns even if the inner code never yields. (b) leaves the underlying
+// work running in the background — `_runWithCardHardcap` clears
+// `gs.potionTargeting` as a best-effort recovery so the next CPU action
+// isn't blocked by a stale resolve-state.
+const CARD_HANDLING_HARDCAP_MS = 30000;
+
+// DEBUG: force-add "The Yeeting" to the CPU's hand at the start of its
+// second LIVE turn. Used to reliably reproduce the Yeeting CPU-resolution
+// path without waiting on the natural draw. Set to false for normal play.
+const DEBUG_FORCE_YEETING_ON_CPU_TURN_2 = true;
 
 // Set to false when the CPU is stable. Keep verbose while we're still shaking
 // out freeze bugs — every major decision point logs so a hang can be traced.
@@ -51,7 +71,7 @@ let _cpuLogSilent = false;
 // surfaces both the CPU's hand state and its per-decision reasoning so
 // the tester can correlate "what was held" with "what was picked." Flip
 // back to `false` for a public build.
-let _cpuVerbose = false;
+let _cpuVerbose = true;
 // Optional transcription function. When set, cpuLog calls it INSTEAD of
 // console.log, regardless of _cpuVerbose. Used by self-play to capture
 // detailed decision traces for a subset of games without flooding stdout.
@@ -111,6 +131,12 @@ function stillCpuTurn(engine, cpuIdx) {
 function cpuPastDeadline(engine) {
   const dl = engine?._cpuTurnDeadline;
   if (typeof dl === 'number' && Date.now() >= dl) return true;
+  // Per-card hardcap. Set by `_runWithCardHardcap` around mctsGatedActivation's
+  // actionFn calls so nested mctsPickFromOptions / rolloutRestOfTurn loops
+  // self-cancel at their await boundaries when a single card's resolution
+  // overruns its budget. Applies regardless of `_inMctsSim`.
+  const cardDl = engine?._cpuCardDeadline;
+  if (typeof cardDl === 'number' && Date.now() >= cardDl) return true;
   if (engine?._inMctsSim) {
     const startT = engine._mctsRolloutStartT;
     if (typeof startT === 'number' && (Date.now() - startT) >= MAX_ROLLOUT_MS) {
@@ -118,6 +144,38 @@ function cpuPastDeadline(engine) {
     }
   }
   return false;
+}
+
+/**
+ * Run a single CPU card-handling actionFn under a 30s hardcap. Two-layer
+ * defence: (1) `_cpuCardDeadline` makes `cpuPastDeadline` true so async
+ * loops inside the actionFn self-cancel, (2) Promise.race against a real
+ * timer returns to the caller even if (1)'s yield points are starved
+ * (sync infinite loop, never-resolving Promise). Best-effort cleanup on
+ * timeout: clear `gs.potionTargeting` so the next CPU sub-phase isn't
+ * stuck on the abandoned card's resolution state.
+ */
+async function _runWithCardHardcap(engine, label, fn) {
+  const prevCardDeadline = engine._cpuCardDeadline;
+  engine._cpuCardDeadline = Date.now() + CARD_HANDLING_HARDCAP_MS;
+  let timerId;
+  const timeoutP = new Promise((_, reject) => {
+    timerId = setTimeout(() => reject(new Error(`hardcap:${label}`)), CARD_HANDLING_HARDCAP_MS);
+  });
+  try {
+    return await Promise.race([Promise.resolve().then(fn), timeoutP]);
+  } catch (err) {
+    if (err && typeof err.message === 'string' && err.message.startsWith('hardcap:')) {
+      console.error(`[CPU] ⚠️  card hardcap hit (${CARD_HANDLING_HARDCAP_MS}ms): ${label} — abandoning play`);
+      cpuLog(`      !! hardcap ${label}`);
+      try { if (engine.gs?.potionTargeting) engine.gs.potionTargeting = null; } catch {}
+      return false;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timerId);
+    engine._cpuCardDeadline = prevCardDeadline;
+  }
 }
 
 // ── Live event-loop yield ───────────────────────────────────────────
@@ -212,6 +270,19 @@ async function runCpuTurn(engine, helpers) {
   // cost cap inside rollouts.
   if (!engine._inMctsSim) {
     engine._cpuTurnDeadline = turnStartT + MAX_CPU_TURN_MS;
+    // DEBUG: force-add Yeeting on the CPU's 2nd LIVE turn. Live-only so
+    // nested-rollout re-entries don't double-stamp. Tracked on the engine
+    // (not the player state) so snapshot/restore inside MCTS doesn't
+    // reset the counter and re-fire the add.
+    if (DEBUG_FORCE_YEETING_ON_CPU_TURN_2) {
+      engine._debugCpuTurnsTaken = (engine._debugCpuTurnsTaken || 0) + 1;
+      if (engine._debugCpuTurnsTaken === 2 && !ps.hand.includes('The Yeeting')) {
+        ps.hand.push('The Yeeting');
+        try { engine._trackCard('The Yeeting', cpuIdx, 'hand'); } catch {}
+        cpuLog(`[DEBUG] force-added "The Yeeting" to CPU hand (CPU turn #2)`);
+        engine.sync();
+      }
+    }
   }
   cpuLog(`===== TURN START turn=${gs.turn} phase=${gs.currentPhase} hand=${ps.hand.length} gold=${ps.gold} fast=${!!engine._fastMode} =====`);
   cpuLog('hand:', ps.hand);
@@ -590,26 +661,22 @@ async function runActionPhase(engine, helpers) {
     // one-by-one and falls through to heuristics for null/invalid slots.
     const hadPlan = Array.isArray(pick.scriptedTargetPlan) && pick.scriptedTargetPlan.length > 0;
     if (hadPlan) engine._mctsTargetPlan = [...pick.scriptedTargetPlan];
-    try {
+    // Wrap the LIVE play in the per-card hardcap so a hung resolution
+    // (e.g. nested mctsPickFromOptions in a card's cpuResponse that never
+    // yields) can't freeze the Action Phase. Skipped inside MCTS sims —
+    // those inherit the outer LIVE call's deadline.
+    let skipCreatureForNoSlot = false;
+    const actionFn = async () => {
       if (pick.cardType === 'AbilityAction') {
-        // Action-costing ability activation (Adventurousness, etc.) — no
-        // hand card, no zoneSlot; fires via doActivateAbility on the chosen
-        // hero+ability zone.
         await helpers.doActivateAbility(helpers.room, cpuIdx, {
           heroIdx: pick.heroIdx,
           zoneIdx: pick.zoneIdx,
         });
       } else if (pick.cardType === 'HeroEffectAction') {
-        // Hero-effect activation that costs an Action (Champion, the
-        // Stormbringer, …). Routed through the same socket helper
-        // human players use; doActivateHeroEffect's `heroEffectActionCost`
-        // path consumes the main Action slot on the chosen hero.
         await helpers.doActivateHeroEffect(helpers.room, cpuIdx, {
           heroIdx: pick.heroIdx,
         });
       } else if (pick.cardType === 'Creature') {
-        // MCTS picked the zone slot during candidate enumeration; honor
-        // it if still free, else fall back to the heuristic picker.
         let zoneSlot = pick.zoneSlot;
         const ps3 = engine.gs.players[cpuIdx];
         const slotTaken = zoneSlot != null
@@ -617,7 +684,7 @@ async function runActionPhase(engine, helpers) {
         if (zoneSlot == null || zoneSlot < 0 || slotTaken) {
           zoneSlot = pickCreatureZoneSlot(engine, cpuIdx, pick.heroIdx);
         }
-        if (zoneSlot < 0) { cpuLog(`    ← no free slot for creature`); continue; }
+        if (zoneSlot < 0) { skipCreatureForNoSlot = true; return; }
         await helpers.doPlayCreature(helpers.room, cpuIdx, {
           cardName: pick.cardName,
           handIndex: pick.handIdx,
@@ -631,9 +698,17 @@ async function runActionPhase(engine, helpers) {
           heroIdx: pick.heroIdx,
         });
       }
+    };
+    try {
+      if (engine._inMctsSim) {
+        await actionFn();
+      } else {
+        await _runWithCardHardcap(engine, `action-phase ${pick.cardType} ${pick.cardName}`, actionFn);
+      }
     } finally {
       if (hadPlan) delete engine._mctsTargetPlan;
     }
+    if (skipCreatureForNoSlot) { cpuLog(`    ← no free slot for creature`); continue; }
 
     // The play handler fully unwound (resolution locks released) → run
     // any reaction-deferred actions (e.g. a human Lunar Eclipse that
@@ -1452,12 +1527,6 @@ function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
   // this, those cards are invisible to the CPU planner.
   if (script.canActivate && !script.canActivate(gs, pi, engine)) return null;
   if (script.blockedByHandLock && ps.handLocked) return null;
-  // Juice: server-side `canActivate` returns true if EITHER side has a
-  // cleansable status, so without this CPU-side guard the CPU happily
-  // plays it when only the opponent has statuses (and the targeting
-  // brain then either picks []-confirms a no-op or actively cleanses
-  // an opponent's debuff, both bad). Gate on own cleansable targets.
-  if (cardName === 'Juice' && !hasCleansableOwnTarget(engine)) return null;
   // Targeted artifacts (getValidTargets + targetingConfig) also go through
   // doUseArtifactEffect — the CPU brain's post-play step picks targets and
   // calls doConfirmPotion to finish resolution.
@@ -2617,52 +2686,35 @@ async function attachAbilities(engine, helpers) {
     if (!stillCpuTurn(engine, cpuIdx)) return;
 
     // ── Per-pass placement biases (recomputed each pass since the
-    // ability board state changes between attaches). These are
-    // archetype-aware overrides on top of the generic tier/score
-    // logic — when a bias matches, candidates not satisfying it are
-    // dropped from this pass entirely, even if they'd otherwise score
-    // higher. Add new biases here as new archetypes need them.
+    // ability board state changes between attaches). Each Ability
+    // opts in via `cpuMeta.cpuPlacementBias(engine, pi, helpers)`,
+    // returning either null (no bias this pass) or
+    //   { allowedHeroes?: Set<heroIdx>, slotByHero?: Map<heroIdx, slotIdx> }
+    // When `allowedHeroes` is present, candidates whose heroIdx isn't
+    // in the set are dropped from this pass. When `slotByHero` is
+    // present and contains the candidate's heroIdx, it overrides the
+    // planner's auto-resolved slot.
     const heroes = ps.heroes || [];
-
-    // Divinity → middle Hero (heroIdx 1) preference. If hero 1 can
-    // legally receive a Divinity copy this pass, skip non-middle
-    // heroes for any Divinity in hand. Falls through to all-hero
-    // candidates if hero 1 is dead / max-leveled / locked out.
-    const divinityMiddleEligible = (() => {
-      const hi = 1;
-      const hero = heroes[hi];
-      if (!hero?.name || hero.hp <= 0) return false;
-      if (ps.abilityGivenThisTurn[hi]) return false;
-      if (heroHasAbilityAtMaxLevel(ps, hi, 'Divinity')) return false;
-      const divCd = cardDB['Divinity'];
-      if (!divCd) return false;
-      if (heroRejectsAbility(engine, cpuIdx, hi, 'Divinity', divCd)) return false;
-      return resolveAbilitySlot(engine, cpuIdx, hi, 'Divinity') !== null;
-    })();
-
-    // Performance → boost an existing Divinity stack if any. Maps
-    // heroIdx → the zoneSlot of that hero's Divinity stack (1 or 2
-    // cards deep, since Performance can't go on full Lv3 zones).
-    // When the map is non-empty, Performance is filtered to those
-    // (hero, slot) pairs only; resolveAbilitySlot's normal random
-    // pick is overridden to land on the Divinity zone specifically.
-    const performanceDivinitySlots = (() => {
-      const map = new Map();
-      for (let hi = 0; hi < heroes.length; hi++) {
-        const hero = heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
-        if (ps.abilityGivenThisTurn[hi]) continue;
-        const abZones = ps.abilityZones?.[hi] || [];
-        for (let z = 0; z < 3; z++) {
-          const zoneArr = abZones[z] || [];
-          if (zoneArr.length === 0 || zoneArr.length >= 3) continue;
-          if (zoneArr[0] !== 'Divinity') continue;
-          map.set(hi, z);
-          break;
+    const biasHelpers = {
+      heroHasAbilityAtMaxLevel,
+      heroRejectsAbility,
+      resolveAbilitySlot,
+    };
+    const biasByCard = new Map();
+    const getBias = (cardName) => {
+      if (biasByCard.has(cardName)) return biasByCard.get(cardName);
+      const fn = loadCardEffect(cardName)?.cpuMeta?.cpuPlacementBias;
+      let bias = null;
+      if (typeof fn === 'function') {
+        try { bias = fn(engine, cpuIdx, biasHelpers) || null; }
+        catch (err) {
+          console.error(`[cpu] cpuPlacementBias ${cardName} threw:`, err.message);
+          bias = null;
         }
       }
-      return map;
-    })();
+      biasByCard.set(cardName, bias);
+      return bias;
+    };
 
     const tier1 = [], tier2 = [], tier3 = [];
     for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
@@ -2685,10 +2737,10 @@ async function attachAbilities(engine, helpers) {
         // school, so the copy is always better placed elsewhere).
         if (heroRejectsAbility(engine, cpuIdx, hi, cardName, cd)) continue;
 
-        // ── Per-card placement biases ──
-        if (cardName === 'Divinity' && divinityMiddleEligible && hi !== 1) continue;
-        if (cardName === 'Performance' && performanceDivinitySlots.size > 0
-            && !performanceDivinitySlots.has(hi)) continue;
+        // ── Per-card placement biases (generic — driven by each
+        //    Ability's `cpuMeta.cpuPlacementBias`) ──
+        const bias = getBias(cardName);
+        if (bias?.allowedHeroes && !bias.allowedHeroes.has(hi)) continue;
 
         let slot = resolveAbilitySlot(engine, cpuIdx, hi, cardName);
         if (slot === null) continue;
@@ -2704,10 +2756,10 @@ async function attachAbilities(engine, helpers) {
         // land somewhere useful (e.g. on a freshly-summoned hero).
         if (isAbilityStackSaturated(engine, cpuIdx, hi, cardName)) continue;
 
-        // Performance bias: override the random custom-placement slot
-        // pick to land specifically on the hero's Divinity zone.
-        if (cardName === 'Performance' && performanceDivinitySlots.has(hi)) {
-          slot = performanceDivinitySlots.get(hi);
+        // Bias may override the auto-resolved slot for this hero
+        // (Performance lands on the hero's Divinity zone specifically).
+        if (bias?.slotByHero?.has(hi)) {
+          slot = bias.slotByHero.get(hi);
         }
 
         const entry = { handIdx, cardName, heroIdx: hi, zoneSlot: slot };
@@ -3521,15 +3573,16 @@ function pickHealTargetsMulti(engine, ownTargets, enemyTargets, cardName, maxSel
     seen.add(t.id);
     picks.push(t);
   };
-  // 1) Overheal Shock lethal on enemy heroes (always valuable)
+  // 1) heal-reversed enemy heroes (Overheal Shock etc.) — lethal heal,
+  //    always valuable.
   for (const t of enemyTargets) {
-    if (t.type === 'hero' && heroHasAttachment(engine, t, 'Overheal Shock')) add(t);
+    if (t.type === 'hero' && heroHealReversed(engine, t)) add(t);
   }
-  // 2) Own targets — skip own-hero with Overheal Shock (would kill us)
-  //    and skip `cpuMeta.preferDead` creatures (Cute Cat etc. — the
-  //    CPU never protects creatures that want to die).
+  // 2) Own targets — skip own-hero whose heal is reversed (would kill
+  //    us) and skip `cpuMeta.preferDead` creatures (Cute Cat etc. —
+  //    the CPU never protects creatures that want to die).
   const safeOwn = ownTargets.filter(t => {
-    if (t.type === 'hero' && heroHasAttachment(engine, t, 'Overheal Shock')) return false;
+    if (t.type === 'hero' && heroHealReversed(engine, t)) return false;
     if (targetIsPreferDead(engine, t)) return false;
     return true;
   });
@@ -3663,16 +3716,30 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // ── Ability-attach prompts (Sacrifice to Divinity, Megu, Alex, …) ──
   // The card hands us an eligibleHeroIdxs allowlist + an ability cardName
   // and asks "which hero gets it?". Mirror the same per-card placement
-  // biases the in-hand attachAbilities loop applies — Divinity always
-  // prefers the middle hero (heroIdx 1) when it's in the allowlist.
+  // biases the in-hand attachAbilities loop applies via each Ability's
+  // `cpuMeta.cpuPlacementBias` — if a bias narrows the allowed heroes,
+  // pick from the intersection.
   if (type === 'abilityAttachTarget') {
     const eligible = Array.isArray(promptData.eligibleHeroIdxs)
       ? promptData.eligibleHeroIdxs
       : null;
     const attachName = promptData.cardName;
     const pickHero = (hi) => ({ heroIdx: hi });
-    if (attachName === 'Divinity' && eligible && eligible.includes(1)) {
-      return pickHero(1);
+    const biasFn = loadCardEffect(attachName)?.cpuMeta?.cpuPlacementBias;
+    if (biasFn && eligible) {
+      const cpuIdx = engine._cpuPlayerIdx;
+      let bias = null;
+      try {
+        bias = biasFn(engine, cpuIdx, {
+          heroHasAbilityAtMaxLevel,
+          heroRejectsAbility,
+          resolveAbilitySlot,
+        }) || null;
+      } catch { bias = null; }
+      if (bias?.allowedHeroes) {
+        const preferred = eligible.find(hi => bias.allowedHeroes.has(hi));
+        if (preferred != null) return pickHero(preferred);
+      }
     }
     if (eligible && eligible.length > 0) {
       return pickHero(eligible[0]);
@@ -4478,17 +4545,17 @@ function pickEnemyTargets(engine, enemyTargets, damage, maxSelect) {
 
 function pickHealTarget(engine, ownTargets, enemyTargets, cardName, _config) {
   const gs = engine.gs;
-  // 1) Overheal Shock on enemy Hero → kill shot: always target.
+  // 1) heal-reversed enemy Hero → kill shot: always target.
   for (const t of enemyTargets) {
     if (t.type !== 'hero') continue;
-    if (heroHasAttachment(engine, t, 'Overheal Shock')) return t;
+    if (heroHealReversed(engine, t)) return t;
   }
 
-  // 2) Skip own Heroes with Overheal Shock attached, and creatures
-  //    flagged `cpuMeta.preferDead` (Cute Cat etc. — the CPU never
-  //    spends a heal / cleanse on creatures that want to die).
+  // 2) Skip own Heroes whose heal is reversed, and creatures flagged
+  //    `cpuMeta.preferDead` (Cute Cat etc. — the CPU never spends a
+  //    heal / cleanse on creatures that want to die).
   const safeOwn = ownTargets.filter(t => {
-    if (t.type === 'hero' && heroHasAttachment(engine, t, 'Overheal Shock')) return false;
+    if (t.type === 'hero' && heroHealReversed(engine, t)) return false;
     if (targetIsPreferDead(engine, t)) return false;
     return true;
   });
@@ -4805,6 +4872,20 @@ function heroHasAttachment(engine, t, attachmentName) {
 }
 
 /**
+ * Generic "any heal on this Hero is applied as damage instead" check.
+ * The Overheal Shock attachment stamps the `healReversed` status on
+ * its target Hero (cleared on leave-zone); any future heal-reversal
+ * effect that uses the same status flows through this predicate
+ * without per-card CPU code. Used by heal-target pickers to
+ * (a) prefer enemy heroes (lethal heal) and (b) skip own heroes.
+ */
+function heroHealReversed(engine, t) {
+  if (t?.type !== 'hero') return false;
+  const hero = engine.gs.players?.[t.owner]?.heroes?.[t.heroIdx];
+  return !!hero?.statuses?.healReversed;
+}
+
+/**
  * Creature whose card script declares `cpuMeta.preferDead: true` —
  * the CPU should NEVER spend defensive resources (heal, cleanse,
  * buff) on it. Cute Cat is the prototype: its on-summon self-discard
@@ -4820,21 +4901,30 @@ function targetIsPreferDead(engine, t) {
   return script?.cpuMeta?.preferDead === true;
 }
 
+/**
+ * Generic heal-target priority hint. Walks the target Hero's support
+ * zones; any attached card whose script exports
+ * `cpuMeta.isHealTargetFresh(engine, inst)` and returns true makes
+ * this Hero a top-priority heal target — healing it will fire that
+ * support card's afterHeal trigger. Canonical user: Lifeforce
+ * Howitzer (its once-per-turn afterHeal still available).
+ */
 function targetHasFreshLifeforceHowitzer(engine, t) {
   if (t?.type !== 'hero') return false;
   const ps = engine.gs.players[t.owner];
   const zones = ps?.supportZones?.[t.heroIdx] || [];
   for (let z = 0; z < zones.length; z++) {
-    if (!(zones[z] || []).includes('Lifeforce Howitzer')) continue;
-    const inst = engine.cardInstances.find(c =>
-      c.owner === t.owner && c.zone === 'support' && c.heroIdx === t.heroIdx
-      && c.zoneSlot === z && c.name === 'Lifeforce Howitzer'
-    );
-    // "Fresh" = this-turn effect not used. Lifeforce Howitzer tracks via a
-    // per-turn counter; if not present or not spent this turn, consider fresh.
-    if (!inst) continue;
-    const used = inst.counters?.lifeforceHowitzerUsedTurn;
-    if (used !== engine.gs.turn) return true;
+    for (const cardName of (zones[z] || [])) {
+      const script = loadCardEffect(cardName);
+      const probe = script?.cpuMeta?.isHealTargetFresh;
+      if (typeof probe !== 'function') continue;
+      const inst = engine.cardInstances.find(c =>
+        c.owner === t.owner && c.zone === 'support' && c.heroIdx === t.heroIdx
+        && c.zoneSlot === z && c.name === cardName
+      );
+      if (!inst) continue;
+      try { if (probe(engine, inst)) return true; } catch { /* ignore */ }
+    }
   }
   return false;
 }
@@ -5526,17 +5616,11 @@ function mctsEnemyCreatureValue(engine, inst) {
   return Math.max(0.3, value);
 }
 
-// Cardinal Beast names used by `estimateHandCardValueFor`'s win-
-// condition floor. Mirrors the array in `evaluateState`'s
-// `scoreCardinalBeasts`; centralised as a Set here for hand-value
-// boosting so the gallery picker treats Beasts as top-tier tutor
-// targets the moment a viable summoner exists on the team.
-const CARDINAL_BEAST_NAMES_FOR_HAND_VALUE = new Set([
-  'Cardinal Beast Baihu',
-  'Cardinal Beast Qinglong',
-  'Cardinal Beast Xuanwu',
-  'Cardinal Beast Zhuque',
-]);
+// Cardinal Beast name lookup shared with `_cardinal-shared.js`. Used
+// by `estimateHandCardValueFor`'s win-condition floor: when a viable
+// summoner exists on the team, every Beast in hand becomes a top-tier
+// tutor target.
+const { CARDINAL_NAMES_SET: CARDINAL_BEAST_NAMES_FOR_HAND_VALUE } = require('./_cardinal-shared');
 
 /**
  * Can ANY hero on `pi`'s team currently summon a Cardinal Beast (Lv5
@@ -5716,25 +5800,25 @@ function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
       && canTeamSummonCardinalBeasts(engine, pi)) {
     base = Math.max(base, 100);
   }
-  // Direct-from-deck summon synergy with Cosmic Manipulation. Cards
-  // that opt into `cpuMeta.directDeckSummon` are worth more when CM is
-  // in hand to react to them; CM itself is worth more when a
-  // directDeckSummon trigger is in hand. Generic — any future card
-  // wearing either flag gets the same lift.
+  // Direct-from-deck summon synergy. Cards that opt into
+  // `cpuMeta.directDeckSummon` are worth more when a reactor
+  // (`cpuMeta.directDeckSummonReactor`) is in hand; reactors are
+  // worth more when a summon-trigger is in hand. Cosmic Manipulation
+  // is the canonical reactor — any future card wearing either flag
+  // gets the same +25 lift without per-card branching here.
   const script = loadCardEffect(cardName);
   const ps2 = engine.gs.players[pi];
-  if (script?.cpuMeta?.directDeckSummon || cardName === 'Cosmic Manipulation') {
+  const isSummon = !!script?.cpuMeta?.directDeckSummon;
+  const isReactor = !!script?.cpuMeta?.directDeckSummonReactor;
+  if (isSummon || isReactor) {
     const hand = ps2?.hand || [];
-    const partnerInHand = (() => {
-      if (cardName === 'Cosmic Manipulation') {
-        for (const cn of hand) {
-          if (cn === cardName) continue;
-          if (loadCardEffect(cn)?.cpuMeta?.directDeckSummon) return true;
-        }
-        return false;
-      }
-      return hand.includes('Cosmic Manipulation');
-    })();
+    const partnerInHand = hand.some(cn => {
+      if (cn === cardName) return false;
+      const partnerScript = loadCardEffect(cn);
+      if (isSummon && partnerScript?.cpuMeta?.directDeckSummonReactor) return true;
+      if (isReactor && partnerScript?.cpuMeta?.directDeckSummon) return true;
+      return false;
+    });
     if (partnerInHand) base += 25;
   }
   // ── Kazena draw-engine override ──────────────────────────────────
@@ -6614,8 +6698,6 @@ function evaluateState(engine, cpuIdx) {
   // discard delta to +25 — a bit lower than the others, exactly
   // matching the user-spec'd gradient.
   const REBELLIOKAI_DISCARD_VALUE = 40;
-  const KIRIN_HAND_RESERVE_VALUE  = 15;
-  const KIRIN_NAME = 'Rebelliokai Courtly Kirin';
   const cardDB = engine._getCardDB();
   const rebelScoreFor = (sidePs) => {
     if (!sidePs) return 0;
@@ -6626,43 +6708,43 @@ function evaluateState(engine, cpuIdx) {
         uniqueDiscardNames.add(cn);
       }
     }
-    let kirinHandCopies = 0;
+    // Per-card hand-reserve credit — any Rebelliokai whose script
+    // declares `cpuMeta.rebelliokaiHandReserveValue` contributes that
+    // many points per copy in hand. Kirin opts in (15); future cards
+    // can opt in without per-card branching here.
+    let handReserveTotal = 0;
     for (const cn of (sidePs.hand || [])) {
-      if (cn === KIRIN_NAME) kirinHandCopies++;
+      const v = loadCardEffect(cn)?.cpuMeta?.rebelliokaiHandReserveValue;
+      if (typeof v === 'number') handReserveTotal += v;
     }
     return uniqueDiscardNames.size * REBELLIOKAI_DISCARD_VALUE
-         + kirinHandCopies        * KIRIN_HAND_RESERVE_VALUE;
+         + handReserveTotal;
   };
   score += rebelScoreFor(ps);
   score -= rebelScoreFor(opp);
 
-  // ── First Circle of Hell parity awareness ───────────────────────
-  // While ANY First Circle is in an Area zone, every player's discard
-  // pile gets wiped at the start of their next turn if it currently
-  // holds an ODD number of cards. Discard contents matter to Guardian
-  // Beasts (delete-cost fuel), Mao (re-fire cost), Niu (post-deletion
-  // bonus) etc., so losing the whole pile is a major setback. Apply a
-  // per-card penalty to odd-count own discards so MCTS prefers
-  // playing a card that flips the parity to even before turn end.
-  // The bonus side is smaller — we don't aggressively force opp's
-  // parity since opp can react during their own turn between the
-  // current eval frame and their actual turn-start trigger.
-  const firstCircleActive = engine.cardInstances.some(c =>
-    c.zone === 'area' && c.name === 'The First Circle of Hell'
-  );
-  if (firstCircleActive) {
-    const ownDpLen = ps.discardPile?.length || 0;
-    if (ownDpLen > 0 && (ownDpLen % 2) === 1) score -= 4 * ownDpLen;
-    const oppDpLen = opp.discardPile?.length || 0;
-    if (oppDpLen > 0 && (oppDpLen % 2) === 1) score += 2 * oppDpLen;
+  // ── Active-Area penalties ───────────────────────────────────────
+  // Each Area script may export `cpuMeta.activeAreaPenalty(engine,
+  // ownPs, oppPs)` returning a score delta to fold in while that
+  // Area is on the board. The First Circle of Hell uses this to
+  // penalise own odd-parity discards (loses the whole pile next
+  // turn-start) and slightly credit forcing opp into the same trap.
+  // Future Areas with persistent positional implications wear the
+  // same hook.
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'area') continue;
+    const fn = loadCardEffect(inst.name)?.cpuMeta?.activeAreaPenalty;
+    if (typeof fn !== 'function') continue;
+    try { score += (fn(engine, ps, opp) || 0); } catch { /* ignore */ }
   }
 
-  // ── Cute Hydra damage potential ────────────────────────────────────
-  // Each Head Counter caps the number of distinct targets her HOPT
-  // can hit for 100 each. Useful damage tops out at the count of
-  // viable enemy targets (heroes + creatures), so we credit
-  // 100 × min(heads, viableTargets) as the per-turn damage threat.
-  // Symmetric across sides — opp's loaded Hydra is our future pain.
+  // ── Per-Creature threat score ──────────────────────────────────────
+  // Each owned Creature whose script exports `cpuMeta.threatScore`
+  // contributes to the owner's score (positive when CPU controls it,
+  // negative when opp does). The hook receives the live engine, the
+  // instance, and the count of viable enemy targets against the
+  // OPPOSING player — enough for Hydra-style "min(heads, targets)"
+  // formulas without re-deriving target counts per card.
   const countViableTargetsAgainst = (player) => {
     let n = 0;
     for (const h of (player.heroes || [])) {
@@ -6676,24 +6758,19 @@ function evaluateState(engine, cpuIdx) {
     }
     return n;
   };
-  const hydraDamagePotential = (ownerIdx, opposingPlayer) => {
-    const targets = countViableTargetsAgainst(opposingPlayer);
-    if (targets === 0) return 0;
-    let total = 0;
-    for (const inst of engine.cardInstances) {
-      if (inst.name !== 'Cute Hydra') continue;
-      if (inst.owner !== ownerIdx) continue;
-      if (inst.zone !== 'support') continue;
-      if (inst.faceDown) continue;
-      if (inst.counters?.negated || inst.counters?.nulled) continue;
-      const heads = inst.counters?.headCounter || 0;
-      if (heads <= 0) continue;
-      total += 100 * Math.min(heads, targets);
-    }
-    return total;
-  };
-  score += hydraDamagePotential(cpuIdx, opp);
-  score -= hydraDamagePotential(oppIdx, ps);
+  const targetsAgainstOpp = countViableTargetsAgainst(opp);
+  const targetsAgainstPs  = countViableTargetsAgainst(ps);
+  for (const inst of engine.cardInstances) {
+    const fn = loadCardEffect(inst.name)?.cpuMeta?.threatScore;
+    if (typeof fn !== 'function') continue;
+    const ownerSide = (inst.controller ?? inst.owner);
+    const viable = ownerSide === cpuIdx ? targetsAgainstOpp : targetsAgainstPs;
+    let s = 0;
+    try { s = fn(engine, inst, viable) || 0; } catch { s = 0; }
+    if (!s) continue;
+    if (ownerSide === cpuIdx) score += s;
+    else if (ownerSide === oppIdx) score -= s;
+  }
 
   // Ability totals — cumulative stacked abilities matter more than fresh ones.
   let ownAb = 0, oppAb = 0;
@@ -7055,12 +7132,7 @@ function evaluateState(engine, cpuIdx) {
   //                              needs to be drawn / tutored first
   //   - Can-potentially-complete bonus (all 4 reachable): +400
   // Symmetric penalty when the opponent is progressing.
-  const CARDINAL_BEAST_NAMES = [
-    'Cardinal Beast Baihu',
-    'Cardinal Beast Qinglong',
-    'Cardinal Beast Xuanwu',
-    'Cardinal Beast Zhuque',
-  ];
+  const { CARDINAL_NAMES: CARDINAL_BEAST_NAMES } = require('./_cardinal-shared');
   const scoreCardinalBeasts = (pi) => {
     const pss = gs.players[pi];
     if (!pss) return 0;
@@ -7585,7 +7657,14 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
       || engine._mctsKilledThisTurn
       || cpuPastDeadline(engine)
       || (engine.gs?.turn || 0) >= MCTS_LATE_GAME_TURN_THRESHOLD) {
-    try { await actionFn(); return true; }
+    // Skip the hardcap inside nested rollouts — those already inherit the
+    // outer LIVE call's deadline and Promise.race here would needlessly
+    // arm a second timer per nested activation.
+    if (engine._inMctsSim) {
+      try { await actionFn(); return true; }
+      catch { return false; }
+    }
+    try { await _runWithCardHardcap(engine, desc, actionFn); return true; }
     catch { return false; }
   }
 
@@ -7763,7 +7842,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
 
   if (best.plan) engine._mctsTargetPlan = [...best.plan];
   try {
-    await actionFn();
+    await _runWithCardHardcap(engine, desc, actionFn);
   } finally {
     delete engine._mctsTargetPlan;
   }
@@ -7777,7 +7856,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
       // policy: commit the action (best-effort) so the live turn
       // progresses with the heuristic action still applied.
       console.error(`[MCTS overload in gate "${desc}"] ${err.message}`);
-      try { await actionFn(); return true; }
+      try { await _runWithCardHardcap(engine, desc, actionFn); return true; }
       catch { return false; }
     }
     throw err;
@@ -8323,4 +8402,4 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
   return best;
 }
 
-module.exports = { runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions };
+module.exports = { runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn };

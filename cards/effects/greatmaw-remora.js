@@ -70,7 +70,7 @@ module.exports = {
 
       // No real Action available → the inherent path is the only way
       // Remora could be here → auto-free, lock applies, no prompt.
-      if (!engine.hasSpendableActionFor(pi, heroIdx)) {
+      if (!engine.hasSpendableActionFor(pi, heroIdx, CARD_NAME)) {
         applyLock();
         return;
       }
@@ -91,7 +91,7 @@ module.exports = {
         cancellable: true,
       });
 
-      if (spendAction && engine.consumeRealActionFor(pi, heroIdx)) {
+      if (spendAction && engine.consumeRealActionFor(pi, heroIdx, CARD_NAME)) {
         engine.log('greatmaw_remora_paid_action', { player: ps.username });
       } else {
         // Chose the free summon, OR chose to pay but no Action could

@@ -27,4 +27,13 @@ const CARD_NAME = 'Grinning Cat';
 module.exports = {
   activeIn: ['support'],
   revealOnEnterHand: true,
+  // Generic opt-in honoured by `engine.getSummonBlocked(pi)`. While
+  // any copy of this card is in `pi`'s hand, every Creature in that
+  // hand whose name is NOT this card's name is added to the blocked
+  // list. Big Gwen Guard's self-reveal suppression lifts it.
+  handSummonLockExceptSelf: true,
+  // Empty hooks bag keeps the loader from culling this module — the
+  // gate above is read via `loadCardEffect`, and the loader rejects
+  // modules with no recognised type/hook flag.
+  hooks: {},
 };

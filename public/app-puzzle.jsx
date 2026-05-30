@@ -1058,6 +1058,13 @@ function PuzzleCreator() {
   // server-side via `grantInheritedAbility` from `_sparkfly-shared`. Null
   // when the open editor target isn't a Sparkfly Queen.
   const [editSparkflyGifts, setEditSparkflyGifts] = useState(null);
+  // For Anti Magic: the level (1/2/3) of Spell immunity it grants the
+  // host Hero. Stored under `_creatureStatuses[hi-slot].antiMagicLevel`
+  // and applied server-side as both `inst.counters.antiMagicLevel` AND
+  // the host Hero's `buffs.magic_immune.level`, so the badge tooltip
+  // and target-filter both use the authored level. Null when the open
+  // editor target isn't an Anti Magic.
+  const [editAntiMagicLevel, setEditAntiMagicLevel] = useState(null);
   // Cards whose puzzle starting state can include Change Counters.
   // Hardcoded here because the script-side `cpuMeta.counterConsumer`
   // flag isn't reachable from the client; mirrors the convention used
@@ -1150,6 +1157,13 @@ function PuzzleCreator() {
             attendant: !!cs._sparkflyGiftFlags?.attendant,
             worker:    !!cs._sparkflyGiftFlags?.worker,
           }
+        : null);
+      // Anti Magic: hydrate the immunity level (1/2/3). Default to 1
+      // when no level is saved yet so the picker has a sensible
+      // starting point. Null for non-Anti-Magic targets so the editor
+      // section stays hidden.
+      setEditAntiMagicLevel(c?.name === 'Anti Magic'
+        ? Math.max(1, Math.min(3, cs.antiMagicLevel || 1))
         : null);
     }
   }, [players, getCard]);
@@ -1282,11 +1296,19 @@ function PuzzleCreator() {
           worker:    !!editSparkflyGifts.worker,
         };
       }
+      // Anti Magic: persist the immunity level. Server applies it as
+      // `inst.counters.antiMagicLevel` AND stamps the host Hero's
+      // `buffs.magic_immune.level` so the badge + target-filter both
+      // read the authored level.
+      delete merged.antiMagicLevel;
+      if (c?.name === 'Anti Magic' && editAntiMagicLevel != null) {
+        merged.antiMagicLevel = Math.max(1, Math.min(3, editAntiMagicLevel));
+      }
       p._creatureStatuses[hi + '-' + slot] = merged;
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editBalanceCounter, editSparkflyGifts, updatePlayer, getCard]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editBalanceCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -1593,14 +1615,14 @@ function PuzzleCreator() {
                 {hero ? <>
                   <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" />
                   {hero.statuses?.frozen && <FrozenOverlay />}
-                  {hero.statuses?.stunned && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
+                  {(hero.statuses?.stunned || hero.statuses?.webbed) && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
                   {hero.statuses?.negated && <NegatedOverlay />}
                   {hero.statuses?.burned && <BurnedOverlay />}
                   {hero.statuses?.poisoned && <PoisonedOverlay stacks={hero.statuses.poisoned.stacks || 1} />}
                   {hero.statuses?.healReversed && <HealReversedOverlay />}
                   {hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                   {hero.statuses?.immune && !hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
-                  {(hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.burned || hero.statuses?.poisoned || hero.statuses?.negated || hero.statuses?.nulled || hero.statuses?.healReversed || hero.statuses?.untargetable || hero.statuses?.charmed || hero.statuses?.bound || hero._extraLife) &&
+                  {(hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.burned || hero.statuses?.poisoned || hero.statuses?.negated || hero.statuses?.nulled || hero.statuses?.healReversed || hero.statuses?.untargetable || hero.statuses?.charmed || hero.statuses?.bound || hero._extraLife) &&
                     <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} isHero={true} />}
                   {hero.buffs && <BuffColumn buffs={hero.buffs} />}
                 </> : <div className="board-zone-empty">Hero</div>}
@@ -2273,6 +2295,33 @@ function PuzzleCreator() {
                 </button>
               );
             })()}
+            {/* Anti Magic Level picker — visible only when the edit
+                target is an Anti Magic Spell. Stamps `antiMagicLevel`
+                into `_creatureStatuses[hi-slot]`, which the server's
+                puzzle loader applies as both `inst.counters.antiMagicLevel`
+                AND the host Hero's `buffs.magic_immune.level` so the
+                Spell-targeting filter + buff badge tooltip read the
+                authored level. */}
+            {!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard?.name === 'Anti Magic' && editAntiMagicLevel != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  🛡️ Anti Magic Immunity Level
+                </span>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  {[1, 2, 3].map(lv => {
+                    const active = editAntiMagicLevel === lv;
+                    return (
+                      <button key={lv} className={'btn ' + (active ? 'btn-success' : '')}
+                        style={{ flex: 1, padding: '10px 0', fontSize: 12, borderColor: active ? '#44dd66' : 'var(--bg4)' }}
+                        onClick={() => setEditAntiMagicLevel(lv)}>
+                        Level {lv}
+                        <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>Immune to ≤ Lv{lv} Spells</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {/* Cute Hydra Head Counter editor — visible only when the
                 edit target is a Cute Hydra. Stamps `headCounter` into
                 `_creatureStatuses[hi-slot]`, which the server's puzzle
@@ -2462,38 +2511,64 @@ function PuzzleCreator() {
                 </div>
               );
             })()}
-            {!isBiomancyTokenEdit && (
-            <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-              <label style={{ flex: 1 }}>
-                <span style={{ fontSize: 10, color: '#ff4466', fontWeight: 700 }}>HP</span>
-                <input className="input" type="number" value={editHp} onChange={(e) => setEditHp(e.target.value)}
-                  style={{ width: '100%', marginTop: 4 }} onKeyDown={(e) => e.key === 'Enter' && saveStats()} autoFocus />
-              </label>
-              {editTarget.zt === 'hero' && (
-                <label style={{ flex: 1 }}>
-                  <span style={{ fontSize: 10, color: '#ff8844', fontWeight: 700 }}>MAX HP</span>
-                  <input className="input" type="number" value={editMaxHp} onChange={(e) => setEditMaxHp(e.target.value)}
-                    style={{ width: '100%', marginTop: 4 }} onKeyDown={(e) => e.key === 'Enter' && saveStats()} />
-                </label>
-              )}
-              {editTarget.zt === 'hero' && (
-                <label style={{ flex: 1 }}>
-                  <span style={{ fontSize: 10, color: '#aabbcc', fontWeight: 700 }}>ATK</span>
-                  <input className="input" type="number" value={editAtk} onChange={(e) => setEditAtk(e.target.value)}
-                    style={{ width: '100%', marginTop: 4 }} onKeyDown={(e) => e.key === 'Enter' && saveStats()} />
-                </label>
-              )}
-            </div>
-            )}
+            {/* HP / Max HP / ATK row — hidden for Biomancy Tokens
+                (level fully determines stats) AND for Attachments /
+                Equipment Artifacts that aren't ALSO subtype Creature.
+                Pollution Spewer and any other Artifact-Creature hybrid
+                keeps HP because its Creature subtype means it has a
+                real HP stat. Anti Magic / Overheal Shock / etc. — pure
+                Attachments — have no HP to edit. */}
+            {(() => {
+              const sub = (_editCard?.subtype || '').toLowerCase();
+              const subtypeIsCreature = sub.split('/').map(s => s.trim()).includes('creature');
+              const isAttachmentEdit = editTarget.zt === 'support'
+                && _editCard?.cardType === 'Spell'
+                && sub === 'attachment';
+              const isEquipEdit = editTarget.zt === 'support'
+                && _editCard?.cardType === 'Artifact'
+                && sub === 'equipment';
+              const hideHp = isBiomancyTokenEdit
+                || ((isAttachmentEdit || isEquipEdit) && !subtypeIsCreature);
+              if (hideHp) return null;
+              return (
+                <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+                  <label style={{ flex: 1 }}>
+                    <span style={{ fontSize: 10, color: '#ff4466', fontWeight: 700 }}>HP</span>
+                    <input className="input" type="number" value={editHp} onChange={(e) => setEditHp(e.target.value)}
+                      style={{ width: '100%', marginTop: 4 }} onKeyDown={(e) => e.key === 'Enter' && saveStats()} autoFocus />
+                  </label>
+                  {editTarget.zt === 'hero' && (
+                    <label style={{ flex: 1 }}>
+                      <span style={{ fontSize: 10, color: '#ff8844', fontWeight: 700 }}>MAX HP</span>
+                      <input className="input" type="number" value={editMaxHp} onChange={(e) => setEditMaxHp(e.target.value)}
+                        style={{ width: '100%', marginTop: 4 }} onKeyDown={(e) => e.key === 'Enter' && saveStats()} />
+                    </label>
+                  )}
+                  {editTarget.zt === 'hero' && (
+                    <label style={{ flex: 1 }}>
+                      <span style={{ fontSize: 10, color: '#aabbcc', fontWeight: 700 }}>ATK</span>
+                      <input className="input" type="number" value={editAtk} onChange={(e) => setEditAtk(e.target.value)}
+                        style={{ width: '100%', marginTop: 4 }} onKeyDown={(e) => e.key === 'Enter' && saveStats()} />
+                    </label>
+                  )}
+                </div>
+              );
+            })()}
             {/* Equip-Artifact edit targets restrict the buff picker to
                 the Anti-Magic-Enchantment buff and hide all Status Effects.
+                Attachment-Spell edit targets hide BOTH sections entirely
+                (Attachments don't carry status/buff state of their own).
                 Biomancy Token edit targets hide both sections entirely. */}
-            {/* ── Status Effects ── (hidden for Equip Artifacts & Biomancy Tokens) */}
+            {/* ── Status Effects ── (hidden for Equip Artifacts, Attachment Spells & Biomancy Tokens) */}
             {!isBiomancyTokenEdit && !(editTarget.zt === 'support' && (() => {
               const p = players[editTarget.si];
               const cards = p.supportZones[editTarget.hi]?.[editTarget.slot] || [];
               const c = cards.length ? getCard(cards[0]) : null;
-              return c && c.cardType === 'Artifact' && (c.subtype || '').toLowerCase() === 'equipment';
+              if (!c) return false;
+              const sub = (c.subtype || '').toLowerCase();
+              const isEquip = c.cardType === 'Artifact' && sub === 'equipment';
+              const isAttachment = c.cardType === 'Spell' && sub === 'attachment';
+              return isEquip || isAttachment;
             })()) && (
             <div style={{ marginBottom: 14 }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>Status Effects</span>
@@ -2538,8 +2613,13 @@ function PuzzleCreator() {
               </div>
             </div>
             )}
-            {/* ── Buffs ── (hidden for Biomancy Tokens) */}
-            {!isBiomancyTokenEdit && (
+            {/* ── Buffs ── (hidden for Biomancy Tokens & Attachment Spells) */}
+            {!isBiomancyTokenEdit && !(editTarget.zt === 'support' && (() => {
+              const p = players[editTarget.si];
+              const cards = p.supportZones[editTarget.hi]?.[editTarget.slot] || [];
+              const c = cards.length ? getCard(cards[0]) : null;
+              return c && c.cardType === 'Spell' && (c.subtype || '').toLowerCase() === 'attachment';
+            })()) && (
             <div style={{ marginBottom: 14 }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>Buffs</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>

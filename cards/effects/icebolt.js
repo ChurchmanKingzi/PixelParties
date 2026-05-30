@@ -61,14 +61,21 @@ module.exports = {
 
       await engine._delay(300);
 
-      // Deal 120 damage
+      // Deal 120 damage. Capture cancellation so the Freeze rider
+      // skips when the hit was fully negated by a reaction (Idej
+      // Projection, Spectral Armor zero-cap, Anti Magic void) —
+      // "negate that damage AND all associated effects" covers the
+      // freeze. `ctx.dealDamage` is the engine's bound wrapper around
+      // `actionDealDamage` and returns the same `{ dealt, cancelled }`
+      // shape.
       if (target.type === 'hero') {
         const hero = gs.players[target.owner].heroes[target.heroIdx];
         if (hero && hero.hp > 0) {
-          await ctx.dealDamage(hero, 120, 'destruction_spell');
-
-          // Freeze the hero if still alive
-          if (hero.hp > 0) {
+          const r = await ctx.dealDamage(hero, 120, 'destruction_spell');
+          if (r?.cancelled) {
+            engine.log('icebolt_rider_skipped', { reason: 'damage_cancelled' });
+          } else if (hero.hp > 0) {
+            // Freeze the hero if still alive
             await engine.addHeroStatus(target.owner, target.heroIdx, 'frozen', {
               appliedBy: pi,
               animationType: 'freeze',
@@ -81,22 +88,26 @@ module.exports = {
           c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst) {
-          await engine.actionDealCreatureDamage(
+          const r = await engine.actionDealCreatureDamage(
             { name: 'Icebolt', owner: pi, heroIdx },
             inst, 120, 'destruction_spell',
             { sourceOwner: pi, canBeNegated: true },
           );
 
-          // Freeze the creature if still on the board. Routed through
-          // applyCreatureStatus so ON_STATUS_APPLIED fires (Bear Rider /
-          // Chilly Wizard / Colored Snow / future listeners).
-          const stillAlive = engine.cardInstances.find(c => c.id === inst.id && c.zone === 'support');
-          if (stillAlive) {
-            const applied = await engine.applyCreatureStatus(stillAlive, 'frozen', {
-              sourceOwner: pi,
-              source: 'Icebolt',
-            });
-            if (applied) engine.log('freeze', { target: inst.name, by: 'Icebolt', type: 'creature' });
+          if (r?.cancelled) {
+            engine.log('icebolt_rider_skipped', { reason: 'damage_cancelled' });
+          } else {
+            // Freeze the creature if still on the board. Routed through
+            // applyCreatureStatus so ON_STATUS_APPLIED fires (Bear Rider /
+            // Chilly Wizard / Colored Snow / future listeners).
+            const stillAlive = engine.cardInstances.find(c => c.id === inst.id && c.zone === 'support');
+            if (stillAlive) {
+              const applied = await engine.applyCreatureStatus(stillAlive, 'frozen', {
+                sourceOwner: pi,
+                source: 'Icebolt',
+              });
+              if (applied) engine.log('freeze', { target: inst.name, by: 'Icebolt', type: 'creature' });
+            }
           }
         }
       }

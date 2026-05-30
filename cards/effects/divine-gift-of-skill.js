@@ -93,6 +93,18 @@ module.exports = {
         gs._spellCancelled = true;
         return;
       }
+      // Anti-Magic protection: gate the whole Hero effect (bonus
+      // attachments + skill lock + blessed_skill buff are one indivisible
+      // grant per the card text). Direct-assignment paths below would
+      // bypass the engine's `addHeroStatus` / `actionAddBuff` gates, so
+      // mirror them here. `Divine Gift of Skill` is printed Lv 0 — a
+      // Lv 1+ Anti Magic on the target Hero covers it.
+      if (engine._isHeroSpellProtected(hero, 'Divine Gift of Skill')) {
+        engine.log('spell_blocked', { target: hero.name, source: 'Divine Gift of Skill', reason: 'magic_immune' });
+        engine._playAntiMagicBlockedAnim(hero);
+        engine.sync();
+        return;
+      }
 
       // Grant bonus ability attachments. Stacks if multiple cards somehow apply.
       if (!ps._bonusAbilityAttachments) ps._bonusAbilityAttachments = {};

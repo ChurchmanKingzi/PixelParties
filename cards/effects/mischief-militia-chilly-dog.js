@@ -79,6 +79,14 @@ function _refreshOwnSide(engine, pi) {
 
 module.exports = {
   activeIn: ['support'],
+  // Engine-level opt-in honoured by `_isFrozenSilenceLifted(pi)`. While
+  // any face-up Support Zone card on `pi`'s side carries this flag AND
+  // is itself active (not negated / stunned / nulled / face-down /
+  // attached to a dead Hero), Frozen Heroes / Abilities / Creatures
+  // on that side keep firing passives and remain activatable. Stunned
+  // / Negated / Nulled still silence. Frozen Heroes still can't
+  // perform Actions — that gate is enforced separately.
+  liftsFrozenSilenceForOwnSide: true,
 
   cpuMeta: {
     onDeathBenefit: 0,

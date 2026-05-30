@@ -94,6 +94,18 @@ module.exports = {
 
       if (targetSlot < 0) return;
 
+      // ── Anti Magic gate ──
+      // Intrude is a Lv 0 Spell — any Anti Magic Lv 1+ attached to
+      // the caster's chosen host Hero covers it. Bail BEFORE the
+      // support-zone push so the server's standard post-resolve path
+      // routes the card to the caster's discard.
+      const destHeroObj = ps?.heroes?.[targetHero];
+      if (destHeroObj && engine._isHeroSpellProtected(destHeroObj, 'Intrude')) {
+        engine.log('equip_blocked', { card: 'Intrude', target: destHeroObj.name, reason: 'magic_immune' });
+        engine._playAntiMagicBlockedAnim(destHeroObj);
+        return;
+      }
+
       // Place in support zone
       if (!ps.supportZones[targetHero]) ps.supportZones[targetHero] = [[], [], []];
       if (!ps.supportZones[targetHero][targetSlot]) ps.supportZones[targetHero][targetSlot] = [];

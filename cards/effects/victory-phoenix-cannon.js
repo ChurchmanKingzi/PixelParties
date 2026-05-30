@@ -118,19 +118,16 @@ module.exports = {
         // hand-active reducers / per-slot offsets).
         const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
         if (lvl > 1) continue;
-        // Check hero has required spell schools for this spell
-        const abZones = ps.abilityZones[heroIdx] || [];
-        const countAb = (school) => {
-          let c = 0;
-          for (const s of abZones) {
-            if (!s || s.length === 0) continue;
-            const base = s[0];
-            for (const a of s) { if (a === school) c++; else if (a === 'Performance' && base === school) c++; }
-          }
-          return c;
-        };
-        if (cd.spellSchool1 && countAb(cd.spellSchool1) < lvl) continue;
-        if (cd.spellSchool2 && countAb(cd.spellSchool2) < lvl) continue;
+        // Check hero has required spell schools for this spell. Caster-
+        // aware so when VPC itself is cast through a "as if school N"
+        // provider (Demon's Gate sets `gs._castSchoolOverride` for the
+        // duration of VPC's own onPlay), the bonus-spell eligibility
+        // honours the same elevated level rather than reading the host
+        // hero's actual stack count.
+        if (cd.spellSchool1
+            && engine.effectiveSchoolLevelForCaster(cd.spellSchool1, pi, heroIdx) < lvl) continue;
+        if (cd.spellSchool2
+            && engine.effectiveSchoolLevelForCaster(cd.spellSchool2, pi, heroIdx) < lvl) continue;
         seen.add(cardName);
         eligibleSpells.push({ name: cardName, source: 'hand' });
       }

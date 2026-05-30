@@ -14,165 +14,72 @@ module.exports = {
   isTargetingArtifact: true,
   deferBroadcast: true,
 
-  // ── CPU prompt routing (BOTH prompts MCTS-driven) ──────────────────
-  // The default brain scores ability targets at 0 and falls back to a
-  // random pick — and worse, it picked the CPU's main-carry Hero as
-  // the "yeeter" (the 150-damage payer) just to remove an unimportant
-  // card, killing its own win condition. Both prompts are now routed
-  // through MCTS:
+  // ── CPU prompt routing (fast heuristic, NO nested MCTS) ───────────
+  // Previous implementation routed both prompts through nested MCTS
+  // (`mctsPickFromOptions`), which spun several full rest-of-turn
+  // rollouts per option per prompt — long enough to time out the live
+  // CPU turn (15+ min freezes observed). Replaced with a fast scoring
+  // heuristic:
   //
-  //   1. Hero picker (which OWN Hero takes 150 self-damage). For each
-  //      candidate Hero the rollout deals 150 artifact damage and
-  //      plays out the rest of the turn — heroes whose loss tanks the
-  //      evaluator (carries, key-passive Heroes, undamaged frontliners)
-  //      score badly, leaving expendable / high-HP Heroes as the
-  //      surviving picks. The board target the SECOND prompt picks is
-  //      identical across hero candidates so it cancels out of the
-  //      ranking — skip simulating the destroy here.
+  //   • Yeeter pick: highest current HP own Hero that survives the
+  //     150 self-damage (HP ≥ 151). If none would survive, pick the
+  //     highest HP anyway (rare; better than abstaining).
   //
-  //   2. Board target picker (which non-Hero card to destroy). The
-  //      per-candidate apply simulates the destroy + plays out the
-  //      rest of the turn, and the evaluator captures all of "deck has
-  //      8 copies of this Ability = very needed", "removing Support
-  //      Magic 2 with no Lv2+ Support Spell in deck = wasted", and
-  //      "highest-level version is more valuable" naturally — no
-  //      hardcoded heuristic to maintain.
-  //
-  // Both branches share the nested-MCTS guard (`_inMctsSim` /
-  // `_mctsKilledThisTurn`) and lazy-load `mctsPickFromOptions` to
-  // avoid circular imports.
+  //   • Destroy pick: per-type value table. Areas use cost×10 (×0.25
+  //     when opp has Cooldin alive — he tutors Areas cheaply, so
+  //     denial is much less valuable). Abilities use level×100 but
+  //     are EXCLUDED entirely when another living enemy Hero has the
+  //     same Ability at equal-or-higher level (redundant). Creatures
+  //     prefer `_cpuStats.damageLastTurn` (true performance signal)
+  //     and fall back to HP+ATK*2 when no track record exists. Other
+  //     types use cost-scaled fallbacks. Cancellable prompt declines
+  //     when no positive-value target exists.
   cpuResponse(engine, kind, payload) {
     if (kind !== 'target') return undefined;
-    const { validTargets, config } = payload || {};
+    const { validTargets } = payload || {};
     if (!Array.isArray(validTargets) || validTargets.length === 0) return undefined;
-
-    // Inside an outer rollout — defer (no nested MCTS).
-    if (engine._inMctsSim || engine._mctsKilledThisTurn) return undefined;
 
     const cpuIdx = engine._cpuPlayerIdx;
     if (cpuIdx < 0) return undefined;
 
-    let mctsPick;
-    try { ({ mctsPickFromOptions: mctsPick } = require('./_cpu')); }
-    catch { mctsPick = null; }
-    if (typeof mctsPick !== 'function') return undefined;
-
-    // Distinguish the two prompts by content: the OWN-hero picker has
-    // only `type === 'hero'` entries on the controller's side; the
-    // board-target picker mixes equips / abilities / permanents / areas.
     const hasNonHero = validTargets.some(t => t.type && t.type !== 'hero');
 
-    // ── Prompt 1: hero picker ────────────────────────────────────────
+    // ── Prompt 1: yeeter pick (own Hero takes 150 self-damage) ───────
     if (!hasNonHero) {
-      // Only consider our own living Heroes (defensive — getValidTargets
-      // already restricts this, but the prompt response is auth-side
-      // so re-filter).
       const heroOpts = validTargets.filter(t =>
         t.type === 'hero' && t.owner === cpuIdx,
       );
       if (heroOpts.length === 0) return undefined;
       if (heroOpts.length === 1) return [heroOpts[0].id];
 
-      return (async () => {
-        const applyHero = async (eng, target) => {
-          const m = (target.id || '').match(/^hero-(\d+)-(\d+)$/);
-          if (!m) return false;
-          const o = +m[1], hi = +m[2];
-          const hero = eng.gs.players[o]?.heroes?.[hi];
-          if (!hero?.name || hero.hp <= 0) return false;
-          // Simulate ONLY the 150 self-damage. The chosen board target
-          // is the same across all hero candidates (resolved by the
-          // next prompt), so its destroy-value cancels out of the
-          // ranking. What remains is each candidate's post-damage
-          // value — a carry that dies here makes the rest-of-turn
-          // rollout score terribly, naturally steering the pick to
-          // an expendable Hero.
-          const src = { name: 'The Yeeting (sim)', owner: cpuIdx, heroIdx: hi };
-          try { await eng.actionDealDamage(src, hero, 150, 'artifact'); } catch {}
-          return true;
-        };
-        let best = null;
-        try { best = await mctsPick(engine, heroOpts, applyHero); }
-        catch { best = null; }
-        if (!best) return undefined;
-        return [best.id];
-      })();
+      const ps = engine.gs.players[cpuIdx];
+      const survivors = heroOpts.filter(t => (ps.heroes?.[t.heroIdx]?.hp || 0) > 150);
+      const pool = survivors.length > 0 ? survivors : heroOpts;
+      let bestHp = -1, picked = null;
+      for (const t of pool) {
+        const hp = ps.heroes?.[t.heroIdx]?.hp || 0;
+        if (hp > bestHp) { bestHp = hp; picked = t; }
+      }
+      return picked ? [picked.id] : undefined;
     }
 
-    // Pre-filter to viable opponent-side candidates. Self-targeting
-    // own equips/abilities almost never scores positively (it just
-    // discards our own value), and immune cards can't be destroyed.
+    // ── Prompt 2: destroy pick (most valuable enemy card) ────────────
     const viable = validTargets.filter(t => {
       if (t.owner === cpuIdx) return false;
       if (t._cardInstance?.counters?.immovable) return false;
       return true;
     });
-    // Nothing useful to hit on the enemy side — let the default brain
-    // decline (cancellable) or fall back.
     if (viable.length === 0) return undefined;
-    if (viable.length === 1) return [viable[0].id];
 
-    return (async () => {
-      // Resolve a target back to its current cardInstance by ID pattern.
-      // The id encodes everything we need; doing this each rollout
-      // tolerates snapshot/restore mutations to the inst array.
-      const findInst = (eng, target) => {
-        const id = target.id || '';
-        // equip-{owner}-{heroIdx}-{slotIdx}
-        let m = id.match(/^equip-(\d+)-(\d+)-(\d+)$/);
-        if (m) {
-          const o = +m[1], h = +m[2], s = +m[3];
-          return eng.cardInstances.find(c =>
-            c.zone === 'support' && c.owner === o && c.heroIdx === h && c.zoneSlot === s);
-        }
-        // ability-{owner}-{heroIdx}-{slotIdx}
-        m = id.match(/^ability-(\d+)-(\d+)-(\d+)$/);
-        if (m) {
-          const o = +m[1], h = +m[2], s = +m[3];
-          return eng.cardInstances.find(c =>
-            c.zone === 'ability' && c.owner === o && c.heroIdx === h && c.zoneSlot === s);
-        }
-        // perm-{owner}-{permId}
-        m = id.match(/^perm-(\d+)-(.+)$/);
-        if (m) {
-          const o = +m[1], pid = m[2];
-          return eng.cardInstances.find(c =>
-            c.zone === 'permanent' && c.owner === o
-            && (String(c.counters?.permId) === pid || String(c.id) === pid));
-        }
-        // area-{owner}
-        m = id.match(/^area-(\d+)$/);
-        if (m) {
-          const o = +m[1];
-          return eng.cardInstances.find(c => c.zone === 'area' && c.owner === o);
-        }
-        // surprise: equip-{owner}-{heroIdx}-surprise
-        m = id.match(/^equip-(\d+)-(\d+)-surprise$/);
-        if (m) {
-          const o = +m[1], h = +m[2];
-          return eng.cardInstances.find(c =>
-            c.zone === 'surprise' && c.owner === o && c.heroIdx === h);
-        }
-        return null;
-      };
-
-      const apply = async (eng, target) => {
-        const inst = findInst(eng, target);
-        if (!inst) return false;
-        // The 150 self-damage to the chosen yeeter is constant across
-        // every candidate (the yeeter was picked by the prior prompt),
-        // so it cancels out of the ranking — skip simulating it.
-        const src = { name: 'The Yeeting (sim)', owner: cpuIdx };
-        try { await eng.actionDestroyCard(src, inst); } catch {}
-        return true;
-      };
-
-      let best = null;
-      try { best = await mctsPick(engine, viable, apply); }
-      catch { best = null; }
-      if (!best) return undefined;
-      return [best.id];
-    })();
+    let bestScore = -Infinity, pickedId = null;
+    for (const t of viable) {
+      const score = _scoreEnemyCard(engine, t);
+      if (score > bestScore) { bestScore = score; pickedId = t.id; }
+    }
+    // Nothing scored positively → decline the cancellable prompt rather
+    // than waste the 150 self-damage destroying a worthless card.
+    if (pickedId == null || bestScore <= 0) return undefined;
+    return [pickedId];
   },
 
   canActivate(gs, pi) {
@@ -355,6 +262,98 @@ module.exports = {
 };
 
 // ── HELPERS ──
+
+const COOLDIN_NAME = 'Cooldin, King of Coolness';
+
+/**
+ * Per-type value score for an enemy board card. Used by the Yeeting
+ * heuristic to pick the highest-value destroy target. Returns a
+ * non-negative number; 0 means "don't bother" (the cancellable prompt
+ * declines if nothing scores positive).
+ *
+ * Type weights are calibrated against the existing eval scale (1 hp
+ * damage ≈ 1 score unit) so future destroy effects (Dark Gear et al.)
+ * can reuse the same numbers without divergence.
+ */
+function _scoreEnemyCard(engine, target) {
+  const inst = target._cardInstance;
+  if (!inst) return 0;
+  const cardDB = engine._getCardDB();
+  const cd = cardDB[inst.name];
+  if (!cd) return 0;
+  const gs = engine.gs;
+  const oppIdx = inst.owner;
+  const opp = gs.players[oppIdx];
+  if (!opp) return 0;
+  const cost = cd.cost || 0;
+
+  // Areas — high value normally; gutted to 0.25× when opp has Cooldin
+  // alive (he tutors Areas for ~free, so removal is easily replaced).
+  if (target.type === 'area') {
+    const cooldinAlive = (opp.heroes || []).some(h =>
+      h?.name === COOLDIN_NAME && h.hp > 0);
+    const base = Math.max(60, cost * 10);
+    return cooldinAlive ? base * 0.25 : base;
+  }
+
+  // Surprises — face-down, unknown contents. Treat as flat moderate
+  // value: typical Surprises cause 200–400 swing (Booby Trap = 100 +
+  // burn-all, Bear Trap = bind, etc.). 200 is a conservative midpoint.
+  if (target.type === 'equip' && inst.zone === 'surprise') return 200;
+
+  // Abilities — REDUNDANCY GATE: if another living enemy Hero already
+  // has the same Ability at equal-or-higher level, removing this copy
+  // is wasted (the team's effective level is unchanged). Skip entirely.
+  if (target.type === 'ability') {
+    const heroIdx = inst.heroIdx;
+    const slotIdx = inst.zoneSlot;
+    const slot = opp.abilityZones?.[heroIdx]?.[slotIdx] || [];
+    const level = slot.length;
+    if (level <= 0) return 0;
+    const abilityName = inst.name;
+    for (let h = 0; h < (opp.heroes || []).length; h++) {
+      if (h === heroIdx) continue;
+      const otherHero = opp.heroes[h];
+      if (!otherHero?.name || otherHero.hp <= 0) continue;
+      const otherZones = opp.abilityZones?.[h] || [];
+      for (const otherSlot of otherZones) {
+        if ((otherSlot || [])[0] !== abilityName) continue;
+        if ((otherSlot.length || 0) >= level) return 0; // redundant copy
+      }
+    }
+    return level * 100;
+  }
+
+  // Support-zone cards: Creatures vs. Equipment.
+  if (target.type === 'equip' && inst.zone === 'support') {
+    const isCreature = cd.cardType === 'Creature'
+      || (cd.cardType === 'Artifact' && (cd.subtype || '').toLowerCase().split('/').some(t => t.trim() === 'creature'));
+    if (isCreature) {
+      // Prefer the real damage-dealt ledger from the CPU stats system
+      // (creature instance counters, updated by recordDamageDealt).
+      const stats = inst.counters?._cpuStats;
+      const dmgLast = stats?.damageLastTurn || 0;
+      if (dmgLast > 0) return 100 + dmgLast;
+      // No track record yet — use HP+ATK as a static threat proxy.
+      const hp = inst.hp ?? cd.hp ?? 0;
+      const atk = inst.atk ?? cd.atk ?? 0;
+      return 30 + hp + atk * 2;
+    }
+    // Equipment — cost is the best static proxy ("opp paid N gold to
+    // get this benefit, denying it is ≈ N gold of tempo"). The +30
+    // baseline keeps cost-0 equips from scoring zero.
+    return 30 + cost * 5;
+  }
+
+  // Permanents — global persistent effects, generally meaningful.
+  if (target.type === 'perm') return 50 + cost * 5;
+
+  // Coolness-stack top — small but non-zero.
+  if (target.type === 'coolnessStackTop') return 20;
+
+  // Fallback: cost proxy.
+  return cost || 10;
+}
 
 function _hasNonHeroCards(gs) {
   for (let p = 0; p < 2; p++) {

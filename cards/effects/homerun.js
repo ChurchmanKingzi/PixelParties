@@ -143,6 +143,11 @@ module.exports = {
      */
     beforeDamage: (ctx) => {
       if (ctx.cancelled) return;
+      // Piercing damage (Ida etc.) bypasses Homerun!. Bail BEFORE
+      // consuming the mark so a future non-piercing hit of ≥maxHp
+      // can still trigger the rescue. The engine's safety net would
+      // otherwise undo the cancellation, but the mark would be lost.
+      if (ctx.cannotBeNegated) return;
       const target = ctx.target;
       if (!target || target.hp === undefined) return;
       if (!(ctx.amount > 0)) return;

@@ -138,7 +138,16 @@ function loadCardEffect(cardName) {
         'canActivate',
       ];
       const hasPassiveGate = PASSIVE_GATE_FNS.some(k => typeof mod[k] === 'function');
-      if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !mod.reduceSpellLevel && !mod.reduceCardLevel && !mod.coverLevelGap && !hasPassiveGate && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
+      // Action-economy / summon-cost entry points. Cards that ONLY plug
+      // into these (Brain Spider: surprise-cost free-Action summon, no
+      // other hooks) are still real effect scripts — the engine consults
+      // `inherentAction` from `getHeroPlayableCards` and `beforeSummon`
+      // from `doPlayCreature`. Without this bucket, a script that just
+      // spreads `makeSurpriseCostSummon` would be nulled out here and
+      // `loadCardEffect` would return null, breaking highlight + play.
+      const hasEngineEntry = (typeof mod.inherentAction === 'function' || mod.inherentAction === true)
+        || typeof mod.beforeSummon === 'function';
+      if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !mod.reduceSpellLevel && !mod.reduceCardLevel && !mod.coverLevelGap && !hasPassiveGate && !hasEngineEntry && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
         console.warn(`[Loader] Card "${cardName}" (${normalized}.js) has no hooks, effects, or card type flags — ignored.`);
         mod = null;
       }

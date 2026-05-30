@@ -13,12 +13,15 @@ const ATK_PER_LEVEL = [10, 10, 20]; // Index 0 = 1st copy, etc.
 function applyBonus(engine, card, hero, ownerIdx, heroIdx, copyIndex) {
   const bonus = ATK_PER_LEVEL[Math.min(copyIndex, ATK_PER_LEVEL.length - 1)];
 
-  hero.atk = (hero.atk || 0) + bonus;
+  // Routed through the engine's canonical ATK delta helper so the
+  // Curse suppression gate fires uniformly — a cursed Hero's
+  // visible ATK stays at 0 and the bonus lands in the hidden
+  // accumulator instead. The card-instance counter is always set
+  // (the cleanse / leave-zone path will pull it from there to know
+  // how much to revoke).
+  engine._applyHeroAtkDelta(hero, ownerIdx, heroIdx, bonus);
   card.counters.atkGranted = bonus;
 
-  engine._broadcastEvent('fighting_atk_change', {
-    owner: ownerIdx, heroIdx, amount: bonus,
-  });
   engine.log('fighting_atk_up', { hero: hero.name, amount: bonus, copy: copyIndex + 1 });
   engine.sync();
 }
@@ -109,11 +112,11 @@ module.exports = {
       const hero = ctx.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
       if (!hero || !hero.name) return;
 
-      hero.atk = Math.max(0, (hero.atk || 0) - atkGranted);
-
-      engine._broadcastEvent('fighting_atk_change', {
-        owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, amount: -atkGranted,
-      });
+      // Same canonical-helper route as the grant path above —
+      // mirrors the Curse-suppression accumulator for revoke
+      // semantics. The broadcast fires inside the helper only when
+      // the hero is NOT cursed (visible stat unchanged otherwise).
+      engine._applyHeroAtkDelta(hero, ctx.cardOwner, ctx.cardHeroIdx, -atkGranted);
 
       ctx.log('fighting_atk_down', { hero: hero.name, amount: atkGranted });
       engine.sync();

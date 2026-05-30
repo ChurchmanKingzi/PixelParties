@@ -9,6 +9,23 @@ const CARDINAL_NAMES = [
   'Cardinal Beast Zhuque',
 ];
 
+// O(1) lookup companion to CARDINAL_NAMES. Used by hot-path guards
+// (damage pipeline, deepsea targeting, CPU evaluators) — the array
+// is kept too for callers that iterate (Cardinal-win check).
+const CARDINAL_NAMES_SET = new Set(CARDINAL_NAMES);
+
+/**
+ * Name-based fallback for the engine's absolute-immunity shield on
+ * Cardinal Beasts. Each Beast's `onPlay` also stamps
+ * `inst.counters._cardinalImmune` via `_setCardinalImmune`, but the
+ * name check catches summon paths that skip onPlay (tutor re-clones,
+ * ascension swaps, etc.) so the "immune to everything" guarantee
+ * holds however the Beast got onto the board.
+ */
+function isCardinalBeastByName(name) {
+  return !!name && CARDINAL_NAMES_SET.has(name);
+}
+
 /**
  * Set immune flag on the Cardinal Beast creature instance.
  */
@@ -58,4 +75,4 @@ async function _checkCardinalWin(ctx) {
   }
 }
 
-module.exports = { _setCardinalImmune, _checkCardinalWin, CARDINAL_NAMES };
+module.exports = { _setCardinalImmune, _checkCardinalWin, CARDINAL_NAMES, CARDINAL_NAMES_SET, isCardinalBeastByName };

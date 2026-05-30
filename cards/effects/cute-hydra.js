@@ -428,5 +428,20 @@ module.exports = {
     // Death routes to deletedPile (no recursion bait for opponents),
     // but the rescue-from-delete clause makes deletion costly.
     onDeathBenefit: 0,
+
+    // Eval threat estimate — each Head Counter caps the number of
+    // distinct targets the HOPT can hit for 100 each. Useful damage
+    // tops out at the count of viable enemy targets, so we credit
+    // 100 × min(heads, viableTargets) as the per-turn damage threat.
+    // The evaluator iterates this for both sides (symmetric).
+    threatScore(engine, inst, viableTargetsAgainstOpp) {
+      if (inst.zone !== 'support') return 0;
+      if (inst.faceDown) return 0;
+      if (inst.counters?.negated || inst.counters?.nulled) return 0;
+      const heads = inst.counters?.headCounter || 0;
+      if (heads <= 0) return 0;
+      if (viableTargetsAgainstOpp <= 0) return 0;
+      return 100 * Math.min(heads, viableTargetsAgainstOpp);
+    },
   },
 };

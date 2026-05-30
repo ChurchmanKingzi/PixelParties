@@ -323,7 +323,14 @@ module.exports = {
       source,
       _skipReactionCheck: true,
     });
-    await engine.actionDestroyCard(source, creatureInst, { fireCreatureDeath: true });
+    // `skipPileTransfer: true` — the catapult animation owns the
+    // corpse's flight from target → discard via the `play_brackle_
+    // catapult` overlay's third phase. Letting actionDestroyCard's
+    // auto-emit fire would overlay a SECOND slot-anchored flight
+    // on top of the catapult arc and double-animate. The card's
+    // dedicated `brackleDiscardSuppressRef` suppression in the
+    // frontend already covers the diff-detector flight.
+    await engine.actionDestroyCard(source, creatureInst, { fireCreatureDeath: true, skipPileTransfer: true });
 
     engine.log('brackle_catapult', {
       player: ps.username,

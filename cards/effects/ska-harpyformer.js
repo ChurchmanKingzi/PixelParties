@@ -25,27 +25,28 @@ module.exports = {
 
   /**
    * CPU brain override for Ska's on-summon "Deal 50 damage to your
-   * host hero to tutor Performance?" confirm. The default CPU brain
-   * declines every cancellable confirm, which made Ska's tutor never
-   * fire — yet Performance is a deck-defining payoff (its once-per-
-   * turn effect attaches ANY Ability from the deck to ANY of our
-   * heroes), so most game states clearly want the trade.
+   * host hero to tutor Performance?" confirm.
    *
-   * Strategy: route the decision through `mctsPickFromOptions`. We
-   * snapshot the engine, apply each option's full effect (decline =
-   * no-op; confirm = 50 damage + tutor Performance into hand), let
-   * the rest-of-turn rollout play out, score the resulting state
-   * via `evaluateState`, and pick whichever option scores higher.
-   * That captures all the downstream value the heuristic would
-   * miss — turn-of-summon Performance plays, follow-up Attacks the
-   * host might still take, opp counter-pressure on a wounded hero,
-   * etc. — without baking any "Performance is worth N points" magic
-   * number into the script.
+   * Heuristic: ALWAYS confirm unless the 50 damage would kill the
+   * host outright OR opp's next turn would kill the host. Per the
+   * user's spec — Performance is a deck-defining tutor payoff and
+   * the brain consistently undervalued it through pure MCTS scoring
+   * (the 50 HP loss is concrete; Performance's value is downstream
+   * and gets discounted by the rollout horizon). Direct heuristic
+   * instead.
+   *
+   * The "would opp's next turn kill the host" check runs a single
+   * snapshot+rollout under MCTS/fast mode (`_inMctsSim = true`,
+   * `enterFastMode`): apply 50 damage to the host, run rest-of-turn
+   * (which extends through opp's full next turn via
+   * `rolloutRestOfTurn`'s horizon loop, capped at 1 turn for this
+   * decision), then check whether the host is still alive on the
+   * other side. Tutor isn't simulated — we only care whether the
+   * hero survives, not the post-tutor board.
    *
    * Same sync-return discipline as Barker / Cute Phoenix: returning
    * `undefined` lets the default brain handle non-Ska prompts. Once
-   * we commit to MCTS we return a `Promise` from the IIFE — the
-   * engine's CPU wrapper passes the Promise through and awaits it.
+   * we commit to the heuristic we return a `Promise` from the IIFE.
    */
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic') return undefined;
@@ -66,54 +67,86 @@ module.exports = {
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return undefined;
 
-    // Lazy-required so card-script load doesn't depend on _cpu init.
-    let mctsPick;
-    try { ({ mctsPickFromOptions: mctsPick } = require('./_cpu')); }
-    catch { mctsPick = null; }
-    // No MCTS available (e.g. test harness, or we're already inside
-    // an outer rollout that's about to recurse): defer to the engine
-    // default (decline). Conservative — same as the pre-MCTS state.
-    if (typeof mctsPick !== 'function' || engine._inMctsSim) {
-      return undefined;
+    // Response shape: `promptConfirmEffect` reads `result?.confirmed
+    // === true`, so we MUST return `{ confirmed: true/false }`, NOT
+    // bare booleans. Bare `true` would evaluate `true.confirmed ===
+    // true` → `undefined === true` → false (decline), which is why
+    // the previous bare-boolean draft never actually triggered the
+    // tutor.
+    const CONFIRM = { confirmed: true };
+    const DECLINE = { confirmed: false };
+
+    // Direct reject: 50 damage would directly kill the host. No
+    // tutor is worth losing the Hero.
+    if (hero.hp <= 50) return DECLINE;
+
+    // Inside an outer rollout — defer to "confirm" (the heuristic's
+    // baseline) so the outer rollout simulates the same future-self
+    // behavior we'll actually execute live. No nested simulation.
+    if (engine._inMctsSim || engine._fastMode) return CONFIRM;
+
+    // Run a 1-turn rollout: take the 50 damage, play out the rest
+    // of our turn + opp's full next turn, then check whether the
+    // host is still alive. If opp kills the host, the tutor isn't
+    // worth it; otherwise the trade is fine.
+    let rolloutRestOfTurnFn;
+    try { ({ rolloutRestOfTurn: rolloutRestOfTurnFn } = require('./_cpu')); }
+    catch { rolloutRestOfTurnFn = null; }
+    if (typeof rolloutRestOfTurnFn !== 'function') {
+      // CPU helpers unavailable (test harness, etc.) — fall back to
+      // the safe-ish default: confirm. Same baseline as inside MCTS.
+      return CONFIRM;
     }
 
     return (async () => {
-      const options = [
-        { confirmed: false },
-        { confirmed: true },
-      ];
+      let snap;
+      try { snap = engine.snapshot(); }
+      catch { return CONFIRM; } // snapshot failed — default confirm
 
-      const apply = async (eng, opt) => {
-        if (!opt.confirmed) return true; // decline → state unchanged.
-        // Confirm = mirror the live `onPlay` resolve flow:
-        //   1. Deal 50 to the host hero.
-        //   2. If the hero survived, tutor Performance from the deck
-        //      into hand and shuffle.
-        // _skipReactionCheck on the damage call so the rollout
-        // doesn't open nested reaction windows (which would waste
-        // budget on opp's reactions to a simulated damage event).
-        const psp = eng.gs.players[cpuIdx];
-        const hp = psp?.heroes?.[heroIdx];
-        if (!hp?.name || hp.hp <= 0) return false;
+      let hostAliveAfter = true;
+      engine._inMctsSim = true;
+      engine.enterFastMode();
+      try {
         const source = { name: CARD_NAME, owner: cpuIdx, heroIdx };
-        try {
-          await eng.actionDealDamage(source, hp, 50, 'other', {
+        const psSim = engine.gs.players[cpuIdx];
+        const hostSim = psSim?.heroes?.[heroIdx];
+        if (!hostSim?.name || hostSim.hp <= 0) {
+          hostAliveAfter = false;
+        } else {
+          await engine.actionDealDamage(source, hostSim, 50, 'other', {
             _skipReactionCheck: true,
           });
-        } catch { return false; }
-        if (hp.hp <= 0) return true; // dealt damage, no tutor — still a valid simulated outcome.
-        if (!(psp.mainDeck || []).includes(ABILITY_NAME)) return true;
-        try {
-          await eng.searchDeckForNamedCard(cpuIdx, ABILITY_NAME, CARD_NAME);
-        } catch { /* tutor failed mid-rollout — keep the partial state */ }
-        return true;
-      };
-
-      try {
-        const best = await mctsPick(engine, options, apply);
-        if (best) return best;
-      } catch { /* fall through — let default decline */ }
-      return undefined;
+          if (hostSim.hp <= 0) {
+            hostAliveAfter = false;
+          } else {
+            // 1-turn lookahead via rolloutRestOfTurn. Save / restore
+            // the global horizon so this decision doesn't leak into
+            // other rollouts.
+            const cpuMod = require('./_cpu');
+            const prevHorizon = cpuMod.getRolloutHorizon
+              ? cpuMod.getRolloutHorizon() : 6;
+            if (cpuMod.setRolloutHorizon) cpuMod.setRolloutHorizon(1);
+            try {
+              const helpers = engine._cpuHelpers || null;
+              if (helpers) await rolloutRestOfTurnFn(engine, helpers);
+            } catch { /* partial state still tells us about host HP */ }
+            finally {
+              if (cpuMod.setRolloutHorizon) cpuMod.setRolloutHorizon(prevHorizon);
+            }
+            const psAfter = engine.gs.players[cpuIdx];
+            const hostAfter = psAfter?.heroes?.[heroIdx];
+            hostAliveAfter = !!(hostAfter?.name && hostAfter.hp > 0);
+          }
+        }
+      } catch {
+        // Simulation crashed — be optimistic and confirm.
+        hostAliveAfter = true;
+      } finally {
+        try { engine.restore(snap); } catch {}
+        engine._inMctsSim = false;
+        engine.exitFastMode();
+      }
+      return hostAliveAfter ? CONFIRM : DECLINE;
     })();
   },
 

@@ -54,6 +54,27 @@ module.exports = {
   isTargetingArtifact: true,
   proactivePlay: true,
 
+  // CPU sanity gate. Juice's server-side `canActivate` returns true if
+  // EITHER side has a cleansable status — without this guard the CPU
+  // would proactively play it on opp-side-only statuses (no-op or
+  // accidental cleanse of opp's debuff). Skip the play unless an own-
+  // side cleansable target exists.
+  cpuShouldPlay(engine, pi) {
+    const { getCleansableStatuses } = require('./_hooks');
+    const ps = engine.gs.players[pi];
+    const negKeys = getCleansableStatuses();
+    for (const h of (ps?.heroes || [])) {
+      if (!h?.name || h.hp <= 0) continue;
+      if (h.statuses && negKeys.some(k => h.statuses[k])) return true;
+    }
+    for (const inst of engine.cardInstances) {
+      if (inst.zone !== 'support') continue;
+      if ((inst.controller ?? inst.owner) !== pi) continue;
+      if (negKeys.some(k => inst.counters?.[k])) return true;
+    }
+    return false;
+  },
+
   reactionCondition: (gs, pi, engine, chainCtx) => {
     // Only trigger as a reaction during the opponent's phase transitions
     if (gs.activePlayer === pi) return false;

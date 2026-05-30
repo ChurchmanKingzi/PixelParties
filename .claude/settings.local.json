@@ -212,7 +212,14 @@
       "Bash(grep -v '\\\\.\\\\|//')",
       "Bash(npx babel *)",
       "Bash(sed -n '3825,3870p' public/app-board.jsx)",
-      "Bash(sed -n '12600,12685p' public/app-board.jsx)"
+      "Bash(sed -n '12600,12685p' public/app-board.jsx)",
+      "Bash(python *)",
+      "Bash(grep -nE 'Lv\\\\s*1|Lv\\\\s*2|Lv\\\\s*3|Lv1|Lv2|Lv3|level\\\\s*===\\\\s*[1-3]|level\\\\s*>=\\\\s*[1-3]|level\\\\s*<=\\\\s*[1-3]|Performance|spellSchool' cards/effects/__TRACKED_VAR__.js)",
+      "Bash(grep -v \"spellSchool\\\\|countAbilitiesForSchool\\\\|//\")",
+      "Bash(grep -E \"^attack\\\\.js$|^backstab\\\\.js$|^breakthrough\\\\.js$|^breaking-strike\")",
+      "Bash(grep -E \"^attack\\\\.js$\")",
+      "Bash(grep -E 'bypassesMagicImmune|_isHeroSpellProtected|attach|supportZones\\\\[.*\\\\]\\\\.push|_spellPlacedOnBoard|targetHero|onPlay' cards/effects/__TRACKED_VAR__.js)",
+      "Bash(grep -n \"^const.*= {$\\\\|^const ANIMATION\\\\|^const animations\\\\|^const FX\\\\|^const effectMap\" \"C:/Pixel Parties WEB/PixelPartiesWeb/public/app-board.jsx\")"
     ]
   }
 }

@@ -66,10 +66,20 @@ module.exports = {
       });
 
       // ── Apply Untargetable buff to casting hero ──
+      // Direct-assignment shortcut bypasses `addHeroStatus`, so the
+      // engine's centralized Anti-Magic gate (in addHeroStatus) doesn't
+      // fire here. Apply the same gate locally so a self-Anti-Magic'd
+      // caster (Anti Magic Lv 2+ attached to their own Hero) doesn't
+      // pick up the untargetable from their own Butterfly Cloud cast.
       if (hero.hp > 0) {
-        if (!hero.statuses) hero.statuses = {};
-        hero.statuses.untargetable = true;
-        engine.log('status_applied', { target: hero.name, status: 'untargetable', player: ps.username });
+        if (engine._isHeroSpellProtected(hero, 'Butterfly Cloud')) {
+          engine.log('status_blocked', { target: hero.name, status: 'untargetable', reason: 'magic_immune' });
+          engine._playAntiMagicBlockedAnim(hero);
+        } else {
+          if (!hero.statuses) hero.statuses = {};
+          hero.statuses.untargetable = true;
+          engine.log('status_applied', { target: hero.name, status: 'untargetable', player: ps.username });
+        }
         engine.sync();
       }
 

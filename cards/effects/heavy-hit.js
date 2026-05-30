@@ -27,7 +27,16 @@ module.exports = {
         excludeSelf: true,
       });
 
-      if (!result) return; // Cancelled
+      if (!result) return; // Cancelled (user backed out of target prompt)
+      // Damage-event cancellation (Idej Projection discard, Spectral
+      // Armor zero-cap, Anti Magic void, etc.) — "negate that damage
+      // and all associated effects" covers the stun rider. Skip the
+      // stun apply when no damage actually landed.
+      if (result.cancelled) {
+        engine.log('heavy_hit_rider_skipped', { reason: 'damage_cancelled' });
+        engine.sync();
+        return;
+      }
 
       // Stun the target for 1 turn
       if (result.target.type === 'hero') {

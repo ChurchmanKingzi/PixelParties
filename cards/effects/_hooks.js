@@ -198,6 +198,49 @@ const STATUS_EFFECTS = {
   // `requiresTarget: true` flag to decide. Cleansable like Stunned.
   // Status icon is rendered as 👁 with a CSS strikethrough line.
   blinded: { negative: true, cleansable: true,  label: 'Blinded', icon: '👁️', immuneKey: 'blind_immune', blocksTargeting: true },
+  // `webbed` — applied by Crimson Web. Silences the bearer exactly like
+  // Stunned ("cannot act and its Abilities are negated"), but PERMANENT
+  // by default (never auto-expires at turn end) and removed only by
+  // cleansing or the attached card's own "discard 1 to untangle"
+  // active. Engine gates that filter on `stunned` also honour
+  // `webbed` as a parallel paralysis-like silence.
+  webbed:  { negative: true, cleansable: true,  label: 'Webbed',  icon: '🕸️', immuneKey: 'web_immune', paralysisLike: true },
+  // `magic_silenced` — applied by Anti Magic Zone, future Spell-suppression
+  // effects. Asymmetric by target type:
+  //   • Heroes: cannot cast Spells. Attacks, Abilities, Hero effects,
+  //     activated artifacts/equipment all still work — only Spell plays
+  //     are gated (in `validateActionPlay`'s Spell branch).
+  //   • Creatures: full effect silence — engine's `runHooks` creature-
+  //     status filter treats this exactly like `negated` / `nulled`, so
+  //     every passive / triggered effect is suppressed.
+  // Cleansable (Juice, Beer, Cure, etc.). Stunned-class silencer applied
+  // PER TARGET — when applied by Anti Magic Zone, it lands on every
+  // alive Hero + face-up Creature individually, so each can be cleansed
+  // independently. New Creatures summoned during the AMZ window
+  // auto-receive the status (handled engine-side in `actionPlaceCreature`).
+  magic_silenced: { negative: true, cleansable: true, label: 'Magic Silenced', icon: '🔕', immuneKey: 'magic_silence_immune' },
+  // `berserked` — applied by Berserk Attachment Spell. The bearer:
+  //   • cannot cast Spells (gated in `validateActionPlay`'s Spell branch),
+  //   • cannot summon Creatures (gated in `validateActionPlay`'s Creature branch),
+  //   • gains a once-per-turn free additional Attack — the engine's
+  //     `validateActionPlay` / `getValidationContext` see the status and
+  //     force `isInherentAction = true` on Attacks until the charge is
+  //     spent (tracked on `hero._berserkChargeUsedTurn`),
+  //   • is capped at 2 Attacks per turn (gated in validateActionPlay).
+  // Cleansable (Juice, Beer, Cure, etc.). The Berserk Attachment Spell
+  // routes ALL attached copies to their original owners' discard piles
+  // when the status is cleansed (its `onStatusRemoved` hook).
+  berserked: { negative: true, cleansable: true, label: 'Berserked', icon: '😡', immuneKey: 'berserk_immune' },
+  // `cursed` — applied by Curse Attachment Spell. The bearer's
+  // Attack stat is suppressed to 0 while attached: the engine's
+  // `actionGrantAtk` / `actionRevokeAtk` / `grantTempHeroAtk` /
+  // temp-atk-expiry sweep all detect the status and route ATK
+  // mutations to a hidden `hero._cursedAtkSuppressed` accumulator
+  // instead of `hero.atk`, which is forced to 0 for the duration.
+  // On cleanse (Juice / Beer / Cure / anything `_viaCleanse`), the
+  // Curse card module restores `hero.atk` from the accumulator and
+  // discards all Curse attachments to their original owners' piles.
+  cursed:    { negative: true, cleansable: true, label: 'Cursed',    icon: '🧿', immuneKey: 'curse_immune' },
   immune:  { negative: false, label: 'Immune',  icon: '🛡️' },
   shielded:{ negative: false, label: 'Shielded', icon: '✨' },
 };
@@ -274,6 +317,15 @@ const BUFF_EFFECTS = {
   // lock). True damage (`actionDealTrueDamage`) bypasses the
   // multiplier pass by design, same as Cloudy / Damage Immune.
   disrupted: { label: 'Disrupted', icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.', damageMultiplier: 2 },
+  // Anti Magic — the equipped Hero cannot be targeted by other Spells
+  // up to and including the buff's `level` (per-instance data set at
+  // attach time, sourced from the caster's Support Magic level when
+  // Anti Magic resolved). Frontend uses a function-form tooltip that
+  // reads the per-instance `level`. The targeting block lives in the
+  // engine's `promptDamageTarget` / `promptMultiTarget` filters,
+  // exempting Spells whose script opts out via `bypassesMagicImmune:
+  // true` (Anti Magic itself, so a new copy can replace an old one).
+  magic_immune: { label: 'Magic Immune', icon: '🛡️' },
 };
 
 // ═══════════════════════════════════════════
@@ -377,6 +429,21 @@ function resolveSourceCreature(engine, source) {
     return hp > 0 ? inst : null;
   };
 
+  // Creature-caster annotation: when a Spell is being cast BY a
+  // Creature (Demon's Gate sets `gs._spellCasterCreature`, the engine
+  // annotates the source with `_creatureCasterForSource`), retaliation
+  // routing must hit that Creature rather than the Spell's host Hero.
+  // The annotation may sit on the source directly OR on its
+  // `cardInstance` field (the engine's surprise pipeline wraps the
+  // annotated source in `{ cardName, cardInstance: source, … }`).
+  // Re-resolve the live instance by id so a stale snapshot can't land
+  // the hit on a wrong target.
+  const ccc = source._creatureCasterForSource || source.cardInstance?._creatureCasterForSource;
+  if (ccc?.id != null) {
+    const byId = engine.cardInstances.find(c => c.id === ccc.id);
+    return aliveSupport(byId);
+  }
+
   // AUTHORITATIVE type check. Card names are unique → exactly one card
   // type, so if we can name the source and it is NOT a Creature it's a
   // Hero-cast Spell/Attack (whose `cardInstance` is the SPELL's inst —
@@ -424,6 +491,16 @@ function resolveSourceCreature(engine, source) {
  */
 function isCreatureSource(engine, source) {
   if (!source) return false;
+  // Creature-caster annotation (Demon's Gate "casts" a Spell): the
+  // attacker for retaliation purposes is the Creature, NOT the Spell's
+  // host Hero. Retaliation routing flips first; type-gates that read
+  // `source.name` directly still see the Spell (preserved by design —
+  // see `_rewriteSourceForCreatureCaster`). The annotation may sit on
+  // the source directly OR on its `cardInstance` field (the surprise
+  // pipeline wraps the annotated source in
+  // `{ cardName, cardInstance: source, … }`).
+  if (source._creatureCasterForSource
+      || source.cardInstance?._creatureCasterForSource) return true;
   // Type the source by its card name (unique → one card type). A
   // Hero-cast Spell/Attack carries a `cardInstance` too (the spell's
   // inst), so presence of `cardInstance` alone must NOT count as a

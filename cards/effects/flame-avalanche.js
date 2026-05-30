@@ -35,6 +35,16 @@ module.exports = {
         },
       });
 
+      // Skip the lock if the cast didn't actually land. `aoeHit` returns
+      // `{ cancelled: true }` on surprise negation (Frost Rune, …) and on
+      // single-target-prompt cancellation; `gs._spellCancelled` is the
+      // single-target prompt's cancel signal; `gs._spellNegatedByEffect`
+      // covers any reaction that flagged the cast as negated. Without
+      // this guard a negated Flame Avalanche would still apply the
+      // "no more damage this turn" debuff for free.
+      const gs = ctx._engine.gs;
+      if (result?.cancelled || gs._spellCancelled || gs._spellNegatedByEffect) return;
+
       // Lock: no more damage to opponent's targets this turn (absolute)
       ps.damageLocked = true;
       ctx._engine.log('damage_locked', { player: ps.username, by: 'Flame Avalanche' });

@@ -27,6 +27,14 @@ module.exports = {
   // hero; for two-equip prompts, the handler auto-assigns the second
   // (cheaper) equip to the remaining hero.
   cpuResponse(engine, kind, promptData) {
+    // Bill's hook fires from `onBeforeHandDraw` (game start) — not from a
+    // CPU-brain-driven activation — so `ps._resolvingCard` is null at the
+    // confirm prompt and `cpuGenericChoice`'s proactive-cast bypass doesn't
+    // match. Cancellable confirms default to DECLINE for the CPU, which
+    // would silently skip Bill's effect every game. Auto-accept it here.
+    if (kind === 'generic' && promptData.type === 'confirm') {
+      return { confirmed: true };
+    }
     if (kind === 'generic' && promptData.type === 'cardGalleryMulti') {
       const cards = promptData.cards || [];
       if (!cards.length) return { selectedCards: [] };

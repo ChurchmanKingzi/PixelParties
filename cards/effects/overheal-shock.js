@@ -177,6 +177,18 @@ module.exports = {
         return;
       }
 
+      // ── Anti-Magic protection ──
+      // Overheal Shock is a Lv 1 Attachment Spell. A target Hero with
+      // `magic_immune.level >= 1` is immune to its effect. Direct
+      // `targetHero.statuses.healReversed = …` assignment below
+      // bypasses `addHeroStatus` (and therefore the engine's
+      // centralized magic_immune gate), so mirror it here.
+      if (engine._isHeroSpellProtected(targetHero, 'Overheal Shock')) {
+        engine.log('equip_blocked', { card: 'Overheal Shock', target: targetHero.name, reason: 'magic_immune' });
+        engine._playAntiMagicBlockedAnim(targetHero);
+        return;
+      }
+
       // ── Resistance gate ──
       // The full effect (zone placement + healReversed status) targets
       // an opponent hero, so it counts as a non-damaging effect that

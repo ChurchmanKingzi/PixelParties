@@ -51,6 +51,13 @@ module.exports = {
       const tgtHeroIdx = target.heroIdx;
       const tgtZoneSlot = target.type === 'hero' ? undefined : target.slotIdx;
 
+      // Pre-resolution hook (Doq's guess, future "when this Hero
+      // attacks" effects) fires AFTER target pick but BEFORE the
+      // animation + damage. Listeners may mutate the about-to-deal
+      // damage.
+      const attackSource = { name: 'Strong Ox Headbutt', owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const finalDmg = await engine._fireAttackDeclare(attackSource, target, baseAtk);
+
       // Ram animation
       engine._broadcastEvent('play_ram_animation', {
         sourceOwner: ctx.cardHeroOwner, sourceHeroIdx: heroIdx,
@@ -67,12 +74,10 @@ module.exports = {
       await engine._delay(200);
 
       // Deal base ATK damage
-      const attackSource = { name: 'Strong Ox Headbutt', owner: pi, heroIdx, controller: pi };
-
       if (target.type === 'hero') {
         const targetHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
         if (targetHero && targetHero.hp > 0) {
-          await engine.actionDealDamage(attackSource, targetHero, baseAtk, 'attack');
+          await engine.actionDealDamage(attackSource, targetHero, finalDmg, 'attack');
         }
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -81,7 +86,7 @@ module.exports = {
         );
         if (inst) {
           await engine.actionDealCreatureDamage(
-            attackSource, inst, baseAtk, 'attack',
+            attackSource, inst, finalDmg, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
         }

@@ -151,6 +151,13 @@ module.exports = {
         if (!_isAttackOrSpellType(e.type)) continue;
         if (!_isFromHostHero(e.source, inst)) continue;
         if (!_isOpponentCreature(e.inst, inst)) continue;
+        // Full negation (Idej Projection, Spectral Armor zero-cap,
+        // Anti Magic void) → no actual damage dealt, no heal to
+        // accumulate. `e.realDealt` is undefined on cancelled entries
+        // (the per-entry damage loop short-circuits before stamping
+        // it), so without this gate the fallback to `e.amount` would
+        // mistakenly count the would-have-dealt damage as lifesteal.
+        if (e.cancelled) continue;
         // `realDealt` is the post-cap HP delta the engine stamps on each
         // entry — overkill capped at pre-hit HP. Falls back to `amount`
         // for safety if the engine ever omits the field.

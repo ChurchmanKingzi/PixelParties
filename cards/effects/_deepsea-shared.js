@@ -249,14 +249,11 @@ async function returnSupportCreatureToHand(engine, inst, sourceName) {
   // so the shield applies here too. Golden Wings also sets this flag.
   // We play the bounce animation above first (so the player sees the
   // attempt hit and fizzle), then bail BEFORE the actual pile-transfer
-  // animation and state mutation. Name-based fallback matches the
-  // engine's damage-path check — if a Beast's onPlay missed stamping
-  // the counter (rare but possible), the name catches it.
-  const CARDINAL_BEAST_NAMES = new Set([
-    'Cardinal Beast Baihu', 'Cardinal Beast Qinglong',
-    'Cardinal Beast Xuanwu', 'Cardinal Beast Zhuque',
-  ]);
-  if (inst.counters?._cardinalImmune || CARDINAL_BEAST_NAMES.has(inst.name)) {
+  // animation and state mutation. Name-based fallback (shared with the
+  // engine's damage-path check) catches summon paths where the
+  // counter stamp got skipped.
+  const { isCardinalBeastByName } = require('./_cardinal-shared');
+  if (inst.counters?._cardinalImmune || isCardinalBeastByName(inst.name)) {
     engine.log('cardinal_immune_block', {
       card: inst.name, by: sourceName, action: 'return_to_hand',
     });

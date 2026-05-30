@@ -75,12 +75,11 @@ function recomputeBonus(ctx) {
   const delta = newBonus - currentBonus;
   if (delta === 0) return;
 
-  hero.atk = Math.max(0, (hero.atk || 0) + delta);
+  // Engine ATK helper routes through Curse's suppression accumulator
+  // when the host is cursed, otherwise mutates + broadcasts normally.
+  engine._applyHeroAtkDelta(hero, owner, heroIdx, delta);
   inst.counters.atkGranted = newBonus;
 
-  engine._broadcastEvent('fighting_atk_change', {
-    owner, heroIdx, amount: delta,
-  });
   engine.log('ancient_tech_atk', {
     hero: hero.name, newBonus, uniqueCount, delta,
   });

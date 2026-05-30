@@ -1492,6 +1492,229 @@ function FirstCircleOfHellOverlay() {
   );
 }
 
+// Spider Hive — a dusty cobwebbed corner of the battlefield. Pale
+// silken arcs spider out from each corner (SVG concentric radials),
+// a few long strands drape diagonally across the middle, and a
+// handful of tiny pixel-spiders crawl along independent looped paths.
+// The whole layer sits under the cards (no zIndex set — defaults to
+// auto, lower than the zone-has-card layer's z:10).
+function SpiderHiveOverlay() {
+  // Stable per-mount randomization for the spiders so they don't
+  // re-randomize every render.
+  const spiders = useMemo(() => Array.from({ length: 6 }, (_, i) => {
+    // Each spider gets a unique path along an ellipse-ish curve so
+    // they wander independently rather than marching in lockstep.
+    const dur = 9 + Math.random() * 7; // seconds for a full loop
+    const delay = -Math.random() * dur;
+    const size = 12 + Math.random() * 6; // SVG-side radius; rendered size is size*2 px wide
+    // Loop centre — kept away from the corners (the corner webs
+    // already live there) and inset from the edges so the wander
+    // arcs don't sail off the playmat.
+    const cx = 18 + Math.random() * 64;
+    const cy = 18 + Math.random() * 64;
+    // Wander radii are generous so the motion reads from across the
+    // board, not a tight twitch. % of parent — see the `left`/`top`
+    // animation comment for why that matters.
+    const rx = 14 + Math.random() * 18;
+    const ry = 10 + Math.random() * 14;
+    return { id: i, dur, delay, size, cx, cy, rx, ry,
+      reverse: Math.random() < 0.5,
+      bob: 1.6 + Math.random() * 1.4 };
+  }), []);
+
+  // Long diagonal strands drifting across the middle.
+  const strands = useMemo(() => Array.from({ length: 5 }, () => ({
+    x1: Math.random() * 100, y1: Math.random() * 100,
+    x2: Math.random() * 100, y2: Math.random() * 100,
+    opacity: 0.10 + Math.random() * 0.12,
+  })), []);
+
+  // Each corner web: concentric arcs (silken filaments) + radial spokes.
+  const renderCornerWeb = (anchor) => {
+    // anchor: 'tl' | 'tr' | 'bl' | 'br' → controls the SVG flip /
+    // position of the radial origin.
+    const isRight = anchor === 'tr' || anchor === 'br';
+    const isBottom = anchor === 'bl' || anchor === 'br';
+    // Radial spokes from (0,0) to a fan of endpoints.
+    const ARC_COUNT = 7;     // concentric webs
+    const SPOKE_COUNT = 9;   // radial threads
+    const MAX_R = 220;       // pixel radius of the largest arc
+    const spokes = [];
+    for (let i = 0; i < SPOKE_COUNT; i++) {
+      const angle = (Math.PI / 2) * (i / (SPOKE_COUNT - 1));
+      const ex = Math.cos(angle) * MAX_R;
+      const ey = Math.sin(angle) * MAX_R;
+      spokes.push({ x: ex, y: ey });
+    }
+    const arcs = [];
+    for (let i = 1; i <= ARC_COUNT; i++) {
+      const r = (MAX_R / ARC_COUNT) * i;
+      arcs.push(r);
+    }
+    return (
+      <svg
+        viewBox={`0 0 ${MAX_R} ${MAX_R}`}
+        preserveAspectRatio="none"
+        style={{
+          position: 'absolute',
+          [isRight ? 'right' : 'left']: 0,
+          [isBottom ? 'bottom' : 'top']: 0,
+          width: '32%', height: '40%',
+          opacity: 0.55,
+          transform:
+            (isRight ? 'scaleX(-1) ' : '')
+            + (isBottom ? 'scaleY(-1) ' : ''),
+          filter: 'drop-shadow(0 0 1px rgba(255,255,255,0.18))',
+          pointerEvents: 'none',
+        }}>
+        {arcs.map((r, i) => (
+          <path key={'arc' + i}
+            d={`M ${r} 0 A ${r} ${r} 0 0 1 0 ${r}`}
+            fill="none"
+            stroke="rgba(220,225,235,0.55)"
+            strokeWidth={0.7}
+          />
+        ))}
+        {spokes.map((s, i) => (
+          <line key={'spoke' + i}
+            x1={0} y1={0} x2={s.x} y2={s.y}
+            stroke="rgba(220,225,235,0.45)"
+            strokeWidth={0.6}
+          />
+        ))}
+      </svg>
+    );
+  };
+
+  return (
+    <div className="spider-hive-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      overflow: 'hidden',
+      // Dusty, faintly bruised tint over the playmat — gives the web
+      // structure a contrasting backdrop.
+      background:
+        'radial-gradient(ellipse at 50% 55%, rgba(40,30,45,0.18) 0%, rgba(20,15,25,0.12) 60%, rgba(0,0,0,0.06) 100%),'
+        + 'linear-gradient(180deg, rgba(50,40,55,0.10) 0%, rgba(20,15,25,0.06) 100%)',
+      mixBlendMode: 'multiply',
+    }}>
+      {/* Four corner webs */}
+      {renderCornerWeb('tl')}
+      {renderCornerWeb('tr')}
+      {renderCornerWeb('bl')}
+      {renderCornerWeb('br')}
+
+      {/* Long diagonal strands drifting across the middle. Pure SVG
+          lines with faint glow — they read as drape silk between the
+          corner webs. */}
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{
+        position: 'absolute', inset: 0, width: '100%', height: '100%',
+        opacity: 0.9, pointerEvents: 'none',
+      }}>
+        {strands.map((s, i) => (
+          <line key={'strand' + i}
+            x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2}
+            stroke={`rgba(220,225,235,${s.opacity})`}
+            strokeWidth={0.18}
+            strokeLinecap="round"
+          />
+        ))}
+      </svg>
+
+      {/* Crawling spiders. Each runs its own elliptical loop, sized
+          and timed independently so the swarm reads as wandering
+          rather than choreographed.
+
+          IMPORTANT: positional animation uses `left`/`top` rather than
+          `transform: translate(%)`. Percentage values on `transform`
+          translate are relative to the ELEMENT'S OWN size (≈20px for
+          the spider SVG) — that would clamp every spider to a tiny
+          arc near top-left. `left`/`top` percentages ARE relative to
+          the parent overlay, so the elliptical wander loop spans the
+          actual playmat. */}
+      {spiders.map(s => (
+        <div key={'sp' + s.id}
+          style={{
+            position: 'absolute',
+            // CSS custom props pipe the per-spider params into the
+            // shared keyframes definition.
+            '--cx': s.cx + '%',
+            '--cy': s.cy + '%',
+            '--rx': s.rx + '%',
+            '--ry': s.ry + '%',
+            '--dur': s.dur + 's',
+            '--delay': s.delay + 's',
+            // Initial position (also where the first keyframe lands so
+            // there's no jump when the animation starts).
+            left: `calc(${s.cx}% + ${s.rx}%)`,
+            top: `${s.cy}%`,
+            width: 0, height: 0,
+            animation: `spiderHiveWander var(--dur) ease-in-out var(--delay) infinite ${s.reverse ? 'reverse' : 'normal'}`,
+          }}>
+          {/* The spider itself — body + 8 legs. The wrapper's left/top
+              points at the wander-loop position; the SVG's
+              `translate(-50%, -50%)` then centers the spider on that
+              point. The bob rotation composes on top of the centering
+              translate. */}
+          <svg
+            viewBox="-20 -20 40 40"
+            width={s.size * 2} height={s.size * 2}
+            style={{
+              position: 'absolute',
+              left: 0, top: 0,
+              transform: 'translate(-50%, -50%)',
+              animation: 'spiderHiveBob 0.45s ease-in-out infinite alternate',
+              filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.55))',
+            }}>
+            {/* Legs (4 pairs, slight curves) */}
+            {[-50, -25, 25, 50].map((angle, li) => {
+              const a = (angle * Math.PI) / 180;
+              const x1 = Math.cos(a) * 4, y1 = Math.sin(a) * 4;
+              const x2 = Math.cos(a) * 14, y2 = Math.sin(a) * 14;
+              // Bend each leg slightly upward at the knee.
+              const kneeAngle = a - 0.35;
+              const kx = Math.cos(kneeAngle) * 9, ky = Math.sin(kneeAngle) * 9;
+              return (
+                <g key={'leg' + li}>
+                  <polyline
+                    points={`${-x1},${y1} ${-kx},${ky} ${-x2},${y2}`}
+                    fill="none" stroke="rgba(20,15,25,0.95)"
+                    strokeWidth={1.4} strokeLinecap="round"
+                  />
+                  <polyline
+                    points={`${x1},${y1} ${kx},${ky} ${x2},${y2}`}
+                    fill="none" stroke="rgba(20,15,25,0.95)"
+                    strokeWidth={1.4} strokeLinecap="round"
+                  />
+                </g>
+              );
+            })}
+            {/* Body */}
+            <ellipse cx={0} cy={0} rx={5.5} ry={4}
+              fill="rgba(20,15,25,1)" stroke="rgba(45,30,50,1)" strokeWidth={0.6} />
+            {/* Tiny eye dots */}
+            <circle cx={-1.6} cy={-1.2} r={0.7} fill="rgba(220,60,60,0.95)" />
+            <circle cx={1.6} cy={-1.2} r={0.7} fill="rgba(220,60,60,0.95)" />
+          </svg>
+        </div>
+      ))}
+
+      <style>{`
+        @keyframes spiderHiveWander {
+          0%   { left: calc(var(--cx) + var(--rx)); top: var(--cy); }
+          25%  { left: var(--cx); top: calc(var(--cy) + var(--ry)); }
+          50%  { left: calc(var(--cx) - var(--rx)); top: var(--cy); }
+          75%  { left: var(--cx); top: calc(var(--cy) - var(--ry)); }
+          100% { left: calc(var(--cx) + var(--rx)); top: var(--cy); }
+        }
+        @keyframes spiderHiveBob {
+          0%   { transform: translate(-50%, -50%) rotate(-6deg); }
+          100% { transform: translate(-50%, -50%) rotate(6deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // Blood Rock — a grimy cobblestone courtyard soaked in blood. A
 // brick-offset grid of rounded stones (seeded jitter so the masonry
 // reads as hand-laid, not tiled), dark blood pooling into the grout
@@ -2764,6 +2987,46 @@ function PoisonedOverlay({ stacks }) {
   );
 }
 
+// Berserked overlay — persistent dark-magic + red-smoke effect that
+// lives on a hero card for as long as the `berserked` status sticks.
+// Mounted alongside the other persistent overlays (Burned, Poisoned,
+// HealReversed). Two particle layers: small dark-purple sparks
+// drifting upward (the "dark magic" half) and slow red-orange smoke
+// puffs (the "red smoke" half). Both loop indefinitely — the
+// status's lifetime is entirely controller-driven (no auto-expiry),
+// so the overlay must keep going until the status is cleansed.
+function BerserkedOverlay() {
+  const sparks = useMemo(() => Array.from({ length: 10 }, () => ({
+    x: 8 + Math.random() * 84,
+    y: 30 + Math.random() * 60,
+    size: 5 + Math.random() * 5,
+    delay: Math.random() * 2.5,
+    dur: 1.0 + Math.random() * 0.8,
+  })), []);
+  const smoke = useMemo(() => Array.from({ length: 6 }, () => ({
+    x: 15 + Math.random() * 70,
+    size: 12 + Math.random() * 8,
+    delay: Math.random() * 2.5,
+    dur: 1.6 + Math.random() * 1.0,
+  })), []);
+  return (
+    <div className="status-berserked-overlay">
+      {smoke.map((s, i) => (
+        <span key={'sm'+i} className="berserked-smoke" style={{
+          left: s.x + '%', fontSize: s.size,
+          animationDelay: s.delay + 's', animationDuration: s.dur + 's',
+        }}>💨</span>
+      ))}
+      {sparks.map((p, i) => (
+        <span key={'sp'+i} className="berserked-particle" style={{
+          left: p.x + '%', top: p.y + '%', fontSize: p.size,
+          animationDelay: p.delay + 's', animationDuration: p.dur + 's',
+        }}>✦</span>
+      ))}
+    </div>
+  );
+}
+
 function HealReversedOverlay() {
   const particles = useMemo(() => Array.from({ length: 10 }, () => ({
     x: 10 + Math.random() * 80,
@@ -2785,6 +3048,14 @@ function HealReversedOverlay() {
       ))}
     </div>
   );
+}
+
+// Light Ball aura — a soft warm-yellow halo wrapping the host Hero
+// while the Attachment Spell is in their Support Zone. CSS-only
+// pulse (no per-particle simulation needed); the keyframes live in
+// style.css alongside the other status overlays.
+function LightBallAura() {
+  return <div className="status-light-ball-aura" />;
 }
 
 // ═══ GENERIC GAME TOOLTIP ═══
@@ -2890,6 +3161,166 @@ function GoldSparkleEffect({ x, y }) {
       <div className="anim-gold-flash" />
       {sparkles.map((s, i) => (
         <div key={'gs'+i} className="anim-explosion-particle" style={{
+          '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+          '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Spider summon flourish — fires when a Spider Creature is summoned
+// from hand via the Spider archetype's surprise-cost path (Box /
+// Brain / Crimson Skull / Diamond). Renders a curtain of cobweb
+// strands descending from above the destination, four spider corner
+// webs flashing in, and a handful of tiny spiders that pop out and
+// crawl away on short looping paths. Pure SVG + CSS keyframes; no
+// per-frame JS. Anchored to the Hero column via the standard
+// `play_zone_animation` plumbing.
+function SpiderSummonEffect({ x, y }) {
+  // Eight spiders bursting outward in a fan.
+  const spiders = useMemo(() => Array.from({ length: 8 }, (_, i) => {
+    const angle = (i / 8) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+    const dist = 36 + Math.random() * 28;
+    return {
+      dx: Math.cos(angle) * dist, dy: Math.sin(angle) * dist,
+      size: 9 + Math.random() * 4,
+      delay: Math.random() * 220,
+      dur: 900 + Math.random() * 300,
+      rotStart: -25 + Math.random() * 50,
+      rotEnd: -45 + Math.random() * 90,
+    };
+  }), []);
+  // Vertical silk strands draping from above the slot.
+  const strands = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+    xOff: -36 + i * 12 + (Math.random() - 0.5) * 4,
+    len: 50 + Math.random() * 30,
+    delay: Math.random() * 200,
+    dur: 700 + Math.random() * 250,
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      {/* Central web burst — concentric arcs flashing outward */}
+      <svg viewBox="-60 -60 120 120" width={140} height={140} style={{
+        position: 'absolute', transform: 'translate(-50%, -50%)',
+        animation: 'spiderSummonWebBurst 1.1s ease-out forwards',
+      }}>
+        {/* Radial spokes */}
+        {Array.from({ length: 12 }).map((_, i) => {
+          const a = (i / 12) * Math.PI * 2;
+          return (
+            <line key={'sp' + i}
+              x1={0} y1={0}
+              x2={Math.cos(a) * 56} y2={Math.sin(a) * 56}
+              stroke="rgba(240,240,255,0.85)"
+              strokeWidth={0.8}
+              strokeLinecap="round"
+            />
+          );
+        })}
+        {/* Concentric arcs */}
+        {[18, 30, 42, 54].map((r, i) => (
+          <circle key={'arc' + i}
+            cx={0} cy={0} r={r}
+            fill="none"
+            stroke="rgba(220,225,235,0.7)"
+            strokeWidth={0.6}
+            strokeDasharray="3 5"
+          />
+        ))}
+      </svg>
+      {/* Silk strands hanging from above */}
+      {strands.map((s, i) => (
+        <div key={'st' + i} style={{
+          position: 'absolute',
+          left: s.xOff, top: -70,
+          width: 1.4, height: s.len,
+          background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(240,240,255,0.7) 30%, rgba(240,240,255,0.85) 100%)',
+          transformOrigin: 'top center',
+          animation: `spiderSummonStrand ${s.dur}ms ease-out ${s.delay}ms forwards`,
+          filter: 'drop-shadow(0 0 2px rgba(180,200,255,0.5))',
+        }} />
+      ))}
+      {/* Burst spiders crawling outward */}
+      {spiders.map((s, i) => (
+        <div key={'sps' + i} style={{
+          position: 'absolute', left: 0, top: 0,
+          width: 0, height: 0,
+          '--dx': s.dx + 'px', '--dy': s.dy + 'px',
+          '--rotStart': s.rotStart + 'deg',
+          '--rotEnd': s.rotEnd + 'deg',
+          animation: `spiderSummonCrawl ${s.dur}ms ease-out ${s.delay}ms forwards`,
+        }}>
+          <svg viewBox="-20 -20 40 40" width={s.size * 2} height={s.size * 2}
+            style={{
+              position: 'absolute', left: 0, top: 0,
+              transform: 'translate(-50%, -50%)',
+              filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.5))',
+            }}>
+            {[-50, -25, 25, 50].map((angle, li) => {
+              const a = (angle * Math.PI) / 180;
+              const x1 = Math.cos(a) * 4, y1 = Math.sin(a) * 4;
+              const x2 = Math.cos(a) * 14, y2 = Math.sin(a) * 14;
+              const kneeAngle = a - 0.35;
+              const kx = Math.cos(kneeAngle) * 9, ky = Math.sin(kneeAngle) * 9;
+              return (
+                <g key={'leg' + li}>
+                  <polyline points={`${-x1},${y1} ${-kx},${ky} ${-x2},${y2}`}
+                    fill="none" stroke="rgba(20,15,25,0.95)" strokeWidth={1.4} strokeLinecap="round" />
+                  <polyline points={`${x1},${y1} ${kx},${ky} ${x2},${y2}`}
+                    fill="none" stroke="rgba(20,15,25,0.95)" strokeWidth={1.4} strokeLinecap="round" />
+                </g>
+              );
+            })}
+            <ellipse cx={0} cy={0} rx={5.5} ry={4}
+              fill="rgba(20,15,25,1)" stroke="rgba(45,30,50,1)" strokeWidth={0.6} />
+            <circle cx={-1.6} cy={-1.2} r={0.7} fill="rgba(220,60,60,0.95)" />
+            <circle cx={1.6} cy={-1.2} r={0.7} fill="rgba(220,60,60,0.95)" />
+          </svg>
+        </div>
+      ))}
+      <style>{`
+        @keyframes spiderSummonWebBurst {
+          0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(0deg); }
+          40%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1) rotate(35deg); }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5) rotate(70deg); }
+        }
+        @keyframes spiderSummonStrand {
+          0%   { opacity: 0; transform: scaleY(0); }
+          40%  { opacity: 1; transform: scaleY(1); }
+          100% { opacity: 0; transform: scaleY(1); }
+        }
+        @keyframes spiderSummonCrawl {
+          0%   { transform: translate(0, 0) rotate(var(--rotStart)); opacity: 0; }
+          25%  { opacity: 1; }
+          100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rotEnd)); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// Diamond sparkle — icy white/cyan recolor of GoldSparkleEffect for
+// "this card flashes a diamond-themed trigger" visuals (Diamond Spider).
+// Shares the same shrapnel particle class as the gold sparkle; only
+// the palette + flash overlay differ.
+function DiamondSparkleEffect({ x, y }) {
+  const sparkles = useMemo(() => Array.from({ length: 14 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 14 + Math.random() * 26;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+      size: 3 + Math.random() * 5,
+      color: ['#ffffff','#cdeeff','#88c8ff','#e0f6ff','#a6e1ff','#ddccff'][Math.floor(Math.random() * 6)],
+      delay: Math.random() * 150,
+      dur: 400 + Math.random() * 400,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-diamond-flash" />
+      {sparkles.map((s, i) => (
+        <div key={'ds'+i} className="anim-explosion-particle" style={{
           '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
           '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
         }} />
@@ -7164,6 +7595,8 @@ const ANIM_REGISTRY = {
   wind: WindEffect,
   shadow_summon: ShadowSummonEffect,
   gold_sparkle: GoldSparkleEffect,
+  diamond_sparkle: DiamondSparkleEffect,
+  spider_summon: SpiderSummonEffect,
   beer_bubbles: BeerBubblesEffect,
   juice_bubbles: (() => {
     // Orange juice bubbles — same as beer but orange palette
@@ -8621,6 +9054,160 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // Love Shot impact burst — a flutter of small pink hearts puffing
+  // outward from the target. Used as Love Shot's landing flourish
+  // (in place of the green heal_sparkle). The emoji mix favours
+  // light-pink hearts to stay on-theme with the projectile, plus a
+  // smaller fraction of sparkle hearts for visual variety. Keyframes
+  // are inline so the effect is self-contained.
+  love_burst: (() => {
+    return function LoveBurstEffect({ x, y }) {
+      const hearts = useMemo(() => Array.from({ length: 22 }, (_, i) => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist  = 24 + Math.random() * 70;
+        // Bias toward light-pink hearts; a few sparkles for texture.
+        const palette = ['💗','💗','💗','💖','💕','💞','🩷'];
+        return {
+          id: i,
+          char: palette[Math.floor(Math.random() * palette.length)],
+          size: 14 + Math.random() * 18,
+          delay: Math.random() * 280,
+          dur: 700 + Math.random() * 500,
+          dx: Math.cos(angle) * dist,
+          dy: Math.sin(angle) * dist - 18,   // slight upward bias
+          rotStart: -25 + Math.random() * 50,
+          rotEnd:   -40 + Math.random() * 80,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {hearts.map(h => (
+            <div key={h.id} style={{
+              position: 'absolute',
+              left: 0, top: 0,
+              fontSize: h.size + 'px',
+              opacity: 0,
+              filter: 'drop-shadow(0 0 4px rgba(255,180,220,.85)) drop-shadow(0 0 8px rgba(255,140,200,.5))',
+              animation: `loveBurstHeart ${h.dur}ms ease-out ${h.delay}ms forwards`,
+              '--lbDx': h.dx + 'px',
+              '--lbDy': h.dy + 'px',
+              '--lbRotS': h.rotStart + 'deg',
+              '--lbRotE': h.rotEnd + 'deg',
+            }}>{h.char}</div>
+          ))}
+          <style>{`
+            @keyframes loveBurstHeart {
+              0%   { opacity: 0; transform: translate(0,0) rotate(var(--lbRotS)) scale(0.4); }
+              20%  { opacity: 1; transform: translate(calc(var(--lbDx) * .25), calc(var(--lbDy) * .25)) rotate(calc((var(--lbRotS) + var(--lbRotE)) / 2)) scale(1.1); }
+              70%  { opacity: 1; transform: translate(calc(var(--lbDx) * .85), calc(var(--lbDy) * .85)) rotate(var(--lbRotE)) scale(1); }
+              100% { opacity: 0; transform: translate(var(--lbDx), var(--lbDy)) rotate(var(--lbRotE)) scale(0.85); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  super_saiyan_aura: (() => {
+    // Golden Super-Saiyan aura — Divine Zeal's heal flourish. A
+    // bright central flash, three expanding gold rings, upward "ki"
+    // streaks rising from the target, and a burst of gold sparkles
+    // radiating outward. Keyframes live inside the component so the
+    // animation is self-contained.
+    return function SuperSaiyanAuraEffect({ x, y }) {
+      const streaks = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+        id: i,
+        x: -55 + Math.random() * 110,
+        delay: Math.random() * 0.35,
+        dur: 0.7 + Math.random() * 0.55,
+        height: 60 + Math.random() * 80,
+        width: 4 + Math.random() * 6,
+      })), []);
+      const sparkles = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+        id: i,
+        angle: Math.random() * Math.PI * 2,
+        dist: 30 + Math.random() * 60,
+        size: 5 + Math.random() * 9,
+        delay: Math.random() * 0.4,
+        dur: 0.55 + Math.random() * 0.5,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10110 }}>
+          {/* Central golden flash */}
+          <div style={{
+            position: 'absolute', left: -65, top: -65, width: 130, height: 130,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,200,.95) 0%, rgba(255,220,80,.85) 30%, rgba(255,170,0,.5) 60%, rgba(255,120,0,0) 100%)',
+            filter: 'blur(2px)',
+            animation: 'ssjFlash 1.3s ease-out forwards',
+          }} />
+          {/* Expanding aura rings */}
+          {[0, 0.15, 0.3].map((d, i) => (
+            <div key={`r${i}`} style={{
+              position: 'absolute', left: -45, top: -45, width: 90, height: 90,
+              border: '3px solid rgba(255,215,0,.9)',
+              borderRadius: '50%',
+              boxShadow: '0 0 22px rgba(255,200,0,.95), inset 0 0 14px rgba(255,235,120,.7)',
+              opacity: 0,
+              animation: `ssjRing 1.1s ease-out ${d}s forwards`,
+            }} />
+          ))}
+          {/* Upward ki streaks */}
+          {streaks.map(s => (
+            <div key={`k${s.id}`} style={{
+              position: 'absolute',
+              left: s.x, top: 30,
+              width: s.width,
+              height: s.height,
+              background: 'linear-gradient(to top, rgba(255,140,0,0), rgba(255,210,40,.95) 40%, rgba(255,250,200,1) 90%)',
+              borderRadius: '50%',
+              filter: 'blur(1.5px)',
+              transformOrigin: 'bottom center',
+              animation: `ssjStreak ${s.dur}s ease-out ${s.delay}s forwards`,
+            }} />
+          ))}
+          {/* Outward sparkles */}
+          {sparkles.map(p => (
+            <div key={`s${p.id}`} style={{
+              position: 'absolute',
+              left: 0, top: 0,
+              width: p.size, height: p.size,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, #fff7c0, #ffd700, #cc8800)',
+              boxShadow: '0 0 8px #ffd700, 0 0 16px #ffaa00',
+              opacity: 0,
+              animation: `ssjSpark ${p.dur}s ease-out ${p.delay}s forwards`,
+              '--ssj-tx': `${Math.cos(p.angle) * p.dist}px`,
+              '--ssj-ty': `${Math.sin(p.angle) * p.dist - 18}px`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes ssjFlash {
+              0%   { opacity: 0; transform: scale(0.4); }
+              18%  { opacity: 1; transform: scale(1.1); }
+              55%  { opacity: 0.85; transform: scale(1.5); }
+              100% { opacity: 0; transform: scale(2.0); }
+            }
+            @keyframes ssjRing {
+              0%   { opacity: 0; transform: scale(0.3); }
+              18%  { opacity: 1; transform: scale(0.65); }
+              70%  { opacity: 0.55; transform: scale(1.7); }
+              100% { opacity: 0; transform: scale(2.4); }
+            }
+            @keyframes ssjStreak {
+              0%   { opacity: 0; transform: translateY(0) scaleY(0.2); }
+              25%  { opacity: 1; transform: translateY(-20px) scaleY(1); }
+              100% { opacity: 0; transform: translateY(-110px) scaleY(0.4); }
+            }
+            @keyframes ssjSpark {
+              0%   { opacity: 0; transform: translate(0,0) scale(0.4); }
+              25%  { opacity: 1; transform: translate(calc(var(--ssj-tx) * 0.35), calc(var(--ssj-ty) * 0.35)) scale(1.2); }
+              100% { opacity: 0; transform: translate(var(--ssj-tx), var(--ssj-ty)) scale(0.2); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   overheal_shock_equip: (() => {
     return function OverhealShockEquipEffect({ x, y }) {
       const particles = useMemo(() => Array.from({ length: 28 }, (_, i) => ({
@@ -8869,6 +9456,479 @@ const ANIM_REGISTRY = {
               20% { opacity: 1; transform: scale(1.8) rotate(120deg); }
               55% { opacity: 0.8; transform: scale(1) rotate(450deg); }
               100% { opacity: 0; transform: scale(0.1) rotate(900deg); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  hand_of_death_strike: (() => {
+    // Death-strike: a colossal grinning skull plummets from above,
+    // crimson lightning bolts crackle into the impact point, a white-
+    // red impact flash and shockwave bloom outward, then a burst of
+    // skulls + bone fragments + crimson sparks scatters. Anchored to
+    // the target zone. Lifespan ~1700ms; the broadcast MUST pass a
+    // matching `duration` so the component stays mounted to the end.
+    return function HandOfDeathStrikeEffect({ x, y }) {
+      const bones = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+        id: i,
+        angle: Math.random() * Math.PI * 2,
+        dist: 50 + Math.random() * 85,
+        size: 14 + Math.random() * 14,
+        delay: 700 + Math.random() * 280,
+        dur: 800 + Math.random() * 420,
+        rot: -180 + Math.random() * 360,
+        char: ['🦴', '🦴', '☠'][Math.floor(Math.random() * 3)],
+      })), []);
+      const skulls = useMemo(() => Array.from({ length: 10 }, (_, i) => ({
+        id: i,
+        angle: Math.random() * Math.PI * 2,
+        dist: 65 + Math.random() * 55,
+        size: 24 + Math.random() * 20,
+        delay: 760 + Math.random() * 220,
+        dur: 800 + Math.random() * 400,
+      })), []);
+      const sparks = useMemo(() => Array.from({ length: 28 }, (_, i) => ({
+        id: i,
+        angle: Math.random() * Math.PI * 2,
+        dist: 55 + Math.random() * 75,
+        size: 4 + Math.random() * 7,
+        delay: 720 + Math.random() * 320,
+        dur: 650 + Math.random() * 400,
+      })), []);
+      const bolts = useMemo(() => Array.from({ length: 5 }, (_, i) => ({
+        id: i,
+        ang: -32 + i * 16,    // -32, -16, 0, 16, 32
+        delay: 680 + i * 28,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10110 }}>
+          {/* Dark crimson aura around the target — converges as the strike descends */}
+          <div style={{
+            position: 'absolute', left: -130, top: -130, width: 260, height: 260,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(90,0,30,.9) 0%, rgba(40,0,15,.75) 40%, rgba(0,0,0,0) 78%)',
+            filter: 'blur(3px)',
+            animation: 'hodAura 1500ms ease-out forwards',
+          }} />
+          {/* Descending grinning skull — the "hand of death" */}
+          <div style={{
+            position: 'absolute', left: -60, top: 0, width: 120, height: 120,
+            fontSize: 108,
+            textAlign: 'center', lineHeight: '120px',
+            filter: 'drop-shadow(0 0 22px rgba(240,40,70,1)) drop-shadow(0 0 44px rgba(160,0,0,.85))',
+            animation: 'hodDescend 750ms cubic-bezier(0.5, 0, 0.7, 1) forwards',
+          }}>💀</div>
+          {/* Crimson lightning bolts converging on impact */}
+          {bolts.map(lb => (
+            <div key={'lb' + lb.id} style={{
+              position: 'absolute', left: -3, top: -190,
+              width: 6, height: 190,
+              background: 'linear-gradient(to bottom, transparent, rgba(255,90,130,.95) 28%, #fff 100%)',
+              borderRadius: '50%',
+              filter: 'drop-shadow(0 0 9px #ff3060) drop-shadow(0 0 16px #ff0040)',
+              transform: `rotate(${lb.ang}deg)`,
+              transformOrigin: 'bottom center',
+              opacity: 0,
+              animation: `hodLightning 320ms ease-out ${lb.delay}ms forwards`,
+            }} />
+          ))}
+          {/* Impact flash — big white-red bloom at touchdown */}
+          <div style={{
+            position: 'absolute', left: -140, top: -140, width: 280, height: 280,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, #fff 0%, #ffdcdc 14%, rgba(255,80,80,.85) 32%, rgba(180,0,30,.55) 55%, rgba(60,0,0,0) 80%)',
+            opacity: 0,
+            animation: 'hodFlash 850ms ease-out 720ms forwards',
+          }} />
+          {/* Expanding shockwave ring */}
+          <div style={{
+            position: 'absolute', left: -30, top: -30, width: 60, height: 60,
+            border: '6px solid rgba(255,40,80,.95)',
+            borderRadius: '50%',
+            boxShadow: '0 0 28px rgba(220,0,40,.9), inset 0 0 18px rgba(255,80,120,.65)',
+            opacity: 0,
+            animation: 'hodShockwave 950ms ease-out 740ms forwards',
+          }} />
+          {/* Inner blood-rim shockwave (slightly larger, slower) */}
+          <div style={{
+            position: 'absolute', left: -40, top: -40, width: 80, height: 80,
+            border: '4px solid rgba(140,0,30,.85)',
+            borderRadius: '50%',
+            opacity: 0,
+            animation: 'hodShockwave 1200ms ease-out 800ms forwards',
+          }} />
+          {/* Skull burst — flying outward */}
+          {skulls.map(s => (
+            <div key={'sk' + s.id} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: s.size,
+              opacity: 0,
+              filter: 'drop-shadow(0 0 10px rgba(220,40,70,1))',
+              '--hod-tx': `${Math.cos(s.angle) * s.dist}px`,
+              '--hod-ty': `${Math.sin(s.angle) * s.dist - 22}px`,
+              animation: `hodSkull ${s.dur}ms ease-out ${s.delay}ms forwards`,
+            }}>💀</div>
+          ))}
+          {/* Bone fragments scattering */}
+          {bones.map(b => (
+            <div key={'b' + b.id} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: b.size,
+              opacity: 0,
+              filter: 'drop-shadow(0 0 6px rgba(255,150,150,.8))',
+              '--hod-tx': `${Math.cos(b.angle) * b.dist}px`,
+              '--hod-ty': `${Math.sin(b.angle) * b.dist - 10}px`,
+              '--hod-rot': `${b.rot}deg`,
+              animation: `hodBone ${b.dur}ms ease-out ${b.delay}ms forwards`,
+            }}>{b.char}</div>
+          ))}
+          {/* Crimson sparks */}
+          {sparks.map(p => (
+            <div key={'sp' + p.id} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: p.size, height: p.size,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, #ffe0e0, #ff3060, #80001a)',
+              boxShadow: '0 0 6px #ff2050, 0 0 14px #aa0030',
+              opacity: 0,
+              '--hod-tx': `${Math.cos(p.angle) * p.dist}px`,
+              '--hod-ty': `${Math.sin(p.angle) * p.dist - 15}px`,
+              animation: `hodSpark ${p.dur}ms ease-out ${p.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes hodAura {
+              0%   { opacity: 0; transform: scale(0.4); }
+              22%  { opacity: 1; transform: scale(1); }
+              70%  { opacity: 0.85; transform: scale(1.2); }
+              100% { opacity: 0; transform: scale(1.45); }
+            }
+            @keyframes hodDescend {
+              0%   { opacity: 0; transform: translateY(-260px) scale(0.55); }
+              28%  { opacity: 1; transform: translateY(-130px) scale(0.85); }
+              68%  { opacity: 1; transform: translateY(0px)    scale(1.15); }
+              85%  { opacity: 0.8; transform: translateY(20px) scale(1.35); }
+              100% { opacity: 0; transform: translateY(30px)   scale(1.55); }
+            }
+            @keyframes hodLightning {
+              0%   { opacity: 0; transform: rotate(var(--rot,0deg)) scaleY(0.05); }
+              25%  { opacity: 1; transform: rotate(var(--rot,0deg)) scaleY(1); }
+              60%  { opacity: 0.9; transform: rotate(var(--rot,0deg)) scaleY(1); }
+              100% { opacity: 0; transform: rotate(var(--rot,0deg)) scaleY(1); }
+            }
+            @keyframes hodFlash {
+              0%   { opacity: 0; transform: scale(0.4); }
+              12%  { opacity: 1; transform: scale(1); }
+              50%  { opacity: 0.7; transform: scale(1.35); }
+              100% { opacity: 0; transform: scale(1.75); }
+            }
+            @keyframes hodShockwave {
+              0%   { opacity: 0; transform: scale(0.4); border-width: 6px; }
+              16%  { opacity: 1; transform: scale(1.2); border-width: 6px; }
+              100% { opacity: 0; transform: scale(5.2); border-width: 1px; }
+            }
+            @keyframes hodSkull {
+              0%   { opacity: 0; transform: translate(0,0) scale(0.4) rotate(0deg); }
+              22%  { opacity: 1; transform: translate(calc(var(--hod-tx)*0.4), calc(var(--hod-ty)*0.4 - 12px)) scale(1.2) rotate(40deg); }
+              100% { opacity: 0; transform: translate(var(--hod-tx), var(--hod-ty)) scale(0.6) rotate(120deg); }
+            }
+            @keyframes hodBone {
+              0%   { opacity: 0; transform: translate(0,0) scale(0.4) rotate(0deg); }
+              25%  { opacity: 1; transform: translate(calc(var(--hod-tx)*0.4), calc(var(--hod-ty)*0.4)) scale(1) rotate(calc(var(--hod-rot)*0.4)); }
+              100% { opacity: 0; transform: translate(var(--hod-tx), var(--hod-ty)) scale(0.55) rotate(var(--hod-rot)); }
+            }
+            @keyframes hodSpark {
+              0%   { opacity: 0; transform: translate(0,0) scale(0.4); }
+              22%  { opacity: 1; transform: translate(calc(var(--hod-tx)*0.35), calc(var(--hod-ty)*0.35)) scale(1.15); }
+              100% { opacity: 0; transform: translate(var(--hod-tx), var(--hod-ty)) scale(0.2); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  icy_grave_strike: (() => {
+    // Icy-grave strike — a colossal ice shard plummets from above
+    // onto the target, four ground-rising frost columns erupt around
+    // it, a pale-blue impact flash and shockwave bloom outward, then
+    // a burst of snowflakes + ice fragments + cyan sparks scatters.
+    // Lifespan ~1700ms; broadcast MUST pass matching `duration`.
+    return function IcyGraveStrikeEffect({ x, y }) {
+      const flakes = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+        id: i,
+        angle: Math.random() * Math.PI * 2,
+        dist: 55 + Math.random() * 85,
+        size: 16 + Math.random() * 14,
+        delay: 720 + Math.random() * 280,
+        dur: 850 + Math.random() * 420,
+        rot: -180 + Math.random() * 360,
+        char: ['❄', '❄', '❅', '❆', '✦'][Math.floor(Math.random() * 5)],
+      })), []);
+      const shards = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+        id: i,
+        angle: Math.random() * Math.PI * 2,
+        dist: 70 + Math.random() * 55,
+        size: 22 + Math.random() * 18,
+        delay: 760 + Math.random() * 220,
+        dur: 800 + Math.random() * 400,
+      })), []);
+      const sparks = useMemo(() => Array.from({ length: 28 }, (_, i) => ({
+        id: i,
+        angle: Math.random() * Math.PI * 2,
+        dist: 55 + Math.random() * 75,
+        size: 4 + Math.random() * 7,
+        delay: 720 + Math.random() * 320,
+        dur: 650 + Math.random() * 400,
+      })), []);
+      // Ground-rising frost spikes around the target — four pillars
+      // erupting upward at the moment of impact.
+      const spikes = useMemo(() => [
+        { x: -60, h: 100, delay: 720, dur: 700 },
+        { x:  60, h: 100, delay: 760, dur: 700 },
+        { x: -30, h: 130, delay: 740, dur: 720 },
+        { x:  30, h: 130, delay: 780, dur: 720 },
+      ], []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10110 }}>
+          {/* Cold pale-blue aura around the target — converges as the shard descends */}
+          <div style={{
+            position: 'absolute', left: -130, top: -130, width: 260, height: 260,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(160,220,255,.85) 0%, rgba(80,160,230,.65) 38%, rgba(20,80,180,.35) 65%, rgba(0,0,0,0) 82%)',
+            filter: 'blur(3px)',
+            animation: 'igAura 1500ms ease-out forwards',
+          }} />
+          {/* Descending icicle */}
+          <div style={{
+            position: 'absolute', left: -60, top: 0, width: 120, height: 120,
+            fontSize: 108,
+            textAlign: 'center', lineHeight: '120px',
+            filter: 'drop-shadow(0 0 22px rgba(140,220,255,1)) drop-shadow(0 0 44px rgba(60,160,230,.85))',
+            animation: 'igDescend 760ms cubic-bezier(0.5, 0, 0.7, 1) forwards',
+          }}>❄</div>
+          {/* Ground-rising frost spikes — four jagged ice columns erupting around the target */}
+          {spikes.map((sp, i) => (
+            <div key={'sp' + i} style={{
+              position: 'absolute',
+              left: sp.x - 12, top: 0,
+              width: 24, height: sp.h,
+              background: 'linear-gradient(to top, rgba(180,230,255,.4), rgba(220,245,255,.95) 60%, #ffffff 100%)',
+              clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)',
+              filter: 'drop-shadow(0 0 10px rgba(120,220,255,.95)) drop-shadow(0 0 22px rgba(60,160,230,.6))',
+              transformOrigin: 'bottom center',
+              opacity: 0,
+              animation: `igSpike ${sp.dur}ms cubic-bezier(0.2, 0.8, 0.3, 1) ${sp.delay}ms forwards`,
+            }} />
+          ))}
+          {/* Impact flash — big white-cyan bloom at touchdown */}
+          <div style={{
+            position: 'absolute', left: -140, top: -140, width: 280, height: 280,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, #fff 0%, #e6f7ff 14%, rgba(120,200,255,.85) 32%, rgba(40,130,220,.55) 55%, rgba(10,60,120,0) 80%)',
+            opacity: 0,
+            animation: 'igFlash 850ms ease-out 720ms forwards',
+          }} />
+          {/* Expanding shockwave ring (cyan-bright) */}
+          <div style={{
+            position: 'absolute', left: -30, top: -30, width: 60, height: 60,
+            border: '6px solid rgba(140,220,255,.95)',
+            borderRadius: '50%',
+            boxShadow: '0 0 28px rgba(60,180,255,.95), inset 0 0 18px rgba(180,235,255,.7)',
+            opacity: 0,
+            animation: 'igShockwave 950ms ease-out 740ms forwards',
+          }} />
+          {/* Inner frost-rim shockwave (slower, deeper blue) */}
+          <div style={{
+            position: 'absolute', left: -40, top: -40, width: 80, height: 80,
+            border: '4px solid rgba(40,120,200,.85)',
+            borderRadius: '50%',
+            opacity: 0,
+            animation: 'igShockwave 1200ms ease-out 800ms forwards',
+          }} />
+          {/* Ice-shard burst */}
+          {shards.map(s => (
+            <div key={'sh' + s.id} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: s.size,
+              opacity: 0,
+              filter: 'drop-shadow(0 0 10px rgba(120,220,255,1))',
+              '--ig-tx': `${Math.cos(s.angle) * s.dist}px`,
+              '--ig-ty': `${Math.sin(s.angle) * s.dist - 22}px`,
+              animation: `igShard ${s.dur}ms ease-out ${s.delay}ms forwards`,
+            }}>🧊</div>
+          ))}
+          {/* Snowflake fragments scattering */}
+          {flakes.map(f => (
+            <div key={'f' + f.id} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: f.size,
+              opacity: 0,
+              filter: 'drop-shadow(0 0 6px rgba(180,230,255,.95))',
+              '--ig-tx': `${Math.cos(f.angle) * f.dist}px`,
+              '--ig-ty': `${Math.sin(f.angle) * f.dist - 10}px`,
+              '--ig-rot': `${f.rot}deg`,
+              animation: `igFlake ${f.dur}ms ease-out ${f.delay}ms forwards`,
+            }}>{f.char}</div>
+          ))}
+          {/* Cyan sparks */}
+          {sparks.map(p => (
+            <div key={'sk' + p.id} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: p.size, height: p.size,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, #fff, #88d8ff, #1a5090)',
+              boxShadow: '0 0 6px #6ad0ff, 0 0 14px #2080d0',
+              opacity: 0,
+              '--ig-tx': `${Math.cos(p.angle) * p.dist}px`,
+              '--ig-ty': `${Math.sin(p.angle) * p.dist - 15}px`,
+              animation: `igSpark ${p.dur}ms ease-out ${p.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes igAura {
+              0%   { opacity: 0; transform: scale(0.4); }
+              22%  { opacity: 1; transform: scale(1); }
+              70%  { opacity: 0.85; transform: scale(1.2); }
+              100% { opacity: 0; transform: scale(1.45); }
+            }
+            @keyframes igDescend {
+              0%   { opacity: 0; transform: translateY(-260px) scale(0.55) rotate(-30deg); }
+              28%  { opacity: 1; transform: translateY(-130px) scale(0.85) rotate(-12deg); }
+              68%  { opacity: 1; transform: translateY(0px)    scale(1.15) rotate(0deg); }
+              85%  { opacity: 0.85; transform: translateY(20px) scale(1.35) rotate(8deg); }
+              100% { opacity: 0; transform: translateY(30px)   scale(1.55) rotate(14deg); }
+            }
+            @keyframes igSpike {
+              0%   { opacity: 0; transform: translateY(0) scaleY(0); }
+              30%  { opacity: 1; transform: translateY(-30px) scaleY(0.8); }
+              60%  { opacity: 1; transform: translateY(-50px) scaleY(1.05); }
+              100% { opacity: 0; transform: translateY(-50px) scaleY(1); }
+            }
+            @keyframes igFlash {
+              0%   { opacity: 0; transform: scale(0.4); }
+              12%  { opacity: 1; transform: scale(1); }
+              50%  { opacity: 0.7; transform: scale(1.35); }
+              100% { opacity: 0; transform: scale(1.75); }
+            }
+            @keyframes igShockwave {
+              0%   { opacity: 0; transform: scale(0.4); border-width: 6px; }
+              16%  { opacity: 1; transform: scale(1.2); border-width: 6px; }
+              100% { opacity: 0; transform: scale(5.2); border-width: 1px; }
+            }
+            @keyframes igShard {
+              0%   { opacity: 0; transform: translate(0,0) scale(0.4) rotate(0deg); }
+              22%  { opacity: 1; transform: translate(calc(var(--ig-tx)*0.4), calc(var(--ig-ty)*0.4 - 12px)) scale(1.15) rotate(40deg); }
+              100% { opacity: 0; transform: translate(var(--ig-tx), var(--ig-ty)) scale(0.6) rotate(120deg); }
+            }
+            @keyframes igFlake {
+              0%   { opacity: 0; transform: translate(0,0) scale(0.4) rotate(0deg); }
+              25%  { opacity: 1; transform: translate(calc(var(--ig-tx)*0.4), calc(var(--ig-ty)*0.4)) scale(1) rotate(calc(var(--ig-rot)*0.4)); }
+              100% { opacity: 0; transform: translate(var(--ig-tx), var(--ig-ty)) scale(0.55) rotate(var(--ig-rot)); }
+            }
+            @keyframes igSpark {
+              0%   { opacity: 0; transform: translate(0,0) scale(0.4); }
+              22%  { opacity: 1; transform: translate(calc(var(--ig-tx)*0.35), calc(var(--ig-ty)*0.35)) scale(1.15); }
+              100% { opacity: 0; transform: translate(var(--ig-tx), var(--ig-ty)) scale(0.2); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  flooding: (() => {
+    // Battlefield-wide flood — Flooding's negation flourish. A wall of
+    // blue water surges up from below, fully covers the playing field
+    // for a beat, then drains back out. Fullscreen anchor — the
+    // component ignores its (x,y) and renders directly to the viewport
+    // (same pattern as cataclysm). The broadcast MUST pass a duration
+    // covering the full 2400ms cycle, otherwise the component unmounts
+    // mid-rise.
+    return function FloodingEffect() {
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 720;
+      const bubbles = useMemo(() => Array.from({ length: 32 }, (_, i) => ({
+        id: i,
+        x: Math.random() * vw,
+        size: 8 + Math.random() * 24,
+        delay: 250 + Math.random() * 1300,
+        dur: 1200 + Math.random() * 900,
+        drift: -60 + Math.random() * 120,
+      })), [vw]);
+      const splashes = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+        id: i,
+        x: Math.random() * vw,
+        delay: 450 + Math.random() * 500,
+        dur: 700 + Math.random() * 500,
+        size: 18 + Math.random() * 22,
+      })), [vw]);
+      return (
+        <div style={{ position: 'fixed', left: 0, top: 0, width: '100vw', height: '100vh',
+                       pointerEvents: 'none', zIndex: 10200, overflow: 'hidden' }}>
+          {/* Water mass — translucent blue gradient that rises from
+              below, holds at peak coverage, then drains back out. */}
+          <div style={{
+            position: 'absolute',
+            left: 0, bottom: 0, width: '100vw', height: '130vh',
+            background: 'linear-gradient(180deg, rgba(140,200,255,.85) 0%, rgba(50,130,220,.9) 22%, rgba(20,80,180,.92) 55%, rgba(10,50,130,.93) 100%)',
+            boxShadow: 'inset 0 40px 80px rgba(255,255,255,.25), inset 0 -40px 100px rgba(0,30,90,.5)',
+            transform: 'translateY(100%)',
+            animation: 'floodWaterRise 2400ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards',
+          }} />
+          {/* Foamy crest sitting on the water surface — moves with the
+              water mass via the same keyframe. */}
+          <div style={{
+            position: 'absolute',
+            left: 0, bottom: 0, width: '100vw', height: '130vh',
+            background: 'linear-gradient(180deg, rgba(255,255,255,.9) 0%, rgba(200,235,255,.55) 3%, transparent 8%)',
+            transform: 'translateY(100%)',
+            animation: 'floodWaterRise 2400ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards',
+            mixBlendMode: 'screen',
+          }} />
+          {/* Rising bubbles — start below the viewport, drift up
+              through the water mass and fade as they approach the
+              surface. */}
+          {bubbles.map(b => (
+            <div key={'fb' + b.id} style={{
+              position: 'absolute',
+              left: b.x + 'px', top: vh + 'px',
+              width: b.size + 'px', height: b.size + 'px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle at 35% 35%, rgba(255,255,255,.95), rgba(180,220,255,.65) 50%, rgba(80,160,230,.4) 80%, transparent)',
+              opacity: 0,
+              '--fb-drift': b.drift + 'px',
+              animation: `floodBubble ${b.dur}ms ease-out ${b.delay}ms forwards`,
+            }} />
+          ))}
+          {/* Splash droplets popping near the rising surface line */}
+          {splashes.map(s => (
+            <div key={'fs' + s.id} style={{
+              position: 'absolute',
+              left: s.x + 'px', top: '12vh',
+              fontSize: s.size + 'px',
+              opacity: 0,
+              filter: 'drop-shadow(0 0 8px rgba(140,210,255,.85))',
+              animation: `floodSplash ${s.dur}ms ease-out ${s.delay}ms forwards`,
+            }}>💧</div>
+          ))}
+          <style>{`
+            @keyframes floodWaterRise {
+              0%   { transform: translateY(100%); }
+              28%  { transform: translateY(15%); }
+              72%  { transform: translateY(15%); }
+              100% { transform: translateY(100%); }
+            }
+            @keyframes floodBubble {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              14%  { opacity: 1; transform: translate(calc(var(--fb-drift) * 0.15), -50px) scale(1); }
+              85%  { opacity: 0.85; transform: translate(var(--fb-drift), -80vh) scale(1.05); }
+              100% { opacity: 0;    transform: translate(var(--fb-drift), -95vh) scale(0.9); }
+            }
+            @keyframes floodSplash {
+              0%   { opacity: 0; transform: translate(-50%, 0) scale(0.5); }
+              22%  { opacity: 1; transform: translate(-50%, -40px) scale(1.15); }
+              70%  { opacity: 0.7; transform: translate(-50%, -10px) scale(1); }
+              100% { opacity: 0;    transform: translate(-50%, 10px) scale(0.7); }
             }
           `}</style>
         </div>
@@ -14133,6 +15193,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [gameAnims, setGameAnims] = useState([]); // Active particle animations (moved up for creature death access)
   const [beamAnims, setBeamAnims] = useState([]); // Beam animations (laser, etc.)
   const [ramAnims, setRamAnims] = useState([]); // Ram animations (hero charges to target and back)
+  const [tharxianHorseAnims, setTharxianHorseAnims] = useState([]); // Trojan Horse charges from Surprise Zone → attacker
 
   // ── Chat & Action Log state ──
   const [chatMessages, setChatMessages] = useState([]);
@@ -15298,7 +16359,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (!canHeroPlayCard(playerData, heroIdx, card)) return false;
     const hero = playerData.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
-    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.bound) return false;
+    if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.bound) return false;
     // Divine Gift of Skill lock — the support slot drag-preview uses
     // this strict client-side check (separate from `heroPlayableCards`,
     // which the server already filters). Without this, empty support
@@ -15407,7 +16468,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (!(ownPlayable[hi] || []).includes(cardName)) continue;
       const hero = me.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.bound) continue;
+      if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.bound) continue;
       if (hero.buffs?.blessed_skill?.locked) continue;
       if (findFreeSupportSlot(me, hi) < 0) continue;
       out.push(hi);
@@ -15683,8 +16744,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (showSurrender || showEndTurnConfirm || spellHeroPick || abilityAttachPick || summonOrRevealPick) return;
     if (gameState.surprisePending) return; // Lock hand during surprise prompts for both players
     const activePrompt = gameState.effectPrompt;
+    const HAND_INTERACTION_PROMPTS = ['forceDiscard','forceDiscardCancellable','pickHandCard','handPick','abilityAttach','heroAction'];
+    const isOwnHandInteractionPrompt = activePrompt && activePrompt.ownerIdx === myIdx
+      && HAND_INTERACTION_PROMPTS.includes(activePrompt.type);
     if (activePrompt && activePrompt.ownerIdx === myIdx
-        && !['forceDiscard','forceDiscardCancellable','pickHandCard','handPick','abilityAttach','heroAction'].includes(activePrompt.type)) return;
+        && !HAND_INTERACTION_PROMPTS.includes(activePrompt.type)) return;
 
     // Block ALL hand activations while ANY card or chain is mid-resolution.
     // Without this, the player can drag a second card onto the board during
@@ -15694,14 +16758,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // duplicate effect activations. Reaction-card chaining isn't blocked:
     // chain prompts arrive as `effectPrompt` of type `confirm` /
     // `cardGallery`, which the check above already routes through the
-    // prompt's own UI, not the hand mouseDown path. Hand-interaction
-    // prompts (forceDiscard, pickHandCard, etc.) were handled in their
-    // own branches earlier and never reach this gate.
+    // prompt's own UI, not the hand mouseDown path.
+    //
+    // EXCEPTION: when an OWN hand-interaction prompt is active
+    // (heroAction, forceDiscard, handPick, …), the prompt EXPECTS the
+    // player to click a hand card. Resolution-depth gating here would
+    // strand prompts opened from inside a Spell's own onPlay — e.g.
+    // Spider Dance's `performImmediateActionAnyHero` bonus-summon
+    // prompt fires while `_spellResolutionDepth > 0` and every click
+    // on an eligible Spider Creature would silently drop. The earlier
+    // prompt-type whitelist already lets those clicks through; the
+    // depth gate must too.
     const anyResolving = !!me.resolvingCard
       || !!opp?.resolvingCard
       || (gameState._spellResolutionDepth || 0) > 0
       || !!reactionChain;
-    if (anyResolving) return;
+    if (anyResolving && !isOwnHandInteractionPrompt) return;
 
     if (e.cancelable) e.preventDefault();
     const card = CARDS_BY_NAME[cardName];
@@ -19676,6 +20748,42 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)), dur);
     };
     socket.on('play_ram_animation', onRamAnimation);
+
+    // Tharxian Horse: large wooden Trojan Horse rolls out of the
+    // activator's flipped-face-up Surprise Zone and rams the
+    // attacker (Hero zone OR specific Creature support slot). Custom
+    // visual + dust trail + impact splash — distinct from the
+    // generic `play_ram_animation` which renders the card itself.
+    const onTharxianCharge = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, duration }) => {
+      if (window.playSFX) window.playSFX('attack_ram', { category: 'effect' });
+      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
+      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcEl = document.querySelector(`[data-surprise-zone][data-surprise-owner="${srcLabel}"][data-surprise-hero="${sourceHeroIdx}"]`);
+      const tgtEl = (targetZoneSlot != null && targetZoneSlot >= 0)
+        ? document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`)
+        : document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const id = Date.now() + Math.random();
+      const dur = duration || 1100;
+      const srcX = sr.left + sr.width / 2;
+      const srcY = sr.top + sr.height / 2;
+      const tgtX = tr.left + tr.width / 2;
+      const tgtY = tr.top + tr.height / 2;
+      // Mirror the horse if charging right-to-left so it always faces
+      // the direction of travel.
+      const facingRight = tgtX >= srcX;
+      setTharxianHorseAnims(prev => [...prev, {
+        id, srcX, srcY, tgtX, tgtY, dur, facingRight,
+      }]);
+      // Cleanup must outlast both the horse roll AND the impact
+      // burst — splinters peak at delay 0.78*dur + 900ms anim, so
+      // ~1.78*dur covers the full sequence with a small buffer.
+      setTimeout(() => setTharxianHorseAnims(prev => prev.filter(a => a.id !== id)), Math.ceil(dur * 1.8 + 200));
+    };
+    socket.on('play_tharxian_charge', onTharxianCharge);
+
     const onCardTransfer = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, sourceZoneKind, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneKind, cardName, duration, particles }) => {
       if (window.playSFX) window.playSFX('placement');
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
@@ -20652,7 +21760,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Generic pile-to-pile flying card animation. Used for moves the
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
-    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, flightStyle }) => {
+    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, flightStyle, faceDown }) => {
       // Backward-compatible: when only `owner` is supplied the source AND
       // destination both belong to that player (Mass Multiplication's
       // discard→deleted, the Deepsea bounce-place hand-swap, etc.). Cross-
@@ -20896,7 +22004,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // kill rule — card movements always play regardless of the user
       // setting per the player's explicit request.
       card.className = 'card-flight';
-      const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
+      // `faceDown` payload flag (Box Spider's tutored Surprise, etc.):
+      // the card's identity is hidden from this receiver, so render the
+      // cardback image and ignore the `cardName`'s real artwork. The
+      // server emits TWO copies of the broadcast — one to the owner
+      // with the actual cardName (no faceDown), one to opp/spectators
+      // with `faceDown: true` — so the owner still sees what they
+      // tutored while opp watches an opaque cardback fly across.
+      const imgUrl = faceDown
+        ? '/cardback.png'
+        : (window.cardImageUrl ? window.cardImageUrl(cardName) : null);
       const isToHand = (to === 'hand');
       const isToSupport = (to === 'support');
       const isWindstorm = (flightStyle === 'windstorm');
@@ -22430,6 +23547,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('surprise_flip', onSurpriseFlip);
       socket.off('surprise_reset', onSurpriseReset);
       socket.off('play_ram_animation', onRamAnimation);
+      socket.off('play_tharxian_charge', onTharxianCharge);
       socket.off('play_card_transfer', onCardTransfer);
       socket.off('play_projectile_animation', onProjectileAnimation);
       socket.off('butterfly_cloud_animation', onButterflyCloud);
@@ -23381,6 +24499,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     }
   }
+  // ── pickSurprise: click highlighted Surprise Zones to (multi-)select ──
+  // Used by the Spider archetype's Surprise-cost summons (Box / Brain /
+  // Crimson Skull / Diamond) and any future "sacrifice N face-down
+  // Surprises" mechanic. Distinct from `zonePick` which is keyed by
+  // Support-Zone slot index. Surprise zones have only one slot per
+  // Hero, so the key is `(owner-heroIdx)`.
+  const surprisePickSet = new Set();
+  const surprisePickInstByKey = new Map();
+  if (isMyEffectPrompt && ep.type === 'pickSurprise') {
+    for (const s of (ep.surprises || [])) {
+      const owner = s.owner ?? myIdx;
+      const key = `${owner}-${s.heroIdx}`;
+      surprisePickSet.add(key);
+      if (s.instId != null) surprisePickInstByKey.set(key, s.instId);
+    }
+  }
+  const [surprisePickSelected, setSurprisePickSelected] = useState([]);
+  // Reset selection on prompt enter/exit/change.
+  useEffect(() => {
+    if (!isMyEffectPrompt || ep?.type !== 'pickSurprise') setSurprisePickSelected([]);
+    // Reset when the prompt's identity (turn/title) changes too. The
+    // server reissues a fresh prompt for each summon attempt; selection
+    // state must not leak across them.
+  }, [ep?.type, ep?.title, ep?.surprises?.length]);
+  const surprisePickSelectedKeys = new Set(surprisePickSelected.map(p => `${p.owner}-${p.heroIdx}`));
   // ── Slippery Skates two-step move ──
   const [skatesSelected, setSkatesSelected] = useState(null); // selected creature zoneSlot or null
   const skatesCreatureSet = new Set();
@@ -24170,7 +25313,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const isValidHeroTarget = isTargeting && validTargetIds.has(heroTargetId);
           const isSelectedHeroTarget = selectedSet.has(heroTargetId);
           const isFrozen = hero?.statuses?.frozen;
-          const isStunned = hero?.statuses?.stunned;
+          const isStunned = (hero?.statuses?.stunned || hero?.statuses?.webbed);
           const isImmune = hero?.statuses?.immune;
           const isNegated = hero?.statuses?.negated;
           const isNulled = hero?.statuses?.nulled;
@@ -24179,9 +25322,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const isShielded = hero?.statuses?.shielded;
           const isHealReversed = hero?.statuses?.healReversed;
           const isUntargetable = hero?.statuses?.untargetable;
+          const isInvisible = hero?.statuses?.invisible;
+          // Light Ball aura — render whenever this Hero hosts the
+          // Light Ball Attachment in any of their Support Zone slots.
+          // The protection itself is engine-side; the aura is just
+          // the visual cue that the host is broadcasting its warm-
+          // light aura over the other own targets.
+          const hasLightBall = (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Light Ball'));
           const isSirenLinked = !!hero?.statuses?.sirenLinked;
           const isBound = !!hero?.statuses?.bound;
           const isBlinded = !!hero?.statuses?.blinded;
+          const isMagicSilenced = !!hero?.statuses?.magic_silenced;
+          const isBerserked = !!hero?.statuses?.berserked;
+          const isCursed = !!hero?.statuses?.cursed;
           // Check if this hero has an active hero effect
           const heroEffectEntry = (gameState.activeHeroEffects || []).find(e => e.heroIdx === i && ((!isOpp && !e.charmedOwner) || (isOpp && e.charmedOwner === pi)));
           const isHeroEffectActive = !!heroEffectEntry;
@@ -24299,7 +25452,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && !isRamming ? (
                   <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={gameSkins}
                     abilities={p.abilityZones?.[i]}
-                    style={isStunned?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' } : undefined} />
+                    style={{
+                      ...(isStunned?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)' } : null),
+                      ...(isInvisible ? { opacity: 0.4 } : null),
+                      transition: 'opacity 0.4s ease, filter 0.5s ease',
+                    }} />
                 ) : hero?.name && isRamming ? (
                   <div className="board-zone-empty" style={{ opacity: 0.3 }}>{hero.name.split(',')[0]}</div>
                 ) : (
@@ -24313,7 +25470,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
                 {hero?.name && isHealReversed && <HealReversedOverlay />}
-                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isSirenLinked || isBound || isBlinded || hero._extraLife) && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
+                {hero?.name && isBerserked && <BerserkedOverlay />}
+                {hero?.name && hasLightBall && <LightBallAura />}
+                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isInvisible || isSirenLinked || isBound || isBlinded || isMagicSilenced || isBerserked || isCursed || hero._extraLife) && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
                 {hero?.name && (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Mummy Token')) && (
@@ -24509,6 +25668,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   const surpriseTargetId = `surprise-${pi}-${i}`;
                   if (isTargeting && validTargetIds.has(surpriseTargetId)) cls += ' potion-target-valid';
                   if (isTargeting && selectedSet.has(surpriseTargetId)) cls += ' potion-target-selected';
+                  // pickSurprise highlight — Spider archetype's
+                  // "sacrifice N Surprises" summon cost flow.
+                  const surpKey = `${pi}-${i}`;
+                  if (surprisePickSet.has(surpKey)) {
+                    cls += surprisePickSelectedKeys.has(surpKey)
+                      ? ' potion-target-selected'
+                      : ' potion-target-valid';
+                  }
                   // Drag highlight logic — eligible zones stay highlighted
                   // for the whole duration of any Surprise-card drag, not
                   // only when the cursor is currently over one.
@@ -24530,6 +25697,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 onClick={(() => {
                   const surpriseTargetId = `surprise-${pi}-${i}`;
                   if (isTargeting && validTargetIds.has(surpriseTargetId)) return () => togglePotionTarget(surpriseTargetId);
+                  // pickSurprise click — toggle selection (single OR
+                  // multi). The floating panel's Confirm button is
+                  // always the authoritative emit path (even at
+                  // selectCount === 1) so React-batch / StrictMode /
+                  // closure-state-staleness can never race a click
+                  // into a double or stale `respondToPrompt`. The
+                  // panel auto-emits when the selection count
+                  // reaches `selectCount` AND a "click again to
+                  // unselect" pass remains available for the
+                  // player.
+                  const surpKey = `${pi}-${i}`;
+                  if (surprisePickSet.has(surpKey)) {
+                    return () => {
+                      const instId = surprisePickInstByKey.get(surpKey);
+                      const owner = pi;
+                      const cap = ep.selectCount ?? ep.maxSelect ?? 1;
+                      const prev = surprisePickSelected;
+                      const alreadyIdx = prev.findIndex(p => p.owner === owner && p.heroIdx === i);
+                      let next;
+                      if (alreadyIdx >= 0) {
+                        next = prev.slice();
+                        next.splice(alreadyIdx, 1);
+                      } else {
+                        if (prev.length >= cap) return; // cap full — ignore click
+                        next = [...prev, { owner, heroIdx: i, instId }];
+                      }
+                      setSurprisePickSelected(next);
+                    };
+                  }
                   // Ushabti summon
                   const ushabtiEntry = !isOpp && (gameState.ushabtiSummonable || []).find(u => u.heroIdx === i);
                   if (ushabtiEntry && !isEffectLocked) return () => {
@@ -24538,13 +25734,54 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   return undefined;
                 })()}
                 style={(() => {
+                  // `position: relative` so the reduced-level badge
+                  // (added below) anchors to this slot rather than
+                  // bubbling up to the nearest positioned ancestor.
+                  const base = { position: 'relative' };
                   const surpriseTargetId = `surprise-${pi}-${i}`;
-                  if (isTargeting && validTargetIds.has(surpriseTargetId)) return { cursor: 'pointer' };
+                  if (isTargeting && validTargetIds.has(surpriseTargetId)) return { ...base, cursor: 'pointer' };
+                  const surpKey = `${pi}-${i}`;
+                  if (surprisePickSet.has(surpKey)) return { ...base, cursor: 'pointer' };
                   const ushabtiEntry = !isOpp && (gameState.ushabtiSummonable || []).find(u => u.heroIdx === i);
-                  if (ushabtiEntry && !isEffectLocked) return { cursor: 'pointer' };
-                  return undefined;
+                  if (ushabtiEntry && !isEffectLocked) return { ...base, cursor: 'pointer' };
+                  return base;
                 })()}>
                 <BoardZone type="surprise" cards={surZones[i] || []} faceDown={isOpp && !(p.surpriseKnown || [])[i] && (surZones[i] || []).every(c => c === '?')} label="Surprise" style={zs('surprise')} />
+                {/* Reduced-level badge — only when the server-computed
+                    effective Surprise level differs from the printed
+                    level (Spider Hive et al). Shows the EFFECTIVE
+                    level so the player can see at a glance what the
+                    activation threshold actually is right now. */}
+                {(() => {
+                  const eff = (p.surpriseEffectiveLevels || [])[i];
+                  if (eff == null) return null;
+                  const surpriseName = (surZones[i] || [])[0];
+                  if (!surpriseName || surpriseName === '?') return null;
+                  const printed = CARDS_BY_NAME[surpriseName]?.level;
+                  if (printed == null || printed === eff) return null;
+                  return (
+                    <div className="surprise-level-badge"
+                      onMouseEnter={e => showGameTooltip(e, `Effective Level ${eff} (printed ${printed}) — reduced by an active effect`)}
+                      onMouseLeave={hideGameTooltip}
+                      style={{
+                        position: 'absolute',
+                        top: 2, left: 2,
+                        background: 'linear-gradient(135deg, #6a3a8a 0%, #4a2a6a 100%)',
+                        color: '#fff',
+                        fontFamily: 'Orbit, monospace',
+                        fontSize: 11,
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        border: '1px solid #b06ad0',
+                        boxShadow: '0 0 6px rgba(176,106,208,.6)',
+                        pointerEvents: 'auto',
+                        cursor: 'help',
+                        zIndex: 5,
+                      }}>
+                      L{eff}
+                    </div>
+                  );
+                })()}
               </div>
               {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxRight }).map((_, s) => (
                 <div key={'rpad-'+s} className="board-zone-spacer" />
@@ -24580,7 +25817,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // the live aura state per side via `chillyDogActiveSides`.
           const _abZoneSide = isOpp ? oppIdx : myIdx;
           const _chillyDogLiftsAbZone = !!(gameState.chillyDogActiveSides || [])[_abZoneSide];
-          const isFrozenOrStunned = hero?.statuses?.stunned
+          const isFrozenOrStunned = (hero?.statuses?.stunned || hero?.statuses?.webbed)
             || (hero?.statuses?.frozen && !_chillyDogLiftsAbZone);
           const abilityAttachActive2 = !isOpp && gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
           const heroIneligible = !isOpp && abilityDrag && (() => {
@@ -25418,7 +26655,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     {cc?.frozen ? <FrozenOverlay /> : null}
                     {(cc?.negated || cc?.nulled) ? <NegatedOverlay /> : null}
                     {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
-                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated || cc?.nulled || cc?._baihuStunned || cc?.sirenLinked || cc?._extraLife) ? <StatusBadges counters={cc} isHero={false} player={p} cardName={cards[cards.length-1]} /> : null}
+                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated || cc?.nulled || cc?.magic_silenced || cc?._baihuStunned || cc?.sirenLinked || cc?._extraLife) ? <StatusBadges counters={cc} isHero={false} player={p} cardName={cards[cards.length-1]} /> : null}
                     {cc?.buffs ? <BuffColumn buffs={cc.buffs} cardName={cards[cards.length-1]} /> : null}
                     {cc?._guardianImmune ? <div className="board-card-guardian-shield" /> : null}
                     </>
@@ -25616,7 +26853,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
         </div>
         {/* Board */}
-        <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '') + (pt?.config?.redSelect ? ' sacrifice-targeting' : '')}>
+        <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '') + (pt?.config?.redSelect ? ' sacrifice-targeting' : '') + (pt?.config?.goldSelect ? ' golden-targeting' : '')}>
           {/* ── Generic Player Debuff Warnings (top of battlefield) ── */}
           {(() => {
             const debuffs = [];
@@ -25751,6 +26988,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {(((gameState.areaZones?.[0] || []).includes('Graveyard of Limited Power')) || ((gameState.areaZones?.[1] || []).includes('Graveyard of Limited Power'))) && <GraveyardOfLimitedPowerOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('The First Circle of Hell')) || ((gameState.areaZones?.[1] || []).includes('The First Circle of Hell'))) && <FirstCircleOfHellOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Blood Rock')) || ((gameState.areaZones?.[1] || []).includes('Blood Rock'))) && <BloodRockOverlay />}
+            {(((gameState.areaZones?.[0] || []).includes('Spider Hive')) || ((gameState.areaZones?.[1] || []).includes('Spider Hive'))) && <SpiderHiveOverlay />}
             {(((gameState.areaZones?.[0] || []).includes("Tarleinn's Floating Island")) || ((gameState.areaZones?.[1] || []).includes("Tarleinn's Floating Island"))) && <FloatingIslandOverlay />}
             {(() => {
               // Gathering Storm is an Attachment Spell — it lives in a
@@ -26592,6 +27830,148 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div className="ram-fire-particle" style={{ '--fp-delay': '0.25s', '--fp-x': '-12px', '--fp-y': '6px' }}>🔥</div>
           </>}
         </div>
+      ))}
+
+      {/* Tharxian (Trojan) Horse charges — a large wooden horse on
+          wheels rolls out of the activator's flipped Surprise Zone
+          and rams into the attacker. Custom SVG silhouette + dust
+          trail; the renderer applies an X-axis flip when charging
+          right-to-left so the horse always faces its direction of
+          travel. A massive impact burst (shockwave ring, white
+          flash, splinters, debris chunks) detonates at the target
+          right when the horse lands. */}
+      {tharxianHorseAnims.map(h => (
+        <React.Fragment key={h.id}>
+          {/* The horse + dust trail (translates from src to tgt) */}
+          <div className="tharxian-horse-anim" style={{
+            left: h.srcX - 65, top: h.srcY - 50,
+            '--thDx': (h.tgtX - h.srcX) + 'px',
+            '--thDy': (h.tgtY - h.srcY) + 'px',
+            animationDuration: h.dur + 'ms',
+          }}>
+            <div className="tharxian-horse-gallop" style={{
+              transform: h.facingRight ? 'scaleX(1)' : 'scaleX(-1)',
+            }}>
+              <svg viewBox="-10 -4 145 108" width="145" height="108"
+                   style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.55))', overflow: 'visible' }}>
+                {/* Tail (long horsehair from the rear) */}
+                <path d="M 12 46 Q 0 50 -2 64 Q 4 58 8 60 Q 4 68 10 70 Q 6 76 14 74"
+                      fill="none" stroke="#3a2008" strokeWidth="2.5" strokeLinecap="round" />
+                {/* Body (oval — slimmer than before, leaving room for the long neck) */}
+                <ellipse cx="48" cy="48" rx="38" ry="17" fill="#6b3f1a" />
+                <ellipse cx="48" cy="48" rx="38" ry="17" fill="none"
+                         stroke="#3a2008" strokeWidth="1.5" />
+                {/* Wood-grain stripes across the body */}
+                <line x1="14" y1="44" x2="84" y2="44" stroke="#4a2a10" strokeWidth="1" />
+                <line x1="12" y1="50" x2="86" y2="50" stroke="#4a2a10" strokeWidth="1" />
+                <line x1="14" y1="55" x2="84" y2="55" stroke="#4a2a10" strokeWidth="1" />
+                {/* Plank bolts */}
+                <circle cx="24" cy="48" r="1.3" fill="#2a1808" />
+                <circle cx="40" cy="48" r="1.3" fill="#2a1808" />
+                <circle cx="56" cy="48" r="1.3" fill="#2a1808" />
+                <circle cx="72" cy="48" r="1.3" fill="#2a1808" />
+                {/* Long arched neck — sweeps up from the front of the
+                    body to the base of the head. Thicker at the
+                    shoulder, tapering as it rises. */}
+                <path d="M 78 38 Q 85 22 100 14 L 110 22 Q 100 30 88 50 Z"
+                      fill="#6b3f1a" stroke="#3a2008" strokeWidth="1.3" />
+                {/* Neck wood-grain stripe (follows the curve) */}
+                <path d="M 82 40 Q 90 26 102 18" fill="none" stroke="#4a2a10" strokeWidth="1" />
+                {/* Spiky wooden mane along the top of the neck */}
+                <path d="M 82 34 L 84 26 L 87 33 L 90 22 L 94 30 L 97 18 L 100 26 L 103 14 Z"
+                      fill="#4a2a10" />
+                {/* Head — elongated muzzle, attached to the top of the neck */}
+                <path d="M 100 10 Q 120 8 124 18 Q 126 28 116 32 L 105 30 Q 99 22 102 12 Z"
+                      fill="#6b3f1a" stroke="#3a2008" strokeWidth="1.3" />
+                {/* Head wood-grain accent */}
+                <line x1="105" y1="22" x2="120" y2="20" stroke="#4a2a10" strokeWidth="0.8" />
+                {/* Ears (two angled triangles) */}
+                <path d="M 106 10 L 108 2 L 111 11 Z" fill="#5a341a" stroke="#3a2008" strokeWidth="0.6" />
+                <path d="M 100 12 L 102 4 L 105 13 Z" fill="#4a2a10" stroke="#3a2008" strokeWidth="0.6" />
+                {/* Eye — ominous orange glow */}
+                <circle cx="116" cy="20" r="2.2" fill="#ff8800" />
+                <circle cx="116" cy="20" r="1" fill="#2a1808" />
+                {/* Nostril + mouth crease at the snout */}
+                <ellipse cx="121" cy="25" rx="1.6" ry="1" fill="#2a1808" />
+                <line x1="116" y1="29" x2="122" y2="29" stroke="#2a1808" strokeWidth="0.9" />
+                {/* Legs (squared wooden posts) */}
+                <rect x="18" y="63" width="9" height="22" fill="#5a341a" stroke="#3a2008" strokeWidth="1" />
+                <rect x="34" y="63" width="9" height="22" fill="#5a341a" stroke="#3a2008" strokeWidth="1" />
+                <rect x="56" y="63" width="9" height="22" fill="#5a341a" stroke="#3a2008" strokeWidth="1" />
+                <rect x="72" y="63" width="9" height="22" fill="#5a341a" stroke="#3a2008" strokeWidth="1" />
+                {/* Wheels (Trojan-cart style) */}
+                <circle cx="24" cy="86" r="7" fill="#3a1f08" stroke="#1f0f04" strokeWidth="1.5" />
+                <circle cx="24" cy="86" r="2.5" fill="#6b3f1a" />
+                <line x1="24" y1="79" x2="24" y2="93" stroke="#1f0f04" strokeWidth="1" />
+                <line x1="17" y1="86" x2="31" y2="86" stroke="#1f0f04" strokeWidth="1" />
+                <circle cx="76" cy="86" r="7" fill="#3a1f08" stroke="#1f0f04" strokeWidth="1.5" />
+                <circle cx="76" cy="86" r="2.5" fill="#6b3f1a" />
+                <line x1="76" y1="79" x2="76" y2="93" stroke="#1f0f04" strokeWidth="1" />
+                <line x1="69" y1="86" x2="83" y2="86" stroke="#1f0f04" strokeWidth="1" />
+              </svg>
+            </div>
+            {/* Dust cloud trail puffs */}
+            {[0, 1, 2, 3, 4].map(i => (
+              <div key={'dust-' + i} className="tharxian-dust-puff" style={{
+                '--puff-delay': (i * 0.12) + 's',
+                '--puff-x': (h.facingRight ? -32 - i * 6 : 32 + i * 6) + 'px',
+                '--puff-y': (50 + (i % 2) * 8) + 'px',
+                '--puff-size': (14 + i * 3) + 'px',
+              }} />
+            ))}
+          </div>
+
+          {/* Huge impact burst at the target — fires exactly when
+              the horse lands. White flash + expanding shockwave
+              ring + radial wood splinters + dust kick. Each child
+              carries an animation delay timed to ~78% of the
+              charge duration so the burst hits sync with the
+              shudder of the horse's impact. */}
+          <div className="tharxian-impact" style={{ left: h.tgtX, top: h.tgtY }}>
+            {/* Outer shockwave ring */}
+            <div className="tharxian-impact-ring" style={{
+              animationDelay: (h.dur * 0.78) + 'ms',
+            }} />
+            {/* Inner faster ring (gives a double-pulse feel) */}
+            <div className="tharxian-impact-ring tharxian-impact-ring--inner" style={{
+              animationDelay: (h.dur * 0.82) + 'ms',
+            }} />
+            {/* Central white-gold flash */}
+            <div className="tharxian-impact-flash" style={{
+              animationDelay: (h.dur * 0.78) + 'ms',
+            }} />
+            {/* Wood splinters — 12 radial chunks of debris */}
+            {Array.from({ length: 12 }).map((_, i) => {
+              const angle = (i / 12) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+              const dist = 90 + Math.random() * 50;
+              return (
+                <div key={'splinter-' + i} className="tharxian-impact-splinter" style={{
+                  '--sp-dx': (Math.cos(angle) * dist) + 'px',
+                  '--sp-dy': (Math.sin(angle) * dist) + 'px',
+                  '--sp-rot-end': (Math.random() * 720 - 360) + 'deg',
+                  animationDelay: (h.dur * 0.78 + i * 15) + 'ms',
+                }} />
+              );
+            })}
+            {/* Heavier debris chunks (square wood blocks) */}
+            {Array.from({ length: 6 }).map((_, i) => {
+              const angle = (i / 6) * Math.PI * 2 + Math.PI / 12;
+              const dist = 60 + Math.random() * 30;
+              return (
+                <div key={'chunk-' + i} className="tharxian-impact-chunk" style={{
+                  '--ck-dx': (Math.cos(angle) * dist) + 'px',
+                  '--ck-dy': (Math.sin(angle) * dist - 20) + 'px', // slight upward bias
+                  '--ck-rot-end': (Math.random() * 540 - 270) + 'deg',
+                  animationDelay: (h.dur * 0.78 + i * 25) + 'ms',
+                }} />
+              );
+            })}
+            {/* Ground dust burst at the impact point */}
+            <div className="tharxian-impact-dust" style={{
+              animationDelay: (h.dur * 0.80) + 'ms',
+            }} />
+          </div>
+        </React.Fragment>
       ))}
 
       {/* Card transfer animations (Dark Gear creature steal, etc.) */}
@@ -27455,6 +28835,47 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </DraggablePanel>
       )}
 
+      {/* ── Effect Prompt: Surprise Picker Panel (Spider archetype) ── */}
+      {isMyEffectPrompt && ep.type === 'pickSurprise' && (() => {
+        const cap = ep.selectCount ?? ep.maxSelect ?? 1;
+        const minN = ep.minSelect ?? cap;
+        const canConfirm = surprisePickSelected.length >= minN
+          && surprisePickSelected.length <= cap;
+        return (
+          <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#b04ba0' }}>
+            <div className="orbit-font" style={{ fontSize: 13, color: '#d36cc0', marginBottom: 8 }}>{ep.title || 'Sacrifice Surprises'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8 }}>{ep.description}</div>
+            <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .8, marginBottom: 8 }}>
+              Click highlighted Surprise{cap > 1 ? 's' : ''} on the board to toggle selection.
+              <span style={{ display: 'block', marginTop: 4, color: '#d36cc0' }}>
+                Selected: {surprisePickSelected.length} / {cap}
+              </span>
+            </div>
+            <button
+              className="btn"
+              disabled={!canConfirm}
+              style={{
+                marginTop: 4, padding: '6px 16px', fontSize: 11,
+                opacity: canConfirm ? 1 : 0.4,
+                cursor: canConfirm ? 'pointer' : 'not-allowed',
+                background: canConfirm ? '#7a2a6a' : undefined,
+                color: canConfirm ? '#fff' : undefined,
+                marginRight: 8,
+              }}
+              onClick={() => {
+                if (!canConfirm) return;
+                respondToPrompt({ selectedSurprises: surprisePickSelected });
+              }}>
+              {ep.confirmLabel || '🕷️ Confirm!'}
+            </button>
+            {ep.cancellable !== false && (
+              <button className="btn" style={{ marginTop: 4, padding: '6px 16px', fontSize: 11 }}
+                onClick={() => respondToPrompt({ cancelled: true })}>{ep.cancelLabel || '← Cancel'}</button>
+            )}
+          </DraggablePanel>
+        );
+      })()}
+
       {/* ── Effect Prompt: Chain Target Pick (Chain Lightning / Qinglong / Bottled Lightning) ── */}
       {isMyEffectPrompt && ep.type === 'chainTargetPick' && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#ffcc00' }}>
@@ -28039,7 +29460,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Potion/Artifact targeting panel */}
       {!isSpectator && isTargeting && pt && !gameState.effectPrompt && (
         <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out' }}>
-          <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
+          <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.goldSelect ? '#ffd700' : pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
           {/* Optional small card preview — passed in via config.previewCardName.
               Bill uses this to show the equip the player is placing; any

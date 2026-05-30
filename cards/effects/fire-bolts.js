@@ -27,10 +27,17 @@
 // ─── HELPERS ─────────────────────────────
 
 /**
- * Count Destruction Magic levels on a specific hero.
- * Performance copies in a DM-base zone count as DM.
+ * Caster-aware Destruction Magic level on a specific hero. Routes
+ * through the engine helper so an active `gs._castSchoolOverride`
+ * (Demon's Gate "as if Destruction Magic 3") wins over the host
+ * hero's actual stack count. Falls back to a local inline count when
+ * no engine reference is available (defensive — every live call site
+ * passes the engine).
  */
-function countDM(gs, playerIdx, heroIdx) {
+function countDM(gs, playerIdx, heroIdx, engine) {
+  if (engine?.effectiveSchoolLevelForCaster) {
+    return engine.effectiveSchoolLevelForCaster('Destruction Magic', playerIdx, heroIdx);
+  }
   const ps = gs.players[playerIdx];
   const abZones = ps?.abilityZones?.[heroIdx] || [];
   let count = 0;
@@ -71,7 +78,7 @@ function isFirstDMSpellThisTurn(engine, playerIdx) {
  * Check if enhanced mode conditions are met.
  */
 function canEnhance(gs, engine, playerIdx, heroIdx) {
-  return countDM(gs, playerIdx, heroIdx) >= 3 && isFirstDMSpellThisTurn(engine, playerIdx);
+  return countDM(gs, playerIdx, heroIdx, engine) >= 3 && isFirstDMSpellThisTurn(engine, playerIdx);
 }
 
 // ─── CARD MODULE ─────────────────────────
@@ -92,7 +99,7 @@ module.exports = {
   inherentAction(gs, playerIdx, heroIdx, engine) {
     const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
     if (!isMainPhase) return false;
-    if (countDM(gs, playerIdx, heroIdx) < 3) return false;
+    if (countDM(gs, playerIdx, heroIdx, engine) < 3) return false;
     if (engine) return isFirstDMSpellThisTurn(engine, playerIdx);
     // Fallback without engine: conservative check via action log absence
     return true;

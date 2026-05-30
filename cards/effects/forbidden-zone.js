@@ -135,7 +135,11 @@ module.exports = {
       for (const t of heroTargets) {
         const hero = oppPs.heroes[t.heroIdx];
         if (!hero || hero.hp <= 0) continue;
-        await ctx.dealDamage(hero, DAMAGE, 'decay_spell');
+        const r = await ctx.dealDamage(hero, DAMAGE, 'decay_spell');
+        // Damage fully cancelled by a reaction (Idej Projection,
+        // Spectral Armor zero-cap, Anti Magic void) → "and all
+        // associated effects" rule: skip the bound rider too.
+        if (r?.cancelled) continue;
         // After-damage state: hero may have died from the hit. Skip the
         // lockout in that case — a dead hero can't act anyway, and
         // adding a status to a corpse breaks the "alive heroes only"
@@ -154,11 +158,16 @@ module.exports = {
       for (const id of creatureTargetIds) {
         const inst = engine.cardInstances.find(c => c.id === id);
         if (!inst || inst.zone !== 'support') continue;
-        await engine.actionDealCreatureDamage(
+        const r = await engine.actionDealCreatureDamage(
           { name: CARD_NAME, owner: pi, heroIdx },
           inst, DAMAGE, 'decay_spell',
           { sourceOwner: pi, canBeNegated: true },
         );
+        // Same "and all associated effects" rule for the creature
+        // half — skip the negate rider when the damage was fully
+        // cancelled (Spectral Armor zero-cap, future creature
+        // damage-negation reactions).
+        if (r?.cancelled) continue;
         // Verify the creature is still on the board after damage.
         const stillOn = engine.cardInstances.find(c => c.id === id);
         if (!stillOn || stillOn.zone !== 'support') continue;

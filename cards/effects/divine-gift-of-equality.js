@@ -152,6 +152,19 @@ module.exports = {
       if (secondT.type === 'hero') {
         const tgtHero = gs.players[secondT.owner]?.heroes?.[secondT.heroIdx];
         if (!tgtHero || tgtHero.hp <= 0) { gs._spellCancelled = true; return; }
+        // Anti-Magic gate. The halving is a non-damage HP mutation, so
+        // neither the damage path nor the new `addHeroStatus` /
+        // `actionAddBuff` / `_actionHealHeroImpl` gates would catch
+        // it. Mirror them here so a target Hero with `magic_immune`
+        // covering this Lv 1 Spell short-circuits the effect (revive
+        // also cancels, since no leftover HP means no resurrection).
+        if (engine._isHeroSpellProtected(tgtHero, 'Divine Gift of Equality')) {
+          engine.log('divine_gift_equality_blocked', { target: tgtHero.name, reason: 'magic_immune' });
+          engine._playAntiMagicBlockedAnim(tgtHero);
+          gs._spellCancelled = true;
+          engine.sync();
+          return;
+        }
         // Resistance gate. The halving is a non-damage HP mutation
         // (it's not routed through actionDealDamage), so neither the
         // damage path nor `actionHealHero`'s `beforeHeroEffect` gate

@@ -72,6 +72,17 @@ module.exports = {
           if (!ok) break;
           if (isSlipperyCard(cardName, engine)) slipperyTouched = true;
           n++;
+          // Sync + stagger AFTER each discard so the client renders
+          // this discard's hand→discard flight before the next one
+          // starts. `actionDiscardHandCard` mutates ps.hand /
+          // ps.discardPile synchronously but does NOT sync — without
+          // this both human and CPU-driven multi-discards would land
+          // in memory and only the final wrapper-level sync flushes
+          // them, dumping the entire hand at once. CPU prompts also
+          // resolve instantly, so the stagger doubles as visible
+          // pacing when the CPU is the one Snobbit-cycling.
+          engine.sync();
+          await engine._delay(260);
         }
         return { count: n, slipperyTouched };
       });

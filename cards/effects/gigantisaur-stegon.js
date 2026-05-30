@@ -57,6 +57,11 @@ module.exports = {
       const entries = Array.isArray(ctx.entries) ? ctx.entries : [];
       for (const e of entries) {
         if (!e || !e.inst || !(e.amount > 0)) continue;
+        // Full negation (Spectral Armor zero-cap, Anti Magic void,
+        // future damage-cancellation reactions on the Gigantisaur
+        // owner's side) → the Gigantisaur didn't actually take
+        // damage, so no recoil should fire.
+        if (e.cancelled) continue;
         // Damaged Creature is owned by us AND is a Gigantisaur.
         const target = e.inst;
         if ((target.controller ?? target.owner) !== pi) continue;

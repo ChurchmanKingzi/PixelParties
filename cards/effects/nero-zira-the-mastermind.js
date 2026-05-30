@@ -71,12 +71,11 @@ module.exports = {
       if (hero._neroZiraAtkBoostUsed >= USES_PER_TURN) return;
       hero._neroZiraAtkBoostUsed++;
 
-      // Permanent ATK gain — direct hero.atk mutation. Mirrors actionGrantAtk
-      // minus the per-instance revoke counter, since this boost never expires.
-      hero.atk = (hero.atk || 0) + ATK_BOOST;
-      engine._broadcastEvent('fighting_atk_change', {
-        owner: pi, heroIdx, amount: ATK_BOOST,
-      });
+      // Permanent ATK gain. Routed through `_applyHeroAtkDelta` so
+      // the Curse suppression accumulator catches it when the host
+      // is cursed — `actionGrantAtk` isn't appropriate here because
+      // the boost never expires (no per-instance revoke counter).
+      engine._applyHeroAtkDelta(hero, pi, heroIdx, ATK_BOOST);
       engine.log('atk_grant', {
         hero: hero.name, amount: ATK_BOOST, source: CARD_NAME,
       });

@@ -88,12 +88,18 @@ module.exports = {
       engine._broadcastEvent('creature_zone_move', { owner: heroOwner, heroIdx, zoneSlot: target.zoneSlot });
     }
 
-    // Fire hooks for face-up Surprise Creatures (counts as creature death)
+    // Fire hooks for face-up Surprise Creatures (counts as creature death).
+    // `instId` is load-bearing — strict-instId on-death listeners
+    // (Exploding Skull) gate on `death.instId === ctx.card.id` and
+    // would silently miss the death otherwise. Hell Fox falls back to
+    // position-matching when instId is absent, but the instId-stamp
+    // is the canonical path the engine's own death paths use.
     if (wasFaceUp && isSurpriseCreature && inst) {
       const deathInfo = {
         name: cardName, owner: heroOwner,
         originalOwner: inst.originalOwner ?? heroOwner,
         heroIdx, zoneSlot: target.zoneSlot ?? 0,
+        instId: inst.id,
       };
       await engine.runHooks('onCardLeaveZone', {
         card: inst, leavingCard: inst,

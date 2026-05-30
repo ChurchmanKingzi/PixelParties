@@ -17,6 +17,17 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
 
+  cpuMeta: {
+    // Heal-target priority hint. Returns true iff THIS Howitzer
+    // instance attached to the prompted Hero target has its
+    // once-per-turn afterHeal trigger still available — i.e. healing
+    // that Hero will fire the laser. The CPU's heal-target picker
+    // boosts such targets to top priority.
+    isHealTargetFresh(engine, hostInst) {
+      return !hostInst?.counters?.howitzerFiredThisTurn;
+    },
+  },
+
   /**
    * Block equip if the target hero already has a Lifeforce Howitzer.
    * Called by the play_artifact handler before placement.

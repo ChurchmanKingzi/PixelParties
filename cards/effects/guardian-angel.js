@@ -150,6 +150,18 @@ module.exports = {
       const targetHero = tps.heroes[targetHeroIdx];
       if (!targetHero?.name) return;
 
+      // ── Anti Magic gate ──
+      // Guardian Angel is a Lv 3 Spell. A target Hero with
+      // `magic_immune.level >= 3` (Anti Magic Lv 3 attached) is immune
+      // to its effect — the attachment must NOT land. Bail BEFORE the
+      // support-zone push + `_spellPlacedOnBoard` flag so the server
+      // routes the card to the caster's discard normally.
+      if (engine._isHeroSpellProtected(targetHero, 'Guardian Angel')) {
+        engine.log('equip_blocked', { card: 'Guardian Angel', target: targetHero.name, reason: 'magic_immune' });
+        engine._playAntiMagicBlockedAnim(targetHero);
+        return;
+      }
+
       // Place card in support zone
       if (!tps.supportZones[targetHeroIdx]) tps.supportZones[targetHeroIdx] = [[], [], []];
       if (!tps.supportZones[targetHeroIdx][targetSlot]) tps.supportZones[targetHeroIdx][targetSlot] = [];

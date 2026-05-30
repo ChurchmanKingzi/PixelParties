@@ -48,6 +48,13 @@ module.exports = {
       const tgtHeroIdx = target.heroIdx;
       const tgtZoneSlot = target.type === 'hero' ? undefined : target.slotIdx;
 
+      // Pre-resolution hook (Doq's guess, future "when this Hero
+      // attacks" effects) fires AFTER target pick but BEFORE the
+      // projectile + impact + damage. Listeners may mutate the
+      // about-to-deal damage.
+      const attackSource = { name: 'Hammer Throw', owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const finalAtk = await engine._fireAttackDeclare(attackSource, target, atk);
+
       // Spinning hammer projectile animation
       engine._broadcastEvent('play_projectile_animation', {
         sourceOwner: pi, sourceHeroIdx: heroIdx,
@@ -68,13 +75,12 @@ module.exports = {
       await engine._delay(150);
 
       // Deal ATK damage
-      const attackSource = { name: 'Hammer Throw', owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
       let negated = false;
 
       if (target.type === 'hero') {
         const targetHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
         if (targetHero && targetHero.hp > 0) {
-          await engine.actionDealDamage(attackSource, targetHero, atk, 'attack');
+          await engine.actionDealDamage(attackSource, targetHero, finalAtk, 'attack');
         }
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -83,7 +89,7 @@ module.exports = {
         );
         if (inst) {
           await engine.actionDealCreatureDamage(
-            attackSource, inst, atk, 'attack',
+            attackSource, inst, finalAtk, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
         }
@@ -103,7 +109,7 @@ module.exports = {
 
       engine.log('hammer_throw', {
         player: ps.username, hero: hero.name,
-        target: target.cardName, damage: atk,
+        target: target.cardName, damage: finalAtk,
       });
       engine.sync();
     },

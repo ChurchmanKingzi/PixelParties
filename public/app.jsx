@@ -3613,6 +3613,7 @@ function StatusBadges({ statuses, counters, isHero }) {
   const c = counters || {};
   if (s.frozen || c.frozen) badges.push({ key: 'frozen', icon: '❄️', tooltip: 'Frozen: Cannot act and has its effects and Abilities negated.' + (isHero ? ' Cannot be equipped with Artifacts.' : '') });
   if (s.stunned || c.stunned) badges.push({ key: 'stunned', icon: '⚡', tooltip: 'Stunned: Cannot act and has its effects and Abilities negated.' });
+  if (s.webbed || c.webbed) badges.push({ key: 'webbed', icon: '🕸️', tooltip: 'Webbed: Cannot act and has its effects and Abilities negated. Only removed by cleansing or by paying the discard cost on the attached Crimson Web.' });
   if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
   if (s.poisoned || c.poisoned) {
     const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
@@ -6407,7 +6408,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
     // Frozen/stunned/negated/bound heroes can't perform Actions —
     // playing a card from hand IS an Action.
     if (card.cardType !== 'Ability') {
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated || hero.statuses?.bound) return false;
+      if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated || hero.statuses?.bound) return false;
     }
     // Combo lock: only the locked hero can act
     if (playerData.comboLockHeroIdx != null && playerData.comboLockHeroIdx !== heroIdx) return false;
@@ -7750,7 +7751,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
           const isValidHeroTarget = isTargeting && validTargetIds.has(heroTargetId);
           const isSelectedHeroTarget = selectedSet.has(heroTargetId);
           const isFrozen = hero?.statuses?.frozen;
-          const isStunned = hero?.statuses?.stunned;
+          const isStunned = (hero?.statuses?.stunned || hero?.statuses?.webbed);
           const isImmune = hero?.statuses?.immune;
           const isNegated = hero?.statuses?.negated;
           const isBurned = hero?.statuses?.burned;
@@ -7815,7 +7816,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         {[0, 1, 2].flatMap(i => {
           const hero = heroes[i];
           const isDead = hero && hero.hp !== undefined && hero.hp <= 0;
-          const isFrozenOrStunned = hero?.statuses?.frozen || hero?.statuses?.stunned || hero?.statuses?.negated;
+          const isFrozenOrStunned = hero?.statuses?.frozen || (hero?.statuses?.stunned || hero?.statuses?.webbed) || hero?.statuses?.negated;
           const abilityAttachActive2 = !isOpp && gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
           const heroIneligible = !isOpp && abilityDrag && (() => {
             if (abilityAttachActive2) {

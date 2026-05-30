@@ -250,8 +250,21 @@ module.exports = {
       }
       if (destSlot < 0) { gs._spellCancelled = true; return; }
 
-      // ── Place into the chosen Support Zone ──
+      // ── Anti Magic gate ──
+      // Dichotomy is a Lv 3 Spell. A host Hero with
+      // `magic_immune.level >= 3` is immune to its effect — the
+      // attachment must NOT land. Bail BEFORE the support-zone push
+      // + `_spellPlacedOnBoard` flag so the server's standard
+      // post-resolve path routes the card to the caster's discard.
       const destPs = gs.players[destOwner];
+      const destHeroObj = destPs?.heroes?.[destHero];
+      if (destHeroObj && engine._isHeroSpellProtected(destHeroObj, CARD_NAME)) {
+        engine.log('equip_blocked', { card: CARD_NAME, target: destHeroObj.name, reason: 'magic_immune' });
+        engine._playAntiMagicBlockedAnim(destHeroObj);
+        return;
+      }
+
+      // ── Place into the chosen Support Zone ──
       if (!destPs.supportZones[destHero]) destPs.supportZones[destHero] = [[], [], []];
       if (!destPs.supportZones[destHero][destSlot]) destPs.supportZones[destHero][destSlot] = [];
       destPs.supportZones[destHero][destSlot].push(CARD_NAME);

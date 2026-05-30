@@ -222,6 +222,11 @@ module.exports = {
      */
     beforeDamage: (ctx) => {
       if (ctx.cancelled) return;
+      // Piercing damage (Ida etc.) bypasses Sculpture Guards. Bail
+      // BEFORE consuming the shield mark so it survives for a future
+      // non-piercing hit. The engine's safety net would otherwise
+      // undo the cancellation, but the mark would be lost.
+      if (ctx.cannotBeNegated) return;
       const target = ctx.target;
       if (!target || target.hp === undefined) return;
       const engine = ctx._engine;

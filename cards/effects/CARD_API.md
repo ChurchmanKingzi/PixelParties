@@ -365,7 +365,7 @@ in the `hooks` object. Each receives a `ctx` object (see next section).
 
 | Hook | Fires when... | Notable ctx fields |
 |------|---------------|-------------------|
-| `onAttackDeclare` | Attack declared | `attacker`, `target` |
+| `onAttackDeclare` | Attack declared — **AFTER target pick, BEFORE animation + damage** (see "onAttackDeclare slot" below) | `source`, `target`, `amount` (modifiable via `modifyAmount` / `setAmount` / `addFlatBonus`) |
 | `beforeDamage` | Damage about to be dealt | `amount` (modifiable), `target`, `source`, `type`, `sourceHeroIdx` |
 | `afterDamage` | Damage was dealt | `amount`, `target`, `source`, `type` |
 | `onHeroKO` | Hero HP reaches 0 | `deadHero`, `heroIdx` |
@@ -705,6 +705,80 @@ back to the server's play handler:
 | `PHASES.ACTION` | 3 | ACTION |
 | `PHASES.MAIN2` | 4 | MAIN2 |
 | `PHASES.END` | 5 | END |
+
+---
+
+## The `onAttackDeclare` slot — "before an Attack's animation"
+
+`onAttackDeclare` is the canonical hook for effects that need to land
+**between target selection and the Attack's impact animation/damage**.
+Doq's detective guess is the prototype: pick a card from the opp's hand,
+declare a type, draw + boost on a hit — all *before* the swoosh, so the
+modified damage and any visible UX bursts (the prompt itself, the
+"correct!" sparkles) read as a single beat.
+
+### Listening (any card)
+
+```js
+module.exports = {
+  activeIn: ['hero'],
+  hooks: {
+    onAttackDeclare: async (ctx) => {
+      // Gate to YOUR card's role. ctx.source is { name, owner, heroIdx,
+      // controller, [usesHeroAtk] } — the Hero making the attack.
+      if (ctx.source?.heroIdx !== ctx.card.heroIdx) return;
+      if ((ctx.source?.owner ?? ctx.source?.controller) !== ctx.cardOwner) return;
+      // ctx.target is the picked target (object) or array (multi-target).
+      // ctx.amount is the about-to-deal damage; mutate via:
+      //   ctx.modifyAmount(delta)  — add/subtract
+      //   ctx.setAmount(val)       — replace
+      //   ctx.addFlatBonus(delta)  — bonus that bypasses buff multipliers
+      ctx.modifyAmount(50);
+    },
+  },
+};
+```
+
+### Firing it from a new Attack card
+
+Attack scripts that build their own resolution flow MUST call
+`engine._fireAttackDeclare(source, target, baseDamage)` AFTER target
+selection but BEFORE the impact animation, then use the returned amount
+in their damage calls:
+
+```js
+const target = await ctx.promptDamageTarget({ /* ... */ });
+if (!target) return;
+
+const attackSource = { name: 'My Attack', owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+const finalDmg = await engine._fireAttackDeclare(attackSource, target, baseDamage);
+
+// (animation broadcasts go here)
+engine._broadcastEvent('play_ram_animation', { /* ... */ });
+await engine._delay(400);
+
+// Damage uses finalDmg (post-listener)
+await engine.actionDealDamage(attackSource, hero, finalDmg, 'attack');
+```
+
+`ctx.executeAttack` already fires the hook internally — Attacks that
+delegate to it (Heavy Hit and similar generic ATK-stat hits) need no
+additional plumbing.
+
+### Auto-fire safety net
+
+If an Attack script forgets to call `_fireAttackDeclare`, the engine
+auto-fires it from inside `actionDealDamage` / `processCreatureDamageBatch`
+when the source is a Hero-attributed Attack-type damage event
+(`type === 'attack'`, `source.heroIdx >= 0`, `source.owner` set). In that
+fallback the prompt lands *after* the script's animation but still
+*before* damage applies — listeners still get their bonus applied. Per-
+source dedup via `source._attackDeclareFired = true` ensures the hook
+fires exactly once per attack regardless of which path triggered it.
+
+`usesHeroAtk: true` on the source is **not required** — the slot is
+formula-agnostic (fires for `atk`-based, `baseAtk`-based, fixed, or
+custom-math damage equally).
 
 ---
 
@@ -1078,3 +1152,222 @@ Reference implementations:
 
 When in doubt: if the player *chose* the card and it *leaves the
 board*, send the zone-anchored `play_pile_transfer` yourself.
+
+---
+
+### Permanent control transfer — ALWAYS physically moves the Creature (MANDATORY)
+
+> **Rule:** any card / effect that grants **permanent control** of an
+> opp Creature MUST physically relocate it to a free Support Zone on
+> the new controller's side. A bare `inst.controller = newOwner` flip
+> WITHOUT a move is **wrong** — it leaves the Creature sitting in the
+> previous controller's slot while card-text reads ("Creatures you
+> control", "your Support Zone", board-position-based interactions)
+> partially disagree about where it lives.
+
+The standard engine path:
+
+```js
+// 1. Build the free-zone list on the new controller's side.
+const freeZones = [];
+for (let hi = 0; hi < newOwnerPs.heroes.length; hi++) {
+  if (!newOwnerPs.heroes[hi]?.name) continue;     // empty hero slot
+  for (let si = 0; si < 3; si++) {
+    if (((newOwnerPs.supportZones[hi] || [])[si] || []).length === 0) {
+      freeZones.push({ heroIdx: hi, slotIdx: si });
+    }
+  }
+}
+// 2. No free zone → effect fizzles (or stays on the previous side,
+//    depending on the card's wording — most "take control" effects
+//    just fail when there's no room).
+if (freeZones.length === 0) return;
+
+// 3. Pick a destination. The new controller's player picks for
+//    intentional control plays (Dark Gear, Diplomacy). For automatic
+//    triggers (Jumper Spider's start-of-turn ping-pong), use
+//    promptZonePick so the controller still gets to choose.
+const picked = await engine.promptZonePick(newOwnerPi, freeZones, {
+  title: sourceCardName, description: `Move ${inst.name} where?`,
+});
+const dest = picked || freeZones[0];
+
+// 4. Single chokepoint — handles source-zone splice, the
+//    onCardLeaveZone hook, the slide-across transfer animation,
+//    destination placement, controller/owner/zone reassignment,
+//    guardian-immunity sync, onCardEnterZone (with _isMove: true),
+//    and the onTakeControl hook.
+await engine.actionTransferCreature(inst, newOwnerPi, dest.heroIdx, dest.slotIdx);
+```
+
+**Defending the Gate**: if the effect SHOULD be blockable by the gate
+(Dark Gear / Diplomacy — opp's effortful "I want this creature" play),
+the CALLER runs the gate check BEFORE `actionTransferCreature` (see
+the preceding section). If the effect is unconditional (Jumper
+Spider's automatic ping-pong — card text says it just happens),
+skip the gate check entirely.
+
+**Why this matters:**
+- The diff-detector, status-removal targeting, ability-zone reads, and
+  every "card in your Support Zone" gate look at `(inst.controller,
+  inst.heroIdx, inst.zoneSlot)` together. A controller-only flip leaves
+  the Creature physically in opp's column — visible to both players in
+  the wrong column, and a footgun for any future card that gates on
+  "in your Support Zone" semantics.
+- `actionTransferCreature` is the **only** path that plays the slide-
+  across animation, syncs guardian immunity, fires `onTakeControl`,
+  and updates `inst.zone` / `inst.heroIdx` / `inst.zoneSlot` /
+  `inst.controller` / `inst.owner` in lockstep. Hand-rolling any of
+  those steps drifts from the engine contract.
+
+Reference implementations:
+- **Dark Gear**, **Diplomacy** — proactive "take control" plays. Build
+  freeZones, prompt for a slot, then `actionTransferCreature`.
+- **Jumper Spider** — automatic start-of-turn ping-pong. Uses the same
+  flow on each turn flip; if the new turn player has no free zone, the
+  transfer simply skips this turn (Jumper Spider stays under the
+  current controller and tries again next turn).
+
+---
+
+### Immunities block effects, NEVER animations (MANDATORY)
+
+> **Rule:** when a card's effect on a target is blocked by an immunity
+> / protection / negation gate (Anti Magic Enchantment, Resistance,
+> Diver Helmet, Cardinal-Beast immunity, charmed-hero damage gate,
+> first-turn protection, untargetable, Wall of Deri, Truth-Seeing
+> Eye's redirect block, magic_immune, …), the **gate stops the
+> effect's state mutation, not its visuals**. Projectile flights,
+> impact bursts, channel beams, hand→target swooshes, screen flashes —
+> all of these still play.
+
+**Why this matters.** A blocked effect with no visual reads as "the
+card did nothing" or "the game lagged" — players can't tell that the
+opponent's protection was the reason. Playing the animation first and
+*then* fizzling the state change makes the block itself a visible
+beat: the heart/fireball/beam lands, and only then does the protection
+sigil / "✗" flash announce that the effect bounced. Same UX as
+Anti Magic Shield (the spell still animates → then the chain shows
+the negation): the player sees what they paid for, and the protection
+gets credit for the save.
+
+**Authoring contract.** In any `onPlay` / `resolve` / activated effect
+where you check an immunity gate:
+
+```js
+// 1. Play the animation(s) FIRST — projectile flight, impact burst,
+//    channel beam, whatever the card uses. await their duration so
+//    the visual finishes landing before any state mutation OR fizzle.
+engine._broadcastEvent('play_projectile_animation', { /* … */ });
+await engine._delay(PROJECTILE_MS);
+engine._broadcastEvent('play_zone_animation', { type: 'love_burst', /* … */ });
+engine.sync();
+
+// 2. NOW consult the immunity gate(s). On block, optionally play a
+//    "protection sigil" flash (anti_magic_block / resistance_flash /
+//    etc.) so the block reads clearly, log it, and return.
+if (engine._isHeroSpellProtected(targetHero, CARD_NAME)) {
+  engine._broadcastEvent('play_zone_animation', {
+    type: 'anti_magic_block', owner: tOwner, heroIdx: tHeroIdx, zoneSlot: -1,
+  });
+  engine.log('blocked', { /* … */ });
+  return;
+}
+// Resistance / other beforeHeroEffect gates: same shape.
+const effectCtx = { /* … */ cancelled: false, _skipReactionCheck: true };
+await engine.runHooks('beforeHeroEffect', effectCtx);
+if (effectCtx.cancelled) { engine.log('resisted', { /* … */ }); return; }
+
+// 3. Effect lands — state mutation goes here.
+```
+
+**Exceptions.** Two narrow carve-outs where the engine *itself*
+short-circuits before the visual can fire, by design:
+- **Reaction-chain Spell negation** (Anti Magic Shield, Storm Ring,
+  Invisibility Cloak's pre-effect window, etc.) runs in the chain
+  window *before* the casting card's `onPlay`. The cast's `onPlay`
+  simply never runs, so its visuals don't fire. The chain UI shows
+  the negation itself, which is the visible beat in this case.
+- **`_spellNegatedByEffect` mid-resolve** void in `_actionDealDamage`
+  Impl: if a post-target reaction sets the flag, subsequent damage
+  events from the same Spell silently zero. This is intentional — the
+  Spell's earlier visual already played; the silent void only affects
+  *further* damage events the Spell would have tried to deal.
+
+For everything else: **animate, then gate**. Don't ever write a gate
+check at the top of `onPlay` that returns before the visual fires.
+
+Reference implementation: **Love Shot** — the heart projectile flies
++ the `love_burst` lands BEFORE the Anti Magic / Resistance check, so
+a protected target visibly sees the heart hit before the block reads.
+
+---
+
+### Deferred side-effects — NEVER use `setTimeout` / `setImmediate` for animation bursts (MANDATORY)
+
+> **Rule:** any code path that calls `engine._broadcastEvent(...)` (or
+> any other side-effect with externally-visible state) MUST be reached
+> via `await engine._delay(N)`, NEVER scheduled via `setTimeout(fn, N)`,
+> `setImmediate(fn)`, `queueMicrotask(fn)`, or a raw
+> `new Promise(r => setTimeout(r, N))`.
+
+**Why this matters.** The CPU brain runs MCTS rollouts inside
+`engine.enterFastMode()` / snapshot → action → restore boundaries. In
+fast-mode, `engine._broadcastEvent` is a no-op (`_engine.js` —
+`_broadcastEvent` returns early when `_fastMode === true`) AND
+`engine._delay(N)` is a microtask-only `Promise.resolve()` (no real
+wait). So a sequence of `flash(); await _delay(200); flash()` runs to
+completion **synchronously inside the fast-mode window** and the
+broadcasts are correctly dropped.
+
+A `setTimeout(flash, 200)` is fundamentally different: the callback is
+queued as a macrotask and **does not run during the rollout**. By the
+time Node services the timer, the rollout has already `restore()`d its
+snapshot and `exitFastMode()`d — so `_fastMode = false` and the
+broadcast goes through with whatever coordinates the closure captured.
+Those coordinates often reference the *simulated* board state (slots
+that don't exist on the live board, or wrong-owner slots), so phantom
+animations paint on random / empty zones of the live UI.
+
+Past field bugs (both fixed):
+- **Diamond Spider** — staggered triple `diamond_sparkle` burst on
+  Surprise-activated draw used `setTimeout(flashEvent, 200/400)`. Every
+  simulated Surprise activation across an MCTS turn (dozens per
+  rollout × dozens of rollouts) leaked late-firing sparkles onto live
+  client zones.
+- **Great Detective Doq** — same `setTimeout`-burst pattern for the
+  "correct prediction!" `gold_sparkle` flourish.
+
+**Authoring contract.** When you need a staggered visual burst:
+
+```js
+// CORRECT — entire sequence inside the fast-mode window.
+const flash = () => engine._broadcastEvent('play_zone_animation', { ... });
+flash();
+await engine._delay(200);
+flash();
+await engine._delay(200);
+flash();
+```
+
+```js
+// WRONG — late macrotasks leak past the rollout boundary.
+const flash = () => engine._broadcastEvent('play_zone_animation', { ... });
+flash();
+setTimeout(flash, 200);
+setTimeout(flash, 400);
+```
+
+**Logic helpers (not broadcasts).** If you must use `setTimeout(0)` /
+`setImmediate` for batch deferral or async re-checks that DON'T
+broadcast — Divine Gift of Time's discard-batch consolidation, Big
+Gwen's hand-limit recheck — guard the queue at scheduling time:
+
+```js
+if (engine._fastMode) return; // skip during MCTS rollouts
+setImmediate(() => { /* live-state recheck */ });
+```
+
+Otherwise the simulated trigger fires a deferred callback that runs
+against the post-restore live state, which usually no-ops but can
+surface unexpected prompts in edge cases.

@@ -48,6 +48,13 @@ module.exports = {
       const tgtZoneSlot = target.type === 'hero' ? undefined : target.slotIdx;
       const impactSlot = target.type === 'hero' ? -1 : target.slotIdx;
 
+      // Pre-resolution hook (Doq's guess, future "when this Hero
+      // attacks" effects) fires AFTER target pick but BEFORE the
+      // animation + damage. Listeners may mutate the about-to-deal
+      // damage.
+      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const finalDmg = await engine._fireAttackDeclare(attackSource, target, damage);
+
       // Very fast ram — the cut is the hero-moment, not the approach.
       engine._broadcastEvent('play_ram_animation', {
         sourceOwner: ctx.cardHeroOwner, sourceHeroIdx: heroIdx,
@@ -64,11 +71,10 @@ module.exports = {
       });
       await engine._delay(200);
 
-      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
       if (target.type === 'hero') {
         const tgtHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
         if (tgtHero && tgtHero.hp > 0) {
-          await engine.actionDealDamage(attackSource, tgtHero, damage, 'attack');
+          await engine.actionDealDamage(attackSource, tgtHero, finalDmg, 'attack');
         }
       } else if (target.type === 'equip' || target.cardInstance) {
         const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -77,7 +83,7 @@ module.exports = {
         );
         if (inst) {
           await engine.actionDealCreatureDamage(
-            attackSource, inst, damage, 'attack',
+            attackSource, inst, finalDmg, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
         }
@@ -86,7 +92,7 @@ module.exports = {
 
       engine.log('critical_strike', {
         player: ps.username, hero: hero.name,
-        target: target.cardName, damage,
+        target: target.cardName, damage: finalDmg,
       });
       engine.sync();
     },

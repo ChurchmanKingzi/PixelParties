@@ -1988,6 +1988,31 @@ function sendGameState(room, playerIdx, extra) {
         const inst = room.engine?.cardInstances.find(c => c.owner === pi && c.zone === 'surprise' && c.heroIdx === hi && c.name === sz[0]);
         return !!(inst && inst.faceDown && inst.knownToOpponent);
       }),
+      // Effective per-Surprise level after board-wide reductions
+      // (Spider Hive's `globalReduceCardLevel`, any future "reduce
+      // Surprise level" Area). Per slot: the level the Surprise
+      // would actually need to be Activated at right now. `null`
+      // when the slot is empty / the card is not visible to the
+      // recipient (face-down opp Surprise outside puzzle mode); the
+      // client only renders the badge when this differs from the
+      // printed level. Computed via the engine's
+      // `effectiveCardLevel` so any new level-reduction mechanism
+      // composes automatically.
+      surpriseEffectiveLevels: ps.surpriseZones.map((sz, hi) => {
+        if (!sz || sz.length === 0) return null;
+        const name = sz[0];
+        const cardDB = room.engine?._getCardDB?.();
+        const cd = cardDB?.[name];
+        if (!cd) return null;
+        // Hidden opp Surprise outside puzzle mode → don't leak level.
+        if (pi !== playerIdx && !gs.isPuzzle) {
+          const inst = room.engine?.cardInstances.find(c =>
+            c.owner === pi && c.zone === 'surprise' && c.heroIdx === hi && c.name === name);
+          if (inst?.faceDown && !inst?.knownToOpponent) return null;
+        }
+        try { return room.engine.effectiveCardLevel(cd, pi); }
+        catch { return null; }
+      }),
       supportZones: pi === playerIdx ? ps.supportZones : ps.supportZones.map((heroSlots, hi) => (heroSlots || []).map((slot, si) => {
         if (!slot || slot.length === 0) return slot;
         const inst = room.engine?.cardInstances.find(c =>
@@ -2677,7 +2702,7 @@ function sendGameState(room, playerIdx, extra) {
       for (let hi = 0; hi < (ps2?.heroes || []).length; hi++) {
         const hero = ps2.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
-        if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated || hero.statuses?.bound) continue;
+        if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated || hero.statuses?.bound) continue;
         const heroScript = loadCardEffect(hero.name);
         if (!heroScript?.isBakhmHero) continue;
         const freeSlots = [];
@@ -2699,7 +2724,7 @@ function sendGameState(room, playerIdx, extra) {
         const hi = inst.heroIdx;
         const hero = ps2?.heroes?.[hi];
         if (!hero?.name || hero.hp <= 0) continue;
-        if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated || hero.statuses?.bound) continue;
+        if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated || hero.statuses?.bound) continue;
         // Check abilities
         const cardData = getCardDB()[inst.name];
         if (!cardData) continue;
@@ -3157,6 +3182,20 @@ function canCardTypeEnterPool(cardDB, deck, cardName, pool) {
   if (pool === 'hero') return ct === 'Hero';
   if (pool === 'side') return true;
   return false;
+}
+
+/**
+ * Combined Potion count across main + Potion Deck. Mirrors the client's
+ * `isDeckLegal` invariant — never more than 15 Potions across both
+ * sections. Side-deck Potions don't count toward the cap.
+ */
+function countCombinedPotions(cardDB, deck) {
+  let n = 0;
+  for (const cn of (deck.mainDeck || [])) {
+    if (cardDB[cn]?.cardType === 'Potion') n++;
+  }
+  n += (deck.potionDeck || []).length; // Potion Deck holds Potions only
+  return n;
 }
 
 async function advanceToNextGame(room, loserIdx) {
@@ -3906,7 +3945,13 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
   const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Spell', 'Attack'], { charmedOwner });
   if (!v) return false;
-  const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
+  const { ps, cardData, hero, script, isActionPhase, isMainPhase, wasBerserkGranted } = v;
+  // `isInherentAction` is mutable post-onPlay: Curse (and any future
+  // card with the same dual-mode shape) sets `gs._spellForcesActionConsume`
+  // during its onPlay to flip the engine's "inherent" classification
+  // back to "consumes a main Action". The flag is consumed and the
+  // local re-bound just before the action-economy hooks fire below.
+  let isInherentAction = v.isInherentAction;
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName, room.engine)) return false;
 
   // Wolflesia-style Creature spell-cast routing: the client sends
@@ -3995,6 +4040,16 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     additionalConsumed = true;
   }
 
+  // Stash the final inherent/non-inherent disposition of this play so
+  // card scripts can read it from inside their onPlay handler. True iff
+  // the engine is treating this play as the script's inherent grant
+  // (no main action consumed, no additional-action source consumed) —
+  // Gate to the Armory's "if inherent, end the turn" post-resolve
+  // clause and any future card with the same dual-mode disposition
+  // read this. Cleared in the finally block below so it never leaks
+  // into a subsequent cast.
+  gs._spellWasInherent = isInherentAction && !additionalConsumed;
+
   // Track whether THIS play's increment crossed into action-2 and
   // consumed _bonusMainActions, so a cancellation can roll back both
   // the counter and the bonus-action slot.
@@ -4048,11 +4103,21 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   // engine's own auto-advance to Main Phase 2 isn't blocked by its own
   // counter), and the finally serves as a double-release-safe safety net.
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
+  // Resolving-Spell name stack: paired with the depth counter so
+  // `addHeroStatus` / `actionAddBuff` / `_actionHealHeroImpl` can
+  // auto-honor Anti Magic without scripts threading a source
+  // argument. Cleared in the same `_releaseSpellDepth` path so all
+  // exit branches (cancel / negate / normal / error) pop exactly once.
+  // Only Spells push (Anti Magic doesn't block Attacks). cardData
+  // is the resolving card; `cardType === 'Spell'` catches Normal,
+  // Reaction, Surprise, Attachment, Area subtypes.
+  if (cardData.cardType === 'Spell') room.engine._pushResolvingSpell(cardName);
   let _spellDepthReleased = false;
   const _releaseSpellDepth = () => {
     if (_spellDepthReleased) return;
     _spellDepthReleased = true;
     gs._spellResolutionDepth = Math.max(0, (gs._spellResolutionDepth || 1) - 1);
+    if (cardData.cardType === 'Spell') room.engine._popResolvingSpell();
   };
 
   try {
@@ -4117,6 +4182,13 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
         if (!ps.heroesAttackedThisTurn) ps.heroesAttackedThisTurn = [];
         if (!ps.heroesAttackedThisTurn.includes(heroIdx)) ps.heroesAttackedThisTurn.push(heroIdx);
+        hero._attacksThisTurn = (hero._attacksThisTurn || 0) + 1;
+        // Negated-attack path mirrors the resolved-attack path:
+        // attacksPlayedThisTurn / _attacksThisTurn are bumped because
+        // the Attack WAS played (the Reaction just negated its
+        // effects). By symmetry the Berserk charge — if the
+        // inherent grant came from Berserk — is now spent too.
+        if (wasBerserkGranted) hero._berserkChargeUsedTurn = gs.turn;
         if (hero.ghuanjunAttacksUsed && !hero.ghuanjunAttacksUsed.includes(cardName)) hero.ghuanjunAttacksUsed.push(cardName);
         // Drop any arrows armed for this negated attack — otherwise a
         // follow-up attack this turn would inherit them.
@@ -4150,6 +4222,16 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     room.engine.maybeFireCpuRevealEarly();
     await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
     delete gs._attachmentZoneSlot;
+    // Post-onPlay inherency override — Curse's "normal Action mode"
+    // (Action Phase pre-acted, picked a non-qualifying target) sets
+    // this flag from its onPlay to convert the engine's default
+    // inherent classification into a consuming main Action. All three
+    // downstream branches (onActionUsed, heroesActedThisTurn push,
+    // phase auto-advance) read the rebound `isInherentAction` below.
+    if (gs._spellForcesActionConsume) {
+      isInherentAction = false;
+      delete gs._spellForcesActionConsume;
+    }
     await room.engine._flushSurpriseDrawChecks();
 
     if (gs._spellCancelled && !gs._spellNegatedByEffect) {
@@ -4343,6 +4425,12 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
       if (!ps.heroesAttackedThisTurn) ps.heroesAttackedThisTurn = [];
       if (!ps.heroesAttackedThisTurn.includes(heroIdx)) ps.heroesAttackedThisTurn.push(heroIdx);
+      hero._attacksThisTurn = (hero._attacksThisTurn || 0) + 1;
+      // Berserk charge consumed: the validation pass made this Attack
+      // inherent on Berserk's behalf (rather than the Attack's own
+      // script-level `inherentAction` flag), so the once-per-turn
+      // grant is now spent.
+      if (wasBerserkGranted) hero._berserkChargeUsedTurn = gs.turn;
     } else if (cardData.cardType === 'Spell') {
       ps.spellsPlayedThisTurn = (ps.spellsPlayedThisTurn || 0) + 1;
     }
@@ -4530,6 +4618,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // Always clear the spell-caster animation override so it never
     // leaks into a subsequent cast.
     if (gs._spellCasterOverride) delete gs._spellCasterOverride;
+    // Same one-shot semantics for the inherent-disposition stash —
+    // delete unconditionally so a subsequent cast computes its own.
+    delete gs._spellWasInherent;
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -4937,7 +5028,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
   // Stunned silences the hero outright. Frozen also silences UNLESS
   // the activator has Chilly Dog (Mischief Militia) in play — its
   // aura lifts the Frozen-only silence on own-side Heroes' Abilities.
-  if (hero.statuses?.stunned) return false;
+  if ((hero.statuses?.stunned || hero.statuses?.webbed)) return false;
   if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
 
@@ -5790,7 +5881,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
   // covers hero effects too. Stunned / negated still silence them.
   // Chilly Dog (Mischief Militia) lifts the Frozen-only silence on
   // the activator's own side.
-  if (hero.statuses?.stunned || hero.statuses?.negated) return false;
+  if ((hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) return false;
   if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;
   if (charmedOwner != null && hero.charmedBy !== pi && hero.controlledBy !== pi) return false;
   // _actionLockedTurn (Treasure Hunter's Backpack, etc.) blocks "Actions"
@@ -6154,12 +6245,11 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
   const hero = ps.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   // Bound blocks "Actions" only — equip-effect activations are an
-  // "effect" per the spec and stay alive under Bound. Stunned still
-  // silences. Frozen silences UNLESS the activator has Chilly Dog
-  // (Mischief Militia) in play.
-  if (hero.statuses?.stunned) return false;
-  if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;
-
+  // "effect" per the spec and stay alive under Bound. Stunned / Webbed
+  // / Frozen silence by default. A script may opt out via
+  // `bypassHostStatusFilter: true` (Crimson Web — the untangle
+  // discard action must fire even when the host Hero is Webbed by
+  // the same card). Defer the script-driven check below.
   const slot = (ps.supportZones[heroIdx] || [])[zoneSlot] || [];
   if (slot.length === 0) return false;
   const cardName = slot[0];
@@ -6171,6 +6261,10 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
 
   const script = loadCardEffect(cardName);
   if (!script?.equipEffect || !script?.onEquipEffect) return false;
+  if (!script.bypassHostStatusFilter) {
+    if ((hero.statuses?.stunned || hero.statuses?.webbed)) return false;
+    if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;
+  }
 
   const hoptKey = `equip-effect:${inst.id}`;
   if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
@@ -6457,13 +6551,22 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
   const cardData = getCardDB()[cardName];
   if (!cardData || (cardData.subtype || '').toLowerCase() !== 'surprise') return false;
 
+  // Once-per-game Surprises (Tharxian Horse, etc.) can only be played
+  // ONCE per game. The client grays the card out via
+  // `getBlockedSpells`, but the server must also enforce it so a
+  // hand-jiggle / replay attempt can't bypass the lock.
+  if (script.oncePerGame) {
+    const opgKey = script.oncePerGameKey || cardName;
+    if (ps._oncePerGameUsed?.has(opgKey)) return false;
+  }
+
   const hero = ps.heroes[heroIdx];
   if (!hero || !hero.name || hero.hp <= 0) return false;
 
   // Bakhm Support-Zone placement: Surprise Creatures can go into Bakhm's own
   // Support Zones instead of the Surprise Zone.
   if (bakhmSlot != null && bakhmSlot >= 0) {
-    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated || hero.statuses?.bound) return false;
+    if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated || hero.statuses?.bound) return false;
     const heroScript = loadCardEffect(hero.name);
     if (!heroScript?.isBakhmHero) return false;
     if (cardData.cardType !== 'Creature') return false;
@@ -6476,6 +6579,11 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
 
     const inst = room.engine._trackCard(cardName, pi, 'support', heroIdx, bakhmSlot);
     inst.faceDown = true;
+
+    if (script.oncePerGame) {
+      if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+      ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
+    }
 
     room.engine.log('surprise_set', { player: ps.username, hero: hero.name, bakhmSlot: true });
     broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'support', heroIdx, slotIdx: bakhmSlot, faceDown: true });
@@ -6499,6 +6607,11 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
 
   const inst = room.engine._trackCard(cardName, pi, 'surprise', heroIdx, 0);
   inst.faceDown = true;
+
+  if (script.oncePerGame) {
+    if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+    ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
+  }
 
   room.engine.log('surprise_set', { player: ps.username, hero: hero.name });
   broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'surprise', heroIdx, slotIdx: 0, faceDown: true });
@@ -8965,7 +9078,7 @@ io.on('connection', (socket) => {
 
     const hero = ps.heroes[heroIdx];
     if (!hero?.name || hero.hp <= 0) return;
-    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated || hero.statuses?.bound) return;
+    if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated || hero.statuses?.bound) return;
 
     // Check abilities
     const cardData = getCardDB()[cardName];
@@ -9537,6 +9650,20 @@ io.on('connection', (socket) => {
       if (!canCardTypeEnterPool(cardDB, simDeck, fromCardName, to)) return;
       if (!canCardTypeEnterPool(cardDB, simDeck, toCardName, from)) return;
 
+      // Combined Potion cap. A swap that puts a Potion into main/potion
+      // from side, in exchange for a non-Potion, increases the combined
+      // count by 1 — reject if that would push the total past 15. The
+      // symmetric direction (Potion out of main/potion into side, with
+      // a non-Potion coming back) decreases the count and is always
+      // fine. Potion-for-Potion or non-Potion-for-non-Potion swaps are
+      // count-neutral.
+      const fromIsPotion = cardDB[fromCardName]?.cardType === 'Potion';
+      const toIsPotion = cardDB[toCardName]?.cardType === 'Potion';
+      const enteringMainOrPotion =
+        (from === 'side' && (to === 'main' || to === 'potion') && fromIsPotion && !toIsPotion)
+        || (to === 'side' && (from === 'main' || from === 'potion') && toIsPotion && !fromIsPotion);
+      if (enteringMainOrPotion && countCombinedPotions(cardDB, deck) >= 15) return;
+
       // Swap the cards
       const tmp = fromPool[fromIdx];
       fromPool[fromIdx] = toPool[toIdx];
@@ -9583,6 +9710,16 @@ io.on('connection', (socket) => {
     if ((from === 'main' && to === 'potion') || (from === 'potion' && to === 'main')) return;
     // Validate using shared type rules
     if (!canCardTypeEnterPool(cardDB, deck, cardName, to)) return;
+    // Combined Potion cap (15 across main + Potion Deck). Side→main and
+    // side→potion moves are the only side-deck phase paths that can
+    // increase the combined count; the move is rejected if it would
+    // push the total past 15.
+    const cardIsPotion = cardDB[cardName]?.cardType === 'Potion';
+    const incomingTo = (to === 'main' || to === 'potion');
+    const outgoingFrom = (from === 'main' || from === 'potion');
+    if (cardIsPotion && incomingTo && !outgoingFrom) {
+      if (countCombinedPotions(cardDB, deck) >= 15) return;
+    }
 
     const card = fromPool.splice(fromIdx, 1)[0];
     toPool.push(card);
@@ -9779,6 +9916,37 @@ io.on('connection', (socket) => {
           statuses: normalizePuzzleStatuses(h.statuses),
           buffs: h.buffs ? enrichPuzzleBuffs(JSON.parse(JSON.stringify(h.buffs))) : undefined,
         };
+        // Cursed-on-load ATK snapshot. A puzzle hero authored with
+        // `statuses: { cursed: true }` would otherwise enter the game
+        // with NO `_cursedAtkSuppressed` baseline — Curse#onPlay never
+        // runs, and the post-init() fix-up sweep further down already
+        // misses the window where ability `onGameStart` hooks
+        // (Fighting, Sacred Hammer, …) route their ATK grants through
+        // `_applyHeroAtkDelta`, which deposits them into
+        // `_cursedAtkSuppressed` BECAUSE the hero is already cursed.
+        // The result: cleanse restores ATK to 0 (or to just the
+        // ability-granted slice) instead of the true pre-curse value.
+        // Snap the baseline BEFORE engine.init() so the ability
+        // grants stack onto the right baseline; cleanse then restores
+        // base + grants in one shot.
+        //
+        // The "true ATK" is taken as the maximum of:
+        //   - the authored `atk` (in case the author wrote the live
+        //     pre-curse value here),
+        //   - the authored `baseAtk` (the natural underlying stat),
+        //   - the card-DB `atk` (the hero's default per cards.json).
+        // The visible `atk` is then zeroed to match the cursed
+        // display contract. Genuine 0-base, 0-card-DB heroes are
+        // preserved (cleanse restores to 0 because that IS truth).
+        if (out.statuses?.cursed) {
+          const cardData = cardsByName?.[out.name];
+          out._cursedAtkSuppressed = Math.max(
+            out.atk || 0,
+            out.baseAtk || 0,
+            cardData?.atk || 0,
+          );
+          out.atk = 0;
+        }
         // Cosmic Depths Change Counters on a Hero (Argos) — authored
         // in the puzzle editor as `h._changeCounters`. The shared
         // cosmic helpers (getChangeCounters, removeChangeCounters)
@@ -10072,8 +10240,142 @@ io.on('connection', (socket) => {
               if (cs._sparkflyGiftFlags.attendant) grantInheritedAbility(inst, 'Sparkfly Attendant');
               if (cs._sparkflyGiftFlags.worker)    grantInheritedAbility(inst, 'Sparkfly Worker');
             }
+            // Anti Magic immunity level — authored in the puzzle editor
+            // as `antiMagicLevel: 1|2|3`. Stamps the level on
+            // `inst.counters.antiMagicLevel` (the source of truth the
+            // card's leave-zone cleanup reads to recompute remaining
+            // buffs) AND applies the `magic_immune` buff to the host
+            // Hero with the matching `level`, so the target-filter +
+            // BuffColumn tooltip both read the authored value.
+            // Multiple Anti Magics on the same Hero correctly keep the
+            // HIGHEST level — `actionAddBuff` overwrites, so we iterate
+            // sup zones with a max-by-level pass after stamping.
+            if (inst.name === 'Anti Magic'
+                && typeof cs.antiMagicLevel === 'number'
+                && cs.antiMagicLevel >= 1 && cs.antiMagicLevel <= 3) {
+              inst.counters.antiMagicLevel = cs.antiMagicLevel;
+              const hostHero = gs.players[pi]?.heroes?.[hi];
+              if (hostHero?.name) {
+                if (!hostHero.buffs) hostHero.buffs = {};
+                const existing = hostHero.buffs.magic_immune?.level || 0;
+                if (cs.antiMagicLevel > existing) {
+                  hostHero.buffs.magic_immune = {
+                    level: cs.antiMagicLevel,
+                    source: 'Anti Magic',
+                    appliedTurn: gs.turn || 0,
+                  };
+                }
+              }
+            }
+          }
+          // Berserk pre-placement: live play applies the `berserked`
+          // status to the host Hero from Berserk's `onPlay` hook,
+          // but the puzzle loader skips onPlay entirely — the card
+          // is just dropped into the support zone. Mirror the status
+          // apply here so a puzzle-authored Berserk lights up the
+          // Hero's overlay + status badge immediately and the
+          // engine's Spell/Creature lockout + free-Attack grant
+          // gates all fire from turn 1. Idempotent: a second
+          // Berserk on the same Hero is the boolean no-op the live
+          // path also produces.
+          //
+          // Lives OUTSIDE the `if (cs)` block above because a plain
+          // pre-placed Berserk doesn't carry a creature-statuses
+          // entry — keying the apply on `inst.name === 'Berserk'` is
+          // enough.
+          if (inst.name === 'Berserk') {
+            const hostHero = gs.players[pi]?.heroes?.[hi];
+            if (hostHero?.name && hostHero.hp > 0) {
+              if (!hostHero.statuses) hostHero.statuses = {};
+              if (!hostHero.statuses.berserked) {
+                hostHero.statuses.berserked = {
+                  appliedTurn: gs.turn || 0,
+                  appliedBy: pi,
+                  source: 'Berserk',
+                };
+              }
+            }
+          }
+          // Curse pre-placement — mirror of Berserk above. Live play
+          // applies the `cursed` status AND zeroes hero.atk in the
+          // card's onPlay. The puzzle loader skips onPlay, so we
+          // replicate both side-effects here so the host Hero opens
+          // the puzzle with a 0 ATK display + status badge active.
+          // Boolean: a second Curse on the same Hero just sees the
+          // existing status and skips re-snapshotting.
+          if (inst.name === 'Curse') {
+            const hostHero = gs.players[pi]?.heroes?.[hi];
+            if (hostHero?.name && hostHero.hp > 0) {
+              if (!hostHero.statuses) hostHero.statuses = {};
+              if (!hostHero.statuses.cursed) {
+                hostHero.statuses.cursed = {
+                  appliedTurn: gs.turn || 0,
+                  appliedBy: pi,
+                  source: 'Curse',
+                };
+                // Snapshot the live ATK into the hidden accumulator
+                // and zero the visible stat — matches what
+                // `Curse#onPlay` would do. Cleanse restores from
+                // `_cursedAtkSuppressed`.
+                hostHero._cursedAtkSuppressed = hostHero.atk || 0;
+                hostHero.atk = 0;
+              }
+            }
+          }
+          // Invisibility pre-placement — mirror of Berserk / Curse
+          // above. Live play stamps `hero.statuses.invisible` on the
+          // host from the Attachment's onPlay, but the puzzle loader
+          // skips onPlay entirely. Mirror the stamp here so a puzzle-
+          // authored Invisibility immediately lights up the Hero's
+          // 👻 status badge AND the engine's hero-targeting filter
+          // treats the host as hidden (pool-shared with Untargetable)
+          // from turn 1.
+          if (inst.name === 'Invisibility') {
+            const hostHero = gs.players[pi]?.heroes?.[hi];
+            if (hostHero?.name && hostHero.hp > 0) {
+              if (!hostHero.statuses) hostHero.statuses = {};
+              if (!hostHero.statuses.invisible) {
+                hostHero.statuses.invisible = {
+                  appliedTurn: gs.turn || 0,
+                  appliedBy: pi,
+                  source: 'Invisibility',
+                };
+              }
+            }
           }
         }
+      }
+    }
+
+    // Cursed-hero ATK-snapshot fix-up. Two puzzle-authoring patterns
+    // can produce a hero with the `cursed` status but no usable
+    // `_cursedAtkSuppressed` snapshot (so cleanse would restore the
+    // hero to 0 ATK instead of its true pre-curse value):
+    //   (a) The author writes `statuses: { cursed: true }` directly
+    //       on a hero, without placing a Curse card in their Support
+    //       Zone — the Curse pre-placement above never fires.
+    //   (b) The author writes `atk: 0` on a hero already showing the
+    //       curse alongside a pre-placed Curse card — the snapshot at
+    //       line ~10276 captures `hostHero.atk` = 0.
+    // Walk every cursed hero post-placement and pick the largest
+    // known "true ATK" candidate as the snapshot: the existing
+    // `_cursedAtkSuppressed`, the hero's `baseAtk` (the underlying
+    // pre-buff stat tracked from puzzle authoring), or the live
+    // `atk` field. Then force `atk` to 0 to keep the status's display
+    // contract intact. A genuine 0-base, 0-snapshot hero is preserved
+    // (cleanse restores to 0 because that IS the true value).
+    for (let pi = 0; pi < 2; pi++) {
+      const ps = gs.players[pi];
+      for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
+        const hero = ps.heroes[hi];
+        if (!hero?.name || !hero.statuses?.cursed) continue;
+        const trueAtk = Math.max(
+          hero._cursedAtkSuppressed || 0,
+          hero.baseAtk || 0,
+          hero.atk || 0,
+        );
+        hero._cursedAtkSuppressed = trueAtk;
+        hero.atk = 0;
       }
     }
 
@@ -10144,7 +10446,10 @@ io.on('connection', (socket) => {
           // filter it out. Universal across card types — discard pile
           // is name-only.
           ps._discardNamesAtTurnStart = new Set(ps.discardPile || []);
-          for (const hero of (ps.heroes || [])) { if (hero?._actionsThisTurn) hero._actionsThisTurn = 0; }
+          for (const hero of (ps.heroes || [])) {
+            if (hero?._actionsThisTurn) hero._actionsThisTurn = 0;
+            if (hero?._attacksThisTurn) hero._attacksThisTurn = 0;
+          }
         }
         room.engine._resetTerrorTracking();
         await room.engine.runHooks('onGameStart', { _skipReactionCheck: true });

@@ -242,6 +242,12 @@ module.exports = {
         if (e.type !== 'attack') continue;
         if ((e.source?.heroIdx ?? -1) !== heroIdx) continue;
         if ((e.source?.owner ?? -1) !== pi) continue;
+        // Full negation reactions (Idej Projection, Spectral Armor
+        // zero-cap, Anti Magic void, future similar) set `e.cancelled`
+        // on the entry. "Negate that damage AND all associated
+        // effects" extends to equipment-added on-hit riders — skip
+        // the burn apply when the hit didn't actually land.
+        if (e.cancelled) continue;
         if (e.amount <= 0) continue;
 
         const inst = e.inst;

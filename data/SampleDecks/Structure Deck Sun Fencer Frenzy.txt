@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
 Name: Structure Deck: Sun Fencer Frenzy
+Cover: Taio, Absorber of the Mountain's Heart
 
 == HEROES ==
 Kazena, the Storming Rebel

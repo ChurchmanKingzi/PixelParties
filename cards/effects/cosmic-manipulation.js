@@ -82,6 +82,16 @@ module.exports = {
   // detection.
   shufflesIntoDeck: true,
 
+  cpuMeta: {
+    // Hand-value synergy hint — Cosmic Manipulation REACTS to direct-
+    // from-deck summons. The CPU's hand-value scorer already lifts
+    // every `directDeckSummon` card by +25 when CM is in hand; this
+    // flag closes the symmetric side (lift CM by +25 when a partner
+    // is in hand). Generic: any future "I react to directDeckSummon"
+    // card can wear this flag instead of being hard-coded.
+    directDeckSummonReactor: true,
+  },
+
   // Trigger only fires when the summon was DIRECT FROM DECK and we
   // haven't used Cosmic Manipulation this turn.
   postSummonReactionCondition(gs, summoningPi, engine, summonedInst, hookCtx) {

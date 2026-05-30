@@ -51,13 +51,23 @@ module.exports = {
       const heroFlag = gs.heroFlags?.[`${pi}-${heroIdx}`];
       const singleTargetOnly = !!heroFlag?.singleTargetAttack;
 
+      const attackSource = { name: 'Whirlwind Strike', owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+
+      // Pre-resolution hook (Doq's guess, future "when this Hero
+      // attacks" effects) — fires AFTER multi-target pick but BEFORE
+      // the spin-up animation, projectile, and damage. The whole
+      // targets array is passed as `target` so listeners that need
+      // to inspect specific picks can defensively handle the array
+      // shape; single-card listeners that only care about the bonus
+      // amount can ignore it.
+      const finalAtk = await engine._fireAttackDeclare(attackSource, selectedHeroes, atkDamage);
+
       // ── ANIMATION: spin up on attacker ──
       engine._broadcastEvent('play_zone_animation', {
         type: 'whirlwind_spin', owner: pi, heroIdx, zoneSlot: -1,
       });
       await engine._delay(400);
 
-      const attackSource = { name: 'Whirlwind Strike', owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
       const cardDB = engine._getCardDB();
 
       // ── Collect ALL damage targets first, then process ──
@@ -81,7 +91,7 @@ module.exports = {
             const cd = cardDB[inst.name];
             if (!cd || !hasCardType(cd, 'Creature')) continue;
             allCreatureEntries.push({
-              inst, amount: atkDamage, type: 'attack',
+              inst, amount: finalAtk, type: 'attack',
               source: attackSource, sourceOwner: pi,
               canBeNegated: true,
               tgtHeroIdx: tgt.heroIdx,
@@ -130,7 +140,7 @@ module.exports = {
         });
 
         // Deal damage to the hero
-        await engine.actionDealDamage(attackSource, tgtHero, atkDamage, 'attack');
+        await engine.actionDealDamage(attackSource, tgtHero, finalAtk, 'attack');
 
         // Brief pause before second target
         if (ti < heroDamageTargets.length - 1) {
@@ -155,7 +165,7 @@ module.exports = {
       engine.log('whirlwind_strike', {
         player: ps.username,
         targets: selectedHeroes.map(t => t.cardName),
-        atkDamage,
+        atkDamage: finalAtk,
         heroCount: heroDamageTargets.length,
         creatureCount: allCreatureEntries.length,
       });

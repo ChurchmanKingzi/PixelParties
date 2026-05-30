@@ -184,8 +184,14 @@ module.exports = {
       // ── Self-damage equal to the revived Creature's max HP ───────
       const maxHp = inst.counters?.maxHp ?? cd.hp ?? 0;
       if (maxHp > 0) {
+        // Pre-resolution hook (Doq's guess, future "when this Hero
+        // attacks" effects) fires BEFORE the damage. The damage is
+        // self-inflicted on the user's own hero — pass that as the
+        // target so listeners can see what's about to be hit.
         const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
-        await engine.actionDealDamage(attackSource, userHero, maxHp, 'attack');
+        const selfTarget = { type: 'hero', owner: pi, heroIdx, cardName: userHero.name };
+        const finalDmg = await engine._fireAttackDeclare(attackSource, selfTarget, maxHp);
+        await engine.actionDealDamage(attackSource, userHero, finalDmg, 'attack');
       }
 
       engine.log('forceful_revival', {

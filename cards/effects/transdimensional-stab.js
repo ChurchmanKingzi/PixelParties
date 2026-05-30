@@ -111,6 +111,14 @@ module.exports = {
       }
 
       // ── Deal damage ──
+      // Pre-resolution hook (Doq's guess, future "when this Hero
+      // attacks" effects) fires AFTER target pick + negation gate but
+      // BEFORE the animation + damage. Placed after the hand-empty
+      // gate so Doq doesn't fire on a negated attack. Listeners may
+      // mutate the about-to-deal damage.
+      const source = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const finalDmg = await engine._fireAttackDeclare(source, target, damage);
+
       const tgtZoneSlot = target.type === 'hero' ? -1 : target.slotIdx;
       engine._broadcastEvent('play_zone_animation', {
         type: 'critical_slash', owner: target.owner,
@@ -118,17 +126,16 @@ module.exports = {
       });
       await engine._delay(380);
 
-      const source = { name: CARD_NAME, owner: pi, heroIdx };
       let dealt = 0;
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {
-          const r = await engine.actionDealDamage(source, tgtHero, damage, 'attack');
+          const r = await engine.actionDealDamage(source, tgtHero, finalDmg, 'attack');
           dealt = r?.dealt || 0;
         }
       } else if (target.cardInstance) {
         const r = await engine.actionDealCreatureDamage(
-          source, target.cardInstance, damage, 'attack',
+          source, target.cardInstance, finalDmg, 'attack',
           { sourceOwner: pi, canBeNegated: true },
         );
         dealt = r?.dealt || 0;

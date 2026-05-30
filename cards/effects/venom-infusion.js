@@ -42,9 +42,9 @@ module.exports = {
 
       if (!target) return;
 
-      // Check for Decay Magic Lv3 on the caster
-      const abZones = ps.abilityZones[heroIdx] || [];
-      const decayLevel = engine.countAbilitiesForSchool('Decay Magic', abZones);
+      // Caster-aware Decay Magic level — honours engine overrides
+      // (Demon's Gate "as if Decay Magic 3").
+      const decayLevel = engine.effectiveSchoolLevelForCaster('Decay Magic', pi, heroIdx);
       const isUnhealable = decayLevel >= 3;
 
       if (target.type === 'hero') {

@@ -44,9 +44,9 @@ module.exports = {
 
       if (!ps || !oppPs) return;
 
-      // Calculate Decay Magic level for this hero
-      const abZones     = ps.abilityZones[heroIdx] || [];
-      const decayLevel  = engine.countAbilitiesForSchool('Decay Magic', abZones);
+      // Caster-aware Decay Magic level — honours engine overrides
+      // (Demon's Gate "as if Decay Magic 3").
+      const decayLevel  = engine.effectiveSchoolLevelForCaster('Decay Magic', pi, heroIdx);
       const discardCount = DISCARD_BY_LEVEL[Math.min(decayLevel, 3)] ?? DISCARD_BY_LEVEL[1];
 
       // Discard one card at a time, playing the dark-magic animation on each

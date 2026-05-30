@@ -98,6 +98,8 @@ body {
 .btn-success:hover { background: rgba(51,255,136,.18); box-shadow: 0 0 15px rgba(51,255,136,.25); }
 .btn-accent2 { border-color: var(--accent2); color: var(--accent2); background: rgba(255,0,170,.08); }
 .btn-accent2:hover { background: rgba(255,0,170,.18); box-shadow: 0 0 15px rgba(255,0,170,.25); }
+.btn-gold { border-color: #ffd700; color: #ffd700; background: rgba(255,215,0,.10); }
+.btn-gold:hover { background: rgba(255,215,0,.22); box-shadow: 0 0 18px rgba(255,215,0,.45); }
 .btn-format-active {
   border-color: #ffd700 !important;
   color: #ffd700 !important;
@@ -1673,6 +1675,60 @@ body {
   box-shadow: 0 0 8px rgba(150,0,220,.5), inset 0 0 4px rgba(180,50,255,.3);
 }
 
+/* Berserked overlay — persistent "dark magic + red smoke" while the
+   `berserked` status is bound to a Hero. Two particle layers (smoke
+   puffs rising from the bottom + dark-magic sparks drifting upward
+   from the middle) plus a tinted gradient + pulsing border. Style
+   mirrors BurnedOverlay / PoisonedOverlay so the visual reads as
+   "negative status" at a glance. */
+.status-berserked-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: linear-gradient(
+    0deg,
+    rgba(180,20,30,.22) 0%,
+    rgba(120,10,80,.14) 45%,
+    rgba(60,0,60,.08) 100%
+  );
+  border: 2px solid rgba(200,40,40,.55);
+  box-shadow: inset 0 0 12px rgba(180,20,40,.25), 0 0 8px rgba(160,0,80,.3);
+  animation: berserkedShimmer 1.4s ease-in-out infinite;
+  overflow: hidden;
+}
+@keyframes berserkedShimmer {
+  0%, 100% { box-shadow: inset 0 0 12px rgba(180,20,40,.25), 0 0 8px rgba(160,0,80,.3); }
+  50%      { box-shadow: inset 0 0 22px rgba(220,40,60,.4),  0 0 14px rgba(200,20,100,.45); }
+}
+.berserked-particle {
+  position: absolute;
+  pointer-events: none;
+  color: #c266ff;
+  text-shadow: 0 0 4px rgba(160,40,200,.95), 0 0 8px rgba(100,0,140,.7);
+  animation: berserkedSpark ease-in-out infinite;
+}
+@keyframes berserkedSpark {
+  0%   { transform: translateY(0) scale(0.5) rotate(0deg);    opacity: 0; }
+  20%  { opacity: .95; }
+  50%  { transform: translateY(-14px) scale(1.1) rotate(60deg); opacity: 1; }
+  100% { transform: translateY(-30px) scale(0.4) rotate(180deg); opacity: 0; }
+}
+.berserked-smoke {
+  position: absolute;
+  bottom: 2%;
+  pointer-events: none;
+  filter: hue-rotate(330deg) saturate(2.2) drop-shadow(0 0 4px rgba(220,40,40,.85));
+  opacity: 0;
+  animation: berserkedSmoke ease-out infinite;
+}
+@keyframes berserkedSmoke {
+  0%   { transform: translateY(0) scale(0.6);  opacity: 0; }
+  20%  { opacity: .8; }
+  60%  { transform: translateY(-28px) scale(1.2); opacity: .55; }
+  100% { transform: translateY(-50px) scale(1.6); opacity: 0; }
+}
+
 /* Overheal Shock — heal reversed overlay */
 .status-heal-reversed-overlay {
   position: absolute;
@@ -1981,6 +2037,188 @@ body {
 @keyframes ramFireParticleDrift {
   0% { opacity: 1; transform: translateY(0) scale(1); }
   100% { opacity: 0.3; transform: translateY(8px) scale(0.5); }
+}
+
+/* ─── Tharxian (Trojan) Horse charge ───────────────────────
+   A large wooden Trojan Horse rolls out of the activator's
+   flipped Surprise Zone and rams into the attacker. The
+   outer `.tharxian-horse-anim` carries the translate-along-
+   path keyframe (`tharxianHorseRoll`); the inner
+   `.tharxian-horse-gallop` carries the up-down gallop bob
+   (kept on a separate element so it doesn't clobber the
+   outer translate). Dust puffs trail behind via
+   `.tharxian-dust-puff` with staggered delays. */
+.tharxian-horse-anim {
+  position: fixed;
+  z-index: 10130;
+  pointer-events: none;
+  animation: tharxianHorseRoll var(--th-dur, 1100ms) cubic-bezier(.22, .8, .38, 1) forwards;
+}
+.tharxian-horse-gallop {
+  position: relative;
+  animation: tharxianHorseGallop 220ms ease-in-out infinite alternate;
+  transform-origin: 50% 80%;
+}
+.tharxian-dust-puff {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--puff-size, 16px);
+  height: var(--puff-size, 16px);
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(180, 150, 110, 0.65) 0%,
+    rgba(150, 120, 80, 0.45) 40%,
+    rgba(120, 95, 55, 0) 70%);
+  filter: blur(2px);
+  opacity: 0;
+  animation: tharxianDustPuff 700ms ease-out var(--puff-delay, 0s) infinite;
+  pointer-events: none;
+}
+@keyframes tharxianHorseRoll {
+  0%   { transform: translate(0, 0) scale(0.85); opacity: 0; }
+  8%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  18%  { transform: translate(calc(var(--thDx) * 0.20), calc(var(--thDy) * 0.20)) scale(1); opacity: 1; }
+  62%  { transform: translate(calc(var(--thDx) * 0.85), calc(var(--thDy) * 0.85)) scale(1); opacity: 1; }
+  78%  { transform: translate(var(--thDx), var(--thDy)) scale(1.18); opacity: 1; }
+  /* Impact shudder */
+  84%  { transform: translate(var(--thDx), var(--thDy)) scale(1.08) rotate(-3deg); opacity: 1; }
+  90%  { transform: translate(var(--thDx), var(--thDy)) scale(1.12) rotate(3deg); opacity: 1; }
+  100% { transform: translate(var(--thDx), var(--thDy)) scale(1.05); opacity: 0; }
+}
+@keyframes tharxianHorseGallop {
+  0%   { transform: translateY(0) rotate(-1deg); }
+  100% { transform: translateY(-4px) rotate(1deg); }
+}
+@keyframes tharxianDustPuff {
+  0%   { opacity: 0; transform: translate(var(--puff-x, 0px), var(--puff-y, 0px)) scale(0.4); }
+  20%  { opacity: 0.85; transform: translate(var(--puff-x, 0px), var(--puff-y, 0px)) scale(1); }
+  100% { opacity: 0; transform: translate(calc(var(--puff-x, 0px) * 1.6), calc(var(--puff-y, 0px) - 12px)) scale(1.6); }
+}
+
+/* ─── Tharxian Horse IMPACT burst ───────────────────────────
+   Detonates at the target the moment the horse lands. Layered
+   visuals: an outer + inner shockwave ring (expanding white-
+   gold halos), a central radial flash (peaks bright then
+   dissipates), 12 wood splinters spraying radially outward
+   with random spins, 6 heavier debris chunks (square wood
+   blocks) with an upward bias, and a ground dust burst at the
+   impact point. Each child carries its own animation-delay
+   timed off `h.dur * 0.78` so the whole sequence fires in
+   sync with the horse's shudder. */
+.tharxian-impact {
+  position: fixed;
+  z-index: 10131;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+.tharxian-impact-ring {
+  position: absolute;
+  left: 0; top: 0;
+  width: 20px; height: 20px;
+  border: 6px solid rgba(255, 230, 140, 0.95);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  box-shadow:
+    0 0 30px rgba(255, 200, 80, 0.7),
+    inset 0 0 16px rgba(255, 240, 180, 0.6);
+  animation: tharxianImpactRing 750ms cubic-bezier(.15, .8, .3, 1) forwards;
+}
+.tharxian-impact-ring--inner {
+  border-color: rgba(255, 180, 60, 0.85);
+  animation-duration: 600ms;
+}
+.tharxian-impact-flash {
+  position: absolute;
+  left: 0; top: 0;
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(255, 255, 240, 1) 0%,
+    rgba(255, 220, 140, 0.8) 30%,
+    rgba(255, 160, 60, 0.4) 60%,
+    transparent 80%);
+  filter: blur(2px);
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  animation: tharxianImpactFlash 650ms ease-out forwards;
+}
+.tharxian-impact-splinter {
+  position: absolute;
+  left: 0; top: 0;
+  width: 18px; height: 5px;
+  background: linear-gradient(90deg, #8a5226 0%, #5a341a 50%, #2a1808 100%);
+  border: 1px solid #1a0e04;
+  border-radius: 1px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: tharxianImpactSplinter 900ms cubic-bezier(.3, .65, .4, 1) forwards;
+}
+.tharxian-impact-chunk {
+  position: absolute;
+  left: 0; top: 0;
+  width: 12px; height: 12px;
+  background: linear-gradient(135deg, #7a4520 0%, #4a2a10 60%, #2a1808 100%);
+  border: 1px solid #1a0e04;
+  border-radius: 2px;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: tharxianImpactChunk 1000ms cubic-bezier(.3, .55, .5, 1) forwards;
+}
+.tharxian-impact-dust {
+  position: absolute;
+  left: 0; top: 0;
+  width: 140px; height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse,
+    rgba(160, 130, 90, 0.7) 0%,
+    rgba(130, 100, 70, 0.4) 40%,
+    transparent 75%);
+  filter: blur(4px);
+  transform: translate(-50%, -50%) scale(0.3);
+  opacity: 0;
+  animation: tharxianImpactDust 800ms ease-out forwards;
+}
+@keyframes tharxianImpactRing {
+  0%   { width: 20px; height: 20px; opacity: 1; border-width: 8px; }
+  50%  { opacity: 0.85; }
+  100% { width: 280px; height: 280px; opacity: 0; border-width: 1px; }
+}
+@keyframes tharxianImpactFlash {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+  20%  { opacity: 1; transform: translate(-50%, -50%) scale(2.6); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(3.8); }
+}
+@keyframes tharxianImpactSplinter {
+  0%   {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(0, 0) rotate(0deg);
+  }
+  10%  { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--sp-dx, 0), var(--sp-dy, 0)) rotate(var(--sp-rot-end, 360deg));
+  }
+}
+@keyframes tharxianImpactChunk {
+  0%   {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(0, 0) rotate(0deg);
+  }
+  8%   { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--ck-dx, 0), var(--ck-dy, 0)) rotate(var(--ck-rot-end, 360deg));
+  }
+}
+@keyframes tharxianImpactDust {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  25%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2); }
 }
 
 /* Projectile animation — flaming emoji flies from source to target */
@@ -4912,6 +5150,30 @@ body {
   100% { transform: scale(1.6); opacity: 0; }
 }
 
+/* Diamond sparkle flash — icy white/cyan radial used by
+   DiamondSparkleEffect. Same scale curve as the gold flash so
+   stagger-emitting works visually identically. */
+.anim-diamond-flash {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  left: -22px;
+  top: -22px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(255,255,255,.95) 0%,
+    rgba(190,235,255,.65) 30%,
+    rgba(120,200,255,.30) 55%,
+    transparent 75%);
+  filter: drop-shadow(0 0 6px rgba(180,230,255,.7));
+  animation: animDiamondFlash .55s ease-out forwards;
+}
+@keyframes animDiamondFlash {
+  0%   { transform: scale(0.3); opacity: 1; }
+  50%  { transform: scale(1.4); opacity: .7; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+
 /* Beer bubbles animation */
 .anim-beer-bubble {
   position: absolute;
@@ -5061,6 +5323,77 @@ body {
       0 0 90px rgba(220,0,0,.95),
       inset 0 0 28px rgba(255,100,100,.9);
     transform: scale(1.10);
+  }
+}
+
+/* Golden targeting — Divine Zeal and any radiant-flavor effect. The
+   valid-target highlight is a soft amber outline so the eligible set
+   stays legible without competing for attention; the selected highlight
+   blows up into a dramatic blazing white-gold halo at a noticeably
+   larger scale + fast pulse, so picked targets are unmistakable next
+   to the merely-eligible ones. Layered ON TOP of `.potion-target-*`
+   via the `.golden-targeting` board wrapper (added when the prompt
+   config carries `goldSelect: true`). */
+.golden-targeting .potion-target-valid {
+  box-shadow:
+    0 0 12px rgba(255,200,40,.55),
+    inset 0 0 6px rgba(255,220,80,.25) !important;
+  border-color: rgba(255,200,40,.7) !important;
+  border-width: 2px !important;
+  animation: goldenTargetValidPulse 1.4s ease-in-out infinite !important;
+  filter: none !important;
+}
+@keyframes goldenTargetValidPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 12px rgba(255,200,40,.55),
+      inset 0 0 6px rgba(255,220,80,.25);
+  }
+  50% {
+    box-shadow:
+      0 0 20px rgba(255,210,60,.75),
+      inset 0 0 10px rgba(255,230,100,.35);
+  }
+}
+.golden-targeting .potion-target-selected {
+  box-shadow:
+    0 0 48px rgba(255,255,220,1),
+    0 0 92px rgba(255,220,40,1),
+    0 0 160px rgba(255,160,0,.9),
+    0 0 240px rgba(255,120,0,.55),
+    inset 0 0 36px rgba(255,255,200,1) !important;
+  border-color: #ffffff !important;
+  border-width: 5px !important;
+  animation: goldenTargetSelectedPulse .5s ease-in-out infinite !important;
+  /* Promote to its own compositor layer so the big box-shadow + scale
+     animation doesn't repaint through the parent on every cursor
+     move (which produced visible black flicker on the selected slot
+     during pointermove events). `translateZ(0)` forces GPU compositing;
+     `backface-visibility: hidden` stops the rasterizer from briefly
+     showing a black backface during sub-pixel transitions. */
+  will-change: transform, box-shadow;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+}
+@keyframes goldenTargetSelectedPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 48px rgba(255,255,220,1),
+      0 0 92px rgba(255,220,40,1),
+      0 0 160px rgba(255,160,0,.9),
+      0 0 240px rgba(255,120,0,.55),
+      inset 0 0 36px rgba(255,255,200,1);
+    transform: translateZ(0) scale(1.06);
+  }
+  50% {
+    box-shadow:
+      0 0 70px rgba(255,255,240,1),
+      0 0 130px rgba(255,240,120,1),
+      0 0 210px rgba(255,190,20,1),
+      0 0 300px rgba(255,140,0,.85),
+      inset 0 0 50px rgba(255,255,230,1);
+    transform: translateZ(0) scale(1.14);
   }
 }
 
@@ -5332,6 +5665,36 @@ body {
   bottom: 3px;
   left: 50%;
   transform: translateX(-50%);
+}
+
+/* Light Ball aura — soft warm-yellow halo around the host Hero
+   while the Attachment Spell is in their Support Zone. The aura is
+   a visual-only marker (the actual negative-status protection is
+   gated engine-side); a slow pulse keeps it ambient and unmistakable
+   without competing for attention with damage / status overlays. */
+.status-light-ball-aura {
+  position: absolute;
+  inset: -6px;
+  pointer-events: none;
+  z-index: 2;
+  border-radius: 14px;
+  animation: lightBallPulse 2.4s ease-in-out infinite;
+}
+@keyframes lightBallPulse {
+  0%, 100% {
+    opacity: 0.75;
+    box-shadow:
+      inset 0 0 20px rgba(255,225,130,.55),
+      0 0 14px rgba(255,210,80,.45),
+      0 0 28px rgba(255,200,60,.3);
+  }
+  50% {
+    opacity: 1;
+    box-shadow:
+      inset 0 0 32px rgba(255,235,160,.85),
+      0 0 24px rgba(255,220,110,.7),
+      0 0 44px rgba(255,210,70,.5);
+  }
 }
 
 /* Overheal barrier indicator (Nao, the Barrier Priestess) */
@@ -6385,6 +6748,54 @@ body:has(.game-hand-me) .board-tooltip {
 @keyframes iceBoltPulse {
   0%   { transform: scale(1); filter: brightness(1); }
   100% { transform: scale(1.15); filter: brightness(1.2); }
+}
+
+/* ===== LOVE SHOT HEART PROJECTILE =====
+   Big light-pink heart that flies slowly from caster to target. The
+   class sits inside `.projectile-rotation-wrap` (which rotates by
+   `--projAngle` to point shaped projectiles like arrows / phoenix
+   at the target). Hearts have a clear top/bottom orientation, so we
+   counter-rotate by `-projAngle` to keep the heart visually upright
+   regardless of flight angle (src → tgt). The pulse + drop-shadow
+   glow live on a `::before` pseudo-element so they don't clobber the
+   counter-rotation transform on the host element. */
+.projectile-love-heart {
+  display: inline-block;
+  line-height: 1;
+  /* Counter-rotates the parent rotation-wrap's `rotate(--projAngle)`,
+     so the heart stays upright for any trajectory. */
+  transform: rotate(calc(-1 * var(--projAngle, 0deg)));
+}
+.projectile-love-heart::before {
+  content: '💗';
+  font-size: 96px;
+  display: inline-block;
+  filter:
+    drop-shadow(0 0 14px rgba(255, 180, 220, .95))
+    drop-shadow(0 0 28px rgba(255, 140, 200, .65))
+    drop-shadow(0 0 44px rgba(255, 110, 180, .35));
+  animation: loveHeartPulse 240ms ease-in-out infinite alternate;
+}
+@keyframes loveHeartPulse {
+  0%   { transform: scale(1);    filter: brightness(1) drop-shadow(0 0 14px rgba(255,180,220,.95)); }
+  100% { transform: scale(1.12); filter: brightness(1.15) drop-shadow(0 0 22px rgba(255,150,210,1)); }
+}
+
+.projectile-love-trail {
+  position: absolute;
+  inset: -32px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse,
+    rgba(255, 200, 230, .55) 0%,
+    rgba(255, 160, 210, .35) 35%,
+    rgba(255, 120, 190, .15) 60%,
+    transparent 80%);
+  animation: loveTrailPulse 110ms ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes loveTrailPulse {
+  0%   { opacity: .55; transform: scale(.95); }
+  100% { opacity: .9;  transform: scale(1.18); }
 }
 
 /* ===== RACCOON PROJECTILE (Smugness) ===== */

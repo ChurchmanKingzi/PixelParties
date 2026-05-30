@@ -102,6 +102,13 @@ module.exports = {
       const baseDamage = DAMAGE_PER_STATUS * statusCount;
       const totalDamage = baseDamage + atkBonus;
 
+      // Pre-resolution hook (Doq's guess, future "when this Hero
+      // attacks" effects) fires AFTER target pick but BEFORE the
+      // animation + damage. Listeners may mutate the about-to-deal
+      // damage.
+      const attackSource = { name: 'Stranglehold', owner: pi, heroIdx, controller: pi, usesHeroAtk: true };
+      const finalDmg = await engine._fireAttackDeclare(attackSource, target, totalDamage);
+
       // Play squeeze animation on target
       if (target.type === 'hero') {
         engine._broadcastEvent('play_zone_animation', {
@@ -117,12 +124,10 @@ module.exports = {
       await engine._delay(600);
 
       // Deal damage with type 'attack' (triggers Sacred Hammer, Sun Sword, etc.)
-      const attackSource = { name: 'Stranglehold', owner: pi, heroIdx, controller: pi };
-
       if (target.type === 'hero') {
         const targetHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (targetHero && targetHero.hp > 0) {
-          await engine.actionDealDamage(attackSource, targetHero, totalDamage, 'attack');
+          await engine.actionDealDamage(attackSource, targetHero, finalDmg, 'attack');
         }
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -131,7 +136,7 @@ module.exports = {
         );
         if (inst) {
           await engine.actionDealCreatureDamage(
-            attackSource, inst, totalDamage, 'attack',
+            attackSource, inst, finalDmg, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
         }
@@ -139,7 +144,7 @@ module.exports = {
 
       engine.log('stranglehold', {
         player: ps.username, target: target.cardName,
-        statusCount, baseDamage, atkBonus, totalDamage,
+        statusCount, baseDamage, atkBonus, totalDamage: finalDmg,
       });
       engine.sync();
     },

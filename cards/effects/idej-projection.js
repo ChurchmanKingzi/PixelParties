@@ -44,6 +44,25 @@ module.exports = {
       if (ctx.target !== hero) return;              // the host Hero must be the target
       if (!(ctx.amount > 0)) return;                // "would take any damage"
 
+      // Piercing damage (Ida's Destruction Spells, future
+      // `cannotBeNegated` sources) bypasses Idej Projection. Bail
+      // BEFORE prompting / paying the discard cost — the engine has a
+      // universal safety net that undoes a beforeDamage cancellation
+      // under cannotBeNegated, but the player would still lose their
+      // Projection to a no-op trade. Same for `cannotBeReduced`-only
+      // sources (current card text reads "cannot be reduced OR
+      // negated" together; treat either as piercing for the
+      // Projection's negation lever).
+      if (ctx.cannotBeNegated || ctx.cannotBeReduced) return;
+
+      // Already-voided incoming damage (Anti Magic's `magic_immune`
+      // covers this Spell, future similar voids) — bail without
+      // prompting. The engine's voiding gate runs AFTER this
+      // beforeDamage hook, so we look ahead via the generic helper.
+      // Saves the Projection for a future damage event that actually
+      // needs it.
+      if (ctx._engine._wouldHeroDamageBeVoided(ctx.target, ctx.source)) return;
+
       // One prompt per damage event, even if the Hero holds several
       // Idej Projections. The flag survives across every beforeDamage
       // hook for this event (ctx.setFlag contract).

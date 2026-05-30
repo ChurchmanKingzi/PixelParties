@@ -49,7 +49,13 @@ module.exports = {
       if (targets.length === 0) return;
 
       // ── Ida single-target override ──
-      const heroFlags = gs.heroFlags?.[`${pi}-${heroIdx}`];
+      // Flag belongs to the Hero PERFORMING the cast — use
+      // cardHeroOwner (board side), not cardOwner (the caster).
+      // Under Love Shot the caster casts through an opp-side Hero;
+      // we must read the opp-side flag, not the caster's same-slot
+      // Hero. cardHeroOwner falls back to cardOwner for normal
+      // casts, so this stays correct outside Love Shot too.
+      const heroFlags = gs.heroFlags?.[`${ctx.cardHeroOwner}-${heroIdx}`];
       if (heroFlags?.forcesSingleTarget) {
         // Opponent picks only 1 target, only the first hit (200) applies
         const selected = await engine.promptEffectTarget(oppIdx, targets, {

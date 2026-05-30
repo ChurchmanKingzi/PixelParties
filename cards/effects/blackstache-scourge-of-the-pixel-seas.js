@@ -31,9 +31,15 @@ const CARD_NAME = 'Blackstache, Scourge of the Pixel Seas';
 module.exports = {
   activeIn: ['hero'],
 
-  // No hooks — pure engine-side gate. The engine's
-  // `_blackstacheBlocksTurnEnd(targetPi, source)` helper checks for
-  // this hero's name on the target's side and matches against the
-  // gating rule (Terror always blocked; opp sources always blocked).
+  // Engine-level opt-ins honoured by `_blackstacheBlocksTurnEnd`:
+  //   • `immuneToTerror: true` — Terror sources (any side) are
+  //     blocked from force-ending this Hero's controller's turn while
+  //     this Hero is alive.
+  //   • `immuneToOpponentTurnEnd: true` — opponent-source turn-end
+  //     effects (Flashbang etc.) are blocked while this Hero is
+  //     alive. Same-side / self sources still resolve normally.
+  immuneToTerror: true,
+  immuneToOpponentTurnEnd: true,
+
   hooks: {},
 };
