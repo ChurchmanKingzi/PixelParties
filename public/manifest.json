@@ -1,0 +1,14 @@
+{
+  "name": "Pixel Parties TCG",
+  "short_name": "Pixel Parties",
+  "description": "Pixel Parties — an online multiplayer Trading Card Game simulator.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0a0a12",
+  "theme_color": "#0a0a12",
+  "icons": [
+    { "src": "/favicon.png", "sizes": "520x520", "type": "image/png", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "520x520", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -196,6 +196,14 @@ async function doJumpCascade(engine, pi) {
 // ─── MODULE EXPORTS ──────────────────────
 
 module.exports = {
+  // CPU: confirm this card's "evade danger?" prompt — the default brain
+  // declines cancellable confirms outside a card-cast, which would make the
+  // reaction-evade a no-op for the CPU. Avoiding damage is beneficial.
+  // (Title must equal the card name for this lookup.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    return undefined;
+  },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Fire hooks ONLY from hand zone

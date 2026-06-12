@@ -18,6 +18,15 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // CPU: confirm this reaction's "protect?" prompt — the default brain
+  // declines cancellable confirms outside a card-cast (damage trigger), and
+  // its confirmLabel lacks the reaction-branch marker, so without this it
+  // never fires. Negating damage + granting immunity is pure upside. (Title
+  // must equal the card name for this lookup.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    return undefined;
+  },
   activeIn: ['hand'],
   oncePerGame: true,
   oncePerGameKey: 'divineGift',

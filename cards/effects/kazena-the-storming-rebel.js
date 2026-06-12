@@ -13,6 +13,15 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // CPU: confirm this Hero's activated-effect "you may" prompt — the default
+  // brain declines cancellable confirms raised outside a card-cast (Hero
+  // effect activations don't set _resolvingCard), which would otherwise make
+  // the effect a no-op even after the CPU chose to activate it. (Title must
+  // equal the card name for this lookup.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    return undefined;
+  },
   activeIn: ['hero'],
   heroEffect: true,
 

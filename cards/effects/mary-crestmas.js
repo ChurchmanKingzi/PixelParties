@@ -28,6 +28,15 @@
 const CARD_NAME = 'Mary Crestmas';
 
 module.exports = {
+  // CPU: confirm this Hero's beneficial "you may" prompts (draw-on-transfer,
+  // negate-damage) — the default brain declines cancellable confirms raised
+  // outside a card-cast (these are passive trigger hooks), which would
+  // otherwise make both effects no-ops for the CPU. (Title must equal the
+  // card name for this lookup.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    return undefined;
+  },
   activeIn: ['hero'],
 
   hooks: {

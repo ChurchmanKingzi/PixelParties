@@ -232,6 +232,13 @@ async function _runAfterPotionUsedRouting(engine, pi, cardName) {
 }
 
 module.exports = {
+  // CPU: confirm the "resolve top of Potion Deck?" prompt — the default brain
+  // declines cancellable confirms outside a card-cast (onStatusApplied
+  // trigger), so without this the bonus never fires. (Title == card name.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    return undefined;
+  },
   activeIn: ['support'],
 
   cpuMeta: {

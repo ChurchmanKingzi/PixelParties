@@ -77,6 +77,15 @@ function eligibleAttacks(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // CPU: confirm this Hero's beneficial "you may" prompt — the default brain
+  // declines cancellable confirms raised outside a card-cast (afterAttack/
+  // afterSpell trigger), which would otherwise skip the bonus Attack. The
+  // follow-up Attack-pick is a cardGallery the brain handles on its own.
+  // (The prompt title must equal the card name for this lookup.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    return undefined;
+  },
   activeIn: ['hero'],
 
   hooks: {

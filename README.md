@@ -17,10 +17,16 @@ Then open **http://localhost:3000** in your browser.
 2. Go to [render.com](https://render.com) → **New** → **Web Service**
 3. Connect your GitHub repo
 4. Configure:
-   - **Build Command:** `npm install`
+   - **Build Command:** `npm install && npm run build`
    - **Start Command:** `node server.js`
    - **Environment:** Node
+   - (Optional) set `NODE_ENV=production` to disable the dev file-watcher.
 5. Deploy!
+
+> The front-end is pre-compiled from `public/*.jsx` to `public/dist/*.js`
+> by `scripts/build.js` (using the vendored Babel in `scripts/vendor/`).
+> `npm run build` does this once; `node server.js` also builds at startup
+> and, outside production, watches the sources for edit-and-refresh dev.
 
 > **Note:** The SQLite database (`data/pixel-parties.db`) is stored on disk.
 > On Render's free tier, the disk resets on redeploy. For persistent data,

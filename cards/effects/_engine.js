@@ -5429,6 +5429,7 @@ class GameEngine {
 
         // Check if ALL heroes of a player are dead → opponent wins
         await this.checkAllHeroesDead();
+        this._maybeFireCpuHeroKilledBark(target, source);
       }
     }
 
@@ -5563,6 +5564,7 @@ class GameEngine {
           target._koProcessed = true;
           await this.handleHeroDeathCleanup(target);
           await this.checkAllHeroesDead();
+          this._maybeFireCpuHeroKilledBark(target, source);
         }
       }
 
@@ -5680,6 +5682,7 @@ class GameEngine {
       target._koProcessed = true;
       await this.handleHeroDeathCleanup(target);
       await this.checkAllHeroesDead();
+      this._maybeFireCpuHeroKilledBark(target, source);
     }
     return { defeated: true };
   }
@@ -24329,6 +24332,51 @@ class GameEngine {
    * Equip artifacts go to discard (fires onCardLeaveZone).
    * Any creatures in island zones are defeated.
    */
+  /**
+   * Mid-game CPU "you killed one of my Heroes" bark. Fires a `cpu_bark`
+   * client event (transient speech bubble above the CPU's avatar) when the
+   * OPPONENT kills a CPU Hero. Deliberately excludes:
+   *   • self-sacrifice / recoil (source belongs to the dead Hero's own side,
+   *     OR there's no attributed killer) — `killerOwner` check,
+   *   • the final Hero's death (the Defeat line covers that) — `stillAlive`,
+   *   • MCTS sims / non-CPU games.
+   * Called from the real KO paths AFTER death is committed; `source` is the
+   * killing card's info ({ name, owner/controller }).
+   */
+  _maybeFireCpuHeroKilledBark(target, source) {
+    if (this._inMctsSim || this._fastMode) return;
+    const gs = this.gs;
+    if (!gs || typeof this._cpuPlayerIdx !== 'number' || this._cpuPlayerIdx < 0) return;
+    const heroOwner = this._cpuPlayerIdx;
+    const ps = gs.players[heroOwner];
+    const heroIdx = (ps?.heroes || []).indexOf(target);
+    if (heroIdx < 0) return; // not a CPU Hero
+    const killerOwner = source?.owner ?? source?.controller ?? -1;
+    if (killerOwner < 0 || killerOwner === heroOwner) return; // opponent kill only (excl. self-sac / recoil / unattributed)
+    const stillAlive = (ps.heroes || []).some(h => h?.name && h.hp > 0);
+    if (!stillAlive) return; // final Hero → Defeat line handles it
+    // The MIDDLE Hero (slot 1) is the CPU's avatar — its death gets a
+    // dedicated, higher-priority line (falling back to the general one).
+    const isMiddle = heroIdx === 1;
+    const text = isMiddle ? (ps.middleHeroKilledMsg || ps.heroKilledMsg) : ps.heroKilledMsg;
+    if (!text) return;
+    const priority = isMiddle ? 2 : 1;
+    // Coalesce: when several Heroes die from one effect, play only ONE bark
+    // and let a middle-Hero death win precedence regardless of resolution
+    // order. A short debounce flushes the highest-priority candidate once.
+    if (!this._pendingHeroBark || priority >= this._pendingHeroBark.priority) {
+      this._pendingHeroBark = { owner: heroOwner, text, priority };
+    }
+    if (this._heroBarkTimer) return;
+    this._heroBarkTimer = setTimeout(() => {
+      const b = this._pendingHeroBark;
+      this._pendingHeroBark = null;
+      this._heroBarkTimer = null;
+      // Suppress if the game ended meanwhile (the Defeat line covers it).
+      if (b && !this.gs?.result) this._broadcastEvent('cpu_bark', { owner: b.owner, text: b.text });
+    }, 90);
+  }
+
   async handleHeroDeathCleanup(hero) {
     if (!hero || !hero.name) return;
 
@@ -24363,21 +24411,36 @@ class GameEngine {
         // Fire onCardLeaveZone (triggers Sun Sword cleanup, Flying Island, etc.)
         // _bypassDeadHeroFilter: hero is already dead, but we still need cleanup hooks to fire
         await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, { _onlyCard: inst, card: inst, fromZone: 'support', fromHeroIdx: hi, _bypassDeadHeroFilter: true });
-        // Move card to discard
+        // Locate the equip's current support slot BEFORE removing it. Tokens
+        // route to the deleted pile; everything else to the discard pile.
         const supZones = ps.supportZones[hi] || [];
+        let slotIdx = -1;
         for (let zi = 0; zi < supZones.length; zi++) {
-          const idx = (supZones[zi] || []).indexOf(inst.name);
-          if (idx >= 0) { supZones[zi].splice(idx, 1); break; }
+          if ((supZones[zi] || []).indexOf(inst.name) >= 0) { slotIdx = zi; break; }
+        }
+        const effectiveCd = this.getEffectiveCardData(inst);
+        const isToken = !!(effectiveCd && hasCardType(effectiveCd, 'Token'));
+        // Zone-anchored fly-out so the client animates this equip from THIS
+        // hero's exact slot, not the leftmost same-named one — e.g. two
+        // Lifeforce Howitzers on different heroes. The client's name-keyed
+        // diff animator otherwise always picks the first captured rect; the
+        // broadcast pre-consumes that entry and flies from the right slot.
+        if (slotIdx >= 0) {
+          this._broadcastEvent('play_pile_transfer', {
+            owner: inst.owner,
+            cardName: inst.name,
+            from: 'support',
+            to: isToken ? 'deleted' : 'discard',
+            fromHeroIdx: hi,
+            fromSlotIdx: slotIdx,
+          });
+          supZones[slotIdx].splice((supZones[slotIdx] || []).indexOf(inst.name), 1);
         }
         // Cards return to their ORIGINAL owner's discard pile (Tokens go to deleted pile)
         const discardPs = this.gs.players[inst.originalOwner];
         if (discardPs) {
-          const effectiveCd = this.getEffectiveCardData(inst);
-          if (effectiveCd && hasCardType(effectiveCd, 'Token')) {
-            discardPs.deletedPile.push(inst.name);
-          } else {
-            discardPs.discardPile.push(inst.name);
-          }
+          if (isToken) discardPs.deletedPile.push(inst.name);
+          else discardPs.discardPile.push(inst.name);
         }
         this.cardInstances = this.cardInstances.filter(c => c.id !== inst.id);
       }

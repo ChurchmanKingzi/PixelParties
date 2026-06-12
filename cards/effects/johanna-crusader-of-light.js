@@ -97,6 +97,14 @@ async function _cleanseAllies(engine, ownerIdx, johannaIdx) {
 }
 
 module.exports = {
+  // CPU: confirm Johanna's damage-redirect prompt — the default brain
+  // declines cancellable confirms outside a card-cast (beforeDamage trigger),
+  // so without this Johanna never tanks for her allies. Her purpose is to
+  // absorb damage onto herself, so accept. (Title must equal the card name.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    return undefined;
+  },
   activeIn: ['hero'],
 
   // CPU threat assessment: passive blanket immunity for the team plus a

@@ -9,9 +9,33 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const { GameEngine } = require('./cards/effects/_engine');
 const { loadCardEffect } = require('./cards/effects/_loader');
 const { BUFF_EFFECTS } = require('./cards/effects/_hooks');
+const { containsProfanity, MESSAGE_MAX_LEN } = require('./public/profanity.js');
+
+// ── Minimal .env loader (no dependency) ──────────────────────────
+// Loads KEY=VALUE pairs from a project-root .env into process.env
+// (without overriding vars already set in the real environment).
+// Used for SMTP credentials; see mailer.js.
+(function loadDotEnv() {
+  try {
+    const envPath = path.join(__dirname, '.env');
+    if (!fs.existsSync(envPath)) return;
+    for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+      const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/i.exec(line);
+      if (!m || line.trim().startsWith('#')) continue;
+      let val = m[2];
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (process.env[m[1]] === undefined) process.env[m[1]] = val;
+    }
+  } catch (e) { console.error('[env] .env load failed:', e.message); }
+})();
+
+const { sendMail } = require('./mailer');
 
 /**
  * Enrich a puzzle-authored buffs object so each entry carries the
@@ -237,6 +261,76 @@ const io = new Server(server, { cors: { origin: '*' } });
 
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
+
+// ───────────────────────────────────────────────────────────────
+//  Front-end build (public/*.jsx → public/dist/*.js)
+//  Compile once at startup so dist is always present/fresh, then
+//  watch in dev so the edit-and-refresh loop still works. In
+//  production set PP_NO_WATCH=1 (the build step having already run).
+// ───────────────────────────────────────────────────────────────
+try {
+  const { buildAll, watch } = require('./scripts/build');
+  buildAll();
+  if (!process.env.PP_NO_WATCH && process.env.NODE_ENV !== 'production') watch();
+} catch (e) {
+  console.error('[build] front-end build failed:', e.message);
+}
+
+// ───────────────────────────────────────────────────────────────
+//  On-the-fly gzip for compressible static assets (zero-dep).
+//  Compresses .js/.json/.css/.svg/.map from public, /data and
+//  /cards. Results are cached in memory keyed by file mtime, so
+//  editing cards.json (etc.) is picked up on the next request.
+//  Conditional requests (If-Modified-Since) still yield 304s, so
+//  repeat visits are not regressed vs express.static.
+// ───────────────────────────────────────────────────────────────
+const GZIP_ROOTS = [
+  ['/data/', path.join(__dirname, 'data')],
+  ['/cards/', path.join(__dirname, 'cards')],
+  ['/', path.join(__dirname, 'public')],
+];
+const GZIP_MIME = {
+  '.js': 'text/javascript; charset=UTF-8',
+  '.json': 'application/json; charset=UTF-8',
+  '.css': 'text/css; charset=UTF-8',
+  '.svg': 'image/svg+xml; charset=UTF-8',
+  '.map': 'application/json; charset=UTF-8',
+};
+const _gzCache = new Map(); // absPath -> { mtimeMs, buf }
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  const ext = path.extname(req.path).toLowerCase();
+  if (!GZIP_MIME[ext]) return next();
+  if (!/\bgzip\b/.test(req.headers['accept-encoding'] || '')) return next();
+  // Resolve the URL against the static roots, guarding traversal.
+  let abs = null;
+  for (const [mount, dir] of GZIP_ROOTS) {
+    if (!req.path.startsWith(mount)) continue;
+    const rel = decodeURIComponent(req.path.slice(mount.length));
+    const candidate = path.join(dir, rel);
+    if (!candidate.startsWith(dir + path.sep)) continue; // path traversal guard
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) { abs = candidate; break; }
+  }
+  if (!abs) return next();
+  const stat = fs.statSync(abs);
+  const lastMod = new Date(Math.floor(stat.mtimeMs / 1000) * 1000).toUTCString();
+  res.setHeader('Vary', 'Accept-Encoding');
+  res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+  res.setHeader('Last-Modified', lastMod);
+  const ims = req.headers['if-modified-since'];
+  if (ims && Date.parse(ims) >= Date.parse(lastMod)) { res.statusCode = 304; return res.end(); }
+  let ent = _gzCache.get(abs);
+  if (!ent || ent.mtimeMs !== stat.mtimeMs) {
+    ent = { mtimeMs: stat.mtimeMs, buf: zlib.gzipSync(fs.readFileSync(abs), { level: 6 }) };
+    _gzCache.set(abs, ent);
+  }
+  res.setHeader('Content-Type', GZIP_MIME[ext]);
+  res.setHeader('Content-Encoding', 'gzip');
+  res.setHeader('Content-Length', ent.buf.length);
+  if (req.method === 'HEAD') return res.end();
+  res.end(ent.buf);
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/data', express.static(path.join(__dirname, 'data')));
 app.use('/cards', express.static(path.join(__dirname, 'cards')));
@@ -272,6 +366,9 @@ async function initDatabase() {
 
   // Safe column migrations
   try { await db.execute("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''"); } catch {}
+  // In-game speech-bubble lines shown above the player's avatar on win/loss.
+  try { await db.execute("ALTER TABLE users ADD COLUMN victory_msg TEXT DEFAULT ''"); } catch {}
+  try { await db.execute("ALTER TABLE users ADD COLUMN defeat_msg TEXT DEFAULT ''"); } catch {}
   try { await db.execute('ALTER TABLE users ADD COLUMN wins INTEGER DEFAULT 0'); } catch {}
   try { await db.execute('ALTER TABLE users ADD COLUMN losses INTEGER DEFAULT 0'); } catch {}
   try { await db.execute("ALTER TABLE decks ADD COLUMN cover_card TEXT DEFAULT ''"); } catch {}
@@ -310,6 +407,46 @@ async function initDatabase() {
   // 0 = unclaimed, 10 or 20 = big bonus already paid out (subsequent
   // 2+/3 wins during the same challenge only pay 1 SC each).
   try { await db.execute("ALTER TABLE users ADD COLUMN daily_claimed_big INTEGER DEFAULT 0"); } catch {}
+  // ── Email verification & password recovery ──
+  // `email` is nullable & unique (case-insensitive) among non-null rows.
+  // `email_verified` gates nothing for legacy accounts: existing rows
+  // (which predate the email column, so email IS NULL) are grandfathered
+  // to verified=1 once. New accounts only ever land in `users` AFTER they
+  // verify (see pending_signups), so they arrive already verified.
+  try { await db.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT NULL"); } catch {}
+  try { await db.execute("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"); } catch {}
+  try { await db.execute("UPDATE users SET email_verified = 1 WHERE email IS NULL AND email_verified = 0"); } catch {}
+  try { await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL"); } catch {}
+
+  // Holds a not-yet-verified registration. No `users` row exists until the
+  // emailed code is confirmed, so unverified attempts never squat a
+  // username and never leave orphan decks.
+  await db.execute(`CREATE TABLE IF NOT EXISTS pending_signups (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    email TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    color TEXT,
+    avatar TEXT,
+    code_hash TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    attempts INTEGER DEFAULT 0,
+    created_at INTEGER DEFAULT (unixepoch())
+  )`);
+
+  // One-time codes for password reset and for grandfathered accounts
+  // adding an email later. `purpose` is 'reset' | 'add_email'.
+  await db.execute(`CREATE TABLE IF NOT EXISTS email_codes (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    email TEXT NOT NULL,
+    code_hash TEXT NOT NULL,
+    purpose TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    attempts INTEGER DEFAULT 0,
+    created_at INTEGER DEFAULT (unixepoch())
+  )`);
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_codes(email)');
 
   await db.execute(`CREATE TABLE IF NOT EXISTS hero_stats (
     user_id TEXT NOT NULL,
@@ -362,6 +499,54 @@ async function initDatabase() {
         AND opponent_deck_id GLOB 'sample-[0-9]*'`);
   } catch (err) {
     console.error('[npc_stats migration] failed:', err.message);
+  }
+
+  // Per-user unlocked CPU opponents. New accounts start with only a few
+  // random opponents unlocked (see seedInitialOpponents); more unlock as
+  // win milestones are hit (see endCpuBattle). The opponent gallery and the
+  // structure-deck shop are both filtered to this set. `is_initial` flags
+  // the starting opponents, whose FIRST win each grants a bonus unlock.
+  await db.execute(`CREATE TABLE IF NOT EXISTS unlocked_opponents (
+    user_id TEXT NOT NULL,
+    opponent_deck_id TEXT NOT NULL,
+    is_initial INTEGER DEFAULT 0,
+    unlocked_at INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, opponent_deck_id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`);
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_unlocked_opponents_user ON unlocked_opponents(user_id)');
+
+  // Account-initialization flags. `opponents_initialized` marks that a
+  // user's unlock set has been seeded; `opponents_regated` marks that the
+  // account has been migrated to the starter-deck-only gating policy.
+  try { await db.execute('ALTER TABLE users ADD COLUMN opponents_initialized INTEGER DEFAULT 0'); } catch {}
+  try { await db.execute('ALTER TABLE users ADD COLUMN opponents_regated INTEGER DEFAULT 0'); } catch {}
+
+  // One-time re-gate: every account not yet migrated has its opponent
+  // roster reset to just the starter-deck opponents (is_initial=1) and its
+  // CPU win/loss records wiped, so the unlock progression starts clean for
+  // everyone — preexisting accounts included. Runs once per account (the
+  // flag flips to 1); new signups arrive already flagged, so a restart
+  // never wipes their progress.
+  try {
+    const toRegate = await db.all('SELECT id FROM users WHERE opponents_regated = 0');
+    if (toRegate.length) {
+      const starterIds = loadSampleDecks().filter(d => !d.isStructure).map(d => d.id);
+      for (const u of toRegate) {
+        await db.run('DELETE FROM unlocked_opponents WHERE user_id = ?', [u.id]);
+        for (const oid of starterIds) {
+          await db.run(
+            'INSERT OR IGNORE INTO unlocked_opponents (user_id, opponent_deck_id, is_initial) VALUES (?, ?, 1)',
+            [u.id, oid]
+          );
+        }
+        await db.run('DELETE FROM npc_stats WHERE user_id = ?', [u.id]);
+      }
+      await db.run('UPDATE users SET opponents_regated = 1, opponents_initialized = 1 WHERE opponents_regated = 0');
+      console.log(`[unlock re-gate] reset ${toRegate.length} account(s) to starter-deck opponents + cleared CPU win/loss`);
+    }
+  } catch (err) {
+    console.error('[unlock re-gate] failed:', err.message);
   }
 
   // Cardback storage table (replaces filesystem storage)
@@ -459,50 +644,279 @@ function authMiddleware(req, res, next) {
   next();
 }
 
-// ===== AUTH ROUTES =====
-app.post('/api/auth/signup', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-  if (username.trim().length < 3) return res.status(400).json({ error: 'Username must be 3+ characters' });
-  if (password.length < 3) return res.status(400).json({ error: 'Password must be 3+ characters' });
+// ===== AUTH HELPERS (email verification & recovery) =====
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CODE_TTL_MS = 15 * 60 * 1000;      // codes valid for 15 minutes
+const MAX_CODE_ATTEMPTS = 6;             // wrong guesses before a code dies
+const RESEND_COOLDOWN_MS = 30 * 1000;    // min gap between sends to one address
+const SEND_WINDOW_MS = 60 * 60 * 1000;   // rolling window for the per-address cap
+const MAX_SENDS_PER_WINDOW = 6;          // max emails per address per window
 
-  const existing = await db.get('SELECT * FROM users WHERE username = ? COLLATE NOCASE', [username.trim()]);
-  if (existing) return res.status(409).json({ error: 'Username already taken' });
+function genCode() { return String(crypto.randomInt(0, 1000000)).padStart(6, '0'); }
+function hashCode(code) { return crypto.createHash('sha256').update(String(code)).digest('hex'); }
+function normEmail(e) { return String(e || '').trim(); }
 
-  const id = uuidv4();
-  const hash = bcrypt.hashSync(password, 10);
-  const defaultAvatar = getRandomDefaultAvatar();
-  // Random player colour at signup so fresh accounts don't all share
-  // the schema's cyan default. Avatar + colour are both rolled up
-  // front; the user changes either from Profile whenever they like.
-  const defaultColor = getRandomDefaultColor();
-  await db.run(
-    'INSERT INTO users (id, username, password_hash, avatar, color) VALUES (?, ?, ?, ?, ?)',
-    [id, username.trim(), hash, defaultAvatar, defaultColor],
-  );
-
-  // Create default deck
-  await db.run('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)', [uuidv4(), id, 'My First Deck']);
-
-  const token = uuidv4();
-  sessions.set(token, { userId: id, username: username.trim() });
-  res.cookie('pp_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
-  const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
-  res.json({ token, user: sanitizeUser(user) });
-});
-
-app.post('/api/auth/login', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-
-  const user = await db.get('SELECT * FROM users WHERE username = ? COLLATE NOCASE', [username.trim()]);
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
-    return res.status(401).json({ error: 'Invalid username or password' });
+// In-memory send throttle (resets on restart — fine for abuse damping).
+const _emailSends = new Map(); // lowercased email -> number[] (timestamps)
+function emailSendStatus(email) {
+  const key = email.toLowerCase();
+  const now = Date.now();
+  const hits = (_emailSends.get(key) || []).filter(t => now - t < SEND_WINDOW_MS);
+  _emailSends.set(key, hits);
+  if (hits.length && now - hits[hits.length - 1] < RESEND_COOLDOWN_MS) {
+    return { ok: false, retryAfter: Math.ceil((RESEND_COOLDOWN_MS - (now - hits[hits.length - 1])) / 1000) };
   }
+  if (hits.length >= MAX_SENDS_PER_WINDOW) return { ok: false, retryAfter: 0, capped: true };
+  return { ok: true };
+}
+function recordEmailSend(email) {
+  const key = email.toLowerCase();
+  const hits = _emailSends.get(key) || [];
+  hits.push(Date.now());
+  _emailSends.set(key, hits);
+}
 
+function codeEmail(kind, code) {
+  const intro = kind === 'reset'
+    ? 'Use this code to reset your Pixel Parties password:'
+    : kind === 'add_email'
+      ? 'Use this code to confirm this email address for your Pixel Parties account:'
+      : 'Welcome to Pixel Parties! Use this code to verify your email and finish creating your account:';
+  const subject = kind === 'reset'
+    ? 'Your Pixel Parties password reset code'
+    : 'Your Pixel Parties verification code';
+  const text = `${intro}\n\n    ${code}\n\nThis code expires in 15 minutes. If you didn't request it, you can ignore this email.`;
+  const html = `<div style="font-family:system-ui,Segoe UI,sans-serif;background:#0a0a12;color:#e0e0f0;padding:32px;border-radius:12px;max-width:440px;margin:auto">
+    <div style="font-size:22px;font-weight:800;letter-spacing:4px;color:#00f0ff;text-transform:uppercase;margin-bottom:16px">Pixel Parties</div>
+    <p style="color:#c0c0d8;line-height:1.5">${intro}</p>
+    <div style="font-size:34px;font-weight:800;letter-spacing:10px;color:#00f0ff;background:#12121f;border:1px solid #252540;border-radius:10px;padding:18px;text-align:center;margin:20px 0">${code}</div>
+    <p style="color:#8888aa;font-size:13px">This code expires in 15 minutes. If you didn't request it, you can safely ignore this email.</p>
+  </div>`;
+  return { subject, text, html };
+}
+
+// Issue + email a code. Returns { ok } or { ok:false, error, status }.
+// `purpose`: 'reset' | 'add_email' (stored in email_codes against a user);
+// signup uses pending_signups directly and calls sendMail itself.
+async function issueAndSendCode({ userId, email, purpose }) {
+  const status = emailSendStatus(email);
+  if (!status.ok) {
+    return status.capped
+      ? { ok: false, status: 429, error: 'Too many emails requested. Please try again later.' }
+      : { ok: false, status: 429, error: `Please wait ${status.retryAfter}s before requesting another code.` };
+  }
+  const code = genCode();
+  await db.run('DELETE FROM email_codes WHERE email = ? COLLATE NOCASE AND purpose = ?', [email, purpose]);
+  await db.run(
+    'INSERT INTO email_codes (id, user_id, email, code_hash, purpose, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [uuidv4(), userId || null, email, hashCode(code), purpose, Date.now() + CODE_TTL_MS],
+  );
+  const { subject, text, html } = codeEmail(purpose, code);
+  try {
+    await sendMail({ to: email, subject, text, html });
+  } catch (e) {
+    console.error('[mailer] send failed:', e.message);
+    return { ok: false, status: 502, error: 'Could not send the email. Please try again later.' };
+  }
+  recordEmailSend(email);
+  return { ok: true };
+}
+
+// Validate a code from email_codes. On success deletes it and returns the row.
+async function consumeEmailCode({ email, purpose, code }) {
+  const row = await db.get(
+    'SELECT * FROM email_codes WHERE email = ? COLLATE NOCASE AND purpose = ? ORDER BY created_at DESC LIMIT 1',
+    [email, purpose],
+  );
+  if (!row) return { ok: false, error: 'No code was requested for this email. Please request a new one.' };
+  if (Date.now() > row.expires_at) {
+    await db.run('DELETE FROM email_codes WHERE id = ?', [row.id]);
+    return { ok: false, error: 'That code has expired. Please request a new one.' };
+  }
+  if (row.attempts >= MAX_CODE_ATTEMPTS) {
+    await db.run('DELETE FROM email_codes WHERE id = ?', [row.id]);
+    return { ok: false, error: 'Too many incorrect attempts. Please request a new code.' };
+  }
+  if (hashCode(code) !== row.code_hash) {
+    await db.run('UPDATE email_codes SET attempts = attempts + 1 WHERE id = ?', [row.id]);
+    return { ok: false, error: 'Incorrect code.' };
+  }
+  await db.run('DELETE FROM email_codes WHERE id = ?', [row.id]);
+  return { ok: true, row };
+}
+
+function startSession(res, user) {
   const token = uuidv4();
   sessions.set(token, { userId: user.id, username: user.username });
   res.cookie('pp_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
+  return token;
+}
+
+// ===== AUTH ROUTES =====
+// Step 1 of registration: validate, stash a pending signup, email a code.
+// The real `users` row is only created on /verify-email.
+app.post('/api/auth/signup', async (req, res) => {
+  const { username, password } = req.body;
+  const email = normEmail(req.body.email);
+  if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address' });
+  if (username.trim().length < 3) return res.status(400).json({ error: 'Username must be 3+ characters' });
+  if (password.length < 3) return res.status(400).json({ error: 'Password must be 3+ characters' });
+
+  const uname = username.trim();
+  if (await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE', [uname])) {
+    return res.status(409).json({ error: 'Username already taken' });
+  }
+  if (await db.get('SELECT 1 FROM users WHERE email = ? COLLATE NOCASE', [email])) {
+    return res.status(409).json({ error: 'That email is already registered. Try logging in or resetting your password.' });
+  }
+
+  const status = emailSendStatus(email);
+  if (!status.ok) {
+    return res.status(429).json({
+      error: status.capped
+        ? 'Too many emails requested. Please try again later.'
+        : `Please wait ${status.retryAfter}s before requesting another code.`,
+    });
+  }
+
+  const code = genCode();
+  // One pending registration per username/email — replace any prior attempt.
+  await db.run('DELETE FROM pending_signups WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE', [uname, email]);
+  await db.run(
+    'INSERT INTO pending_signups (id, username, email, password_hash, color, avatar, code_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [uuidv4(), uname, email, bcrypt.hashSync(password, 10), getRandomDefaultColor(), getRandomDefaultAvatar(), hashCode(code), Date.now() + CODE_TTL_MS],
+  );
+  const { subject, text, html } = codeEmail('signup', code);
+  try {
+    await sendMail({ to: email, subject, text, html });
+  } catch (e) {
+    console.error('[mailer] signup send failed:', e.message);
+    return res.status(502).json({ error: 'Could not send the verification email. Please try again later.' });
+  }
+  recordEmailSend(email);
+  res.json({ needsVerification: true, email, username: uname });
+});
+
+// Step 2 of registration: confirm the code, create the real account, log in.
+app.post('/api/auth/verify-email', async (req, res) => {
+  const email = normEmail(req.body.email);
+  const code = String(req.body.code || '').trim();
+  if (!email || !code) return res.status(400).json({ error: 'Email and code are required' });
+
+  const pending = await db.get('SELECT * FROM pending_signups WHERE email = ? COLLATE NOCASE', [email]);
+  if (!pending) return res.status(400).json({ error: 'No pending registration for this email. Please sign up again.' });
+  if (Date.now() > pending.expires_at) {
+    await db.run('DELETE FROM pending_signups WHERE id = ?', [pending.id]);
+    return res.status(400).json({ error: 'That code has expired. Please sign up again.' });
+  }
+  if (pending.attempts >= MAX_CODE_ATTEMPTS) {
+    await db.run('DELETE FROM pending_signups WHERE id = ?', [pending.id]);
+    return res.status(400).json({ error: 'Too many incorrect attempts. Please sign up again.' });
+  }
+  if (hashCode(code) !== pending.code_hash) {
+    await db.run('UPDATE pending_signups SET attempts = attempts + 1 WHERE id = ?', [pending.id]);
+    return res.status(400).json({ error: 'Incorrect code.' });
+  }
+
+  // Re-check uniqueness in case someone grabbed the name/email meanwhile.
+  if (await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE', [pending.username])) {
+    await db.run('DELETE FROM pending_signups WHERE id = ?', [pending.id]);
+    return res.status(409).json({ error: 'Username already taken. Please sign up again.' });
+  }
+  if (await db.get('SELECT 1 FROM users WHERE email = ? COLLATE NOCASE', [pending.email])) {
+    await db.run('DELETE FROM pending_signups WHERE id = ?', [pending.id]);
+    return res.status(409).json({ error: 'That email is already registered.' });
+  }
+
+  const id = uuidv4();
+  await db.run(
+    'INSERT INTO users (id, username, password_hash, avatar, color, email, email_verified) VALUES (?, ?, ?, ?, ?, ?, 1)',
+    [id, pending.username, pending.password_hash, pending.avatar, pending.color, pending.email],
+  );
+  await db.run('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)', [uuidv4(), id, 'My First Deck']);
+  // Unlock the starting roster of random CPU opponents for the new account.
+  try { await seedInitialOpponents(id); } catch (err) { console.error('[signup] seedInitialOpponents failed:', err.message); }
+  await db.run('DELETE FROM pending_signups WHERE id = ?', [pending.id]);
+
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
+  const token = startSession(res, user);
+  res.json({ token, user: sanitizeUser(user), isNewAccount: true });
+});
+
+// Resend the signup verification code for a pending registration.
+app.post('/api/auth/resend', async (req, res) => {
+  const email = normEmail(req.body.email);
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  const pending = await db.get('SELECT * FROM pending_signups WHERE email = ? COLLATE NOCASE', [email]);
+  // Don't reveal whether a pending registration exists.
+  if (!pending) return res.json({ ok: true });
+  const status = emailSendStatus(email);
+  if (!status.ok) {
+    return res.status(429).json({
+      error: status.capped
+        ? 'Too many emails requested. Please try again later.'
+        : `Please wait ${status.retryAfter}s before requesting another code.`,
+    });
+  }
+  const code = genCode();
+  await db.run('UPDATE pending_signups SET code_hash = ?, expires_at = ?, attempts = 0 WHERE id = ?',
+    [hashCode(code), Date.now() + CODE_TTL_MS, pending.id]);
+  const { subject, text, html } = codeEmail('signup', code);
+  try { await sendMail({ to: email, subject, text, html }); }
+  catch (e) { console.error('[mailer] resend failed:', e.message); return res.status(502).json({ error: 'Could not send the email. Please try again later.' }); }
+  recordEmailSend(email);
+  res.json({ ok: true });
+});
+
+// Forgot password — always responds ok (no account enumeration).
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const email = normEmail(req.body.email);
+  if (!email || !EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address' });
+  const user = await db.get('SELECT * FROM users WHERE email = ? COLLATE NOCASE AND email_verified = 1', [email]);
+  if (user) {
+    const r = await issueAndSendCode({ userId: user.id, email, purpose: 'reset' });
+    // Swallow rate-limit/send errors into the generic response except the
+    // cooldown hint, which is safe and useful to surface.
+    if (!r.ok && r.status === 429) return res.status(429).json({ error: r.error });
+  }
+  res.json({ ok: true });
+});
+
+// Reset password using the emailed code.
+app.post('/api/auth/reset-password', async (req, res) => {
+  const email = normEmail(req.body.email);
+  const code = String(req.body.code || '').trim();
+  const newPassword = req.body.newPassword || '';
+  if (!email || !code) return res.status(400).json({ error: 'Email and code are required' });
+  if (newPassword.length < 3) return res.status(400).json({ error: 'Password must be 3+ characters' });
+  const result = await consumeEmailCode({ email, purpose: 'reset', code });
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  const user = await db.get('SELECT * FROM users WHERE email = ? COLLATE NOCASE AND email_verified = 1', [email]);
+  if (!user) return res.status(400).json({ error: 'No account found for this email.' });
+  await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync(newPassword, 10), user.id]);
+  // Invalidate any live sessions for this account after a reset.
+  for (const [tok, sess] of sessions) if (sess.userId === user.id) sessions.delete(tok);
+  res.json({ ok: true });
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  // Accept either a username or an email in `identifier` (legacy clients
+  // send `username`).
+  const identifier = String(req.body.identifier ?? req.body.username ?? '').trim();
+  const { password } = req.body;
+  if (!identifier || !password) return res.status(400).json({ error: 'Username/email and password required' });
+
+  const looksEmail = identifier.includes('@');
+  const user = looksEmail
+    ? await db.get('SELECT * FROM users WHERE email = ? COLLATE NOCASE', [identifier])
+    : await db.get('SELECT * FROM users WHERE username = ? COLLATE NOCASE', [identifier]);
+  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    return res.status(401).json({ error: 'Invalid username/email or password' });
+  }
+
+  const token = startSession(res, user);
   // Assign a random default avatar if the user doesn't have one
   if (!user.avatar) {
     const defaultAvatar = getRandomDefaultAvatar();
@@ -547,16 +961,34 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), defaultSampleDeckId: u.default_sample_deck_id || null };
+  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified };
 }
 
 // ===== PROFILE ROUTES =====
 app.put('/api/profile', authMiddleware, async (req, res) => {
-  const { color, avatar, cardback, bio, board } = req.body;
-  if (board !== undefined) {
-    await db.run('UPDATE users SET color = ?, avatar = ?, cardback = ?, bio = ?, board = ? WHERE id = ?', [color || '#00f0ff', avatar || null, cardback || null, (bio || '').slice(0, 200), board || null, req.user.userId]);
-  } else {
-    await db.run('UPDATE users SET color = ?, avatar = ?, cardback = ?, bio = ? WHERE id = ?', [color || '#00f0ff', avatar || null, cardback || null, (bio || '').slice(0, 200), req.user.userId]);
+  const b = req.body || {};
+  // Validate the in-game speech-bubble messages up front (length + a basic
+  // profanity gate). Reject outright so nothing offensive is ever stored.
+  for (const [key, label] of [['victoryMsg', 'Victory Message'], ['defeatMsg', 'Defeat Message']]) {
+    if (b[key] === undefined) continue;
+    const msg = String(b[key] || '');
+    if (msg.length > MESSAGE_MAX_LEN) return res.status(400).json({ error: `${label} is too long (max ${MESSAGE_MAX_LEN} characters).` });
+    if (containsProfanity(msg)) return res.status(400).json({ error: `${label}: please remove inappropriate language.` });
+  }
+  // Update only the fields the client actually sent, so single-field
+  // quick-saves (avatar, sleeve, …) never clobber the others.
+  const sets = [];
+  const vals = [];
+  if (b.color !== undefined)      { sets.push('color = ?');       vals.push(b.color || '#00f0ff'); }
+  if (b.avatar !== undefined)     { sets.push('avatar = ?');      vals.push(b.avatar || null); }
+  if (b.cardback !== undefined)   { sets.push('cardback = ?');    vals.push(b.cardback || null); }
+  if (b.bio !== undefined)        { sets.push('bio = ?');         vals.push((b.bio || '').slice(0, 200)); }
+  if (b.board !== undefined)      { sets.push('board = ?');       vals.push(b.board || null); }
+  if (b.victoryMsg !== undefined) { sets.push('victory_msg = ?'); vals.push(String(b.victoryMsg || '').slice(0, MESSAGE_MAX_LEN)); }
+  if (b.defeatMsg !== undefined)  { sets.push('defeat_msg = ?');  vals.push(String(b.defeatMsg || '').slice(0, MESSAGE_MAX_LEN)); }
+  if (sets.length) {
+    vals.push(req.user.userId);
+    await db.run('UPDATE users SET ' + sets.join(', ') + ' WHERE id = ?', vals);
   }
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ user: sanitizeUser(user) });
@@ -578,6 +1010,33 @@ app.put('/api/profile/play-animations', authMiddleware, async (req, res) => {
   await db.run('UPDATE users SET play_animations = ? WHERE id = ?', [play, req.user.userId]);
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ user: sanitizeUser(user) });
+});
+
+// Request an email-verification code for the logged-in account (used by
+// grandfathered accounts adding an email, or anyone changing it).
+app.post('/api/profile/email/request', authMiddleware, async (req, res) => {
+  const email = normEmail(req.body.email);
+  if (!email || !EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address' });
+  const taken = await db.get('SELECT 1 FROM users WHERE email = ? COLLATE NOCASE AND id != ?', [email, req.user.userId]);
+  if (taken) return res.status(409).json({ error: 'That email is already in use by another account.' });
+  const r = await issueAndSendCode({ userId: req.user.userId, email, purpose: 'add_email' });
+  if (!r.ok) return res.status(r.status || 500).json({ error: r.error });
+  res.json({ ok: true, email });
+});
+
+// Confirm the code and attach the verified email to the account.
+app.post('/api/profile/email/confirm', authMiddleware, async (req, res) => {
+  const email = normEmail(req.body.email);
+  const code = String(req.body.code || '').trim();
+  if (!email || !code) return res.status(400).json({ error: 'Email and code are required' });
+  const result = await consumeEmailCode({ email, purpose: 'add_email', code });
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  // Guard the race on the unique-email index.
+  const taken = await db.get('SELECT 1 FROM users WHERE email = ? COLLATE NOCASE AND id != ?', [email, req.user.userId]);
+  if (taken) return res.status(409).json({ error: 'That email is already in use by another account.' });
+  await db.run('UPDATE users SET email = ?, email_verified = 1 WHERE id = ?', [email, req.user.userId]);
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
+  res.json({ ok: true, user: sanitizeUser(user) });
 });
 
 // Avatar upload — accepts base64 data URL in JSON body
@@ -813,7 +1272,7 @@ app.post('/api/game/result', authMiddleware, async (req, res) => {
 });
 
 // ===== LEADERBOARD =====
-// Returns up to the top 10 ranked players ordered by ELO. A player counts
+// Returns up to the top 20 ranked players ordered by ELO. A player counts
 // as "ranked" once they've finished at least one ranked set (Bo1/Bo3/Bo5)
 // — fresh accounts sitting on the default 1000 ELO are filtered out so
 // the board reflects actual competitive standing. Public endpoint: no
@@ -826,7 +1285,7 @@ app.post('/api/game/result', authMiddleware, async (req, res) => {
 app.get('/api/leaderboard', async (req, res) => {
   try {
     const rows = await db.all(
-      'SELECT username, elo, color FROM users WHERE ranked_games > 0 ORDER BY elo DESC, username ASC LIMIT 10'
+      'SELECT username, elo, color FROM users WHERE ranked_games > 0 ORDER BY elo DESC, username ASC LIMIT 20'
     );
     res.json({
       players: rows.map((r, i) => ({
@@ -843,16 +1302,34 @@ app.get('/api/leaderboard', async (req, res) => {
 });
 
 // ===== HERO STATS =====
+// Smoothing for the "top Heroes" ranking. We rank by a Bayesian-shrinkage
+// score rather than raw win-rate so a Hero played once and won (100%) does
+// not outrank a Hero with a strong record over many games. The score pulls
+// low-sample Heroes toward a neutral 50% prior; PRIOR_GAMES is how many
+// "phantom" .500 games each Hero is seeded with — the more real games a
+// Hero has, the less the prior matters.
+const HERO_RANK_PRIOR_GAMES = 5;
+const HERO_RANK_PRIOR_RATE = 0.5;
+
 app.get('/api/profile/hero-stats', authMiddleware, async (req, res) => {
-  const rows = await db.all('SELECT hero_name, wins, losses FROM hero_stats WHERE user_id = ? ORDER BY (CAST(wins AS REAL) / MAX(wins + losses, 1)) DESC, (wins + losses) DESC', [req.user.userId]);
-  // Return top 3 by win rate (already sorted by the query)
-  const top = rows.slice(0, 3).map(r => ({
-    name: r.hero_name,
-    wins: r.wins,
-    losses: r.losses,
-    games: r.wins + r.losses,
-    winRate: r.wins + r.losses > 0 ? Math.round((r.wins / (r.wins + r.losses)) * 100) : 0
-  }));
+  const rows = await db.all('SELECT hero_name, wins, losses FROM hero_stats WHERE user_id = ?', [req.user.userId]);
+  // Bayesian-shrinkage score: (wins + prior) / (games + priorGames), then
+  // break ties by total games so the more-played Hero wins a dead heat.
+  const scored = rows.map(r => {
+    const games = r.wins + r.losses;
+    const score = (r.wins + HERO_RANK_PRIOR_GAMES * HERO_RANK_PRIOR_RATE) / (games + HERO_RANK_PRIOR_GAMES);
+    return {
+      name: r.hero_name,
+      wins: r.wins,
+      losses: r.losses,
+      games,
+      winRate: games > 0 ? Math.round((r.wins / games) * 100) : 0,
+      score,
+    };
+  });
+  scored.sort((a, b) => (b.score - a.score) || (b.games - a.games));
+  // Drop the internal score from the payload — clients only show winRate.
+  const top = scored.slice(0, 3).map(({ score, ...rest }) => rest);
   res.json({ heroes: top });
 });
 
@@ -1149,12 +1626,17 @@ function loadSampleDecks() {
 
       // "Structure Deck …" files are gated behind a shop purchase. Others
       // are "Starter Decks" — always visible in the deck list and used as
-      // the random default for new accounts.
-      const isStructure = /^Structure Deck\b/i.test(fileBase) || /^Structure Deck\b/i.test(deckName);
-      // Strip the "Structure Deck" / "Starter Deck" prefix (with optional
-      // colon) from the stored Name so the deck list / shop show just the
-      // real deck title.
-      const stripped = deckName.replace(/^(Structure|Starter) Deck\s*:?\s*/i, '').trim();
+      // the initial unlocked opponents for new accounts.
+      // The separator after "Deck" varies in the data (space, ":" or a
+      // typo'd "_", e.g. "Structure Deck_ Grand Rebellion"), so match
+      // "Structure Deck" not directly followed by another letter rather
+      // than relying on \b (which treats "_" as a word char and misfires).
+      const STRUCTURE_RE = /^Structure Deck(?![A-Za-z])/i;
+      const isStructure = STRUCTURE_RE.test(fileBase) || STRUCTURE_RE.test(deckName);
+      // Strip the "Structure Deck" / "Starter Deck" prefix (plus any
+      // space / ":" / "_" separators) from the stored Name so the deck
+      // list / shop show just the real deck title.
+      const stripped = deckName.replace(/^(Structure|Starter) Deck[\s:_]*/i, '').trim();
       const displayName = stripped || deckName;
 
       decks.push({
@@ -1178,6 +1660,336 @@ function loadSampleDecks() {
     } catch (err) { console.error('[SampleDecks] Error reading', files[fi], err.message); }
   }
   return decks;
+}
+
+// Per-CPU-opponent speech-bubble lines, keyed by sample-deck id
+// ('sample-' + filename). Populated with per-opponent flavour text (step 2);
+// any opponent missing an entry simply shows no bubble. Human players use
+// their own profile's victory_msg / defeat_msg instead of this table.
+// Markup: *text* = italic, **text** = bold (rendered client-side). Messages
+// type out letter-by-letter in the bubble. Author-defined here, so they are
+// NOT run through the profanity filter (that gates only human profile input).
+const CPU_MESSAGES = {
+  // ── Starter Decks ──
+  'sample-Heal Burn': { // Nao, the Barrier Priestess
+    greeting: "May the Fairies laugh upon this game!",
+    victory: "I hope it doesn't hurt...",
+    defeat: "Ouch... I could not shield *that*...",
+    heroKilled: "Oh no! Poor soul...",
+    middleHeroKilled: "Oh dear...",
+  },
+  'sample-Suicide Bombers': { // Bomb Berserker Bartas
+    greeting: "YOU WANT FUN? I'LL GIVE YOU THE EXPLOSIVE KIND!",
+    victory: "BOOM BABY!",
+    defeat: "GRAH, THAT BLOWS!",
+    heroKilled: "WHA-?! OI, **I** WANTED TO EXPLODE THAT ONE!",
+    middleHeroKilled: "HA! OUT WITH A BANG!",
+  },
+  'sample-Venom Swamp': { // Zsos'Ssar, the Serpent Warlord
+    greeting: "Beware of Poissssson!",
+    victory: "*Exssssellent*!",
+    defeat: "*Impossssssible*!",
+    heroKilled: "Unaccsssseptable!",
+    middleHeroKilled: "Ssssstop that!",
+  },
+  // ── Structure Decks ──
+  'sample-Structure Deck Bamboo Warrior': { // Xiong, the Bamboo Guardian
+    greeting: "Oi - you're not trying to steal my stuff, are you?",
+    victory: "There - and don't try me again if you know what's good for you!",
+    defeat: "**GRRR...!**",
+    heroKilled: "Why you...!",
+    middleHeroKilled: "Ouch- hey, a bit gentler!",
+  },
+  'sample-Structure Deck Big Stomp': { // Kit, the Shark Researcher
+    greeting: "This game will be *great* data!",
+    victory: "Aaaand that's the study. Thanks for participating.",
+    defeat: "Hmm... *not* as expected. Where did I miscalculate...?",
+    heroKilled: "Hmm... *not* what the data suggested...",
+    middleHeroKilled: "Yikes - so much for that experiment.",
+  },
+  'sample-Structure Deck Bloody King Zi': { // Timeless King Zi
+    greeting: "Time for a challenge.",
+    victory: "Tick-Tock - Time's Up!",
+    defeat: "... tick-tock. **My** time is up...",
+    heroKilled: "This one's time was already up it seems.",
+    middleHeroKilled: "Oh no - my time is not over!",
+  },
+  'sample-Structure Deck Bone Rush': { // Vacarn, the Dark Goblin Necromancer
+    greeting: "Rise, my minions, and see this fool who wants to face us!",
+    victory: "Rise, rise, RISE, my minions! Khekhekhe!",
+    defeat: "NO! My minions, my **beautiful** minions...!",
+    heroKilled: "NOOO! My **beautiful** minion!",
+    middleHeroKilled: "MINIONS! PROTECT YOUR MASTER!",
+  },
+  'sample-Structure Deck Burning Inferno': { // Luna Pele, the Flame Dancer
+    greeting: "This will be a fiery dance!",
+    victory: "Now that was a hot performance if I ever saw one!",
+    defeat: "Oh no - looks like I got burned!",
+    heroKilled: "Very elegant, I love it!",
+    middleHeroKilled: "What a SHOW!",
+  },
+  'sample-Structure Deck Cool Gang': { // Thorad, Strength of Coolness
+    greeting: "Yo dude - this'll be, like, **so cool!**",
+    victory: "Coo-hool!",
+    defeat: "Not cool!",
+    heroKilled: "Yoooo, *cool* hit! Noice!",
+    middleHeroKilled: "Yoooo ... not *cool*, dude!",
+  },
+  'sample-Structure Deck Creepy Crawlies': { // Alleria, the Queen of Spiders
+    greeting: "Careful... don't get too tangled up in my pretty nets...",
+    victory: "Kch kch kch... A nice dance!",
+    defeat: "... let's get out of here!",
+    heroKilled: "... right through my webs?",
+    middleHeroKilled: "Kch - scatter, my children!",
+  },
+  'sample-Structure Deck Crystal Gifts': { // Mary Crestmas
+    greeting: "Here, sweetie - take a present or five 💕",
+    victory: "Mary Crestmas!",
+    defeat: "This is my gift to you!",
+    heroKilled: "Do you dislike my presents...?",
+    middleHeroKilled: "Is that how you thank me...?",
+  },
+  'sample-Structure Deck Cute Commando': { // Cute Annoyance Mini
+    greeting: "Heh - **you** think you could fight me? With *that* face and **that** skill level? What an insult!",
+    victory: "A-HAHAHAHA! YOUR FACE! YOUR **STUPID** FACE! WHAT A LOSER!!!",
+    defeat: "WHA-?! That... That *so* doesn't count! You're ... you're such a bully!!!",
+    heroKilled: "Oh-my-**GOD**! How can you be such a big meanie?!",
+    middleHeroKilled: "CHEATER!",
+  },
+  'sample-Structure Deck Dance of the Butterflies': { // Beato, the Butterfly Witch
+    greeting: "Here's to a fun game ahead. Let's both give it our best showing~",
+    victory: "*Magical*!",
+    defeat: "Huh... that was *quite* elegant!",
+    heroKilled: "Beautifully executed!",
+    middleHeroKilled: "Hmm-mm - *excellent* maneuver there~",
+  },
+  'sample-Structure Deck Deepsea Terror': { // Siphem, the Deepsea Demon
+    greeting: "GARH-HAR-HAR!",
+    victory: "Gre-he-he...",
+    defeat: "Grrrr?!",
+    heroKilled: "Garr!",
+    middleHeroKilled: "GRAARGH!",
+  },
+  'sample-Structure Deck Depths of the Cosmos': { // Argos, the Eye of the Cosmos
+    greeting: "...",
+    victory: "...",
+    defeat: "...?!",
+    heroKilled: "...",
+    middleHeroKilled: "...",
+  },
+  'sample-Structure Deck Flying Sparks': { // Lilly, the Charming Infiltrator
+    greeting: "Heyyyy, sweetie 💕",
+    victory: "Hihi... thanks for the win, your cards were *delightful*. Think I'll keep 'em~",
+    defeat: "Awww - no fair! Buuuut it was still fun, so I forgive ya~",
+    heroKilled: "Buuhhh...!",
+    middleHeroKilled: "Booo, what a killjoy you are!",
+  },
+  'sample-Structure Deck Gates to Hell': { // Silent Water Mizune
+    greeting: "A little distraction...? Sure. Why not?",
+    victory: "Hmm... A good distraction.",
+    defeat: "Welp... Guess that's how it goes.",
+    heroKilled: "Hmm... Good job.",
+    middleHeroKilled: "Ah. Of course. Ouch.",
+  },
+  'sample-Structure Deck Gather That Storm': { // Tarleinn the Traveler
+    greeting: "Oh, THIS will be hype!",
+    victory: "WOOO! Did you **see** that game?! Amazing stuff!",
+    defeat: "Woah - you **totally** blew me out! And I loved every bit of it!",
+    heroKilled: "YOOO! The battle's getting exciting!",
+    middleHeroKilled: "Hahaha - damn, that's *one way* to deal with me!",
+  },
+  'sample-Structure Deck_ Grand Rebellion': { // Champion, the Stormbringer
+    greeting: "A game...? You mean a *slaughter*. But fine. I'll indulge you.",
+    victory: "... sorry. That was inevitable. I *am* the strongest after all.",
+    defeat: "... *what*? **How**?!",
+    heroKilled: "Strong. But I am *stronger*!",
+    middleHeroKilled: "No way - how did you beat the strongest of them all?!",
+  },
+  'sample-Structure Deck Great Weapon Master': { // Toras, Master of all Weapons
+    greeting: "I got *just* the weapon for the job - get ready!",
+    victory: "Had the right weapons for the fight. Nice try!",
+    defeat: "... 60 weapons, and none fit. Surprising. And impressive!",
+    heroKilled: "Good hit. *Ready for the counter?!*",
+    middleHeroKilled: "I... I just needed a better weapon, that's all!",
+  },
+  'sample-Structure Deck Guardians of the Treasure Cave': { // Mao, the Vengeful Guardian
+    greeting: "Grrr... you know where *they* are...?",
+    victory: "One more down ... still twelve to go...!",
+    defeat: "KCHHHH!",
+    heroKilled: "Chrrr...!",
+    middleHeroKilled: "Tssk!",
+  },
+  'sample-Structure Deck Idej Illusions': { // Idej Lord Daiyo
+    greeting: "Sorry. You won't be able to lay a hand on me.",
+    victory: "You couldn't touch me. They never can.",
+    defeat: "How did you...? You should not even be able to harm me!",
+    heroKilled: "What? That one was so easily killable?!",
+    middleHeroKilled: "Preposterous...!",
+  },
+  'sample-Structure Deck Lightning Caller': { // Sol Rym, the Thunder Djinn
+    greeting: "Let's have an *electric* battle under the open sky!",
+    victory: "Pew-pew!",
+    defeat: "My lightning - my gorgeous, majestic, crackling lightning...!",
+    heroKilled: "Good, good - give the heavens a show!",
+    middleHeroKilled: "HA! That's how you make a ruckus up in the skies!",
+  },
+  'sample-Structure Deck Mans Best Friends': { // Orthos, the Loyal Guard Dog
+    greeting: "I'll protect my pack!",
+    victory: "Woof - of course, there was never so much as a possibility I would let you hurt my pack.",
+    defeat: "GRRR, no, back off!",
+    heroKilled: "No, my pack...!",
+    middleHeroKilled: "No...! My pack needs me!",
+  },
+  'sample-Structure Deck Mawstruck': { // Nero Zira, the Mastermind
+    greeting: "INITIATE BOOT SEQUENCE. 10 PERCENT ... 50 PERCENT ... 100 PERCENT. INITIATE ANNIHILATION.EXE ...",
+    victory: "Beep-Boop! Do-mi-nate! De-feat all flesh-lings!",
+    defeat: "ERROR ERROR ERROR - DOES NOT COMPUTE DOES NOT COMPUTE RESTART DECK.EXE!",
+    heroKilled: "WARNING! WARNING! INCONCLUSIVE READINGS!",
+    middleHeroKilled: "CRITICAL ERROR! REBOOTING... REBOOTING...",
+  },
+  'sample-Structure Deck One-Two-Punch': { // Ghuanjun, the Undead Martial Artist
+    greeting: "...",
+    victory: "...",
+    defeat: "...",
+    heroKilled: "...",
+    middleHeroKilled: "...",
+  },
+  'sample-Structure Deck Parts of the Soul': { // Thep, the Court Scribe
+    greeting: "The quill is ready. Write history!",
+    victory: "And so it is written, in the chronicles of eternity.",
+    defeat: "Hmm... *that* was not in today's chapter. Now it is.",
+    heroKilled: "I will make sure to write *that* down!",
+  },
+  'sample-Structure Deck Pew-Pew': { // Bow Sniper Darge
+    greeting: "Alright - stand *right there*. And put an apple on your head, will ya?",
+    victory: "BULLSEYE!",
+    defeat: "Can you **PLEASE** stop moving so much so I can hit you cleanly?!",
+    heroKilled: "Shoot, right in the head...!",
+    middleHeroKilled: "*Yikes*, going straight for the head, are you?",
+  },
+  'sample-Structure Deck Poison Torture': { // Reiza, the Chief Tormentor
+    greeting: "Ohoho... I feel like this will be *great* fun...!",
+    victory: "Kikiki... now come, the dungeon awaits...!",
+    defeat: "How **DARE** YOU?!",
+    heroKilled: "Ouch - I'll feel that one for a while, hihi~",
+    middleHeroKilled: "Hmmm... I *like* being handled like that...",
+  },
+  'sample-Structure Deck Shadows over Blackport': { // Arthor, the King of Blackport
+    greeting: "You want to play a game...? Sorry, I deal in *plans*. This won't take long.",
+    victory: "Quite plain. You will not be a threat to me.",
+    defeat: "Just ... *forget it*!",
+    heroKilled: "That's fine. Still all according to plan.",
+    middleHeroKilled: "Just ... just a *minor* setback... I'm sure...!",
+  },
+  'sample-Structure Deck Shifting Sandlands': { // Bakhm, the Desert Digger
+    greeting: "GRRMMMBB...",
+    victory: "GROAARRR!",
+    defeat: "GRRRR!",
+    heroKilled: "GRRR!",
+    middleHeroKilled: "GROAR!",
+  },
+  'sample-Structure Deck Slimy Infestation': { // Stellan, the Calm Cat
+    greeting: "Hmm? Play with me? Sure. Let's do this.",
+    victory: "Hmmm-mm. Neat.",
+    defeat: "Ah... how unfortunate.",
+    heroKilled: "Ah. Good one.",
+    middleHeroKilled: "Ah. That's not very nice of you.",
+  },
+  'sample-Structure Deck Slip n Slide': { // Hel, the Bound Specter
+    greeting: "Hihihi... ready for a *chilling* experience?",
+    victory: "Huhu... spooky, isn't it?",
+    defeat: "Now *you* are scaring *me* - **stop that!**",
+    heroKilled: "Ahhhh! Stop it!",
+    middleHeroKilled: "Huhuhu... Now *I* am scared!",
+  },
+  'sample-Structure Deck Spell Industrialization': { // Victorica, the Eternal Empress
+    greeting: "Just ... *who* do you think you are, *challenging* the Empress?!",
+    victory: "Absolute authority. Of course. Like always.",
+    defeat: "Impertinent little...! You should be *grateful* I am not petty enough to have you *punished* on the spot!",
+    heroKilled: "How cheeky of you!",
+    middleHeroKilled: "Huh - *that's* how dying feels? How unpleasant - why do people *do that*?",
+  },
+  'sample-Structure Deck Steam Dwarf Mines': { // Layn, Defender of Deri
+    greeting: "Throw everything you got at me! Nothing will get through!",
+    victory: "HA! You will **NEVER** breach my defenses!",
+    defeat: "How... how did you break through?!",
+    heroKilled: "That's... that's just a minor setback! Don't think for a second that breached my defenses!",
+    middleHeroKilled: "Noooo, my beautiful perfect defenses!",
+  },
+  'sample-Structure Deck Sun Fencer Frenzy': { // Taio, the Sun Fencer
+    greeting: "Another game, another heist!",
+    victory: "The perfect heist!",
+    defeat: "Shoot, guess I got careless there...",
+    heroKilled: "Guess this just got a bit more risky. Just how I like it!",
+    middleHeroKilled: "Busted...!",
+  },
+  'sample-Structure Deck To Attain Divinity': { // Archibald, the Archmage
+    greeting: "Get ready - to witness a god!",
+    victory: "Bow, for you are talking to a god now!",
+    defeat: "My - my *perfect magic*!",
+    heroKilled: "Just a small sacrifice for the greater good!",
+    middleHeroKilled: "No-no-NOOOO!",
+  },
+};
+function getCpuMessages(deckId) {
+  const m = CPU_MESSAGES[deckId] || {};
+  return { greeting: m.greeting || '', victory: m.victory || '', defeat: m.defeat || '', heroKilled: m.heroKilled || '', middleHeroKilled: m.middleHeroKilled || '' };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  CPU OPPONENT UNLOCK SYSTEM
+//  Accounts start with only the starter-deck opponents unlocked.
+//  More unlock as the player hits win milestones (endCpuBattle):
+//    • the first win vs each of the initial opponents → +1 random unlock
+//    • reaching THREE_WIN_MILESTONE wins vs ANY opponent → +1 random unlock
+//  The gallery and the structure-deck shop are both filtered to a user's
+//  unlocked set. Preexisting accounts are re-gated to this same starting
+//  point by a one-time migration (see initDatabase).
+// ═══════════════════════════════════════════════════════════════════
+const THREE_WIN_MILESTONE = 3;
+
+// Seed an account with its initial opponent roster — the starter-deck
+// (non-structure) opponents — flagged is_initial=1, and mark the account
+// initialized + re-gated so the startup migration never resets it again.
+// Returns the seeded deckIds.
+async function seedInitialOpponents(userId) {
+  const starterIds = loadSampleDecks().filter(d => !d.isStructure).map(d => d.id);
+  for (const oid of starterIds) {
+    await db.run(
+      'INSERT OR IGNORE INTO unlocked_opponents (user_id, opponent_deck_id, is_initial) VALUES (?, ?, 1)',
+      [userId, oid]
+    );
+  }
+  await db.run('UPDATE users SET opponents_initialized = 1, opponents_regated = 1 WHERE id = ?', [userId]);
+  return starterIds;
+}
+
+// Set of opponent deckIds unlocked for a user. Defensively self-heals an
+// account that somehow has no unlock rows yet (e.g. seeding was interrupted)
+// by seeding it on first read, so the gallery is never empty.
+async function getUnlockedOpponentIds(userId) {
+  const rows = await db.all('SELECT opponent_deck_id FROM unlocked_opponents WHERE user_id = ?', [userId]);
+  if (rows.length === 0) {
+    await seedInitialOpponents(userId);
+    const seeded = await db.all('SELECT opponent_deck_id FROM unlocked_opponents WHERE user_id = ?', [userId]);
+    return new Set(seeded.map(r => r.opponent_deck_id));
+  }
+  return new Set(rows.map(r => r.opponent_deck_id));
+}
+
+// Unlock one random still-locked opponent for the user. Returns the
+// newly-unlocked { id, name, middleHero } or null when nothing is left.
+async function unlockRandomOpponent(userId) {
+  const all = loadSampleDecks();
+  const unlocked = await getUnlockedOpponentIds(userId);
+  const locked = all.filter(d => !unlocked.has(d.id));
+  if (locked.length === 0) return null;
+  const pick = locked[Math.floor(Math.random() * locked.length)];
+  await db.run(
+    'INSERT OR IGNORE INTO unlocked_opponents (user_id, opponent_deck_id, is_initial) VALUES (?, ?, 0)',
+    [userId, pick.id]
+  );
+  return { id: pick.id, name: pick.name, middleHero: pick.heroes?.[1]?.hero || null };
 }
 
 // Only the starter (non-structure) sample decks are returned to every
@@ -1207,7 +2019,25 @@ app.get('/api/sample-decks/owned', authMiddleware, async (req, res) => {
 // portrait tile. Note: structure-deck ownership still gates use of the deck
 // in the deckbuilder — this endpoint just opens every AI opponent.
 app.get('/api/sample-decks/gallery', authMiddleware, async (req, res) => {
-  const decks = loadSampleDecks();
+  // Only opponents the caller has unlocked are surfaced in the gallery.
+  // Self-heal seeding first, then pull the unlock rows in unlock order so we
+  // can order the tiles: always-unlocked Starter Deck opponents come first,
+  // the rest follow in the (random, per-account) order they were unlocked.
+  await getUnlockedOpponentIds(req.user.userId);
+  const unlockRows = await db.all(
+    'SELECT opponent_deck_id, is_initial, unlocked_at FROM unlocked_opponents WHERE user_id = ? ORDER BY unlocked_at ASC, rowid ASC',
+    [req.user.userId]
+  );
+  const unlocked = new Set(unlockRows.map(r => r.opponent_deck_id));
+  const isInitialMap = new Map(unlockRows.map(r => [r.opponent_deck_id, !!r.is_initial]));
+  // Rank by unlock order (ascending) — drives the post-starter ordering.
+  const unlockRank = new Map();
+  unlockRows.forEach((r, i) => unlockRank.set(r.opponent_deck_id, i));
+
+  const allDecks = loadSampleDecks();
+  // Stable fallback order for the starter block (the natural roster order).
+  const baseIndex = new Map(allDecks.map((d, i) => [d.id, i]));
+  const decks = allDecks.filter(d => unlocked.has(d.id));
   const statRows = await db.all(
     'SELECT opponent_deck_id, wins, losses FROM npc_stats WHERE user_id = ?',
     [req.user.userId]
@@ -1225,12 +2055,22 @@ app.get('/api/sample-decks/gallery', authMiddleware, async (req, res) => {
       losses: stat?.losses || 0,
     };
   });
+  enriched.sort((a, b) => {
+    const aInit = isInitialMap.get(a.id) ? 1 : 0;
+    const bInit = isInitialMap.get(b.id) ? 1 : 0;
+    if (aInit !== bInit) return bInit - aInit;            // starters first
+    if (aInit) return baseIndex.get(a.id) - baseIndex.get(b.id); // starters: roster order
+    return (unlockRank.get(a.id) ?? 0) - (unlockRank.get(b.id) ?? 0); // rest: unlock order
+  });
   res.json({ opponents: enriched });
 });
 
 // Structure-deck shop catalog with per-deck ownership flags.
 app.get('/api/shop/structure-decks', authMiddleware, async (req, res) => {
-  const all = loadSampleDecks().filter(d => d.isStructure);
+  // Restrict the shop to structure decks whose opponent the player has
+  // unlocked — locked opponents' decks aren't purchasable yet.
+  const unlocked = await getUnlockedOpponentIds(req.user.userId);
+  const all = loadSampleDecks().filter(d => d.isStructure && unlocked.has(d.id));
   const ownedRows = await db.all(
     "SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck'",
     [req.user.userId]
@@ -1438,8 +2278,12 @@ app.post('/api/shop/buy-structure-deck', authMiddleware, async (req, res) => {
   const { structureId } = req.body;
   if (!structureId) return res.status(400).json({ error: 'Missing structureId' });
 
-  const exists = loadSampleDecks().some(d => d.isStructure && d.structureId === structureId);
-  if (!exists) return res.status(404).json({ error: 'Structure deck not found' });
+  const deck = loadSampleDecks().find(d => d.isStructure && d.structureId === structureId);
+  if (!deck) return res.status(404).json({ error: 'Structure deck not found' });
+
+  // Can't buy a structure deck whose opponent isn't unlocked yet.
+  const unlocked = await getUnlockedOpponentIds(req.user.userId);
+  if (!unlocked.has(deck.id)) return res.status(403).json({ error: 'Opponent not unlocked yet' });
 
   const already = await db.get(
     "SELECT id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck' AND item_id = ?",
@@ -1461,7 +2305,9 @@ app.post('/api/shop/buy-structure-deck', authMiddleware, async (req, res) => {
 
 // POST /api/shop/buy-random-structure-deck — unlock a random unowned structure deck.
 app.post('/api/shop/buy-random-structure-deck', authMiddleware, async (req, res) => {
-  const all = loadSampleDecks().filter(d => d.isStructure);
+  // Pool is limited to structure decks whose opponent the player unlocked.
+  const unlocked = await getUnlockedOpponentIds(req.user.userId);
+  const all = loadSampleDecks().filter(d => d.isStructure && unlocked.has(d.id));
   if (all.length === 0) return res.status(400).json({ error: 'No structure decks available' });
 
   const ownedRows = await db.all(
@@ -1868,6 +2714,19 @@ const rooms = new Map();
 const activeGames = new Map(); // userId -> roomId
 const disconnectTimers = new Map(); // userId -> timeout handle
 
+// ===== LIVE STATS =====
+// Cheap public snapshot for the main-menu hub panels: how many clients
+// are currently connected and how many distinct games are in progress.
+// Defined here (rather than next to the other /api routes) so it can see
+// the `activeGames` map declared just above. Express runs the handler at
+// request time, long after the rest of the module has evaluated.
+app.get('/api/stats/live', (req, res) => {
+  res.json({
+    playersOnline: io.engine.clientsCount,
+    gamesLive: new Set(activeGames.values()).size,
+  });
+});
+
 /**
  * After a potion resolves, check if any hero on the player's side
  * has a potionLockAfterN flag and the threshold has been met.
@@ -1959,6 +2818,7 @@ function sendGameState(room, playerIdx, extra) {
     myIndex: playerIdx, roomId: room.id,
     players: gs.players.map((ps, pi) => ({
       username: ps.username, color: ps.color, avatar: ps.avatar, cardback: ps.cardback || null, board: ps.board || null,
+      victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       surpriseZones: pi === playerIdx ? ps.surpriseZones : ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
         // Puzzle mode: reveal opponent (CPU) surprises so the player can
@@ -2785,6 +3645,7 @@ function sendSpectatorGameState(room) {
     roomId: room.id,
     players: gs.players.map((ps, spi) => ({
       username: ps.username, color: ps.color, avatar: ps.avatar, cardback: ps.cardback || null, board: ps.board || null,
+      victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       surpriseZones: ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
         const inst = room.engine?.cardInstances.find(c => c.owner === spi && c.zone === 'surprise' && c.heroIdx === hi && c.name === cn);
@@ -3350,12 +4211,21 @@ function endCpuBattle(room, winnerIdx, reason) {
   // Surrenders count as a loss for the human — bailing out shouldn't be
   // a free escape from the record.
   const humanUserId = room.players?.[0]?.userId;
+  const humanSid = room.players?.[0]?.socketId || null;
   const opponentDeckId = room.players?.[1]?.deckId;
   if (humanUserId && opponentDeckId) {
     const humanWon = winnerIdx === 0 ? 1 : 0;
     const humanLost = winnerIdx === 0 ? 0 : 1;
     (async () => {
       try {
+        // Read the pre-update win count so we can detect milestone
+        // crossings (each happens exactly once since wins climb by 1).
+        const prior = await db.get(
+          'SELECT wins FROM npc_stats WHERE user_id = ? AND opponent_deck_id = ?',
+          [humanUserId, opponentDeckId]
+        );
+        const preWins = prior?.wins || 0;
+
         await db.run(`
           INSERT INTO npc_stats (user_id, opponent_deck_id, wins, losses)
           VALUES (?, ?, ?, ?)
@@ -3363,8 +4233,31 @@ function endCpuBattle(room, winnerIdx, reason) {
             wins = wins + excluded.wins,
             losses = losses + excluded.losses
         `, [humanUserId, opponentDeckId, humanWon, humanLost]);
+
+        // Opponent-unlock milestones — only on a win.
+        if (humanWon) {
+          const initRow = await db.get(
+            'SELECT is_initial FROM unlocked_opponents WHERE user_id = ? AND opponent_deck_id = ?',
+            [humanUserId, opponentDeckId]
+          );
+          const isInitial = !!(initRow && initRow.is_initial);
+          let unlockCount = 0;
+          // First-ever win against one of the starting opponents.
+          if (isInitial && preWins === 0) unlockCount++;
+          // Crossing the "beat the same opponent N times" threshold.
+          if (preWins === THREE_WIN_MILESTONE - 1) unlockCount++;
+
+          const newlyUnlocked = [];
+          for (let k = 0; k < unlockCount; k++) {
+            const u = await unlockRandomOpponent(humanUserId);
+            if (u) newlyUnlocked.push(u);
+          }
+          if (newlyUnlocked.length && humanSid) {
+            io.to(humanSid).emit('opponents_unlocked', { opponents: newlyUnlocked });
+          }
+        }
       } catch (err) {
-        console.error('[CPU battle] npc_stats update error:', err.message);
+        console.error('[CPU battle] npc_stats/unlock update error:', err.message);
       }
     })();
   }
@@ -8236,6 +9129,16 @@ async function setupGameState(room) {
     }
 
     const usr = await db.get('SELECT * FROM users WHERE id = ?', [p.userId]);
+    // Win/loss speech-bubble lines: a human uses their own profile messages;
+    // a CPU (no user record) draws from the per-opponent CPU_MESSAGES table.
+    const cpuMsgs = usr ? null : getCpuMessages(p.deckId);
+    const victoryMsg = usr ? (usr.victory_msg || '') : cpuMsgs.victory;
+    const defeatMsg = usr ? (usr.defeat_msg || '') : cpuMsgs.defeat;
+    // CPU-only mid-game barks: general "a Hero was killed" + a higher-priority
+    // line for when the CPU's MIDDLE Hero (its avatar) is the one killed.
+    const heroKilledMsg = usr ? '' : cpuMsgs.heroKilled;
+    const middleHeroKilledMsg = usr ? '' : cpuMsgs.middleHeroKilled;
+    const greetingMsg = usr ? '' : cpuMsgs.greeting;
     const heroes = (deck?.heroes||[]).map(h => {
       const c = h.hero ? cardsByName[h.hero] : null;
       return { name:h.hero, hp:c?.hp||0, maxHp:c?.hp||0, atk:c?.atk||0, baseAtk:c?.atk||0, ability1:h.ability1||null, ability2:h.ability2||null, statuses:{} };
@@ -8257,6 +9160,7 @@ async function setupGameState(room) {
     const sideDeck = (room._currentDecks?.[idx]?.sideDeck || []).slice();
     playerStates.push({ userId:p.userId, username:p.username, socketId:p.socketId,
       color:usr?.color||'#00f0ff', avatar:usr?.avatar||null, cardback:usr?.cardback||null, board:usr?.board||null,
+      victoryMsg, defeatMsg, heroKilledMsg, middleHeroKilledMsg, greetingMsg,
       heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
       // Top-first list of card names that are publicly known to be on
       // top of `mainDeck` (Premonition's face-down stash, future similar
@@ -10625,6 +11529,13 @@ io.on('connection', (socket) => {
     if (!playerDeck) { socket.emit('cpu_battle_error', 'Your deck is not available'); return; }
     if (!cpuDeck) { socket.emit('cpu_battle_error', 'CPU deck is not available'); return; }
 
+    // Opponents are unlock-gated. The gallery only surfaces unlocked ones,
+    // but guard the socket path against crafted requests / stale clients.
+    if (typeof cpuDeckId === 'string' && cpuDeckId.startsWith('sample-')) {
+      const unlocked = await getUnlockedOpponentIds(currentUser.userId);
+      if (!unlocked.has(cpuDeckId)) { socket.emit('cpu_battle_error', 'Opponent not unlocked yet'); return; }
+    }
+
     const snapshotDeck = (d) => JSON.parse(JSON.stringify({
       mainDeck: d.mainDeck || [], heroes: d.heroes || [],
       potionDeck: d.potionDeck || [], sideDeck: d.sideDeck || [],
@@ -10660,6 +11571,18 @@ io.on('connection', (socket) => {
     });
     console.log(`[SP trace] startGameEngine returned — mulliganPending=${room.gameState.mulliganPending}`);
     room.engine._cpuDriver = makeCpuDriver(room);
+    // Opening greeting bark — the very first CPU dialogue of the match.
+    // Fired shortly after setup so the board (and avatar) are rendered on
+    // the client; reuses the cpu_bark transient-bubble path. Rematches run
+    // back through createCpuBattle, so this covers them too.
+    {
+      const _gIdx = room.engine?._cpuPlayerIdx;
+      const _greet = (typeof _gIdx === 'number' && _gIdx >= 0)
+        ? room.gameState?.players?.[_gIdx]?.greetingMsg : '';
+      if (_greet) setTimeout(() => {
+        try { room.engine?._broadcastEvent('cpu_bark', { owner: _gIdx, text: _greet }); } catch {}
+      }, 700);
+    }
     if (room.gameState.mulliganDecisions) {
       // CPU smart-mulligan: evaluate the opening hand. If too few cards are
       // playable in the first couple of turns, shuffle back and redraw.

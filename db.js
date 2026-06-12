@@ -25,9 +25,13 @@ if (isRemote) {
     authToken: process.env.TURSO_AUTH_TOKEN,
   });
 } else {
-  const dbDir = path.join(__dirname, 'data');
+  // PP_DB_PATH overrides the default location (used for tests / running
+  // an isolated instance against a throwaway database copy).
+  const dbPath = process.env.PP_DB_PATH
+    ? path.resolve(process.env.PP_DB_PATH)
+    : path.join(__dirname, 'data', 'pixel-parties.db');
+  const dbDir = path.dirname(dbPath);
   if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
-  const dbPath = path.join(dbDir, 'pixel-parties.db');
   console.log(`[DB] Using local SQLite at: ${dbPath}`);
   client = createClient({ url: `file:${dbPath}` });
 }

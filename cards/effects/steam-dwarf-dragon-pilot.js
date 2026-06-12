@@ -69,6 +69,14 @@ const LV1_SACRIFICE_SPEC = {
 };
 
 module.exports = attachSteamEngine({
+  // CPU: confirm the "unleash fireball?" prompt — the default brain declines
+  // cancellable confirms outside a card-cast (onDiscard trigger), so without
+  // this the fireball never fires. Free damage is beneficial. (Title == card
+  // name for this lookup.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    return undefined;
+  },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Cheap gate — true whenever a valid sacrifice subset exists right now.

@@ -2473,6 +2473,60 @@ function anyLivingHeroHasAbility(ps, cardName) {
 // Also handles non-school abilities (Leadership, Toughness, Wisdom,
 // Performance): unlock term is 0, so the tie-break elects the hero
 // closest to level 3.
+// Credit a spell-level-reducer Ability (e.g. Mana Mining, which lowers the
+// level of Pollution-placing Spells) for every Spell / Attack / Creature it
+// would turn from un-castable into castable on THIS hero once placed. The
+// normal `unlock` term in scoreAbilityPlacement only fires for abilities a
+// card lists as spellSchool1/2 — a level reducer adds NO school level, so it
+// would otherwise score 0 and the CPU would never prioritise it, leaving the
+// deck's whole Spell suite locked. We simulate the placement on a copy of the
+// hero's ability zones and diff the engine's side-effect-free level check
+// (which already applies reduceSpellLevel) before vs after.
+function scoreSpellLevelReducerUnlock(engine, pi, heroIdx, cardName, script, abZones, ps, cardDB) {
+  if (typeof engine._testLevelReqForZones !== 'function') return 0;
+  const hero = ps.heroes?.[heroIdx];
+  if (!hero?.name) return 0;
+  // Post-placement zones: stack onto an existing copy (< lvl 3), else drop
+  // into the first empty slot. No room → nothing to score.
+  const simZones = abZones.map(slot => (slot ? slot.slice() : []));
+  let placed = false;
+  for (const slot of simZones) {
+    if (slot.length > 0 && slot[0] === cardName && slot.length < 3) { slot.push(cardName); placed = true; break; }
+  }
+  if (!placed) {
+    for (const slot of simZones) {
+      if (slot.length === 0) { slot.push(cardName); placed = true; break; }
+    }
+  }
+  if (!placed) return 0;
+
+  let unlock = 0;
+  const scan = (arr, weight) => {
+    for (const cn of (arr || [])) {
+      const cd = cardDB[cn];
+      if (!cd) continue;
+      const t = cd.cardType;
+      if (t !== 'Spell' && t !== 'Attack' && t !== 'Creature') continue;
+      const rawLevel = cd.level || 0;
+      if (rawLevel <= 0) continue;
+      // Cheap pre-filter: only cards this ability actually reduces.
+      let red = 0;
+      try { red = Number(script.reduceSpellLevel(cd, 3, engine)) || 0; } catch {}
+      if (red <= 0) continue;
+      // Already castable here → no unlock credit; only count newly-unlocked.
+      let before = true;
+      try { before = engine._testLevelReqForZones(pi, heroIdx, cd, hero, rawLevel, abZones); } catch {}
+      if (before) continue;
+      let after = false;
+      try { after = engine._testLevelReqForZones(pi, heroIdx, cd, hero, rawLevel, simZones); } catch {}
+      if (after) unlock += rawLevel * weight;
+    }
+  };
+  scan(ps.hand, 2);
+  scan(ps.mainDeck, 1);
+  return unlock;
+}
+
 function scoreAbilityPlacement(engine, pi, heroIdx, cardName) {
   const ps = engine.gs.players[pi];
   const abZones = ps?.abilityZones?.[heroIdx];
@@ -2590,12 +2644,21 @@ function scoreAbilityPlacement(engine, pi, heroIdx, cardName) {
     }
   }
 
+  // Spell-level-reducer abilities (Mana Mining) add no school level, so the
+  // `unlock` term above is 0 for them — credit them by how many cards this
+  // placement turns castable on the hero (the engine applies the reduction
+  // inside its level check). Weighted like a school unlock.
+  let reducerUnlock = 0;
+  if (typeof script?.reduceSpellLevel === 'function') {
+    reducerUnlock = scoreSpellLevelReducerUnlock(engine, pi, heroIdx, cardName, script, abZones, ps, cardDB);
+  }
+
   // Scaling cards add value proportional to the new level (each level
   // reached cranks Heal/Phoenix Tackle/etc. higher). Heuristically the
   // bonus is `scalingValue * newLevel`; combined with the unlock term
   // it lets a 3-Heal deck still want Support Magic Lv3 even when the
   // deck has nothing requiring Support Magic Lv2/Lv3 to cast.
-  return unlock * 100 + scalingValue * newLevel + currentLevel * 10 + attachmentBonus;
+  return unlock * 100 + reducerUnlock * 100 + scalingValue * newLevel + currentLevel * 10 + attachmentBonus;
 }
 
 // Cheap helper: does ANY card in hand+deck require this school for its

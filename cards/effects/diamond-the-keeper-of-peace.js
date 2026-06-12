@@ -21,6 +21,14 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // CPU: confirm Diamond's "protect your Creatures?" prompt — the default
+  // brain declines cancellable confirms outside a card-cast (damage trigger),
+  // so without this Diamond never shields. Shielding (Diamond self-tanks) is
+  // her purpose, so accept. (Title must equal the card name for this lookup.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    return undefined;
+  },
   activeIn: ['hero'],
 
   hooks: {

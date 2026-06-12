@@ -134,8 +134,17 @@ function DeckBuilder() {
         const data = await api('/decks');
         if (data.decks && data.decks.length > 0) {
           setDecks(data.decks);
-          const defIdx = data.decks.findIndex(d => d.isDefault);
-          if (defIdx >= 0) setActiveIdx(defIdx);
+          // A specific deck was requested (e.g. the freshly-built Daily Deck);
+          // open it and clear the one-shot request. Otherwise fall back to the
+          // default deck.
+          const requestedId = window._deckBuilderOpenDeckId;
+          window._deckBuilderOpenDeckId = null;
+          const reqIdx = requestedId != null ? data.decks.findIndex(d => d.id === requestedId) : -1;
+          if (reqIdx >= 0) setActiveIdx(reqIdx);
+          else {
+            const defIdx = data.decks.findIndex(d => d.isDefault);
+            if (defIdx >= 0) setActiveIdx(defIdx);
+          }
         } else {
           const nd = await api('/decks', { method: 'POST', body: JSON.stringify({ name: 'My First Deck' }) });
           setDecks([nd.deck]);
@@ -1182,7 +1191,7 @@ function DeckBuilder() {
       {/* ── TOP BAR ── */}
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 10px', fontSize: 9 }} onClick={() => hasUnsaved && !isSampleMode ? setShowLeaveConfirm(true) : setScreen('menu')}>← MENU</button>
-        <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', margin: '0 8px' }}>DECK BUILDER</h2>
+        <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>DECK BUILDER</h2>
         <div style={{ flex: 1 }} />
         <button className="btn" style={{ padding: '4px 10px', fontSize: 9 }}
           disabled={!hasUnsaved || isSampleMode}
@@ -1190,7 +1199,7 @@ function DeckBuilder() {
           ↩ RESET</button>
         <button className={'btn' + (hasUnsaved && !isSampleMode ? ' btn-flash-save' : '')} style={{ padding: '4px 10px', fontSize: 9 }} onClick={saveCurrent} disabled={!hasUnsaved || isSampleMode}
           title={isSampleMode ? 'Cannot save sample decks — use Save As or Rename' : ''}>💾 SAVE</button>
-        <button className="btn btn-accent2" style={{ padding: '4px 10px', fontSize: 9 }} onClick={saveAs}>SAVE AS</button>
+        <button className="btn" style={{ padding: '4px 10px', fontSize: 9, borderColor: 'var(--player-color)', color: 'var(--player-color)', background: 'color-mix(in srgb, var(--player-color) 8%, transparent)' }} onClick={saveAs}>SAVE AS</button>
         <button className="btn btn-danger" style={{ padding: '4px 10px', fontSize: 9 }} onClick={deleteDeck} disabled={decks.length <= 1 || isSampleMode}>🗑 DELETE</button>
         <button className="btn btn-success" style={{ padding: '4px 10px', fontSize: 9 }} onClick={setDefault}
           disabled={!validation.legal || currentDeck?.isDefault || isCube}

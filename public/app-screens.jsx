@@ -7,55 +7,566 @@ const { api, socket, AppContext, CardMini, cardImageUrl,
         typeColor, skinImageUrl, CardTooltipContent, isDeckLegal } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, SKINS_DB } = window;
 
+// Eye / eye-off glyphs for the password show/hide toggle.
+const EyeIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" /><circle cx="12" cy="12" r="3" />
+  </svg>
+);
+const EyeOffIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+);
+
+// Text input with an inline show/hide toggle. Reused by the auth screen
+// and the profile password-change form.
+function PasswordInput({ value, onChange, placeholder, onEnter, autoFocus, autoComplete }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="pw-field">
+      <input
+        className="input" type={show ? 'text' : 'password'} placeholder={placeholder}
+        value={value} autoFocus={autoFocus} autoComplete={autoComplete || 'current-password'}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && onEnter) onEnter(); }}
+      />
+      <button type="button" className="pw-toggle" tabIndex={-1}
+        aria-label={show ? 'Hide password' : 'Show password'}
+        onClick={() => setShow(s => !s)}>
+        {show ? <EyeOffIcon /> : <EyeIcon />}
+      </button>
+    </div>
+  );
+}
+window.PasswordInput = PasswordInput;
+
 function AuthScreen() {
   const { setUser } = useContext(AppContext);
-  const [mode, setMode] = useState('login');
+  // mode: 'login' | 'signup' | 'verify' | 'forgot' | 'reset'
+  const [mode, setModeRaw] = useState('login');
+  const [identifier, setIdentifier] = useState(''); // login: username OR email
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [pendingEmail, setPendingEmail] = useState(''); // email a code was sent to
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0); // resend throttle (seconds)
 
-  const handleSubmit = async () => {
-    if (!username.trim() || !password.trim()) { setError('Fill in all fields'); return; }
+  const setMode = (m) => { setModeRaw(m); setError(''); setInfo(''); };
+
+  // Tick down the resend cooldown.
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+  const startCooldown = () => setCooldown(30);
+
+  const run = async (fn) => {
     setLoading(true); setError('');
-    try {
-      const data = await api('/auth/' + (mode === 'login' ? 'login' : 'signup'), {
-        method: 'POST',
-        body: JSON.stringify({ username: username.trim(), password })
-      });
-      window.AUTH_TOKEN = data.token;
-      socket.emit('auth', data.token);
-      if (mode === 'signup') window._isNewAccount = true;
-      setUser(data.user);
-    } catch (e) { setError(e.message); }
+    try { await fn(); } catch (e) { setError(e.message || 'Something went wrong'); }
     setLoading(false);
   };
+
+  const finishAuth = (data, isNew) => {
+    window.AUTH_TOKEN = data.token;
+    socket.emit('auth', data.token);
+    if (isNew) window._isNewAccount = true;
+    setUser(data.user);
+  };
+
+  const submitLogin = () => run(async () => {
+    if (!identifier.trim() || !password) { setError('Fill in all fields'); return; }
+    const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ identifier: identifier.trim(), password }) });
+    finishAuth(data, false);
+  });
+
+  const submitSignup = () => run(async () => {
+    if (!username.trim() || !email.trim() || !password) { setError('Fill in all fields'); return; }
+    const data = await api('/auth/signup', { method: 'POST', body: JSON.stringify({ username: username.trim(), email: email.trim(), password }) });
+    setPendingEmail(data.email); setCode(''); startCooldown(); setMode('verify');
+  });
+
+  const submitVerify = () => run(async () => {
+    if (!code.trim()) { setError('Enter the code from your email'); return; }
+    const data = await api('/auth/verify-email', { method: 'POST', body: JSON.stringify({ email: pendingEmail, code: code.trim() }) });
+    finishAuth(data, !!data.isNewAccount);
+  });
+
+  const resendSignup = () => run(async () => {
+    await api('/auth/resend', { method: 'POST', body: JSON.stringify({ email: pendingEmail }) });
+    setInfo('A new code has been sent.'); startCooldown();
+  });
+
+  const submitForgot = () => run(async () => {
+    if (!email.trim()) { setError('Enter your email'); return; }
+    await api('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email: email.trim() }) });
+    setPendingEmail(email.trim()); setCode(''); setNewPassword(''); startCooldown();
+    setMode('reset'); setInfo('If that email is registered, a reset code is on its way.');
+  });
+
+  const resendForgot = () => run(async () => {
+    await api('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email: pendingEmail }) });
+    setInfo('If that email is registered, a new code is on its way.'); startCooldown();
+  });
+
+  const submitReset = () => run(async () => {
+    if (!code.trim() || !newPassword) { setError('Enter the code and a new password'); return; }
+    await api('/auth/reset-password', { method: 'POST', body: JSON.stringify({ email: pendingEmail, code: code.trim(), newPassword }) });
+    setIdentifier(pendingEmail); setPassword(''); setMode('login'); setInfo('Password updated — you can log in now.');
+  });
+
+  const Header = (
+    <>
+      <h1 className="pixel-font" style={{ fontSize: 18, color: 'var(--accent)', marginBottom: 4, textShadow: '0 0 20px var(--accent)' }}>
+        PIXEL PARTIES
+      </h1>
+      <div className="orbit-font" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 24, letterSpacing: 2 }}>
+        TRADING CARD GAME
+      </div>
+    </>
+  );
+
+  const Msgs = (
+    <>
+      {error && <div className="auth-msg auth-err">{error}</div>}
+      {info && <div className="auth-msg auth-ok">{info}</div>}
+    </>
+  );
+
+  const codeField = (
+    <input className="input auth-code" inputMode="numeric" autoComplete="one-time-code"
+      placeholder="6-digit code" maxLength={6} value={code} autoFocus
+      onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+      onKeyDown={e => e.key === 'Enter' && (mode === 'verify' ? submitVerify() : submitReset())} />
+  );
+
+  let body;
+  if (mode === 'login' || mode === 'signup') {
+    body = (
+      <>
+        <div className="tab-bar" style={{ marginBottom: 20 }}>
+          <div className={'tab' + (mode === 'login' ? ' active' : '')} onClick={() => setMode('login')}>LOG IN</div>
+          <div className={'tab' + (mode === 'signup' ? ' active' : '')} onClick={() => setMode('signup')}>SIGN UP</div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {mode === 'login' ? (
+            <input className="input" placeholder="Username or Email" value={identifier} autoComplete="username"
+              onChange={e => setIdentifier(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitLogin()} />
+          ) : (
+            <>
+              <input className="input" placeholder="Username" value={username} autoComplete="username"
+                onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
+              <input className="input" type="email" placeholder="Email" value={email} autoComplete="email"
+                onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
+            </>
+          )}
+          <PasswordInput value={password} onChange={setPassword} placeholder="Password"
+            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            onEnter={mode === 'login' ? submitLogin : submitSignup} />
+          {Msgs}
+          <button className="btn btn-big" onClick={mode === 'login' ? submitLogin : submitSignup} disabled={loading}>
+            {loading ? '...' : mode === 'login' ? 'LOG IN' : 'SIGN UP'}
+          </button>
+          {mode === 'login' && (
+            <div className="auth-link" onClick={() => { setEmail(identifier.includes('@') ? identifier : ''); setMode('forgot'); }}>
+              Forgot your password?
+            </div>
+          )}
+          {mode === 'signup' && (
+            <div className="auth-fine">We'll email you a 6-digit code to confirm your address.</div>
+          )}
+        </div>
+      </>
+    );
+  } else if (mode === 'verify') {
+    body = (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="auth-step-title">Check your email</div>
+        <div className="auth-fine">We sent a 6-digit code to <b>{pendingEmail}</b>. Enter it below to finish creating your account.</div>
+        {codeField}
+        {Msgs}
+        <button className="btn btn-big" onClick={submitVerify} disabled={loading}>{loading ? '...' : 'VERIFY'}</button>
+        <div className="auth-row">
+          <span className="auth-link" onClick={() => setMode('signup')}>← Back</span>
+          <span className={'auth-link' + (cooldown > 0 || loading ? ' disabled' : '')}
+            onClick={() => cooldown <= 0 && !loading && resendSignup()}>
+            {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+          </span>
+        </div>
+      </div>
+    );
+  } else if (mode === 'forgot') {
+    body = (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="auth-step-title">Reset your password</div>
+        <div className="auth-fine">Enter your account email and we'll send you a reset code.</div>
+        <input className="input" type="email" placeholder="Email" value={email} autoFocus autoComplete="email"
+          onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitForgot()} />
+        {Msgs}
+        <button className="btn btn-big" onClick={submitForgot} disabled={loading}>{loading ? '...' : 'SEND CODE'}</button>
+        <div className="auth-row">
+          <span className="auth-link" onClick={() => setMode('login')}>← Back to log in</span>
+        </div>
+      </div>
+    );
+  } else if (mode === 'reset') {
+    body = (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="auth-step-title">Enter your reset code</div>
+        <div className="auth-fine">If <b>{pendingEmail}</b> is registered, a code is on its way. Enter it with your new password.</div>
+        {codeField}
+        <PasswordInput value={newPassword} onChange={setNewPassword} placeholder="New password"
+          autoComplete="new-password" onEnter={submitReset} />
+        {Msgs}
+        <button className="btn btn-big" onClick={submitReset} disabled={loading}>{loading ? '...' : 'SET NEW PASSWORD'}</button>
+        <div className="auth-row">
+          <span className="auth-link" onClick={() => setMode('login')}>← Back to log in</span>
+          <span className={'auth-link' + (cooldown > 0 || loading ? ' disabled' : '')}
+            onClick={() => cooldown <= 0 && !loading && resendForgot()}>
+            {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="screen-center auth-screen">
       <div className="panel animate-in" style={{ width: 380, textAlign: 'center' }}>
-        <h1 className="pixel-font" style={{ fontSize: 18, color: 'var(--accent)', marginBottom: 4, textShadow: '0 0 20px var(--accent)' }}>
-          PIXEL PARTIES
-        </h1>
-        <div className="orbit-font" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 24, letterSpacing: 2 }}>
-          TRADING CARD GAME
-        </div>
-        <div className="tab-bar" style={{ marginBottom: 20 }}>
-          <div className={'tab' + (mode === 'login' ? ' active' : '')} onClick={() => { setMode('login'); setError(''); }}>LOG IN</div>
-          <div className={'tab' + (mode === 'signup' ? ' active' : '')} onClick={() => { setMode('signup'); setError(''); }}>SIGN UP</div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <input className="input" placeholder="Username" value={username}
-            onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSubmit()} />
-          <input className="input" type="password" placeholder="Password" value={password}
-            onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSubmit()} />
-          {error && <div style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</div>}
-          <button className="btn btn-big" onClick={handleSubmit} disabled={loading}>
-            {loading ? '...' : mode === 'login' ? 'LOG IN' : 'SIGN UP'}
-          </button>
-        </div>
+        {Header}
+        {body}
       </div>
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+//  MENU CARD BACKGROUND
+//  A slow, seamlessly-looping wall of random card art that scrolls
+//  bottom→top behind the main menu. 10 cards per row fill the width;
+//  no two identical cards ever sit adjacent (incl. diagonally, and
+//  across the loop seam). Purely cosmetic — pointer-events disabled
+//  and layered beneath the menu content.
+// ═══════════════════════════════════════════
+const MENU_BG_COLS = 10;
+const MENU_BG_CARD_ASPECT = 1050 / 750; // card art is 750×1050
+
+// Pick a random url not in `forbidden` (a Set). With ~700 cards and a
+// forbidden set of ≤8 neighbours, rejection sampling converges instantly.
+function menuBgPick(urls, forbidden) {
+  let u, tries = 0;
+  do { u = urls[(Math.random() * urls.length) | 0]; tries++; }
+  while (forbidden.has(u) && tries < 60);
+  return u;
+}
+
+// Build a `rows × MENU_BG_COLS` grid of image urls where no cell equals
+// any of its 8 neighbours. Row 0 is also checked against the last row so
+// the tile can be stacked on itself for a seamless vertical loop.
+function buildMenuBgGrid(urls, rows) {
+  const cols = MENU_BG_COLS;
+  const grid = [];
+  for (let r = 0; r < rows; r++) {
+    grid[r] = [];
+    for (let c = 0; c < cols; c++) {
+      const forbidden = new Set();
+      if (c > 0) forbidden.add(grid[r][c - 1]);               // left
+      if (r > 0) {                                            // row above
+        forbidden.add(grid[r - 1][c]);
+        if (c > 0) forbidden.add(grid[r - 1][c - 1]);
+        if (c < cols - 1) forbidden.add(grid[r - 1][c + 1]);
+      }
+      grid[r][c] = menuBgPick(urls, forbidden);
+    }
+  }
+  // Seam fix-up: make row 0 valid against the last row (which becomes its
+  // upper neighbour when the tile repeats), plus its own settled neighbours.
+  if (rows >= 2) {
+    const last = grid[rows - 1];
+    for (let c = 0; c < cols; c++) {
+      const forbidden = new Set();
+      if (c > 0) forbidden.add(grid[0][c - 1]);
+      if (c < cols - 1) forbidden.add(grid[0][c + 1]);
+      forbidden.add(grid[1][c]);
+      if (c > 0) forbidden.add(grid[1][c - 1]);
+      if (c < cols - 1) forbidden.add(grid[1][c + 1]);
+      forbidden.add(last[c]);
+      if (c > 0) forbidden.add(last[c - 1]);
+      if (c < cols - 1) forbidden.add(last[c + 1]);
+      if (forbidden.has(grid[0][c])) grid[0][c] = menuBgPick(urls, forbidden);
+    }
+  }
+  return grid;
+}
+
+// AVAILABLE_MAP values are bare filenames (e.g. "Archer.png"); turn them
+// into the served image urls under /cards/.
+function menuBgUrls() {
+  return Object.values(window.AVAILABLE_MAP || {})
+    .map(f => '/cards/' + encodeURIComponent(f));
+}
+
+function MenuCardBackground() {
+  const rootRef = useRef(null);
+  const [urls, setUrls] = useState(menuBgUrls);
+  const [rows, setRows] = useState(0);
+
+  // Card images load asynchronously; if AVAILABLE_MAP isn't populated yet,
+  // poll briefly until it is.
+  useEffect(() => {
+    if (urls.length) return;
+    let alive = true;
+    const t = setInterval(() => {
+      const v = menuBgUrls();
+      if (v.length && alive) { setUrls(v); clearInterval(t); }
+    }, 250);
+    return () => { alive = false; clearInterval(t); };
+  }, [urls.length]);
+
+  // Decide how many rows one tile needs so a single copy always covers the
+  // viewport (the scroller stacks two copies for a seamless loop). Recompute
+  // on resize, but only grow — never reshuffle the wall on minor changes.
+  useEffect(() => {
+    const compute = () => {
+      const w = (rootRef.current && rootRef.current.clientWidth) || window.innerWidth;
+      const h = (rootRef.current && rootRef.current.clientHeight) || window.innerHeight;
+      const cellH = (w / MENU_BG_COLS) * MENU_BG_CARD_ASPECT;
+      const needed = Math.max(5, Math.ceil(h / cellH) + 2);
+      setRows(prev => (needed > prev ? needed : prev));
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    return () => window.removeEventListener('resize', compute);
+  }, []);
+
+  const grid = useMemo(
+    () => (urls.length && rows ? buildMenuBgGrid(urls, rows) : null),
+    [urls, rows]
+  );
+
+  if (!grid) return <div ref={rootRef} className="menu-card-bg" aria-hidden="true" />;
+
+  // Constant scroll speed: ~5s per row regardless of tile height.
+  const duration = rows * 5;
+  const tile = (
+    <div className="menu-card-bg-tile">
+      {grid.map((row, r) =>
+        row.map((src, c) => (
+          <div className="menu-card-bg-cell" key={r + '-' + c}>
+            <img src={src} alt="" draggable="false" decoding="async" />
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  return (
+    <div ref={rootRef} className="menu-card-bg" aria-hidden="true">
+      <div className="menu-card-bg-scroller" style={{ animationDuration: duration + 's' }}>
+        {tile}
+        {tile}
+      </div>
+      <div className="menu-card-bg-veil" />
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+//  MENU HUB SIDE PANELS
+//  Frosted panels flanking the menu on wide screens: a live leaderboard
+//  on the left, the player's snapshot (record / top heroes / active deck)
+//  on the right. Hidden below 1100px so they never crowd the menu.
+// ═══════════════════════════════════════════
+
+// Small standalone card thumbnail (no tooltip/drag machinery — just art).
+function MenuCardThumb({ name, skin, w = 42, onClick }) {
+  const url = name && cardImageUrl(name, skin ? { [name]: skin } : null);
+  const style = {
+    width: w, height: Math.round(w * MENU_BG_CARD_ASPECT), borderRadius: 5,
+    objectFit: 'cover', display: 'block', flexShrink: 0,
+    border: '1px solid rgba(255,255,255,.12)',
+    cursor: onClick ? 'pointer' : 'default',
+  };
+  if (!url) {
+    return (
+      <div style={{ ...style, background: 'rgba(255,255,255,.05)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', fontSize: 8, color: 'var(--text2)',
+        textAlign: 'center', padding: 2 }} onClick={onClick}>{name || '?'}</div>
+    );
+  }
+  return <img src={url} alt="" draggable="false" style={style} onClick={onClick} title={name} />;
+}
+
+// ── Left: live leaderboard ──
+function MenuLeaderboardPanel({ top, height }) {
+  const { user } = useContext(AppContext);
+  const [players, setPlayers] = useState(null);
+  const [live, setLive] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    api('/leaderboard').then(d => { if (alive) setPlayers(d.players || []); }).catch(() => { if (alive) setPlayers([]); });
+    const pollLive = () => api('/stats/live').then(d => { if (alive) setLive(d); }).catch(() => {});
+    pollLive();
+    const t = setInterval(pollLive, 20000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+
+  const style = {};
+  if (top != null) style.top = top;
+  if (height != null) style.height = height;
+
+  return (
+    <aside className="menu-side menu-side-left" style={style}>
+      <div className="menu-side-panel ornate-frame">
+        <div className="menu-side-live">
+          <span className="menu-live-dot" />
+          {live
+            ? <span>{live.playersOnline} online · {live.gamesLive} game{live.gamesLive === 1 ? '' : 's'} live</span>
+            : <span style={{ color: 'var(--text2)' }}>connecting…</span>}
+        </div>
+        <h3 className="menu-side-title">★ TOP PLAYERS</h3>
+        <div className="menu-side-scroll">
+          {players === null ? (
+            <div className="menu-side-empty">Loading…</div>
+          ) : players.length === 0 ? (
+            <div className="menu-side-empty">No ranked players yet.</div>
+          ) : (
+            <ol className="menu-lb-list">
+              {players.map(p => (
+                <li key={p.rank} className={'menu-lb-row'
+                    + (p.rank <= 3 ? ' menu-lb-medal rank-' + p.rank : '')
+                    + (p.username === user.username ? ' is-me' : '')}>
+                  <span className={'menu-lb-rank' + (p.rank <= 3 ? ' top' : '')}>{p.rank}</span>
+                  <span className="menu-lb-name" style={{ color: p.color || 'var(--accent)' }}>{p.username}</span>
+                  <span className="menu-lb-elo">{p.elo}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+// ── Right: the player's own snapshot ──
+function MenuPlayerPanel({ top, height }) {
+  const { user, setScreen, notify } = useContext(AppContext);
+  const [decks, setDecks] = useState(null); // null=loading, []=none
+  const [settingId, setSettingId] = useState(null); // deck id currently being set
+
+  useEffect(() => {
+    let alive = true;
+    api('/profile/deck-stats').then(d => { if (alive) setDecks(d.decks || []); }).catch(() => { if (alive) setDecks([]); });
+    return () => { alive = false; };
+  }, []);
+
+  // Click a deck → make it the current (default) deck. Illegal decks can
+  // never be set active.
+  const selectDeck = async (deck) => {
+    if (deck.isDefault || settingId) return;
+    if (!deck.legal) {
+      notify && notify('"' + deck.name + '" is incomplete — finish it in the deck builder before setting it active', 'error');
+      return;
+    }
+    setSettingId(deck.id);
+    try {
+      await api('/decks/' + deck.id + '/set-default', { method: 'POST' });
+      setDecks(list => (list || []).map(d => ({ ...d, isDefault: d.id === deck.id })));
+      notify && notify(deck.name + ' is now your active deck', 'success');
+    } catch (e) {
+      notify && notify(e.message || 'Failed to set active deck', 'error');
+    }
+    setSettingId(null);
+  };
+
+  const wins = user.wins || 0, losses = user.losses || 0;
+  const total = wins + losses;
+  const winRate = total ? Math.round((wins / total) * 100) : 0;
+
+  // Active deck is derived from the decks list, so it updates the moment
+  // the player picks a different one below.
+  const activeDeck = decks ? decks.find(d => d.isDefault) : undefined;
+
+  const style = {};
+  if (top != null) style.top = top;
+  if (height != null) style.height = height;
+
+  return (
+    <aside className="menu-side menu-side-right" style={style}>
+      <div className="menu-side-panel ornate-frame">
+        <h3 className="menu-side-title">⚔ YOUR RECORD</h3>
+        <div className="menu-record">
+          <div className="menu-record-cell"><b style={{ color: 'var(--success)' }}>{wins}</b><span>WINS</span></div>
+          <div className="menu-record-cell"><b style={{ color: 'var(--danger)' }}>{losses}</b><span>LOSSES</span></div>
+          <div className="menu-record-cell"><b style={{ color: 'var(--accent)' }}>{winRate}%</b><span>WIN RATE</span></div>
+        </div>
+
+        <h3 className="menu-side-title">✦ ACTIVE DECK</h3>
+        {decks === null ? (
+          <div className="menu-side-empty">Loading…</div>
+        ) : !activeDeck ? (
+          <button className="menu-side-empty menu-side-link" onClick={() => setScreen('deckbuilder')}>
+            No active deck — pick one below or build one →
+          </button>
+        ) : (
+          <button className="menu-deck-card is-active is-editable" onClick={() => setScreen('deckbuilder')} title="Edit in deck builder">
+            <MenuCardThumb name={activeDeck.repCard} skin={activeDeck.repSkin} w={56} />
+            <span className="menu-deck-meta">
+              <span className="menu-deck-name">{activeDeck.name}</span>
+              <span className={'menu-deck-status ' + (activeDeck.legal ? 'ok' : 'bad')}>
+                {activeDeck.legal ? '✓ Tournament legal' : '✗ Incomplete'}
+              </span>
+            </span>
+            <span className="menu-deck-flag">EDIT →</span>
+          </button>
+        )}
+
+        <h3 className="menu-side-title">🃏 YOUR DECKS</h3>
+        <div className="menu-side-scroll">
+          {decks === null ? (
+            <div className="menu-side-empty">Loading…</div>
+          ) : decks.length === 0 ? (
+            <button className="menu-side-empty menu-side-link" onClick={() => setScreen('deckbuilder')}>
+              No decks yet — build one →
+            </button>
+          ) : (
+            <div className="menu-deck-list">
+              {decks.map(d => (
+                <button
+                  key={d.id}
+                  className={'menu-deck-card'
+                    + (d.isDefault ? ' is-active' : '')
+                    + (!d.isDefault && !d.legal ? ' is-illegal' : '')
+                    + (settingId === d.id ? ' is-busy' : '')}
+                  onClick={() => selectDeck(d)}
+                  title={d.isDefault ? 'Active deck' : (d.legal ? 'Set as active deck' : 'Incomplete — finish it in the deck builder')}
+                >
+                  <MenuCardThumb name={d.repCard} skin={d.repSkin} w={56} />
+                  <span className="menu-deck-meta">
+                    <span className="menu-deck-name">{d.name}</span>
+                    <span className={'menu-deck-status ' + (d.legal ? 'ok' : 'bad')}>
+                      {d.legal ? '✓ Legal' : '✗ Incomplete'}
+                    </span>
+                  </span>
+                  <span className="menu-deck-flag">
+                    {d.isDefault ? '● ACTIVE' : (settingId === d.id ? '…' : '')}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </aside>
   );
 }
 
@@ -64,7 +575,6 @@ function AuthScreen() {
 // ═══════════════════════════════════════════
 function MainMenu() {
   const { user, setScreen, setUser, notify, setBgmMode } = useContext(AppContext);
-  const [puzzleOpen, setPuzzleOpen] = useState(false);
   // ── Menu top-anchor ──
   // Out of the box, .screen-center vertically centers the whole menu
   // (title + buttons + user-info), so when the Puzzle submenu opens
@@ -76,7 +586,12 @@ function MainMenu() {
   // submenu only extends the menu DOWNWARD — the title and the rest
   // of the page sit exactly where they did when the menu was collapsed.
   const screenRef = useRef(null);
+  const menuBodyRef = useRef(null);
   const [menuTopPad, setMenuTopPad] = useState(null);
+  // Top offset + height (px) of the menu-body strip — used to align the
+  // flanking hub panels with the button strip and match its height.
+  const [panelTop, setPanelTop] = useState(null);
+  const [panelHeight, setPanelHeight] = useState(null);
   useLayoutEffect(() => {
     if (menuTopPad !== null || !screenRef.current) return;
     const screenEl = screenRef.current;
@@ -90,7 +605,23 @@ function MainMenu() {
     if (!firstFlowChild) return;
     const screenRect = screenEl.getBoundingClientRect();
     const childRect = firstFlowChild.getBoundingClientRect();
-    setMenuTopPad(Math.max(0, childRect.top - screenRect.top));
+    // Drop the strip (and the side panels that align to it) below its
+    // natural centered position, so there's a generous gap under the top
+    // row; the slack is taken from the bottom margin.
+    const MENU_VERTICAL_DROP = 40;
+    setMenuTopPad(Math.max(0, childRect.top - screenRect.top) + MENU_VERTICAL_DROP);
+  }, [menuTopPad]);
+  // Once the menu's vertical anchor is locked in, measure where the
+  // button strip (menu-body) begins and how tall it is, so the side
+  // panels line up with its top and match its height. Re-runs on the
+  // anchor recompute (mount + resize) and when the puzzle submenu
+  // toggles (which changes the strip's height).
+  useLayoutEffect(() => {
+    if (menuTopPad === null || !screenRef.current || !menuBodyRef.current) return;
+    const screenRect = screenRef.current.getBoundingClientRect();
+    const bodyRect = menuBodyRef.current.getBoundingClientRect();
+    setPanelTop(Math.max(0, bodyRect.top - screenRect.top));
+    setPanelHeight(Math.round(bodyRect.height));
   }, [menuTopPad]);
   // Reset the anchor on viewport resize so a window-size change still
   // looks centered when collapsed. The next layout effect re-measures
@@ -160,6 +691,32 @@ function MainMenu() {
 
   const closeDaily = () => setDailyOpen(false);
 
+  // Build a fresh, empty deck with the three Daily Heroes pre-slotted, then
+  // jump straight into the deck editor on it.
+  const [creatingDailyDeck, setCreatingDailyDeck] = useState(false);
+  const createDailyDeck = async () => {
+    if (creatingDailyDeck || !(daily?.heroes?.length === 3)) return;
+    setCreatingDailyDeck(true);
+    try {
+      const heroes = daily.heroes.map((name) => {
+        const c = CARDS_BY_NAME[name];
+        return { hero: name, ability1: c?.startingAbility1 || null, ability2: c?.startingAbility2 || null };
+      });
+      const created = await api('/decks', { method: 'POST', body: JSON.stringify({ name: 'Daily Deck' }) });
+      const id = created.deck.id;
+      await api('/decks/' + id, { method: 'PUT', body: JSON.stringify({
+        name: 'Daily Deck', mainDeck: [], heroes, potionDeck: [], sideDeck: [], isDefault: false,
+      }) });
+      // Tell the deck editor which deck to open on mount.
+      window._deckBuilderOpenDeckId = id;
+      setDailyOpen(false);
+      setScreen('deckbuilder');
+    } catch (e) {
+      notify(e.message || 'Failed to create Daily Deck', 'error');
+    }
+    setCreatingDailyDeck(false);
+  };
+
   // Escape to close the daily modal.
   useEffect(() => {
     if (!dailyOpen) return;
@@ -182,11 +739,22 @@ function MainMenu() {
   // Singleplayer lives in its own screen now (see SingleplayerScreen).
   // MainMenu just routes to it via setScreen('singleplayer').
 
+  const [logoutConfirm, setLogoutConfirm] = useState(false);
   const logout = async () => {
     try { await api('/auth/logout', { method: 'POST' }); } catch {}
     window.AUTH_TOKEN = null;
     setUser(null);
   };
+
+  // Close the logout confirmation on Escape or an outside click.
+  useEffect(() => {
+    if (!logoutConfirm) return;
+    const onDown = (e) => { if (!e.target.closest('.menu-logout-confirm-wrap')) setLogoutConfirm(false); };
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); setLogoutConfirm(false); } };
+    window.addEventListener('mousedown', onDown, true);
+    window.addEventListener('keydown', onKey, true);
+    return () => { window.removeEventListener('mousedown', onDown, true); window.removeEventListener('keydown', onKey, true); };
+  }, [logoutConfirm]);
 
   // Fetch puzzle list when browser opens
   useEffect(() => {
@@ -400,67 +968,87 @@ function MainMenu() {
            flexDirection: 'column',
            gap: 20,
            position: 'relative',
+           // The player's own colour, exposed as a custom property so the
+           // ornate frames on the menu strip + side panels can all pick it
+           // up via inheritance.
+           '--player-color': user.color || '#00f0ff',
            // Once the collapsed-state top is captured, anchor it via
            // `padding-top` + `flex-start` so submenu toggles only
            // grow the menu downward.
            ...(menuTopPad !== null && { justifyContent: 'flex-start', paddingTop: menuTopPad }),
          }}>
-      <div style={{ position: 'absolute', top: 12, left: 16, display: 'flex', alignItems: 'center', gap: 8, zIndex: 5 }}>
-        <button
-          className={'btn menu-daily-btn' + (daily?.available ? ' is-available' : '')}
+      <MenuCardBackground />
+      <MenuLeaderboardPanel top={panelTop} height={panelHeight} />
+      <MenuPlayerPanel top={panelTop} height={panelHeight} />
+      {/* Brand label sits centered in the top row (above the menu strip),
+          kept at its full size. */}
+      <h1 className="pixel-font menu-title title-outline" style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', fontSize: 24, color: 'var(--accent)', textShadow: '0 0 30px var(--accent)', margin: 0, zIndex: 5 }}>PIXEL PARTIES</h1>
+      <div style={{ position: 'absolute', top: 14, left: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10, zIndex: 5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* ELO + SC stats (the name now lives above the avatar below). */}
+          <span className="badge" style={{ background: 'rgba(170,255,0,.12)', color: 'var(--accent3)', fontSize: 20, padding: '10px 20px' }}>ELO {user.elo}</span>
+          <span className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 8, fontSize: 20, padding: '10px 20px' }}>
+            <img src="/data/sc.png" style={{ width: 26, height: 26, imageRendering: 'pixelated' }} /> {user.sc || 0} SC
+          </span>
+        </div>
+      </div>
+      {/* Player name stacked directly above the avatar, both horizontally
+          centered in the gutter between the screen edge and the Top Players
+          panel (equal gaps on both sides). Clicking either opens the profile. */}
+      <div className="menu-profile-gutter" style={panelTop != null ? { top: panelTop } : undefined}>
+        <span className="orbit-font menu-player-name" onClick={() => setScreen('profile')} title="View Profile"
+          style={{ color: user.color || 'var(--accent)', fontWeight: 800, fontSize: 22, whiteSpace: 'nowrap' }}>{user.username}</span>
+        <div className="menu-profile-avatar" onClick={() => setScreen('profile')} title="View Profile"
           style={{
-            padding: '6px 18px',
-            fontSize: 12,
-            borderColor: '#ffd700',
-            color: '#ffd700',
-            background: daily?.available ? 'rgba(255,215,0,.18)' : 'rgba(255,215,0,.06)',
-            fontWeight: 700,
-            letterSpacing: 1.5,
-          }}
-          onClick={openDaily}
-          title="Daily Challenge"
-        >
-          ★ DAILY{daily?.active && daily?.claimedBig ? ' ✓' : ''}
-        </button>
+            color: user.color || 'var(--accent)',
+            borderColor: user.color || 'var(--accent)',
+            boxShadow: '0 0 18px ' + (user.color || 'var(--accent)') + '55',
+          }}>
+          {user.avatar
+            ? <img src={user.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
+            : <span style={{ fontSize: 56, opacity: 0.5 }}>👤</span>}
+        </div>
       </div>
-      <div style={{ position: 'absolute', top: 12, right: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button className="btn menu-logout-btn" style={{ padding: '4px 16px', fontSize: 10 }} onClick={logout}>LOGOUT</button>
-        <VolumeControl />
-      </div>
-      <h1 className="pixel-font menu-title" style={{ fontSize: 24, color: 'var(--accent)', textShadow: '0 0 30px var(--accent)' }}>PIXEL PARTIES</h1>
-      <div className="orbit-font menu-subtitle" style={{ fontSize: 12, color: 'var(--text2)', letterSpacing: 3 }}>TRADING CARD GAME</div>
-      <div className="menu-body">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 280 }} className="animate-in menu-buttons">
-          {!user.hide_tutorial && (
-            <button className="btn btn-big" onClick={() => setTutorialBrowserOpen(true)} style={{ fontSize: 16, borderColor: '#ff44cc', color: '#ff44cc', background: 'rgba(255,68,204,.08)' }}>📖 TUTORIAL</button>
-          )}
-          <button className="btn btn-big" onClick={() => setScreen('singleplayer')} style={{ fontSize: 16, borderColor: '#aa88ff', color: '#aa88ff', background: 'rgba(170,136,255,.08)' }}>🤖 SINGLEPLAYER</button>
-          <button className="btn btn-big" onClick={() => setScreen('play')} style={{ fontSize: 16 }}>⚔ FIND OPPONENT</button>
-          <button className="btn btn-big btn-accent2" onClick={() => setScreen('deckbuilder')} style={{ fontSize: 16 }}>✦ EDIT DECK</button>
-          <button className="btn btn-big" onClick={() => setScreen('shop')} style={{ fontSize: 16, borderColor: '#ffd700', color: '#ffd700', background: 'rgba(255,215,0,.08)' }}>✦ SHOP</button>
-          <button className="btn btn-big btn-success" onClick={() => setScreen('profile')} style={{ fontSize: 16 }}>♛ VIEW PROFILE</button>
-          <button className="btn btn-big" onClick={() => setPuzzleOpen(!puzzleOpen)} style={{ fontSize: 16, borderColor: '#ff8800', color: '#ff8800', background: 'rgba(255,136,0,.08)' }}>🧩 PUZZLE MODE {puzzleOpen ? '▲' : '▼'}</button>
-          {/* Submenu is conditionally mounted so the menu stays
-              compact when collapsed. The screen's top is anchored via
-              `menuTopPad` (see useLayoutEffect above), so adding this
-              row only extends the menu downward — title + everything
-              above the submenu stay put. */}
-          {puzzleOpen && (
-            <div style={{ display: 'flex', gap: 8, marginTop: -4 }}>
-              <button className="btn" onClick={() => setPuzzleBrowserOpen(true)} style={{ flex: 1, padding: '10px 0', fontSize: 13, borderColor: '#ff8800', color: '#ff8800', background: 'rgba(255,136,0,.06)' }}>⚡ Attempt</button>
-              <button className="btn" onClick={() => setScreen('puzzle-create')} style={{ flex: 1, padding: '10px 0', fontSize: 13, borderColor: '#ff8800', color: '#ff8800', background: 'rgba(255,136,0,.06)' }}>🔧 Create</button>
+      <div style={{ position: 'absolute', top: 14, right: 16, display: 'flex', alignItems: 'center', gap: 10, zIndex: 5 }}>
+        <div className="menu-logout-confirm-wrap" style={{ position: 'relative' }}>
+          <button className="btn menu-logout-btn" style={{ padding: '7px 22px', fontSize: 13 }} onClick={() => setLogoutConfirm(v => !v)}>LOGOUT</button>
+          {logoutConfirm && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, background: 'var(--bg2)', border: '1px solid var(--danger)', borderRadius: 6, padding: '10px 12px', boxShadow: '0 4px 16px rgba(0,0,0,.5)', whiteSpace: 'nowrap', zIndex: 20 }}>
+              <div style={{ fontSize: 12, color: 'var(--text1)', marginBottom: 8, textAlign: 'center' }}>Really log out?</div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                <button className="btn btn-danger" style={{ padding: '4px 16px', fontSize: 11 }} onClick={logout}>YES</button>
+                <button className="btn" style={{ padding: '4px 16px', fontSize: 11 }} onClick={() => setLogoutConfirm(false)}>NO</button>
+              </div>
             </div>
           )}
-          <button className="btn btn-big" onClick={() => setScreen('rules')} style={{ fontSize: 16, borderColor: 'var(--text2)', color: 'var(--text2)', background: 'rgba(255,255,255,.03)' }}>📜 RULES</button>
         </div>
-        <div className="menu-user-info">
-          <span style={{ color: user.color || 'var(--accent)', fontWeight: 800, fontSize: 22 }} className="orbit-font">{user.username}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span className="badge" style={{ background: 'rgba(170,255,0,.12)', color: 'var(--accent3)', fontSize: 18, padding: '8px 16px' }}>ELO {user.elo}</span>
-            <span className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '8px 16px' }}>
-              <img src="/data/sc.png" style={{ width: 22, height: 22, imageRendering: 'pixelated' }} /> {user.sc || 0} SC
-            </span>
+        <VolumeControl />
+      </div>
+      <div ref={menuBodyRef} className="menu-body ornate-frame" style={{ position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 340 }} className="animate-in menu-buttons">
+          <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('play')}>
+            <span className="menu-nav-label">PLAY ONLINE</span></button>
+          <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('singleplayer')}>
+            <span className="menu-nav-label">VS CPU</span></button>
+          <button className="btn btn-big menu-nav-btn" onClick={openDaily} title="Daily Challenge">
+            <span className="menu-nav-label">DAILY{daily?.active && daily?.claimedBig ? ' ✓' : ''}</span></button>
+          {/* Puzzle pair: two half-width buttons sharing one row. */}
+          <div className="menu-nav-row">
+            <button className="btn btn-big menu-nav-btn menu-nav-btn--half" onClick={() => setScreen('puzzle-create')}>
+              <span className="menu-nav-label">CREATE PUZZLE</span></button>
+            <button className="btn btn-big menu-nav-btn menu-nav-btn--half" onClick={() => setPuzzleBrowserOpen(true)}>
+              <span className="menu-nav-label">ATTEMPT PUZZLE</span></button>
           </div>
+          <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('deckbuilder')}>
+            <span className="menu-nav-label">DECK EDITOR</span></button>
+          <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('shop')}>
+            <span className="menu-nav-label">SHOP</span></button>
+          <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('profile')}>
+            <span className="menu-nav-label">PROFILE</span></button>
+          {/* How to Play replaces the old Tutorial + Rules buttons; it opens
+              the tutorial browser, which now always offers View Rules. */}
+          <button className="btn btn-big menu-nav-btn" onClick={() => setTutorialBrowserOpen(true)}>
+            <span className="menu-nav-label">HOW TO PLAY</span></button>
         </div>
       </div>
 
@@ -468,9 +1056,9 @@ function MainMenu() {
       {dailyOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={(e) => { if (e.target === e.currentTarget) closeDaily(); }}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid #ffd700', borderRadius: 8, width: 560, maxWidth: '92vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,215,0,.25)', position: 'relative' }}>
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 className="orbit-font" style={{ fontSize: 16, color: '#ffd700', margin: 0 }}>★ DAILY CHALLENGE</h3>
+          <div style={{ background: 'var(--bg2)', border: '1px solid #ffd700', borderRadius: 8, width: 700, maxWidth: '92vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,215,0,.25)', position: 'relative' }}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
+              <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>DAILY CHALLENGE</h3>
               <button className="btn" onClick={closeDaily} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
             </div>
             <div style={{ padding: '18px 22px 22px', overflowY: 'auto' }}>
@@ -478,9 +1066,9 @@ function MainMenu() {
                 <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>Loading…</div>
               ) : (daily.active && daily.heroes?.length === 3) ? (
                 <>
-                  <div style={{ color: 'var(--text1)', fontSize: 13, lineHeight: 1.55, marginBottom: 14 }}>
-                    Win a game today with <b style={{ color: '#ffd700' }}>2 of these Heroes</b> in your deck to earn{' '}
-                    <b style={{ color: '#ffd700' }}>10 bonus SC</b>, or <b style={{ color: '#ffd700' }}>all 3 for 20 bonus SC</b>!
+                  <div style={{ color: 'var(--text1)', fontSize: 13, lineHeight: 1.55, marginBottom: 14, whiteSpace: 'nowrap' }}>
+                    Win a game today with <b style={{ color: 'var(--player-color)' }}>2 of these Heroes</b> in your deck to earn{' '}
+                    <b style={{ color: 'var(--player-color)' }}>10 bonus SC</b>, or <b style={{ color: 'var(--player-color)' }}>all 3 for 20 bonus SC</b>!
                   </div>
                   <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
                     {daily.heroes.map((name) => {
@@ -498,6 +1086,12 @@ function MainMenu() {
                       );
                     })}
                   </div>
+                  {/* One-click: spin up a fresh deck with all 3 Daily Heroes
+                      pre-slotted and drop the player into the deck editor. */}
+                  <button className="btn" onClick={createDailyDeck} disabled={creatingDailyDeck}
+                    style={{ display: 'block', width: '100%', marginBottom: 14, padding: '11px', fontSize: 13, borderColor: 'var(--player-color)', color: 'var(--player-color)', background: 'color-mix(in srgb, var(--player-color) 12%, transparent)', fontWeight: 700, letterSpacing: 1 }}>
+                    {creatingDailyDeck ? 'CREATING…' : 'CREATE DAILY DECK'}
+                  </button>
                   {(() => {
                     const _ = dailyTick; // re-render hook for the live countdown
                     const nowMs = Date.now();
@@ -509,6 +1103,8 @@ function MainMenu() {
                     const m = Math.floor((remainSec % 3600) / 60);
                     const s = remainSec % 60;
                     const tStr = (h > 0 ? `${h}h ` : '') + `${m}m ${String(s).padStart(2, '0')}s`;
+                    // Player colour normally; red once under an hour remains.
+                    const timerColor = remainSec < 3600 ? '#ff4444' : 'var(--player-color)';
                     return (
                       <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text2)' }}>
                         {daily.claimedBig ? (
@@ -518,7 +1114,7 @@ function MainMenu() {
                         ) : (
                           <div style={{ marginBottom: 6 }}>Big bonus still available.</div>
                         )}
-                        <div>Time remaining: <span style={{ color: '#ffd700' }}>{tStr}</span></div>
+                        <div>Time remaining: <span style={{ color: timerColor, fontWeight: 700 }}>{tStr}</span></div>
                       </div>
                     );
                   })()}
@@ -538,8 +1134,8 @@ function MainMenu() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={(e) => { if (e.target === e.currentTarget) setPuzzleBrowserOpen(false); }}>
           <div style={{ background: 'var(--bg2)', border: '1px solid #ff8800', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,136,0,.2)', position: 'relative' }}>
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 className="orbit-font" style={{ fontSize: 16, color: '#ff8800', margin: 0 }}>🧩 PUZZLE LIBRARY</h3>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
+              <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>PUZZLE LIBRARY</h3>
               <button className="btn" onClick={() => setPuzzleBrowserOpen(false)} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
             </div>
             {scFloat && (
@@ -561,9 +1157,9 @@ function MainMenu() {
                   const scReward = { easy: 3, medium: 6, hard: 10 };
                   return (
                     <div key={diff} style={{ marginBottom: 16 }}>
-                      <div className="orbit-font" style={{ fontSize: 11, color: diffColors[diff], letterSpacing: 2, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className="orbit-font" style={{ fontSize: 11, fontWeight: 800, color: diffColors[diff], letterSpacing: 2, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
                         {diff.toUpperCase()}
-                        <span style={{ fontSize: 9, color: 'var(--text2)', letterSpacing: 0 }}>({scReward[diff]} SC)</span>
+                        <span style={{ fontSize: 9, fontWeight: 400, color: 'var(--text2)', letterSpacing: 0 }}>({scReward[diff]} SC)</span>
                       </div>
                       {puzzles.map(p => (
                         <button key={p.puzzleId} className="btn" onClick={() => startPuzzleAttempt(p)}
@@ -587,8 +1183,8 @@ function MainMenu() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={(e) => { if (e.target === e.currentTarget) setTutorialBrowserOpen(false); }}>
           <div style={{ background: 'var(--bg2)', border: '1px solid #ff44cc', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,68,204,.2)' }}>
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 className="orbit-font" style={{ fontSize: 16, color: '#ff44cc', margin: 0 }}>📖 TUTORIAL</h3>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
+              <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>HOW TO PLAY</h3>
               <button className="btn" onClick={() => setTutorialBrowserOpen(false)} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px 20px' }}>
@@ -612,6 +1208,13 @@ function MainMenu() {
                   </button>
                 ))
               )}
+              {/* Always-available rules entry — bottom-most, never locked.
+                  Replaces the old standalone Rules menu button. */}
+              <button className="btn" onClick={() => { setTutorialBrowserOpen(false); setScreen('rules'); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginTop: 10, borderColor: 'rgba(255,68,204,.45)', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', cursor: 'pointer' }}>
+                <span style={{ color: '#ff44cc', fontSize: 16, width: 20, textAlign: 'center' }}>📜</span>
+                <span style={{ flex: 1, fontWeight: 700 }}>View Rules</span>
+              </button>
             </div>
           </div>
         </div>
@@ -646,8 +1249,8 @@ function ProfileScreen() {
   const [color, setColor] = useState(user.color || '#00f0ff');
   const [avatar, setAvatar] = useState(user.avatar);
   const [cardback, setCardback] = useState(user.cardback);
-  const [bio, setBio] = useState(user.bio || '');
-  const [deckStats, setDeckStats] = useState({ total: 0, legal: 0, decks: [] });
+  const [victoryMsg, setVictoryMsg] = useState(user.victoryMsg || '');
+  const [defeatMsg, setDefeatMsg] = useState(user.defeatMsg || '');
   const [saving, setSaving] = useState(false);
 
   // Password change
@@ -655,6 +1258,35 @@ function ProfileScreen() {
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
+
+  // Email & recovery
+  const [emailInput, setEmailInput] = useState('');
+  const [emailCode, setEmailCode] = useState('');
+  const [emailStage, setEmailStage] = useState('idle'); // 'idle' | 'code'
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailEditing, setEmailEditing] = useState(false);
+
+  const requestEmailCode = async () => {
+    if (!emailInput.trim()) { notify('Enter an email address', 'error'); return; }
+    setEmailBusy(true);
+    try {
+      const data = await api('/profile/email/request', { method: 'POST', body: JSON.stringify({ email: emailInput.trim() }) });
+      setEmailInput(data.email); setEmailStage('code'); setEmailCode('');
+      notify('Verification code sent — check your inbox.', 'success');
+    } catch (e) { notify(e.message, 'error'); }
+    setEmailBusy(false);
+  };
+  const confirmEmailCode = async () => {
+    if (!emailCode.trim()) { notify('Enter the code from your email', 'error'); return; }
+    setEmailBusy(true);
+    try {
+      const data = await api('/profile/email/confirm', { method: 'POST', body: JSON.stringify({ email: emailInput.trim(), code: emailCode.trim() }) });
+      setUser(data.user);
+      setEmailStage('idle'); setEmailEditing(false); setEmailCode(''); setEmailInput('');
+      notify('Email verified!', 'success');
+    } catch (e) { notify(e.message, 'error'); }
+    setEmailBusy(false);
+  };
 
   // Sleeve gallery (was cardback gallery)
   const [showSleeveGallery, setShowSleeveGallery] = useState(false);
@@ -686,7 +1318,8 @@ function ProfileScreen() {
   const isDirty = color !== (user.color || '#00f0ff')
     || avatar !== user.avatar
     || cardback !== user.cardback
-    || bio !== (user.bio || '');
+    || victoryMsg !== (user.victoryMsg || '')
+    || defeatMsg !== (user.defeatMsg || '');
 
   const rank = getRank(user.elo || 1000);
   const wins = user.wins || 0;
@@ -702,7 +1335,6 @@ function ProfileScreen() {
   const eloProgress = nextRank ? Math.min(100, Math.round(((user.elo - prevMin) / (nextMin - prevMin)) * 100)) : 100;
 
   useEffect(() => {
-    api('/profile/deck-stats').then(setDeckStats).catch(() => {});
     api('/profile/hero-stats').then(d => setTopHeroes(d.heroes || [])).catch(() => {});
     loadCardbackGallery();
     // Load standard avatars and owned shop items
@@ -793,9 +1425,14 @@ function ProfileScreen() {
   };
 
   const save = async () => {
+    // Client-side profanity guard mirrors the server's reject — just gives
+    // faster feedback. The server stays the authoritative gate.
+    const cp = window.containsProfanity;
+    if (cp && cp(victoryMsg)) { notify('Victory Message: please remove inappropriate language.', 'error'); return; }
+    if (cp && cp(defeatMsg)) { notify('Defeat Message: please remove inappropriate language.', 'error'); return; }
     setSaving(true);
     try {
-      const data = await api('/profile', { method: 'PUT', body: JSON.stringify({ color, avatar, cardback, bio }) });
+      const data = await api('/profile', { method: 'PUT', body: JSON.stringify({ color, avatar, cardback, victoryMsg, defeatMsg }) });
       setUser(data.user);
       notify('Profile saved!', 'success');
     } catch (e) { notify(e.message, 'error'); }
@@ -880,7 +1517,7 @@ function ProfileScreen() {
     <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)' }}>
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
-        <h2 className="orbit-font" style={{ fontSize: 16, color: 'var(--accent)' }}>PLAYER PROFILE</h2>
+        <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>PLAYER PROFILE</h2>
         <div style={{ flex: 1 }} />
         <div style={{ fontSize: 10, color: 'var(--text2)' }}>Member since {memberSince}</div>
         <VolumeControl />
@@ -898,7 +1535,7 @@ function ProfileScreen() {
                 onClick={() => setShowAvatarGallery(true)}>
                 <div className="profile-avatar-inner">
                   {avatar
-                    ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
                     : <span style={{ fontSize: 56, opacity: 0.5 }}>👤</span>}
                 </div>
                 <div className="profile-avatar-upload-overlay">
@@ -953,18 +1590,33 @@ function ProfileScreen() {
             {/* Divider */}
             <div style={{ borderTop: '1px solid var(--bg4)', margin: '16px 0' }} />
 
-            {/* Bio */}
+            {/* In-game speech-bubble messages. Shown above your avatar to
+                both players when a match ends — your Victory line if you win,
+                your Defeat line if you lose. Capped at ~10 words; a basic
+                profanity filter runs on save. */}
             <div>
-              <div className="profile-section-label">MOTTO</div>
+              <div className="profile-section-label">VICTORY MESSAGE</div>
               <textarea
                 className="profile-bio-input"
-                value={bio}
-                onChange={e => setBio(e.target.value.slice(0, 200))}
-                placeholder="Write something memorable..."
-                rows={3}
-                maxLength={200}
+                value={victoryMsg}
+                onChange={e => setVictoryMsg(e.target.value.slice(0, 80))}
+                placeholder="Shown above your avatar when you win…"
+                rows={2}
+                maxLength={80}
               />
-              <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text2)', marginTop: 2 }}>{bio.length}/200</div>
+              <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text2)', marginTop: 2 }}>{victoryMsg.length}/80</div>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <div className="profile-section-label">DEFEAT MESSAGE</div>
+              <textarea
+                className="profile-bio-input"
+                value={defeatMsg}
+                onChange={e => setDefeatMsg(e.target.value.slice(0, 80))}
+                placeholder="Shown above your avatar when you lose…"
+                rows={2}
+                maxLength={80}
+              />
+              <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text2)', marginTop: 2 }}>{defeatMsg.length}/80</div>
             </div>
 
             {/* Profile Backup */}
@@ -1291,6 +1943,53 @@ function ProfileScreen() {
             </div>
           </div>
 
+          {/* Email & recovery */}
+          <div className="profile-section profile-section-wide">
+            <div className="profile-section-label">EMAIL &amp; RECOVERY</div>
+            {user.email && !emailEditing ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: 'var(--text)' }}>{user.email}</span>
+                <span style={{ fontSize: 10, color: 'var(--success)', border: '1px solid var(--success)', borderRadius: 4, padding: '1px 6px' }}>VERIFIED</span>
+                <button className="btn" style={{ padding: '6px 14px', fontSize: 10, marginLeft: 'auto' }}
+                  onClick={() => { setEmailEditing(true); setEmailStage('idle'); setEmailInput(''); setEmailCode(''); }}>
+                  CHANGE
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {!user.email && (
+                  <span style={{ fontSize: 11, color: 'var(--text2)' }}>
+                    Add a verified email so you can recover your account if you forget your password.
+                  </span>
+                )}
+                {emailStage === 'idle' ? (
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <input className="input" type="email" placeholder="your@email.com" value={emailInput}
+                      onChange={e => setEmailInput(e.target.value)} style={{ flex: 1 }}
+                      onKeyDown={e => e.key === 'Enter' && requestEmailCode()} />
+                    <button className="btn" style={{ padding: '8px 18px', fontSize: 11, whiteSpace: 'nowrap' }}
+                      onClick={requestEmailCode} disabled={emailBusy}>{emailBusy ? '...' : 'SEND CODE'}</button>
+                    {user.email && emailEditing && (
+                      <button className="btn" style={{ padding: '8px 14px', fontSize: 11 }}
+                        onClick={() => { setEmailEditing(false); setEmailStage('idle'); }}>CANCEL</button>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: 'var(--text2)', whiteSpace: 'nowrap' }}>Code sent to <b style={{ color: 'var(--text)' }}>{emailInput}</b></span>
+                    <input className="input auth-code" inputMode="numeric" placeholder="000000" maxLength={6} value={emailCode}
+                      onChange={e => setEmailCode(e.target.value.replace(/\D/g, ''))} style={{ flex: 1, fontSize: 16, letterSpacing: 6 }}
+                      onKeyDown={e => e.key === 'Enter' && confirmEmailCode()} />
+                    <button className="btn btn-success" style={{ padding: '8px 18px', fontSize: 11, whiteSpace: 'nowrap' }}
+                      onClick={confirmEmailCode} disabled={emailBusy}>{emailBusy ? '...' : 'CONFIRM'}</button>
+                    <button className="btn" style={{ padding: '8px 14px', fontSize: 11 }}
+                      onClick={() => setEmailStage('idle')}>BACK</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Change Password */}
           <div className="profile-section profile-section-wide">
             <div className="profile-section-label">CHANGE PASSWORD</div>
@@ -1307,47 +2006,6 @@ function ProfileScreen() {
                 {pwSaving ? '...' : 'CHANGE'}
               </button>
             </div>
-          </div>
-
-          {/* ═══ DECK COLLECTION + WALL ═══ */}
-          <div className="profile-section profile-section-wide" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <div className="profile-section-label" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <span>DECK COLLECTION</span>
-              <div style={{ display: 'flex', gap: 12, marginLeft: 'auto', fontSize: 9, borderBottom: 'none', paddingBottom: 0, marginBottom: 0 }}>
-                <span style={{ color: 'var(--text)' }}>{deckStats.total} <span style={{ color: 'var(--text2)' }}>TOTAL</span></span>
-                <span style={{ color: 'var(--success)' }}>{deckStats.legal} <span style={{ color: 'var(--text2)' }}>LEGAL</span></span>
-                <span style={{ color: deckStats.total - deckStats.legal > 0 ? 'var(--danger)' : 'var(--text2)' }}>
-                  {deckStats.total - deckStats.legal} <span style={{ color: 'var(--text2)' }}>ILLEGAL</span>
-                </span>
-              </div>
-            </div>
-            {(deckStats.decks || []).length === 0 ? (
-              <div style={{ color: 'var(--text2)', fontSize: 13, padding: '20px 0', textAlign: 'center' }}>
-                No decks yet — head to the Deck Builder to create one!
-              </div>
-            ) : (
-              <div className="profile-deck-wall">
-                {(deckStats.decks || []).map(d => {
-                  const img = d.repSkin ? skinImageUrl(d.repSkin) : getCardImage(d.repCard);
-                  return (
-                    <div key={d.id} className="profile-deck-tile" onClick={() => setScreen('deckbuilder')}>
-                      <div className="profile-deck-tile-card">
-                        {img
-                          ? <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
-                          : <div style={{ width: '100%', height: '100%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--text2)' }}>?</div>
-                        }
-                        {d.isDefault && <div className="profile-deck-tile-star" title="Default deck">★</div>}
-                        <div className="profile-deck-tile-status" style={{ color: d.legal ? 'var(--success)' : 'var(--danger)' }}>
-                          {d.legal ? '✓' : '✗'}
-                        </div>
-                      </div>
-                      <div className="profile-deck-tile-name" title={d.name}>{d.name}</div>
-                      <div className="profile-deck-tile-count">{d.cardCount}/60</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
 
         </div>
@@ -1769,7 +2427,7 @@ function ShopScreen() {
             const equipped = isOwned && isEquipped(type, item.id);
             const sel = !isOwned && isSelected(type, item.id);
             return (
-              <div key={item.id} className={'shop-item' + (isOwned ? ' shop-owned' : '') + (equipped ? ' shop-equipped' : '') + (sel ? ' shop-selected' : '')}
+              <div key={item.id} className={'shop-item' + (type === 'avatar' ? ' shop-avatar-item' : '') + (isOwned ? ' shop-owned' : '') + (equipped ? ' shop-equipped' : '') + (sel ? ' shop-selected' : '')}
                 onClick={() => isOwned ? (!equipped && equipItem(type, item.id)) : toggleSelect(type, item.id)}>
                 <div className="shop-item-img-wrap">
                   <img src={imgBase + encodeURIComponent(item.file)} draggable={false} />
@@ -1804,15 +2462,6 @@ function ShopScreen() {
           </button>
           <span className="shop-random-hint">{unownedCount > 0 ? unownedCount + ' skin' + (unownedCount !== 1 ? 's' : '') + ' left to collect' : 'All collected!'}</span>
         </div>
-        {/* Hero filter */}
-        {heroNames.length > 1 && (
-          <div className="shop-filter-row">
-            <select className="select" value={skinFilter} onChange={e => setSkinFilter(e.target.value)} style={{ maxWidth: 260, fontSize: 11 }}>
-              <option value="">All Heroes</option>
-              {heroNames.map(h => <option key={h} value={h}>{h}</option>)}
-            </select>
-          </div>
-        )}
         <div className="shop-grid shop-grid-skins">
           {filteredSkins.map(skin => {
             const isOwned = ownedSet.skin.has(skin.id);
@@ -1966,7 +2615,7 @@ function ShopScreen() {
       )}
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
-        <h2 className="orbit-font" style={{ fontSize: 16, color: '#ffd700' }}>SHOP</h2>
+        <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>SHOP</h2>
         <div style={{ flex: 1 }} />
         <div className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '6px 14px' }}>
           <img src="/data/sc.png" style={{ width: 22, height: 22, imageRendering: 'pixelated' }} /> {user.sc || 0} SC
@@ -2108,7 +2757,7 @@ function RulesScreen() {
     <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #10101d 40%, #0a0a12 100%)' }}>
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
-        <h2 className="orbit-font" style={{ fontSize: 16, color: 'var(--accent)' }}>📜 RULES</h2>
+        <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>RULES</h2>
         <div style={{ flex: 1 }} />
         <VolumeControl />
       </div>
@@ -2543,6 +3192,7 @@ function SingleplayerScreen() {
   const [selectedDeck, setSelectedDeck] = useState('');
   const [cpuBattleState, setCpuBattleState] = useState(null);
   const [starting, setStarting] = useState(false);
+  const [search, setSearch] = useState('');
   const cpuBattleRoom = useRef(null);
 
   // Load gallery + caller's own decks (needed to resolve the player deck
@@ -2612,6 +3262,14 @@ function SingleplayerScreen() {
     socket.on('cpu_battle_error', onError);
     return () => { socket.off('game_state', onGameState); socket.off('cpu_battle_error', onError); };
   }, [notify]);
+
+  // Keep the gallery in sync when a battle unlocks a new opponent (the
+  // ornate popup is handled globally; this just makes the new tile appear).
+  useEffect(() => {
+    const onUnlocked = () => refreshGallery();
+    socket.on('opponents_unlocked', onUnlocked);
+    return () => socket.off('opponents_unlocked', onUnlocked);
+  }, [refreshGallery]);
 
   // BGM
   useEffect(() => {
@@ -2684,12 +3342,38 @@ function SingleplayerScreen() {
   const hasAnyLegal = personalDecks.some(d => isDeckLegal(d).legal)
                    || sampleDecks.some(d => isDeckLegal(d).legal);
 
+  // Filter the gallery by the search box (matches the visible hero name and
+  // the deck name, case-insensitive). Ordering from the server is preserved.
+  const q = search.trim().toLowerCase();
+  const visibleOpponents = !q || opponents === null
+    ? opponents
+    : opponents.filter(op =>
+        (op.middleHero || '').toLowerCase().includes(q)
+        || (op.name || '').toLowerCase().includes(q));
+
   return (
     <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)', overflow: 'auto' }}>
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
-        <h2 className="orbit-font" style={{ fontSize: 16, color: '#aa88ff' }}>🤖 CHOOSE OPPONENT!</h2>
+        <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>CHOOSE OPPONENT!</h2>
         <div style={{ flex: 1 }} />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <input
+            className="select"
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="🔍 Search opponents..."
+            style={{ fontSize: 12, width: 200, padding: '4px 8px', paddingRight: search ? 24 : 8, borderColor: '#ff7777', color: 'var(--text)' }}
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              title="Clear"
+              style={{ position: 'absolute', right: 4, background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 2 }}
+            >×</button>
+          )}
+        </div>
         <label style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
           🃏 Deck:
           <select className="select" value={selectedDeck} onChange={async e => {
@@ -2729,6 +3413,8 @@ function SingleplayerScreen() {
           <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 60, fontSize: 13 }}>Loading opponents...</div>
         ) : opponents.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 60, fontSize: 13 }}>No opponents available.</div>
+        ) : visibleOpponents.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 60, fontSize: 13 }}>No opponents match “{search.trim()}”.</div>
         ) : (
           <div style={{
             display: 'grid',
@@ -2736,7 +3422,7 @@ function SingleplayerScreen() {
             justifyContent: 'center',
             gap: 14,
           }}>
-            {opponents.map(op => {
+            {visibleOpponents.map(op => {
               const imgWidth = 240;
               const total = (op.wins || 0) + (op.losses || 0);
               const frameColor = '#ff4444';

@@ -36,6 +36,16 @@ const CARD_NAME = 'Golden Vermin';
 const MAX_USES_PER_TURN = 5;
 
 module.exports = {
+  // CPU: this is a gold→draw tradeoff prompt fired on every Gold gain. The
+  // default brain declines cancellable confirms outside a card-cast, which
+  // would make Golden Vermin a dead card for the CPU. Convert to a draw only
+  // while the hand is still thin (keep the Gold otherwise) so it doesn't
+  // starve the CPU's economy. (Title must equal the card name for this lookup.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type !== 'confirm' || promptData.showCard) return undefined;
+    const ps = engine.gs.players?.[engine._cpuPlayerIdx];
+    return { confirmed: (ps?.hand?.length || 0) < 5 };
+  },
   activeIn: ['support'],
 
   hooks: {

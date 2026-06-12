@@ -38,7 +38,10 @@ module.exports = {
     if (!ps) return undefined;
     const deckSize = (ps.mainDeck || []).length;
     if (deckSize <= 20 || ps._oppHasMilledMe) return { confirmed: false };
-    return undefined;
+    // Healthy deck → actually confirm. Returning undefined would let the
+    // default brain DECLINE this cancellable confirm (it no longer
+    // auto-confirms), making Trade dead for the CPU.
+    return { confirmed: true };
   },
 
   /**

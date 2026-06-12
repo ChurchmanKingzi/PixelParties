@@ -44,6 +44,14 @@ const CARD_NAME = 'Rebelliokai Backup Bakus';
 const HOPT_KEY  = 'rebelliokai-backup-bakus-recur';
 
 module.exports = {
+  // CPU: confirm the "recur?" prompt — the default brain declines cancellable
+  // confirms outside a card-cast (onDiscard trigger), so without this the
+  // recursion never fires. Returning to hand + drawing is pure upside.
+  // (Title must equal the card name for this lookup.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    return undefined;
+  },
   selfDeleteOnExternalDiscard: true,
   // Broad activeIn: see header comment. The state-based discardPile
   // check below is the real "am I in the discard pile?" gate, so the

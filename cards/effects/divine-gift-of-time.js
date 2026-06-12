@@ -190,6 +190,14 @@ async function tryTimeRescue(engine, pi, ps, names) {
 }
 
 module.exports = {
+  // CPU: confirm this reaction's "rewind?" prompt — the default brain
+  // declines cancellable confirms outside a card-cast (discard trigger), so
+  // without this it never fires. Recovering discarded cards to hand is pure
+  // upside. (Title must equal the card name for this lookup.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    return undefined;
+  },
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
   activeIn: ['hand'],

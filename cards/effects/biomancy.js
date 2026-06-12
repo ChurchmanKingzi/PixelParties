@@ -22,6 +22,19 @@ const LEVEL_STATS = { 1: 40, 2: 60, 3: 80 };
 
 module.exports = {
   activeIn: ['ability'],
+
+  // CPU: Biomancy's afterPotionUsed trigger is a cancellable "you may" confirm.
+  // The generic CPU resolver declines every cancellable confirm by default, so
+  // without this the CPU would NEVER convert a spent Potion into a Token —
+  // Biomancy would be dead for the CPU. Converting a spent Potion into a free
+  // board Creature is always beneficial (eligibility already requires a free
+  // Support Zone), so confirm. NOTE: the prompt's `title` MUST be the exact
+  // card name 'Biomancy' for the brain's title→script cpuResponse lookup to
+  // find this — the per-level label lives in the description instead.
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm') return { confirmed: true };
+    return undefined;
+  },
   // Lizbeth/Smugbeth: auto-mirror disabled. The hook walks the
   // borrower's own heroes for free Support Zones + Biomancy level,
   // and Lizbeth without her own Biomancy slot resolves no eligible
@@ -82,9 +95,12 @@ module.exports = {
         const stats = LEVEL_STATS[Math.min(entry.level, 3)];
 
         const result = await engine.promptGeneric(pi, {
+          // Title must stay the bare card name so the CPU brain's
+          // title→script cpuResponse lookup resolves (see cpuResponse above);
+          // the level is surfaced in the description instead.
           type: 'confirm',
-          title: `Biomancy Lv${entry.level}`,
-          description: `Convert the spent Potion into a Biomancy Token (${stats} HP, ${stats} damage) on ${entry.hero.name}?`,
+          title: 'Biomancy',
+          description: `Biomancy Lv${entry.level}: Convert the spent Potion into a Biomancy Token (${stats} HP, ${stats} damage) on ${entry.hero.name}?`,
           confirmLabel: '🌿 Create Token!',
           confirmClass: 'btn-success',
           cancellable: true,

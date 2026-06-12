@@ -17,6 +17,19 @@ module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
 
+  // CPU: confirm Alchemy's own activation prompt. The CPU's free-ability
+  // loop only fires Alchemy when it wants the draw (gold + non-empty Potion
+  // Deck are pre-checked, and a gold→card trade is treated as always
+  // tempo-positive). But the generic CPU resolver DECLINES every cancellable
+  // prompt by default, which would cancel this confirm — leaving the hard
+  // once-per-turn unclaimed, so the CPU re-attempts Alchemy on every Hero
+  // each phase (phantom "activated Alchemy" log spam with no actual draw).
+  // Confirming lets the activation resolve once and claim its HOPT.
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm') return { confirmed: true };
+    return undefined;
+  },
+
   // CPU threat assessment. Potion draw per turn at all levels; net gold cost
   // varies. Returning numbers lets the CPU rank hero supporters dynamically
   // (see _cpu.js heroSupportUnits).

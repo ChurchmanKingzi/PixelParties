@@ -1,0 +1,486 @@
+﻿############################################################### Untap Version
+
+mse version: 0.3.8
+game: PixelParties
+short name: PixelParties
+installer group: PixelParties/game files
+icon: card-sample.png
+position hint: 01
+
+version: 2009-08-08
+depends on:
+	package: PixelParties.mse-game
+	version: 2009-08-08
+
+card width: 750
+card height: 1050
+card dpi: 300
+
+############################################################## Shared scripts
+init script:
+	col_white          := rgb(255,255,255)
+	col_boss           := rgb(200,0,0)
+	col_boss_text      := rgb(240,50,50)
+	col_token          := rgb(50,50,50)
+	col_sapphire       := rgb(8,211,239)
+	col_diamond        := rgb(145,230,230)
+	col_artifact       := rgb(170,83,0)
+	col_super          := rgb(255,221,0)
+	col_super_arti     := rgb(255,125,0)
+	col_super_arti_num := rgb(255,95,0)
+	col_rare           := rgb(173,97,0)
+	is_boss      := { card.card_type == "boss" }
+	is_superhero := { card.card_type == "superhero" }
+	is_fullart   := { card.card_type == "superhero" or card.card_type == "fullartHero" }
+	is_hero3     := { card.card_type == "hero" or card.card_type == "boss" or card.card_type == "fullartHero" }
+	is_token     := { card.card_type == "token" or card.card_type == "tokenCreature" }
+	is_skill3    := { card.card_type == "skill3" or card.card_type == "moniaSkill" }
+	is_arti2     := { card.card_type == "artifact" or card.card_type == "artifactCreature" }
+	is_arti3     := { card.card_type == "artifact" or card.card_type == "artifactCreature" or card.card_type == "artifact-back" }
+	is_artiB     := { card.card_type == "artifact" or card.card_type == "artifact-back" }
+	is_wars2     := { card.card_type == "warsHero" or card.card_type == "warsUnit" }
+	is_wars3     := { card.card_type == "warsHero" or card.card_type == "warsUnit" or card.card_type == "warsBuilding" }
+	is_oldframe  := { is_wars3() or card.card_type == "moniaPotion" or card.card_type == "moniaSkill" or card.card_type == "common" or card.card_type == "uncommon" or card.card_type == "rare" or card.card_type == "superrare" or card.card_type == "monster" }
+	is_smallbox  := { card.card_type == "skill" or card.card_type == "summon" or card.card_type == "potion" or card.card_type == "token" or card.card_type == "tokenCreature" or card.card_type == "moniaPotion" or card.card_type == "common" or card.card_type == "uncommon" or card.card_type == "rare" or card.card_type == "superrare" or card.card_type == "monster" or card.card_type == "artifact" or card.card_type == "artifactCreature" }
+	is_diamond  := { card.rarity == "diamond" }
+	is_super    := { card.rarity == "super rare" }
+	is_sapphire := { card.rarity == "sapphire" }
+
+############################################################## Extra style
+styling field:
+	type: choice
+	name: rules alignment
+	description: Should the rules text be justified? WARNING: Justification is not perfect.
+	initial: justified
+	choice: not justified
+	choice: justified
+styling field:
+	type: boolean
+	name: bold effect text
+	description: Should effect text be bold as seen on some cards such as those from The Dark Emperor?
+	initial: no
+
+############################################################## Card fields
+card style:
+	############################# Background stuff
+	card type:
+		left: 0
+		top: 0
+		width: 750
+		height: 1050
+		z index: -2
+		render style: image
+		popup style: in place
+		choice images:
+			hero: card-hero.png
+			superhero: card-superhero.png
+			fullartHero: card-fullHero.png
+			skill: card-skill.png
+			skill3: card-skill3.png
+			spell: card-spell.png
+			artifact: card-artifact.png
+			artifactCreature: card-artifact-creature.png
+			potion: card-potion.png
+			common: card-common.png
+			uncommon: card-uncommon.png
+			rare: card-rare.png
+			superrare: card-superrare.png
+			monster: card-monster.png
+			summon: card-summon.png
+			boss: card-boss.png
+			moniaPotion: card-potion.png
+			moniaSkill: card-skill3.png
+			warsHero: wars-card-hero.png
+			warsUnit: wars-card-unit.png
+			warsBuilding: wars-card-building.png
+			token: card-token.png
+			tokenCreature: card-token-creature.png
+			experimagic: card-experimagic.png
+
+	############################# Foil Rahmen
+	foils:
+		left: 0
+		top: 0
+		width: 750
+		height: 1050
+		z index: 5
+		render style: image
+		popup style: in place
+		image:
+			script:	if card.card_type == "superhero" then "superheroFoil.png"
+				else if card.card_type == "fullartHero" then "fullartFoil.png"
+				else if card.rarity == "rare" then "superfoil.png"
+				else if card.rarity == "super rare" then "ultrafoil.png"
+				else if card.rarity == "diamond" then "diafoil.png"
+				else if is_sapphire() then
+					if card.card_type == "skill3" then "foil-sapphire-ability.png"
+					else if card.card_type == "artifact" and card.spell_symbol_field2 != "none" then "foil-sapphire-equip.png"
+					else if card.card_type == "artifact" then "foil-sapphire-artifact.png"
+					else if card.card_type == "hero" then "foil-sapphire-hero.png"
+					else if card.card_type == "potion" then "foil-sapphire-potion.png"
+					else if card.spell_symbol_field2 != "none" then "foil-sapphire-spell-equip.png"
+					else "foil-sapphire-spell.png"
+
+	imageFoil:
+		left: 78
+		top: 175
+		width: 594
+		height: 394
+		visible: yes
+		z index: 10000000
+		render style: image
+		popup style: in place
+		image:
+			script:	if not is_fullart() then
+				if card.rarity == "super rare" then "imageFoilSuper.png"
+				else if card.rarity == "diamond" then "imageFoilDiamond.png"
+
+	############################# Name line
+	name:
+		left: {if is_superhero() then 48 else 103}
+		top : 48
+		width: {if is_superhero() then 654 else 544}
+		height: 55
+		alignment: center shrink-overflow
+		padding bottom: 0
+		z index: 2
+		font:
+			name: Pixel Intv
+			size: 50
+			scale down to: 48
+			color: {if is_boss() then col_boss else if is_token() then col_token else if is_superhero() then col_white else if is_sapphire() then col_sapphire else if is_super() and is_arti2() then col_super_arti else if is_super() then col_super else if is_arti3() then col_artifact else if is_diamond() then col_diamond else if card.card_type == "rare" then col_rare else col_white}
+
+	############################# Image
+	image:
+		left: {if is_fullart() then 0 else 78}
+		top: {if is_fullart() then 0 else 175}
+		width: {if is_fullart() then 750 else 594}
+		height: {if is_fullart() then 1050 else 398}
+		mask: {if is_superhero() then "mask-hero.png" else if card.card_type == "fullartHero" then "mask-fullart.png" else "mask.png"}
+		z index: 1
+		visible: true
+
+	############################# Card ID
+	number:
+		left: 0
+		top : 585
+		width: 750
+		height: 27
+		z index: 2
+		alignment: top center
+		visible: {not is_oldframe()}
+		font:
+			name: Pixel Intv
+			size: 18
+			color: {if is_boss() then col_boss else if is_superhero() then col_white else if is_sapphire() then col_sapphire else if is_super() and is_arti2() then col_super_arti_num else if is_super() then col_super else if is_arti3() then col_artifact else if is_diamond() then col_diamond else col_white}
+
+	############################# Text box
+	rule_text:
+		top: {if is_wars3() then 636 else if is_smallbox() then 640 else if card.card_type == "spell" or card.card_type == "experimagic" then 655 else if is_hero3() then 685 else if is_superhero() then 715 else 789}
+		left: 95
+		width: {if is_skill3() then 0 else 560}
+		height: {if is_wars2() then 268 else if card.card_type == "adventure" then 775 else if is_smallbox() then 330 else if card.card_type == "spell" or card.card_type == "experimagic" or card.card_type == "warsBuilding" then 315 else if is_hero3() then 290 else if is_superhero() then 262 else 174}
+		alignment: {if styling.rules_alignment == "not justified" then "middle left" else "middle justify"}
+		font:
+			name: Pixel Intv
+			size: 20
+			scale down to: 7
+			color: {if is_boss() then col_boss_text else if is_token() then col_token else if is_arti2() then col_artifact else if is_diamond() then col_diamond else if card.card_type == "rare" then col_rare else col_white}
+		z index: 39999999999999999999999999
+		padding left: 1
+		padding top: 2
+		padding right: 0
+		padding bottom: 0
+		line height hard: 1.0
+		line height line: 1.0
+		line height soft: 1.0
+		line height hard max: 1.0
+		line height line max: 1.0
+		visible: {not is_skill3()}
+		symbol font:
+			name: PixelParties-text-replacements
+			alignment: middle center
+			scale down to: 1
+			size: 8.5
+
+	abilityText1:
+		left: 88
+		top: 629
+		width: 574
+		height: {if is_skill3() then 113 else 0}
+		alignment: {if styling.rules_alignment == "not justified" then "middle left" else "middle justify"}
+		font:
+			name: Pixel Intv
+			size: 20
+			scale down to: 7
+			color: rgb(255,255,255)
+		z index: 3
+		padding left: 1
+		padding top: 2
+		padding right: 0
+		padding bottom: 0
+		line height hard: 0.9
+		line height line: 0.9
+		line height soft: 0.9
+		line height hard max: 0.9
+		line height line max: 0.9
+		visible: {is_skill3()}
+		symbol font:
+			name: PixelParties-text-replacements
+			alignment: middle center
+			scale down to: 1
+			size: 10.5
+
+	abilityText2:
+		left: 88
+		top: 760
+		width: 574
+		height: {if is_skill3() then 113 else 0}
+		alignment: {if styling.rules_alignment == "not justified" then "middle left" else "middle justify"}
+		font:
+			name: Pixel Intv
+			size: 20
+			scale down to: 7
+			color: rgb(255,255,255)
+		z index: 3
+		padding left: 1
+		padding top: 2
+		padding right: 0
+		padding bottom: 0
+		line height hard: 0.8
+		line height line: 0.8
+		line height soft: 0.8
+		line height hard max: 0.8
+		line height line max: 0.8
+		visible: {is_skill3()}
+		symbol font:
+			name: PixelParties-text-replacements
+			alignment: middle center
+			scale down to: 1
+			size: 10.5
+
+	abilityText3:
+		left: 88
+		top: 891
+		width: 574
+		height: {if is_skill3() then 113 else 0}
+		alignment: {if styling.rules_alignment == "not justified" then "middle left" else "middle justify"}
+		font:
+			name: Pixel Intv
+			size: 20
+			scale down to: 7
+			color: rgb(255,255,255)
+		z index: 3
+		padding left: 1
+		padding top: 2
+		padding right: 0
+		padding bottom: 0
+		line height hard: 0.9
+		line height line: 0.9
+		line height soft: 0.9
+		line height hard max: 0.9
+		line height line max: 0.9
+		visible: {is_skill3()}
+		symbol font:
+			name: PixelParties-text-replacements
+			alignment: middle center
+			scale down to: 1
+			size: 10.5
+
+	############################# Skillbox
+	skill_box:
+		left: 90
+		top: 615
+		width: {if is_superhero() then 560 else 260}
+		height: {if is_hero3() then 65 else if is_superhero() then 100 else 0}
+		font:
+			name: Pixel Intv
+			size: {if is_superhero() then 20 else 22}
+			scale down to: 1
+			color: {if is_boss() then col_boss else if is_diamond() then col_diamond else col_white}
+		alignment: middle center shrink-overflow
+		z index: 2
+		visible: {is_hero3() or is_superhero()}
+
+	skill_box2:
+		left: 400
+		top: 615
+		width: 260
+		height: {if is_hero3() or is_superhero() then 65 else 0}
+		font:
+			name: Pixel Intv
+			size: 22
+			scale down to: 1
+			color: {if is_boss() then col_boss else if is_diamond() then col_diamond else col_white}
+		alignment: middle center shrink-overflow
+		z index: 2
+		visible: {is_hero3()}
+
+	############################# Statuswerte
+	attack:
+		left: {if card.card_type == "artifact" then 296 else 514}
+		top: {if is_wars2() then 942 else 979}
+		width: {if is_arti2() then 150 else 94}
+		height: {if is_wars2() then 48 else 60}
+		z index: 10101
+		alignment: center shrink-overflow
+		font:
+			name: Pixel Intv
+			size: 38
+			color: {if is_boss() then col_boss else if is_token() then col_token else if is_superhero() then col_white else if is_arti3() then col_artifact else if is_diamond() then col_diamond else if card.card_type == "rare" then col_rare else col_white}
+		visible: {is_hero3() or is_superhero() or is_wars2() or card.card_type == "summon" or is_arti2()}
+
+	hp:
+		left: {if is_wars2() or card.card_type == "summon" or card.card_type == "artifactCreature" then 230 else if card.card_type == "boss" then 160 else 201}
+		top: {if is_wars2() then 942 else 979}
+		width: {if card.card_type == "boss" then 194 else 94}
+		height: 60
+		z index: 10100
+		alignment: center shrink-overflow
+		font:
+			name: Pixel Intv
+			size: 38
+			color: {if is_boss() then col_boss else if is_token() then col_token else if is_superhero() then col_white else if is_arti3() then col_artifact else if is_diamond() then col_diamond else if card.card_type == "rare" then col_rare else col_white}
+		visible: {is_hero3() or is_superhero() or is_wars2() or card.card_type == "summon" or card.card_type == "tokenCreature" or card.card_type == "artifactCreature"}
+
+	speed:
+		left: 230
+		top: 999
+		width: 94
+		height: 48
+		z index: 102
+		alignment: center shrink-overflow
+		font:
+			name: Pixel Intv
+			size: 56
+			color: {if is_boss() then col_boss else if is_diamond() then col_diamond else if is_artiB() then col_artifact else col_white}
+		visible: {is_wars2()}
+
+	range:
+		left: 514
+		top: 999
+		width: 94
+		height: 48
+		z index: 1
+		alignment: center shrink-overflow
+		font:
+			name: Pixel Intv
+			size: 56
+			color: {if is_boss() then col_boss else if is_artiB() then col_artifact else col_white}
+		visible: {is_wars2()}
+
+	#############################Copyright Stuff
+	rarity:
+		left: 690
+		top : 996
+		height: 33
+		width: 34
+		z index: 3
+		render style: image
+		popup style: in place
+		choice images:
+			common: blank2.png
+			uncommon: blank2.png
+			rare: blank2.png
+			super rare: blank2.png
+			diamond: blank2.png
+			sapphire: blank2.png
+	corner foil:
+		left: 689
+		top : 989
+		height: 47
+		width: 47
+		z index: 40000000000
+		render style: image list
+		visible: {not is_oldframe()}
+		choice images:
+			stamp:
+				script:
+				if card.rarity == "common" then if is_arti2() then "cornersupercommonWhite.png" else "cornersupercommon.png"
+				else if card.rarity == "uncommon" then if is_arti2() then "cornercommonWhite.png" else "cornercommon.png"
+				else if card.rarity == "rare" then if is_arti2() then "corneruncommonWhite.png" else "corneruncommon.png"
+				else if card.rarity == "super rare" then if is_arti2() then "cornerrareWhite.png" else "cornerrare.png"
+				else if card.rarity == "diamond" then "cornerdiamond.png"
+				else if card.rarity == "sapphire" then "cornersapphire.png"
+
+	############################# Card sorting / numbering
+	spell_symbol_field:
+		left: 15
+		top : 583
+		width: 96
+		height: 89
+		z index: 2
+		render style: image
+		popup style: in place
+		choice images:
+			destruction: icon_destruction.png
+			support: icon_support.png
+			summoning: icon_summoning.png
+			decay: icon_decay.png
+			arts: icon_arts.png
+			fight: icon_sword.png
+			decayDestruction: icon_decayDestruction.png
+			decayArts: icon_decayArts.png
+			decaySummoning: icon_decaySummoning.png
+			decaySupport: icon_decaySupport.png
+			destructionArts: icon_destructionArts.png
+			destructionSummoning: icon_destructionSummoning.png
+			destructionSupport: icon_destructionSupport.png
+			artsSummoning: icon_artsSummoning.png
+			artsSupport: icon_artsSupport.png
+			summoningSupport: icon_summoningSupport.png
+		visible: {card.card_type == "spell" or card.card_type == "experimagic" or card.card_type == "summon" or is_wars3()}
+
+	spell_symbol_field2:
+		left: 0
+		top : 933
+		width: 126
+		height: 118
+		z index: 3
+		render style: image
+		popup style: in place
+		choice images:
+			none: blank2.png
+			trap: icon_trap.png
+			quick: icon_instant.png
+			area: icon_area.png
+			attachment: icon_attach.png
+			quickArti: icon_instant_artifact.png
+			attachmentArti: icon_attach_artifact.png
+			trapArti: icon_trap_artifact.png
+			areaArti: icon_area_artifact.png
+			trapExperimagic: icon_trap_experimagic.png
+			quickExperimagic: icon_instant_experimagic.png
+			areaExperimagic: icon_area_experimagic.png
+			attachmentExperimagic: icon_attach_experimagic.png
+			trapPotion: icon_trap_potion.png
+			quickPotion: icon_instant_potion.png
+			areaPotion: icon_area_potion.png
+			attachmentPotion: icon_attach_potion.png
+		visible: {card.card_type == "spell" or card.card_type == "potion" or card.card_type == "experimagic" or card.card_type == "summon" or card.card_type == "artifact"}
+
+	level_field:
+		left: 646
+		top : 574
+		height: 91
+		width: 94
+		z index: 2
+		alignment: center middle shrink-overflow
+		font:
+			name: Pixel Intv
+			size: 65
+			color: {if is_diamond() then col_diamond else if is_super() and card.card_type == "artifact" then col_super_arti else if is_super() then col_super else if is_artiB() then col_artifact else col_white}
+		visible: {card.card_type == "spell" or card.card_type == "experimagic" or card.card_type == "summon" or card.card_type == "warsUnit"}
+
+	cost:
+		left: 16
+		top : 976
+		height: 87
+		width: 90
+		z index: 20
+		alignment: center middle shrink-overflow
+		font:
+			name: Pixel Intv
+			size: 50
+			color: {if is_diamond() then col_diamond else if is_super() then col_super else col_white}
+		visible: {is_wars3()}

@@ -425,8 +425,11 @@ async function handleBiomancyMirror(ctx) {
 
   const result = await engine.promptGeneric(pi, {
     type: 'confirm',
-    title: `Biomancy Lv${level} (Lizbeth)`,
-    description: `Convert the spent Potion into a Biomancy Token (${stats} HP, ${stats} damage) on ${ctx.attachedHero?.name || CARD_NAME}?`,
+    // Title must be the bare card name 'Biomancy' so the CPU brain's
+    // title→script cpuResponse lookup resolves to biomancy.js (which confirms);
+    // the Lizbeth-borrow context lives in the description instead.
+    title: 'Biomancy',
+    description: `Biomancy Lv${level} (via Lizbeth): Convert the spent Potion into a Biomancy Token (${stats} HP, ${stats} damage) on ${ctx.attachedHero?.name || CARD_NAME}?`,
     confirmLabel: '🌿 Create Token!',
     confirmClass: 'btn-success',
     cancellable: true,

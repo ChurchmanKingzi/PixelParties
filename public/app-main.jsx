@@ -1407,7 +1407,7 @@ function PlayScreen() {
           <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>
             {isHost ? 'CLOSE ROOM' : 'LEAVE'}
           </button>
-          <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>GAME LOBBY</h2>
+          <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>GAME LOBBY</h2>
           <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
             {lobby.type.toUpperCase()}
           </span>
@@ -1498,7 +1498,7 @@ function PlayScreen() {
     <div className="screen-full">
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
-        <h2 className="orbit-font" style={{ fontSize: 16, color: 'var(--accent)' }}>PLAY</h2>
+        <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>ONLINE LOBBY</h2>
         <div style={{ flex: 1 }} />
         <label style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
           🃏 Deck:
@@ -1527,7 +1527,7 @@ function PlayScreen() {
             {sampleDecks.filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}{user?.defaultSampleDeckId === d.id ? ' ★' : ''}</option>)}
           </select>
         </label>
-        <button className="btn btn-accent2" onClick={() => setCreating(true)}>+ CREATE GAME</button>
+        <button className="btn" onClick={() => setCreating(true)} style={{ borderColor: 'var(--player-color)', color: 'var(--player-color)', background: 'color-mix(in srgb, var(--player-color) 8%, transparent)' }}>+ CREATE GAME</button>
         <VolumeControl />
       </div>
 
@@ -1570,7 +1570,7 @@ function PlayScreen() {
 
         {/* In Progress */}
         <div style={{ flex: 1, borderRight: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column' }}>
-          <div className="orbit-font" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent2)', borderBottom: '1px solid var(--bg4)' }}>
+          <div className="orbit-font" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--player-color)', borderBottom: '1px solid var(--bg4)' }}>
             IN PROGRESS ({activeRooms.length})
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
@@ -2010,6 +2010,144 @@ function MusicManager({ bgmMode }) {
   return null; // No visual output
 }
 
+// ═══════════════════════════════════════════
+//  OPPONENT UNLOCK POPUP
+//  Global, always-mounted overlay. Listens for the server's
+//  `opponents_unlocked` socket event (emitted at the end of a CPU battle
+//  when a win milestone is hit) and shows a big ornate celebration for
+//  each newly-unlocked opponent in turn. Queues multiple unlocks so they
+//  display one after another.
+// ═══════════════════════════════════════════
+function OpponentUnlockPopup() {
+  const [queue, setQueue] = useState([]);
+
+  useEffect(() => {
+    const onUnlocked = (data) => {
+      const list = (data && data.opponents) || [];
+      if (list.length) setQueue(q => [...q, ...list]);
+    };
+    socket.on('opponents_unlocked', onUnlocked);
+    return () => socket.off('opponents_unlocked', onUnlocked);
+  }, []);
+
+  const current = queue.length ? queue[0] : null;
+  const dismiss = useCallback(() => setQueue(q => q.slice(1)), []);
+
+  // Celebratory sting + Enter-to-continue, refreshed for each unlock.
+  useEffect(() => {
+    if (!current) return;
+    if (window.playSFX) window.playSFX('ascension');
+    const onKey = (e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); dismiss(); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [current ? current.id : null, dismiss]);
+
+  if (!current) return null;
+  const heroArt = typeof HeroArtCrop === 'function';
+
+  return (
+    <div
+      onClick={dismiss}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 100000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'radial-gradient(circle at 50% 45%, rgba(40,28,5,.55), rgba(5,3,12,.9))',
+        backdropFilter: 'blur(3px)',
+        animation: 'ppUnlockFade .3s ease both',
+      }}
+    >
+      <style>{`
+        @keyframes ppUnlockFade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes ppUnlockPop {
+          0% { transform: scale(.7) translateY(20px); opacity: 0; }
+          60% { transform: scale(1.04); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes ppUnlockSpin { to { transform: rotate(360deg); } }
+        @keyframes ppUnlockGlow {
+          0%,100% { box-shadow: 0 0 28px rgba(255,200,60,.55), 0 0 70px rgba(255,160,20,.35), inset 0 0 24px rgba(255,200,60,.18); }
+          50% { box-shadow: 0 0 44px rgba(255,225,120,.85), 0 0 110px rgba(255,170,30,.55), inset 0 0 34px rgba(255,210,90,.3); }
+        }
+        @keyframes ppUnlockTitle {
+          0%,100% { text-shadow: 0 0 10px rgba(255,210,90,.8), 0 0 22px rgba(255,160,20,.5); }
+          50% { text-shadow: 0 0 18px rgba(255,235,150,1), 0 0 40px rgba(255,180,40,.8); }
+        }
+      `}</style>
+
+      {/* Rotating shimmer ring behind the card */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+           onClick={e => e.stopPropagation()}>
+        <div style={{
+          position: 'absolute', width: 620, height: 620, borderRadius: '50%',
+          background: 'conic-gradient(from 0deg, rgba(255,200,60,0) 0deg, rgba(255,210,90,.32) 60deg, rgba(255,200,60,0) 120deg, rgba(255,210,90,.32) 180deg, rgba(255,200,60,0) 240deg, rgba(255,210,90,.32) 300deg, rgba(255,200,60,0) 360deg)',
+          filter: 'blur(6px)', animation: 'ppUnlockSpin 14s linear infinite', pointerEvents: 'none',
+        }} />
+
+        {/* Ornate frame */}
+        <div style={{
+          position: 'relative',
+          width: 'min(90vw, 460px)',
+          padding: '34px 36px 30px',
+          textAlign: 'center',
+          borderRadius: 18,
+          border: '3px solid #ffcf52',
+          outline: '1px solid rgba(255,225,140,.6)',
+          outlineOffset: 6,
+          background: 'linear-gradient(160deg, #241a36 0%, #15101f 55%, #1d1330 100%)',
+          animation: 'ppUnlockPop .5s cubic-bezier(.18,.9,.3,1.2) both, ppUnlockGlow 2.6s ease-in-out infinite',
+        }}>
+          {/* Ornamental corner flourishes */}
+          {[['top','left'],['top','right'],['bottom','left'],['bottom','right']].map(([v,h]) => (
+            <div key={v+h} style={{
+              position: 'absolute', [v]: 6, [h]: 10, color: '#ffd76a',
+              fontSize: 20, lineHeight: 1, textShadow: '0 0 8px rgba(255,180,40,.8)', pointerEvents: 'none',
+            }}>✦</div>
+          ))}
+
+          <div className="orbit-font" style={{
+            fontSize: 15, fontWeight: 800, letterSpacing: 3, color: '#ffd76a',
+            marginBottom: 18, animation: 'ppUnlockTitle 2.2s ease-in-out infinite',
+          }}>✦ NEW OPPONENT UNLOCKED ✦</div>
+
+          {/* Hero portrait in a gold frame */}
+          <div style={{
+            display: 'inline-block', padding: 4, borderRadius: 10,
+            border: '2px solid #ffcf52', background: '#0a0a12',
+            boxShadow: '0 0 18px rgba(255,190,50,.5)', marginBottom: 18,
+          }}>
+            {heroArt
+              ? <HeroArtCrop heroName={current.middleHero} width={300} />
+              : <div style={{ width: 300, height: 200, background: '#1a1a28' }} />}
+          </div>
+
+          <div style={{ fontSize: 16, color: 'var(--text)', lineHeight: 1.5, marginBottom: 22 }}>
+            You unlocked{' '}
+            <span className="orbit-font" style={{
+              color: '#ffe08a', fontWeight: 800, fontSize: 20,
+              textShadow: '0 0 12px rgba(255,190,50,.7)',
+            }}>{current.middleHero || current.name}</span>{' '}
+            as a new opponent!
+          </div>
+
+          <button
+            onClick={dismiss}
+            className="orbit-font"
+            style={{
+              padding: '10px 34px', fontSize: 14, fontWeight: 800, letterSpacing: 2,
+              color: '#3a2600', cursor: 'pointer', borderRadius: 8, border: 'none',
+              background: 'linear-gradient(180deg, #ffe27a 0%, #ffc23a 60%, #f0a51c 100%)',
+              boxShadow: '0 0 16px rgba(255,190,50,.7), 0 3px 0 #b9791a',
+              transition: 'transform .12s ease, box-shadow .12s ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 26px rgba(255,210,90,.9), 0 5px 0 #b9791a'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 16px rgba(255,190,50,.7), 0 3px 0 #b9791a'; }}
+          >CONTINUE</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [screen, setScreen] = useState('menu');
@@ -2021,6 +2159,12 @@ function App() {
   const [bgmMode, setBgmMode] = useState('menu');
   const inBattle = bgmMode !== 'menu';
   const setInBattle = useCallback((v) => setBgmMode(v ? 'battle' : 'menu'), []);
+
+  // Expose the player's chosen colour as a global CSS variable so every
+  // screen/submenu (titles, etc.) can theme off it via var(--player-color).
+  useEffect(() => {
+    document.documentElement.style.setProperty('--player-color', (user && user.color) || '#00f0ff');
+  }, [user && user.color]);
 
   const notify = useCallback((message, type) => {
     setNotif({ message, type, id: Date.now() });
@@ -2158,6 +2302,7 @@ function App() {
       </div>
       <MusicManager bgmMode={bgmMode} />
       <TextBox />
+      <OpponentUnlockPopup />
       {notif && <Notification key={notif.id} message={notif.message} type={notif.type} onClose={() => setNotif(null)} />}
       {!user ? <AuthScreen /> :
         screen === 'menu' ? <MainMenu /> :

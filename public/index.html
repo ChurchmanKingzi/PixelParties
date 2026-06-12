@@ -3,30 +3,93 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Pixel Parties TCG</title>
+  <meta name="description" content="Pixel Parties — an online multiplayer Trading Card Game simulator. Build decks, duel live opponents, and climb the ranks.">
+  <meta name="theme-color" content="#0a0a12">
+
+  <!-- Icons / PWA -->
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="manifest" href="/manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>Pixel Parties TCG</title>
+
+  <!-- Social share preview (set og:url/og:image to absolute URLs once a public domain is known) -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Pixel Parties TCG">
+  <meta property="og:description" content="Build decks, duel live opponents, and climb the ranks in the Pixel Parties online TCG simulator.">
+  <meta property="og:image" content="/title.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Pixel Parties TCG">
+  <meta name="twitter:description" content="Build decks, duel live opponents, and climb the ranks in the Pixel Parties online TCG simulator.">
+  <meta name="twitter:image" content="/title.png">
+
+  <!-- Warm up the connections the first paint depends on -->
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" href="/data/cards.json" as="fetch" crossorigin>
+
   <link rel="stylesheet" href="/style.css">
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="/socket.io/socket.io.js"></script>
-</head>
-<body>
-  <div id="root"></div>
+
+  <!-- Instant branded splash, shown until React mounts. Styles are
+       inlined so it renders before style.css and never flashes. React
+       replaces #root's contents on first render, removing it. -->
+  <style>
+    #boot-splash {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 22px; background: #0a0a12; color: #00f0ff;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    #boot-splash .bs-title {
+      font-size: 30px; font-weight: 800; letter-spacing: 6px;
+      text-transform: uppercase; text-shadow: 0 0 24px rgba(0,240,255,.55);
+    }
+    #boot-splash .bs-sub { font-size: 12px; letter-spacing: 4px; color: #8888aa; }
+    #boot-splash .bs-ring {
+      width: 38px; height: 38px; border-radius: 50%;
+      border: 3px solid rgba(0,240,255,.18); border-top-color: #00f0ff;
+      animation: bs-spin .8s linear infinite;
+    }
+    @keyframes bs-spin { to { transform: rotate(360deg); } }
+  </style>
+
+  <!-- Card DB globals must exist before app-shared.js runs. This inline
+       script executes at parse time, i.e. before the deferred bundles. -->
   <script>
-    // Card DB will be fetched from /data/cards.json at startup
     window.CARDS_LOADED = false;
     window.ALL_CARDS = [];
     window.CARDS_BY_NAME = {};
   </script>
-  <script type="text/babel" src="/app-shared.jsx"></script>
-  <script type="text/babel" src="/app-screens.jsx"></script>
-  <script type="text/babel" src="/app-puzzle.jsx"></script>
-  <script type="text/babel" src="/app-deckbuilder.jsx"></script>
-  <script type="text/babel" src="/app-board.jsx"></script>
-  <script type="text/babel" src="/app-main.jsx"></script>
+
+  <!-- React runtime (deferred so the splash paints first). -->
+  <script defer src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script defer src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script defer src="/socket.io/socket.io.js"></script>
+
+  <!-- Pre-compiled app bundles (built from public/*.jsx by scripts/build.js).
+       Loaded in the same order the old text/babel scripts ran; defer
+       preserves that order and runs them after the document parses. -->
+  <!-- Shared profanity filter (also require()d by the server). Plain script
+       so it sets window.Profanity / window.containsProfanity before the
+       bundles run. -->
+  <script defer src="/profanity.js"></script>
+  <script defer src="/dist/app-shared.js"></script>
+  <script defer src="/dist/app-screens.js"></script>
+  <script defer src="/dist/app-puzzle.js"></script>
+  <script defer src="/dist/app-deckbuilder.js"></script>
+  <script defer src="/dist/app-board.js"></script>
+  <script defer src="/dist/app-main.js"></script>
+</head>
+<body>
+  <div id="root">
+    <div id="boot-splash">
+      <div class="bs-title">Pixel Parties</div>
+      <div class="bs-ring"></div>
+      <div class="bs-sub">LOADING…</div>
+    </div>
+  </div>
 </body>
 </html>

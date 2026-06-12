@@ -82,6 +82,13 @@ async function sleepCreature(engine, inst, ownerPi) {
 }
 
 module.exports = {
+  // CPU: confirm Unwanted Audience's "play it?" prompt — the default brain
+  // declines cancellable confirms outside a card-cast (onTurnStart trigger),
+  // so without this the CPU never plays this disruption. (Title == card name.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    return undefined;
+  },
   // Fire hooks from hand (the onTurnStart trigger) AND discard (the
   // catch-later-summons listener, after the card resolves there).
   activeIn: ['hand', 'discard'],

@@ -41,6 +41,10 @@ module.exports = {
   // the default brain auto-confirm them.
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic') return undefined;
+    // Barker's onTurnStart "you may tame" gate is a cancellable confirm; the
+    // default brain now declines those (regressed from when undefined meant
+    // auto-confirm), which silently skipped Barker. Confirm it explicitly.
+    if (promptData.type === 'confirm' && !promptData.showCard) return { confirmed: true };
     if (promptData.type !== 'cardGallery') return undefined;
     const cards = promptData.cards || [];
     if (!cards.length) return undefined;

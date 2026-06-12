@@ -26,6 +26,14 @@ const { loadCardEffect } = require('./_loader');
 const CARD_NAME = 'Andras, the Human Weapon';
 
 module.exports = {
+  // CPU: confirm this Hero's beneficial "you may" prompt — the default brain
+  // declines cancellable confirms raised outside a card-cast (afterSpell
+  // trigger), which would otherwise make the second-hit a no-op for the CPU.
+  // (The prompt title must equal the card name for this lookup.)
+  cpuResponse(engine, kind, promptData) {
+    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    return undefined;
+  },
   activeIn: ['hero'],
 
   hooks: {

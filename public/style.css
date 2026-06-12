@@ -557,6 +557,17 @@ body {
 .result-overlay-fade {
   animation: result-fade-in .6s ease-out;
 }
+/* Speech-bubble SHOUTING: all-caps-word letters bob slightly up/down so the
+   CPU reads as yelling. Per-letter animation-delay (set inline) phase-shifts
+   adjacent letters into a trembling wave. */
+@keyframes cpu-shout-bob {
+  0%, 100% { transform: translateY(-1.5px); }
+  50%      { transform: translateY(1.5px); }
+}
+.cpu-shout-letter {
+  display: inline-block;
+  animation: cpu-shout-bob 0.5s ease-in-out infinite;
+}
 .result-overlay-fading {
   animation: result-fade-out .7s ease-in forwards;
   pointer-events: none;
@@ -629,6 +640,38 @@ body {
   border: 1px solid rgba(170, 136, 255, .35);
 }
 
+/* ── Password field with show/hide toggle ── */
+.pw-field { position: relative; display: flex; }
+.pw-field .input { padding-right: 38px; }
+.pw-toggle {
+  position: absolute; right: 1px; top: 1px; bottom: 1px; width: 34px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--text2); transition: color .15s;
+}
+.pw-toggle:hover { color: var(--accent); }
+
+/* ── Auth screen messages, links & steps ── */
+.auth-msg { font-size: 12px; line-height: 1.4; text-align: left; }
+.auth-err { color: var(--danger); }
+.auth-ok { color: var(--success); }
+.auth-link {
+  font-size: 12px; color: var(--accent); cursor: pointer;
+  letter-spacing: .5px; user-select: none; transition: opacity .15s, text-shadow .15s;
+}
+.auth-link:hover { text-shadow: 0 0 8px var(--accent); }
+.auth-link.disabled { color: var(--text2); cursor: default; text-shadow: none; opacity: .7; }
+.auth-row { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
+.auth-fine { font-size: 11.5px; color: var(--text2); line-height: 1.5; text-align: left; }
+.auth-step-title {
+  font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 15px;
+  color: var(--text); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px;
+}
+.auth-code {
+  text-align: center; font-size: 22px !important; letter-spacing: 10px;
+  font-weight: 700; padding-left: 12px;
+}
+
 .screen-full {
   height: 100vh;
   display: flex;
@@ -643,6 +686,36 @@ body {
   background: var(--bg2);
   border-bottom: 1px solid var(--bg4);
   flex-shrink: 0;
+  position: relative; /* anchor for the centered title */
+}
+/* Submenu/screen title is always centered at the top, independent of the
+   back button on the left and any controls on the right. (The in-game board
+   header centers its own title via inline styles, which still take priority.) */
+.top-bar > h2 {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  white-space: nowrap;
+  pointer-events: none; /* never block the buttons/controls underneath */
+}
+/* Black outline on screen/submenu titles (and the menu brand + modal
+   titles via .title-outline). The stroke is painted behind the fill so the
+   glyphs stay full-weight instead of thinning. */
+.top-bar > h2,
+.title-outline {
+  -webkit-text-stroke: 2px #000;
+  paint-order: stroke fill;
+}
+/* Underline the screen/submenu/pop-up titles (but not the PIXEL PARTIES
+   brand logo). Drawn as a border in the player's colour rather than
+   text-decoration, because the black -webkit-text-stroke can bleed onto a
+   text-decoration underline and make it look black. */
+.top-bar > h2,
+.title-outline:not(.menu-title) {
+  text-decoration: none;
+  border-bottom: 3px solid var(--player-color);
+  padding-bottom: 4px;
 }
 
 /* ===== DECK LIST ===== */
@@ -1340,7 +1413,9 @@ body {
   border: 1px solid var(--bg4);
 }
 .game-hand-avatar-big {
-  width: calc(44px * var(--board-scale)); height: calc(44px * var(--board-scale));
+  /* Almost the full height of the hand container (--hand-min-h), kept square. */
+  width: calc(var(--hand-min-h) * 0.86); height: calc(var(--hand-min-h) * 0.86);
+  object-fit: cover;
   border: 2px solid var(--bg4);
 }
 /* CPU / avatar-less player portrait. Wraps a `<HeroArtCrop>` (the same
@@ -1353,10 +1428,13 @@ body {
 .game-hand-avatar-crop {
   display: inline-flex;
   flex-shrink: 0;
-  /* Match HeroArtCrop's rendered height (72 * 398/594 ≈ 48px) on both
-     axes so the result is a hero-height square. */
-  width: calc(72px * 398 / 594);
-  height: calc(72px * 398 / 594);
+  /* Almost the full height of the hand container (--hand-min-h), kept square —
+     matches .game-hand-avatar-big. The inner <HeroArtCrop> is rendered at a
+     fixed width (135px in app-board.jsx) whose cropped height (135*398/594 ≈
+     90px) is >= this square at every --board-scale (capped at 1.0), so it
+     always fills the frame with no gaps; excess is center-clipped. */
+  width: calc(var(--hand-min-h) * 0.86);
+  height: calc(var(--hand-min-h) * 0.86);
   border: 2px solid var(--bg4);
   line-height: 0;
   overflow: hidden;
@@ -7810,11 +7888,16 @@ body:has(.game-hand-me) .board-tooltip {
    shop content behind her. */
 .shop-antonia {
   position: fixed;
-  left: 24px;
-  /* ~10vh lower than the old pinned position so she sits comfortably in
-     the tab body rather than crowding the tabs row. Viewport-relative
-     so the offset scales with screen height. */
-  top: calc(110px + 10vh);
+  /* Horizontally centered in the gutter between the screen edge and the
+     centered 900px items gallery, so the gap to the left border equals the
+     gap to the gallery. galleryLeft = 50vw - 450px; centering her 220px
+     width in [0, galleryLeft] gives (galleryLeft - 220)/2 = 25vw - 335px.
+     Clamped so she never slides off-screen on narrower viewports. */
+  left: max(16px, calc(25vw - 335px));
+  /* Sits well down in the tab body so that even her tall idle-chatter
+     speech bubble (which rises above her head) clears the Skins/Avatars
+     tabs row above. Viewport-relative so the offset scales with height. */
+  top: calc(265px + 10vh);
   width: 220px;
   pointer-events: none;
   z-index: 500;
@@ -7836,31 +7919,57 @@ body:has(.game-hand-me) .board-tooltip {
   image-rendering: pixelated;
   -ms-interpolation-mode: nearest-neighbor;
   filter: drop-shadow(0 8px 18px rgba(0,0,0,.6))
-          drop-shadow(0 0 28px rgba(255,68,68,.22));
+          drop-shadow(0 0 16px rgba(255,40,40,.6))
+          drop-shadow(0 0 36px rgba(255,30,30,.45));
+  /* Gentle vertical squash-and-stretch, anchored at her feet. Separate from
+     the float on .shop-antonia-float so the two layer. Slightly off her
+     float period so they don't lock in sync. */
+  transform-origin: 50% 100%;
+  animation: shopAntoniaSquash 3.1s ease-in-out infinite;
+}
+@keyframes shopAntoniaSquash {
+  0%, 100% { transform: scaleY(1); }
+  30%      { transform: scaleY(1.03); }
+  70%      { transform: scaleY(0.97); }
 }
 .shop-antonia-name {
   margin-top: 10px;
   font-family: 'Press Start 2P', monospace;
-  font-size: 11px;
+  font-size: 15px;
   letter-spacing: 1px;
   color: #ff4444;
-  text-shadow: 0 0 12px rgba(255,68,68,.6), 0 2px 0 rgba(0,0,0,.8);
+  /* Chunky black outline (stroke painted behind the fill so the letters
+     don't thin out) makes the pixel font read bigger and bolder. */
+  -webkit-text-stroke: 3px #000;
+  paint-order: stroke fill;
+  text-shadow:
+    -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000,
+    0 -2px 0 #000, 0 2px 0 #000, -2px 0 0 #000, 2px 0 0 #000,
+    0 0 14px rgba(255,68,68,.7);
   white-space: nowrap;
 }
 /* Khekhekhe! speech bubble — pops above the sprite on every purchase.
    Lives inside .shop-antonia-float, so it floats with her. */
 .shop-antonia-bubble {
   position: absolute;
-  bottom: calc(100% + 12px);
+  bottom: calc(100% + 30px);
   left: 50%;
-  background: #ffffff;
+  /* Faint lavender sheen up top fading to pure white at the tail so the
+     tail's white fill stays seamless. */
+  background: linear-gradient(165deg, #fbfaff 0%, #ffffff 70%);
   color: #1a1a2e;
   font-family: 'Press Start 2P', monospace;
   font-size: 12px;
-  padding: 10px 16px;
+  padding: 11px 17px;
   border: 3px solid #1a1a2e;
-  border-radius: 14px;
-  box-shadow: 0 6px 14px rgba(0,0,0,.55);
+  border-radius: 16px;
+  /* Fancy framed look: a gold ring hugging the dark border, then a thin
+     dark outline around that, plus a drop shadow and a soft gold glow. */
+  box-shadow:
+    0 0 0 3px #ffd700,
+    0 0 0 5px #1a1a2e,
+    0 8px 16px rgba(0,0,0,.55),
+    0 0 22px rgba(255,215,0,.30);
   white-space: nowrap;
   animation: shopAntoniaBubble 1.4s ease-out forwards;
   transform-origin: 50% 100%;
@@ -7927,14 +8036,14 @@ body:has(.game-hand-me) .board-tooltip {
   100% { opacity: 0; transform: translate(-50%, -6px) scale(1); }
 }
 @media (max-width: 900px) {
-  .shop-antonia { width: 150px; left: 12px; top: calc(96px + 10vh); }
-  .shop-antonia-name { font-size: 9px; margin-top: 7px; }
+  .shop-antonia { width: 150px; left: 12px; top: calc(251px + 10vh); }
+  .shop-antonia-name { font-size: 12px; margin-top: 7px; -webkit-text-stroke-width: 2px; }
   .shop-antonia-bubble { font-size: 10px; padding: 7px 12px; }
   .shop-antonia-bubble-chatter { max-width: 220px; min-width: 150px; }
 }
 @media (max-width: 600px) {
-  .shop-antonia { width: 92px; left: 6px; top: calc(110px + 10vh); }
-  .shop-antonia-name { font-size: 7px; margin-top: 4px; letter-spacing: 0; }
+  .shop-antonia { width: 92px; left: 6px; top: calc(265px + 10vh); }
+  .shop-antonia-name { font-size: 10px; margin-top: 4px; letter-spacing: 0; -webkit-text-stroke-width: 1.5px; }
   .shop-antonia-bubble { font-size: 9px; padding: 5px 9px; border-width: 2px; }
   .shop-antonia-bubble::before { border-top-width: 10px; border-left-width: 8px; border-right-width: 8px; }
   .shop-antonia-bubble::after { border-top-width: 6px; border-left-width: 5px; border-right-width: 5px; }
@@ -8065,8 +8174,28 @@ body:has(.game-hand-me) .board-tooltip {
   aspect-ratio: 5 / 7;
   object-fit: cover;
   display: block;
-  image-rendering: auto;
+  /* Pixel art — nearest-neighbor scaling, no interpolation. */
+  image-rendering: pixelated;
 }
+
+/* ── Avatar squash-and-stretch ──
+   A looping bouncy idle. Applied to the whole image container (not the
+   <img>) so it scales as one unit inside the overflow:hidden frame with no
+   clipping/bg-reveal artifacts. Bottom-anchored for a grounded bounce, and
+   roughly volume-preserving (wider+shorter, then taller+narrower). */
+@keyframes shop-avatar-squash {
+  0%, 100% { transform: scaleY(1); }
+  35%      { transform: scaleY(0.98); }
+  70%      { transform: scaleY(1.02); }
+}
+.shop-avatar-item .shop-item-img-wrap {
+  transform-origin: 50% 100%;
+  animation: shop-avatar-squash 3.6s ease-in-out infinite;
+  will-change: transform;
+}
+/* Desync the grid so they don't all pulse together. */
+.shop-avatar-item:nth-child(3n+2) .shop-item-img-wrap { animation-delay: -1.2s; }
+.shop-avatar-item:nth-child(3n+3) .shop-item-img-wrap { animation-delay: -2.4s; }
 
 .shop-skin-locked {
   filter: grayscale(1) brightness(0.55) contrast(0.85);
@@ -8177,29 +8306,32 @@ body:has(.game-hand-me) .board-tooltip {
 }
 
 .shop-random-wrap {
+  /* Pinned to the top of the scrolling shop content — the item grid scrolls
+     behind it. Full-bleed across the content's 16px padding on all sides
+     (negative margins + matching top offset) so its opaque backdrop runs
+     flush up to the tabs row above with no gap, and nothing shows through. */
+  position: sticky;
+  top: -16px;
+  z-index: 10;
   text-align: center;
-  margin-bottom: 16px;
-  padding: 14px;
-  background: var(--bg2);
-  border: 1px solid var(--bg4);
-  border-radius: 8px;
-  max-width: 400px;
-  margin-left: auto;
-  margin-right: auto;
+  margin: -16px -16px 16px;
+  padding: 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--bg4);
 }
 .shop-random-btn {
   padding: 10px 28px !important;
   font-size: 14px !important;
-  border-color: var(--accent2) !important;
-  color: var(--accent2) !important;
-  background: rgba(255,0,170,.08) !important;
+  border-color: var(--player-color) !important;
+  color: var(--player-color) !important;
+  background: color-mix(in srgb, var(--player-color) 8%, transparent) !important;
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 .shop-random-btn:hover:not(:disabled) {
-  background: rgba(255,0,170,.2) !important;
-  box-shadow: 0 0 12px rgba(255,0,170,.3);
+  background: color-mix(in srgb, var(--player-color) 20%, transparent) !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--player-color) 35%, transparent);
 }
 .shop-random-btn:disabled {
   opacity: .4;
@@ -9681,18 +9813,407 @@ body:has(.textbox-overlay) .tooltip {
   .top-bar { gap: 6px; padding: 6px 10px; }
 }
 
+/* ═══ Main Menu card-wall background ═══ */
+/* A seamless wall of random card art scrolling bottom→top, layered
+   behind the menu. The scroller stacks two identical tiles and slides
+   up by exactly one tile height, then loops with no visible seam. */
+.menu-card-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--bg1, #0a0a12);
+}
+.menu-card-bg-scroller {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+  animation-name: menu-card-bg-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.menu-card-bg-tile {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  width: 100%;
+}
+.menu-card-bg-cell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 750 / 1050;
+}
+.menu-card-bg-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+/* Dark veil so the menu stays readable over the bright card art. */
+.menu-card-bg-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at center, rgba(10,10,18,.55) 0%, rgba(10,10,18,.82) 70%, rgba(10,10,18,.92) 100%);
+}
+@keyframes menu-card-bg-scroll {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-card-bg-scroller { animation: none; }
+}
+
+/* ═══ Ornate player-coloured frame (menu strip + both side panels) ═══ */
+/* --player-color is set on .main-menu-screen and inherited here. The
+   frame layers a bold outer border, a glow, an inset accent line, and
+   four corner brackets — all in the player's colour. */
+.ornate-frame {
+  position: relative;
+  border: 2px solid var(--player-color, #00f0ff);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, .45),
+    inset 0 0 26px color-mix(in srgb, var(--player-color, #00f0ff) 16%, transparent),
+    0 0 30px color-mix(in srgb, var(--player-color, #00f0ff) 30%, transparent),
+    0 12px 46px rgba(0, 0, 0, .55);
+}
+/* Inset accent line, following the rounded corners. */
+.ornate-frame::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  z-index: -1;
+  border: 1px solid color-mix(in srgb, var(--player-color, #00f0ff) 45%, transparent);
+  border-radius: 13px;
+  pointer-events: none;
+}
+/* Four corner brackets (8 gradient bars — a horizontal + vertical arm at
+   each corner). */
+.ornate-frame::after {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
+    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
+    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
+    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
+    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
+    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
+    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
+    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff));
+  background-repeat: no-repeat;
+  background-position:
+    left top, left top, right top, right top,
+    left bottom, left bottom, right bottom, right bottom;
+  background-size:
+    18px 2px, 2px 18px, 18px 2px, 2px 18px,
+    18px 2px, 2px 18px, 18px 2px, 2px 18px;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--player-color, #00f0ff) 60%, transparent));
+}
+
+/* ═══ Main Menu hub side panels ═══ */
+.menu-side {
+  position: absolute;
+  top: 78px;
+  z-index: 2;
+  width: clamp(300px, 26vw, 470px);
+  max-height: calc(100vh - 104px);
+  display: flex;
+}
+/* Anchor each panel's inner edge a fixed distance from screen centre
+   (just outside the ~360px menu strip) so they hug the menu instead of
+   pinning to the screen edges and leaving a big gap on wide monitors. */
+.menu-side-left { right: calc(50% + 256px); left: auto; }
+.menu-side-right { left: calc(50% + 256px); right: auto; }
+/* Left gutter between the screen edge and the Top Players panel's inner edge.
+   The avatar is centered inside it so its left/right gaps stay equal. */
+.menu-profile-gutter {
+  position: absolute;
+  top: 78px; /* fallback before panelTop is measured; matches .menu-side */
+  left: 0;
+  width: calc(50% - 256px - clamp(300px, 26vw, 470px));
+  display: flex;
+  flex-direction: column;   /* name stacked above the avatar */
+  align-items: center;
+  gap: 8px;                 /* slight gap between name and avatar */
+  z-index: 5;
+}
+.menu-profile-avatar {
+  /* Scale with the gutter, leaving room for the equal side gaps, but stay
+     within sensible bounds. */
+  width: clamp(72px, calc(50vw - 256px - clamp(300px, 26vw, 470px) - 64px), 160px);
+  aspect-ratio: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid var(--accent);
+  background: rgba(0, 0, 0, .35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .12s ease;
+}
+.menu-profile-avatar:hover {
+  transform: scale(1.06);
+  filter: brightness(1.15);
+  box-shadow: 0 0 26px currentColor !important;
+}
+
+/* Clickable player name: always reads as a link (dotted underline +
+   pointer), and lights up clearly on hover. Colour is inherited from the
+   inline player colour. */
+.menu-player-name {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-color: currentColor;
+  text-underline-offset: 4px;
+  transition: text-shadow .12s ease, transform .12s ease, text-decoration-color .12s ease;
+}
+.menu-player-name:hover {
+  text-decoration: underline solid;
+  text-shadow: 0 0 12px currentColor, 0 0 20px currentColor;
+  transform: scale(1.04);
+}
+.menu-side-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;        /* allow the inner scroll area to shrink */
+  overflow: hidden;     /* the scrolling happens in .menu-side-scroll */
+  background: rgba(8, 10, 18, .66);
+  border-radius: 18px;
+  padding: 22px 24px 26px;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+/* The one growable, scrollable region inside a panel (leaderboard list /
+   decks list). Fixed sections above it stay put; this fills the rest of
+   the panel height and scrolls when its content overflows. */
+.menu-side-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  margin: 0 -6px;       /* let rows use the panel's full width */
+  padding: 0 6px;
+}
+.menu-side-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 16px;
+  letter-spacing: 1.8px;
+  color: var(--accent);
+  margin: 22px 0 13px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+.menu-side-title:first-child { margin-top: 0; }
+.menu-side-empty {
+  font-size: 14px;
+  color: var(--text2);
+  text-align: center;
+  padding: 14px 4px;
+}
+.menu-side-link {
+  display: block; width: 100%;
+  background: none; border: none; cursor: pointer;
+  color: var(--accent); font-family: inherit;
+}
+.menu-side-link:hover { text-decoration: underline; }
+
+/* Live counter strip */
+.menu-side-live {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 14px; color: var(--text);
+  margin-bottom: 16px;
+}
+.menu-live-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--success, #33ff88);
+  box-shadow: 0 0 10px var(--success, #33ff88);
+  animation: menu-live-pulse 1.8s ease-in-out infinite;
+}
+@keyframes menu-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* Leaderboard list */
+.menu-lb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.menu-lb-row {
+  display: flex; align-items: center; gap: 11px;
+  padding: 8px 10px; border-radius: 8px;
+  font-size: 15px;
+  border: 1px solid transparent;   /* keep height stable vs. medal rows */
+}
+.menu-lb-row.is-me { background: rgba(0, 240, 255, .12); outline: 1px solid rgba(0, 240, 255, .3); }
+/* Top-3 podium: gold / silver / bronze tinted backdrop + border. */
+.menu-lb-row.rank-1 {
+  background: rgba(255, 215, 0, .16);
+  border-color: rgba(255, 215, 0, .6);
+  box-shadow: 0 0 12px rgba(255, 215, 0, .22);
+}
+.menu-lb-row.rank-2 {
+  background: rgba(196, 200, 210, .15);
+  border-color: rgba(206, 210, 220, .6);
+  box-shadow: 0 0 12px rgba(200, 205, 215, .18);
+}
+.menu-lb-row.rank-3 {
+  background: rgba(205, 127, 50, .16);
+  border-color: rgba(214, 137, 60, .6);
+  box-shadow: 0 0 12px rgba(205, 127, 50, .2);
+}
+.menu-lb-rank {
+  flex-shrink: 0; width: 24px; text-align: center;
+  font-weight: 700; color: var(--text2); font-size: 14px;
+}
+.menu-lb-rank.top { color: #ffd700; }
+.menu-lb-row.rank-1 .menu-lb-rank { color: #ffd700; }
+.menu-lb-row.rank-2 .menu-lb-rank { color: #d8dce6; }
+.menu-lb-row.rank-3 .menu-lb-rank { color: #e0903c; }
+.menu-lb-name {
+  flex: 1; min-width: 0; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.menu-lb-elo { flex-shrink: 0; color: var(--accent3, #aaff00); font-weight: 700; font-size: 14px; }
+
+/* Record row */
+.menu-record { display: flex; gap: 9px; }
+.menu-record-cell {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 13px 6px; border-radius: 10px;
+  background: rgba(255, 255, 255, .04);
+}
+.menu-record-cell b { font-size: 28px; font-weight: 800; line-height: 1; }
+.menu-record-cell span { font-size: 10.5px; letter-spacing: .6px; color: var(--text2); }
+
+/* Top heroes */
+.menu-hero-row { display: flex; gap: 12px; justify-content: center; }
+.menu-hero-cell { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.menu-hero-wr { font-size: 13px; font-weight: 700; color: var(--accent3, #aaff00); }
+
+/* Decks list */
+.menu-deck-list { display: flex; flex-direction: column; gap: 8px; }
+.menu-deck-card {
+  display: flex; align-items: center; gap: 13px; width: 100%;
+  padding: 10px 12px; border-radius: 12px; cursor: pointer; text-align: left;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .08);
+  transition: background .15s, border-color .15s;
+}
+.menu-deck-card:hover { background: rgba(0, 240, 255, .1); border-color: rgba(0, 240, 255, .35); }
+.menu-deck-card.is-active {
+  background: rgba(0, 240, 255, .14);
+  border-color: rgba(0, 240, 255, .55);
+  cursor: default;
+}
+/* The standalone "Active Deck" card up top is clickable (→ deck builder). */
+.menu-deck-card.is-editable { cursor: pointer; }
+.menu-deck-card.is-editable:hover { background: rgba(0, 240, 255, .2); }
+.menu-deck-card.is-busy { opacity: .55; cursor: progress; }
+/* Illegal decks can't be set active — dim them and signal not-allowed,
+   but keep them clickable so the click can explain why. */
+.menu-deck-card.is-illegal { opacity: .5; cursor: not-allowed; }
+.menu-deck-card.is-illegal:hover { background: rgba(255, 51, 102, .1); border-color: rgba(255, 51, 102, .35); }
+.menu-deck-meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.menu-deck-name {
+  font-size: 15px; font-weight: 700; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.menu-deck-status { font-size: 12px; }
+.menu-deck-status.ok { color: var(--success, #33ff88); }
+.menu-deck-status.bad { color: var(--danger, #ff3366); }
+.menu-deck-flag {
+  flex-shrink: 0; font-size: 10px; font-weight: 800; letter-spacing: .5px;
+  color: var(--accent); white-space: nowrap;
+}
+
+/* Hide the flanking panels when there isn't room beside the menu. */
+@media (max-width: 1180px) {
+  .menu-side { display: none; }
+}
+
 /* ═══ Main Menu responsive ═══ */
 .menu-body {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 30px;
+  /* Frosted dark panel so buttons/labels read over the scrolling card
+     wall (the menu buttons are mostly transparent on their own). Border +
+     glow come from .ornate-frame. */
+  background: rgba(8, 10, 18, .66);
+  border-radius: 18px;
+  padding: 30px 40px;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
+/* Title + subtitle get their own backdrop plaque (they sit above the
+   menu-body panel in the layout). */
+.menu-title,
+.menu-subtitle {
+  background: rgba(8, 10, 18, .55);
+  border-radius: 12px;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.menu-title { padding: 8px 24px; }
+.menu-subtitle { padding: 5px 16px; border-radius: 9px; }
 .menu-user-info {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
+}
+/* With the title/subtitle gone from above and the player info up in the
+   top row, the central strip grows to fill the freed vertical space —
+   the buttons get taller and larger so they fill the now-higher (and
+   wider) container. (font-size needs !important to beat the per-button
+   inline fontSize.) */
+.menu-buttons .btn-big {
+  height: 66px;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 18px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  /* Every main-menu button tracks the player's chosen colour (text, border
+     and icon), the way Play Online always has. */
+  color: var(--player-color, #00f0ff);
+  border-color: var(--player-color, #00f0ff);
+  background: color-mix(in srgb, var(--player-color, #00f0ff) 8%, transparent);
+}
+/* Labels are centered on the button. */
+.menu-nav-label {
+  text-align: center;
+}
+/* Puzzle pair: two half-width buttons sharing a row. They sit flush with
+   the full-width buttons above/below. */
+.menu-nav-row {
+  display: flex;
+  gap: 12px;
+}
+.menu-nav-row .btn-big {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* Half buttons are narrower, so shrink the label a touch and allow it to
+   wrap to two lines. */
+.menu-buttons .btn-big.menu-nav-btn--half {
+  font-size: 14px !important;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.menu-nav-btn--half .menu-nav-label {
+  white-space: normal;
+  line-height: 1.15;
 }
 
 /* ═══ Daily challenge button ═══ */
@@ -9711,7 +10232,7 @@ body:has(.textbox-overlay) .tooltip {
   .menu-subtitle { font-size: 9px !important; position: absolute; top: 32px; left: 50%; transform: translateX(-50%); }
   .menu-body { flex-direction: row; gap: 40px; margin-top: 20px; }
   .menu-buttons { width: 200px !important; gap: 8px !important; }
-  .menu-buttons .btn-big { font-size: 12px !important; padding: 6px 12px !important; }
+  .menu-buttons .btn-big { font-size: 12px !important; padding: 6px 12px !important; height: auto !important; }
   .menu-user-info { align-items: flex-start; gap: 8px; }
   .menu-user-info .orbit-font { font-size: 16px !important; }
   .menu-user-info .badge { font-size: 13px !important; padding: 5px 10px !important; }

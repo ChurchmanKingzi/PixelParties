@@ -8,6 +8,93 @@ const { api, emitSocket, socket, AppContext, CardMini, FoilOverlay, useFoilBands
         cardImageUrl, skinImageUrl, typeColor, typeClass, CARDS_BY_NAME, SKINS_DB } = window;
 
 // ═══════════════════════════════════════════
+//  TYPEWRITER TEXT (win/loss speech bubbles)
+//  Reveals a message letter-by-letter (fast) and renders lightweight
+//  markup: *italic* and **bold**. Used for both players' end-game lines.
+// ═══════════════════════════════════════════
+// Split a string into formatted runs. `**` toggles bold, a lone `*` toggles
+// italic; the markers themselves are consumed, not shown.
+function parseBubbleMarkup(str) {
+  const segs = [];
+  let bold = false, italic = false, buf = '';
+  const flush = () => { if (buf) { segs.push({ text: buf, bold, italic }); buf = ''; } };
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === '*' && str[i + 1] === '*') { flush(); bold = !bold; i++; continue; }
+    if (str[i] === '*') { flush(); italic = !italic; continue; }
+    buf += str[i];
+  }
+  flush();
+  return segs;
+}
+
+// Per-character "is this letter part of a SHOUTED (all-caps) word?" flags.
+// A word = a maximal letter-run; it shouts if it's 2+ letters and entirely
+// uppercase (so "BOOM"/"HA" bob, but a lone "I"/"A" or "Ha" don't). Shouted
+// letters get a slight up/down wobble (.cpu-shout-letter) to read as yelling.
+function shoutFlags(text) {
+  const flags = new Array(text.length).fill(false);
+  const re = /[A-Za-z]+/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const w = m[0];
+    if (w.length >= 2 && w === w.toUpperCase()) {
+      for (let i = 0; i < w.length; i++) flags[m.index + i] = true;
+    }
+  }
+  return flags;
+}
+
+function TypewriterText({ text, speed = 26 }) {
+  const segs = useMemo(() => parseBubbleMarkup(text || ''), [text]);
+  const total = useMemo(() => segs.reduce((n, s) => n + s.text.length, 0), [segs]);
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    setShown(0);
+    if (!total) return;
+    const id = setInterval(() => {
+      setShown(prev => {
+        if (prev >= total) { clearInterval(id); return prev; }
+        return prev + 1;
+      });
+    }, speed);
+    return () => clearInterval(id);
+  }, [text, total, speed]);
+  // Slice the formatted runs to the number of revealed characters. Within
+  // each run, all-caps-word letters become individually-wobbling spans
+  // (phase-staggered by absolute position for a trembling "scream" wave);
+  // everything else stays plain text.
+  let left = shown;
+  let offset = 0; // absolute char position across the whole message
+  return (
+    <>
+      {segs.map((s, i) => {
+        if (left <= 0) { offset += s.text.length; return null; }
+        const piece = s.text.slice(0, left);
+        left -= piece.length;
+        const flags = shoutFlags(s.text);
+        const children = [];
+        let buf = '';
+        for (let c = 0; c < piece.length; c++) {
+          if (flags[c]) {
+            if (buf) { children.push(buf); buf = ''; }
+            children.push(
+              <span key={'s' + c} className="cpu-shout-letter" style={{ animationDelay: ((offset + c) * -0.07) + 's' }}>{piece[c]}</span>
+            );
+          } else {
+            buf += piece[c];
+          }
+        }
+        if (buf) children.push(buf);
+        offset += s.text.length;
+        return (
+          <span key={i} style={{ fontWeight: s.bold ? 800 : undefined, fontStyle: s.italic ? 'italic' : undefined }}>{children}</span>
+        );
+      })}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════
 //  SHARED BOARD TOOLTIP SYSTEM
 //  Single tooltip rendered in GameBoard, driven
 //  by mouse events from BoardCard / CardRevealEntry.
@@ -16099,6 +16186,113 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const handRef = useRef(null);
   const handAnimDataRef = useRef(null); // FLIP animation data: { oldRects[], indexMap[] }
 
+  // ── Win/Loss speech bubbles ──────────────────────────────────────
+  // When a match ends we float each player's custom Victory / Defeat line
+  // above (mine) / below (opponent's) their avatar. The end-game modal has
+  // a full-screen dark overlay at z-index 1000, so these are fixed-position
+  // at z-index 1100 and anchored to the measured avatar rows. Shown to both
+  // players in PvP; in a CPU battle the CPU's line comes from CPU_MESSAGES.
+  const speechOppRef = useRef(null);
+  const speechMeRef = useRef(null);
+  const [bubbleAnchors, setBubbleAnchors] = useState(null);
+  const showEndBubbles = !!result && !result.isPuzzle && typeof result.winnerIdx === 'number';
+  useEffect(() => {
+    if (!showEndBubbles) { setBubbleAnchors(null); return; }
+    const measure = () => {
+      const o = speechOppRef.current?.getBoundingClientRect();
+      const m = speechMeRef.current?.getBoundingClientRect();
+      // For the player's own bubble, anchor its bottom to the TOP of the
+      // whole bottom hand container (not just the avatar row), so it floats
+      // clearly above the hand instead of overlapping / sitting below it.
+      const meHand = document.querySelector('.game-hand-me');
+      const mc = meHand?.getBoundingClientRect();
+      setBubbleAnchors({
+        opp: o ? { x: o.left + o.width / 2, top: o.top, bottom: o.bottom } : null,
+        me: m ? { x: m.left + m.width / 2, top: mc ? mc.top : m.top, bottom: m.bottom } : null,
+      });
+    };
+    measure();
+    const t = setTimeout(measure, 250); // re-measure after the result fade settles
+    window.addEventListener('resize', measure);
+    return () => { clearTimeout(t); window.removeEventListener('resize', measure); };
+  }, [showEndBubbles]);
+  // Generic speech-bubble renderer (end-game win/loss lines AND mid-game CPU
+  // barks). `tkey` forces a fresh TypewriterText mount so the type-out
+  // restarts even when the same text is shown twice in a row.
+  const renderBubbleAt = (msg, color, dir, anchor, tkey) => {
+    if (!msg || !anchor) return null;
+    const isUp = dir === 'up'; // tail points up → bubble sits below the avatar
+    // Avatars sit at the screen's left edge, so a bubble centered on the
+    // avatar would spill off the left. Anchor the bubble's LEFT edge just
+    // left of the avatar and let it grow rightward, clamped to the viewport;
+    // the tail still points back at the avatar.
+    const PAD = 10;
+    const TAIL_INSET = 28; // tail's distance from the bubble's left edge
+    const vw = (typeof window !== 'undefined' ? window.innerWidth : 1280);
+    const bubbleLeft = Math.max(PAD, anchor.x - TAIL_INSET);
+    const maxWidth = Math.max(120, Math.min(300, vw - bubbleLeft - PAD));
+    const tailLeft = Math.max(14, anchor.x - bubbleLeft);
+    return (
+      <div style={{ position: 'fixed', left: bubbleLeft, top: isUp ? anchor.bottom + 12 : anchor.top - 12, transform: isUp ? 'none' : 'translateY(-100%)', zIndex: 1100, pointerEvents: 'none', maxWidth }}>
+        <div style={{ position: 'relative', background: '#15151f', border: '2px solid ' + color, borderRadius: 10, padding: '8px 14px', color: '#fff', fontSize: 15, fontWeight: 600, textAlign: 'center', lineHeight: 1.3, boxShadow: '0 0 16px ' + color + '66', wordBreak: 'break-word', animation: 'result-fade-in .5s ease-out' }}>
+          <TypewriterText key={tkey} text={msg} />
+          <div style={{ position: 'absolute', left: tailLeft, transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', ...(isUp ? { top: -10, borderBottom: '10px solid ' + color } : { bottom: -10, borderTop: '10px solid ' + color }) }} />
+        </div>
+      </div>
+    );
+  };
+  const renderEndBubble = (msg, won, dir, anchor) =>
+    renderBubbleAt(msg, won ? 'var(--success)' : 'var(--danger)', dir, anchor);
+
+  // ── Mid-game CPU bark (e.g. "you killed one of my Heroes") ──
+  // Server broadcasts `cpu_bark` { owner, text }; we float a transient amber
+  // speech bubble above that player's avatar for a few seconds. Measured on
+  // arrival from the same avatar refs the end-game bubbles use.
+  const [cpuBark, setCpuBark] = useState(null); // { text, anchor, dir, id }
+  useEffect(() => {
+    const onBark = ({ owner, text }) => {
+      if (!text) return;
+      const ref = owner === oppIdx ? speechOppRef : speechMeRef;
+      // Retry briefly: a greeting can arrive before the board/avatar has
+      // painted (game start), so the rect isn't measurable yet.
+      let tries = 0;
+      const tryShow = () => {
+        const r = ref.current?.getBoundingClientRect();
+        if (r && r.width > 0) {
+          setCpuBark({
+            text, id: Date.now(),
+            dir: owner === oppIdx ? 'up' : 'down',
+            anchor: { x: r.left + r.width / 2, top: r.top, bottom: r.bottom },
+          });
+        } else if (tries++ < 20) {
+          setTimeout(tryShow, 50);
+        }
+      };
+      tryShow();
+    };
+    socket.on('cpu_bark', onBark);
+    return () => socket.off('cpu_bark', onBark);
+  }, [oppIdx]);
+  useEffect(() => {
+    if (!cpuBark) return;
+    const t = setTimeout(() => setCpuBark(c => (c && c.id === cpuBark.id ? null : c)), 4800);
+    return () => clearTimeout(t);
+  }, [cpuBark]);
+  // Resolve each side's end-game line once, shared by the bubbles and the
+  // avatar highlight below. A side shows its Victory line if it won, its
+  // Defeat line if the other side won (nothing on a draw / no message).
+  const endMeWon = showEndBubbles && result.winnerIdx === myIdx;
+  const endOppWon = showEndBubbles && result.winnerIdx === oppIdx;
+  const meBubbleMsg = !showEndBubbles ? '' : (endMeWon ? me.victoryMsg : (endOppWon ? me.defeatMsg : ''));
+  const oppBubbleMsg = !showEndBubbles ? '' : (endOppWon ? opp.victoryMsg : (endMeWon ? opp.defeatMsg : ''));
+  // While a side's line is shown, lift its avatar above the end-game veil
+  // (z 1000) and give it a win/loss glow so the "speaker" is highlighted
+  // instead of dimmed. The bottom hand already sits at z 10000; the opponent
+  // row only has z 2, so it otherwise hides behind the veil.
+  const endGlow = (won) => 'drop-shadow(0 0 10px ' + (won ? 'var(--success)' : 'var(--danger)') + ')';
+  const oppAvatarHighlight = oppBubbleMsg ? { zIndex: 1100, filter: endGlow(endOppWon) } : undefined;
+  const meAvatarHighlight = meBubbleMsg ? { filter: endGlow(endMeWon) } : undefined;
+
   // ── Hand Shuffle & Sort with FLIP animation ──
   const captureHandRects = () => {
     const slots = handRef.current?.querySelectorAll('.hand-slot');
@@ -26711,19 +26905,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       </div>
 
       <div className="game-layout">
+        {showEndBubbles && bubbleAnchors && (
+          <>
+            {renderEndBubble(oppBubbleMsg, endOppWon, 'up', bubbleAnchors.opp)}
+            {renderEndBubble(meBubbleMsg, endMeWon, 'down', bubbleAnchors.me)}
+          </>
+        )}
+        {/* Mid-game CPU bark (hidden once the end-game bubbles take over) */}
+        {!showEndBubbles && cpuBark && renderBubbleAt(cpuBark.text, '#ffcc44', cpuBark.dir, cpuBark.anchor, cpuBark.id)}
         {/* Opponent hand */}
         <div className="game-hand game-hand-opp">
-          <div className="game-hand-info">
+          <div className="game-hand-info" ref={speechOppRef} style={oppAvatarHighlight}>
             {opp.avatar
               ? <img src={opp.avatar} className={'game-hand-avatar game-hand-avatar-big' + (!result && (isMyTurn ? ' avatar-inactive' : ' avatar-active'))} />
               : opp.heroes?.[1]?.name && HeroArtCrop
                 ? (
                   <div className={'game-hand-avatar-crop' + (!result && (isMyTurn ? ' avatar-inactive' : ' avatar-active'))}>
-                    <HeroArtCrop heroName={opp.heroes[1].name} width={72} />
+                    <HeroArtCrop heroName={opp.heroes[1].name} width={135} />
                   </div>
                 )
                 : null}
-            <span className="orbit-font" style={{ fontSize: 18, fontWeight: 800, color: opp.color }}>{opp.username}</span>
+            <span className="orbit-font" style={{ fontSize: 18, fontWeight: 800, color: opp.color }}>{
+              // CPU opponents are labelled "CPU" server-side; show their
+              // middle Hero's full name (incl. title) instead so they read
+              // as a character. Falls back to the first living Hero, then CPU.
+              (gameState.isCpuBattle && opp.username === 'CPU')
+                ? (opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
+                : opp.username
+            }</span>
             {oppDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
           </div>
           <div className={"game-hand-cards"
@@ -27351,13 +27560,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
         {/* My hand (bottom player) — drag to reorder for players, face-down for spectators */}
         <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef}>
-          <div className="game-hand-info">
+          <div className="game-hand-info" ref={speechMeRef} style={meAvatarHighlight}>
             {me.avatar
               ? <img src={me.avatar} className={'game-hand-avatar game-hand-avatar-big' + (!result && (isMyTurn ? ' avatar-active' : ' avatar-inactive'))} />
               : me.heroes?.[1]?.name && HeroArtCrop
                 ? (
                   <div className={'game-hand-avatar-crop' + (!result && (isMyTurn ? ' avatar-active' : ' avatar-inactive'))}>
-                    <HeroArtCrop heroName={me.heroes[1].name} width={72} />
+                    <HeroArtCrop heroName={me.heroes[1].name} width={135} />
                   </div>
                 )
                 : null}

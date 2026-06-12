@@ -242,6 +242,30 @@ function PuzzleCreator() {
   const touchStartRef = useRef(null);
   const lastTapRef = useRef({ time: 0, handSource: null, handIdx: -1 }); // double-tap detection
 
+  // Filtered card search results. Declared up here (before the scrollbar
+  // effect below depends on it) so it's initialized when that effect's
+  // dependency array is evaluated during render — otherwise referencing it
+  // later triggers a temporal-dead-zone error.
+  const searchResults = useMemo(() => {
+    let result = window.AVAILABLE_CARDS || [];
+    // Sidebar filter set — mirrors the deck builder's filter pipeline.
+    const f = puzzleFilters;
+    if (f.name) result = result.filter(c => c.name.toLowerCase().includes(f.name.toLowerCase()));
+    if (f.effect) result = result.filter(c => c.effect && c.effect.toLowerCase().includes(f.effect.toLowerCase()));
+    if (f.cardType) result = result.filter(c => c.cardType === f.cardType);
+    if (f.subtype) result = result.filter(c => c.subtype === f.subtype);
+    if (f.archetype) result = result.filter(c => c.archetype === f.archetype);
+    if (f.sa1) result = result.filter(c => c.startingAbility1 === f.sa1 || c.startingAbility2 === f.sa1);
+    if (f.sa2) result = result.filter(c => c.startingAbility1 === f.sa2 || c.startingAbility2 === f.sa2);
+    if (f.ss1) result = result.filter(c => c.spellSchool1 === f.ss1 || c.spellSchool2 === f.ss1);
+    if (f.ss2) result = result.filter(c => c.spellSchool1 === f.ss2 || c.spellSchool2 === f.ss2);
+    if (f.level !== '') result = result.filter(c => c.level != null && c.level === parseInt(f.level));
+    if (f.cost !== '') result = result.filter(c => c.cost != null && c.cost === parseInt(f.cost));
+    if (f.hp !== '') result = result.filter(c => c.hp != null && c.hp === parseInt(f.hp));
+    if (f.atk !== '') result = result.filter(c => c.atk != null && c.atk === parseInt(f.atk));
+    return result;
+  }, [puzzleFilters]);
+
   // ── Custom scrollbar for mobile (CSS scrollbars aren't touch-interactive) ──
   const updateScrollThumb = useCallback(() => {
     const el = searchResultsRef.current;
@@ -568,26 +592,6 @@ function PuzzleCreator() {
     updateScale();
     return () => { ro.disconnect(); document.documentElement.style.setProperty('--board-scale', '1'); };
   }, []);
-
-  const searchResults = useMemo(() => {
-    let result = window.AVAILABLE_CARDS || [];
-    // Sidebar filter set — mirrors the deck builder's filter pipeline.
-    const f = puzzleFilters;
-    if (f.name) result = result.filter(c => c.name.toLowerCase().includes(f.name.toLowerCase()));
-    if (f.effect) result = result.filter(c => c.effect && c.effect.toLowerCase().includes(f.effect.toLowerCase()));
-    if (f.cardType) result = result.filter(c => c.cardType === f.cardType);
-    if (f.subtype) result = result.filter(c => c.subtype === f.subtype);
-    if (f.archetype) result = result.filter(c => c.archetype === f.archetype);
-    if (f.sa1) result = result.filter(c => c.startingAbility1 === f.sa1 || c.startingAbility2 === f.sa1);
-    if (f.sa2) result = result.filter(c => c.startingAbility1 === f.sa2 || c.startingAbility2 === f.sa2);
-    if (f.ss1) result = result.filter(c => c.spellSchool1 === f.ss1 || c.spellSchool2 === f.ss1);
-    if (f.ss2) result = result.filter(c => c.spellSchool1 === f.ss2 || c.spellSchool2 === f.ss2);
-    if (f.level !== '') result = result.filter(c => c.level != null && c.level === parseInt(f.level));
-    if (f.cost !== '') result = result.filter(c => c.cost != null && c.cost === parseInt(f.cost));
-    if (f.hp !== '') result = result.filter(c => c.hp != null && c.hp === parseInt(f.hp));
-    if (f.atk !== '') result = result.filter(c => c.atk != null && c.atk === parseInt(f.atk));
-    return result;
-  }, [puzzleFilters]);
 
   const invalidate = useCallback(() => setValidated(false), []);
   // Invalidate whenever hands change (covers add, remove, reorder, drag-drop)
@@ -1894,14 +1898,14 @@ function PuzzleCreator() {
     <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #10101d 40%, #0a0a12 100%)' }}>
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
-        <h2 className="orbit-font" style={{ fontSize: 14, color: '#ff8800' }}>🔧 PUZZLE CREATOR</h2>
+        <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>PUZZLE CREATOR</h2>
         <input className="input" value={puzzleName} onChange={(e) => { setPuzzleName(e.target.value); setValidated(false); }}
           placeholder="Puzzle name..." style={{ width: 180, padding: '4px 10px', fontSize: 11, borderColor: 'rgba(255,136,0,.4)', color: '#ff8800' }} />
         <div style={{ flex: 1 }} />
-        <button className="btn btn-danger" onClick={handleReset} style={{ padding: '4px 14px', fontSize: 10 }}>↺ RESET</button>
-        <button className="btn" onClick={handleVerify} style={{ padding: '4px 14px', fontSize: 10, borderColor: 'var(--success)', color: 'var(--success)' }}>⚔️ TEST PUZZLE</button>
+        <button className="btn btn-danger" onClick={handleReset} style={{ padding: '0 14px', height: 28, display: 'inline-flex', alignItems: 'center', fontSize: 10 }}>↺ RESET</button>
+        <button className="btn" onClick={handleVerify} style={{ padding: '0 14px', height: 28, display: 'inline-flex', alignItems: 'center', fontSize: 10, borderColor: 'var(--success)', color: 'var(--success)' }}>⚔️ TEST PUZZLE</button>
         <button className="btn" onClick={handleExport} disabled={!validated}
-          style={{ padding: '4px 14px', fontSize: 10, borderColor: validated ? '#ff8800' : 'var(--bg4)', color: validated ? '#ff8800' : 'var(--text2)', opacity: validated ? 1 : 0.4 }}>↓ EXPORT</button>
+          style={{ padding: '0 14px', height: 28, display: 'inline-flex', alignItems: 'center', fontSize: 10, borderColor: validated ? '#ff8800' : 'var(--bg4)', color: validated ? '#ff8800' : 'var(--text2)', opacity: validated ? 1 : 0.4 }}>↓ EXPORT</button>
         {validated && <span className="badge" style={{ background: 'rgba(51,255,136,.12)', color: 'var(--success)', fontSize: 9, padding: '2px 8px' }}>VALIDATED</span>}
         <VolumeControl />
       </div>
