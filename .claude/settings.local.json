@@ -266,7 +266,17 @@
       "WebSearch",
       "Bash(nslookup -type=NS pixelparties.com)",
       "Bash(nslookup -type=SOA pixelparties.com)",
-      "Bash(SMTP_TLS_INSECURE=true node scripts/mail-test.js)"
+      "Bash(SMTP_TLS_INSECURE=true node scripts/mail-test.js)",
+      "PowerShell(New-Item *)",
+      "PowerShell(Add-Type -AssemblyName System.Drawing; $p=\"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\electron\\\\build\\\\icon.png\"; if\\(Test-Path $p\\){ $img=[System.Drawing.Image]::FromFile\\($p\\); \"icon.png: $\\($img.Width\\)x$\\($img.Height\\)\"; $img.Dispose\\(\\) } else { \"MISSING\" })",
+      "PowerShell(npm install *)",
+      "PowerShell(npm config *)",
+      "PowerShell(Set-Location *)",
+      "PowerShell(Set-Location \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\"; node scripts/build.js --force; \"EXIT=$LASTEXITCODE\")",
+      "PowerShell(Get-ChildItem \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\electron\\\\dist\" -File | Select-Object Name, @{n='Size';e={\"{0:N1} MB\" -f \\($_.Length/1MB\\)}} | Format-Table -AutoSize)",
+      "PowerShell(Set-Location \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\"; node --check server.js; if \\($?\\) { \"server.js: syntax OK\" }; node scripts/build.js --force; \"BUILD EXIT=$LASTEXITCODE\")",
+      "PowerShell(Set-Location \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\"; node scripts/build.js --force; \"BUILD EXIT=$LASTEXITCODE\")",
+      "PowerShell(Set-Location \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\"; node _tmp_countguests.js \"$env:TEMP\\\\pp-guest-test.db\")"
     ]
   }
 }

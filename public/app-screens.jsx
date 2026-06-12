@@ -122,6 +122,12 @@ function AuthScreen() {
     setIdentifier(pendingEmail); setPassword(''); setMode('login'); setInfo('Password updated — you can log in now.');
   });
 
+  // Start a throwaway guest session — straight into starter-decks-vs-CPU.
+  const submitGuest = () => run(async () => {
+    const data = await api('/auth/guest', { method: 'POST' });
+    finishAuth(data, false);
+  });
+
   const Header = (
     <>
       <h1 className="pixel-font" style={{ fontSize: 18, color: 'var(--accent)', marginBottom: 4, textShadow: '0 0 20px var(--accent)' }}>
@@ -182,6 +188,11 @@ function AuthScreen() {
           {mode === 'signup' && (
             <div className="auth-fine">We'll email you a 6-digit code to confirm your address.</div>
           )}
+          <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, margin: '2px 0' }}>— or —</div>
+          <button className="btn" onClick={submitGuest} disabled={loading}>
+            ▶ PLAY AS GUEST · vs CPU
+          </button>
+          <div className="auth-fine" style={{ textAlign: 'center' }}>Jump into a match with a Starter Deck — no account needed.</div>
         </div>
       </>
     );
@@ -459,28 +470,56 @@ function MenuLeaderboardPanel({ top, height }) {
 
 // ── Right: the player's own snapshot ──
 function MenuPlayerPanel({ top, height }) {
-  const { user, setScreen, notify } = useContext(AppContext);
-  const [decks, setDecks] = useState(null); // null=loading, []=none
+  const { user, setScreen, setUser, notify } = useContext(AppContext);
+  const [decks, setDecks] = useState(null); // null=loading, []=none  (self-made)
+  const [samples, setSamples] = useState([]); // prebuilt (starter / owned structure) decks
   const [settingId, setSettingId] = useState(null); // deck id currently being set
 
   useEffect(() => {
     let alive = true;
     api('/profile/deck-stats').then(d => { if (alive) setDecks(d.decks || []); }).catch(() => { if (alive) setDecks([]); });
+    api('/sample-decks/owned').then(d => { if (alive) setSamples(d.decks || []); }).catch(() => { if (alive) setSamples([]); });
     return () => { alive = false; };
   }, []);
 
-  // Click a deck → make it the current (default) deck. Illegal decks can
-  // never be set active.
+  // Prebuilt (sample) decks are surfaced and selected exactly like self-made
+  // ones. Their rep card comes from the cover (or a hero), legality from the
+  // shared checker, and "active" from the user's pinned sample-deck id.
+  const sampleRep = (d) => d.coverCard || (d.heroes || []).find(h => h && h.hero)?.hero || (d.mainDeck || [])[0] || null;
+  const pinnedSampleId = user?.defaultSampleDeckId || null;
+  const personalList = (decks || []).map(d => ({
+    id: d.id, name: d.name, legal: d.legal, repCard: d.repCard, repSkin: d.repSkin,
+    isSample: false, isActive: !!d.isDefault,
+  }));
+  const sampleList = samples.map(d => ({
+    id: d.id, name: d.name, legal: isDeckLegal(d).legal, repCard: sampleRep(d), repSkin: null,
+    isSample: true, isActive: d.id === pinnedSampleId,
+  }));
+  const allDecks = decks === null ? null : [...personalList, ...sampleList];
+  // Active deck is derived from the combined list, so it updates the moment
+  // the player picks a different one below.
+  const activeDeck = allDecks ? allDecks.find(d => d.isActive) : undefined;
+
+  // Click a deck → make it the current (default) deck. Illegal decks can never
+  // be set active. Self-made and prebuilt decks pin via their own endpoints,
+  // but the server keeps the two "default" kinds mutually exclusive.
   const selectDeck = async (deck) => {
-    if (deck.isDefault || settingId) return;
+    if (deck.isActive || settingId) return;
     if (!deck.legal) {
       notify && notify('"' + deck.name + '" is incomplete — finish it in the deck builder before setting it active', 'error');
       return;
     }
     setSettingId(deck.id);
     try {
-      await api('/decks/' + deck.id + '/set-default', { method: 'POST' });
-      setDecks(list => (list || []).map(d => ({ ...d, isDefault: d.id === deck.id })));
+      if (deck.isSample) {
+        await api('/decks/set-default-sample', { method: 'POST', body: JSON.stringify({ sampleDeckId: deck.id }) });
+        setDecks(list => (list || []).map(d => ({ ...d, isDefault: false })));
+        setUser(u => u ? { ...u, defaultSampleDeckId: deck.id } : u);
+      } else {
+        await api('/decks/' + deck.id + '/set-default', { method: 'POST' });
+        setDecks(list => (list || []).map(d => ({ ...d, isDefault: d.id === deck.id })));
+        setUser(u => u ? { ...u, defaultSampleDeckId: null } : u);
+      }
       notify && notify(deck.name + ' is now your active deck', 'success');
     } catch (e) {
       notify && notify(e.message || 'Failed to set active deck', 'error');
@@ -491,10 +530,6 @@ function MenuPlayerPanel({ top, height }) {
   const wins = user.wins || 0, losses = user.losses || 0;
   const total = wins + losses;
   const winRate = total ? Math.round((wins / total) * 100) : 0;
-
-  // Active deck is derived from the decks list, so it updates the moment
-  // the player picks a different one below.
-  const activeDeck = decks ? decks.find(d => d.isDefault) : undefined;
 
   const style = {};
   if (top != null) style.top = top;
@@ -511,54 +546,55 @@ function MenuPlayerPanel({ top, height }) {
         </div>
 
         <h3 className="menu-side-title">✦ ACTIVE DECK</h3>
-        {decks === null ? (
+        {allDecks === null ? (
           <div className="menu-side-empty">Loading…</div>
         ) : !activeDeck ? (
           <button className="menu-side-empty menu-side-link" onClick={() => setScreen('deckbuilder')}>
             No active deck — pick one below or build one →
           </button>
         ) : (
-          <button className="menu-deck-card is-active is-editable" onClick={() => setScreen('deckbuilder')} title="Edit in deck builder">
+          <button className="menu-deck-card is-active is-editable" onClick={() => setScreen('deckbuilder')}
+            title={activeDeck.isSample ? 'Prebuilt deck — open the deck builder' : 'Edit in deck builder'}>
             <MenuCardThumb name={activeDeck.repCard} skin={activeDeck.repSkin} w={56} />
             <span className="menu-deck-meta">
-              <span className="menu-deck-name">{activeDeck.name}</span>
+              <span className="menu-deck-name">{activeDeck.isSample ? '📋 ' : ''}{activeDeck.name}</span>
               <span className={'menu-deck-status ' + (activeDeck.legal ? 'ok' : 'bad')}>
                 {activeDeck.legal ? '✓ Tournament legal' : '✗ Incomplete'}
               </span>
             </span>
-            <span className="menu-deck-flag">EDIT →</span>
+            <span className="menu-deck-flag">{activeDeck.isSample ? 'PREBUILT' : 'EDIT →'}</span>
           </button>
         )}
 
         <h3 className="menu-side-title">🃏 YOUR DECKS</h3>
         <div className="menu-side-scroll">
-          {decks === null ? (
+          {allDecks === null ? (
             <div className="menu-side-empty">Loading…</div>
-          ) : decks.length === 0 ? (
+          ) : allDecks.length === 0 ? (
             <button className="menu-side-empty menu-side-link" onClick={() => setScreen('deckbuilder')}>
               No decks yet — build one →
             </button>
           ) : (
             <div className="menu-deck-list">
-              {decks.map(d => (
+              {allDecks.map(d => (
                 <button
                   key={d.id}
                   className={'menu-deck-card'
-                    + (d.isDefault ? ' is-active' : '')
-                    + (!d.isDefault && !d.legal ? ' is-illegal' : '')
+                    + (d.isActive ? ' is-active' : '')
+                    + (!d.isActive && !d.legal ? ' is-illegal' : '')
                     + (settingId === d.id ? ' is-busy' : '')}
                   onClick={() => selectDeck(d)}
-                  title={d.isDefault ? 'Active deck' : (d.legal ? 'Set as active deck' : 'Incomplete — finish it in the deck builder')}
+                  title={d.isActive ? 'Active deck' : (d.legal ? 'Set as active deck' : 'Incomplete — finish it in the deck builder')}
                 >
                   <MenuCardThumb name={d.repCard} skin={d.repSkin} w={56} />
                   <span className="menu-deck-meta">
-                    <span className="menu-deck-name">{d.name}</span>
+                    <span className="menu-deck-name">{d.isSample ? '📋 ' : ''}{d.name}</span>
                     <span className={'menu-deck-status ' + (d.legal ? 'ok' : 'bad')}>
                       {d.legal ? '✓ Legal' : '✗ Incomplete'}
                     </span>
                   </span>
                   <span className="menu-deck-flag">
-                    {d.isDefault ? '● ACTIVE' : (settingId === d.id ? '…' : '')}
+                    {d.isActive ? '● ACTIVE' : (settingId === d.id ? '…' : '')}
                   </span>
                 </button>
               ))}
@@ -1306,8 +1342,6 @@ function ProfileScreen() {
   // Top heroes
   const [topHeroes, setTopHeroes] = useState([]);
 
-  // Tutorial visibility toggle
-  const [hideTutorial, setHideTutorial] = useState(!!user.hide_tutorial);
   // Play Animations toggle. The flag is stored as 0/1 on the user
   // record, with `null`/missing treated as enabled. The battle client
   // reads this on game start and gates every animation + transition
@@ -1484,15 +1518,6 @@ function ProfileScreen() {
       setOldPw(''); setNewPw(''); setConfirmPw('');
     } catch (e) { notify(e.message, 'error'); }
     setPwSaving(false);
-  };
-
-  const toggleTutorial = async () => {
-    const newVal = !hideTutorial;
-    setHideTutorial(newVal);
-    try {
-      const data = await api('/profile/hide-tutorial', { method: 'PUT', body: JSON.stringify({ hide_tutorial: newVal }) });
-      setUser(data.user);
-    } catch (e) { notify(e.message, 'error'); setHideTutorial(!newVal); }
   };
 
   const togglePlayAnimations = async () => {
@@ -1903,25 +1928,6 @@ function ProfileScreen() {
           {/* Settings */}
           <div className="profile-section profile-section-wide">
             <div className="profile-section-label">SETTINGS</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 12, color: 'var(--text)' }}>
-                <div
-                  onClick={toggleTutorial}
-                  style={{
-                    width: 40, height: 22, borderRadius: 11, background: hideTutorial ? 'var(--accent)' : 'var(--bg4)',
-                    position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0
-                  }}
-                >
-                  <div style={{
-                    width: 18, height: 18, borderRadius: '50%', background: '#fff',
-                    position: 'absolute', top: 2, left: hideTutorial ? 20 : 2,
-                    transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.4)'
-                  }} />
-                </div>
-                <span onClick={toggleTutorial}>Hide Tutorial from Main Menu</span>
-              </label>
-              <span style={{ fontSize: 9, color: 'var(--text2)' }}>Toggle off to show the tutorial button again</span>
-            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 12, color: 'var(--text)' }}>
                 <div
@@ -3351,10 +3357,22 @@ function SingleplayerScreen() {
         (op.middleHero || '').toLowerCase().includes(q)
         || (op.name || '').toLowerCase().includes(q));
 
+  // Guests have no main menu — Back ends their throwaway session and returns
+  // to the login screen. Everyone else goes back to the menu.
+  const onBack = async () => {
+    if (user?.isGuest) {
+      try { await api('/auth/logout', { method: 'POST' }); } catch {}
+      window.AUTH_TOKEN = null;
+      setUser(null);
+      return;
+    }
+    setScreen('menu');
+  };
+
   return (
     <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)', overflow: 'auto' }}>
       <div className="top-bar">
-        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
+        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={onBack}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>CHOOSE OPPONENT!</h2>
         <div style={{ flex: 1 }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0a12;
+      font-family: system-ui, "Segoe UI", sans-serif;
+      color: #eaf6ff;
+      user-select: none;
+      cursor: default;
+    }
+    /* The whole window is the artwork, framed by a border. */
+    .frame {
+      position: fixed;
+      inset: 0;
+      box-sizing: border-box;
+      border: 3px solid #00f0ff;
+      background-image: url('assets/title.png');
+      background-size: cover;       /* fill the window (16:9 → no crop) */
+      background-position: center;
+      background-repeat: no-repeat;
+      -webkit-app-region: drag;     /* let the frameless splash be dragged */
+    }
+    /* Spinner dead-centre, sitting in the middle of the artwork. */
+    .spinner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 54px;
+      height: 54px;
+      border: 5px solid rgba(0, 0, 0, 0.35);
+      border-top-color: #00f0ff;
+      border-radius: 50%;
+      box-shadow: 0 0 18px rgba(0, 240, 255, 0.5);
+      animation: spin 0.85s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+    /* Status text overlaps the bottom of the artwork. */
+    .text {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 14px;
+      text-align: center;
+      padding: 0 18px;
+    }
+    .status {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
+    }
+    .hint {
+      margin-top: 6px;
+      font-size: 12px;
+      line-height: 1.4;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
+    }
+    .hint.show { opacity: 0.95; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="spinner"></div>
+    <div class="text">
+      <div class="status" id="status">Loading…</div>
+      <div class="hint" id="hint">
+        Waking the server — the first load after a quiet spell can take up to a minute.
+      </div>
+    </div>
+  </div>
+  <script>
+    // Reassure the player if the (cold-start) load is taking a while.
+    setTimeout(() => {
+      document.getElementById('hint').classList.add('show');
+      document.getElementById('status').textContent = 'Connecting to the server…';
+    }, 4000);
+  </script>
+</body>
+</html>

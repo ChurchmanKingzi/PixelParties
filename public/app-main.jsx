@@ -1795,7 +1795,13 @@ const _bgmPuzzle = typeof Audio !== 'undefined' ? new Audio('/music/bgm_puzzle.m
 const _bgmShop = typeof Audio !== 'undefined' ? new Audio('/music/bgm_shop.mp3') : null;
 const _bgmTracks = { menu: _bgmMenu, battle: _bgmBattle, puzzle: _bgmPuzzle, shop: _bgmShop };
 for (const t of [_bgmMenu, _bgmBattle, _bgmPuzzle, _bgmShop]) {
-  if (t) { t.loop = true; t.volume = 0.4; t.preload = 'auto'; }
+  if (t) {
+    t.loop = true;
+    // Start from the player's persisted volume (0 if they muted last session)
+    // so audio never blips at the default before <VolumeControl> mounts.
+    t.volume = window._ppPersistedVolume ? window._ppPersistedVolume() : 0.4;
+    t.preload = 'auto';
+  }
 }
 
 // Volume control bridge — VolumeControl sets this
@@ -1859,7 +1865,8 @@ window._ppDuckBgm = (phase) => {
     // switchTrack's pending-target buffer. If a different track is
     // pending, hand off to the music manager hook instead of resuming
     // the paused one. Otherwise resume the paused track in place.
-    const targetVol = window._ppGetVolume ? window._ppGetVolume() : 0.4;
+    const targetVol = window._ppGetVolume ? window._ppGetVolume()
+      : (window._ppPersistedVolume ? window._ppPersistedVolume() : 0.4);
     const pending = window._ppPendingBgmTarget;
     if (pending && window._ppApplyPendingBgm) {
       window._ppPendingBgmTarget = null;
@@ -1883,7 +1890,8 @@ function MusicManager({ bgmMode }) {
   const currentTrack = useRef(null); // 'menu' | 'battle' | 'puzzle'
 
   const getTargetVol = useCallback(() => {
-    return window._ppGetVolume ? window._ppGetVolume() : 0.4;
+    if (window._ppGetVolume) return window._ppGetVolume();
+    return window._ppPersistedVolume ? window._ppPersistedVolume() : 0.4;
   }, []);
 
   const switchTrack = useCallback((target) => {
@@ -2305,6 +2313,7 @@ function App() {
       <OpponentUnlockPopup />
       {notif && <Notification key={notif.id} message={notif.message} type={notif.type} onClose={() => setNotif(null)} />}
       {!user ? <AuthScreen /> :
+        user.isGuest ? <SingleplayerScreen /> :
         screen === 'menu' ? <MainMenu /> :
         screen === 'play' ? <PlayScreen /> :
         screen === 'singleplayer' ? <SingleplayerScreen /> :

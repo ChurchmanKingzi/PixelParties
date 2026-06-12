@@ -141,8 +141,23 @@ function _initSoundManager() {
   for (const name of SFX_NAMES) _fetchSfxBytes(name);
 }
 
+// Effective audio volume persisted from the user's last session. Used as the
+// fallback BEFORE <VolumeControl> mounts and registers window._ppGetVolume —
+// so a player who muted last session stays muted from the very first frame
+// (login / auth screen) instead of hearing audio until the menu loads.
+function _ppPersistedVolume() {
+  try {
+    if (localStorage.getItem('pp_muted') === '1') return 0;
+    const v = parseFloat(localStorage.getItem('pp_volume'));
+    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.4;
+  } catch {
+    return 0.4;
+  }
+}
+window._ppPersistedVolume = _ppPersistedVolume;
+
 function _sfxVolume() {
-  const v = window._ppGetVolume ? window._ppGetVolume() : 0.4;
+  const v = window._ppGetVolume ? window._ppGetVolume() : _ppPersistedVolume();
   return Math.max(0, Math.min(1, typeof v === 'number' ? v : 0.4));
 }
 

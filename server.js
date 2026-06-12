@@ -399,6 +399,9 @@ async function initDatabase() {
   // Tracks which sample deck (starter or structure) the user has pinned as
   // their default. Null when the default is a custom deck from `decks`.
   try { await db.execute("ALTER TABLE users ADD COLUMN default_sample_deck_id TEXT DEFAULT NULL"); } catch {}
+  // Guest accounts: ephemeral, starter-decks-vs-CPU only, never unlock new
+  // opponents, and purged on logout / server start (see purgeGuest).
+  try { await db.execute("ALTER TABLE users ADD COLUMN is_guest INTEGER DEFAULT 0"); } catch {}
   // Daily Challenge — 3 random Heroes the player must win with for SC bonuses.
   // Resets every 12:00 Europe/Berlin (CET/CEST) globally, or 24h after the
   // player's last `start`, whichever comes first.
@@ -836,6 +839,17 @@ app.post('/api/auth/verify-email', async (req, res) => {
     [id, pending.username, pending.password_hash, pending.avatar, pending.color, pending.email],
   );
   await db.run('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)', [uuidv4(), id, 'My First Deck']);
+  // Pin a random Starter Deck (already in everyone's deck list) as the new
+  // player's default, so they can jump into a match immediately — without
+  // copying it into their self-made decks. ensureValidDefaultDeck preserves
+  // this pin on later session checks (starters are always-legal non-structure).
+  try {
+    const starters = loadSampleDecks().filter(s => !s.isStructure);
+    if (starters.length > 0) {
+      const pick = starters[Math.floor(Math.random() * starters.length)];
+      await db.run('UPDATE users SET default_sample_deck_id = ? WHERE id = ?', [pick.id, id]);
+    }
+  } catch (err) { console.error('[signup] starter-deck pin failed:', err.message); }
   // Unlock the starting roster of random CPU opponents for the new account.
   try { await seedInitialOpponents(id); } catch (err) { console.error('[signup] seedInitialOpponents failed:', err.message); }
   await db.run('DELETE FROM pending_signups WHERE id = ?', [pending.id]);
@@ -929,10 +943,69 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.post('/api/auth/logout', async (req, res) => {
-  const token = req.cookies?.pp_token;
+  const token = req.cookies?.pp_token || req.headers['x-auth-token'];
+  // If this was a guest session, tear the throwaway account + its data down.
+  if (token && sessions.has(token)) {
+    const sess = sessions.get(token);
+    try { await purgeGuest(sess.userId); } catch (err) { console.error('[logout] purgeGuest failed:', err.message); }
+  }
   if (token) sessions.delete(token);
   res.clearCookie('pp_token');
   res.json({ ok: true });
+});
+
+// Delete a guest account and all of its rows. No-op for real (non-guest)
+// accounts — the `is_guest = 1` guard makes this safe to call with any id.
+async function purgeGuest(userId) {
+  if (!userId) return;
+  const row = await db.get('SELECT is_guest FROM users WHERE id = ?', [userId]);
+  if (!row || !row.is_guest) return;
+  for (const t of ['decks', 'unlocked_opponents', 'npc_stats', 'user_shop_items']) {
+    try { await db.run(`DELETE FROM ${t} WHERE user_id = ?`, [userId]); } catch {}
+  }
+  await db.run('DELETE FROM users WHERE id = ? AND is_guest = 1', [userId]);
+}
+
+// Sweep every guest account. Guest sessions live only in the in-memory
+// `sessions` map, so any guest row still around at startup is orphaned —
+// no one can ever log back into it. Called once on boot.
+async function purgeAllGuests() {
+  try {
+    const guests = await db.all('SELECT id FROM users WHERE is_guest = 1');
+    for (const g of guests) await purgeGuest(g.id);
+    if (guests.length) console.log(`[guest cleanup] removed ${guests.length} stale guest account(s)`);
+  } catch (err) { console.error('[guest cleanup] failed:', err.message); }
+}
+
+// Create a throwaway guest account: starter decks vs CPU only, seeded with
+// just the starter-deck opponents and pinned to a random starter. Guests
+// never unlock new opponents (see endCpuBattle) and are purged on logout.
+app.post('/api/auth/guest', async (req, res) => {
+  try {
+    const id = uuidv4();
+    const username = 'Guest-' + id.slice(0, 8);
+    const passwordHash = bcrypt.hashSync(uuidv4(), 10); // random; guests can't log in by password
+    await db.run(
+      'INSERT INTO users (id, username, password_hash, avatar, color, is_guest) VALUES (?, ?, ?, ?, ?, 1)',
+      [id, username, passwordHash, getRandomDefaultAvatar(), getRandomDefaultColor()]
+    );
+    try { await seedInitialOpponents(id); } catch (err) { console.error('[guest] seedInitialOpponents failed:', err.message); }
+    // Pin a random Starter Deck as the guest's default so a deck is preselected.
+    try {
+      const starters = loadSampleDecks().filter(s => !s.isStructure);
+      if (starters.length > 0) {
+        const pick = starters[Math.floor(Math.random() * starters.length)];
+        await db.run('UPDATE users SET default_sample_deck_id = ? WHERE id = ?', [pick.id, id]);
+      }
+    } catch (err) { console.error('[guest] starter pin failed:', err.message); }
+
+    const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
+    const token = startSession(res, user);
+    res.json({ token, user: sanitizeUser(user), isGuest: true });
+  } catch (err) {
+    console.error('[guest] creation failed:', err.message);
+    res.status(500).json({ error: 'Could not start a guest session' });
+  }
 });
 
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
@@ -961,7 +1034,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified };
+  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: u.avatar, cardback: u.cardback, board: u.board || null, bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
 }
 
 // ===== PROFILE ROUTES =====
@@ -990,14 +1063,6 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
     vals.push(req.user.userId);
     await db.run('UPDATE users SET ' + sets.join(', ') + ' WHERE id = ?', vals);
   }
-  const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
-  res.json({ user: sanitizeUser(user) });
-});
-
-// Toggle hide_tutorial preference
-app.put('/api/profile/hide-tutorial', authMiddleware, async (req, res) => {
-  const hide = req.body.hide_tutorial ? 1 : 0;
-  await db.run('UPDATE users SET hide_tutorial = ? WHERE id = ?', [hide, req.user.userId]);
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ user: sanitizeUser(user) });
 });
@@ -4234,8 +4299,10 @@ function endCpuBattle(room, winnerIdx, reason) {
             losses = losses + excluded.losses
         `, [humanUserId, opponentDeckId, humanWon, humanLost]);
 
-        // Opponent-unlock milestones — only on a win.
-        if (humanWon) {
+        // Opponent-unlock milestones — only on a win, and never for guests
+        // (they're permanently locked to the starter-deck opponents).
+        const guestRow = await db.get('SELECT is_guest FROM users WHERE id = ?', [humanUserId]);
+        if (humanWon && !guestRow?.is_guest) {
           const initRow = await db.get(
             'SELECT is_initial FROM unlocked_opponents WHERE user_id = ? AND opponent_deck_id = ?',
             [humanUserId, opponentDeckId]
@@ -13622,7 +13689,8 @@ app.get('*', async (req, res) => {
 });
 
 // ===== START =====
-initDatabase().then(() => {
+initDatabase().then(async () => {
+  await purgeAllGuests(); // clear orphaned guest accounts from previous runs
   server.listen(PORT, () => {
     console.log(`Pixel Parties TCG running on http://localhost:${PORT}`);
   });
