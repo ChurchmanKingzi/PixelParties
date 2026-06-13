@@ -45,7 +45,12 @@ window.PasswordInput = PasswordInput;
 function AuthScreen() {
   const { setUser } = useContext(AppContext);
   // mode: 'login' | 'signup' | 'verify' | 'forgot' | 'reset'
-  const [mode, setModeRaw] = useState('login');
+  // A guest clicking "Register now!" sets window._pendingAuthMode so we open
+  // straight on the sign-up tab after their session is torn down.
+  const [mode, setModeRaw] = useState(() => {
+    const m = window._pendingAuthMode; window._pendingAuthMode = null;
+    return (m === 'signup' || m === 'login') ? m : 'login';
+  });
   const [identifier, setIdentifier] = useState(''); // login: username OR email
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -189,8 +194,8 @@ function AuthScreen() {
             <div className="auth-fine">We'll email you a 6-digit code to confirm your address.</div>
           )}
           <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, margin: '2px 0' }}>— or —</div>
-          <button className="btn" onClick={submitGuest} disabled={loading}>
-            ▶ PLAY AS GUEST · vs CPU
+          <button className="btn btn-big" onClick={submitGuest} disabled={loading}>
+            ▶ TRY AS GUEST · vs CPU
           </button>
           <div className="auth-fine" style={{ textAlign: 'center' }}>Jump into a match with a Starter Deck — no account needed.</div>
         </div>
@@ -3190,6 +3195,74 @@ function HeroArtCrop({ heroName, width = 160 }) {
   );
 }
 
+// In-place registration modal for guests (opened from the VS CPU screen).
+// Signs up + verifies without leaving the screen; on success it logs in as the
+// new (non-guest) account, which routes the app to the main menu. `starterDeckId`
+// carries the guest's currently-selected deck so the new account keeps it.
+function GuestRegisterModal({ onClose, starterDeckId }) {
+  const { setUser } = useContext(AppContext);
+  const [step, setStep] = useState('form'); // 'form' | 'verify'
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const run = async (fn) => {
+    setLoading(true); setError('');
+    try { await fn(); } catch (e) { setError(e.message || 'Something went wrong'); }
+    setLoading(false);
+  };
+
+  const submitSignup = () => run(async () => {
+    if (!username.trim() || !email.trim() || !password) { setError('Fill in all fields'); return; }
+    const data = await api('/auth/signup', { method: 'POST', body: JSON.stringify({ username: username.trim(), email: email.trim(), password }) });
+    setPendingEmail(data.email); setCode(''); setInfo('We emailed you a 6-digit code.'); setStep('verify');
+  });
+
+  const submitVerify = () => run(async () => {
+    if (!code.trim()) { setError('Enter the code from your email'); return; }
+    const data = await api('/auth/verify-email', { method: 'POST', body: JSON.stringify({ email: pendingEmail, code: code.trim(), starterDeckId: starterDeckId || undefined }) });
+    // Log in as the new (non-guest) account → App routes to the main menu.
+    window.AUTH_TOKEN = data.token;
+    socket.emit('auth', data.token);
+    if (data.isNewAccount) window._isNewAccount = true;
+    setUser(data.user);
+  });
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#12101f', border: '1px solid var(--accent)', borderRadius: 10, padding: '24px 26px', width: 340, maxWidth: '90vw', boxShadow: '0 0 30px rgba(0,0,0,.6)', position: 'relative' }}>
+        <button onClick={onClose} title="Close" style={{ position: 'absolute', top: 8, right: 10, background: 'none', border: 'none', color: 'var(--text2)', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        <h2 className="pixel-font" style={{ fontSize: 15, color: 'var(--accent)', marginBottom: 4, textShadow: '0 0 16px var(--accent)' }}>CREATE ACCOUNT</h2>
+        <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 16, letterSpacing: 1 }}>Keep your deck &amp; unlock everything</div>
+        {step === 'form' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <input className="input" placeholder="Username" value={username} autoComplete="username" onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
+            <input className="input" type="email" placeholder="Email" value={email} autoComplete="email" onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
+            <input className="input" type="password" placeholder="Password" value={password} autoComplete="new-password" onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
+            {error && <div className="auth-msg auth-err">{error}</div>}
+            <button className="btn btn-big" onClick={submitSignup} disabled={loading}>{loading ? '...' : 'SIGN UP'}</button>
+            <div className="auth-fine">We'll email you a 6-digit code to confirm your address.</div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="auth-fine">We sent a 6-digit code to <b>{pendingEmail}</b>.</div>
+            <input className="input auth-code" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" maxLength={6} value={code} autoFocus onChange={e => setCode(e.target.value.replace(/\D/g, ''))} onKeyDown={e => e.key === 'Enter' && submitVerify()} />
+            {error && <div className="auth-msg auth-err">{error}</div>}
+            {info && <div className="auth-msg auth-ok">{info}</div>}
+            <button className="btn btn-big" onClick={submitVerify} disabled={loading}>{loading ? '...' : 'VERIFY & PLAY'}</button>
+            <div className="auth-link" onClick={() => { setStep('form'); setError(''); }}>← Back</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SingleplayerScreen() {
   const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
   const [opponents, setOpponents] = useState(null);          // null = loading
@@ -3199,6 +3272,7 @@ function SingleplayerScreen() {
   const [cpuBattleState, setCpuBattleState] = useState(null);
   const [starting, setStarting] = useState(false);
   const [search, setSearch] = useState('');
+  const [showRegister, setShowRegister] = useState(false); // guest registration modal
   const cpuBattleRoom = useRef(null);
 
   // Load gallery + caller's own decks (needed to resolve the player deck
@@ -3285,17 +3359,28 @@ function SingleplayerScreen() {
     return () => { if (setBgmMode) setBgmMode('menu'); };
   }, [cpuBattleState, setBgmMode]);
 
-  // Esc → back to menu (battle's own Esc handling takes priority)
+  // Esc → back to menu (battle's own Esc handling takes priority). Guests have
+  // no menu, so Esc ends their session and returns to the login screen — same
+  // as the Back button.
   useEffect(() => {
     const h = (e) => {
       if (e.key === 'Escape' && !cpuBattleState) {
         e.stopImmediatePropagation();
-        setScreen('menu');
+        // While the registration modal is open, Esc just closes it.
+        if (showRegister) { setShowRegister(false); return; }
+        if (user?.isGuest) {
+          api('/auth/logout', { method: 'POST' }).catch(() => {}).finally(() => {
+            window.AUTH_TOKEN = null;
+            setUser(null);
+          });
+        } else {
+          setScreen('menu');
+        }
       }
     };
     window.addEventListener('keydown', h, true);
     return () => window.removeEventListener('keydown', h, true);
-  }, [cpuBattleState, setScreen]);
+  }, [cpuBattleState, setScreen, setUser, user, showRegister]);
 
   const startBattle = useCallback((opponentId) => {
     if (starting) return;
@@ -3371,8 +3456,12 @@ function SingleplayerScreen() {
 
   return (
     <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)', overflow: 'auto' }}>
+      {showRegister && <GuestRegisterModal starterDeckId={selectedDeck} onClose={() => setShowRegister(false)} />}
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={onBack}>← BACK</button>
+        {user?.isGuest && (
+          <button className="btn" style={{ padding: '5px 16px', fontSize: 13 }} onClick={() => setShowRegister(true)}>★ REGISTER NOW!</button>
+        )}
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>CHOOSE OPPONENT!</h2>
         <div style={{ flex: 1 }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -3382,7 +3471,7 @@ function SingleplayerScreen() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="🔍 Search opponents..."
-            style={{ fontSize: 12, width: 200, padding: '4px 8px', paddingRight: search ? 24 : 8, borderColor: '#ff7777', color: 'var(--text)' }}
+            style={{ fontSize: 12, width: 200, padding: '4px 8px', paddingRight: search ? 24 : 8, borderColor: 'var(--player-color)', color: 'var(--text)' }}
           />
           {search && (
             <button
@@ -3413,7 +3502,7 @@ function SingleplayerScreen() {
                   setUser(u => u ? { ...u, defaultSampleDeckId: id } : u);
                 }
               } catch {}
-            }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: '#aa88ff', color: 'var(--text)' }}>
+            }} style={{ fontSize: 12, minWidth: 180, padding: '4px 8px', borderColor: 'var(--player-color)', color: 'var(--text)' }}>
             {personalDecks.map(d => <option key={d.id} value={d.id}>{d.name} {isDeckLegal(d).legal ? '✓' : '✗'}{d.isDefault ? ' ★' : ''}</option>)}
             {sampleDecks.filter(d => isDeckLegal(d).legal).length > 0 && <option disabled>── Sample Decks ──</option>}
             {sampleDecks.filter(d => isDeckLegal(d).legal).map(d => <option key={d.id} value={d.id}>📋 {d.name}{user?.defaultSampleDeckId === d.id ? ' ★' : ''}</option>)}

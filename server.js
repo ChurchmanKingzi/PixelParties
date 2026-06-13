@@ -839,14 +839,17 @@ app.post('/api/auth/verify-email', async (req, res) => {
     [id, pending.username, pending.password_hash, pending.avatar, pending.color, pending.email],
   );
   await db.run('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)', [uuidv4(), id, 'My First Deck']);
-  // Pin a random Starter Deck (already in everyone's deck list) as the new
-  // player's default, so they can jump into a match immediately — without
-  // copying it into their self-made decks. ensureValidDefaultDeck preserves
-  // this pin on later session checks (starters are always-legal non-structure).
+  // Pin a Starter Deck (already in everyone's deck list) as the new player's
+  // default so they can jump into a match immediately — without copying it into
+  // their self-made decks. If the client passes a specific starter (a guest
+  // registering keeps the deck they were using), honour it; otherwise random.
+  // Only non-structure starters are allowed (structure decks are paywalled).
   try {
     const starters = loadSampleDecks().filter(s => !s.isStructure);
     if (starters.length > 0) {
-      const pick = starters[Math.floor(Math.random() * starters.length)];
+      const requested = req.body.starterDeckId;
+      const pick = (requested && starters.find(s => s.id === requested))
+        || starters[Math.floor(Math.random() * starters.length)];
       await db.run('UPDATE users SET default_sample_deck_id = ? WHERE id = ?', [pick.id, id]);
     }
   } catch (err) { console.error('[signup] starter-deck pin failed:', err.message); }
@@ -986,8 +989,10 @@ app.post('/api/auth/guest', async (req, res) => {
     const username = 'Guest-' + id.slice(0, 8);
     const passwordHash = bcrypt.hashSync(uuidv4(), 10); // random; guests can't log in by password
     await db.run(
+      // Fixed teal (the login-screen accent) so the guest UI doesn't flicker a
+      // new random colour every session.
       'INSERT INTO users (id, username, password_hash, avatar, color, is_guest) VALUES (?, ?, ?, ?, ?, 1)',
-      [id, username, passwordHash, getRandomDefaultAvatar(), getRandomDefaultColor()]
+      [id, username, passwordHash, getRandomDefaultAvatar(), '#00f0ff']
     );
     try { await seedInitialOpponents(id); } catch (err) { console.error('[guest] seedInitialOpponents failed:', err.message); }
     // Pin a random Starter Deck as the guest's default so a deck is preselected.

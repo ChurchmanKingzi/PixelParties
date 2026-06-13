@@ -24908,8 +24908,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return () => window.removeEventListener('keydown', handleEsc, true);
   }, [gameState.effectPrompt]);
 
+  // Guest → real account: end the guest session and reopen the auth screen on
+  // the sign-up tab (window._pendingAuthMode is read by AuthScreen on mount).
+  const registerNow = async () => {
+    try { socket.emit('leave_game', { roomId: gameState.roomId }); } catch {}
+    window._pendingAuthMode = 'signup';
+    try { await api('/auth/logout', { method: 'POST' }); } catch {}
+    window.AUTH_TOKEN = null;
+    setUser(null);
+  };
+
   // ── SC earned display helper ──
   const renderSCEarned = () => {
+    // Guests don't earn/spend SC — the SC panel is replaced by a register CTA.
+    if (user?.isGuest) {
+      return (
+        <div style={{ marginTop: 20, marginBottom: 20, textAlign: 'center', maxWidth: 440, marginLeft: 'auto', marginRight: 'auto' }}>
+          <div style={{ fontSize: 15, color: 'var(--text)', lineHeight: 1.55, marginBottom: 16 }}>
+            Enjoying the game? Register now to make your own decks, be able to unlock new enemies, play online against others, and much more!
+          </div>
+          <button className="btn btn-big" onClick={registerNow}>★ REGISTER NOW!</button>
+        </div>
+      );
+    }
     if (!scEarned) return null;
     if (isSpectator) {
       // Spectator sees both players' SC data
