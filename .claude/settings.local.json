@@ -277,7 +277,8 @@
       "PowerShell(Set-Location \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\"; node --check server.js; if \\($?\\) { \"server.js: syntax OK\" }; node scripts/build.js --force; \"BUILD EXIT=$LASTEXITCODE\")",
       "PowerShell(Set-Location \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\"; node scripts/build.js --force; \"BUILD EXIT=$LASTEXITCODE\")",
       "PowerShell(Set-Location \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\"; node _tmp_countguests.js \"$env:TEMP\\\\pp-guest-test.db\")",
-      "PowerShell(Get-Content *)"
+      "PowerShell(Get-Content *)",
+      "PowerShell(npm run *)"
     ]
   }
 }

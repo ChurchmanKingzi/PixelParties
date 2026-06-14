@@ -8510,6 +8510,51 @@ body:has(.game-hand-me) .board-tooltip {
   position: relative;
   flex-shrink: 0;
 }
+/* Discord invite button — brand-coloured pill, used on the title/login
+   screen (fixed top-right) and the main menu (below the Logout button). */
+.discord-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  background: #5865F2;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 1px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 0 14px rgba(88, 101, 242, .45);
+  transition: background .15s, box-shadow .15s, transform .1s;
+}
+.discord-btn:hover {
+  background: #4752c4;
+  box-shadow: 0 0 20px rgba(88, 101, 242, .7);
+  transform: translateY(-1px);
+}
+.discord-btn:active { transform: translateY(0); }
+.discord-btn svg { display: block; }
+.discord-btn-label { white-space: nowrap; }
+/* Full-width banner variant (main menu): the logo fills the button width,
+   so the height scales proportionally with however wide the button gets. */
+.discord-btn--block {
+  width: 100%;
+  justify-content: center;
+  padding: 14px 18px;
+}
+.discord-btn--block svg {
+  width: 100%;
+  height: auto;
+}
+/* Large pill variant (title/login screen). */
+.discord-btn--lg {
+  padding: 12px 24px;
+  gap: 12px;
+  font-size: 16px;
+  letter-spacing: 1.5px;
+}
 .volume-btn {
   background: none;
   border: 1px solid transparent;

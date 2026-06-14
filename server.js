@@ -331,6 +331,47 @@ app.use((req, res, next) => {
   res.end(ent.buf);
 });
 
+// ───────────────────────────────────────────────────────────────
+//  index.html with environment-aware social-share tags.
+//  Crawlers (Discord/Twitter/…) don't run JS and need absolute
+//  og:/twitter: URLs in the served HTML. index.html ships with the
+//  production base hard-coded as a safe default; here we swap it for
+//  the host that actually served the request, so link previews
+//  resolve from both the live Render site and a local test build.
+//  PUBLIC_BASE_URL overrides everything (e.g. a future custom domain).
+//  Registered before express.static so it wins for "/" and
+//  "/index.html"; the SPA catch-all reuses it too.
+// ───────────────────────────────────────────────────────────────
+const INDEX_HTML_PATH = path.join(__dirname, 'public', 'index.html');
+const SHARE_BASE_DEFAULT = 'https://pixelparties.onrender.com';
+let _indexCache = { mtimeMs: -1, html: '' };
+
+function resolveOrigin(req) {
+  if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/+$/, '');
+  const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+  return host ? `${proto}://${host}` : SHARE_BASE_DEFAULT;
+}
+
+function serveIndexHtml(req, res) {
+  try {
+    const stat = fs.statSync(INDEX_HTML_PATH);
+    if (stat.mtimeMs !== _indexCache.mtimeMs) {
+      _indexCache = { mtimeMs: stat.mtimeMs, html: fs.readFileSync(INDEX_HTML_PATH, 'utf8') };
+    }
+    const origin = resolveOrigin(req);
+    const html = (origin === SHARE_BASE_DEFAULT)
+      ? _indexCache.html
+      : _indexCache.html.split(SHARE_BASE_DEFAULT).join(origin);
+    res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    return res.send(html);
+  } catch (e) {
+    return res.sendFile(INDEX_HTML_PATH);
+  }
+}
+app.get(['/', '/index.html'], serveIndexHtml);
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/data', express.static(path.join(__dirname, 'data')));
 app.use('/cards', express.static(path.join(__dirname, 'cards')));
@@ -13689,9 +13730,7 @@ function sanitizeRoom(room, forUser) {
 }
 
 // ===== CATCH-ALL (SPA) =====
-app.get('*', async (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+app.get('*', serveIndexHtml);
 
 // ===== START =====
 initDatabase().then(async () => {

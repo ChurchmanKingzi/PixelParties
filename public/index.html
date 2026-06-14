@@ -15,21 +15,29 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
 
-  <!-- Social share preview (set og:url/og:image to absolute URLs once a public domain is known) -->
+  <!-- Social share preview. Crawlers (Discord/Twitter/…) don't run JS, so
+       these URLs must be absolute and live in the served HTML. The base
+       below is the production default; the server rewrites it to whatever
+       host actually served the page (see serveIndexHtml in server.js), so
+       previews resolve from both the live site and local test builds. -->
+  <link rel="canonical" href="https://pixelparties.onrender.com/">
   <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pixelparties.onrender.com/">
   <meta property="og:title" content="Pixel Parties TCG">
   <meta property="og:description" content="Build decks, duel live opponents, and climb the ranks in the Pixel Parties online TCG simulator.">
-  <meta property="og:image" content="/title.png">
+  <meta property="og:image" content="https://pixelparties.onrender.com/title.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Pixel Parties TCG">
   <meta name="twitter:description" content="Build decks, duel live opponents, and climb the ranks in the Pixel Parties online TCG simulator.">
-  <meta name="twitter:image" content="/title.png">
+  <meta name="twitter:image" content="https://pixelparties.onrender.com/title.png">
 
   <!-- Warm up the connections the first paint depends on -->
   <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="/data/cards.json" as="fetch" crossorigin>
+  <!-- Key art backs both the boot splash and the auth screen — fetch it up front. -->
+  <link rel="preload" href="/title.png" as="image">
 
   <link rel="stylesheet" href="/style.css">
 
@@ -37,15 +45,30 @@
        inlined so it renders before style.css and never flashes. React
        replaces #root's contents on first render, removing it. -->
   <style>
+    /* Boot splash — mirrors .auth-screen so the first paint matches the
+       login screen that follows (same key art + translucent panel). Uses
+       no web fonts, so there's no font-swap flash before React mounts. */
     #boot-splash {
       position: fixed; inset: 0; z-index: 9999;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 22px; background: #0a0a12; color: #00f0ff;
+      display: flex; align-items: center; justify-content: center;
+      background-image: url('/title.png'), linear-gradient(135deg, #0a0a12 0%, #1a0a2e 50%, #0a1a1e 100%);
+      background-size: 100% 100%, auto;
+      background-position: center center, center center;
+      background-repeat: no-repeat, no-repeat;
+      background-color: #050510;
       font-family: 'Segoe UI', system-ui, sans-serif;
     }
+    #boot-splash .bs-panel {
+      display: flex; flex-direction: column; align-items: center; gap: 18px;
+      padding: 28px 44px;
+      background: rgba(10, 10, 20, .82);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(170, 136, 255, .35); border-radius: 12px;
+      box-shadow: 0 0 40px rgba(0, 0, 0, .75), 0 0 60px rgba(170, 136, 255, .15);
+    }
     #boot-splash .bs-title {
-      font-size: 30px; font-weight: 800; letter-spacing: 6px;
-      text-transform: uppercase; text-shadow: 0 0 24px rgba(0,240,255,.55);
+      font-size: 24px; font-weight: 800; letter-spacing: 6px;
+      text-transform: uppercase; color: #00f0ff; text-shadow: 0 0 24px rgba(0,240,255,.55);
     }
     #boot-splash .bs-sub { font-size: 12px; letter-spacing: 4px; color: #8888aa; }
     #boot-splash .bs-ring {
@@ -86,9 +109,11 @@
 <body>
   <div id="root">
     <div id="boot-splash">
-      <div class="bs-title">Pixel Parties</div>
-      <div class="bs-ring"></div>
-      <div class="bs-sub">LOADING…</div>
+      <div class="bs-panel">
+        <div class="bs-title">Pixel Parties</div>
+        <div class="bs-ring"></div>
+        <div class="bs-sub">LOADING…</div>
+      </div>
     </div>
   </div>
 </body>

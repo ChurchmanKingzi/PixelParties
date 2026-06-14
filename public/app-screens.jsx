@@ -42,6 +42,37 @@ function PasswordInput({ value, onChange, placeholder, onEnter, autoFocus, autoC
 }
 window.PasswordInput = PasswordInput;
 
+// Official Discord wordmark logo, scaled by `size` (width); height keeps
+// the brand 127.14×96.36 aspect ratio. Inherits `currentColor`.
+const DiscordIcon = ({ size = 22 }) => (
+  <svg width={size} height={(size * 96.36 / 127.14).toFixed(1)} viewBox="0 0 127.14 96.36" fill="currentColor" aria-hidden="true">
+    <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z" />
+  </svg>
+);
+
+// Button that opens the community Discord invite in a new tab. Reused on
+// the auth/title screen (compact pill) and the main menu (`block` — a
+// full-width banner whose logo fills the width, so its height scales with
+// it). Returned by the auth/title screen and the main menu.
+function DiscordButton({ size = 22, label, block, style, className }) {
+  return (
+    <a href="https://discord.gg/K8PFRjr" target="_blank" rel="noopener noreferrer"
+      className={'discord-btn' + (block ? ' discord-btn--block' : '') + (className ? ' ' + className : '')}
+      title="Join our Discord" style={style}>
+      <DiscordIcon size={size} />
+      {label && !block && <span className="discord-btn-label">{label}</span>}
+    </a>
+  );
+}
+window.DiscordButton = DiscordButton;
+
+// Inline currency coin — used in place of a spelled-out "SC" so the coin
+// icon alone signifies money. `size` in px.
+const CoinIcon = ({ size = 14, style }) => (
+  <img src="/data/sc.png" alt="coins" draggable={false}
+    style={{ width: size, height: size, imageRendering: 'pixelated', verticalAlign: 'middle', ...style }} />
+);
+
 function AuthScreen() {
   const { setUser } = useContext(AppContext);
   // mode: 'login' | 'signup' | 'verify' | 'forgot' | 'reset'
@@ -255,6 +286,7 @@ function AuthScreen() {
 
   return (
     <div className="screen-center auth-screen">
+      <DiscordButton label="DISCORD" size={40} className="discord-btn--lg" style={{ position: 'fixed', top: 16, right: 16, zIndex: 10 }} />
       <div className="panel animate-in" style={{ width: 380, textAlign: 'center' }}>
         {Header}
         {body}
@@ -861,7 +893,7 @@ function MainMenu() {
         // shows the pre-puzzle balance) until the user navigates
         // away and back or reloads.
         setUser(u => u ? { ...u, sc: (u.sc || 0) + result.scAwarded } : u);
-        notify(`🧩 Puzzle cleared! +${result.scAwarded} SC`, 'success');
+        notify(`🧩 Puzzle cleared! +${result.scAwarded} 🪙`, 'success');
       } else if (success) {
         notify('🧩 Puzzle cleared!', 'success');
       } else {
@@ -1029,7 +1061,7 @@ function MainMenu() {
           {/* ELO + SC stats (the name now lives above the avatar below). */}
           <span className="badge" style={{ background: 'rgba(170,255,0,.12)', color: 'var(--accent3)', fontSize: 20, padding: '10px 20px' }}>ELO {user.elo}</span>
           <span className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 8, fontSize: 20, padding: '10px 20px' }}>
-            <img src="/data/sc.png" style={{ width: 26, height: 26, imageRendering: 'pixelated' }} /> {user.sc || 0} SC
+            <img src="/data/sc.png" style={{ width: 26, height: 26, imageRendering: 'pixelated' }} /> {user.sc || 0}
           </span>
         </div>
       </div>
@@ -1050,20 +1082,23 @@ function MainMenu() {
             : <span style={{ fontSize: 56, opacity: 0.5 }}>👤</span>}
         </div>
       </div>
-      <div style={{ position: 'absolute', top: 14, right: 16, display: 'flex', alignItems: 'center', gap: 10, zIndex: 5 }}>
-        <div className="menu-logout-confirm-wrap" style={{ position: 'relative' }}>
-          <button className="btn menu-logout-btn" style={{ padding: '7px 22px', fontSize: 13 }} onClick={() => setLogoutConfirm(v => !v)}>LOGOUT</button>
-          {logoutConfirm && (
-            <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, background: 'var(--bg2)', border: '1px solid var(--danger)', borderRadius: 6, padding: '10px 12px', boxShadow: '0 4px 16px rgba(0,0,0,.5)', whiteSpace: 'nowrap', zIndex: 20 }}>
-              <div style={{ fontSize: 12, color: 'var(--text1)', marginBottom: 8, textAlign: 'center' }}>Really log out?</div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                <button className="btn btn-danger" style={{ padding: '4px 16px', fontSize: 11 }} onClick={logout}>YES</button>
-                <button className="btn" style={{ padding: '4px 16px', fontSize: 11 }} onClick={() => setLogoutConfirm(false)}>NO</button>
+      <div style={{ position: 'absolute', top: 14, right: 12, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 20, zIndex: 5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+          <div className="menu-logout-confirm-wrap" style={{ position: 'relative' }}>
+            <button className="btn menu-logout-btn" style={{ padding: '7px 22px', fontSize: 13 }} onClick={() => setLogoutConfirm(v => !v)}>LOGOUT</button>
+            {logoutConfirm && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, background: 'var(--bg2)', border: '1px solid var(--danger)', borderRadius: 6, padding: '10px 12px', boxShadow: '0 4px 16px rgba(0,0,0,.5)', whiteSpace: 'nowrap', zIndex: 20 }}>
+                <div style={{ fontSize: 12, color: 'var(--text1)', marginBottom: 8, textAlign: 'center' }}>Really log out?</div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                  <button className="btn btn-danger" style={{ padding: '4px 16px', fontSize: 11 }} onClick={logout}>YES</button>
+                  <button className="btn" style={{ padding: '4px 16px', fontSize: 11 }} onClick={() => setLogoutConfirm(false)}>NO</button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+          <VolumeControl />
         </div>
-        <VolumeControl />
+        <DiscordButton block />
       </div>
       <div ref={menuBodyRef} className="menu-body ornate-frame" style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 340 }} className="animate-in menu-buttons">
@@ -1109,7 +1144,7 @@ function MainMenu() {
                 <>
                   <div style={{ color: 'var(--text1)', fontSize: 13, lineHeight: 1.55, marginBottom: 14, whiteSpace: 'nowrap' }}>
                     Win a game today with <b style={{ color: 'var(--player-color)' }}>2 of these Heroes</b> in your deck to earn{' '}
-                    <b style={{ color: 'var(--player-color)' }}>10 bonus SC</b>, or <b style={{ color: 'var(--player-color)' }}>all 3 for 20 bonus SC</b>!
+                    <b style={{ color: 'var(--player-color)' }}>10 bonus <CoinIcon size={14} /></b>, or <b style={{ color: 'var(--player-color)' }}>all 3 for 20 bonus <CoinIcon size={14} /></b>!
                   </div>
                   <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
                     {daily.heroes.map((name) => {
@@ -1150,7 +1185,7 @@ function MainMenu() {
                       <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text2)' }}>
                         {daily.claimedBig ? (
                           <div style={{ color: '#33ff88', marginBottom: 6 }}>
-                            ✓ Big bonus claimed (+{daily.claimedBig} SC) — extra wins with 2+ Heroes now give <b>+1 SC</b> each.
+                            ✓ Big bonus claimed (+{daily.claimedBig} <CoinIcon size={12} />) — extra wins with 2+ Heroes now give <b>+1 <CoinIcon size={12} /></b> each.
                           </div>
                         ) : (
                           <div style={{ marginBottom: 6 }}>Big bonus still available.</div>
@@ -1200,7 +1235,7 @@ function MainMenu() {
                     <div key={diff} style={{ marginBottom: 16 }}>
                       <div className="orbit-font" style={{ fontSize: 11, fontWeight: 800, color: diffColors[diff], letterSpacing: 2, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
                         {diff.toUpperCase()}
-                        <span style={{ fontSize: 9, fontWeight: 400, color: 'var(--text2)', letterSpacing: 0 }}>({scReward[diff]} SC)</span>
+                        <span style={{ fontSize: 9, fontWeight: 400, color: 'var(--text2)', letterSpacing: 0 }}>({scReward[diff]} <CoinIcon size={11} />)</span>
                       </div>
                       {puzzles.map(p => (
                         <button key={p.puzzleId} className="btn" onClick={() => startPuzzleAttempt(p)}
@@ -1600,7 +1635,6 @@ function ProfileScreen() {
                   </div>
                 </div>
                 <span className="orbit-font" style={{ fontSize: 20, fontWeight: 700, color: '#ffd700' }}>{user.sc || 0}</span>
-                <span style={{ fontSize: 11, color: 'var(--text2)' }}>SC</span>
               </div>
             </div>
 
@@ -2256,7 +2290,7 @@ function ShopScreen() {
   const buyStructureDeck = async (structureId, e) => {
     if (e) e.stopPropagation();
     if (buying || !structureCatalog) return;
-    if ((user.sc || 0) < structureCatalog.price) { notify('Not enough SC!', 'error'); return; }
+    if ((user.sc || 0) < structureCatalog.price) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
     try {
@@ -2270,7 +2304,7 @@ function ShopScreen() {
 
   const buyRandomStructureDeck = async (e) => {
     if (buying || !structureCatalog) return;
-    if ((user.sc || 0) < structureCatalog.randomPrice) { notify('Not enough SC!', 'error'); return; }
+    if ((user.sc || 0) < structureCatalog.randomPrice) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
     try {
@@ -2343,7 +2377,7 @@ function ShopScreen() {
   const buyItem = async (itemType, itemId, price, e) => {
     if (e) e.stopPropagation();
     if (buying) return;
-    if ((user.sc || 0) < price) { notify('Not enough SC!', 'error'); return; }
+    if ((user.sc || 0) < price) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
     try {
@@ -2358,7 +2392,7 @@ function ShopScreen() {
   const buyRandomSkin = async (e) => {
     if (buying) return;
     const rp = catalog?.randomPrices?.skin || 5;
-    if ((user.sc || 0) < rp) { notify('Not enough SC!', 'error'); return; }
+    if ((user.sc || 0) < rp) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
     try {
@@ -2378,7 +2412,7 @@ function ShopScreen() {
   const buyRandom = async (itemType, e) => {
     if (buying) return;
     const rp = catalog?.randomPrices?.[itemType] || 5;
-    if ((user.sc || 0) < rp) { notify('Not enough SC!', 'error'); return; }
+    if ((user.sc || 0) < rp) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
     try {
@@ -2564,7 +2598,7 @@ function ShopScreen() {
                   <button className="btn" disabled={buying || !canAfford}
                     onClick={(e) => buyStructureDeck(d.structureId, e)}
                     style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#ffd700', color: canAfford ? '#ffd700' : 'var(--text2)' }}>
-                    🔒 {price} SC
+                    🔒 {price} <CoinIcon size={13} />
                   </button>
                 )}
               </div>
@@ -2629,7 +2663,7 @@ function ShopScreen() {
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>SHOP</h2>
         <div style={{ flex: 1 }} />
         <div className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '6px 14px' }}>
-          <img src="/data/sc.png" style={{ width: 22, height: 22, imageRendering: 'pixelated' }} /> {user.sc || 0} SC
+          <img src="/data/sc.png" style={{ width: 22, height: 22, imageRendering: 'pixelated' }} /> {user.sc || 0}
         </div>
         <VolumeControl />
       </div>
