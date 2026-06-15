@@ -73,6 +73,145 @@ const CoinIcon = ({ size = 14, style }) => (
     style={{ width: size, height: size, imageRendering: 'pixelated', verticalAlign: 'middle', ...style }} />
 );
 
+// ═══════════════════════════════════════════
+//  TUTORIAL FLOW (shared)
+//  Drives the "How to Play" tutorial system used by both the main menu's
+//  HOW TO PLAY button and the VS-CPU screen's Tutorial Raccoon. The hook
+//  owns the tutorial list, the live attempt board state, and the Monia-Bot
+//  intro textboxes. The CALLER owns: when the browser is open, BGM, the
+//  Escape key, and rendering the GameBoard while an attempt is in progress
+//  (both menus already do the latter for their other game modes).
+// ═══════════════════════════════════════════
+function useTutorialFlow(open) {
+  const { notify } = useContext(AppContext);
+  const [tutorialList, setTutorialList] = useState(null);
+  const [tutorialAttemptState, setTutorialAttemptState] = useState(null);
+  const tutorialAttemptRoom = useRef(null);
+
+  // Fetch the tutorial list whenever the browser opens.
+  useEffect(() => {
+    if (!open) return;
+    socket.emit('get_tutorials');
+    const onList = (list) => setTutorialList(list);
+    socket.on('tutorial_list', onList);
+    return () => socket.off('tutorial_list', onList);
+  }, [open]);
+
+  // Receive the board state for a running tutorial attempt.
+  useEffect(() => {
+    if (!open) return;
+    const onGameState = (state) => {
+      if (state.isPuzzle && state.isTutorial && !window._tutorialGaveUp) {
+        tutorialAttemptRoom.current = state.roomId;
+        setTutorialAttemptState(state);
+      }
+    };
+    const onError = (msg) => notify('Tutorial error: ' + msg, 'error');
+    socket.on('game_state', onGameState);
+    socket.on('puzzle_error', onError);
+    return () => { socket.off('game_state', onGameState); socket.off('puzzle_error', onError); };
+  }, [open, notify]);
+
+  // Show the Monia-Bot intro textbox when a stage's board first loads (and
+  // again on a retry, which arrives under a new roomId).
+  const tutorialIntroShownRef = useRef(null);
+  const tutorialRoomIdRef = useRef(null);
+  useEffect(() => {
+    if (!tutorialAttemptState || tutorialAttemptState.result) return;
+    if (tutorialAttemptState.roomId !== tutorialRoomIdRef.current) {
+      tutorialRoomIdRef.current = tutorialAttemptState.roomId;
+      tutorialIntroShownRef.current = null;
+    }
+    const num = window._currentTutorialNum;
+    if (!num || tutorialIntroShownRef.current === num) return;
+    const script = (window.TUTORIAL_SCRIPTS || {})[num];
+    if (script?.intro) {
+      tutorialIntroShownRef.current = num;
+      setTimeout(() => {
+        const introPages = Array.isArray(script.intro) ? script.intro : undefined;
+        const introText = typeof script.intro === 'string' ? script.intro : undefined;
+        showTextBox({
+          speaker: '/MoniaBot.png',
+          speakerName: 'Monia Bot',
+          ...(introPages ? { pages: introPages } : { text: introText }),
+          ...(script.opts || {}),
+        });
+      }, 600);
+    }
+  }, [tutorialAttemptState]);
+
+  const startTutorialAttempt = useCallback((tutorial) => {
+    window._currentTutorialNum = tutorial.num;
+    window._currentTutorialRetryId = tutorial.tutorialId;
+    window._tutorialGaveUp = false;
+    socket.emit('start_tutorial_attempt', { tutorialId: tutorial.tutorialId });
+  }, []);
+
+  const onTutorialAttemptLeave = useCallback(() => {
+    const roomId = tutorialAttemptRoom.current;
+    const result = tutorialAttemptState?.result;
+    if (roomId) socket.emit('leave_game', { roomId });
+    setTutorialAttemptState(null);
+    tutorialAttemptRoom.current = null;
+    tutorialIntroShownRef.current = null;
+    window._currentTutorialNum = null;
+    socket.emit('get_tutorials');
+    if (result) {
+      const success = result.isPuzzle && result.puzzleResult === 'success';
+      notify(success ? '📖 Stage cleared!' : 'Stage not cleared — try again!', success ? 'success' : 'info');
+    }
+  }, [tutorialAttemptState, notify]);
+
+  return { tutorialList, tutorialAttemptState, startTutorialAttempt, onTutorialAttemptLeave };
+}
+
+// Modal listing the tutorial missions (with progression locks) plus an
+// always-available rules entry. Presentational — the caller owns open state
+// and supplies onViewRules (the menu navigates to the Rules screen; the
+// VS-CPU screen, reachable by guests who can't change screens, shows Rules
+// in place).
+function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ background: 'var(--bg2)', border: '1px solid #ff44cc', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,68,204,.2)' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
+          <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>HOW TO PLAY</h3>
+          <button className="btn" onClick={onClose} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px 20px' }}>
+          {tutorialList === null ? (
+            <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>Loading tutorials...</div>
+          ) : tutorialList.length === 0 ? (
+            <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>No tutorials available yet.</div>
+          ) : (
+            tutorialList.map((t) => (
+              <button key={t.tutorialId} className="btn" disabled={t.locked}
+                onClick={() => { if (!t.locked) onStart(t); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: 'rgba(255,68,204,.25)', color: t.locked ? 'var(--text2)' : 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', opacity: t.locked ? 0.55 : 1, cursor: t.locked ? 'not-allowed' : 'pointer' }}>
+                <span style={{ color: t.locked ? 'var(--text2)' : (t.completed ? '#33ff88' : 'var(--bg4)'), fontSize: 16, width: 20, textAlign: 'center' }}>
+                  {t.locked ? '🔒' : (t.completed ? '✓' : '○')}
+                </span>
+                <span style={{ color: t.locked ? 'var(--text2)' : '#ff44cc', fontSize: 11, width: 24, flexShrink: 0 }}>{t.num}.</span>
+                <span style={{ flex: 1 }}>{t.name}</span>
+                {t.locked
+                  ? <span style={{ fontSize: 9, color: 'var(--text2)' }}>LOCKED</span>
+                  : (t.completed && <span style={{ fontSize: 9, color: 'var(--text2)' }}>CLEARED</span>)}
+              </button>
+            ))
+          )}
+          {/* Always-available rules entry — bottom-most, never locked. */}
+          <button className="btn" onClick={onViewRules}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginTop: 10, borderColor: 'rgba(255,68,204,.45)', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', cursor: 'pointer' }}>
+            <span style={{ color: '#ff44cc', fontSize: 16, width: 20, textAlign: 'center' }}>📜</span>
+            <span style={{ flex: 1, fontWeight: 700 }}>View Rules</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AuthScreen() {
   const { setUser } = useContext(AppContext);
   // mode: 'login' | 'signup' | 'verify' | 'forgot' | 'reset'
@@ -803,11 +942,9 @@ function MainMenu() {
     return () => window.removeEventListener('keydown', h, true);
   }, [dailyOpen]);
 
-  // Tutorial state
+  // Tutorial state — the flow itself lives in the shared useTutorialFlow hook.
   const [tutorialBrowserOpen, setTutorialBrowserOpen] = useState(false);
-  const [tutorialList, setTutorialList] = useState(null);
-  const [tutorialAttemptState, setTutorialAttemptState] = useState(null);
-  const tutorialAttemptRoom = useRef(null);
+  const { tutorialList, tutorialAttemptState, startTutorialAttempt, onTutorialAttemptLeave } = useTutorialFlow(tutorialBrowserOpen);
 
   // Singleplayer lives in its own screen now (see SingleplayerScreen).
   // MainMenu just routes to it via setScreen('singleplayer').
@@ -902,30 +1039,9 @@ function MainMenu() {
     }
   }, [puzzleAttemptState, notify, setUser]);
 
-  // ── Tutorial system ──
-  useEffect(() => {
-    if (!tutorialBrowserOpen) return;
-    socket.emit('get_tutorials');
-    const onList = (list) => setTutorialList(list);
-    socket.on('tutorial_list', onList);
-    return () => socket.off('tutorial_list', onList);
-  }, [tutorialBrowserOpen]);
-
-
-  useEffect(() => {
-    if (!tutorialBrowserOpen) return;
-    const onGameState = (state) => {
-      if (state.isPuzzle && state.isTutorial && !window._tutorialGaveUp) {
-        tutorialAttemptRoom.current = state.roomId;
-        setTutorialAttemptState(state);
-      }
-    };
-    const onError = (msg) => notify('Tutorial error: ' + msg, 'error');
-    socket.on('game_state', onGameState);
-    socket.on('puzzle_error', onError);
-    return () => { socket.off('game_state', onGameState); socket.off('puzzle_error', onError); };
-  }, [tutorialBrowserOpen, notify]);
-
+  // ── Tutorial system — list fetch, attempt board state and intro textboxes
+  // all live in the shared useTutorialFlow hook (called above). The Escape
+  // handler stays here because it's tied to this screen's modal. ──
   useEffect(() => {
     if (!tutorialBrowserOpen) return;
     const h = (e) => {
@@ -938,61 +1054,6 @@ function MainMenu() {
     window.addEventListener('keydown', h, true);
     return () => window.removeEventListener('keydown', h, true);
   }, [tutorialBrowserOpen, tutorialAttemptState]);
-
-  // Show tutorial intro textbox when game first loads (or on retry with new roomId)
-  const tutorialIntroShownRef = useRef(null);
-  const tutorialRoomIdRef = useRef(null);
-  useEffect(() => {
-    if (!tutorialAttemptState || tutorialAttemptState.result) return;
-    // Reset intro tracking when room changes (retry)
-    if (tutorialAttemptState.roomId !== tutorialRoomIdRef.current) {
-      tutorialRoomIdRef.current = tutorialAttemptState.roomId;
-      tutorialIntroShownRef.current = null;
-    }
-    const num = window._currentTutorialNum;
-    if (!num || tutorialIntroShownRef.current === num) return;
-    const script = (window.TUTORIAL_SCRIPTS || {})[num];
-    if (script?.intro) {
-      tutorialIntroShownRef.current = num;
-      setTimeout(() => {
-        const introPages = Array.isArray(script.intro) ? script.intro : undefined;
-        const introText = typeof script.intro === 'string' ? script.intro : undefined;
-        showTextBox({
-          speaker: '/MoniaBot.png',
-          speakerName: 'Monia Bot',
-          ...(introPages ? { pages: introPages } : { text: introText }),
-          ...(script.opts || {}),
-        });
-      }, 600);
-    }
-  }, [tutorialAttemptState]);
-
-  const startTutorialAttempt = (tutorial) => {
-    window._currentTutorialNum = tutorial.num;
-    window._currentTutorialRetryId = tutorial.tutorialId;
-    window._tutorialGaveUp = false;
-    socket.emit('start_tutorial_attempt', { tutorialId: tutorial.tutorialId });
-  };
-
-  const onTutorialAttemptLeave = useCallback(() => {
-    const gs = tutorialAttemptState;
-    const roomId = tutorialAttemptRoom.current;
-    const result = gs?.result;
-    if (roomId) socket.emit('leave_game', { roomId });
-    setTutorialAttemptState(null);
-    tutorialAttemptRoom.current = null;
-    tutorialIntroShownRef.current = null;
-    window._currentTutorialNum = null;
-    socket.emit('get_tutorials');
-    if (result) {
-      const success = result.isPuzzle && result.puzzleResult === 'success';
-      if (success) {
-        notify('📖 Stage cleared!', 'success');
-      } else {
-        notify('Stage not cleared — try again!', 'info');
-      }
-    }
-  }, [tutorialAttemptState, notify]);
 
   // Play bgm_puzzle while a puzzle attempt or tutorial attempt is active.
   useEffect(() => {
@@ -1254,46 +1315,14 @@ function MainMenu() {
         </div>
       )}
 
-      {/* ── Tutorial Browser Modal ── */}
+      {/* ── Tutorial Browser (How to Play) ── */}
       {tutorialBrowserOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={(e) => { if (e.target === e.currentTarget) setTutorialBrowserOpen(false); }}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid #ff44cc', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,68,204,.2)' }}>
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
-              <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>HOW TO PLAY</h3>
-              <button className="btn" onClick={() => setTutorialBrowserOpen(false)} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px 20px' }}>
-              {tutorialList === null ? (
-                <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>Loading tutorials...</div>
-              ) : tutorialList.length === 0 ? (
-                <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>No tutorials available yet.</div>
-              ) : (
-                tutorialList.map((t, i) => (
-                  <button key={t.tutorialId} className="btn" disabled={t.locked}
-                    onClick={() => { if (!t.locked) startTutorialAttempt(t); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginBottom: 4, borderColor: 'rgba(255,68,204,.25)', color: t.locked ? 'var(--text2)' : 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', opacity: t.locked ? 0.55 : 1, cursor: t.locked ? 'not-allowed' : 'pointer' }}>
-                    <span style={{ color: t.locked ? 'var(--text2)' : (t.completed ? '#33ff88' : 'var(--bg4)'), fontSize: 16, width: 20, textAlign: 'center' }}>
-                      {t.locked ? '🔒' : (t.completed ? '✓' : '○')}
-                    </span>
-                    <span style={{ color: t.locked ? 'var(--text2)' : '#ff44cc', fontSize: 11, width: 24, flexShrink: 0 }}>{t.num}.</span>
-                    <span style={{ flex: 1 }}>{t.name}</span>
-                    {t.locked
-                      ? <span style={{ fontSize: 9, color: 'var(--text2)' }}>LOCKED</span>
-                      : (t.completed && <span style={{ fontSize: 9, color: 'var(--text2)' }}>CLEARED</span>)}
-                  </button>
-                ))
-              )}
-              {/* Always-available rules entry — bottom-most, never locked.
-                  Replaces the old standalone Rules menu button. */}
-              <button className="btn" onClick={() => { setTutorialBrowserOpen(false); setScreen('rules'); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', fontSize: 13, marginTop: 10, borderColor: 'rgba(255,68,204,.45)', color: 'var(--text1)', textAlign: 'left', justifyContent: 'flex-start', cursor: 'pointer' }}>
-                <span style={{ color: '#ff44cc', fontSize: 16, width: 20, textAlign: 'center' }}>📜</span>
-                <span style={{ flex: 1, fontWeight: 700 }}>View Rules</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <TutorialBrowserModal
+          tutorialList={tutorialList}
+          onClose={() => setTutorialBrowserOpen(false)}
+          onStart={startTutorialAttempt}
+          onViewRules={() => { setTutorialBrowserOpen(false); setScreen('rules'); }}
+        />
       )}
     </div>
   );
@@ -2737,8 +2766,11 @@ const RULES_SECTIONS = [
   { id: 'deckbuilding',  label: 'Deck Construction' },
 ];
 
-function RulesScreen() {
+function RulesScreen({ onBack }) {
   const { setScreen } = useContext(AppContext);
+  // Guests can't switch screens (the app pins them to the VS-CPU screen), so
+  // callers can pass onBack to dismiss an in-place Rules overlay instead.
+  const goBack = onBack || (() => setScreen('menu'));
   const contentRef = useRef(null);
   const [activeSection, setActiveSection] = useState('overview');
 
@@ -2769,7 +2801,7 @@ function RulesScreen() {
   // Escape → back to menu
   useEffect(() => {
     const handleEsc = (e) => {
-      if (e.key === 'Escape') { e.stopImmediatePropagation(); setScreen('menu'); }
+      if (e.key === 'Escape') { e.stopImmediatePropagation(); goBack(); }
     };
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
@@ -2801,7 +2833,7 @@ function RulesScreen() {
   return (
     <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #10101d 40%, #0a0a12 100%)' }}>
       <div className="top-bar">
-        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
+        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={goBack}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>RULES</h2>
         <div style={{ flex: 1 }} />
         <VolumeControl />
@@ -3307,7 +3339,10 @@ function SingleplayerScreen() {
   const [starting, setStarting] = useState(false);
   const [search, setSearch] = useState('');
   const [showRegister, setShowRegister] = useState(false); // guest registration modal
+  const [tutorialBrowserOpen, setTutorialBrowserOpen] = useState(false); // Tutorial Raccoon
+  const [showRules, setShowRules] = useState(false); // in-place Rules overlay (guests)
   const cpuBattleRoom = useRef(null);
+  const { tutorialList, tutorialAttemptState, startTutorialAttempt, onTutorialAttemptLeave } = useTutorialFlow(tutorialBrowserOpen);
 
   // Load gallery + caller's own decks (needed to resolve the player deck
   // for the match — we auto-pick their default, same as the old dropdown).
@@ -3389,18 +3424,23 @@ function SingleplayerScreen() {
   useEffect(() => {
     if (!setBgmMode) return;
     if (cpuBattleState && !cpuBattleState.result) setBgmMode('battle');
+    else if (tutorialAttemptState && !tutorialAttemptState.result) setBgmMode('puzzle');
     else setBgmMode('menu');
     return () => { if (setBgmMode) setBgmMode('menu'); };
-  }, [cpuBattleState, setBgmMode]);
+  }, [cpuBattleState, tutorialAttemptState, setBgmMode]);
 
   // Esc → back to menu (battle's own Esc handling takes priority). Guests have
   // no menu, so Esc ends their session and returns to the login screen — same
   // as the Back button.
   useEffect(() => {
     const h = (e) => {
-      if (e.key === 'Escape' && !cpuBattleState) {
+      // The active board (CPU duel or tutorial mission) and the in-place Rules
+      // overlay handle their own Escape, so don't also leave the screen here.
+      if (e.key === 'Escape' && !cpuBattleState && !tutorialAttemptState && !showRules) {
+        // The tutorial browser and guest-register modals trap Esc to close
+        // themselves before it falls through to "leave the screen".
+        if (tutorialBrowserOpen) { e.stopImmediatePropagation(); setTutorialBrowserOpen(false); return; }
         e.stopImmediatePropagation();
-        // While the registration modal is open, Esc just closes it.
         if (showRegister) { setShowRegister(false); return; }
         if (user?.isGuest) {
           api('/auth/logout', { method: 'POST' }).catch(() => {}).finally(() => {
@@ -3414,7 +3454,7 @@ function SingleplayerScreen() {
     };
     window.addEventListener('keydown', h, true);
     return () => window.removeEventListener('keydown', h, true);
-  }, [cpuBattleState, setScreen, setUser, user, showRegister]);
+  }, [cpuBattleState, tutorialAttemptState, showRules, tutorialBrowserOpen, setScreen, setUser, user, showRegister]);
 
   const startBattle = useCallback((opponentId) => {
     if (starting) return;
@@ -3447,6 +3487,29 @@ function SingleplayerScreen() {
     // Refresh so the gallery W/L reflects the outcome
     refreshGallery();
   }, [refreshGallery]);
+
+  // Active tutorial mission — hand the whole screen to the board (same as a
+  // CPU duel). The tutorial uses its own fixed decks, so no deck props apply.
+  if (tutorialAttemptState) {
+    const GameBoard = window.GameBoard;
+    return (
+      <GameBoard
+        gameState={tutorialAttemptState}
+        lobby={{ id: tutorialAttemptState.roomId }}
+        onLeave={onTutorialAttemptLeave}
+        decks={[]}
+        sampleDecks={[]}
+        selectedDeck={null}
+        setSelectedDeck={() => {}}
+      />
+    );
+  }
+
+  // Rules overlay — guests can't navigate to the standalone Rules screen, so
+  // render it in place with a Back that returns to the opponent picker.
+  if (showRules) {
+    return <RulesScreen onBack={() => setShowRules(false)} />;
+  }
 
   // Active CPU battle — render the board and nothing else
   if (cpuBattleState) {
@@ -3491,6 +3554,14 @@ function SingleplayerScreen() {
   return (
     <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)', overflow: 'auto' }}>
       {showRegister && <GuestRegisterModal starterDeckId={selectedDeck} onClose={() => setShowRegister(false)} />}
+      {tutorialBrowserOpen && (
+        <TutorialBrowserModal
+          tutorialList={tutorialList}
+          onClose={() => setTutorialBrowserOpen(false)}
+          onStart={startTutorialAttempt}
+          onViewRules={() => { setTutorialBrowserOpen(false); setShowRules(true); }}
+        />
+      )}
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={onBack}>← BACK</button>
         {user?.isGuest && (
@@ -3550,20 +3621,53 @@ function SingleplayerScreen() {
             You need at least one legal deck to play. Edit a deck or pick a starter deck first.
           </div>
         )}
-        {opponents === null ? (
-          <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 60, fontSize: 13 }}>Loading opponents...</div>
-        ) : opponents.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 60, fontSize: 13 }}>No opponents available.</div>
-        ) : visibleOpponents.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 60, fontSize: 13 }}>No opponents match “{search.trim()}”.</div>
-        ) : (
+        {(() => {
+          // The Tutorial Raccoon is always the first "opponent": clicking her
+          // opens the How-to-Play tutorial browser instead of starting a duel.
+          // She borrows Smug Mastermind Antonia's hero art (cropped like the
+          // real tiles) and is themed pink to set her apart from actual foes.
+          const showRaccoon = !q || 'tutorial raccoon how to play smug mastermind antonia'.includes(q);
+          const oppTiles = (opponents && visibleOpponents) ? visibleOpponents : [];
+          const racColor = '#ff44cc';
+          return (
+          <>
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, 264px)',
             justifyContent: 'center',
             gap: 14,
           }}>
-            {visibleOpponents.map(op => {
+            {showRaccoon && (
+              <button
+                key="__tutorial_raccoon"
+                disabled={starting}
+                onClick={() => setTutorialBrowserOpen(true)}
+                title="Tutorial Raccoon — learn how to play"
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  gap: 6, padding: 8,
+                  background: 'rgba(255,68,204,.07)',
+                  border: '2px solid ' + racColor,
+                  borderRadius: 6,
+                  boxShadow: '0 0 10px ' + racColor + '44',
+                  cursor: starting ? 'not-allowed' : 'pointer',
+                  opacity: starting ? 0.55 : 1,
+                  transition: 'transform .15s ease, box-shadow .15s ease',
+                  fontFamily: 'inherit', color: 'inherit',
+                }}
+                onMouseEnter={e => { if (!starting) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 18px ' + racColor + '88'; } }}
+                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 10px ' + racColor + '44'; }}
+              >
+                <HeroArtCrop heroName="Smug Mastermind Antonia" width={240} />
+                <div className="orbit-font" style={{ fontSize: 16, color: racColor, textAlign: 'center', fontWeight: 700, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  Tutorial Raccoon
+                </div>
+                <div style={{ display: 'flex', gap: 6, fontSize: 13, marginTop: 'auto', color: racColor, fontWeight: 700 }}>
+                  ★ Learn to Play
+                </div>
+              </button>
+            )}
+            {oppTiles.map(op => {
               const imgWidth = 240;
               const total = (op.wins || 0) + (op.losses || 0);
               const frameColor = '#ff4444';
@@ -3610,7 +3714,18 @@ function SingleplayerScreen() {
               );
             })}
           </div>
-        )}
+          {opponents === null && (
+            <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 40, fontSize: 13 }}>Loading opponents...</div>
+          )}
+          {opponents !== null && opponents.length === 0 && (
+            <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 40, fontSize: 13 }}>No opponents available yet.</div>
+          )}
+          {opponents !== null && opponents.length > 0 && visibleOpponents.length === 0 && (
+            <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 40, fontSize: 13 }}>No opponents match “{search.trim()}”.</div>
+          )}
+          </>
+          );
+        })()}
       </div>
     </div>
   );

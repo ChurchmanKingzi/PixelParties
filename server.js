@@ -374,7 +374,13 @@ app.get(['/', '/index.html'], serveIndexHtml);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/data', express.static(path.join(__dirname, 'data')));
-app.use('/cards', express.static(path.join(__dirname, 'cards')));
+// Card art (~730 immutable-ish PNGs). A long cache lifetime means a full
+// reload / re-login serves them straight from disk instead of re-fetching
+// or revalidating ~730 files. Paired with the background preloader, art
+// effectively never "loads in" after the first visit. (Card images are
+// added far more often than existing ones change; if you do replace one
+// in place, bump its filename or shorten this during that release.)
+app.use('/cards', express.static(path.join(__dirname, 'cards'), { maxAge: '7d' }));
 
 // Database initialization (async — called at startup)
 async function initDatabase() {

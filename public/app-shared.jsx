@@ -999,6 +999,47 @@ window.computeSupportHandLimit = function (sideState, areaZone) {
   return Math.max(1, cap);
 };
 
+// ── Background card-art preloader ─────────────────────────────────
+// Card art is ~730 full-res PNGs; the first time each is needed (menu
+// wall, deck builder, battlefield) it pops in slowly. This warms them
+// all into the browser cache during idle time — low priority and low
+// concurrency so it never competes with on-demand loads — and bows out
+// on data-saver / 2G so the player never feels it. Combined with the
+// long Cache-Control on /cards (server.js), warmed art also survives a
+// full reload / re-login.
+let _cardArtPreloadStarted = false;
+function preloadAllCardArt() {
+  if (_cardArtPreloadStarted) return;
+  _cardArtPreloadStarted = true;
+
+  const conn = navigator.connection;
+  if (conn && (conn.saveData || /(^|[^0-9])2g$/.test(conn.effectiveType || ''))) return;
+
+  const urls = [...new Set(
+    Object.values(window.AVAILABLE_MAP || {}).map(f => '/cards/' + encodeURIComponent(f))
+  )];
+  if (!urls.length) return;
+
+  const MAX_PARALLEL = 4;
+  let i = 0, active = 0;
+  const idle = window.requestIdleCallback || (cb => setTimeout(cb, 300));
+
+  function pump() {
+    while (active < MAX_PARALLEL && i < urls.length) {
+      active++;
+      const img = new Image();
+      if ('fetchPriority' in img) img.fetchPriority = 'low';
+      img.decoding = 'async';
+      const next = () => { active--; if (i < urls.length) idle(pump); };
+      img.onload = next;
+      img.onerror = next;
+      img.src = urls[i++];
+    }
+  }
+  idle(pump);
+}
+window.preloadAllCardArt = preloadAllCardArt;
+
 async function loadCardDB() {
   // Load full card database (needed for rule lookups on existing decks)
   const res = await fetch('/data/cards.json');
@@ -1054,6 +1095,10 @@ async function loadCardDB() {
   } catch {
     for (const k of Object.keys(window.SKINS_DB)) delete window.SKINS_DB[k];
   }
+
+  // Now that AVAILABLE_MAP is populated, warm every card image into the
+  // browser cache in the background once the app has had a moment to settle.
+  setTimeout(preloadAllCardArt, 5000);
 }
 
 function cardImageUrl(cardName, skinOverrides) {
