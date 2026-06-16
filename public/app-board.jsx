@@ -26895,7 +26895,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   };
 
   return (
-    <div className="screen-full" style={{ background: '#0c0c14' }}>
+    <div className="screen-full no-crt" style={{ background: '#0c0c14' }}>
       <div className="top-bar" style={{ justifyContent: 'space-between', position: 'relative' }}>
         {isSpectator ? (
           <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={handleLeave}>

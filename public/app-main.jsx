@@ -2327,5 +2327,24 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+// Mount once the pixel UI font is actually loaded. <input> fields don't
+// repaint when a web font finishes loading lazily, so if we render before
+// 'Pixel Intv' is ready the login fields get stuck on a fallback font until
+// they're focused. The boot splash (Segoe UI) covers this brief wait; a
+// timeout guarantees we mount even if the font load stalls or fails.
+(function mountApp() {
+  const mount = () => ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  try {
+    if (document.fonts && document.fonts.load) {
+      let done = false;
+      const go = () => { if (!done) { done = true; mount(); } };
+      document.fonts.load('16px "Pixel Intv"').then(go, go);
+      setTimeout(go, 1500);
+    } else {
+      mount();
+    }
+  } catch (e) {
+    mount();
+  }
+})();
 

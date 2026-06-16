@@ -1626,7 +1626,7 @@ function TipBtn({ tip, children, ...props }) {
         <div style={{
           position: 'fixed', left: pos.x, top: pos.y - 28, transform: 'translateX(-50%)',
           background: 'var(--bg2)', border: '1px solid var(--accent)', color: 'var(--text)',
-          padding: '3px 10px', fontSize: 11, fontFamily: "'Rajdhani', sans-serif", fontWeight: 600,
+          padding: '3px 10px', fontSize: 11, fontFamily: "var(--font-body), sans-serif", fontWeight: 600,
           whiteSpace: 'nowrap', zIndex: 9990, pointerEvents: 'none',
           boxShadow: '0 2px 8px rgba(0,0,0,.6)'
         }}>{tip}</div>

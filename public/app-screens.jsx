@@ -1116,12 +1116,12 @@ function MainMenu() {
       <MenuPlayerPanel top={panelTop} height={panelHeight} />
       {/* Brand label sits centered in the top row (above the menu strip),
           kept at its full size. */}
-      <h1 className="pixel-font menu-title title-outline" style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', fontSize: 24, color: 'var(--accent)', textShadow: '0 0 30px var(--accent)', margin: 0, zIndex: 5 }}>PIXEL PARTIES</h1>
+      <h1 className="pixel-font menu-title title-outline" style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', fontSize: 34, color: 'var(--accent)', textShadow: '0 0 30px var(--accent)', margin: 0, zIndex: 5, border: '3px solid var(--player-color, #00f0ff)', background: 'color-mix(in srgb, var(--player-color, #00f0ff) 8%, var(--menu-surface))' }}>PIXEL PARTIES</h1>
       <div style={{ position: 'absolute', top: 14, left: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10, zIndex: 5 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* ELO + SC stats (the name now lives above the avatar below). */}
-          <span className="badge" style={{ background: 'rgba(170,255,0,.12)', color: 'var(--accent3)', fontSize: 20, padding: '10px 20px' }}>ELO {user.elo}</span>
-          <span className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 8, fontSize: 20, padding: '10px 20px' }}>
+          <span className="badge" style={{ background: 'color-mix(in srgb, var(--player-color, #00f0ff) 14%, var(--menu-surface))', color: 'var(--player-color, #00f0ff)', fontSize: 20, padding: '10px 20px' }}>ELO {user.elo}</span>
+          <span className="badge" style={{ background: 'color-mix(in srgb, #ffd700 12%, var(--menu-surface))', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 8, fontSize: 20, padding: '10px 20px' }}>
             <img src="/data/sc.png" style={{ width: 26, height: 26, imageRendering: 'pixelated' }} /> {user.sc || 0}
           </span>
         </div>
@@ -1198,14 +1198,15 @@ function MainMenu() {
               <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>DAILY CHALLENGE</h3>
               <button className="btn" onClick={closeDaily} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
             </div>
-            <div style={{ padding: '18px 22px 22px', overflowY: 'auto' }}>
+            <div style={{ padding: '18px 22px 22px', overflow: 'hidden auto' }}>
               {(dailyStarting || daily === null) ? (
                 <div style={{ color: 'var(--text2)', textAlign: 'center', padding: 30, fontSize: 13 }}>Loading…</div>
               ) : (daily.active && daily.heroes?.length === 3) ? (
                 <>
-                  <div style={{ color: 'var(--text1)', fontSize: 13, lineHeight: 1.55, marginBottom: 14, whiteSpace: 'nowrap' }}>
+                  <div style={{ color: 'var(--text1)', fontSize: 13, lineHeight: 1.55, marginBottom: 14, textAlign: 'center' }}>
                     Win a game today with <b style={{ color: 'var(--player-color)' }}>2 of these Heroes</b> in your deck to earn{' '}
-                    <b style={{ color: 'var(--player-color)' }}>10 bonus <CoinIcon size={14} /></b>, or <b style={{ color: 'var(--player-color)' }}>all 3 for 20 bonus <CoinIcon size={14} /></b>!
+                    <b style={{ color: 'var(--player-color)' }}>10 bonus <CoinIcon size={14} /></b>,<br />
+                    or <b style={{ color: 'var(--player-color)' }}>all 3 for 20 bonus <CoinIcon size={14} /></b>!
                   </div>
                   <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
                     {daily.heroes.map((name) => {
@@ -1916,7 +1917,7 @@ function ProfileScreen() {
                   <h3 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)', flex: 1 }}>SELECT AVATAR</h3>
                   <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setShowAvatarGallery(false)}>✕ CLOSE</button>
                 </div>
-                <div style={{ overflowY: 'auto', flex: 1 }}>
+                <div style={{ overflow: 'hidden auto', flex: 1 }}>
                   <div className="profile-avatar-gallery">
                     {/* Standard avatars (free) */}
                     {standardAvatars.map(file => {
@@ -3622,11 +3623,12 @@ function SingleplayerScreen() {
           </div>
         )}
         {(() => {
-          // The Tutorial Raccoon is always the first "opponent": clicking her
-          // opens the How-to-Play tutorial browser instead of starting a duel.
-          // She borrows Smug Mastermind Antonia's hero art (cropped like the
-          // real tiles) and is themed pink to set her apart from actual foes.
-          const showRaccoon = !q || 'tutorial raccoon how to play smug mastermind antonia'.includes(q);
+          // The Tutorial Raccoon is the first "opponent" for guests only:
+          // clicking her opens the How-to-Play tutorial browser instead of
+          // starting a duel. She borrows Smug Mastermind Antonia's hero art
+          // (cropped like the real tiles) and is themed pink to set her apart
+          // from actual foes. Registered players don't see her.
+          const showRaccoon = !!user?.isGuest && (!q || 'tutorial raccoon how to play smug mastermind antonia'.includes(q));
           const oppTiles = (opponents && visibleOpponents) ? visibleOpponents : [];
           const racColor = '#ff44cc';
           return (

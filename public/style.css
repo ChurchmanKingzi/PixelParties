@@ -6,6 +6,10 @@
        url('/data/Pixel Intv.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
+  /* block (not swap): briefly hide text rather than flash a fallback that
+     <input> elements won't repaint away until focused. Paired with a
+     <link rel="preload"> in index.html so the block period is tiny. */
+  font-display: block;
 }
 
 :root {
@@ -33,6 +37,15 @@
   --board-font: calc(9px * var(--board-scale));
   --hand-min-h: calc(102px * var(--board-scale));
   --chat-col-w: 324px;
+  /* ── Typography (pixel-art UI) ──
+     One place to retune the whole interface. Pixel Intv is a readable
+     pixel font (also used on cards); Press Start 2P is the chunky 8-bit
+     display face. --font-display/-body alias the old Orbitron/Rajdhani
+     roles so every existing rule flips to pixel at once. */
+  --font-pixel: 'Press Start 2P', monospace;
+  --font-display: 'Pixel Intv', 'Press Start 2P', monospace;
+  --font-body: 'Pixel Intv', 'Press Start 2P', monospace;
+  --font-orbit: var(--font-display); /* legacy alias still referenced in app-board */
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -40,7 +53,7 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Rajdhani', sans-serif;
+  font-family: var(--font-body), sans-serif;
   overflow: hidden;
   height: 100vh;
 }
@@ -52,7 +65,7 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
 
 .pixel-font { font-family: 'Press Start 2P', monospace; }
-.orbit-font { font-family: 'Orbitron', sans-serif; }
+.orbit-font { font-family: var(--font-display), sans-serif; }
 
 /* ===== ANIMATIONS ===== */
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
@@ -77,7 +90,7 @@ body {
 
 /* ===== BUTTONS ===== */
 .btn {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-weight: 600;
   padding: 10px 20px;
   border: 2px solid var(--accent);
@@ -143,7 +156,7 @@ body {
   border: 1px solid var(--bg4);
   color: var(--text);
   padding: 8px 12px;
-  font-family: 'Rajdhani', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-size: 14px;
   outline: none;
   width: 100%;
@@ -155,7 +168,7 @@ body {
   border: 1px solid var(--bg4);
   color: var(--text);
   padding: 8px 12px;
-  font-family: 'Rajdhani', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-size: 14px;
   outline: none;
   cursor: pointer;
@@ -398,7 +411,7 @@ body {
   border: 1px solid var(--bg4);
   color: var(--text);
   padding: 7px 10px;
-  font-family: 'Rajdhani', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-size: 15px;
   outline: none;
   width: 100%;
@@ -409,7 +422,7 @@ body {
   border: 1px solid var(--bg4);
   color: var(--text);
   padding: 7px 10px;
-  font-family: 'Rajdhani', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-size: 15px;
   outline: none;
   cursor: pointer;
@@ -435,7 +448,7 @@ body {
   padding: 8px 14px;
   cursor: pointer;
   font-size: 13px;
-  font-family: 'Rajdhani', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-weight: 600;
   transition: background .1s;
   display: flex;
@@ -458,7 +471,7 @@ body {
   gap: 8px;
   padding: 6px 10px;
   border-bottom: 1px solid var(--bg4);
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 11px;
   font-weight: 700;
 }
@@ -594,7 +607,7 @@ body {
   font-weight: 600;
   color: var(--text2);
   transition: all .2s;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 11px;
 }
 .tab:hover { color: var(--text); }
@@ -641,8 +654,11 @@ body {
 }
 
 /* ── Password field with show/hide toggle ── */
-.pw-field { position: relative; display: flex; }
-.pw-field .input { padding-right: 38px; }
+/* Block (not flex): the eye toggle is absolutely positioned, so no flex is
+   needed — and as a plain block the input lays out at a true width:100%,
+   matching the other (unwrapped) inputs exactly. */
+.pw-field { position: relative; display: block; }
+.pw-field .input { width: 100%; padding-right: 38px; }
 .pw-toggle {
   position: absolute; right: 1px; top: 1px; bottom: 1px; width: 34px;
   display: flex; align-items: center; justify-content: center;
@@ -664,7 +680,7 @@ body {
 .auth-row { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
 .auth-fine { font-size: 11.5px; color: var(--text2); line-height: 1.5; text-align: left; }
 .auth-step-title {
-  font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 15px;
+  font-family: var(--font-display), sans-serif; font-weight: 700; font-size: 15px;
   color: var(--text); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px;
 }
 .auth-code {
@@ -777,7 +793,7 @@ body {
 }
 .leaderboard-row:hover { border-color: var(--accent4); }
 .leaderboard-rank {
-  font-family: 'Orbitron', monospace;
+  font-family: var(--font-display), monospace;
   font-weight: 700;
   font-size: 10px;
   color: var(--text2);
@@ -785,7 +801,7 @@ body {
 }
 .leaderboard-name {
   flex: 1;
-  font-family: 'Rajdhani', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-weight: 700;
   font-size: 13px;
   letter-spacing: .3px;
@@ -794,7 +810,7 @@ body {
   text-overflow: ellipsis;
 }
 .leaderboard-elo {
-  font-family: 'Orbitron', monospace;
+  font-family: var(--font-display), monospace;
   font-weight: 700;
   font-size: 12px;
   color: var(--text);
@@ -943,7 +959,8 @@ body {
   position: relative;
   animation: avatarPulse 3s ease-in-out infinite;
   background: var(--bg);
-  clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+  border-radius: 0;            /* square, matching the main-menu avatar */
+  clip-path: none;
 }
 .profile-avatar-inner {
   width: 100%;
@@ -963,7 +980,7 @@ body {
   opacity: 0;
   transition: opacity .2s;
   cursor: pointer;
-  clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+  clip-path: none;
   font-size: 28px;
   color: #fff;
 }
@@ -998,7 +1015,7 @@ body {
   padding: 18px 22px;
 }
 .profile-section-label {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 10px;
   font-weight: 700;
   color: var(--text2);
@@ -1025,7 +1042,7 @@ body {
   padding: 16px 8px;
 }
 .profile-stat-value {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 20px;
   font-weight: 800;
   color: var(--text);
@@ -1035,7 +1052,7 @@ body {
   font-size: 28px;
 }
 .profile-stat-label {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 8px;
   font-weight: 600;
   color: var(--text2);
@@ -1053,7 +1070,7 @@ body {
   border: 1px solid var(--bg4);
   color: var(--text);
   padding: 8px 10px;
-  font-family: 'Rajdhani', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-size: 14px;
   outline: none;
   resize: none;
@@ -1127,7 +1144,7 @@ body {
   background: rgba(0,0,0,.6);
   opacity: 0;
   transition: opacity .2s;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 13px;
   font-weight: 700;
   color: var(--accent);
@@ -1292,7 +1309,7 @@ body {
 .profile-deck-tile-count {
   font-size: 9px;
   color: var(--text2);
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
 }
 
 /* ===== GAME BOARD ===== */
@@ -1391,6 +1408,34 @@ body {
 }
 .deck-empty-slot .card-slot {
   border-style: dashed;
+}
+/* Simulated starting-hand highlight: strongly glow the first 6 main-deck
+   cards after Shuffle, and veil the rest so the "hand" pops. */
+.deck-hand-highlight {
+  position: relative;
+  z-index: 3;
+  border-radius: 6px;
+  outline: 3px solid #ffe34d;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px #ffd700, 0 0 18px 6px rgba(255,215,0,.8), 0 0 36px 12px rgba(255,200,0,.4);
+  animation: handHighlightPulse 2.4s ease-in-out infinite;
+}
+@keyframes handHighlightPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 3px #ffd700, 0 0 14px 4px rgba(255,215,0,.6), 0 0 30px 9px rgba(255,200,0,.3);
+  }
+  50% {
+    box-shadow: 0 0 0 3px #ffd700, 0 0 22px 8px rgba(255,215,0,.85), 0 0 42px 15px rgba(255,200,0,.5);
+  }
+}
+/* Dim/desaturate the non-hand cards while the highlight is active. The
+   filter/opacity is applied to the card visual only (not the slot) so the
+   hover tooltip — a sibling of .card-mini inside the slot — renders normally. */
+.deck-section-body.hand-veil .deck-drag-slot:not(.deck-hand-highlight) .card-mini,
+.deck-section-body.hand-veil .deck-empty-slot .card-slot {
+  opacity: .28;
+  filter: grayscale(.6) brightness(.7);
+  transition: opacity .2s ease, filter .2s ease;
 }
 
 .hand-floating-card {
@@ -3149,7 +3194,7 @@ body {
   flex-shrink: 0;
 }
 .board-phase-item {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: var(--board-font);
   font-weight: 700;
   color: rgba(255,255,255,.4);
@@ -4190,7 +4235,7 @@ body {
   top: 42%;
   transform: translate(-50%, -50%);
   text-align: center;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   color: #e7e7ea;
   text-shadow: 0 0 18px rgba(0,0,0,.95), 0 0 8px rgba(120,120,140,.8);
   animation: zhuSkipLabelPop 1.3s ease-out forwards;
@@ -4231,7 +4276,7 @@ body {
    reads as "the air itself is sleeping". */
 .zhu-skip-zzz {
   position: absolute;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-weight: 800;
   color: #cdd0db;
   text-shadow: 0 0 12px rgba(200,210,255,.8), 0 0 4px rgba(140,160,220,.9);
@@ -5612,7 +5657,7 @@ body {
   opacity: .5;
   text-transform: uppercase;
   letter-spacing: .5px;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   text-align: center;
   line-height: 1.3;
 }
@@ -6140,7 +6185,7 @@ body {
   font-size: calc(10px * var(--board-scale)); font-weight: 700;
   color: #fff;
   text-shadow: 0 0 4px #000, 0 0 2px #000;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
 }
 .deck-empty-label {
   position: absolute;
@@ -6148,7 +6193,7 @@ body {
   font-size: calc(10px * var(--board-scale)); font-weight: 700;
   color: #fff;
   text-shadow: 0 0 4px #000, 0 0 2px #000;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   opacity: 0.5;
 }
 .board-card.flipped .board-card-label {
@@ -7063,7 +7108,7 @@ body:has(.game-hand-me) .board-tooltip {
   color: var(--text);
   padding: 3px 10px;
   font-size: 11px;
-  font-family: 'Rajdhani', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-weight: 600;
   max-width: 280px;
   pointer-events: none;
@@ -7102,7 +7147,7 @@ body:has(.game-hand-me) .board-tooltip {
   left: 100%;
   top: 50%;
   transform: translate(1px, -50%);
-  font-family: 'Rajdhani', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-weight: 800;
   font-size: calc(11px * var(--board-scale));
   line-height: 1;
@@ -7118,7 +7163,7 @@ body:has(.game-hand-me) .board-tooltip {
   left: 2px;
   font-size: calc(11px * var(--board-scale));
   font-weight: 800;
-  font-family: 'Rajdhani', sans-serif;
+  font-family: var(--font-body), sans-serif;
   background: rgba(255,180,0,.9);
   color: #000;
   padding: calc(1px * var(--board-scale)) calc(5px * var(--board-scale));
@@ -7845,7 +7890,7 @@ body:has(.game-hand-me) .board-tooltip {
 }
 .shop-tab {
   padding: 8px 18px;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 11px;
   background: transparent;
   border: none;
@@ -8210,7 +8255,7 @@ body:has(.game-hand-me) .board-tooltip {
   right: 6px;
   background: rgba(255,215,0,.9);
   color: #000;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 8px;
   font-weight: 700;
   padding: 2px 6px;
@@ -8367,7 +8412,7 @@ body:has(.game-hand-me) .board-tooltip {
 .shop-purchase-text {
   position: absolute;
   transform: translateX(-50%);
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 42px;
   font-weight: 900;
   color: #ffd700;
@@ -8483,7 +8528,7 @@ body:has(.game-hand-me) .board-tooltip {
 
 .shop-reveal-label {
   margin-top: 16px;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 16px;
   font-weight: 800;
   background: linear-gradient(105deg, #ffd700 0%, #fff8b0 30%, #ffaa00 60%, #ffd700 100%);
@@ -8545,7 +8590,7 @@ body:has(.game-hand-me) .board-tooltip {
   padding: 14px 18px;
 }
 .discord-btn--block svg {
-  width: 100%;
+  width: 67%;
   height: auto;
 }
 /* Large pill variant (title/login screen). */
@@ -8726,7 +8771,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   border: none;
   border-left: 3px solid transparent;
   color: var(--text2);
-  font-family: 'Rajdhani', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-size: 16px;
   font-weight: 600;
   padding: 8px 16px;
@@ -8881,7 +8926,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   color: #000;
   font-weight: 800;
   font-size: 11px;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
 }
 
 /* ── Icon rows (subtypes, schools) ── */
@@ -8963,7 +9008,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 16px;
   font-weight: 700;
   color: var(--accent);
@@ -9034,7 +9079,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   color: #000;
   font-weight: 800;
   font-size: 13px;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
 }
 .rules-phase-name {
   font-size: 17px;
@@ -9063,7 +9108,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   margin: 0;
 }
 .rules-status-name {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 15px;
   font-weight: 700;
   margin-bottom: 6px;
@@ -9096,7 +9141,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   padding: 14px 16px;
 }
 .rules-deck-limit-label {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 15px;
   font-weight: 700;
   color: var(--accent);
@@ -9717,7 +9762,7 @@ body:has(.textbox-overlay) .tooltip {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   text-align: center;
   padding: 24px;
 }
@@ -9907,6 +9952,22 @@ body:has(.textbox-overlay) .tooltip {
   background:
     radial-gradient(ellipse at center, rgba(10,10,18,.55) 0%, rgba(10,10,18,.82) 70%, rgba(10,10,18,.92) 100%);
 }
+/* EXPERIMENTAL — faint pixel dither over the scrolling card wall, just to add a
+   touch of texture to the background. Sits above the cards + veil but below all
+   menu content (the whole .menu-card-bg layer is z-index:0; content is z-index
+   1+). Kept semi-transparent so the card art still reads through it. To remove,
+   delete this single rule. Tuning knobs: `opacity` and `background-size`. */
+.menu-card-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .03;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff'/%3E%3Crect x='1' y='0' width='1' height='1' fill='%23000000'/%3E%3Crect x='0' y='1' width='1' height='1' fill='%23000000'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  background-repeat: repeat;
+  image-rendering: pixelated;
+}
 @keyframes menu-card-bg-scroll {
   from { transform: translateY(0); }
   to   { transform: translateY(-50%); }
@@ -9937,32 +9998,6 @@ body:has(.textbox-overlay) .tooltip {
   border: 1px solid color-mix(in srgb, var(--player-color, #00f0ff) 45%, transparent);
   border-radius: 13px;
   pointer-events: none;
-}
-/* Four corner brackets (8 gradient bars — a horizontal + vertical arm at
-   each corner). */
-.ornate-frame::after {
-  content: '';
-  position: absolute;
-  inset: 9px;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
-    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
-    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
-    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
-    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
-    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
-    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff)),
-    linear-gradient(var(--player-color, #00f0ff), var(--player-color, #00f0ff));
-  background-repeat: no-repeat;
-  background-position:
-    left top, left top, right top, right top,
-    left bottom, left bottom, right bottom, right bottom;
-  background-size:
-    18px 2px, 2px 18px, 18px 2px, 2px 18px,
-    18px 2px, 2px 18px, 18px 2px, 2px 18px;
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--player-color, #00f0ff) 60%, transparent));
 }
 
 /* ═══ Main Menu hub side panels ═══ */
@@ -9997,7 +10032,7 @@ body:has(.textbox-overlay) .tooltip {
      within sensible bounds. */
   width: clamp(72px, calc(50vw - 256px - clamp(300px, 26vw, 470px) - 64px), 160px);
   aspect-ratio: 1;
-  border-radius: 10px;
+  border-radius: 0;            /* angular, matching the menu boxes */
   overflow: hidden;
   cursor: pointer;
   border: 2px solid var(--accent);
@@ -10052,7 +10087,7 @@ body:has(.textbox-overlay) .tooltip {
   padding: 0 6px;
 }
 .menu-side-title {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 16px;
   letter-spacing: 1.8px;
   color: var(--accent);
@@ -10092,7 +10127,7 @@ body:has(.textbox-overlay) .tooltip {
 .menu-lb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
 .menu-lb-row {
   display: flex; align-items: center; gap: 11px;
-  padding: 8px 10px; border-radius: 8px;
+  padding: 8px 10px; border-radius: 0;
   font-size: 15px;
   border: 1px solid transparent;   /* keep height stable vs. medal rows */
 }
@@ -10131,8 +10166,9 @@ body:has(.textbox-overlay) .tooltip {
 .menu-record { display: flex; gap: 9px; }
 .menu-record-cell {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 13px 6px; border-radius: 10px;
+  padding: 13px 6px; border-radius: 0;
   background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--player-color, #00f0ff);
 }
 .menu-record-cell b { font-size: 28px; font-weight: 800; line-height: 1; }
 .menu-record-cell span { font-size: 10.5px; letter-spacing: .6px; color: var(--text2); }
@@ -10146,15 +10182,18 @@ body:has(.textbox-overlay) .tooltip {
 .menu-deck-list { display: flex; flex-direction: column; gap: 8px; }
 .menu-deck-card {
   display: flex; align-items: center; gap: 13px; width: 100%;
-  padding: 10px 12px; border-radius: 12px; cursor: pointer; text-align: left;
+  padding: 10px 12px; border-radius: 0; cursor: pointer; text-align: left;
   background: rgba(255, 255, 255, .04);
-  border: 1px solid rgba(255, 255, 255, .08);
+  border: 1px solid var(--player-color, #00f0ff);
   transition: background .15s, border-color .15s;
+  /* <button> doesn't inherit the page font — set the pixel UI font explicitly
+     so the deck rows match the rest of the menu. */
+  font-family: var(--font-display), sans-serif;
 }
-.menu-deck-card:hover { background: rgba(0, 240, 255, .1); border-color: rgba(0, 240, 255, .35); }
+.menu-deck-card:hover { background: rgba(0, 240, 255, .1); border-color: var(--player-color, #00f0ff); }
 .menu-deck-card.is-active {
   background: rgba(0, 240, 255, .14);
-  border-color: rgba(0, 240, 255, .55);
+  border-color: var(--player-color, #00f0ff);
   cursor: default;
 }
 /* The standalone "Active Deck" card up top is clickable (→ deck builder). */
@@ -10207,7 +10246,7 @@ body:has(.textbox-overlay) .tooltip {
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
 }
-.menu-title { padding: 8px 24px; }
+.menu-title { padding: 14px 24px; }
 .menu-subtitle { padding: 5px 16px; border-radius: 9px; }
 .menu-user-info {
   display: flex;
@@ -10312,7 +10351,7 @@ body:has(.textbox-overlay) .tooltip {
     display: flex !important;
     position: absolute; bottom: 0; left: 0; right: 0;
     background: rgba(0,0,0,.75);
-    font-family: 'Orbitron', sans-serif;
+    font-family: var(--font-display), sans-serif;
     font-size: 12px; font-weight: 800;
     justify-content: center; padding: 2px 0;
     text-shadow: 0 0 6px currentColor;
@@ -10559,7 +10598,7 @@ body:has(.textbox-overlay) .tooltip {
   min-height: 0;
 }
 .action-log-header {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 9px;
   font-weight: 700;
   color: var(--text2);
@@ -10592,7 +10631,7 @@ body:has(.textbox-overlay) .tooltip {
 .action-log-entry:last-child { border-bottom: none; }
 .action-log-turn-divider {
   text-align: center;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 8px;
   color: rgba(255,255,255,.3);
   padding: 4px 0 2px;
@@ -10624,7 +10663,7 @@ body:has(.textbox-overlay) .tooltip {
   min-height: 0;
 }
 .chat-header {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 9px;
   font-weight: 700;
   color: var(--text2);
@@ -10660,7 +10699,7 @@ body:has(.textbox-overlay) .tooltip {
   cursor: pointer;
   border-bottom: 2px solid transparent;
   transition: all .15s;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   letter-spacing: .5px;
 }
 .chat-tab:hover { color: #fff; background: rgba(255,255,255,.03); }
@@ -10724,7 +10763,7 @@ body:has(.textbox-overlay) .tooltip {
   font-size: 10px;
   padding: 0 10px;
   cursor: pointer;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   letter-spacing: .5px;
   transition: background .15s;
 }
@@ -10761,7 +10800,7 @@ body:has(.textbox-overlay) .tooltip {
 .player-list-name { font-weight: 600; }
 .player-list-badge {
   font-size: 7px;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   opacity: .5;
   margin-left: auto;
 }
@@ -10830,7 +10869,7 @@ body:has(.textbox-overlay) .tooltip {
   width: 100%;
   height: 100%;
   padding: 8px 2px;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-weight: 700;
   transition: color .2s;
 }
@@ -10889,4 +10928,169 @@ body:has(.textbox-overlay) .tooltip {
   .rules-card-img-sm { width: 100%; max-width: 360px; }
   .rules-status-grid { grid-template-columns: 1fr; }
   .rules-deck-limits { flex-direction: column; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RETRO PIXEL THEME  —  appended override layer (menus only)
+   One self-contained block so it's easy to tweak or rip out. Leans the
+   interface into the 16-bit look: crisp pixel text, square chrome, chunky
+   bevels, hard offset shadows, pressed-in buttons, and a subtle CRT pass.
+   The in-game board opts out via `.screen-full.no-crt`.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* 1 ── Crisp pixel text — kill the anti-alias blur on the pixel fonts */
+body, button, input, select, textarea,
+.btn, .orbit-font, .pixel-font, .tab, .badge {
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
+}
+
+/* 2 ── Keep scaled 16-bit art crisp instead of bilinear-blurred */
+img, .card-tooltip-img img { image-rendering: pixelated; }
+
+/* 3 ── Buttons: flat fill, square, hard offset shadow, press-in on click */
+.btn {
+  letter-spacing: 0;
+  border-radius: 0;
+  box-shadow: 2px 2px 0 rgba(0,0,0,.5);
+  transition: filter .1s, transform .05s, box-shadow .05s,
+              background .15s, color .15s, border-color .15s;
+}
+.btn:hover  { box-shadow: 3px 3px 0 rgba(0,0,0,.5); }
+.btn:active { transform: translate(2px,2px); box-shadow: none; }
+.btn:disabled { box-shadow: 1px 1px 0 rgba(0,0,0,.35); }
+.btn-big, .menu-nav-btn { border-radius: 0; }
+/* menu-hub buttons keep their colour-glow hover but adopt the press-in feel */
+.menu-buttons .btn:active { transform: translate(2px,2px) scale(1); box-shadow: none; }
+
+/* 4 ── Inputs & selects: square, chunkier border, hard focus outline */
+.input, .select, .db-filter-input, .db-filter-select {
+  border-radius: 0;
+  border-width: 2px;
+}
+.input:focus, .select:focus,
+.db-filter-input:focus, .db-filter-select:focus {
+  box-shadow: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+/* 5 ── Panels: square + 16-bit bevel (light top-left, dark bottom-right) */
+.panel {
+  border-radius: 0;
+  border: 3px solid var(--bg4);
+  box-shadow:
+    inset 2px 2px 0 rgba(255,255,255,.05),
+    inset -2px -2px 0 rgba(0,0,0,.45),
+    5px 5px 0 rgba(0,0,0,.5);
+}
+
+/* 6 ── Modals: square, hard drop shadow, darker dim */
+.modal { border-radius: 0; box-shadow: 6px 6px 0 rgba(0,0,0,.6); }
+.modal-overlay { background: rgba(4,4,10,.8); }
+
+/* 7 ── Badges: square with a crisp 2px frame */
+.badge { border-radius: 0; border: 2px solid currentColor; }
+
+/* 8 ── Auth/login panel: drop the frosted glass for a flat pixel window */
+.auth-screen .panel {
+  border-radius: 0;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(8,8,16,.92);
+  border: 3px solid rgba(170,136,255,.55);
+  box-shadow: 6px 6px 0 rgba(0,0,0,.7), 0 0 0 1px rgba(0,0,0,.6);
+}
+
+/* 9 ── Main-menu chrome: square the frames/plaques, drop the blur */
+.ornate-frame, .ornate-frame::before { border-radius: 0; }
+.menu-body, .menu-side-panel {
+  border-radius: 0;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(8,10,18,.85);
+}
+.menu-title, .menu-subtitle {
+  border-radius: 0;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(8,10,18,.78);
+}
+
+/* 12 ── Dithering — a coarse ordered checkerboard tiled over the menu boxes
+   (panels/modals/containers) for that hand-shaded 16-bit texture. It's a tiny 2x2 SVG
+   (two opaque pixels on the diagonal) scaled up with image-rendering:pixelated
+   so the chunky squares stay sharp. Layered as background-IMAGE with
+   !important so it rides on top of each element's background-COLOR and survives
+   the shorthand `background` resets on hover / inline tints.
+   Because it's a *background*, text/numbers (foreground content) always render
+   ABOVE it — only the surfaces are dithered, never the glyphs. */
+.panel,
+.modal,
+.menu-body,
+.menu-side-panel {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.10'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.10'/%3E%3C/svg%3E") !important;
+  background-size: 8px 8px !important;
+  background-repeat: repeat !important;
+  image-rendering: pixelated;
+}
+
+/* 13 ── Mask the menu-box dithering under content that sits on top of it.
+   Buttons / deck cards / leaderboard rows have translucent backgrounds, so the
+   dithered panel behind them "shines through". A translucent layer can't hide
+   just one layer behind it, so instead we give these elements an OPAQUE surface
+   (panel-toned) with their own tint mixed in: the colour reads the same, but the
+   solid fill stops the dither at their edges. --menu-surface ≈ the panels'
+   apparent colour, so the masked tiles blend into the box. */
+:root { --menu-surface: #0b0d16; }
+
+/* Main-menu nav buttons */
+.menu-buttons .btn {
+  background: color-mix(in srgb, var(--player-color, #00f0ff) 8%, var(--menu-surface)) !important;
+}
+
+/* Deck cards (Active Deck + Your Decks), incl. hover / state tints */
+.menu-deck-card {
+  background: color-mix(in srgb, #ffffff 4%, var(--menu-surface)) !important;
+}
+.menu-deck-card:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--menu-surface)) !important;
+}
+.menu-deck-card.is-active {
+  background: color-mix(in srgb, var(--accent) 14%, var(--menu-surface)) !important;
+}
+.menu-deck-card.is-editable:hover {
+  background: color-mix(in srgb, var(--accent) 20%, var(--menu-surface)) !important;
+}
+.menu-deck-card.is-illegal:hover {
+  background: color-mix(in srgb, var(--danger) 10%, var(--menu-surface)) !important;
+}
+
+/* Top-players rows (the player-name labels live here) + stat cells */
+.menu-lb-row { background: var(--menu-surface) !important; }
+.menu-lb-row.is-me  { background: color-mix(in srgb, var(--accent) 12%, var(--menu-surface)) !important; }
+.menu-lb-row.rank-1 { background: color-mix(in srgb, #ffd700 16%, var(--menu-surface)) !important; }
+.menu-lb-row.rank-2 { background: color-mix(in srgb, #ced2dc 15%, var(--menu-surface)) !important; }
+.menu-lb-row.rank-3 { background: color-mix(in srgb, #cd7f32 16%, var(--menu-surface)) !important; }
+.menu-record-cell   { background: color-mix(in srgb, #ffffff 4%, var(--menu-surface)) !important; }
+
+/* Login screen: its panel is dithered too, and the buttons are translucent —
+   give them the same opaque-surface masking as the menu buttons so the dither
+   doesn't shine through. (Inputs are already opaque, so they don't need it.) */
+.auth-screen .btn {
+  background: color-mix(in srgb, var(--accent) 8%, var(--menu-surface)) !important;
+}
+.auth-screen .btn:hover {
+  background: color-mix(in srgb, var(--accent) 18%, var(--menu-surface)) !important;
+}
+
+/* Logout button: same opaque-surface treatment as the menu nav buttons so the
+   card wall / dither doesn't show through it (keeps its own accent colour). */
+.menu-logout-btn {
+  background: color-mix(in srgb, var(--accent) 8%, var(--menu-surface)) !important;
+}
+.menu-logout-btn:hover {
+  background: color-mix(in srgb, var(--accent) 18%, var(--menu-surface)) !important;
 }

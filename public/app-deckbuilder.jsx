@@ -83,7 +83,7 @@ function TipBtn({ tip, children, ...props }) {
         <div style={{
           position: 'fixed', left: pos.x, top: pos.y - 28, transform: 'translateX(-50%)',
           background: 'var(--bg2)', border: '1px solid var(--accent)', color: 'var(--text)',
-          padding: '3px 10px', fontSize: 11, fontFamily: "'Rajdhani', sans-serif", fontWeight: 600,
+          padding: '3px 10px', fontSize: 11, fontFamily: "var(--font-body), sans-serif", fontWeight: 600,
           whiteSpace: 'nowrap', zIndex: 9990, pointerEvents: 'none',
           boxShadow: '0 2px 8px rgba(0,0,0,.6)'
         }}>{tip}</div>
@@ -114,6 +114,21 @@ function DeckBuilder() {
   const [ctxMenu, setCtxMenu] = useState(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [historyTick, setHistoryTick] = useState(0);
+  const [deckDropdownOpen, setDeckDropdownOpen] = useState(false);
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  // Highlights the first 6 main-deck cards as a simulated starting hand (toggled by Shuffle/Sort)
+  const [handHighlight, setHandHighlight] = useState(false);
+  // Drop the highlight when switching to another deck
+  useEffect(() => { setHandHighlight(false); }, [activeIdx, sampleActive]);
+  const leftPanelRef = useRef(null);
+
+  // Close the deck dropdown when clicking anywhere outside the left panel
+  useEffect(() => {
+    if (!deckDropdownOpen) return;
+    const onDown = (e) => { if (leftPanelRef.current && !leftPanelRef.current.contains(e.target)) setDeckDropdownOpen(false); };
+    window.addEventListener('mousedown', onDown, true);
+    return () => window.removeEventListener('mousedown', onDown, true);
+  }, [deckDropdownOpen]);
 
   // Per-section undo/redo history
   // deckId -> { main:{stack,idx}, heroes:{stack,idx}, potion:{stack,idx}, side:{stack,idx} }
@@ -174,6 +189,7 @@ function DeckBuilder() {
       // the deck header without leaving the deck editor; same for skin
       // gallery and context menu. Only when no overlay is open does
       // Escape navigate away (with the unsaved-changes guard).
+      if (s.deckDropdownOpen) { e.preventDefault(); e.stopImmediatePropagation(); setDeckDropdownOpen(false); return; }
       if (s.renaming) { e.preventDefault(); e.stopImmediatePropagation(); setRenaming(false); setRenameVal(''); return; }
       if (s.showLeaveConfirm) { e.preventDefault(); e.stopImmediatePropagation(); setShowLeaveConfirm(false); setScreen('menu'); return; }
       if (s.skinGallery) { e.preventDefault(); e.stopImmediatePropagation(); setSkinGallery(null); return; }
@@ -809,10 +825,11 @@ function DeckBuilder() {
   // Per-section sort/shuffle/empty
   const sortSec = (sec) => {
     if (!currentDeck) return;
+    if (sec === 'main') setHandHighlight(false);
     const keyMap = { main: 'mainDeck', potion: 'potionDeck', side: 'sideDeck' };
     if (keyMap[sec]) updateSections({ [sec]: sortDeckCards(currentDeck[keyMap[sec]] || []) });
   };
-  const shuffleMain = () => { if (currentDeck) updateSections({ main: shuffleArray(currentDeck.mainDeck || []) }); };
+  const shuffleMain = () => { if (currentDeck) { updateSections({ main: shuffleArray(currentDeck.mainDeck || []) }); setHandHighlight(true); } };
   const emptySec = (sec) => {
     if (!currentDeck) return;
     const emptyVals = { main: [], heroes: [{hero:null,ability1:null,ability2:null},{hero:null,ability1:null,ability2:null},{hero:null,ability1:null,ability2:null}], potion: [], side: [] };
@@ -857,13 +874,15 @@ function DeckBuilder() {
     return result;
   }, [filters, isCube]);
 
-  const pageCount = Math.ceil(filteredCards.length / 20);
-  const pageCards = filteredCards.slice(cardPage * 20, (cardPage + 1) * 20);
-  useEffect(() => setCardPage(0), [filters]);
+  // Collapsing the filter panel frees vertical room, so show more cards per page.
+  const pageSize = filtersCollapsed ? 40 : 20;
+  const pageCount = Math.ceil(filteredCards.length / pageSize);
+  const pageCards = filteredCards.slice(cardPage * pageSize, (cardPage + 1) * pageSize);
+  useEffect(() => setCardPage(0), [filters, filtersCollapsed]);
 
   const validation = currentDeck ? isDeckLegal(currentDeck) : { legal: false, reasons: [] };
   const hasUnsaved = currentDeck && unsaved[currentDeck.id];
-  escStateRef.current = { showLeaveConfirm, skinGallery, ctxMenu, renaming, hasUnsaved, isSampleMode };
+  escStateRef.current = { showLeaveConfirm, skinGallery, ctxMenu, renaming, hasUnsaved, isSampleMode, deckDropdownOpen };
   const heroes = currentDeck?.heroes || [{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null }];
 
   const importFileRef = useRef(null);
@@ -1192,177 +1211,203 @@ function DeckBuilder() {
       <div className="top-bar">
         <button className="btn" style={{ padding: '4px 10px', fontSize: 9 }} onClick={() => hasUnsaved && !isSampleMode ? setShowLeaveConfirm(true) : setScreen('menu')}>← MENU</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>DECK BUILDER</h2>
+        {currentDeck && (
+          /* Deck name + legality, left-aligned to sit directly above the
+             center deck panel (left panel 170 + 1px border + 12px padding). */
+          <div style={{ position: 'absolute', left: 183, top: 0, bottom: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            {renaming ? (
+              <>
+                <input className="input" value={renameVal} onChange={e => setRenameVal(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') finishRename(); }} autoFocus style={{ width: 200 }} />
+                <button className="btn" style={{ padding: '2px 8px', fontSize: 9 }} onClick={finishRename}>OK</button>
+              </>
+            ) : (
+              <>
+                <span className="orbit-font" style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentDeck.name}{hasUnsaved ? ' *' : ''}</span>
+                <button style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', fontSize: 12 }}
+                  onClick={() => { setRenameVal(currentDeck?.name || ''); setRenaming(true); }}>✏️</button>
+                {validation.legal
+                  ? <span className="badge" style={{ background: 'rgba(51,255,136,.12)', color: 'var(--success)' }}>LEGAL</span>
+                  : <span className="badge" style={{ background: 'rgba(255,51,102,.12)', color: 'var(--danger)' }} title={validation.reasons.join(' · ')}>ILLEGAL</span>}
+              </>
+            )}
+          </div>
+        )}
         <div style={{ flex: 1 }} />
-        <button className="btn" style={{ padding: '4px 10px', fontSize: 9 }}
-          disabled={!hasUnsaved || isSampleMode}
-          onClick={() => { if (!currentDeck) return; const id = currentDeck.id; setUnsaved(prev => { const n = { ...prev }; delete n[id]; return n; }); delete shRef.current[id]; setHistoryTick(t => t + 1); }}>
-          ↩ RESET</button>
-        <button className={'btn' + (hasUnsaved && !isSampleMode ? ' btn-flash-save' : '')} style={{ padding: '4px 10px', fontSize: 9 }} onClick={saveCurrent} disabled={!hasUnsaved || isSampleMode}
-          title={isSampleMode ? 'Cannot save sample decks — use Save As or Rename' : ''}>💾 SAVE</button>
-        <button className="btn" style={{ padding: '4px 10px', fontSize: 9, borderColor: 'var(--player-color)', color: 'var(--player-color)', background: 'color-mix(in srgb, var(--player-color) 8%, transparent)' }} onClick={saveAs}>SAVE AS</button>
-        <button className="btn btn-danger" style={{ padding: '4px 10px', fontSize: 9 }} onClick={deleteDeck} disabled={decks.length <= 1 || isSampleMode}>🗑 DELETE</button>
-        <button className="btn btn-success" style={{ padding: '4px 10px', fontSize: 9 }} onClick={setDefault}
-          disabled={!validation.legal || currentDeck?.isDefault || isCube}
-          title={isCube ? 'Cubes cannot be used as a default play deck' : !validation.legal ? validation.reasons.join(', ') : currentDeck?.isDefault ? 'Already default' : isSampleMode ? 'Will save sample deck and set as default' : 'Set as default deck'}>
-          {currentDeck?.isDefault ? '★ DEFAULT' : '☆ SET DEFAULT'}
-        </button>
-        <div style={{ width: 1, height: 20, background: 'var(--bg4)', margin: '0 4px' }} />
-        <button className="btn" style={{ padding: '4px 10px', fontSize: 9 }} onClick={exportDeck} disabled={!currentDeck}>📤 EXPORT</button>
-        <label className="btn" style={{ padding: '4px 10px', fontSize: 9, cursor: 'pointer' }}>
-          📥 IMPORT<input ref={importFileRef} type="file" accept=".txt" onChange={importDeck} style={{ display: 'none' }} />
-        </label>
         <VolumeControl />
       </div>
 
       <div className="db-content" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* ── LEFT: DECK LIST ── */}
-        <div className="db-panel-left" style={{ width: 170, background: 'var(--bg2)', borderRight: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-          <div className="orbit-font" style={{ padding: 8, fontSize: 10, color: 'var(--text2)', fontWeight: 700 }}>YOUR DECKS</div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            {decks.map((d, i) => {
-              if (isCubeDeck(d)) return null;
-              if (d.mode === 'drafted') return null;
-              const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
-              return (
-                <div key={d.id} role="button" className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); }}>
-                  {d.isDefault && <span style={{ color: '#ffd700', fontSize: 10 }}>★</span>}
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
-                  <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
-                </div>
-              );
-            })}
-            {(() => {
-              const cubeEntries = decks.map((d, i) => ({ d, i })).filter(e => isCubeDeck(e.d));
-              if (cubeEntries.length === 0) return null;
-              return (
-                <>
-                  <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
-                    <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, flex: 1 }}>CUBES</span>
-                  </div>
-                  {cubeEntries.map(({ d, i }) => {
+        {/* ── LEFT: DECK DROPDOWN + ACTIONS ── */}
+        <div ref={leftPanelRef} className="db-panel-left" style={{ width: 170, background: 'var(--bg2)', borderRight: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'relative' }}>
+          {/* Dropdown toggle showing the current deck */}
+          <div role="button" className="deck-dropdown-toggle" onClick={() => setDeckDropdownOpen(o => !o)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid var(--bg4)', background: 'var(--bg3)', flexShrink: 0 }}>
+            <span className="orbit-font" style={{ flex: 1, fontSize: 11, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {currentDeck ? currentDeck.name : 'YOUR DECKS'}{hasUnsaved ? ' *' : ''}
+            </span>
+            <span style={{ fontSize: 10, color: 'var(--accent)' }}>{deckDropdownOpen ? '▲' : '▼'}</span>
+          </div>
+
+          {/* Region below the toggle — action buttons + New Deck/Cube, covered by the deck list when the dropdown is open */}
+          <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            {/* Action buttons (formerly the top row) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 8 }}>
+              <button className="btn" style={{ padding: '6px 8px', fontSize: 10, width: '100%' }}
+                disabled={!hasUnsaved || isSampleMode}
+                onClick={() => { if (!currentDeck) return; const id = currentDeck.id; setUnsaved(prev => { const n = { ...prev }; delete n[id]; return n; }); delete shRef.current[id]; setHistoryTick(t => t + 1); }}>
+                ↩ RESET</button>
+              <button className={'btn' + (hasUnsaved && !isSampleMode ? ' btn-flash-save' : '')} style={{ padding: '6px 8px', fontSize: 10, width: '100%' }} onClick={saveCurrent} disabled={!hasUnsaved || isSampleMode}
+                title={isSampleMode ? 'Cannot save sample decks — use Save As or Rename' : ''}>💾 SAVE</button>
+              <button className="btn" style={{ padding: '6px 8px', fontSize: 10, width: '100%', borderColor: 'var(--player-color)', color: 'var(--player-color)', background: 'color-mix(in srgb, var(--player-color) 8%, transparent)' }} onClick={saveAs}>SAVE AS</button>
+              <button className="btn btn-danger" style={{ padding: '6px 8px', fontSize: 10, width: '100%' }} onClick={deleteDeck} disabled={decks.length <= 1 || isSampleMode}>🗑 DELETE</button>
+              <button className="btn btn-success" style={{ padding: '6px 8px', fontSize: 10, width: '100%' }} onClick={setDefault}
+                disabled={!validation.legal || currentDeck?.isDefault || isCube}
+                title={isCube ? 'Cubes cannot be used as a default play deck' : !validation.legal ? validation.reasons.join(', ') : currentDeck?.isDefault ? 'Already default' : isSampleMode ? 'Will save sample deck and set as default' : 'Set as default deck'}>
+                {currentDeck?.isDefault ? '★ DEFAULT' : '☆ SET DEFAULT'}
+              </button>
+              <div style={{ height: 1, background: 'var(--bg4)', margin: '2px 0' }} />
+              <button className="btn" style={{ padding: '6px 8px', fontSize: 10, width: '100%' }} onClick={exportDeck} disabled={!currentDeck}>📤 EXPORT</button>
+              <label className="btn" style={{ padding: '6px 8px', fontSize: 10, width: '100%', cursor: 'pointer', textAlign: 'center' }}>
+                📥 IMPORT<input ref={importFileRef} type="file" accept=".txt" onChange={importDeck} style={{ display: 'none' }} />
+              </label>
+            </div>
+
+            <div style={{ flex: 1 }} />
+
+            {/* New Deck / New Cube */}
+            <button className="btn" style={{ margin: '8px 8px 4px', padding: 6, fontSize: 10 }} onClick={async () => {
+              try { const data = await api('/decks', { method: 'POST', body: JSON.stringify({ name: 'Deck ' + (decks.length + 1) }) }); setDecks([...decks, data.deck]); setActiveIdx(decks.length); } catch (e) { notify(e.message, 'error'); }
+            }}>+ NEW DECK</button>
+            <button className="btn" style={{ margin: '0 8px 8px', padding: 6, fontSize: 10 }} onClick={async () => {
+              try {
+                const cubeNumber = decks.filter(d => isCubeDeck(d)).length + 1;
+                const data = await api('/decks', { method: 'POST', body: JSON.stringify({ name: 'Cube ' + cubeNumber, mode: 'cube' }) });
+                setDecks([...decks, data.deck]);
+                setActiveIdx(decks.length);
+                setSampleActive(-1);
+              } catch (e) { notify(e.message, 'error'); }
+            }}>+ NEW CUBE</button>
+
+            {/* Deck list — opens as a dropdown overlaying the buttons above */}
+            {deckDropdownOpen && (
+              <div className="deck-dropdown-list" style={{ position: 'absolute', inset: 0, background: 'var(--bg2)', overflowY: 'auto', zIndex: 200, boxShadow: '0 6px 16px rgba(0,0,0,.5)' }}>
+                <div className="orbit-font" style={{ padding: 8, fontSize: 10, color: 'var(--text2)', fontWeight: 700 }}>YOUR DECKS</div>
+                {decks.map((d, i) => {
+                  if (isCubeDeck(d)) return null;
+                  if (d.mode === 'drafted') return null;
+                  const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
+                  return (
+                    <div key={d.id} role="button" className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); setDeckDropdownOpen(false); }}>
+                      {d.isDefault && <span style={{ color: '#ffd700', fontSize: 10 }}>★</span>}
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
+                      <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
+                    </div>
+                  );
+                })}
+                {(() => {
+                  const cubeEntries = decks.map((d, i) => ({ d, i })).filter(e => isCubeDeck(e.d));
+                  if (cubeEntries.length === 0) return null;
+                  return (
+                    <>
+                      <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
+                        <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, flex: 1 }}>CUBES</span>
+                      </div>
+                      {cubeEntries.map(({ d, i }) => {
+                        const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
+                        return (
+                          <div key={d.id} role="button" className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); setDeckDropdownOpen(false); }}>
+                            <span style={{ color: '#9ad8ff', fontSize: 10 }}>🧊</span>
+                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
+                            <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
+                          </div>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
+                {(() => {
+                  const draftedEntries = decks
+                    .map((d, i) => ({ d, i }))
+                    .filter(e => e.d.mode === 'drafted');
+                  if (draftedEntries.length === 0) return null;
+                  return (
+                    <>
+                      <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
+                        <span style={{ fontSize: 9, color: '#ffd700', fontWeight: 700, flex: 1 }}>🏆 DRAFTED DECKS</span>
+                      </div>
+                      {draftedEntries.map(({ d, i }) => {
+                        const hasChanges = unsaved[d.id];
+                        const meta = d.cubeDraftMeta || {};
+                        const tip = meta.cubeName
+                          ? `Drafted from "${meta.cubeName}"${meta.draftedAt ? ` on ${new Date(meta.draftedAt).toLocaleDateString()}` : ''}`
+                          : 'Cube-drafted deck';
+                        return (
+                          <div key={d.id} role="button" title={tip}
+                            className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')}
+                            onClick={() => { setActiveIdx(i); setSampleActive(-1); setDeckDropdownOpen(false); }}>
+                            <span style={{ color: '#ffd700', fontSize: 10 }}>🏆</span>
+                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
+                          </div>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
+                {sampleDecks.length > 0 && (() => {
+                  // Split sample decks into Structure (owned shop decks) and
+                  // Starter (always-free) categories. Each section gets its
+                  // own collapsible header. sampleActive still indexes the
+                  // original sampleDecks array so persistent state / selection
+                  // remains stable across renders.
+                  const structureDecks = sampleDecks
+                    .map((d, i) => ({ d, i }))
+                    .filter(e => e.d.isStructure);
+                  const starterDecks = sampleDecks
+                    .map((d, i) => ({ d, i }))
+                    .filter(e => !e.d.isStructure);
+                  const renderSampleRow = ({ d, i }) => {
                     const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
                     return (
-                      <div key={d.id} role="button" className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')} onClick={() => { setActiveIdx(i); setSampleActive(-1); }}>
-                        <span style={{ color: '#9ad8ff', fontSize: 10 }}>🧊</span>
+                      <div key={d.id} role="button" className={'deck-list-item deck-list-sample' + (isSampleMode && sampleActive === i ? ' active' : '')}
+                        onClick={() => { setSampleActive(i); setDeckDropdownOpen(false); }}>
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
                         <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
                       </div>
                     );
-                  })}
-                </>
-              );
-            })()}
-            {(() => {
-              const draftedEntries = decks
-                .map((d, i) => ({ d, i }))
-                .filter(e => e.d.mode === 'drafted');
-              if (draftedEntries.length === 0) return null;
-              return (
-                <>
-                  <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
-                    <span style={{ fontSize: 9, color: '#ffd700', fontWeight: 700, flex: 1 }}>🏆 DRAFTED DECKS</span>
-                  </div>
-                  {draftedEntries.map(({ d, i }) => {
-                    const hasChanges = unsaved[d.id];
-                    const meta = d.cubeDraftMeta || {};
-                    const tip = meta.cubeName
-                      ? `Drafted from "${meta.cubeName}"${meta.draftedAt ? ` on ${new Date(meta.draftedAt).toLocaleDateString()}` : ''}`
-                      : 'Cube-drafted deck';
-                    return (
-                      <div key={d.id} role="button" title={tip}
-                        className={'deck-list-item' + (i === activeIdx && !isSampleMode ? ' active' : '')}
-                        onClick={() => { setActiveIdx(i); setSampleActive(-1); }}>
-                        <span style={{ color: '#ffd700', fontSize: 10 }}>🏆</span>
-                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
-                      </div>
-                    );
-                  })}
-                </>
-              );
-            })()}
-            {sampleDecks.length > 0 && (() => {
-              // Split sample decks into Structure (owned shop decks) and
-              // Starter (always-free) categories. Each section gets its
-              // own collapsible header. sampleActive still indexes the
-              // original sampleDecks array so persistent state / selection
-              // remains stable across renders.
-              const structureDecks = sampleDecks
-                .map((d, i) => ({ d, i }))
-                .filter(e => e.d.isStructure);
-              const starterDecks = sampleDecks
-                .map((d, i) => ({ d, i }))
-                .filter(e => !e.d.isStructure);
-              const renderSampleRow = ({ d, i }) => {
-                const v = isDeckLegal(d); const hasChanges = unsaved[d.id];
-                return (
-                  <div key={d.id} role="button" className={'deck-list-item deck-list-sample' + (isSampleMode && sampleActive === i ? ' active' : '')}
-                    onClick={() => setSampleActive(i)}>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}{hasChanges ? ' *' : ''}</span>
-                    <span style={{ fontSize: 8, color: v.legal ? 'var(--success)' : 'var(--danger)' }}>{v.legal ? '✓' : '✗'}</span>
-                  </div>
-                );
-              };
-              return (
-                <>
-                  {structureDecks.length > 0 && (
+                  };
+                  return (
                     <>
-                      <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
-                        <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, flex: 1 }}>STRUCTURE DECKS</span>
-                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, color: 'var(--accent)', padding: 0 }}
-                          onClick={() => setShowStructures(v => !v)}>{showStructures ? 'Hide' : 'Show'}</button>
-                      </div>
-                      {showStructures && structureDecks.map(renderSampleRow)}
+                      {structureDecks.length > 0 && (
+                        <>
+                          <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
+                            <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, flex: 1 }}>STRUCTURE DECKS</span>
+                            <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, color: 'var(--accent)', padding: 0 }}
+                              onClick={() => setShowStructures(v => !v)}>{showStructures ? 'Hide' : 'Show'}</button>
+                          </div>
+                          {showStructures && structureDecks.map(renderSampleRow)}
+                        </>
+                      )}
+                      {starterDecks.length > 0 && (
+                        <>
+                          <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
+                            <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, flex: 1 }}>STARTER DECKS</span>
+                            <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, color: 'var(--accent)', padding: 0 }}
+                              onClick={() => setShowStarters(v => !v)}>{showStarters ? 'Hide' : 'Show'}</button>
+                          </div>
+                          {showStarters && starterDecks.map(renderSampleRow)}
+                        </>
+                      )}
                     </>
-                  )}
-                  {starterDecks.length > 0 && (
-                    <>
-                      <div style={{ padding: '6px 8px 4px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--bg4)', marginTop: 4 }}>
-                        <span style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, flex: 1 }}>STARTER DECKS</span>
-                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, color: 'var(--accent)', padding: 0 }}
-                          onClick={() => setShowStarters(v => !v)}>{showStarters ? 'Hide' : 'Show'}</button>
-                      </div>
-                      {showStarters && starterDecks.map(renderSampleRow)}
-                    </>
-                  )}
-                </>
-              );
-            })()}
+                  );
+                })()}
+              </div>
+            )}
           </div>
-          <button className="btn" style={{ margin: '8px 8px 4px', padding: 6, fontSize: 10 }} onClick={async () => {
-            try { const data = await api('/decks', { method: 'POST', body: JSON.stringify({ name: 'Deck ' + (decks.length + 1) }) }); setDecks([...decks, data.deck]); setActiveIdx(decks.length); } catch (e) { notify(e.message, 'error'); }
-          }}>+ NEW DECK</button>
-          <button className="btn" style={{ margin: '0 8px 8px', padding: 6, fontSize: 10 }} onClick={async () => {
-            try {
-              const cubeNumber = decks.filter(d => isCubeDeck(d)).length + 1;
-              const data = await api('/decks', { method: 'POST', body: JSON.stringify({ name: 'Cube ' + cubeNumber, mode: 'cube' }) });
-              setDecks([...decks, data.deck]);
-              setActiveIdx(decks.length);
-              setSampleActive(-1);
-            } catch (e) { notify(e.message, 'error'); }
-          }}>+ NEW CUBE</button>
         </div>
 
         {/* ── CENTER: ALL DECK SECTIONS ── */}
         <div className="db-panel-center" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-          {/* Deck name + validation */}
-          <div style={{ padding: '6px 12px', background: 'var(--bg3)', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            {renaming ? (
-              <div style={{ display: 'flex', gap: 4, flex: 1 }}>
-                <input className="input" value={renameVal} onChange={e => setRenameVal(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') finishRename(); }} autoFocus style={{ flex: 1 }} />
-                <button className="btn" style={{ padding: '2px 8px', fontSize: 9 }} onClick={finishRename}>OK</button>
-              </div>
-            ) : (
-              <>
-                <span className="orbit-font" style={{ fontWeight: 700, fontSize: 15 }}>{currentDeck?.name}</span>
-                <button style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', fontSize: 12 }}
-                  onClick={() => { setRenameVal(currentDeck?.name || ''); setRenaming(true); }}>✏️</button>
-              </>
-            )}
-            <div style={{ flex: 1 }} />
-            {!validation.legal && <div style={{ fontSize: 9, color: 'var(--danger)', maxWidth: 300, textAlign: 'right' }}>{validation.reasons.join(' · ')}</div>}
-            {validation.legal && <span className="badge" style={{ background: 'rgba(51,255,136,.12)', color: 'var(--success)' }}>LEGAL</span>}
-          </div>
 
           {/* Scrollable deck body */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
@@ -1415,7 +1460,7 @@ function DeckBuilder() {
                           background: 'rgba(0,0,0,.85)', color: '#fff',
                           border: '1px solid #9ad8ff', borderRadius: 4,
                           padding: '1px 5px', fontSize: 11, fontWeight: 700,
-                          fontFamily: "'Rajdhani', sans-serif", lineHeight: 1.2,
+                          fontFamily: "var(--font-body), sans-serif", lineHeight: 1.2,
                           pointerEvents: 'none', zIndex: 2
                         }}>×{item.count}</div>
                       )}
@@ -1487,13 +1532,13 @@ function DeckBuilder() {
             <DropSection sectionId="main" onDrop={(d, mx, my) => handleDrop('main', d, mx, my)} onDragPos={onGalleryDragPos} className="deck-section">
               <SecHeader sec="main" color="#44aaff" icon="📋" label="MAIN DECK" count={(currentDeck?.mainDeck||[]).length} max={60}
                 extra={<><TipBtn tip="Shuffle" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={shuffleMain}>🔀</TipBtn><TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('main')}>↕</TipBtn></>} />
-              <div className="deck-section-body" data-deck-section="main">
+              <div className={'deck-section-body' + (handHighlight ? ' hand-veil' : '')} data-deck-section="main">
                 {buildDeckDisplay('main', currentDeck?.mainDeck || []).map((item, idx) => {
                   if (item.isGap) return <div key={'gap-'+idx} className="deck-drag-gap" />;
                   if (item.isEmpty) return <div key={'empty-'+idx} className="deck-drag-slot deck-empty-slot"><div className="card-slot" style={{ width: '100%', height: '100%', fontSize: 9 }} /></div>;
                   const card = CARDS_BY_NAME[item.card]; if (!card) return null;
                   const isDragging = deckDrag && deckDrag.section === 'main' && deckDrag.fromIdx === item.origIdx;
-                  return <div key={'m-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '')} data-touch-drag="1"
+                  return <div key={'m-'+item.origIdx} className={'deck-drag-slot' + (isDragging ? ' deck-dragging' : '') + (handHighlight && item.origIdx < 6 ? ' deck-hand-highlight' : '')} data-touch-drag="1"
                     onMouseDown={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}
                     onTouchStart={(e) => onDeckCardMouseDown(e, 'main', item.origIdx, item.card)}
                     onContextMenu={(e) => { e.preventDefault(); removeFrom(item.card, 'main', item.origIdx); }}>
@@ -1549,10 +1594,15 @@ function DeckBuilder() {
 
         {/* ── RIGHT: CARD DATABASE ── */}
         <div className="db-panel-right" style={{ width: 400, background: 'var(--bg2)', borderLeft: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-          <div className="orbit-font" style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text2)', fontWeight: 700 }}>
-            CARD DATABASE ({filteredCards.length} / {AVAILABLE_CARDS.length})
+          <div className="orbit-font" style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text2)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ flex: 1 }}>CARD DATABASE ({filteredCards.length} / {AVAILABLE_CARDS.length})</span>
+            <button className="btn" style={{ padding: '2px 8px', fontSize: 9 }} onClick={() => setFiltersCollapsed(c => !c)}
+              title={filtersCollapsed ? 'Show filters' : 'Hide filters for more room'}>
+              {filtersCollapsed ? '▾ FILTERS' : '▴ FILTERS'}
+            </button>
           </div>
           {/* Filters */}
+          {!filtersCollapsed && (
           <div style={{ padding: '4px 8px 8px', borderBottom: '1px solid var(--bg4)', flexShrink: 0 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
               <input className="db-filter-input" placeholder="Search name..." value={filters.name} onChange={e => setFilters(p => ({ ...p, name: e.target.value }))} style={{ gridColumn: '1/3' }} />
@@ -1574,6 +1624,7 @@ function DeckBuilder() {
                 onClick={() => setFilters({ name:'',effect:'',cardType:'',subtype:'',archetype:'',sa1:'',sa2:'',ss1:'',ss2:'',level:'',cost:'',hp:'',atk:'' })}>CLEAR FILTERS</button>
             ); })()}
           </div>
+          )}
           {/* Card grid */}
           <div style={{ flex: 1, overflowY: 'auto', padding: 6 }}>
             <div className="db-card-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
