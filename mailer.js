@@ -19,6 +19,7 @@
 const tls = require('tls');
 const net = require('net');
 const os = require('os');
+const https = require('https');
 const crypto = require('crypto');
 
 function config() {
@@ -29,6 +30,11 @@ function config() {
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
     from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@pixelparties',
+    // Brevo (HTTP API) transport. Preferred on hosts that block outbound
+    // SMTP ports (e.g. Render free tier blocks 25/465/587). When set, mail
+    // goes over HTTPS (port 443) instead of a raw SMTP connection. The
+    // sender identity still comes from SMTP_FROM (a Brevo-verified address).
+    brevoKey: process.env.BREVO_API_KEY || '',
     secure: process.env.SMTP_SECURE
       ? process.env.SMTP_SECURE === 'true'
       : port === 465,
@@ -44,13 +50,20 @@ function config() {
 
 function isConfigured() {
   const c = config();
-  return !!(c.host && c.user && c.pass);
+  return !!(c.brevoKey || (c.host && c.user && c.pass));
 }
 
 // Pull the bare address out of a "Name <addr@host>" / "addr@host" string.
 function addressOf(s) {
   const m = /<([^>]+)>/.exec(s);
   return (m ? m[1] : s).trim();
+}
+
+// Split a "Name <addr@host>" / "addr@host" string into { name?, email }.
+function parseAddress(s) {
+  const m = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(s || '');
+  if (m) return { name: m[1] || undefined, email: m[2].trim() };
+  return { email: (s || '').trim() };
 }
 
 // ── SMTP response reader ────────────────────────────────────────
@@ -189,21 +202,67 @@ async function smtpSend(msg) {
   ]).finally(() => { try { sock.destroy(); } catch {} });
 }
 
+// ── Brevo transactional email over HTTPS ────────────────────────
+// Sends via Brevo's REST API (port 443) so it works on hosts that
+// block outbound SMTP ports. Rejects on any non-2xx response.
+async function brevoSend(msg) {
+  const c = config();
+  const sender = parseAddress(c.from);
+  const payload = JSON.stringify({
+    sender: { email: sender.email, ...(sender.name ? { name: sender.name } : {}) },
+    to: [{ email: addressOf(msg.to) }],
+    subject: msg.subject,
+    htmlContent: msg.html || `<pre>${msg.text || ''}</pre>`,
+    textContent: msg.text || '',
+  });
+  await new Promise((resolve, reject) => {
+    const req = https.request({
+      method: 'POST',
+      hostname: 'api.brevo.com',
+      path: '/v3/smtp/email',
+      headers: {
+        'api-key': c.brevoKey,
+        'content-type': 'application/json',
+        'accept': 'application/json',
+        'content-length': Buffer.byteLength(payload),
+      },
+      timeout: 20000,
+    }, res => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', d => { body += d; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) resolve();
+        else reject(new Error(`Brevo API ${res.statusCode}: ${body.trim()}`));
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('Brevo API timeout')));
+    req.write(payload);
+    req.end();
+  });
+}
+
 /**
- * Send an email. Resolves on success; rejects on hard SMTP failure.
- * In dev (no SMTP configured) it logs to the console and resolves.
+ * Send an email. Resolves on success; rejects on hard send failure.
+ * Transport priority: Brevo HTTP API (if BREVO_API_KEY set) → raw SMTP
+ * (if SMTP creds set) → dev console log (nothing configured).
  */
 async function sendMail({ to, subject, text, html }) {
   if (!isConfigured()) {
-    console.log('\n──────── [mailer:dev] email not sent (SMTP not configured) ────────');
+    console.log('\n──────── [mailer:dev] email not sent (no transport configured) ────────');
     console.log(`  To:      ${to}`);
     console.log(`  Subject: ${subject}`);
     console.log('  ' + (text || '').split('\n').join('\n  '));
     console.log('────────────────────────────────────────────────────────────────\n');
     return { dev: true };
   }
+  if (config().brevoKey) {
+    await brevoSend({ to, subject, text, html });
+    return { sent: true, via: 'brevo' };
+  }
   await smtpSend({ to, subject, text, html });
-  return { sent: true };
+  return { sent: true, via: 'smtp' };
 }
 
 module.exports = { sendMail, isConfigured };

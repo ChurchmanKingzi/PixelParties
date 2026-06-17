@@ -1295,9 +1295,9 @@ function MainMenu() {
                   const scReward = { easy: 3, medium: 6, hard: 10 };
                   return (
                     <div key={diff} style={{ marginBottom: 16 }}>
-                      <div className="orbit-font" style={{ fontSize: 11, fontWeight: 800, color: diffColors[diff], letterSpacing: 2, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className="orbit-font" style={{ fontSize: 14, fontWeight: 800, color: diffColors[diff], letterSpacing: 2, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
                         {diff.toUpperCase()}
-                        <span style={{ fontSize: 9, fontWeight: 400, color: 'var(--text2)', letterSpacing: 0 }}>({scReward[diff]} <CoinIcon size={11} />)</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', letterSpacing: 0, display: 'inline-flex', alignItems: 'center', gap: 4 }}>({scReward[diff]} <CoinIcon size={15} />)</span>
                       </div>
                       {puzzles.map(p => (
                         <button key={p.puzzleId} className="btn" onClick={() => startPuzzleAttempt(p)}
