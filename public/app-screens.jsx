@@ -232,6 +232,8 @@ function AuthScreen() {
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0); // resend throttle (seconds)
+  const googleBtnRef = useRef(null);   // container Google renders its button into
+  const googleInited = useRef(false);  // GIS initialize() is one-shot per page
 
   const setMode = (m) => { setModeRaw(m); setError(''); setInfo(''); };
 
@@ -303,6 +305,48 @@ function AuthScreen() {
     finishAuth(data, false);
   });
 
+  // Exchange a Google ID token for a session (sign-in or sign-up).
+  const submitGoogle = (credential) => run(async () => {
+    if (!credential) { setError('Google sign-in was cancelled.'); return; }
+    const data = await api('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) });
+    finishAuth(data, !!data.isNewAccount);
+  });
+
+  // Load Google Identity Services and render its button (login/signup tabs only).
+  // The GIS script is added once; renderButton re-runs on tab switch so the
+  // button text matches ("Sign in"/"Sign up with Google").
+  useEffect(() => {
+    if (!window.GOOGLE_CLIENT_ID) return;
+    if (mode !== 'login' && mode !== 'signup') return;
+    let cancelled = false;
+    const render = () => {
+      const gid = window.google && window.google.accounts && window.google.accounts.id;
+      if (cancelled || !gid || !googleBtnRef.current) return;
+      if (!googleInited.current) {
+        gid.initialize({
+          client_id: window.GOOGLE_CLIENT_ID,
+          callback: (resp) => submitGoogle(resp && resp.credential),
+        });
+        googleInited.current = true;
+      }
+      googleBtnRef.current.innerHTML = '';
+      gid.renderButton(googleBtnRef.current, {
+        theme: 'filled_black', size: 'large', shape: 'pill', width: 280,
+        text: mode === 'signup' ? 'signup_with' : 'signin_with',
+      });
+    };
+    if (window.google && window.google.accounts && window.google.accounts.id) { render(); return () => { cancelled = true; }; }
+    let s = document.getElementById('gis-script');
+    if (!s) {
+      s = document.createElement('script');
+      s.id = 'gis-script'; s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true; s.defer = true;
+      document.head.appendChild(s);
+    }
+    s.addEventListener('load', render);
+    return () => { cancelled = true; s.removeEventListener('load', render); };
+  }, [mode]);
+
   const Header = (
     <>
       <h1 className="pixel-font" style={{ fontSize: 18, color: 'var(--accent)', marginBottom: 4, textShadow: '0 0 20px var(--accent)' }}>
@@ -362,6 +406,12 @@ function AuthScreen() {
           )}
           {mode === 'signup' && (
             <div className="auth-fine">We'll email you a 6-digit code to confirm your address.</div>
+          )}
+          {window.GOOGLE_CLIENT_ID && (
+            <>
+              <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, margin: '2px 0' }}>— or —</div>
+              <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
+            </>
           )}
           <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, margin: '2px 0' }}>— or —</div>
           <button className="btn btn-big" onClick={submitGuest} disabled={loading}>

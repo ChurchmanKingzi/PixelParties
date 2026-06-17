@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const { Server } = require('socket.io');
 const db = require('./db');
 const bcrypt = require('bcryptjs');
@@ -360,9 +361,12 @@ function serveIndexHtml(req, res) {
       _indexCache = { mtimeMs: stat.mtimeMs, html: fs.readFileSync(INDEX_HTML_PATH, 'utf8') };
     }
     const origin = resolveOrigin(req);
-    const html = (origin === SHARE_BASE_DEFAULT)
+    let html = (origin === SHARE_BASE_DEFAULT)
       ? _indexCache.html
       : _indexCache.html.split(SHARE_BASE_DEFAULT).join(origin);
+    // Expose the public Google OAuth client id to the front-end. Empty string
+    // when unset, which hides the "Sign in with Google" button client-side.
+    html = html.split('__GOOGLE_CLIENT_ID__').join(process.env.GOOGLE_CLIENT_ID || '');
     res.setHeader('Content-Type', 'text/html; charset=UTF-8');
     res.setHeader('Cache-Control', 'no-cache');
     return res.send(html);
@@ -467,6 +471,13 @@ async function initDatabase() {
   try { await db.execute("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"); } catch {}
   try { await db.execute("UPDATE users SET email_verified = 1 WHERE email IS NULL AND email_verified = 0"); } catch {}
   try { await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL"); } catch {}
+
+  // Google sign-in: links a Google account's stable subject id ("sub") to a
+  // local user. NULL for password-only accounts. Google-only accounts still
+  // carry a random unusable password_hash so the NOT NULL column holds and
+  // password login can never match.
+  try { await db.execute("ALTER TABLE users ADD COLUMN google_id TEXT DEFAULT NULL"); } catch {}
+  try { await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google ON users(google_id) WHERE google_id IS NOT NULL"); } catch {}
 
   // Holds a not-yet-verified registration. No `users` row exists until the
   // emailed code is confirmed, so unverified attempts never squat a
@@ -802,6 +813,72 @@ function startSession(res, user) {
   return token;
 }
 
+// Finish setting up a freshly-created `users` row: give them a first deck, pin
+// a (non-structure) Starter Deck as their default so they can play immediately,
+// and unlock the starting CPU roster. Shared by email signup (/verify-email)
+// and Google signup (/auth/google) so both paths produce identical accounts.
+async function bootstrapNewAccount(userId, { starterDeckId } = {}) {
+  await db.run('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)', [uuidv4(), userId, 'My First Deck']);
+  try {
+    const starters = loadSampleDecks().filter(s => !s.isStructure);
+    if (starters.length > 0) {
+      const pick = (starterDeckId && starters.find(s => s.id === starterDeckId))
+        || starters[Math.floor(Math.random() * starters.length)];
+      await db.run('UPDATE users SET default_sample_deck_id = ? WHERE id = ?', [pick.id, userId]);
+    }
+  } catch (err) { console.error('[bootstrap] starter-deck pin failed:', err.message); }
+  try { await seedInitialOpponents(userId); } catch (err) { console.error('[bootstrap] seedInitialOpponents failed:', err.message); }
+}
+
+// Verify a Google ID token (the `credential` from Google Identity Services).
+// Dependency-free: hits Google's tokeninfo endpoint over HTTPS, then checks the
+// audience (our client id) and issuer. Resolves with the token payload.
+function verifyGoogleIdToken(credential) {
+  return new Promise((resolve, reject) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID || '';
+    if (!clientId) return reject(new Error('GOOGLE_CLIENT_ID not configured'));
+    if (!credential) return reject(new Error('missing credential'));
+    const req = https.request({
+      method: 'GET',
+      hostname: 'oauth2.googleapis.com',
+      path: '/tokeninfo?id_token=' + encodeURIComponent(credential),
+      timeout: 10000,
+    }, r => {
+      let body = '';
+      r.setEncoding('utf8');
+      r.on('data', d => { body += d; });
+      r.on('end', () => {
+        if (r.statusCode !== 200) return reject(new Error(`tokeninfo ${r.statusCode}: ${body.trim()}`));
+        let p;
+        try { p = JSON.parse(body); } catch { return reject(new Error('bad tokeninfo response')); }
+        if (p.aud !== clientId) return reject(new Error('token audience mismatch'));
+        const iss = p.iss || '';
+        if (iss !== 'accounts.google.com' && iss !== 'https://accounts.google.com') {
+          return reject(new Error('bad token issuer'));
+        }
+        resolve(p);
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('tokeninfo timeout')));
+    req.end();
+  });
+}
+
+// Derive a unique, valid username from a Google display name / email local-part.
+async function uniqueUsernameFrom(raw) {
+  let base = String(raw || '').replace(/[^A-Za-z0-9 _-]/g, '').trim().replace(/\s+/g, ' ').slice(0, 16).trim();
+  if (base.length < 3 || containsProfanity(base)) base = 'Player';
+  let name = base;
+  let n = 0;
+  // username is UNIQUE COLLATE NOCASE — append an incrementing suffix on clash.
+  while (await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE', [name])) {
+    n++;
+    name = (base + n).slice(0, 20);
+  }
+  return name;
+}
+
 // ===== AUTH ROUTES =====
 // Step 1 of registration: validate, stash a pending signup, email a code.
 // The real `users` row is only created on /verify-email.
@@ -885,23 +962,9 @@ app.post('/api/auth/verify-email', async (req, res) => {
     'INSERT INTO users (id, username, password_hash, avatar, color, email, email_verified) VALUES (?, ?, ?, ?, ?, ?, 1)',
     [id, pending.username, pending.password_hash, pending.avatar, pending.color, pending.email],
   );
-  await db.run('INSERT INTO decks (id, user_id, name) VALUES (?, ?, ?)', [uuidv4(), id, 'My First Deck']);
-  // Pin a Starter Deck (already in everyone's deck list) as the new player's
-  // default so they can jump into a match immediately — without copying it into
-  // their self-made decks. If the client passes a specific starter (a guest
-  // registering keeps the deck they were using), honour it; otherwise random.
-  // Only non-structure starters are allowed (structure decks are paywalled).
-  try {
-    const starters = loadSampleDecks().filter(s => !s.isStructure);
-    if (starters.length > 0) {
-      const requested = req.body.starterDeckId;
-      const pick = (requested && starters.find(s => s.id === requested))
-        || starters[Math.floor(Math.random() * starters.length)];
-      await db.run('UPDATE users SET default_sample_deck_id = ? WHERE id = ?', [pick.id, id]);
-    }
-  } catch (err) { console.error('[signup] starter-deck pin failed:', err.message); }
-  // Unlock the starting roster of random CPU opponents for the new account.
-  try { await seedInitialOpponents(id); } catch (err) { console.error('[signup] seedInitialOpponents failed:', err.message); }
+  // Give the new account a first deck, a pinned Starter Deck (honouring a
+  // specific one if a registering guest passed theirs), and the CPU roster.
+  await bootstrapNewAccount(id, { starterDeckId: req.body.starterDeckId });
   await db.run('DELETE FROM pending_signups WHERE id = ?', [pending.id]);
 
   const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
@@ -990,6 +1053,76 @@ app.post('/api/auth/login', async (req, res) => {
     }
   }
   res.json({ token, user: sanitizeUser(user) });
+});
+
+// Sign in / sign up with Google. The client sends the ID token ("credential")
+// from Google Identity Services. We verify it, then: (1) log in an existing
+// google-linked user; (2) else auto-link to an existing account with the same
+// verified email; (3) else create a brand-new account. Google has already
+// verified the email, so linking is safe and accounts land email_verified.
+app.post('/api/auth/google', async (req, res) => {
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    return res.status(503).json({ error: 'Google sign-in is not configured.' });
+  }
+  let payload;
+  try {
+    payload = await verifyGoogleIdToken(String(req.body.credential || ''));
+  } catch (e) {
+    console.error('[auth/google] verify failed:', e.message);
+    return res.status(401).json({ error: 'Google sign-in failed. Please try again.' });
+  }
+
+  const email = normEmail(payload.email);
+  const googleId = String(payload.sub || '');
+  if (!email || !googleId) return res.status(400).json({ error: 'Your Google account is missing an email address.' });
+  // tokeninfo returns email_verified as the string "true"/"false".
+  if (payload.email_verified === false || payload.email_verified === 'false') {
+    return res.status(400).json({ error: 'Your Google email address is not verified.' });
+  }
+
+  let user = await db.get('SELECT * FROM users WHERE google_id = ?', [googleId]);
+  let isNew = false;
+
+  // (2) Auto-link to an existing account sharing this email.
+  if (!user) {
+    const byEmail = await db.get('SELECT * FROM users WHERE email = ? COLLATE NOCASE', [email]);
+    if (byEmail) {
+      await db.run('UPDATE users SET google_id = ?, email_verified = 1 WHERE id = ?', [googleId, byEmail.id]);
+      user = await db.get('SELECT * FROM users WHERE id = ?', [byEmail.id]);
+    }
+  }
+
+  // (3) Create a new account.
+  if (!user) {
+    const id = uuidv4();
+    const username = await uniqueUsernameFrom(payload.name || (payload.given_name) || email.split('@')[0]);
+    // Random unusable password so the NOT NULL column holds; password login
+    // can never match it (the user authenticates via Google).
+    const unusable = bcrypt.hashSync(uuidv4() + uuidv4(), 10);
+    try {
+      await db.run(
+        'INSERT INTO users (id, username, password_hash, avatar, color, email, email_verified, google_id) VALUES (?, ?, ?, ?, ?, ?, 1, ?)',
+        [id, username, unusable, getRandomDefaultAvatar(), getRandomDefaultColor(), email, googleId],
+      );
+    } catch (e) {
+      console.error('[auth/google] create failed:', e.message);
+      return res.status(500).json({ error: 'Could not create your account. Please try again.' });
+    }
+    await bootstrapNewAccount(id, {});
+    user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
+    isNew = true;
+  }
+
+  if (!user.avatar) {
+    const defaultAvatar = getRandomDefaultAvatar();
+    if (defaultAvatar) {
+      await db.run('UPDATE users SET avatar = ? WHERE id = ?', [defaultAvatar, user.id]);
+      user.avatar = defaultAvatar;
+    }
+  }
+
+  const token = startSession(res, user);
+  res.json({ token, user: sanitizeUser(user), isNewAccount: isNew });
 });
 
 app.post('/api/auth/logout', async (req, res) => {

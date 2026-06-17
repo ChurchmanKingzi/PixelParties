@@ -89,6 +89,9 @@
     window.CARDS_LOADED = false;
     window.ALL_CARDS = [];
     window.CARDS_BY_NAME = {};
+    // Public Google OAuth client id, injected by the server (serveIndexHtml).
+    // Empty when unconfigured — the auth screen hides the Google button then.
+    window.GOOGLE_CLIENT_ID = "__GOOGLE_CLIENT_ID__";
   </script>
 
   <!-- React runtime (deferred so the splash paints first). -->
