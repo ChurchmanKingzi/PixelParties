@@ -2284,7 +2284,7 @@ function App() {
         showTextBox({
           speaker: '/MoniaBot.png',
           speakerName: 'Monia Bot',
-          text: 'Heya! Welcome to Pixel Parties, beep-boop!\nI am your friendly neighborhood Monia Bot, the coolest bot there is, here to guide you through the game.\nIf you want my help to learn the ropes - follow me into the Tutorial!\nIf not, you can disable the Tutorial in your Profile, beep-boop!',
+          text: 'Heya! Welcome to Pixel Parties, beep-boop!\nI am your friendly neighborhood Monia Bot, the coolest bot there is, here to guide you through the game.\nIf you want my help to learn the ropes, follow me to the tutorial under How to Play!',
         });
       }, 400);
     }

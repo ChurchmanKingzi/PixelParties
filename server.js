@@ -833,10 +833,16 @@ async function bootstrapNewAccount(userId, { starterDeckId } = {}) {
 // Verify a Google ID token (the `credential` from Google Identity Services).
 // Dependency-free: hits Google's tokeninfo endpoint over HTTPS, then checks the
 // audience (our client id) and issuer. Resolves with the token payload.
+//
+// Two audiences are accepted: the web client id (GIS browser flow) and the
+// desktop client id (the Electron PKCE flow exchanges its own code, so its
+// id_token carries the desktop client id as `aud`).
 function verifyGoogleIdToken(credential) {
   return new Promise((resolve, reject) => {
     const clientId = process.env.GOOGLE_CLIENT_ID || '';
+    const desktopClientId = process.env.GOOGLE_DESKTOP_CLIENT_ID || '';
     if (!clientId) return reject(new Error('GOOGLE_CLIENT_ID not configured'));
+    const allowedAud = [clientId, desktopClientId].filter(Boolean);
     if (!credential) return reject(new Error('missing credential'));
     const req = https.request({
       method: 'GET',
@@ -851,7 +857,7 @@ function verifyGoogleIdToken(credential) {
         if (r.statusCode !== 200) return reject(new Error(`tokeninfo ${r.statusCode}: ${body.trim()}`));
         let p;
         try { p = JSON.parse(body); } catch { return reject(new Error('bad tokeninfo response')); }
-        if (p.aud !== clientId) return reject(new Error('token audience mismatch'));
+        if (!allowedAud.includes(p.aud)) return reject(new Error('token audience mismatch'));
         const iss = p.iss || '';
         if (iss !== 'accounts.google.com' && iss !== 'https://accounts.google.com') {
           return reject(new Error('bad token issuer'));

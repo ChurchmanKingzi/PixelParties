@@ -234,6 +234,10 @@ function AuthScreen() {
   const [cooldown, setCooldown] = useState(0); // resend throttle (seconds)
   const googleBtnRef = useRef(null);   // container Google renders its button into
   const googleInited = useRef(false);  // GIS initialize() is one-shot per page
+  // Inside the Electron desktop shell the GIS popup can't postMessage its
+  // credential back (the popup is ejected to the system browser), so the
+  // desktop build uses a native OAuth flow exposed by the preload bridge.
+  const isDesktop = !!(window.pixelPartiesDesktop && window.pixelPartiesDesktop.isDesktop);
 
   const setMode = (m) => { setModeRaw(m); setError(''); setInfo(''); };
 
@@ -312,10 +316,21 @@ function AuthScreen() {
     finishAuth(data, !!data.isNewAccount);
   });
 
+  // Desktop build: run the native OAuth (PKCE) flow via the preload bridge and
+  // hand its id_token to the same /auth/google endpoint the browser uses.
+  const submitGoogleDesktop = () => run(async () => {
+    const credential = await window.pixelPartiesDesktop.googleSignIn();
+    if (!credential) { setError('Google sign-in was cancelled.'); return; }
+    const data = await api('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) });
+    finishAuth(data, !!data.isNewAccount);
+  });
+
   // Load Google Identity Services and render its button (login/signup tabs only).
   // The GIS script is added once; renderButton re-runs on tab switch so the
-  // button text matches ("Sign in"/"Sign up with Google").
+  // button text matches ("Sign in"/"Sign up with Google"). Skipped in the
+  // desktop shell, which uses submitGoogleDesktop and its own button instead.
   useEffect(() => {
+    if (isDesktop) return;
     if (!window.GOOGLE_CLIENT_ID) return;
     if (mode !== 'login' && mode !== 'signup') return;
     let cancelled = false;
@@ -410,7 +425,26 @@ function AuthScreen() {
           {window.GOOGLE_CLIENT_ID && (
             <>
               <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, margin: '2px 0' }}>— or —</div>
-              <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
+              {isDesktop ? (
+                <div style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }}>
+                  <button
+                    type="button"
+                    className="google-btn"
+                    onClick={submitGoogleDesktop}
+                    disabled={loading}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
+                      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/>
+                      <path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33z"/>
+                      <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
+                    </svg>
+                    {mode === 'signup' ? 'Sign up with Google' : 'Sign in with Google'}
+                  </button>
+                </div>
+              ) : (
+                <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
+              )}
             </>
           )}
           <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, margin: '2px 0' }}>— or —</div>
@@ -1170,7 +1204,7 @@ function MainMenu() {
       <div style={{ position: 'absolute', top: 14, left: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10, zIndex: 5 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* ELO + SC stats (the name now lives above the avatar below). */}
-          <span className="badge" style={{ background: 'color-mix(in srgb, var(--player-color, #00f0ff) 14%, var(--menu-surface))', color: 'var(--player-color, #00f0ff)', fontSize: 20, padding: '10px 20px' }}>ELO {user.elo}</span>
+          <span className="badge" style={{ background: 'color-mix(in srgb, var(--player-color, #00f0ff) 14%, var(--menu-surface))', color: 'var(--player-color, #00f0ff)', display: 'flex', alignItems: 'center', lineHeight: '26px', fontSize: 20, padding: '10px 20px' }}>ELO {user.elo}</span>
           <span className="badge" style={{ background: 'color-mix(in srgb, #ffd700 12%, var(--menu-surface))', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 8, fontSize: 20, padding: '10px 20px' }}>
             <img src="/data/sc.png" style={{ width: 26, height: 26, imageRendering: 'pixelated' }} /> {user.sc || 0}
           </span>

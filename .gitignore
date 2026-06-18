@@ -7,3 +7,4 @@ uploads/cardbacks/*
 !uploads/cardbacks/.gitkeep
 !cards/.gitkeep
 .env
+electron/desktop-secrets.json

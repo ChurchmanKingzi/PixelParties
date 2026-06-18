@@ -279,7 +279,11 @@
       "PowerShell(Set-Location \"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\"; node _tmp_countguests.js \"$env:TEMP\\\\pp-guest-test.db\")",
       "PowerShell(Get-Content *)",
       "PowerShell(npm run *)",
-      "PowerShell(Stop-Process *)"
+      "PowerShell(Stop-Process *)",
+      "PowerShell(node scripts/build.js --force)",
+      "PowerShell(node --check electron/main.js; if \\($?\\) { \"main.js OK\" })",
+      "PowerShell(git log --oneline origin/main..HEAD; \"---\"; git diff --stat origin/main..HEAD)",
+      "PowerShell(git *)"
     ]
   }
 }

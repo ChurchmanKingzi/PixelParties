@@ -679,6 +679,21 @@ body {
 .auth-link.disabled { color: var(--text2); cursor: default; text-shadow: none; opacity: .7; }
 .auth-row { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
 .auth-fine { font-size: 11.5px; color: var(--text2); line-height: 1.5; text-align: left; }
+
+/* Native "Sign in with Google" button for the desktop shell — mirrors the
+   GIS filled_black pill the browser renders, since GIS's own button can't be
+   used inside Electron. */
+.google-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  width: 280px; height: 44px; padding: 0 16px;
+  background: #131314; color: #e3e3e3;
+  border: 1px solid #5f6368; border-radius: 22px;
+  font-family: 'Roboto', system-ui, sans-serif; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: background .15s, border-color .15s;
+}
+.google-btn:hover:not(:disabled) { background: #1f2023; border-color: #8a8f93; }
+.google-btn:disabled { opacity: .6; cursor: default; }
+.google-btn svg { flex: 0 0 auto; }
 .auth-step-title {
   font-family: var(--font-display), sans-serif; font-weight: 700; font-size: 15px;
   color: var(--text); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px;

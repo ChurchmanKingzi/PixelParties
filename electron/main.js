@@ -7,10 +7,13 @@
 // Nothing here touches the Node/Express server code.
 
 const {
-  app, BrowserWindow, Menu, shell, screen, powerSaveBlocker, dialog,
+  app, BrowserWindow, Menu, shell, screen, powerSaveBlocker, dialog, ipcMain,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
+const crypto = require('crypto');
 
 // ---------------------------------------------------------------------------
 // Where to load the game from.
@@ -30,6 +33,173 @@ const TARGET_URL =
   (USE_PRODUCTION ? PRODUCTION_URL : LOCAL_URL);
 
 const IS_DEV = !app.isPackaged;
+
+// ===========================================================================
+// Google sign-in (desktop) — Authorization Code + PKCE flow.
+//
+// Why this exists: the web client's Google Identity Services button uses a
+// popup that postMessages the credential back to its opener. Inside Electron
+// that popup gets ejected to the system browser (see setWindowOpenHandler),
+// which severs the opener link, so the credential never returns. Instead we
+// run the OAuth dance the way Google recommends for desktop apps: open the
+// SYSTEM browser to Google's consent screen, catch the redirect on a localhost
+// loopback server, exchange the code (with PKCE) for an id_token, and hand
+// that id_token to the web client — which posts it to /api/auth/google exactly
+// like the browser flow does.
+//
+// Set up: create an OAuth client of type "Desktop app" in the Google Cloud
+// console (separate from the web client). The desktop client id must also be
+// set as GOOGLE_DESKTOP_CLIENT_ID on the server so verifyGoogleIdToken accepts
+// that audience.
+//
+// Credentials are NEVER hardcoded here (GitHub push protection blocks committed
+// OAuth secrets, and a public repo shouldn't carry them anyway). They load from
+// env vars, or from a local, gitignored electron/desktop-secrets.json:
+//   { "GOOGLE_DESKTOP_CLIENT_ID": "...", "GOOGLE_DESKTOP_CLIENT_SECRET": "..." }
+// That file is in the electron-builder `files` list, so it IS bundled into the
+// shipped .exe (for installed apps the "secret" isn't confidential — PKCE is
+// the real protection — so shipping it is expected; keeping it out of git is
+// just hygiene).
+// ===========================================================================
+function loadDesktopGoogleCreds() {
+  let file = {};
+  try {
+    file = JSON.parse(fs.readFileSync(path.join(__dirname, 'desktop-secrets.json'), 'utf8'));
+  } catch { /* no local secrets file — fall back to env (or unconfigured) */ }
+  return {
+    id: process.env.GOOGLE_DESKTOP_CLIENT_ID || file.GOOGLE_DESKTOP_CLIENT_ID || '',
+    secret: process.env.GOOGLE_DESKTOP_CLIENT_SECRET || file.GOOGLE_DESKTOP_CLIENT_SECRET || '',
+  };
+}
+const { id: GOOGLE_DESKTOP_CLIENT_ID, secret: GOOGLE_DESKTOP_CLIENT_SECRET } = loadDesktopGoogleCreds();
+
+const b64url = (buf) => buf.toString('base64')
+  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+// POST application/x-www-form-urlencoded to Google's token endpoint.
+function exchangeCodeForTokens(form) {
+  return new Promise((resolve, reject) => {
+    const body = new URLSearchParams(form).toString();
+    const req = https.request({
+      method: 'POST',
+      hostname: 'oauth2.googleapis.com',
+      path: '/token',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(body),
+      },
+      timeout: 15000,
+    }, (r) => {
+      let data = '';
+      r.setEncoding('utf8');
+      r.on('data', (d) => { data += d; });
+      r.on('end', () => {
+        let json;
+        try { json = JSON.parse(data); } catch { return reject(new Error('bad token response')); }
+        if (r.statusCode !== 200) {
+          return reject(new Error(json.error_description || json.error || `token ${r.statusCode}`));
+        }
+        resolve(json);
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('token request timed out')));
+    req.end(body);
+  });
+}
+
+// Runs the full PKCE flow. Resolves with a Google id_token (string), or null if
+// the user cancelled, or rejects on a hard error.
+function runGoogleDesktopSignIn() {
+  return new Promise((resolve, reject) => {
+    if (!GOOGLE_DESKTOP_CLIENT_ID || !GOOGLE_DESKTOP_CLIENT_SECRET) {
+      return reject(new Error('Desktop Google sign-in is not configured.'));
+    }
+
+    const verifier = b64url(crypto.randomBytes(32));
+    const challenge = b64url(crypto.createHash('sha256').update(verifier).digest());
+    const state = b64url(crypto.randomBytes(16));
+
+    let settled = false;
+    let timer = null;
+    const finish = (fn, arg) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { server.close(); } catch { /* already closing */ }
+      fn(arg);
+    };
+
+    // Loopback redirect target. "Desktop app" clients accept any 127.0.0.1 port
+    // without pre-registering it, so we let the OS pick a free one.
+    const server = http.createServer(async (req, res) => {
+      const reqUrl = new URL(req.url, `http://127.0.0.1`);
+      if (reqUrl.pathname !== '/callback') { res.statusCode = 404; res.end(); return; }
+
+      const closeTabHtml = (msg) => `<!doctype html><meta charset="utf-8">
+        <body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;
+        font-family:system-ui,sans-serif;background:#1a1a1a;color:#eee;text-align:center;">
+        <div><h2 style="margin:0 0 8px;">${msg}</h2>
+        <p style="opacity:.7;">You can close this tab and return to Pixel Parties.</p></div>`;
+
+      const respond = (msg) => {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(closeTabHtml(msg));
+      };
+
+      const err = reqUrl.searchParams.get('error');
+      const code = reqUrl.searchParams.get('code');
+      const returnedState = reqUrl.searchParams.get('state');
+
+      if (err) { respond('Sign-in cancelled.'); finish(resolve, null); return; }
+      if (returnedState !== state) { respond('Sign-in failed (state mismatch).'); finish(reject, new Error('state mismatch')); return; }
+      if (!code) { respond('Sign-in failed.'); finish(reject, new Error('no authorization code')); return; }
+
+      try {
+        const tokens = await exchangeCodeForTokens({
+          code,
+          client_id: GOOGLE_DESKTOP_CLIENT_ID,
+          client_secret: GOOGLE_DESKTOP_CLIENT_SECRET,
+          code_verifier: verifier,
+          grant_type: 'authorization_code',
+          redirect_uri: redirectUri,
+        });
+        if (!tokens.id_token) { respond('Sign-in failed.'); finish(reject, new Error('no id_token in response')); return; }
+        respond('Signed in!');
+        finish(resolve, tokens.id_token);
+      } catch (e) {
+        respond('Sign-in failed.');
+        finish(reject, e);
+      }
+    });
+
+    let redirectUri = '';
+    server.listen(0, '127.0.0.1', () => {
+      const { port } = server.address();
+      redirectUri = `http://127.0.0.1:${port}/callback`;
+      const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+        client_id: GOOGLE_DESKTOP_CLIENT_ID,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: 'openid email profile',
+        code_challenge: challenge,
+        code_challenge_method: 'S256',
+        state,
+        prompt: 'select_account',
+      }).toString();
+      shell.openExternal(authUrl);
+    });
+    server.on('error', (e) => finish(reject, e));
+
+    // Give up if the user never completes the flow (closed the browser, etc.).
+    timer = setTimeout(() => finish(resolve, null), 5 * 60 * 1000);
+  });
+}
+
+// Bridge for the web client's "Sign in with Google" button (desktop build).
+ipcMain.handle('pixel-parties:google-signin', async () => {
+  return runGoogleDesktopSignIn();
+});
 
 let mainWindow = null;
 let splashWindow = null;
