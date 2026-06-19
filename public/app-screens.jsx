@@ -1198,9 +1198,16 @@ function MainMenu() {
       <MenuCardBackground />
       <MenuLeaderboardPanel top={panelTop} height={panelHeight} />
       <MenuPlayerPanel top={panelTop} height={panelHeight} />
-      {/* Brand label sits centered in the top row (above the menu strip),
-          kept at its full size. */}
-      <h1 className="pixel-font menu-title title-outline" style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', fontSize: 34, color: 'var(--accent)', textShadow: '0 0 30px var(--accent)', margin: 0, zIndex: 5, border: '3px solid var(--player-color, #00f0ff)', background: 'color-mix(in srgb, var(--player-color, #00f0ff) 8%, var(--menu-surface))' }}>PIXEL PARTIES</h1>
+      {/* Brand logo (data/logo.png) — decoupled from the top row and centered
+          vertically in the gap between the top of the screen and the menu boxes
+          (the wrapper spans top:0 → panelTop, which is the top of .menu-body).
+          The pp-logo-tint overlay paints a player-colour gradient onto it. */}
+      <div className="pp-logo-wrap" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: panelTop != null ? panelTop : 160, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, pointerEvents: 'none' }}>
+        <div className="pp-logo-stack">
+          <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
+          <div className="pp-logo-tint" aria-hidden="true"></div>
+        </div>
+      </div>
       <div style={{ position: 'absolute', top: 14, left: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10, zIndex: 5 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* ELO + SC stats (the name now lives above the avatar below). */}

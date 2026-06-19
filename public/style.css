@@ -749,6 +749,44 @@ body {
   padding-bottom: 4px;
 }
 
+/* ===== PIXEL PARTIES brand logo (main menu) =====
+   Uses data/logo.png (a pixel-art wordmark). Pixelated scaling keeps the chunky
+   pixels crisp; the drop-shadow lifts it off the scrolling card-wall behind. */
+.pp-logo-stack {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  /* Contain the multiply blend to this stack (image only), not the menu bg. */
+  isolation: isolate;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,.7));
+}
+.pp-logo-img {
+  display: block;
+  height: 92px;
+  width: auto;
+  /* Shrink to fit short windows; width re-derives to keep the aspect ratio. */
+  max-height: 24vh;
+  image-rendering: pixelated;
+}
+/* Player-colour gradient applied ONLY to the white outline of the wordmark.
+   data/logo-mask-white.png is a derived mask (only the logo's near-white pixels
+   are opaque), so the gradient lands solely on the letter border — the gray
+   letter faces and dark pixels keep their original colour. */
+.pp-logo-tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg,
+    color-mix(in srgb, var(--player-color, #00f0ff) 35%, #ffffff) 0%,
+    var(--player-color, #00f0ff) 50%,
+    color-mix(in srgb, var(--player-color, #00f0ff) 55%, #000000) 100%);
+  -webkit-mask: url(/data/logo-mask-white.png) center / 100% 100% no-repeat;
+  mask: url(/data/logo-mask-white.png) center / 100% 100% no-repeat;
+}
+@media (max-width: 900px) {
+  .pp-logo-img { height: 46px; }
+}
+
 /* ===== DECK LIST ===== */
 .deck-list-item {
   padding: 8px 10px;

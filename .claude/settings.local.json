@@ -287,7 +287,8 @@
       "Bash(grep -n \"window\\\\\\\\.preload\\\\|window\\\\\\\\.cache\\\\|Image\\(\\)\\\\|.decode\\(\\)\\\\|requestIdleCallback\\\\|setTimeout.*preload\" public/app.jsx)",
       "Bash(grep -n \"window\\\\\\\\.\" public/app.jsx)",
       "Bash(grep -n \"window\\\\\\\\.api\\\\|window\\\\\\\\.socket\\\\|window\\\\\\\\.AVAILABLE_CARDS\\\\|window\\\\\\\\.cardImageUrl\" public/app.jsx)",
-      "Bash(grep -v \"^//\\\\|EyeIcon\\\\|DiscordIcon\\\\|CoinIcon\")"
+      "Bash(grep -v \"^//\\\\|EyeIcon\\\\|DiscordIcon\\\\|CoinIcon\")",
+      "PowerShell(Add-Type -AssemblyName System.Drawing; $img = [System.Drawing.Image]::FromFile\\(\"C:\\\\Pixel Parties WEB\\\\PixelPartiesWeb\\\\data\\\\logo.png\"\\); \"$\\($img.Width\\) x $\\($img.Height\\)\"; $img.Dispose\\(\\))"
     ]
   }
 }
