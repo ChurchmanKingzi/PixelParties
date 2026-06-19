@@ -8134,20 +8134,19 @@ body:has(.game-hand-me) .board-tooltip {
 }
 .shop-item:hover {
   border-color: var(--accent);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0,0,0,.5);
+  /* No translateY lift on hover: moving the card shifts its hit-box (and the
+     tooltip trigger) out from under the cursor at the bottom edge, which
+     un-hovers it, drops it back under the cursor, and loops forever. A deeper
+     shadow gives the same "pop" without moving the pointer target. */
+  box-shadow: 0 6px 22px rgba(0,0,0,.6);
 }
 .shop-item.shop-owned {
   border-color: #ffd700;
   border-width: 3px;
+  /* Static gold glow (the periodic pulse was moved to the unowned items). */
   box-shadow: 0 0 10px rgba(255,215,0,.35), 0 0 20px rgba(255,215,0,.15), inset 0 0 8px rgba(255,215,0,.1);
   position: relative;
   overflow: visible;
-  animation: shop-owned-glow 2.5s ease-in-out infinite;
-}
-@keyframes shop-owned-glow {
-  0%, 100% { box-shadow: 0 0 10px rgba(255,215,0,.35), 0 0 20px rgba(255,215,0,.15), inset 0 0 8px rgba(255,215,0,.1); }
-  50% { box-shadow: 0 0 16px rgba(255,215,0,.55), 0 0 30px rgba(255,215,0,.25), 0 0 50px rgba(255,170,0,.1), inset 0 0 12px rgba(255,215,0,.15); }
 }
 .shop-item.shop-owned::before {
   content: '';
@@ -8194,6 +8193,49 @@ body:has(.game-hand-me) .board-tooltip {
   box-shadow: 0 0 18px rgba(255,215,0,.6), 0 0 36px rgba(255,215,0,.25), inset 0 0 10px rgba(255,215,0,.15);
 }
 
+/* Unowned items: an enticing iridescent gradient border (::before) plus a
+   periodic glow (::after) so they draw the eye toward a purchase (owned items
+   get the static gold border instead). Excludes:
+   - .shop-owned          → owned, gets the gold border
+   - .structure-deck-default → owned default deck (not flagged .shop-owned)
+   - .shop-selected       → clicked, the gold selection highlight takes over */
+.shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected) {
+  position: relative;
+  border-color: transparent;
+  overflow: visible;
+  /* Periodic glow — animated box-shadow on the item itself (the same mechanism
+     the owned glow used, so it renders reliably). */
+  animation: shop-unowned-glow 3s ease-in-out infinite;
+}
+.shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected)::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: linear-gradient(120deg, #00f0ff, #5b8cff, #c44bff, #ff49b0, #c44bff, #5b8cff, #00f0ff) border-box;
+  background-size: 200% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+@keyframes shop-unowned-glow {
+  0%, 100% { box-shadow: 0 0 6px rgba(0,240,255,.25), 0 0 14px rgba(196,75,255,.12); }
+  50%      { box-shadow: 0 0 18px rgba(0,240,255,.6), 0 0 32px rgba(255,73,176,.38); }
+}
+/* Hover: shimmer the gradient border + quicken the glow pulse. */
+.shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected):hover {
+  animation-duration: 1.4s;
+}
+.shop-item:not(.shop-owned):not(.structure-deck-default):not(.shop-selected):hover::before {
+  animation: shop-unowned-shimmer 2s linear infinite;
+}
+@keyframes shop-unowned-shimmer {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
 /* Structure Decks — inherit frame styling from .shop-item / .shop-owned
    so locked (default dim border) vs unlocked (gold) vs default (green) read
    the same as other shop tiles. */
@@ -8202,12 +8244,47 @@ body:has(.game-hand-me) .board-tooltip {
   gap: 4px;
   transition: transform .15s, box-shadow .2s, border-color .2s;
 }
+/* The DEFAULT badge must match the SELECT / buy buttons' box exactly, or
+   swapping between them changes the control height — and since the grid
+   stretches every card in a row to the tallest, that resizes the whole row.
+   Mirror the .btn metrics (padding 4x10, 11px, 2px border) so the height is
+   identical in every state. Colours come from the inline style. */
+.shop-price {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display), sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  border: 2px solid currentColor;
+  border-radius: 0;
+}
+
+/* Bottom-align the action control (SELECT / DEFAULT / buy). The grid stretches
+   every card in a row to the tallest, and deck names wrap to differing heights,
+   so without this the buttons sit "right below the name" at varying heights.
+   margin-top:auto eats the slack above the control, lining them all up at the
+   card's bottom. !important beats the buttons' inline marginTop. */
+.structure-deck-item > .btn,
+.structure-deck-item > .shop-price {
+  margin-top: auto !important;
+}
 .structure-deck-item:hover:not([disabled]) {
-  transform: translateY(-2px);
+  /* Shadow-only hover (no translateY) — see .shop-item:hover for why moving the
+     card on hover causes the tooltip flicker loop. */
+  box-shadow: 0 6px 22px rgba(0,0,0,.55);
 }
 .structure-deck-item.structure-deck-default {
   animation: structure-deck-equipped-pulse 2s ease-in-out infinite;
   background: linear-gradient(180deg, rgba(51,255,136,.12) 0%, rgba(0,0,0,.25) 100%);
+  /* Match the owned (shop-owned) state's 3px border so an owned deck's height
+     is identical whether or not it's the default. Otherwise toggling default
+     flips this card between 2px and 3px borders, and since the grid stretches
+     every card in a row to the tallest, the whole row shifts by ~2px. */
+  border-width: 3px;
 }
 @keyframes structure-deck-equipped-pulse {
   0%, 100% { box-shadow: 0 0 16px rgba(51,255,136,.7), 0 0 28px rgba(51,255,136,.35); }
@@ -8304,32 +8381,22 @@ body:has(.game-hand-me) .board-tooltip {
   75% { background-position: 0% 100%; text-shadow: 0 0 10px rgba(255,215,0,.7), 0 0 24px rgba(255,170,0,.35); }
 }
 
-.shop-skin-name {
-  padding: 6px 6px 2px;
-  font-size: 10px;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  width: 100%;
+/* Hero/Skin flip toggle under each skin tile (replaces the old skin-name and
+   hero-name labels, which overflowed the tile). Styled like the buy button but
+   in accent (cyan) so it reads clearly as an interactive control. */
+.shop-skin-toggle {
+  margin-top: 7px;
+  padding: 4px 14px !important;
+  font-size: 10px !important;
   font-weight: 700;
-  background: linear-gradient(105deg, #ffd700 0%, #fff8b0 20%, #ffaa00 40%, #ffd700 60%, #ffe870 80%, #ffaa00 100%);
-  background-size: 300% 300%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: shop-sparkle 3s ease-in-out infinite;
-  letter-spacing: .3px;
+  letter-spacing: 1px;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+  background: rgba(0,240,255,.12) !important;
 }
-.shop-item-hero {
-  font-size: 8px;
-  color: var(--text2);
-  text-align: center;
-  padding: 0 6px 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  width: 100%;
+.shop-skin-toggle:hover {
+  background: rgba(0,240,255,.24) !important;
+  box-shadow: 0 0 10px rgba(0,240,255,.35);
 }
 
 .shop-buy-btn {
@@ -8413,7 +8480,8 @@ body:has(.game-hand-me) .board-tooltip {
 .shop-item.shop-selected {
   border-color: #ffd700 !important;
   box-shadow: 0 0 12px rgba(255,215,0,.5), 0 0 24px rgba(255,215,0,.2), inset 0 0 8px rgba(255,215,0,.1);
-  transform: translateY(-3px) scale(1.02);
+  /* No transform lift on select — the gold border + glow mark the selection,
+     and moving the item shifts its hit-box (see .shop-item:hover). */
 }
 
 /* Purchase celebration overlay text */
@@ -9188,6 +9256,34 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   padding: 0;
   gap: 0;
 }
+
+/* Faint pixel dither — same coarse 2x2 ordered checkerboard as the main-menu
+   boxes (section 12), but at 3% opacity. Used by the Puzzle Creator's surface
+   boxes, the menu's pop-up sub-menus (.menu-popup-dither: How to Play, Daily
+   Challenge, Puzzle Library), the Player Profile's surface boxes, the
+   Shop's content area + header, the Deck Editor's side panels, and the online
+   lobby / VS CPU content areas. Layered as a
+   !important background-IMAGE so it rides on
+   top of each box's background-COLOR (incl. inline styles); foreground content
+   renders above it. Only applied to boxes whose own background is a colour (or
+   transparent over a coloured parent) — never one with its own
+   background-IMAGE/gradient, which this would clobber. */
+.pz-search-panel,
+.pz-hand,
+.menu-popup-dither,
+.profile-identity-panel,
+.profile-section,
+.shop-content,
+.shop-screen .top-bar,
+.db-panel-left,
+.db-panel-right,
+.lobby-content,
+.vscpu-content {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.03'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.03'/%3E%3C/svg%3E") !important;
+  background-size: 8px 8px !important;
+  background-repeat: repeat !important;
+  image-rendering: pixelated;
+}
 /* Left filter sidebar — same control set as the deck builder. Fixed
    width chosen to give the side-by-side filter inputs (Lv / Cost,
    HP / ATK) breathing room without eating too much gallery width. */
@@ -9225,11 +9321,13 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   gap: 5px;
   align-content: start;
   scrollbar-width: auto;
-  scrollbar-color: rgba(255,255,255,.25) rgba(255,255,255,.05);
+  scrollbar-color: #4d4d57 #1e1e2a;
 }
 .pz-search-results::-webkit-scrollbar { width: 18px; }
-.pz-search-results::-webkit-scrollbar-track { background: rgba(255,255,255,.05); border-radius: 9px; }
-.pz-search-results::-webkit-scrollbar-thumb { background: rgba(255,255,255,.25); border-radius: 9px; min-height: 40px; }
+/* Opaque track/thumb (composited equivalents of the old translucent
+   white) so the panel's dither doesn't show through the scrollbar. */
+.pz-search-results::-webkit-scrollbar-track { background: #1e1e2a; border-radius: 9px; }
+.pz-search-results::-webkit-scrollbar-thumb { background: #4d4d57; border-radius: 9px; min-height: 40px; }
 .pz-search-results::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 /* Hide native scrollbar on touch devices — custom DOM scrollbar replaces it */
 @media (pointer: coarse) {
@@ -9251,7 +9349,9 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   right: 2px;
   width: 16px;
   min-height: 40px;
-  background: rgba(255,255,255,.3);
+  /* Opaque (composited equivalent of the old translucent white) so the
+     panel's dither doesn't show through the touch scrollbar thumb. */
+  background: #595962;
   border-radius: 8px;
   touch-action: none;
 }
@@ -9457,7 +9557,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
     margin-left: 4px !important;
   }
   .pz-gold-input span { font-size: 14px !important; }
-  .pz-gold-input input { width: 40px !important; font-size: 13px !important; }
+  .pz-gold-input input { width: 50px !important; font-size: 13px !important; }
   .pz-side-label { font-size: 7px !important; letter-spacing: 1px !important; }
   .pz-board-wrap { justify-content: flex-start; }
 }
@@ -11108,4 +11208,39 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 }
 .menu-logout-btn:hover {
   background: color-mix(in srgb, var(--accent) 18%, var(--menu-surface)) !important;
+}
+
+/* Modal buttons (e.g. the Create Game submenu) sit on the dithered .modal
+   surface and are translucent, so the dither shines through and they read as
+   "background-less". Give them the same opaque tinted surface treatment as the
+   menu buttons — mixed with the modal's own --bg2 so they blend in — per
+   button variant. Variant rules come after the base so they win (equal
+   specificity, later source). */
+.modal .btn {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg2)) !important;
+}
+.modal .btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 24%, var(--bg2)) !important;
+}
+.modal .btn-accent2 {
+  background: color-mix(in srgb, var(--accent2) 12%, var(--bg2)) !important;
+}
+.modal .btn-accent2:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent2) 24%, var(--bg2)) !important;
+}
+.modal .btn-success {
+  background: color-mix(in srgb, var(--success) 12%, var(--bg2)) !important;
+}
+.modal .btn-success:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--success) 24%, var(--bg2)) !important;
+}
+.modal .btn-danger {
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg2)) !important;
+}
+.modal .btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 24%, var(--bg2)) !important;
+}
+/* Active format/selection pills keep a stronger gold fill, still opaque. */
+.modal .btn-format-active {
+  background: color-mix(in srgb, #ffd700 22%, var(--bg2)) !important;
 }

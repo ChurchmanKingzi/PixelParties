@@ -174,7 +174,7 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ background: 'var(--bg2)', border: '1px solid #ff44cc', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,68,204,.2)' }}>
+      <div className="menu-popup-dither" style={{ background: 'var(--bg2)', border: '1px solid #ff44cc', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,68,204,.2)' }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
           <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>HOW TO PLAY</h3>
           <button className="btn" onClick={onClose} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
@@ -1277,7 +1277,7 @@ function MainMenu() {
       {dailyOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={(e) => { if (e.target === e.currentTarget) closeDaily(); }}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid #ffd700', borderRadius: 8, width: 700, maxWidth: '92vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,215,0,.25)', position: 'relative' }}>
+          <div className="menu-popup-dither" style={{ background: 'var(--bg2)', border: '1px solid #ffd700', borderRadius: 8, width: 700, maxWidth: '92vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,215,0,.25)', position: 'relative' }}>
             <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
               <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>DAILY CHALLENGE</h3>
               <button className="btn" onClick={closeDaily} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
@@ -1355,7 +1355,7 @@ function MainMenu() {
       {puzzleBrowserOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={(e) => { if (e.target === e.currentTarget) setPuzzleBrowserOpen(false); }}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid #ff8800', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,136,0,.2)', position: 'relative' }}>
+          <div className="menu-popup-dither" style={{ background: 'var(--bg2)', border: '1px solid #ff8800', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,136,0,.2)', position: 'relative' }}>
             <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
               <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>PUZZLE LIBRARY</h3>
               <button className="btn" onClick={() => setPuzzleBrowserOpen(false)} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
@@ -1442,6 +1442,13 @@ function ProfileScreen() {
   const [victoryMsg, setVictoryMsg] = useState(user.victoryMsg || '');
   const [defeatMsg, setDefeatMsg] = useState(user.defeatMsg || '');
   const [saving, setSaving] = useState(false);
+
+  // Name editor — inline rename with live availability feedback.
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(user.username);
+  // null = idle, 'checking', or { available: bool, reason: string }
+  const [nameStatus, setNameStatus] = useState(null);
+  const [savingName, setSavingName] = useState(false);
 
   // Password change
   const [oldPw, setOldPw] = useState('');
@@ -1612,6 +1619,42 @@ function ProfileScreen() {
     reader.readAsDataURL(file);
   };
 
+  // Debounced live availability check while the name editor is open. The
+  // server is authoritative; we short-circuit the obvious cases (unchanged /
+  // too short / too long) locally to avoid needless requests.
+  useEffect(() => {
+    if (!editingName) return;
+    const trimmed = nameInput.trim();
+    if (trimmed === user.username) { setNameStatus({ available: false, reason: 'This is your current name', unchanged: true }); return; }
+    if (trimmed.length < 3) { setNameStatus({ available: false, reason: 'Too short (3+ characters)' }); return; }
+    if (trimmed.length > 20) { setNameStatus({ available: false, reason: 'Too long (max 20 characters)' }); return; }
+    setNameStatus('checking');
+    const t = setTimeout(async () => {
+      try {
+        const data = await api('/profile/check-username?name=' + encodeURIComponent(trimmed));
+        setNameStatus(data);
+      } catch (e) { setNameStatus({ available: false, reason: 'Could not check name' }); }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [nameInput, editingName, user.username]);
+
+  // Saveable only once the server confirms the (changed) name is free.
+  const canSaveName = !savingName && nameStatus && nameStatus !== 'checking' && nameStatus.available === true;
+
+  const startNameEdit = () => { setNameInput(user.username); setNameStatus(null); setEditingName(true); };
+  const cancelNameEdit = () => { setEditingName(false); setNameInput(user.username); setNameStatus(null); };
+  const saveName = async () => {
+    if (!canSaveName) return;
+    setSavingName(true);
+    try {
+      const data = await api('/profile', { method: 'PUT', body: JSON.stringify({ username: nameInput.trim() }) });
+      setUser(data.user);
+      setEditingName(false);
+      notify('Name updated!', 'success');
+    } catch (e) { notify(e.message, 'error'); setNameStatus({ available: false, reason: e.message }); }
+    setSavingName(false);
+  };
+
   const save = async () => {
     // Client-side profanity guard mirrors the server's reject — just gives
     // faster feedback. The server stays the authoritative gate.
@@ -1729,10 +1772,40 @@ function ProfileScreen() {
               </div>
             </div>
 
-            {/* Username */}
-            <div className="orbit-font" style={{ fontSize: 30, fontWeight: 800, color, letterSpacing: 1, textShadow: `0 0 25px ${color}44`, textAlign: 'center', marginTop: 10 }}>
-              {user.username}
-            </div>
+            {/* Username (inline editable, with live availability feedback) */}
+            {!editingName ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10 }}>
+                <div className="orbit-font" style={{ fontSize: 30, fontWeight: 800, color, letterSpacing: 1, textShadow: `0 0 25px ${color}44`, textAlign: 'center' }}>
+                  {user.username}
+                </div>
+                <button className="btn" title="Edit name" onClick={startNameEdit} style={{ padding: '3px 9px', fontSize: 13, lineHeight: 1 }}>✎</button>
+              </div>
+            ) : (() => {
+              const checking = nameStatus === 'checking';
+              const obj = (nameStatus && nameStatus !== 'checking') ? nameStatus : null;
+              // Green when free, red when taken/invalid, neutral while checking
+              // or when it's still the current (unchanged) name.
+              const tone = (checking || !obj || obj.unchanged) ? 'var(--text2)'
+                : obj.available ? 'var(--success)' : 'var(--danger)';
+              return (
+                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
+                  <input className="input" value={nameInput} maxLength={20} autoFocus
+                    onChange={(e) => setNameInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') saveName(); else if (e.key === 'Escape') cancelNameEdit(); }}
+                    style={{ textAlign: 'center', fontSize: 22, fontWeight: 800, width: 260, color, borderColor: tone, boxShadow: `0 0 10px ${tone}33` }} />
+                  <div style={{ fontSize: 12, fontWeight: 700, color: tone, minHeight: 15, letterSpacing: .5 }}>
+                    {checking ? 'Checking…' : (obj ? obj.reason : '')}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-success" onClick={saveName} disabled={!canSaveName}
+                      style={{ padding: '5px 16px', fontSize: 12, opacity: canSaveName ? 1 : .45 }}>
+                      {savingName ? '…' : 'SAVE NAME'}
+                    </button>
+                    <button className="btn" onClick={cancelNameEdit} style={{ padding: '5px 16px', fontSize: 12 }}>CANCEL</button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ELO + SC display */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 6 }}>
@@ -2296,6 +2369,14 @@ function ShopScreen() {
   const [randomReveal, setRandomReveal] = useState(null); // { imgUrl, label, subtitle } or null
   const [hoverDeckCard, setHoverDeckCard] = useState(null); // cover card name being previewed
   const [hoverSkin, setHoverSkin] = useState(null); // { skinName, heroName } being previewed
+  // Skin ids currently flipped to show the original Hero art instead of the
+  // skin art (toggled per-card via the Hero/Skin button under each tile).
+  const [skinShowHero, setSkinShowHero] = useState(() => new Set());
+  const toggleSkinHero = (id) => setSkinShowHero(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
   // Tutorial 5 is where Antonia reveals her name in-story — until that
   // tutorial is cleared we call the shopkeep "Raccoon Shopkeep" instead.
   const [tutorial5Cleared, setTutorial5Cleared] = useState(false);
@@ -2625,18 +2706,27 @@ function ShopScreen() {
           {filteredSkins.map(skin => {
             const isOwned = ownedSet.skin.has(skin.id);
             const sel = isSelected('skin', skin.id);
+            const showHero = skinShowHero.has(skin.id);
+            const imgSrc = showHero
+              ? (cardImageUrl(skin.heroName) || '/cardback.png')
+              : '/cards/skins/' + encodeURIComponent(skin.skinName) + '.png';
             return (
               <div key={skin.id} className={'shop-item shop-skin-item' + (isOwned ? ' shop-owned' : ' shop-unowned-skin') + (sel ? ' shop-selected' : '')}
                 onMouseEnter={() => setHoverSkin({ skinName: skin.skinName, heroName: skin.heroName })}
                 onMouseLeave={() => setHoverSkin(null)}
                 onClick={() => toggleSelect('skin', skin.id)}>
                 <div className="shop-item-img-wrap">
-                  <img src={'/cards/skins/' + encodeURIComponent(skin.skinName) + '.png'} draggable={false}
+                  <img src={imgSrc} draggable={false}
                     className={!isOwned ? 'shop-skin-locked' : ''} />
                   {isOwned && <div className="shop-owned-badge">OWNED</div>}
                 </div>
-                <div className="shop-skin-name" title={skin.heroName}>{skin.skinName}</div>
-                <div className="shop-item-hero">{skin.heroName}</div>
+                {/* Flip between the skin art and the original Hero art so the
+                    player can tell which Hero a skin belongs to (names removed
+                    because most skin names overflowed the tile). */}
+                <button className="btn shop-skin-toggle"
+                  onClick={(e) => { e.stopPropagation(); toggleSkinHero(skin.id); if (window.playSFX) window.playSFX('ui_click'); }}>
+                  {showHero ? 'Show Skin' : 'Show Hero'}
+                </button>
                 {!isOwned && (
                   <button className="btn shop-buy-btn" disabled={buying || (user.sc || 0) < prices.skin}
                     onClick={(e) => buyItem('skin', skin.id, prices.skin, e)}>
@@ -2680,7 +2770,7 @@ function ShopScreen() {
             // Not owned → default shop-item (dim) frame so it clearly reads
             // as unpurchased, mirroring avatar/sleeve/board tiles.
             const frameStyle = {
-              cursor: d.owned ? 'pointer' : 'default',
+              cursor: 'default',
               position: 'relative',
             };
             if (isCurrentDefault) {
@@ -2697,17 +2787,21 @@ function ShopScreen() {
               <div key={d.structureId} className={classes}
                 style={frameStyle}
                 onMouseEnter={() => d.coverCard && setHoverDeckCard(d.coverCard)}
-                onMouseLeave={() => setHoverDeckCard(null)}
-                onClick={d.owned ? () => pickStructureAsDefault(d.id) : undefined}>
+                onMouseLeave={() => setHoverDeckCard(null)}>
                 <img src={coverUrl} alt={d.name} draggable={false}
                   style={{ width: '100%', height: 148, objectFit: 'cover', objectPosition: 'center top', borderRadius: 4, opacity: d.owned ? 1 : 0.5 }} />
                 <div style={{ fontSize: 11, textAlign: 'center', padding: '6px 4px 2px', color: isCurrentDefault ? '#33ff88' : (d.owned ? '#ffd700' : 'var(--text2)'), fontWeight: 600 }}>
                   {d.name}
                 </div>
                 {d.owned ? (
-                  <div className="shop-price" style={{ borderColor: isCurrentDefault ? '#33ff88' : '#ffd700', color: isCurrentDefault ? '#33ff88' : '#ffd700' }}>
-                    {isCurrentDefault ? 'DEFAULT' : 'Click to select'}
-                  </div>
+                  isCurrentDefault ? (
+                    <div className="shop-price" style={{ borderColor: '#33ff88', color: '#33ff88' }}>DEFAULT</div>
+                  ) : (
+                    <button className="btn" onClick={(e) => { e.stopPropagation(); pickStructureAsDefault(d.id); }}
+                      style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#ffd700', color: '#ffd700' }}>
+                      SELECT
+                    </button>
+                  )
                 ) : (
                   <button className="btn" disabled={buying || !canAfford}
                     onClick={(e) => buyStructureDeck(d.structureId, e)}
@@ -3700,7 +3794,7 @@ function SingleplayerScreen() {
         </label>
         <VolumeControl />
       </div>
-      <div style={{ padding: '20px 40px 40px', boxSizing: 'border-box', width: '100%', maxWidth: 1500, alignSelf: 'center' }}>
+      <div className="vscpu-content" style={{ padding: '20px 40px 40px', boxSizing: 'border-box', width: '100%', maxWidth: 1500, alignSelf: 'center' }}>
         {!hasAnyLegal && (
           <div style={{ color: '#ff7777', textAlign: 'center', padding: '12px 16px', marginBottom: 20, border: '1px solid #ff7777', borderRadius: 4, background: 'rgba(255,119,119,.08)', fontSize: 12 }}>
             You need at least one legal deck to play. Edit a deck or pick a starter deck first.
@@ -3732,7 +3826,9 @@ function SingleplayerScreen() {
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center',
                   gap: 6, padding: 8,
-                  background: 'rgba(255,68,204,.07)',
+                  // Opaque (tint mixed into --bg2) so the dithered content
+                  // behind the tile doesn't show through it.
+                  background: 'color-mix(in srgb, ' + racColor + ' 8%, var(--bg2))',
                   border: '2px solid ' + racColor,
                   borderRadius: 6,
                   boxShadow: '0 0 10px ' + racColor + '44',
@@ -3766,7 +3862,9 @@ function SingleplayerScreen() {
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center',
                     gap: 6, padding: 8,
-                    background: 'rgba(255,68,68,.06)',
+                    // Opaque (tint mixed into --bg2) so the dithered content
+                    // behind the tile doesn't show through it.
+                    background: 'color-mix(in srgb, ' + frameColor + ' 7%, var(--bg2))',
                     border: '2px solid ' + frameColor,
                     borderRadius: 6,
                     boxShadow: '0 0 10px ' + frameColor + '33',

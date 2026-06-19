@@ -1007,21 +1007,16 @@ window.computeSupportHandLimit = function (sideState, areaZone) {
 // on data-saver / 2G so the player never feels it. Combined with the
 // long Cache-Control on /cards (server.js), warmed art also survives a
 // full reload / re-login.
-let _cardArtPreloadStarted = false;
-function preloadAllCardArt() {
-  if (_cardArtPreloadStarted) return;
-  _cardArtPreloadStarted = true;
-
-  const conn = navigator.connection;
-  if (conn && (conn.saveData || /(^|[^0-9])2g$/.test(conn.effectiveType || ''))) return;
-
-  const urls = [...new Set(
-    Object.values(window.AVAILABLE_MAP || {}).map(f => '/cards/' + encodeURIComponent(f))
-  )];
-  if (!urls.length) return;
-
+// Low-priority image warmer shared by the card-art and shop-asset preloaders.
+// Pumps `urls` into the browser cache at low concurrency/priority during idle
+// time, then invokes `onDone` once the whole queue has settled (each url has
+// either loaded or errored). Combined with the long Cache-Control on /cards &
+// /data (server.js), warmed images survive a full reload / re-login.
+function _warmImageUrls(urls, onDone) {
+  if (!urls.length) { if (onDone) onDone(); return; }
   const MAX_PARALLEL = 4;
-  let i = 0, active = 0;
+  let i = 0, active = 0, settled = 0;
+  const total = urls.length;
   const idle = window.requestIdleCallback || (cb => setTimeout(cb, 300));
 
   function pump() {
@@ -1030,7 +1025,11 @@ function preloadAllCardArt() {
       const img = new Image();
       if ('fetchPriority' in img) img.fetchPriority = 'low';
       img.decoding = 'async';
-      const next = () => { active--; if (i < urls.length) idle(pump); };
+      const next = () => {
+        active--; settled++;
+        if (settled >= total) { if (onDone) onDone(); return; }
+        if (i < urls.length) idle(pump);
+      };
       img.onload = next;
       img.onerror = next;
       img.src = urls[i++];
@@ -1038,7 +1037,54 @@ function preloadAllCardArt() {
   }
   idle(pump);
 }
+
+// Skip background warming on a metered / very slow connection so the player
+// never feels it.
+function _preloadDeferOnSlowConn() {
+  const conn = navigator.connection;
+  return !!(conn && (conn.saveData || /(^|[^0-9])2g$/.test(conn.effectiveType || '')));
+}
+
+let _cardArtPreloadStarted = false;
+function preloadAllCardArt() {
+  if (_cardArtPreloadStarted) return;
+  _cardArtPreloadStarted = true;
+  if (_preloadDeferOnSlowConn()) return;
+
+  const urls = [...new Set(
+    Object.values(window.AVAILABLE_MAP || {}).map(f => '/cards/' + encodeURIComponent(f))
+  )];
+  // Once the card images are warm, chain the shop assets (skins, avatars,
+  // sleeves, boards) so opening the Shop is instant instead of streaming in
+  // over ~10s. Shop art waits for the card queue to drain first so it never
+  // competes with the higher-priority card art.
+  _warmImageUrls(urls, preloadShopAssets);
+}
 window.preloadAllCardArt = preloadAllCardArt;
+
+// Warm the Shop's images in the background. Mirrors ShopScreen's exact URL
+// construction from the public /api/shop/catalog so each warmed entry is a
+// cache hit when the Shop renders. Runs once, after the card art is warm.
+let _shopAssetsPreloadStarted = false;
+function preloadShopAssets() {
+  if (_shopAssetsPreloadStarted) return;
+  _shopAssetsPreloadStarted = true;
+  if (_preloadDeferOnSlowConn()) return;
+
+  const fetchCatalog = window.api
+    ? window.api('/shop/catalog')
+    : fetch('/api/shop/catalog').then(r => r.json());
+  fetchCatalog.then(cat => {
+    if (!cat) return;
+    const urls = [];
+    for (const s of (cat.skins   || [])) urls.push('/cards/skins/'       + encodeURIComponent(s.skinName) + '.png');
+    for (const a of (cat.avatars || [])) urls.push('/data/shop/avatars/' + encodeURIComponent(a.file));
+    for (const s of (cat.sleeves || [])) urls.push('/data/shop/sleeves/' + encodeURIComponent(s.file));
+    for (const b of (cat.boards  || [])) urls.push('/data/shop/boards/'  + encodeURIComponent(b.file));
+    _warmImageUrls([...new Set(urls)]);
+  }).catch(() => {});
+}
+window.preloadShopAssets = preloadShopAssets;
 
 async function loadCardDB() {
   // Load full card database (needed for rule lookups on existing decks)

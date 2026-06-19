@@ -217,6 +217,9 @@ function PuzzleCreator() {
     sa1: '', sa2: '', ss1: '', ss2: '',
     level: '', cost: '', hp: '', atk: '',
   });
+  // Collapse the filter sidebar to reclaim its width for a wider card
+  // grid (3 → 5 columns), mirroring the deck builder's collapsible filters.
+  const [puzzleFiltersCollapsed, setPuzzleFiltersCollapsed] = useState(false);
   const [validated, setValidated] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [editHp, setEditHp] = useState('');
@@ -1914,6 +1917,7 @@ function PuzzleCreator() {
         {/* ── Card Search Panel ── */}
         <div className="pz-search-panel">
           {/* ── Filter sidebar (mirrors the deck builder's filter set) ── */}
+          {!puzzleFiltersCollapsed && (
           <div className="pz-filter-sidebar">
             <div className="orbit-font" style={{ fontSize: 10, color: 'var(--text2)', fontWeight: 700, letterSpacing: 1 }}>
               FILTERS
@@ -1996,9 +2000,22 @@ function PuzzleCreator() {
               );
             })()}
           </div>
+          )}
           {/* ── Gallery column (scrollable card grid; name search lives in
                 the sidebar's Name filter input). ── */}
           <div className="pz-gallery-column">
+          {/* Collapse toggle — hides the filter sidebar so the grid widens
+              from 3 to 5 cards per row (see pz-search-results inline grid). */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <button className="btn" style={{ padding: '3px 10px', fontSize: 9 }}
+              onClick={() => setPuzzleFiltersCollapsed(c => !c)}
+              title={puzzleFiltersCollapsed ? 'Show filters' : 'Hide filters for a wider gallery'}>
+              {puzzleFiltersCollapsed ? '▾ FILTERS' : '▴ FILTERS'}
+            </button>
+            <span className="orbit-font" style={{ fontSize: 10, color: 'var(--text2)', fontWeight: 700, letterSpacing: 1 }}>
+              {searchResults.length} CARDS
+            </span>
+          </div>
           <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
             {/* Don't toggle overflowY during drag: hiding the native
                 18px scrollbar reflows the `repeat(3, 1fr)` grid and
@@ -2007,6 +2024,7 @@ function PuzzleCreator() {
                 drag doesn't auto-scroll arbitrary children, only the
                 window edges, so leaving overflow as `auto` is safe. */}
             <div className="pz-search-results" ref={searchResultsRef} style={{
+              gridTemplateColumns: `repeat(${puzzleFiltersCollapsed ? 5 : 3}, 1fr)`,
               ...(isTouchDevice ? { scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } : {}),
             }}>
             {searchResults.map((c, i) => {
@@ -2091,10 +2109,12 @@ function PuzzleCreator() {
               {oppHand.length === 0 && <span style={{ color: 'var(--text2)', fontSize: 11 }}>Drag cards here for the opponent's hand.</span>}
             </div>
             <div className="pz-gold-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginLeft: 8, flexShrink: 0, alignSelf: 'stretch', padding: '4px 10px', borderLeft: '1px solid rgba(255,215,0,.2)', background: 'rgba(255,215,0,.04)' }}>
-              <span style={{ fontSize: 18, color: '#ffd700' }}>💰</span>
-              <input className="input" type="number" min="0" value={players[1].gold ?? 0}
-                onChange={(e) => { const v = Math.max(0, parseInt(e.target.value) || 0); updatePlayer(1, p => { p.gold = v; return p; }); }}
-                style={{ width: 52, padding: '6px 4px', fontSize: 16, textAlign: 'center', borderColor: 'rgba(255,215,0,.4)', color: '#ffd700', fontWeight: 700 }} />
+              <span style={{ fontSize: 18, color: '#ffd700', width: 24, textAlign: 'center', flexShrink: 0 }}>💰</span>
+              <input className="input" type="number" min="0" max="999" value={players[1].gold ?? 0}
+                onChange={(e) => { const v = Math.min(999, Math.max(0, parseInt(e.target.value) || 0)); updatePlayer(1, p => { p.gold = v; return p; }); }}
+                style={{ width: 64, padding: '6px 6px', fontSize: 16, textAlign: 'center', borderColor: 'rgba(255,215,0,.4)', color: '#ffd700', fontWeight: 700 }} />
+              {/* Right spacer mirrors the bag icon's width so the field sits centered */}
+              <span aria-hidden="true" style={{ width: 24, flexShrink: 0 }} />
             </div>
             <DebuffSelector
               side="opp"
@@ -2124,11 +2144,12 @@ function PuzzleCreator() {
 
             {renderSide(0, false)}
           <div className="pz-side-label orbit-font">YOU</div>
-        </div>
-      </div>
 
-      {/* ── Staging Hand (z-index above tooltip) ── */}
-      <div className="pz-hand" style={{ position: 'relative', zIndex: 10000 }}
+          {/* ── Staging Hand: kept inside the board column so it only spans
+               the board width (mirroring the opponent's hand bar at the top)
+               instead of the full screen — this frees the area beneath the
+               gallery, which now fills the full height. ── */}
+          <div className="pz-hand" style={{ position: 'relative', zIndex: 10000 }}
         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('hand'); }}
         onDragLeave={() => setDragOverZone(null)}
         onDrop={handleHandDrop}>
@@ -2161,10 +2182,12 @@ function PuzzleCreator() {
           {hand.length === 0 && <span style={{ color: 'var(--text2)', fontSize: 11 }}>{isTouchDevice ? 'Search → tap to add. Tap card, then tap zone to place.' : 'Search → click to add or drag directly onto the board. Right-click to remove.'}</span>}
         </div>
         <div className="pz-gold-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginLeft: 8, flexShrink: 0, alignSelf: 'stretch', padding: '4px 10px', borderLeft: '1px solid rgba(255,215,0,.2)', background: 'rgba(255,215,0,.04)' }}>
-          <span style={{ fontSize: 18, color: '#ffd700' }}>💰</span>
-          <input className="input" type="number" min="0" value={players[0].gold ?? 0}
-            onChange={(e) => { const v = Math.max(0, parseInt(e.target.value) || 0); updatePlayer(0, p => { p.gold = v; return p; }); }}
-            style={{ width: 52, padding: '6px 4px', fontSize: 16, textAlign: 'center', borderColor: 'rgba(255,215,0,.4)', color: '#ffd700', fontWeight: 700 }} />
+          <span style={{ fontSize: 18, color: '#ffd700', width: 24, textAlign: 'center', flexShrink: 0 }}>💰</span>
+          <input className="input" type="number" min="0" max="999" value={players[0].gold ?? 0}
+            onChange={(e) => { const v = Math.min(999, Math.max(0, parseInt(e.target.value) || 0)); updatePlayer(0, p => { p.gold = v; return p; }); }}
+            style={{ width: 64, padding: '6px 6px', fontSize: 16, textAlign: 'center', borderColor: 'rgba(255,215,0,.4)', color: '#ffd700', fontWeight: 700 }} />
+          {/* Right spacer mirrors the bag icon's width so the field sits centered */}
+          <span aria-hidden="true" style={{ width: 24, flexShrink: 0 }} />
         </div>
         <DebuffSelector
           side="me"
@@ -2174,6 +2197,8 @@ function PuzzleCreator() {
           onToggle={() => setDebuffMenuOpen(debuffMenuOpen === 'me' ? null : 'me')}
           onClose={() => setDebuffMenuOpen(null)}
         />
+          </div>
+        </div>
       </div>
 
       {/* ── Card Tooltip Panel ── */}

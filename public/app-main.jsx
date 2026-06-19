@@ -1531,7 +1531,7 @@ function PlayScreen() {
         <VolumeControl />
       </div>
 
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }} className="animate-in">
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }} className="lobby-content animate-in">
         {/* Open Games */}
         <div style={{ flex: 1, borderRight: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column' }}>
           <div className="orbit-font" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent)', borderBottom: '1px solid var(--bg4)' }}>

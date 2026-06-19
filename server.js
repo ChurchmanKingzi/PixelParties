@@ -1229,6 +1229,18 @@ function sanitizeUser(u) {
 }
 
 // ===== PROFILE ROUTES =====
+// Live username-availability check powering the profile name editor's
+// green/red feedback. Mirrors the validation in PUT /api/profile so the two
+// never disagree. The user's own current name reads as available (id != self).
+app.get('/api/profile/check-username', authMiddleware, async (req, res) => {
+  const name = String(req.query.name || '').trim();
+  if (name.length < 3) return res.json({ available: false, reason: 'Too short (3+ characters)' });
+  if (name.length > 20) return res.json({ available: false, reason: 'Too long (max 20 characters)' });
+  if (containsProfanity(name)) return res.json({ available: false, reason: 'Inappropriate language' });
+  const taken = await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ?', [name, req.user.userId]);
+  res.json({ available: !taken, reason: taken ? 'Already taken' : 'Available' });
+});
+
 app.put('/api/profile', authMiddleware, async (req, res) => {
   const b = req.body || {};
   // Validate the in-game speech-bubble messages up front (length + a basic
@@ -1239,10 +1251,24 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
     if (msg.length > MESSAGE_MAX_LEN) return res.status(400).json({ error: `${label} is too long (max ${MESSAGE_MAX_LEN} characters).` });
     if (containsProfanity(msg)) return res.status(400).json({ error: `${label}: please remove inappropriate language.` });
   }
+  // Renaming: same rules as signup (3–20 chars), plus a profanity gate and a
+  // case-insensitive uniqueness check that excludes the user's own row (so
+  // re-saving your current name, or just a case change, is allowed).
+  let newUsername;
+  if (b.username !== undefined) {
+    newUsername = String(b.username || '').trim();
+    if (newUsername.length < 3) return res.status(400).json({ error: 'Username must be 3+ characters' });
+    if (newUsername.length > 20) return res.status(400).json({ error: 'Username must be 20 characters or fewer' });
+    if (containsProfanity(newUsername)) return res.status(400).json({ error: 'Username: please remove inappropriate language.' });
+    if (await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ?', [newUsername, req.user.userId])) {
+      return res.status(409).json({ error: 'Username already taken' });
+    }
+  }
   // Update only the fields the client actually sent, so single-field
   // quick-saves (avatar, sleeve, …) never clobber the others.
   const sets = [];
   const vals = [];
+  if (b.username !== undefined)   { sets.push('username = ?');     vals.push(newUsername); }
   if (b.color !== undefined)      { sets.push('color = ?');       vals.push(b.color || '#00f0ff'); }
   if (b.avatar !== undefined)     { sets.push('avatar = ?');      vals.push(b.avatar || null); }
   if (b.cardback !== undefined)   { sets.push('cardback = ?');    vals.push(b.cardback || null); }
