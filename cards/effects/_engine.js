@@ -11895,6 +11895,10 @@ class GameEngine {
         // Soul Shards: per-name 1/turn cap. Wipe the whole map so every
         // Shard becomes summonable again (subject to its other gates).
         delete ps._soulShardSummonedThisTurn;
+        // Cycling Demons: per-name 1/turn cap (counts hand summons AND
+        // defeat-chain placements). Wipe so each demon name is summonable
+        // / placeable again next turn.
+        delete ps._cyclingDemonSummonedThisTurn;
         // Snapshot the names already in this player's discard pile at
         // turn start — universal "was the card sent here this turn?"
         // gate. Covers EVERY card type (Creatures, Spells, Attacks,
