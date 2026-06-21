@@ -139,11 +139,9 @@ module.exports = {
     const occName = occ.name;
 
     // (1) Fire ON_CREATURE_SACRIFICED while the occupant is still in its
-    //     slot — feeds Temple / Ruin Mourner / Corpse Cannibal / etc. +
-    //     the per-turn tally and the `_sacrificedTurn` stamp.
-    ps._creaturesSacrificedThisTurn = (ps._creaturesSacrificedThisTurn || 0) + 1;
-    if (!occ.counters) occ.counters = {};
-    occ.counters._sacrificedTurn = gs.turn;
+    //     slot — feeds Temple / Ruin Mourner / Corpse Cannibal / etc. The
+    //     per-turn tally and the `_sacrificedTurn` stamp are applied
+    //     centrally in runHooks(onCreatureSacrificed) — don't do them here.
     engine._broadcastEvent('play_zone_animation', {
       type: 'knife_sacrifice', owner: pi, heroIdx, zoneSlot: slotIdx,
     });

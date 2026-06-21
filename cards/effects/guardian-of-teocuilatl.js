@@ -40,9 +40,8 @@ function hasTribute(engine, pi) {
  *  sacrifice signal + per-turn tally/stamp, then route it to discard. */
 async function sacrificeSelf(engine, inst, pi) {
   const ps = engine.gs.players[pi];
-  if (ps) ps._creaturesSacrificedThisTurn = (ps._creaturesSacrificedThisTurn || 0) + 1;
-  if (!inst.counters) inst.counters = {};
-  inst.counters._sacrificedTurn = engine.gs.turn;
+  // Per-turn tally + `_sacrificedTurn` stamp are applied centrally in
+  // `runHooks(onCreatureSacrificed)` — don't do them here (double-count).
   await engine.runHooks('onCreatureSacrificed', {
     creature: inst, cardName: inst.name, owner: inst.owner,
     heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,

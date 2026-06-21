@@ -75,13 +75,19 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps || !(ps.hand || []).includes(CARD_NAME)) return;
 
-      // The freed slot must be available and belong to a living Hero.
+      // The freed slot must be available AND its Hero must actually be
+      // able to summon Corpse Cannibal — the SAME gate as a normal summon
+      // (alive, not Frozen/Stunned, meets Summoning Magic Lv1, has the
+      // free slot). A Hero with too little Summoning Magic shouldn't host
+      // it just because a slot opened up under them — and it's specifically
+      // THIS slot's Hero that matters, not some other Hero who could
+      // summon it. `_canHeroActivateSurprise` is the same full-gate helper
+      // Rider Warg's reaction-summon uses.
       const heroIdx = death.heroIdx;
       const slot = death.zoneSlot;
       if (heroIdx == null || slot == null || slot < 0) return;
-      const hero = ps.heroes?.[heroIdx];
-      if (!hero?.name || hero.hp <= 0) return;
       if (((ps.supportZones?.[heroIdx] || [])[slot] || []).length !== 0) return;
+      if (!engine._canHeroActivateSurprise(pi, heroIdx, CARD_NAME)) return;
 
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -97,6 +103,7 @@ module.exports = {
       // Re-validate post-prompt (board can shift across the await).
       if (!(ps.hand || []).includes(CARD_NAME)) return;
       if (((ps.supportZones?.[heroIdx] || [])[slot] || []).length !== 0) return;
+      if (!engine._canHeroActivateSurprise(pi, heroIdx, CARD_NAME)) return;
 
       // ── Hand→board summon flight + landing shine. ──
       // Broadcast the flight BEFORE mutating state: the client captures

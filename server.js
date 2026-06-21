@@ -6615,10 +6615,28 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         // Place fizzled (full zone, etc.) — refund Hero pre-action cost.
         await room.engine.refundHeroActionCost(pi, heroIdx);
         _heroCostFinalized = true;
-        // Fizzle on a full zone — foreign-origin Creatures still route
-        // their fizzle discard back to the original owner's pile.
         const fizzleDiscardOwner = room.engine._consumeHandCardOrigin(pi, cardName);
-        gs.players[fizzleDiscardOwner].discardPile.push(cardName);
+        if (fizzleDiscardOwner === pi) {
+          // OWN card that couldn't be placed — return it to HAND, not the
+          // discard pile. The board UI only ever offers a full-zoned Hero
+          // as a drop/click target through the bounce-place / sacrifice-
+          // summon path (Deepsea swap, Suspicious Monster); if that path
+          // didn't consume the placement (occupant no longer bounceable,
+          // a reaction filled the slot, etc.), summonCreature relocates
+          // and — with no free base zone — fizzles here. Discarding silently
+          // LOST the player's card (reported: clicking a bounce/sacrifice
+          // target sent the creature straight to the discard pile). A no-op
+          // refund is the correct outcome; the action-economy rollback
+          // below already un-spends the Action.
+          ps.hand.push(cardName);
+          if (gs._scTracking && pi >= 0 && pi < 2) {
+            gs._scTracking[pi].cardsPlayedFromHand = Math.max(0, (gs._scTracking[pi].cardsPlayedFromHand || 0) - 1);
+          }
+        } else {
+          // Foreign-origin Creatures (Magic Lamp gifts etc.) still route
+          // their fizzle discard back to the original owner's pile.
+          gs.players[fizzleDiscardOwner].discardPile.push(cardName);
+        }
         // Roll back action-economy bookkeeping — the Creature couldn't
         // be placed, so the Action resource wasn't actually spent.
         if (additionalConsumed && consumedInst) {

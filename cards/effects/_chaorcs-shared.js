@@ -94,9 +94,9 @@ function firstFreeSupportSlot(engine, pi, heroIdx) {
  */
 async function treatAsSacrificed(engine, inst, ownerPi, sourceName) {
   if (!inst) return;
-  const ps = engine.gs.players[ownerPi];
-  if (ps) ps._creaturesSacrificedThisTurn = (ps._creaturesSacrificedThisTurn || 0) + 1;
-  if (inst.counters) inst.counters._sacrificedTurn = engine.gs.turn;
+  // The per-turn tally + `_sacrificedTurn` stamp are applied centrally in
+  // `runHooks(onCreatureSacrificed)` below — don't increment here (would
+  // double-count).
   await engine.runHooks('onCreatureSacrificed', {
     creature: inst,
     cardName: inst.name,

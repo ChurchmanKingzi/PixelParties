@@ -391,24 +391,32 @@ async function tryBouncePlace(ctx) {
     return true;
   }
 
+  // Capture & clear any explicit occupied-slot bounce request UP-FRONT
+  // (the server sets ps._requestedBouncePlaceSlot when the player drops /
+  // clicks the hand card directly onto an occupied bounceable slot). When
+  // set, the player deliberately targeted an occupied slot — they do NOT
+  // want a normal summon. So if the bounce can't be performed below, we
+  // ABORT (return false → card stays in hand) rather than falling through
+  // to a normal summon, which would relocate the card and — on a full
+  // board — fizzle it straight into the discard pile (the reported bug:
+  // clicking a bounce target sent the creature to discard).
+  const bounceReq = ps._requestedBouncePlaceSlot || null;
+  if (ps._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
+
   const bounceable = getBounceableDeepseaCreatures(engine, pi);
   if (bounceable.length === 0) {
-    // No bounce target — normal summon is the only path. The
-    // inherentAction / canBypassLevelReq helpers also return false
-    // when there's no bounceable, so this path means the player is
-    // paying the Action + Summoning Magic normally.
-    return true;
+    // No bounce target. If the player explicitly aimed at an occupied
+    // slot, abort instead of normal-summoning into it. Otherwise this is
+    // a plain normal summon (the inherentAction / canBypassLevelReq
+    // helpers also return false with no bounceable, so the Action +
+    // Summoning Magic were paid normally).
+    return bounceReq ? false : true;
   }
 
-  // Did the player already drop the hand card directly onto a specific
-  // occupied Deepsea slot? The server sets ps._requestedBouncePlaceSlot
-  // when the drag target is an occupied bounceable slot. In that case we
-  // skip the zone-pick prompt entirely and place into that slot.
+  // If the player targeted a specific occupied slot, place into it.
   let chosen = null;
-  if (ps._requestedBouncePlaceSlot) {
-    const req = ps._requestedBouncePlaceSlot;
-    delete ps._requestedBouncePlaceSlot;
-    chosen = bounceable.find(b => b.heroIdx === req.heroIdx && b.slotIdx === req.slotIdx) || null;
+  if (bounceReq) {
+    chosen = bounceable.find(b => b.heroIdx === bounceReq.heroIdx && b.slotIdx === bounceReq.slotIdx) || null;
     // If the request no longer matches (creature moved / bounced), fall
     // back to the prompt path below.
   }

@@ -1962,21 +1962,32 @@ class GameEngine {
     // before short-circuiting again.
     if (this._turnHooksKilled) return;
 
-    // Central sacrifice marker. EVERY path that fires
+    // Central sacrifice bookkeeping. EVERY path that fires
     // ON_CREATURE_SACRIFICED — `resolveSacrificeCost`, `treatAsSacrificed`,
-    // Occultism, Suspicious Monster, any future ad-hoc sacrifice — stamps
-    // the tribute instance with the turn it was sacrificed, right before
-    // the listeners (and the subsequent destroy → ON_CARD_LEAVE_ZONE /
-    // ON_CREATURE_DEATH) run. Post-destroy reactions that recognise a
-    // sacrifice from the marker (Corpse Cannibal's same-slot resummon,
-    // Rider Warg's "it's ALREADY a sacrifice, don't offer the discard
-    // rider" guard) then fire consistently no matter which card triggered
-    // the sacrifice — callers no longer each have to remember to stamp.
-    // Idempotent (re-stamping the same turn is a no-op); harmless on the
-    // synthesised creature-shaped payloads some callers pass.
-    if (hookName === HOOKS.ON_CREATURE_SACRIFICED && hookCtx.creature && typeof hookCtx.creature === 'object') {
-      if (!hookCtx.creature.counters) hookCtx.creature.counters = {};
-      hookCtx.creature.counters._sacrificedTurn = this.gs.turn;
+    // Occultism, Guardian of Teocuilatl, Suspicious Monster, any future
+    // ad-hoc sacrifice — runs through here right before the listeners (and
+    // the subsequent destroy → ON_CARD_LEAVE_ZONE / ON_CREATURE_DEATH).
+    // Two markers, both single-sourced HERE so callers never have to
+    // remember them (and must NOT also do them — that would double-count):
+    //   1. `_sacrificedTurn` on the tribute instance — post-destroy
+    //      reactions recognise the sacrifice from it (Corpse Cannibal's
+    //      same-slot resummon, Rider Warg's "already a sacrifice, skip the
+    //      discard rider" guard). Idempotent; harmless on the synthesised
+    //      creature-shaped payloads some callers pass.
+    //   2. The sacrificer's per-turn tally `_creaturesSacrificedThisTurn`
+    //      (read by Ruin Mourner's level reduction and Pyre Grill Master's
+    //      free-summon gate). Keyed to the SACRIFICER (`source.owner`),
+    //      i.e. the player performing the sacrifice — matches the old
+    //      per-path increments exactly.
+    if (hookName === HOOKS.ON_CREATURE_SACRIFICED) {
+      if (hookCtx.creature && typeof hookCtx.creature === 'object') {
+        if (!hookCtx.creature.counters) hookCtx.creature.counters = {};
+        hookCtx.creature.counters._sacrificedTurn = this.gs.turn;
+      }
+      const sacrificer = hookCtx.source?.owner ?? hookCtx.source?.controller
+        ?? hookCtx.creature?.controller ?? hookCtx.creature?.owner;
+      const sacPs = (sacrificer != null) ? this.gs.players[sacrificer] : null;
+      if (sacPs) sacPs._creaturesSacrificedThisTurn = (sacPs._creaturesSacrificedThisTurn || 0) + 1;
     }
     // Inline heap check every 50 hook invocations (was 500 — tightened
     // after overnight OOMs kept slipping through). setInterval-based
@@ -13936,19 +13947,12 @@ class GameEngine {
         // dying, so on-death effects (Hell Fox, etc.) must still
         // trigger. A card that only cares about deaths (without
         // distinguishing the cause) keeps working unchanged.
-        // Per-turn sacrifice tally — symmetric to
-        // `_creaturesSummonedThisTurn`. Read by the Chaorcs
-        // (Pyre Grill Master's free-summon gate, Ruin Mourner's
-        // hand level reduction). Stamp the tribute with the turn it
-        // was sacrificed so cards that must react AFTER the destroy
-        // (Corpse Cannibal's same-slot resummon) can recognise it
-        // from the post-destroy ON_CREATURE_DEATH event.
-        const _sacPs = this.gs.players[pi];
-        if (_sacPs) _sacPs._creaturesSacrificedThisTurn = (_sacPs._creaturesSacrificedThisTurn || 0) + 1;
-        if (t.cardInstance) {
-          if (!t.cardInstance.counters) t.cardInstance.counters = {};
-          t.cardInstance.counters._sacrificedTurn = this.gs.turn;
-        }
+        // Per-turn sacrifice tally + the `_sacrificedTurn` tribute stamp
+        // are applied centrally in `runHooks(ON_CREATURE_SACRIFICED)` (read
+        // by Pyre Grill Master's free-summon gate and Ruin Mourner's hand
+        // level reduction; the stamp lets post-destroy reactions like
+        // Corpse Cannibal recognise the sacrifice). Don't touch them here
+        // — doing so would double-count the tally.
         await this.runHooks(HOOKS.ON_CREATURE_SACRIFICED, {
           creature: t.cardInstance,
           cardName: t.cardInstance?.name,
