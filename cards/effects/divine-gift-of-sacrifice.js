@@ -116,7 +116,10 @@ async function doSacrifice(engine, pi) {
   await engine.actionDefeatHero(
     { name: 'Divine Gift of Sacrifice', owner: pi },
     sacHero,
-    { reason: 'Divine Gift of Sacrifice', respectFirstTurnProtection: false }
+    // `isSacrifice` flags the KO as a voluntary Hero sacrifice so
+    // Temple of Sacrifice (and future "when a Hero is sacrificed" cards)
+    // can react to it specifically, not to ordinary defeats.
+    { reason: 'Divine Gift of Sacrifice', respectFirstTurnProtection: false, isSacrifice: true }
   );
 
   // If game ended from all heroes dead, stop

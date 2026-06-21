@@ -783,8 +783,45 @@ body {
   -webkit-mask: url(/data/logo-mask-white.png) center / 100% 100% no-repeat;
   mask: url(/data/logo-mask-white.png) center / 100% 100% no-repeat;
 }
+/* Decorative pixel particles drifting AROUND the logo. The layer extends
+   past the wordmark (negative inset) and sits BEHIND the logo image
+   (z-index:-1, contained by the stack's `isolation:isolate`), so over-logo
+   particles tuck behind the crisp letters while the rest haloes the edges.
+   Cosmetic only — pointer-events:none. */
+.pp-logo-particles {
+  position: absolute;
+  inset: -60px -92px;
+  z-index: -1;
+  pointer-events: none;
+}
+.pp-logo-particle {
+  position: absolute;
+  width: var(--p-size, 4px);
+  height: var(--p-size, 4px);
+  background: var(--p-color, var(--player-color, #00f0ff));
+  box-shadow:
+    0 0 8px var(--p-color, var(--player-color, #00f0ff)),
+    0 0 16px var(--p-color, var(--player-color, #00f0ff));
+  image-rendering: pixelated;
+  opacity: 0;
+  transform: translate(0, 0) scale(.6);
+  animation: pp-particle-float var(--p-dur, 3.5s) ease-in-out var(--p-delay, 0s) infinite;
+  will-change: transform, opacity;
+}
+@keyframes pp-particle-float {
+  0%   { opacity: 0; transform: translate(0, 0) scale(.55); }
+  20%  { opacity: var(--p-max, .85); }
+  50%  { transform: translate(var(--p-dx, 0), var(--p-dy, -12px)) scale(1); }
+  80%  { opacity: var(--p-max, .85); }
+  100% { opacity: 0; transform: translate(calc(var(--p-dx, 0) * 1.7), calc(var(--p-dy, -12px) * 1.9)) scale(.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-logo-particle { animation: none; opacity: calc(var(--p-max, .85) * .6); transform: none; }
+}
+
 @media (max-width: 900px) {
   .pp-logo-img { height: 46px; }
+  .pp-logo-particles { inset: -34px -50px; }
 }
 
 /* ===== DECK LIST ===== */

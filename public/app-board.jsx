@@ -1802,6 +1802,72 @@ function SpiderHiveOverlay() {
   );
 }
 
+// Temple of Sacrifice — a wall of gilded golden bricks. A brick-offset
+// grid of gold blocks (seeded jitter so the masonry reads as hand-laid,
+// not tiled) over dark mortar, with a warm ambient glow that slowly
+// shimmers. Static masonry keeps it cheap; only the glow pulses.
+function TempleOfSacrificeOverlay() {
+  const COLS = 11;
+  const ROWS = 8;
+  const bricks = useMemo(() => {
+    const out = [];
+    for (let r = 0; r < ROWS; r++) {
+      const offset = (r % 2) * (50 / COLS); // half-cell shift on odd rows
+      for (let c = 0; c < COLS; c++) {
+        const lum = 150 + Math.floor(Math.random() * 70); // gold luminance range
+        out.push({
+          x: (c * (100 / COLS)) + offset + (Math.random() * 2 - 1),
+          y: (r * (100 / ROWS)) + (Math.random() * 2 - 1),
+          w: (100 / COLS) * (0.88 + Math.random() * 0.12),
+          h: (100 / ROWS) * (0.84 + Math.random() * 0.16),
+          tilt: -3 + Math.random() * 6,
+          // Warm gilded tone — strong red+green, low blue = gold.
+          tone: `rgb(${lum + 30}, ${Math.round(lum * 0.78)}, ${Math.round(lum * 0.18)})`,
+          radius: 10 + Math.random() * 12,
+        });
+      }
+    }
+    return out;
+  }, []);
+  return (
+    <div className="temple-of-sacrifice-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
+    }}>
+      <style>{`@keyframes templeGoldGlow { 0%,100% { opacity: 0.6 } 50% { opacity: 1 } }`}</style>
+      {/* Layer 1: dark mortar base showing through the seams. */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background:
+          'linear-gradient(180deg, rgba(60,42,10,0.97) 0%, rgba(42,28,6,0.98) 55%, rgba(26,16,2,0.99) 100%)',
+      }} />
+      {/* Layer 2: the golden bricks. */}
+      {bricks.map((b, i) => (
+        <div key={'gbrick' + i} style={{
+          position: 'absolute',
+          left: b.x + '%', top: b.y + '%',
+          width: b.w + '%', height: b.h + '%',
+          transform: 'rotate(' + b.tilt + 'deg)',
+          background: 'linear-gradient(150deg, ' + b.tone + ' 0%, rgba(120,80,12,0.96) 100%)',
+          borderRadius: b.radius + '%',
+          boxShadow:
+            'inset 0 2px 4px rgba(255,245,200,0.45), '
+            + 'inset 0 -4px 6px rgba(70,44,4,0.7), '
+            + '0 2px 4px rgba(0,0,0,0.5)',
+        }} />
+      ))}
+      {/* Layer 3: warm gilded glow + slow shimmer (screen blend so it
+          brightens the gold rather than washing it out). */}
+      <div style={{
+        position: 'absolute', inset: 0, mixBlendMode: 'screen',
+        background:
+          'radial-gradient(ellipse at 50% 38%, rgba(255,210,90,0.30) 0%, '
+          + 'rgba(200,150,30,0.12) 45%, rgba(0,0,0,0) 78%)',
+        animation: 'templeGoldGlow 4.5s ease-in-out infinite',
+      }} />
+    </div>
+  );
+}
+
 // Blood Rock — a grimy cobblestone courtyard soaked in blood. A
 // brick-offset grid of rounded stones (seeded jitter so the masonry
 // reads as hand-laid, not tiled), dark blood pooling into the grout
@@ -26505,7 +26571,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 || brackleSourceHidden.has(`${pi}-${i}-${z}`)
                 || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? ' zone-drag-invalid' : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   onClick={isCsppEmptySlot ? () => {
                     // Click-pick destination chosen → route through the
@@ -27218,6 +27284,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {(((gameState.areaZones?.[0] || []).includes('Graveyard of Limited Power')) || ((gameState.areaZones?.[1] || []).includes('Graveyard of Limited Power'))) && <GraveyardOfLimitedPowerOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('The First Circle of Hell')) || ((gameState.areaZones?.[1] || []).includes('The First Circle of Hell'))) && <FirstCircleOfHellOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Blood Rock')) || ((gameState.areaZones?.[1] || []).includes('Blood Rock'))) && <BloodRockOverlay />}
+            {(((gameState.areaZones?.[0] || []).includes('Temple of Sacrifice')) || ((gameState.areaZones?.[1] || []).includes('Temple of Sacrifice'))) && <TempleOfSacrificeOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Spider Hive')) || ((gameState.areaZones?.[1] || []).includes('Spider Hive'))) && <SpiderHiveOverlay />}
             {(((gameState.areaZones?.[0] || []).includes("Tarleinn's Floating Island")) || ((gameState.areaZones?.[1] || []).includes("Tarleinn's Floating Island"))) && <FloatingIslandOverlay />}
             {(() => {
@@ -28876,7 +28943,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* ── Effect Prompt: Option Picker (generic multi-option) ── */}
       {isMyEffectPrompt && ep.type === 'optionPicker' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)' }}>
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
           {ep.renderAs === 'dropdown' ? (
@@ -28915,6 +28983,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               )}
             </div>
           )}
+          </div>
+          {ep.showCard && CARDS_BY_NAME[ep.showCard] && (() => {
+            const showCardData = CARDS_BY_NAME[ep.showCard];
+            const showCardImg = cardImageUrl(ep.showCard);
+            return (
+              <div className="board-card" style={{ width: 100, minHeight: 130, flexShrink: 0, alignSelf: 'center', borderRadius: 6, overflow: 'hidden', border: '2px solid var(--bg4)', background: 'var(--bg3)' }}
+                onMouseEnter={() => { _boardTooltipLocked = true; setBoardTooltip(showCardData); }}
+                onMouseLeave={() => { _boardTooltipLocked = false; setBoardTooltip(null); }}>
+                {showCardImg ? (
+                  <img src={showCardImg} alt={ep.showCard} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, textAlign: 'center', fontSize: 11, color: 'var(--text2)' }}>{ep.showCard}</div>
+                )}
+              </div>
+            );
+          })()}
         </DraggablePanel>
       )}
 
@@ -29689,19 +29773,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* Potion/Artifact targeting panel */}
       {!isSpectator && isTargeting && pt && !gameState.effectPrompt && (
-        <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out' }}>
+        <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.goldSelect ? '#ffd700' : pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>
-          {/* Optional small card preview — passed in via config.previewCardName.
-              Bill uses this to show the equip the player is placing; any
-              future card can do the same with no further panel changes. */}
-          {pt.config?.previewCardName && CARDS_BY_NAME[pt.config.previewCardName] && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-              <div style={{ width: 90 }}>
-                <CardMini card={CARDS_BY_NAME[pt.config.previewCardName]} inGallery />
-              </div>
-            </div>
-          )}
           {pt.config?.maxTotal > 0 && pt.validTargets?.length > 0 && (() => {
             // For Pollution-capped prompts (Sun Beam etc.), the effective cap
             // grows with each own-support target selected — since destroying
@@ -29770,6 +29845,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </button>
             )}
           </div>
+          </div>
+          {/* Source card preview — rendered to the RIGHT of the prompt body
+              (mirrors the confirm / optionPicker panels) so the image never
+              sits alone in its own row beneath the controls. */}
+          {pt.config?.previewCardName && CARDS_BY_NAME[pt.config.previewCardName] && (
+            <div style={{ width: 100, flexShrink: 0, alignSelf: 'center' }}>
+              <CardMini card={CARDS_BY_NAME[pt.config.previewCardName]} inGallery />
+            </div>
+          )}
         </DraggablePanel>
       )}
 

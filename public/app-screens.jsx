@@ -866,6 +866,50 @@ function MenuPlayerPanel({ top, height }) {
   );
 }
 
+// Decorative pixel particles that drift around the main-menu logo. Pure
+// cosmetic — `aria-hidden`, pointer-events:none. Positions / timings /
+// colours are randomised ONCE (useMemo) so they don't reshuffle on every
+// render. Each particle reads its randomised values from CSS custom
+// properties consumed by the `pp-particle-float` keyframes in style.css.
+function LogoParticles() {
+  const particles = useMemo(() => {
+    const N = 64;
+    const arr = [];
+    for (let i = 0; i < N; i++) {
+      const dur = 1.8 + Math.random() * 3.4;            // 1.8–5.2s (snappier)
+      arr.push({
+        top:   Math.random() * 100,                      // % within the expanded box
+        left:  Math.random() * 100,
+        size:  2 + Math.floor(Math.random() * 6),        // 2–7px pixel squares
+        dur,
+        delay: -Math.random() * dur,                     // negative → mid-cycle stagger
+        dx:    (Math.random() * 2 - 1) * 30,             // -30..30px horizontal drift
+        dy:    -(14 + Math.random() * 40),               // bigger upward drift
+        max:   0.7 + Math.random() * 0.3,                // peak opacity (brighter)
+        // Mostly player-colour, a third sparkle white for a festive pop.
+        color: Math.random() < 0.34 ? '#ffffff' : 'var(--player-color, #00f0ff)',
+      });
+    }
+    return arr;
+  }, []);
+  return (
+    <div className="pp-logo-particles" aria-hidden="true">
+      {particles.map((p, i) => (
+        <span key={i} className="pp-logo-particle" style={{
+          top: p.top + '%', left: p.left + '%',
+          '--p-size': p.size + 'px',
+          '--p-color': p.color,
+          '--p-dur': p.dur + 's',
+          '--p-delay': p.delay + 's',
+          '--p-dx': p.dx + 'px',
+          '--p-dy': p.dy + 'px',
+          '--p-max': p.max,
+        }} />
+      ))}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════
 //  MAIN MENU
 // ═══════════════════════════════════════════
@@ -1204,6 +1248,7 @@ function MainMenu() {
           The pp-logo-tint overlay paints a player-colour gradient onto it. */}
       <div className="pp-logo-wrap" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: panelTop != null ? panelTop : 160, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, pointerEvents: 'none' }}>
         <div className="pp-logo-stack">
+          <LogoParticles />
           <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
           <div className="pp-logo-tint" aria-hidden="true"></div>
         </div>

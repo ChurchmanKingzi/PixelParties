@@ -6018,7 +6018,17 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     }
 
     const ctx = room.engine._createContext(inst, {});
-    const resolved = await script.onCreatureEffect(ctx);
+    // Mark this Creature as the ambient prompt source so any confirm /
+    // optionPicker its activated effect opens via promptGeneric shows its
+    // image (general "which card is prompting" rule; ctx helpers already
+    // inject directly). Popped in finally so an error can't leave it set.
+    room.engine._promptCardStack.push(inst.name);
+    let resolved;
+    try {
+      resolved = await script.onCreatureEffect(ctx);
+    } finally {
+      room.engine._promptCardStack.pop();
+    }
 
     if (charmedHeroCreature) {
       inst.controller = origController;

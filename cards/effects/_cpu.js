@@ -6385,7 +6385,10 @@ function evaluateState(engine, cpuIdx) {
     const sources = [];
     for (const inst of engine.cardInstances) {
       if (inst.owner !== ownerIdx) continue;
-      if (inst.zone !== 'support') continue;
+      // Support-zone Creatures (Loyal Terrier, Ruin Mourner, …) AND Area
+      // cards (Temple of Sacrifice) can be chain sources — anything that
+      // profits when an ally Creature dies / is sacrificed.
+      if (inst.zone !== 'support' && inst.zone !== 'area') continue;
       if (inst.faceDown) continue;
       const script = loadCardEffect(inst.name);
       const chain = script?.cpuMeta?.chainSource;

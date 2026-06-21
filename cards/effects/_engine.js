@@ -328,6 +328,17 @@ class GameEngine {
     // Card instance tracking
     this.cardInstances = []; // All tracked CardInstance objects
 
+    // Ambient "which card is prompting" stack. `runHooks` pushes the
+    // listener card's name around each hook dispatch (and pops in a
+    // finally), so any confirm / optionPicker a card opens via
+    // `promptGeneric` while resolving a hook automatically shows that
+    // card's image — the general rule that an "activate this effect /
+    // choose an effect / cancel" prompt always identifies its source
+    // card. Card-aware ctx helpers (promptDamageTarget, promptTarget,
+    // promptConfirmEffect) inject the image directly; this stack covers
+    // the cards that call `promptGeneric` straight from a hook.
+    this._promptCardStack = [];
+
     // Reaction summons that opted to wait until the triggering effect /
     // AoE has fully resolved. Stellan / Stellin push closures here from
     // `afterDamage` / `afterCreatureDamageBatch` so the Creatures they
@@ -1950,6 +1961,23 @@ class GameEngine {
     // from re-tripping the cap and paying 10000 hooks of allocation
     // before short-circuiting again.
     if (this._turnHooksKilled) return;
+
+    // Central sacrifice marker. EVERY path that fires
+    // ON_CREATURE_SACRIFICED — `resolveSacrificeCost`, `treatAsSacrificed`,
+    // Occultism, Suspicious Monster, any future ad-hoc sacrifice — stamps
+    // the tribute instance with the turn it was sacrificed, right before
+    // the listeners (and the subsequent destroy → ON_CARD_LEAVE_ZONE /
+    // ON_CREATURE_DEATH) run. Post-destroy reactions that recognise a
+    // sacrifice from the marker (Corpse Cannibal's same-slot resummon,
+    // Rider Warg's "it's ALREADY a sacrifice, don't offer the discard
+    // rider" guard) then fire consistently no matter which card triggered
+    // the sacrifice — callers no longer each have to remember to stamp.
+    // Idempotent (re-stamping the same turn is a no-op); harmless on the
+    // synthesised creature-shaped payloads some callers pass.
+    if (hookName === HOOKS.ON_CREATURE_SACRIFICED && hookCtx.creature && typeof hookCtx.creature === 'object') {
+      if (!hookCtx.creature.counters) hookCtx.creature.counters = {};
+      hookCtx.creature.counters._sacrificedTurn = this.gs.turn;
+    }
     // Inline heap check every 50 hook invocations (was 500 — tightened
     // after overnight OOMs kept slipping through). setInterval-based
     // watchdogs can't fire during sync allocation, so this inline check
@@ -2211,6 +2239,10 @@ class GameEngine {
         try { heapBefore = process.memoryUsage().heapUsed; } catch { heapBefore = 0; }
       }
 
+      // Mark this card as the ambient prompt source for the duration of
+      // its hook, so any confirm / optionPicker it opens via
+      // promptGeneric defaults to showing its image (popped in finally).
+      this._promptCardStack.push(card.name);
       try {
         if (this._fastMode) {
           // Fast mode (MCTS sim, self-play): skip the Promise.race timeout
@@ -2284,6 +2316,8 @@ class GameEngine {
           throw err;
         }
         console.error(`[Engine] Hook "${hookName}" on card "${card.name}" (${card.id}) failed:`, err.message);
+      } finally {
+        this._promptCardStack.pop();
       }
 
       // Per-hook heap-delta capture (success path). Negative deltas
@@ -2728,7 +2762,10 @@ class GameEngine {
           });
           if (targets.length === 0 && validTargets.length > 0) targets = validTargets; // Fallback
         }
-        const selectedIds = await engine.promptEffectTarget(cardInstance.controller, targets, config);
+        // General rule: surface the source card's image in the targeting
+        // panel (overridable via an explicit `previewCardName`).
+        const selectedIds = await engine.promptEffectTarget(cardInstance.controller, targets,
+          { previewCardName: cardInstance.name, ...config });
 
         // ── Target redirect check (Challenge, etc.) ──
         // Only for single-target selections with hero/creature targets
@@ -2901,6 +2938,9 @@ class GameEngine {
           message: config.message,
           cancellable: config.cancellable !== false,
           gerrymanderEligible: config.gerrymanderEligible !== false,
+          // General rule: show the source card's image on the confirm so
+          // the player sees which card is asking (overridable).
+          showCard: config.showCard || cardInstance.name,
         });
         return result?.confirmed === true;
       },
@@ -2957,8 +2997,10 @@ class GameEngine {
           // Read by the zonePick renderer in `app-board.jsx` (~L25420).
           cancelLabel: config.cancelLabel,
           // Optional preview card name — renders a CardMini above the
-          // prompt so the player sees what they're placing.
-          previewCardName: config.previewCardName,
+          // prompt so the player sees what they're placing. Defaults to
+          // the source card (general "show which card is prompting" rule);
+          // overridable by passing an explicit `previewCardName`.
+          previewCardName: config.previewCardName || cardInstance.name,
         });
       },
 
@@ -3557,6 +3599,12 @@ class GameEngine {
           confirmLabel: config.confirmLabel || 'Attack!',
           confirmClass: config.confirmClass || 'btn-danger',
           cancellable: config.cancellable !== false,
+          // General rule: a prompt that asks the player to activate an
+          // effect / aim it / cancel shows the source card's image, so
+          // they always see WHICH card is prompting. Defaults to this
+          // card; a caller can override (e.g. preview the equip it's
+          // offering) by passing `previewCardName` explicitly.
+          previewCardName: config.previewCardName || cardInstance.name,
           // Optional override for the cancel button label. Used when
           // cancelling means "step back" rather than "abort" — e.g.
           // Brackle's "↩ Back" returns to the sacrifice picker.
@@ -4009,6 +4057,8 @@ class GameEngine {
           confirmLabel: config.confirmLabel || 'Confirm',
           confirmClass: config.confirmClass || 'btn-danger',
           cancellable: config.cancellable !== false,
+          // General rule: show the source card's image in the picker.
+          previewCardName: config.previewCardName || cardInstance.name,
           maxTotal: max,
           minRequired: min,
           // Forward intent fields — see promptDamageTarget for rationale.
@@ -5653,7 +5703,7 @@ class GameEngine {
       hero: target, source, heroOwner: targetOwner,
       killerOwner: source?.owner ?? source?.controller ?? -1,
     };
-    await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, _bypassDeadHeroFilter: true });
+    await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, isSacrifice: !!opts.isSacrifice, _bypassDeadHeroFilter: true });
     delete this.gs._heroKOContext;
 
     // Generic extra-life net (Trial of Coolness, etc.) — AFTER onHeroKO
@@ -6914,6 +6964,28 @@ class GameEngine {
           this.log('move_blocked', { card: cardInstance.name, reason: 'creature protection' });
           return;
         }
+      }
+    }
+
+    // Area-protection window (Guardian of Teocuilatl). Covers Areas being
+    // moved OUT of the area zone by any card/effect — bounced to hand,
+    // shuffled to deck, or destroyed via `actionDestroyCard` (which
+    // routes here as area→discard). The manual `removeArea` discard path
+    // fires the same window separately. No-op when nothing listens.
+    if (fromZone === 'area' && toZone !== 'area') {
+      const areaProtectCtx = {
+        affectedArea: cardInstance, affectedOwner: cardInstance.owner,
+        areaName: cardInstance.name,
+        source: opts.deathSource?.name || opts.source?.name || opts.source || opts.sourceName || 'an effect',
+        cancelled: false,
+      };
+      await this.runHooks('onAreaWouldBeAffected', areaProtectCtx);
+      if (areaProtectCtx.cancelled) {
+        this.log('area_protected', {
+          player: this.gs.players[cardInstance.owner]?.username,
+          area: cardInstance.name, by: areaProtectCtx.source,
+        });
+        return;
       }
     }
 
@@ -9600,7 +9672,7 @@ class GameEngine {
    * @param {CardInstance} card - The card whose level to change
    * @param {number} delta - Amount to change (positive or negative)
    */
-  async actionChangeLevel(card, delta) {
+  async actionChangeLevel(card, delta, opts = {}) {
     if (!card || delta === 0) return;
 
     // Fire BEFORE hook — allows modification of delta (e.g. Slime Rancher adds +1)
@@ -9614,12 +9686,18 @@ class GameEngine {
 
     this.log('level_change', { card: card.name, owner: card.owner, delta: finalDelta, newLevel: card.counters.level });
 
-    // Broadcast for frontend popup
-    this._broadcastEvent('level_change', {
-      cardName: card.name, owner: card.owner,
-      heroIdx: card.heroIdx, zoneSlot: card.zoneSlot,
-      delta: finalDelta, newLevel: card.counters.level,
-    });
+    // Broadcast for frontend popup. `opts.silent` suppresses the
+    // floating ±N indicator for level changes that are an intrinsic part
+    // of another action's resolution (e.g. Calamitusk summoning a Chaorc
+    // "with its level reduced by 1" — the -1 is part of the summon, not
+    // a standalone level-down the player needs flagged).
+    if (!opts.silent) {
+      this._broadcastEvent('level_change', {
+        cardName: card.name, owner: card.owner,
+        heroIdx: card.heroIdx, zoneSlot: card.zoneSlot,
+        delta: finalDelta, newLevel: card.counters.level,
+      });
+    }
 
     await this.runHooks(HOOKS.AFTER_LEVEL_CHANGE, { targetCard: card, delta: finalDelta, newLevel: card.counters.level });
     this.sync();
@@ -11889,6 +11967,9 @@ class GameEngine {
         ps.heroesActedThisTurn = [];
         ps.heroesAttackedThisTurn = [];
         ps._creaturesSummonedThisTurn = 0;
+        // Chaorcs: per-turn count of Creatures this player sacrificed
+        // (reset symmetrically with the summon tally above).
+        ps._creaturesSacrificedThisTurn = 0;
         // Guardian Beasts: cleared so the first Guardian Beast summon
         // of the new turn correctly grants the additional-Action grant.
         ps._guardianBeastSummonedThisTurn = false;
@@ -13589,10 +13670,47 @@ class GameEngine {
     return true;
   }
 
+  /**
+   * Creatures in `playerIdx`'s HAND that may be sacrificed as a
+   * substitute for any "sacrifice a Creature you control" cost — i.e.
+   * cards exporting `sacrificableFromHand: true` (Chosen Sacrifice).
+   * Returned in the same candidate shape as board creatures, tagged
+   * `_fromHand` so the picker / destroy paths render + remove them as
+   * hand cards. Inert when no such card is in hand, so existing
+   * sacrifice behaviour is unchanged.
+   */
+  _getHandSacrificeSubstitutes(playerIdx, selfId) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+    const cardDB = this._getCardDB();
+    const out = [];
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== 'hand') continue;
+      if ((inst.controller ?? inst.owner) !== playerIdx) continue;
+      if (selfId != null && inst.id === selfId) continue;
+      let script = null;
+      try { script = loadCardEffect(inst.name); } catch { /* ignore */ }
+      if (!script?.sacrificableFromHand) continue;
+      const cd = cardDB[inst.name];
+      const maxHp = inst.counters?.maxHp ?? cd?.hp ?? 0;
+      const level = cd?.level || 0;
+      out.push({ inst, maxHp, level, cardName: inst.name, _fromHand: true });
+    }
+    return out;
+  }
+
   _collectSacrificeCandidates(playerIdx, spec, selfId) {
     let cs = this.getSacrificableCreatures(playerIdx);
     if (selfId != null) cs = cs.filter(c => c.inst.id !== selfId);
     if (spec?.filter) cs = cs.filter(c => spec.filter(c));
+    // Hand substitutes (Chosen Sacrifice) are EXEMPT from `spec.filter`:
+    // the card replaces the would-be sacrifice ("you may instead
+    // sacrifice this Creature in your hand"), so cost restrictions like
+    // "not summoned this turn" don't apply to it. Opt out per-cost via
+    // `spec.noHandSubstitute`.
+    if (!spec?.noHandSubstitute) {
+      cs = cs.concat(this._getHandSacrificeSubstitutes(playerIdx, selfId));
+    }
     return cs;
   }
 
@@ -13657,13 +13775,29 @@ class GameEngine {
       }
     }
 
-    const targets = candidates.map(c => ({
-      id: `equip-${c.inst.owner}-${c.inst.heroIdx}-${c.inst.zoneSlot}`,
-      type: 'equip',
-      owner: c.inst.owner, heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot,
-      cardName: c.cardName, cardInstance: c.inst,
-      _meta: { maxHp: c.maxHp, level: c.level },
-    }));
+    const targets = candidates.map(c => {
+      // Hand substitutes (Chosen Sacrifice) render as clickable hand
+      // cards via the `type: 'hand'` picker entry — the same mixed
+      // hand+board target list Rocky Slime builds.
+      if (c._fromHand) {
+        const handIdx = (this.gs.players[c.inst.owner]?.hand || []).indexOf(c.cardName);
+        return {
+          id: `hand-${c.inst.owner}-${handIdx}`,
+          type: 'hand',
+          owner: c.inst.owner, handIndex: handIdx,
+          heroIdx: -1, slotIdx: -1,
+          cardName: c.cardName, cardInstance: c.inst,
+          _meta: { maxHp: c.maxHp, level: c.level },
+        };
+      }
+      return {
+        id: `equip-${c.inst.owner}-${c.inst.heroIdx}-${c.inst.zoneSlot}`,
+        type: 'equip',
+        owner: c.inst.owner, heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot,
+        cardName: c.cardName, cardInstance: c.inst,
+        _meta: { maxHp: c.maxHp, level: c.level },
+      };
+    });
 
     // Optional: also include the filtered-out sacrificable Creatures as
     // visually dimmed ineligible targets, so the player can see at a
@@ -13779,7 +13913,8 @@ class GameEngine {
         // the creature is still rendered in its zone. Brief delay
         // lets the impact play before the slot empties.
         const inst = t.cardInstance;
-        if (inst) {
+        const isHandSub = t.type === 'hand' || inst?.zone === 'hand';
+        if (inst && !isHandSub) {
           this._broadcastEvent('play_zone_animation', {
             type: sacAnimType,
             owner: inst.owner,
@@ -13789,6 +13924,10 @@ class GameEngine {
           });
           await this._delay(sacAnimDelay);
         }
+        // Hand substitutes (Chosen Sacrifice) have NO board slot to plunge
+        // a knife into, and their hand→discard flight is deferred to the
+        // destroy step below — it must play AFTER any on-sacrifice reward
+        // (the draw / gold choice) resolves, not before it.
         // Fire ON_CREATURE_SACRIFICED BEFORE destroyCard so listeners
         // can read the live instance (zone='support', counters intact)
         // before it gets routed to discard. actionDestroyCard (via
@@ -13797,6 +13936,19 @@ class GameEngine {
         // dying, so on-death effects (Hell Fox, etc.) must still
         // trigger. A card that only cares about deaths (without
         // distinguishing the cause) keeps working unchanged.
+        // Per-turn sacrifice tally — symmetric to
+        // `_creaturesSummonedThisTurn`. Read by the Chaorcs
+        // (Pyre Grill Master's free-summon gate, Ruin Mourner's
+        // hand level reduction). Stamp the tribute with the turn it
+        // was sacrificed so cards that must react AFTER the destroy
+        // (Corpse Cannibal's same-slot resummon) can recognise it
+        // from the post-destroy ON_CREATURE_DEATH event.
+        const _sacPs = this.gs.players[pi];
+        if (_sacPs) _sacPs._creaturesSacrificedThisTurn = (_sacPs._creaturesSacrificedThisTurn || 0) + 1;
+        if (t.cardInstance) {
+          if (!t.cardInstance.counters) t.cardInstance.counters = {};
+          t.cardInstance.counters._sacrificedTurn = this.gs.turn;
+        }
         await this.runHooks(HOOKS.ON_CREATURE_SACRIFICED, {
           creature: t.cardInstance,
           cardName: t.cardInstance?.name,
@@ -13804,12 +13956,45 @@ class GameEngine {
           heroIdx: t.cardInstance?.heroIdx,
           zoneSlot: t.cardInstance?.zoneSlot,
           source: { name: ctx.cardName, owner: pi, heroIdx: ctx.cardHeroIdx },
+          // These tributes belong to ONE sacrifice cost — the
+          // `onSacrificeBatch` fired after the loop is the per-event
+          // signal (Temple of Sacrifice's "1+ Creatures → draw 1").
+          // Per-tribute listeners that want event granularity skip the
+          // flagged fires and react to the batch instead.
+          _inSacrificeBatch: true,
           _skipReactionCheck: true,
         });
-        await this.actionDestroyCard(
-          { name: ctx.cardName, owner: pi, heroIdx: ctx.cardHeroIdx },
-          t.cardInstance,
-        );
+        if (isHandSub && inst) {
+          // Route the hand substitute to discard manually — it never
+          // entered the board, so no ON_CREATURE_DEATH (that's a board-
+          // death concept; on-death watchers like Hell Fox must NOT fire
+          // for a card sacrificed straight from hand). The
+          // ON_CREATURE_SACRIFICED above already fired the sacrifice
+          // signal listeners care about — including the card's own
+          // reward (Chosen Sacrifice's draw / gold choice), which has now
+          // resolved. ONLY NOW fly the card from hand to discard, with
+          // the broadcast + splice + sync kept adjacent so the pile-
+          // transfer suppression window covers the state change and
+          // exactly ONE flight plays (deferring it past the reward also
+          // stops the pre-reward flight that used to fire as well).
+          const subPs = this.gs.players[inst.owner];
+          const hi = (subPs?.hand || []).indexOf(inst.name);
+          this._broadcastEvent('play_pile_transfer', {
+            owner: inst.owner, cardName: inst.name,
+            from: 'hand', to: 'discard',
+            fromHandIdx: hi >= 0 ? hi : 0,
+          });
+          if (hi >= 0) subPs.hand.splice(hi, 1);
+          if (subPs) subPs.discardPile.push(inst.name);
+          inst.zone = 'discard'; inst.heroIdx = -1; inst.zoneSlot = -1;
+          this._untrackCard(inst.id);
+          this.sync();
+        } else {
+          await this.actionDestroyCard(
+            { name: ctx.cardName, owner: pi, heroIdx: ctx.cardHeroIdx },
+            t.cardInstance,
+          );
+        }
       } catch (err) {
         console.error(`[${ctx.cardName}] sacrifice destroy failed:`, err.message);
       }
@@ -13824,6 +14009,15 @@ class GameEngine {
       try { await spec.onResolved(ctx, picked); }
       catch (err) { console.error(`[${ctx.cardName}] sacrifice onResolved rider failed:`, err.message); }
     }
+
+    // Per-event "a player sacrificed 1+ Creatures" signal — fired ONCE
+    // for the whole cost regardless of how many tributes were paid
+    // (Temple of Sacrifice's draw-1). Manual single-tribute sacrifices
+    // elsewhere (Garius, Brackle, treatAsSacrificed, …) don't fire this
+    // and are caught per-tribute via the unflagged ON_CREATURE_SACRIFICED.
+    await this.runHooks('onSacrificeBatch', {
+      playerIdx: pi, creatureCount: picked.length, _skipReactionCheck: true,
+    });
     return true;
   }
 
@@ -13919,6 +14113,23 @@ class GameEngine {
     const ps = gs.players[ownerIdx];
     if (!ps) return;
     const cardName = cardInstance.name;
+
+    // ── Area-protection window ──
+    // "When an Area would be affected by a card or effect" (Guardian of
+    // Teocuilatl). Fired BEFORE any state change / animation so a
+    // listener can cancel the removal (paying its sacrifice cost inside
+    // the hook). `removeAllAreas` routes through here per-area, so it's
+    // covered too. No-op when nothing listens.
+    const protectCtx = {
+      affectedArea: cardInstance, affectedOwner: ownerIdx,
+      areaName: cardName, source: sourceName, cancelled: false,
+    };
+    await this.runHooks('onAreaWouldBeAffected', protectCtx);
+    if (protectCtx.cancelled) {
+      this.log('area_protected', { player: ps.username, area: cardName, by: sourceName });
+      this.sync();
+      return;
+    }
 
     this._broadcastEvent('play_pile_transfer', {
       owner: ownerIdx, cardName, from: 'area', to: 'discard',
@@ -14813,6 +15024,28 @@ class GameEngine {
    * @param {object} promptData - { type, title, ...typeSpecificData }
    */
   async promptGeneric(playerIdx, promptData) {
+    // General rule: a prompt that asks the player to activate an effect,
+    // choose between effects, or cancel ('confirm' / 'optionPicker')
+    // shows the source card's image. When the calling card didn't set
+    // `showCard`, default it to the card currently resolving a hook
+    // (tracked in `_promptCardStack`). A card can opt OUT with
+    // `showCard: null` (=== undefined is the "didn't specify" sentinel).
+    //
+    // The injected image is tagged `_autoShowCard` so it stays purely
+    // cosmetic: `_tryGerrymanderRedirect` keys Gerrymander eligibility on
+    // an EXPLICIT `showCard` (the reaction-confirm marker), and ignores
+    // auto-injected ones — so showing the card on a plain cast-
+    // confirmation gate (Haste, Brilliant Idea) doesn't widen Gerrymander.
+    if (promptData
+        && (promptData.type === 'confirm' || promptData.type === 'optionPicker')
+        && promptData.showCard === undefined
+        && this._promptCardStack.length > 0) {
+      promptData = {
+        ...promptData,
+        showCard: this._promptCardStack[this._promptCardStack.length - 1],
+        _autoShowCard: true,
+      };
+    }
     // Learning forces the inner spell to commit — galleries / confirms /
     // pickers opened by the caster during a Learning-cast spell can't
     // be cancelled. Scoped to the caster: opponent reaction confirms in
@@ -14902,7 +15135,12 @@ class GameEngine {
     } else if (promptData.type === 'confirm'
         && promptData.cancellable === true
         && (promptData.gerrymanderEligible === true
-            || (typeof promptData.showCard === 'string' && promptData.showCard.length > 0))) {
+            || (typeof promptData.showCard === 'string' && promptData.showCard.length > 0
+                // An auto-injected image (the general "show which card is
+                // prompting" rule) is purely cosmetic and must NOT make a
+                // plain cast-confirmation gate Gerrymander-eligible — only
+                // an EXPLICIT showCard (the reaction-confirm marker) does.
+                && promptData._autoShowCard !== true))) {
       mode = 'may';
     }
     if (!mode) return null;
@@ -22252,7 +22490,7 @@ class GameEngine {
    *                             reducers that gate on who is casting).
    * @returns {number} effective level (≥ 0).
    */
-  _applyCardLevelReductions(cardData, rawLevel, playerIdx, heroIdx) {
+  _applyCardLevelReductions(cardData, rawLevel, playerIdx, heroIdx, evalOpts = {}) {
     if (!cardData || rawLevel <= 0) return rawLevel;
     let total = 0;
     for (const inst of this.cardInstances) {
@@ -22271,10 +22509,13 @@ class GameEngine {
       if (!script.globalReduceCardLevel && inst.controller !== playerIdx) continue;
       try {
         // Pass the contributing instance as a 4th arg + the casting Hero's
-        // heroIdx as a 5th arg so per-instance / per-hero restrictions
-        // are possible. Cards that don't need either (Elven Forager etc.)
-        // ignore the extras — backwards-compatible.
-        const r = Number(script.reduceCardLevel(cardData, this, playerIdx, inst, heroIdx)) || 0;
+        // heroIdx as a 5th arg + the evaluation opts as a 6th arg so per-
+        // instance / per-hero / per-zone restrictions are possible. Cards
+        // that don't need them (Elven Forager etc.) ignore the extras —
+        // backwards-compatible. `evalOpts.pileSide` lets "in your hand"
+        // reducers (Chaorc Ruin Mourner) skip deck / discard / deleted
+        // evaluations so the reduction doesn't leak to a card in a pile.
+        const r = Number(script.reduceCardLevel(cardData, this, playerIdx, inst, heroIdx, evalOpts)) || 0;
         if (r > 0) total += r;
       } catch { /* card threw — ignore, no reduction */ }
     }
@@ -22384,13 +22625,14 @@ class GameEngine {
     // moving between the two piles keeps its stamps (per the card
     // text: stamps wipe only on move-to-hand/deck). Returns the highest
     // stamp on any current occupant of `cardName` across both piles.
-    if (pileSide && cardData.cardType === 'Creature' && cardData.name && ps) {
+    if (pileSide && pileSide !== 'deck' && cardData.cardType === 'Creature' && cardData.name && ps) {
       const bonus = this._getLetheStampBonus(playerIdx, cardData.name);
       if (bonus > 0) raw += bonus;
     }
 
-    // (5) Generic per-instance reducer hooks.
-    return this._applyCardLevelReductions(cardData, raw, playerIdx, heroIdx);
+    // (5) Generic per-instance reducer hooks. Forward `opts` so per-zone
+    // reducers (e.g. "level in your hand" only) can skip pile evaluations.
+    return this._applyCardLevelReductions(cardData, raw, playerIdx, heroIdx, opts);
   }
 
   // ─── LETHE PILE LEVEL STAMPS ─────────────────

@@ -35,6 +35,12 @@ module.exports = {
       // Creatures. promptMultiTarget handles the targeting UI plus the
       // surprise + post-target reaction windows (baseDamage:150 makes
       // the damage-mitigation reactions eligible).
+      // When performed via a forced effect (Chaorc Friendly Fireballer
+      // sacrifices a Creature → "the Fireball MUST be used"), there's no
+      // opt-out: the targeting can't be cancelled, so the player must
+      // pick a target and fire. promptMultiTarget already enforces a
+      // minimum of 1 target, so removing the cancel button is enough.
+      const forced = !!ctx._forcePerform;
       const targets = await ctx.promptMultiTarget({
         types: ['hero', 'creature'],
         side: 'enemy',
@@ -45,7 +51,7 @@ module.exports = {
         description: `Choose up to 2 targets your opponent controls — deal ${FIREBALL_DAMAGE} damage to each.`,
         confirmLabel: `🔥 Fireball! (${FIREBALL_DAMAGE})`,
         confirmClass: 'btn-danger',
-        cancellable: true,
+        cancellable: !forced,
       });
 
       // [] = cancelled or fully negated (promptMultiTarget already set
@@ -58,17 +64,27 @@ module.exports = {
       // Staggered so two fireballs read as a quick volley, then we
       // wait out the trailing flight so the impact flames + damage
       // numbers land together with the projectiles.
-      const FLIGHT = 650;
+      const FLIGHT = 520;
       const STAGGER = 130;
       for (let i = 0; i < targets.length; i++) {
         const t = targets[i];
         engine._broadcastEvent('play_projectile_animation', {
           sourceOwner: pi,
           sourceHeroIdx: srcHeroIdx,
+          // Originate from the CASTER: a Hero cast leaves the source
+          // card's zoneSlot at -1 (→ Hero portrait), while a Creature
+          // performing the Fireball (Chaorc Friendly Fireballer) carries
+          // its own Support-Zone slot (→ the Creature fires it).
+          sourceZoneSlot: ctx.card?.zoneSlot,
           targetOwner: t.owner,
           targetHeroIdx: t.heroIdx,
           targetZoneSlot: t.type === 'hero' ? undefined : t.slotIdx,
           emoji: '🔥',
+          // The projectile-rotation wrapper assumes an EAST-facing
+          // visual (rotation = the src→tgt angle). The 🔥 emoji points
+          // UP by nature, so it reads 90° off — `baseAngle: 90` rotates
+          // it to lead tip-first along the caster→target axis.
+          baseAngle: 90,
           emojiStyle: { fontSize: 44 },
           duration: FLIGHT,
         });

@@ -294,7 +294,9 @@
       "Bash(echo \"EXIT=$?\")",
       "Bash(cat _repro_herb_out.txt)",
       "Bash(rm -f _repro_herb.js _repro_herb_out.txt)",
-      "Bash(taskkill //F //IM node.exe)"
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(npm run *)",
+      "Bash(python3 -c \"import json; data = json.load\\(open\\('data/cards.json'\\)\\); doomClocks = [c['name'] for c in data if c.get\\('archetype'\\) == 'Doom Clock']; print\\('\\\\n'.join\\(doomClocks\\)\\)\")"
     ]
   }
 }

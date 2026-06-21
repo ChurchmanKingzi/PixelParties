@@ -55,13 +55,22 @@
 const ARCHETYPE = 'Cycling Demons';
 
 // name → { predecessor (whose defeat placed me → fires my bonus),
-//          successor   (whom my defeat places) }
+//          successor   (whom my defeat places),
+//          onDeathBenefit (CPU sacrifice-value of THIS demon dying) }
+//
+// onDeathBenefit reflects what the SUCCESSOR this demon places (and the
+// bonus that successor then fires) is worth — all net positive so every
+// demon reads as worthwhile sacrifice fodder:
+//   • Bouldor (→ Infernous: 150 burst damage)        = most  (55)
+//   • Serpentous (→ Hydrogen: Freeze a Hero 1 turn)  = least (18)
+//   • the middle three (discard-grab / opp-discard-2 /
+//     draw-2 payloads)                               = 30 each
 const CYCLE = {
-  'Hydrogen Demon':   { predecessor: 'Serpentous Demon', successor: 'Herbithorn Demon' },
-  'Herbithorn Demon': { predecessor: 'Hydrogen Demon',   successor: 'Bouldor Demon' },
-  'Bouldor Demon':    { predecessor: 'Herbithorn Demon', successor: 'Infernous Demon' },
-  'Infernous Demon':  { predecessor: 'Bouldor Demon',    successor: 'Serpentous Demon' },
-  'Serpentous Demon': { predecessor: 'Infernous Demon',  successor: 'Hydrogen Demon' },
+  'Hydrogen Demon':   { predecessor: 'Serpentous Demon', successor: 'Herbithorn Demon', onDeathBenefit: 30 },
+  'Herbithorn Demon': { predecessor: 'Hydrogen Demon',   successor: 'Bouldor Demon',    onDeathBenefit: 30 },
+  'Bouldor Demon':    { predecessor: 'Herbithorn Demon', successor: 'Infernous Demon',  onDeathBenefit: 55 },
+  'Infernous Demon':  { predecessor: 'Bouldor Demon',    successor: 'Serpentous Demon', onDeathBenefit: 30 },
+  'Serpentous Demon': { predecessor: 'Infernous Demon',  successor: 'Hydrogen Demon',   onDeathBenefit: 18 },
 };
 
 const CYCLING_DEMON_NAMES = new Set(Object.keys(CYCLE));
@@ -284,10 +293,18 @@ function buildDemonHooks(cardName) {
     // "place", which `isPlacement` permits even on a dead host).
     bypassDeadHeroFilter: true,
 
-    // The whole archetype's value is on-death (the chain triggers when
-    // the demon dies), so own copies are attractive sacrifice fodder and
-    // opp copies are unattractive Attack targets. See CARD_API cpuMeta.
-    cpuMeta: { onDeathBenefit: 30 },
+    // The whole archetype's value is ON-DEATH: dying tutors + places the
+    // next demon and fires its bonus. Same "preferred dead" handling as
+    // Hell Fox / Exploding Skull:
+    //   • onDeathBenefit (per-demon, from CYCLE — see table) discounts this
+    //     slot's "alive value", so the eval treats own copies as attractive
+    //     sacrifice fodder and opp copies as unattractive Attack targets
+    //     (don't feed the opponent's chain). The magnitude scales with what
+    //     the successor this demon places is worth.
+    //   • preferDead keeps the CPU from ever spending defensive resources
+    //     (heals / cleanses / buffs) on a demon — every turn it lives
+    //     without dying is a turn its payload + cycle aren't firing.
+    cpuMeta: { onDeathBenefit: def.onDeathBenefit, preferDead: true },
 
     hooks: {
       // On-summon: stamp the per-turn cap for EVERY arrival, then fire

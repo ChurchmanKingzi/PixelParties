@@ -211,6 +211,8 @@ module.exports = {
             await engine.actionDefeatHero(source, victim, {
               reason: 'Pharaoh sacrifice',
               respectFirstTurnProtection: false,
+              // Flag the voluntary Hero sacrifice (Temple of Sacrifice etc.).
+              isSacrifice: true,
             });
           }
         } else if (target.cardInstance) {

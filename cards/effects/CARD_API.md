@@ -496,6 +496,23 @@ card scripts have to the game engine.
 | `ctx.confirm(message)` | `Promise<bool>` | Low-level confirm dialog |
 | `ctx.performImmediateAction(heroIdx, config)` | `Promise<{played, cardName?, cardType?}>` | Hero-locked additional Action — see below |
 
+### Prompts show the source card's image (automatic)
+
+**Rule:** any prompt that asks the player to **activate an effect, choose between effects, or cancel** displays the prompting card's image, so the player always sees *which* card is asking. This is handled by the engine — you normally do **nothing**:
+
+- **Target prompts** (`promptDamageTarget`, `promptTarget`, `executeAttack`) render a `CardMini` of the source card in the targeting panel via `previewCardName`.
+- **Confirms** opened with `promptConfirmEffect` set `showCard` to the source card.
+- **Zone pickers** (`promptZonePick`) preview the source card.
+- **Direct `engine.promptGeneric` calls** of type `confirm` / `optionPicker` made while a card's hook (`onPlay`, `onCreatureSacrificed`, reactions, …) or activated creature effect is executing are auto-stamped with the resolving card's `showCard` — the engine tracks the active card in `_promptCardStack` and fills it in.
+
+Overrides:
+- Pass an explicit `showCard: '<Card Name>'` / `previewCardName: '<Card Name>'` to preview a *different* card (e.g. the equip a Creature is offering).
+- Pass `showCard: null` to suppress the image for a prompt where it would be redundant.
+
+Notes:
+- Auto-injected images are cosmetic only: they are tagged `_autoShowCard` so they do **not** make a plain cast-confirmation gate Gerrymander-eligible. Only an **explicit** `showCard` on a cancellable confirm is the Gerrymander "you may" marker (see `gerrymander.js`).
+- Galleries (`promptCardGallery` / `promptCardGalleryMulti`) already display the choosable cards, so they're exempt from this rule.
+
 ### Hand-only pickers — ALWAYS use `handPick`, NEVER a gallery
 
 **Rule:** any prompt that picks one or more cards FROM THE PLAYER'S HAND (and only from the hand) MUST use the `handPick` prompt — `promptCardGallery` / `promptCardGalleryMulti` are reserved for picks that span deck / discard / multi-source pools where a popup is the only sensible UI.
