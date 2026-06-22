@@ -2156,6 +2156,13 @@ const CPU_MESSAGES = {
     heroKilled: "Ouch - I'll feel that one for a while, hihi~",
     middleHeroKilled: "Hmmm... I *like* being handled like that...",
   },
+  'sample-Structure Deck Sacrificial Demons': { // Calamitusk, the Chaorc War Chief
+    greeting: "Gruh-! Body for pile! Burn it, grill it, add it to the stake!",
+    victory: "Chrr, chrr - Chaorcs strong, like always!",
+    defeat: "**REEEE!**",
+    heroKilled: "Yum! That one, tasty! Grill, now!",
+    middleHeroKilled: "GRAH! NO! NO EATING THIS ONE! THIS ONE ME!!!",
+  },
   'sample-Structure Deck Shadows over Blackport': { // Arthor, the King of Blackport
     greeting: "You want to play a game...? Sorry, I deal in *plans*. This won't take long.",
     victory: "Quite plain. You will not be a threat to me.",

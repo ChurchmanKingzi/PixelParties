@@ -29,7 +29,7 @@
 //  any other Creature pool.
 // ═══════════════════════════════════════════
 
-const { hasCuteInName } = require('./_cute-shared');
+const { hasCuteInName, heroHasCuteWings } = require('./_cute-shared');
 
 module.exports = {
   activeIn: ['hero'],
@@ -39,19 +39,26 @@ module.exports = {
    * the card as un-playable on Mary, dimming it client-side and
    * rejecting any direct play attempt. Non-Creature cards pass
    * through unchanged.
+   *
+   * "Cute Wings" makes EVERY Creature Mary summons count as "Cute", so
+   * while she wears it her "can only summon Cute Creatures" restriction
+   * opens up to any Creature.
    */
   canPlayCard(gs, playerIdx, heroIdx, cardData, engine) {
     if (cardData.cardType !== 'Creature') return true;
-    return hasCuteInName(cardData.name);
+    return hasCuteInName(cardData.name) || heroHasCuteWings(engine, playerIdx, heroIdx);
   },
 
   /**
    * Hero-side level-req bypass. Mary skips the school / level check
    * (and any Wisdom-paid coverage) when summoning a Cute Creature —
    * she'll happily host a Lv3 Cute Phoenix despite having no
-   * Summoning Magic of her own.
+   * Summoning Magic of her own. With "Cute Wings" equipped, every
+   * Creature she summons counts as Cute, so the bypass extends to ANY
+   * Creature regardless of level.
    */
   canBypassLevelReqForCard(gs, playerIdx, heroIdx, cardData, engine) {
-    return cardData.cardType === 'Creature' && hasCuteInName(cardData.name);
+    if (cardData.cardType !== 'Creature') return false;
+    return hasCuteInName(cardData.name) || heroHasCuteWings(engine, playerIdx, heroIdx);
   },
 };

@@ -423,19 +423,31 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
           )}
           <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
             <div style={{ fontWeight: 700, marginBottom: 5, color: typeColor(card.cardType), fontSize: 18 }}>{card.name}</div>
-            <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>
-              {card.cardType}{card.subtype ? ' · ' + card.subtype : ''}{card.archetype ? ' · ' + card.archetype : ''}
+            <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 4 }}>
+              {[card.cardType, card.subtype, card.archetype].filter(Boolean).join(' · ')}{card.level != null ? ' · Lv ' + card.level : ''}
             </div>
-            {card.level != null && <div style={{ fontSize: 15 }}>Level: {card.level}</div>}
+            {(card.startingAbility1 || card.startingAbility2) && (() => {
+              const order = [], counts = new Map();
+              for (const a of [card.startingAbility1, card.startingAbility2]) {
+                if (!a) continue;
+                if (!counts.has(a)) order.push(a);
+                counts.set(a, (counts.get(a) || 0) + 1);
+              }
+              return (
+                <div style={{ marginBottom: 8 }}>
+                  {order.map(name => (
+                    <div key={name} style={{ fontSize: 14, color: typeColor('Ability') }}>{name} {counts.get(name)}</div>
+                  ))}
+                </div>
+              );
+            })()}
+            {card.cardType !== 'Creature' && (card.spellSchool1 || card.spellSchool2) &&
+              <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>{[card.spellSchool1, card.spellSchool2].filter(Boolean).join(' · ')}</div>}
             <div style={{ display: 'flex', gap: 12, fontSize: 15, marginBottom: 8 }}>
               {card.hp != null && <span>HP: {card.hp}</span>}
               {card.atk != null && <span>ATK: {card.atk}</span>}
               {card.cost != null && <span>Cost: {card.cost}</span>}
             </div>
-            {(card.spellSchool1 || card.spellSchool2) &&
-              <div style={{ fontSize: 14, color: '#aa88ff', marginBottom: 4 }}>Schools: {[card.spellSchool1, card.spellSchool2].filter(Boolean).join(', ')}</div>}
-            {(card.startingAbility1 || card.startingAbility2) &&
-              <div style={{ fontSize: 14, color: '#ffcc44', marginBottom: 4 }}>Abilities: {[card.startingAbility1, card.startingAbility2].filter(Boolean).join(', ')}</div>}
             {card.effect &&
               <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
           </div>

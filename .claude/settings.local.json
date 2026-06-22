@@ -296,7 +296,9 @@
       "Bash(rm -f _repro_herb.js _repro_herb_out.txt)",
       "Bash(taskkill //F //IM node.exe)",
       "Bash(npm run *)",
-      "Bash(python3 -c \"import json; data = json.load\\(open\\('data/cards.json'\\)\\); doomClocks = [c['name'] for c in data if c.get\\('archetype'\\) == 'Doom Clock']; print\\('\\\\n'.join\\(doomClocks\\)\\)\")"
+      "Bash(python3 -c \"import json; data = json.load\\(open\\('data/cards.json'\\)\\); doomClocks = [c['name'] for c in data if c.get\\('archetype'\\) == 'Doom Clock']; print\\('\\\\n'.join\\(doomClocks\\)\\)\")",
+      "Bash(grep -iv \"//\\\\|description:\\\\|name contains\\\\|console\\\\|setID\")",
+      "Bash(grep -n \"heart_burst\\\\|^const.*=.*{$\\\\|ZONE_ANIM\\\\|zoneAnimation\\\\|summon_effect:\" public/app-board.jsx)"
     ]
   }
 }

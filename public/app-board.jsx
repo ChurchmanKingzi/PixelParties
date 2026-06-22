@@ -16300,7 +16300,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const tailLeft = Math.max(14, anchor.x - bubbleLeft);
     return (
       <div style={{ position: 'fixed', left: bubbleLeft, top: isUp ? anchor.bottom + 12 : anchor.top - 12, transform: isUp ? 'none' : 'translateY(-100%)', zIndex: 1100, pointerEvents: 'none', maxWidth }}>
-        <div style={{ position: 'relative', background: '#15151f', border: '2px solid ' + color, borderRadius: 10, padding: '8px 14px', color: '#fff', fontSize: 15, fontWeight: 600, textAlign: 'center', lineHeight: 1.3, boxShadow: '0 0 16px ' + color + '66', wordBreak: 'break-word', animation: 'result-fade-in .5s ease-out' }}>
+        <div style={{ position: 'relative', background: '#15151f', border: '2px solid ' + color, borderRadius: 10, padding: '8px 14px', color: '#fff', fontSize: 15, fontWeight: 600, textAlign: 'center', lineHeight: 1.3, boxShadow: '0 0 16px ' + color + '66', wordBreak: 'normal', overflowWrap: 'break-word', animation: 'result-fade-in .5s ease-out' }}>
           <TypewriterText key={tkey} text={msg} />
           <div style={{ position: 'absolute', left: tailLeft, transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', ...(isUp ? { top: -10, borderBottom: '10px solid ' + color } : { bottom: -10, borderTop: '10px solid ' + color }) }} />
         </div>

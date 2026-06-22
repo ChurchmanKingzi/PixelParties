@@ -31,12 +31,18 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { heroHasCuteWings } = require('./_cute-shared');
 
 const CARD_NAME = 'Army of the Cute';
 
-/** Is `cd` a "Cute"-archetype Creature? */
-function isCuteCreature(cd) {
-  return !!cd && cd.archetype === 'Cute' && hasCardType(cd, 'Creature');
+/** Is `cd` a legal Army pick when cast by the Hero at (pi, heroIdx)?
+ *  Any printed-Cute Creature qualifies; while that Hero wears "Cute
+ *  Wings" EVERY Creature it summons counts as Cute, so any Creature
+ *  qualifies. (`heroIdx == null` → no Wings context, printed-Cute only.) */
+function isArmyPick(engine, cd, pi, heroIdx) {
+  if (!cd || !hasCardType(cd, 'Creature')) return false;
+  if (cd.archetype === 'Cute') return true;
+  return heroIdx != null && heroIdx >= 0 && heroHasCuteWings(engine, pi, heroIdx);
 }
 
 /** Casting Hero's Summoning Magic level, clamped to [1, 3]. */
@@ -61,21 +67,21 @@ function freeSlots(ps, heroIdx) {
  *  (Whoolmoth-style, etc.) and Lethe per-pile stamps both bite the
  *  cap honestly — a Lv5 Cute card rebated to 0 costs 0 budget, a
  *  Lv2 card with a +1 Lethe stamp in discard costs 3. */
-function cuteGallery(engine, pi) {
+function cuteGallery(engine, pi, heroIdx) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
   const out = [];
   for (const name of (ps.hand || [])) {
     const cd = cardDB[name];
-    if (isCuteCreature(cd)) {
+    if (isArmyPick(engine, cd, pi, heroIdx)) {
       const level = engine.effectiveCardLevel(cd, pi);
       out.push({ name, level, source: 'hand' });
     }
   }
   for (const name of (ps.discardPile || [])) {
     const cd = cardDB[name];
-    if (isCuteCreature(cd)) {
+    if (isArmyPick(engine, cd, pi, heroIdx)) {
       const level = engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' });
       out.push({ name, level, source: 'discard' });
     }
@@ -89,7 +95,15 @@ module.exports = {
   // in onPlay and cancel cleanly back to hand if unmet.
   spellPlayCondition: (gs, pi, engine) => {
     if (!engine) return true;
-    return cuteGallery(engine, pi).length > 0;
+    // A printed-Cute Creature is always a valid pick; a Hero wearing
+    // "Cute Wings" can pick ANY Creature. Loosely gate on whether SOME of
+    // the player's Heroes yields a pick (onPlay re-validates against the
+    // ACTUAL casting Hero and cancels back to hand if it can't be met).
+    const heroes = gs.players[pi]?.heroes || [];
+    for (let hi = 0; hi < heroes.length; hi++) {
+      if (heroes[hi]?.name && cuteGallery(engine, pi, hi).length > 0) return true;
+    }
+    return false;
   },
 
   hooks: {
@@ -113,7 +127,7 @@ module.exports = {
       // Per-copy entries; drop any single Creature already over budget
       // (it can never be part of a legal pick — keeps the gallery clean
       // on top of the client-side grey-out).
-      const gallery = cuteGallery(engine, pi).filter(e => (e.level || 0) <= cap);
+      const gallery = cuteGallery(engine, pi, heroIdx).filter(e => (e.level || 0) <= cap);
       if (gallery.length === 0) {
         gs._spellCancelled = true;
         engine.log('army_of_the_cute_fizzle', { player: ps.username, reason: 'no_affordable_cute' });
@@ -150,7 +164,7 @@ module.exports = {
       // so the cap check matches what the picker enforced. `selectedIndices`
       // disambiguates duplicate-name entries across hand vs discard.
       const chosen = result.selectedCards.filter(n =>
-        typeof n === 'string' && isCuteCreature(cardDB[n]));
+        typeof n === 'string' && isArmyPick(engine, cardDB[n], pi, heroIdx));
       const selectedIndices = Array.isArray(result.selectedIndices) ? result.selectedIndices : null;
       const totalLvl = selectedIndices
         ? selectedIndices.reduce((s, i) => s + (gallery[i]?.level || 0), 0)
@@ -203,6 +217,12 @@ module.exports = {
 
         engine._broadcastEvent('summon_effect', {
           owner: pi, heroIdx, zoneSlot: slot, cardName: name,
+        });
+        // Cute flourish: a burst of little hearts puffs off each Creature
+        // as the Army assembles (the same pink heart_burst Cute Angel
+        // Molinda / Summoning Circle use), layered over the summon shine.
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'heart_burst', owner: pi, heroIdx, zoneSlot: slot,
         });
         engine.sync(); // this Creature pops in now (one-by-one)
 

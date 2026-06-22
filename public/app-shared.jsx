@@ -1656,19 +1656,31 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
           )}
           <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
             <div style={{ fontWeight: 700, marginBottom: 5, color: typeColor(card.cardType), fontSize: 18 }}>{card.name}</div>
-            <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>
-              {card.cardType}{card.subtype ? ' · ' + card.subtype : ''}{card.archetype ? ' · ' + card.archetype : ''}
+            <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 4 }}>
+              {[card.cardType, card.subtype, card.archetype].filter(Boolean).join(' · ')}{card.level != null ? ' · Lv ' + card.level : ''}
             </div>
-            {card.level != null && <div style={{ fontSize: 15 }}>Level: {card.level}</div>}
+            {(card.startingAbility1 || card.startingAbility2) && (() => {
+              const order = [], counts = new Map();
+              for (const a of [card.startingAbility1, card.startingAbility2]) {
+                if (!a) continue;
+                if (!counts.has(a)) order.push(a);
+                counts.set(a, (counts.get(a) || 0) + 1);
+              }
+              return (
+                <div style={{ marginBottom: 8 }}>
+                  {order.map(name => (
+                    <div key={name} style={{ fontSize: 14, color: typeColor('Ability') }}>{name} {counts.get(name)}</div>
+                  ))}
+                </div>
+              );
+            })()}
+            {card.cardType !== 'Creature' && (card.spellSchool1 || card.spellSchool2) &&
+              <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>{[card.spellSchool1, card.spellSchool2].filter(Boolean).join(' · ')}</div>}
             <div style={{ display: 'flex', gap: 12, fontSize: 15, marginBottom: 8 }}>
               {card.hp != null && <span>HP: {card.hp}</span>}
               {card.atk != null && <span>ATK: {card.atk}</span>}
               {card.cost != null && <span>Cost: {card.cost}</span>}
             </div>
-            {(card.spellSchool1 || card.spellSchool2) &&
-              <div style={{ fontSize: 14, color: '#aa88ff', marginBottom: 4 }}>Schools: {[card.spellSchool1, card.spellSchool2].filter(Boolean).join(', ')}</div>}
-            {(card.startingAbility1 || card.startingAbility2) &&
-              <div style={{ fontSize: 14, color: '#ffcc44', marginBottom: 4 }}>Abilities: {[card.startingAbility1, card.startingAbility2].filter(Boolean).join(', ')}</div>}
             {card.effect &&
               <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
           </div>
@@ -2102,9 +2114,47 @@ function CardTooltipContent({ card, children, imageUrl }) {
       )}
       <div style={{ padding: '10px 12px' }}>
         <div style={{ fontWeight: 700, fontSize: 18, color: typeColor(card.cardType), marginBottom: 5 }}>{displayName}</div>
-        <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>
-          {card.cardType}{card.subtype ? ' · ' + card.subtype : ''}{card.archetype ? ' · ' + card.archetype : ''}
+        <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 4 }}>
+          {[card.cardType, card.subtype, card.archetype].filter(Boolean).join(' · ')}
+          {(card._liveLevel != null || card.level != null) && (() => {
+            const eff = card._liveLevel != null ? card._liveLevel : card.level;
+            const bonus = card._stampBonus || 0;
+            return <span style={bonus > 0 ? { color: '#c4a8ff', fontWeight: 700 } : undefined}> · Lv {eff}{bonus > 0 ? ` (+${bonus})` : ''}</span>;
+          })()}
         </div>
+        {/* Abilities — shown directly under the "Hero · archetype" line. One
+            row per distinct Ability in the Ability colour, "<name> <level>"
+            (no prefix). Live ability-zone stacks when BoardCard threads them
+            (combining repeats + Performance copies of the same slot), else
+            the static startingAbility1/2 fallback. */}
+        {(() => {
+          const order = [];
+          const counts = new Map();
+          const add = (name, n) => {
+            if (!name) return;
+            if (!counts.has(name)) order.push(name);
+            counts.set(name, (counts.get(name) || 0) + n);
+          };
+          const liveZones = Array.isArray(card._liveAbilities) ? card._liveAbilities : null;
+          if (liveZones) {
+            for (const slot of liveZones) {
+              if (!Array.isArray(slot) || slot.length === 0) continue;
+              add(slot[0], slot.length); // base ability for the slot
+            }
+          } else {
+            for (const a of [card.startingAbility1, card.startingAbility2]) add(a, 1);
+          }
+          if (order.length === 0) return null;
+          return (
+            <div style={{ marginBottom: 8 }}>
+              {order.map(name => (
+                <div key={name} style={{ fontSize: 14, color: typeColor('Ability') }}>{name} {counts.get(name)}</div>
+              ))}
+            </div>
+          );
+        })()}
+        {card.cardType !== 'Creature' && (card.spellSchool1 || card.spellSchool2) &&
+          <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>{[card.spellSchool1, card.spellSchool2].filter(Boolean).join(' · ')}</div>}
         {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
         {/* Inherited effects (Sparkfly Queen's gifts from sacrificed
             Sparkflies — and any future card that populates
@@ -2137,52 +2187,7 @@ function CardTooltipContent({ card, children, imageUrl }) {
             <span style={{ color: '#ffaa44' }}>⚔ ATK {card._liveAtk != null ? card._liveAtk : card.atk}</span>
           )}
           {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {card.cost}</span>}
-          {/* Lv — prefer live `_liveLevel` (BoardCard threads the pile-
-              stamped value for discard/deleted top cards) over the
-              cards.json base. A non-zero `_stampBonus` paints the badge
-              purple + adds a "(+N)" suffix so the player can see at a
-              glance that this is a stamp-bumped read, not the printed
-              level. */}
-          {(card._liveLevel != null || card.level != null) && (() => {
-            const eff = card._liveLevel != null ? card._liveLevel : card.level;
-            const bonus = card._stampBonus || 0;
-            return <span style={bonus > 0 ? { color: '#c4a8ff', fontWeight: 700 } : undefined}>
-              Lv {eff}{bonus > 0 ? ` (+${bonus})` : ''}
-            </span>;
-          })()}
         </div>
-        {/* Abilities row. When BoardCard threads the LIVE
-            `abilityZones[heroIdx]` shape via `_liveAbilities`, render
-            the current stack — combine repeats of the same name into
-            `<name> N` so a slot like ['Fighting','Fighting'] reads as
-            "Fighting 2" instead of duplicating. Performance copies
-            inherit the base ability's name (zone[0]) for display so
-            ['Fighting','Performance'] also shows as "Fighting 2".
-            Off-board previews (deck list, gallery, card-DB lookups)
-            don't supply `_liveAbilities` and fall back to the static
-            cards.json `startingAbility1/2` line.
-        */}
-        {(() => {
-          const liveZones = Array.isArray(card._liveAbilities) ? card._liveAbilities : null;
-          if (liveZones) {
-            const counts = new Map(); // base-name → stack count
-            for (const slot of liveZones) {
-              if (!Array.isArray(slot) || slot.length === 0) continue;
-              const baseName = slot[0]; // base ability for the slot
-              if (!baseName) continue;
-              counts.set(baseName, (counts.get(baseName) || 0) + slot.length);
-            }
-            if (counts.size === 0) return null;
-            const parts = [...counts.entries()].map(([name, n]) => n > 1 ? `${name} ${n}` : name);
-            return <div style={{ fontSize: 14, color: '#ffcc44', marginTop: 6 }}>Abilities: {parts.join(', ')}</div>;
-          }
-          if (card.startingAbility1 || card.startingAbility2) {
-            return <div style={{ fontSize: 14, color: '#ffcc44', marginTop: 6 }}>Abilities: {[card.startingAbility1, card.startingAbility2].filter(Boolean).join(', ')}</div>;
-          }
-          return null;
-        })()}
-        {(card.spellSchool1 || card.spellSchool2) &&
-          <div style={{ fontSize: 14, color: '#aa88ff', marginTop: 4 }}>Schools: {[card.spellSchool1, card.spellSchool2].filter(Boolean).join(', ')}</div>}
         {children}
       </div>
     </>
