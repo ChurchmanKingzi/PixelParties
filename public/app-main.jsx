@@ -2194,7 +2194,7 @@ function _drawHoverCursor() {
     if (!s) { s = document.createElement('style'); s.id = 'pp-hover-cursor'; document.head.appendChild(s); }
     s.textContent = '.btn:not(:disabled):not([disabled]), button:not(:disabled):not([disabled]), '
       + 'a[href], select, summary, .board-zone-clickable, .ctx-menu-item:not(.disabled), '
-      + '[class*="clickable"], [style*="cursor: pointer"], [style*="cursor:pointer"] '
+      + '[class*="clickable"], [style*="cursor: pointer"], [style*="cursor:pointer"], .pp-hover-pointer '
       + '{ cursor: url("' + url + '") 2 2, pointer !important; }';
   } catch {}
 }
@@ -2230,6 +2230,29 @@ function App() {
     // Recolour the hover/clickable cursor to a shining tone of this colour.
     applyPixelHoverCursor(col);
   }, [user && user.color]);
+
+  // Catch-all pixel hover cursor: any element whose cursor still COMPUTES to
+  // the native `pointer` (a clickable the static selector list didn't cover —
+  // avatars, links, tabs, gallery tiles, …) gets tagged with `.pp-hover-pointer`
+  // on hover, which the hover-cursor rules target. This ends the whack-a-mole
+  // of listing every clickable class and future-proofs new ones. Elements our
+  // rules already handle compute to `url(...)`, so they never match here.
+  useEffect(() => {
+    const tag = (e) => {
+      const el = e.target;
+      if (!el || el.nodeType !== 1 || !el.classList || el.classList.contains('pp-hover-pointer')) return;
+      let c;
+      try { c = getComputedStyle(el).cursor; } catch { return; }
+      if (c === 'pointer') el.classList.add('pp-hover-pointer');
+    };
+    const untag = (e) => { const el = e.target; if (el && el.classList) el.classList.remove('pp-hover-pointer'); };
+    document.addEventListener('mouseover', tag, true);
+    document.addEventListener('mouseout', untag, true);
+    return () => {
+      document.removeEventListener('mouseover', tag, true);
+      document.removeEventListener('mouseout', untag, true);
+    };
+  }, []);
 
   const notify = useCallback((message, type) => {
     setNotif({ message, type, id: Date.now() });

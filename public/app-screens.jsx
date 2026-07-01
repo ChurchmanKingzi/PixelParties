@@ -240,17 +240,20 @@ function AnimatedTitleBackdrop() {
       };
     });
   }, []);
-  // Helper: a full-frame art layer covering the frame ("cover").
+  // Helper: a full-frame art layer stretched to fill the viewport exactly
+  // (size 100% 100%). Unlike `cover` this never crops — on a short (non-16:9)
+  // windowed viewport it squashes vertically so every sprite stays fully
+  // visible; at true 16:9 (fullscreen) there's no distortion.
   const layer = (file, extra) => ({
     position: 'absolute', inset: 0, willChange: 'transform',
-    background: "url('" + ANIM_LAYERS_DIR + file + "') center/cover no-repeat",
+    background: "url('" + ANIM_LAYERS_DIR + file + "') center / 100% 100% no-repeat",
     ...extra,
   });
   return (
     <div className="anim-backdrop" aria-hidden="true">
       <div className="anim-shake">
         {/* 0 — background plate (overscanned so shake never reveals edges) */}
-        <div style={{ position: 'absolute', inset: '-2%', background: "url('" + ANIM_LAYERS_DIR + "background.png') center/cover no-repeat" }} />
+        <div style={{ position: 'absolute', inset: '-2%', background: "url('" + ANIM_LAYERS_DIR + "background.png') center / 100% 100% no-repeat" }} />
         {/* 1 — hammer girl */}
         <div style={layer('hammer.png', { transformOrigin: '72% 28%', '--mx': '0.469vw', '--my': '-1.389vh', '--mr': '2deg', animation: 'ab-floaty 4.2s ease-in-out -0.6s infinite' })} />
         {/* 2 — explosion core (scales on the tether clock) */}
@@ -258,7 +261,7 @@ function AnimatedTitleBackdrop() {
         {/* 3 — central bloom */}
         <div className="anim-bloom" />
         {/* 4 — Broghan (right shooter), nudged flush to the right edge */}
-        <div style={{ position: 'absolute', inset: 0, transform: 'translate(5.781vw, -0.278vh)' }}>
+        <div style={{ position: 'absolute', inset: 0, transform: 'translate(5.781vw, 0.278vh)' }}>
           <div style={layer('golem.png', { animation: 'ab-broghanTether 4.8s ease-in-out infinite' })} />
         </div>
         {/* 5 — Kyli (tree girl), shifted down */}
@@ -322,7 +325,7 @@ function AnimatedTitleBackdrop() {
 function AnimatedTitleCatsOverlay() {
   const layer = (file, extra) => ({
     position: 'absolute', inset: 0, willChange: 'transform',
-    background: "url('" + ANIM_LAYERS_DIR + file + "') center/cover no-repeat",
+    background: "url('" + ANIM_LAYERS_DIR + file + "') center / 100% 100% no-repeat",
     ...extra,
   });
   return (

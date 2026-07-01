@@ -3338,7 +3338,7 @@ input[type="url"], input:not([type]), textarea {
 button:not(:disabled):not([disabled]),
 a[href], select, summary,
 .board-zone-clickable, .ctx-menu-item:not(.disabled), [class*="clickable"],
-[style*="cursor: pointer"], [style*="cursor:pointer"] {
+[style*="cursor: pointer"], [style*="cursor:pointer"], .pp-hover-pointer {
   cursor: url("/cursor-arrow-cyan.png?v=4") 2 2, pointer !important;
 }
 /* Pixel-styled versions of the remaining keyword cursors. !important so they
