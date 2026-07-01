@@ -11667,6 +11667,70 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   background: rgba(8,8,16,.92);
   border: 4px solid rgba(170,136,255,.55);
   box-shadow: 6px 6px 0 rgba(0,0,0,.7), 0 0 0 1px rgba(0,0,0,.6);
+  /* Own stacking context + relative positioning + visible overflow so the
+     .auth-panel-explosion child can be a full-viewport overlay that renders
+     ABOVE the box's background/dither (painted first) but BELOW the form
+     controls (.auth-panel-content, z-index:2). The box no longer clips it. */
+  position: relative;
+  z-index: 0;
+  overflow: visible;
+}
+/* Form controls, lifted above the explosion overlay. */
+.auth-panel-content {
+  position: relative;
+  z-index: 2;
+  /* The dithered box surface (the text's old dark backing) now sits BELOW the
+     explosion, so bare text would read teal-on-yellow over the blast. Give all
+     panel text a hard 1px pixel outline in the box's near-black tone: it stays
+     legible on the bright explosion without touching any text colour. Inputs
+     opt out — their opaque field background already backs the typed text. */
+  --pixel-outline:
+    1px 1px 0 #05050c, -1px 1px 0 #05050c, 1px -1px 0 #05050c, -1px -1px 0 #05050c,
+    0 1px 0 #05050c, 0 -1px 0 #05050c, 1px 0 0 #05050c, -1px 0 0 #05050c;
+  text-shadow: var(--pixel-outline);
+}
+.auth-panel-content .input { text-shadow: none; }
+/* "Trading Card Game" gets a small border in the logo's colour to match — a
+   slim 4-direction 1px ring (thinner than the full 8-direction outline). */
+.auth-panel-content .auth-subtitle {
+  text-shadow:
+    1px 0 0 var(--player-color, #00f0ff), -1px 0 0 var(--player-color, #00f0ff),
+    0 1px 0 var(--player-color, #00f0ff), 0 -1px 0 var(--player-color, #00f0ff);
+}
+/* Keep the link hover glow, but preserve the readable outline underneath it. */
+.auth-panel-content .auth-link:hover { text-shadow: var(--pixel-outline), 0 0 8px var(--accent); }
+
+/* Login screen reuses the main-menu wordmark logo. .pp-logo-img is sized for
+   the full-width menu header (831×105 art at 92px tall ≈ 728px wide), so here
+   we centre the stack and fit the image to the panel width instead. */
+.auth-logo { display: block; margin: 0 auto 10px; transform: scale(1.06); transform-origin: center bottom; }
+.auth-logo .pp-logo-img { width: 100%; height: auto; max-height: none; }
+
+/* Explosion overlay. The wrapper is a viewport-sized box centred on the panel
+   — and .screen-center centres the panel in the viewport, so it lines up flush
+   with the backdrop scene. The inner core reproduces the backdrop's explosion
+   layer verbatim (inset:0 + center/100% 100% + ab-coreTether), so the blast
+   sits in EXACTLY the same place it did in the scene; only its layer changed
+   (now above the box, below the controls). It rides the auth-panel-shake clock,
+   staying in sync with the scene's shake. .auth-screen's overflow:hidden clips
+   the viewport-sized box, so no scrollbars. z-index:1 keeps it above the box. */
+.auth-panel-explosion {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100vw;
+  height: 100vh;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  pointer-events: none;
+}
+.auth-panel-explosion__core {
+  position: absolute;
+  inset: 0;
+  background: url('/data/animated_screen/layers2/explosion.png') center / 100% 100% no-repeat;
+  transform-origin: 52% 42%;
+  animation: ab-coreTether 4.8s ease-in-out infinite;
+  image-rendering: pixelated;
 }
 
 /* 9 ── Main-menu chrome: square the frames/plaques, drop the blur */

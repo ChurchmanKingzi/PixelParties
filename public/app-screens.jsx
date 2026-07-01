@@ -254,10 +254,29 @@ function AnimatedTitleBackdrop() {
       <div className="anim-shake">
         {/* 0 — background plate (overscanned so shake never reveals edges) */}
         <div style={{ position: 'absolute', inset: '-2%', background: "url('" + ANIM_LAYERS_DIR + "background.png') center / 100% 100% no-repeat" }} />
+        {/* Impact flash + lightning FLASHES render BELOW the characters
+            (screen-blended onto the background plate only) so they never light the
+            laser beams baked into golem/rabbit. That keeps both beams at their
+            constant baked colour — matching the central burst, which lives in the
+            panel and gets no flash either — so the whole laser reads as one uniform
+            piece. (The jagged bolts render ABOVE the characters — see below.) */}
+        <div className="anim-lightning">
+          <div className="anim-lflash anim-lflash-impact" />
+          <div className="anim-lflash anim-lflash-ambient" />
+        </div>
+        <div className="anim-flash" />
+        {/* Vignette also renders BELOW the characters, for the same reason as the
+            flash: it's a full-screen dark radial, and golem is pinned to the right
+            edge where the vignette is darkest — so above the characters it would
+            dim golem's beam while the central burst (in the panel, above the
+            vignette) stays bright, breaking the seam. Below the characters it
+            frames only the background and leaves every sprite at its true colour. */}
+        <div className="anim-vignette" />
         {/* 1 — hammer girl */}
         <div style={layer('hammer.png', { transformOrigin: '72% 28%', '--mx': '0.469vw', '--my': '-1.389vh', '--mr': '2deg', animation: 'ab-floaty 4.2s ease-in-out -0.6s infinite' })} />
-        {/* 2 — explosion core (scales on the tether clock) */}
-        <div style={layer('explosion.png', { transformOrigin: '52% 42%', animation: 'ab-coreTether 4.8s ease-in-out infinite' })} />
+        {/* 2 — explosion core moved OUT of the backdrop: it now renders inside
+            the auth panel (above the box's dithered surface, below the form
+            controls). See `.auth-panel-explosion` in AuthScreen / style.css. */}
         {/* 3 — central bloom */}
         <div className="anim-bloom" />
         {/* 4 — Broghan (right shooter), nudged flush to the right edge */}
@@ -281,6 +300,21 @@ function AnimatedTitleBackdrop() {
         {/* 10-12 — flying cats live in <AnimatedTitleCatsOverlay/> instead, so
             they render ABOVE the login panel (can't rise above it from inside
             this z-index:0 stacking context). */}
+        {/* Lightning bolts render ABOVE the characters (in front of the cast) —
+            they're thin jagged strikes, so unlike the full-screen flashes they
+            don't wash the lasers. Kept inside the shake group, after every
+            character, so they jolt in sync with the scene. */}
+        <div className="anim-lightning">
+          <svg className="anim-bolt anim-bolt-a" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points="52,0 40,70 62,80 38,150 60,165 34,240 58,255 30,340 50,360 42,400" />
+          </svg>
+          <svg className="anim-bolt anim-bolt-b" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points="48,0 62,75 38,88 60,160 36,175 58,250 34,265 56,345 40,375 50,400" />
+          </svg>
+          <svg className="anim-bolt anim-bolt-c" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points="50,0 58,80 40,92 60,175 38,190 56,270 36,285 52,370 46,400" />
+          </svg>
+        </div>
         {/* 13 — embers */}
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
           {embers.map((e, i) => (
@@ -294,25 +328,6 @@ function AnimatedTitleBackdrop() {
           ))}
         </div>
       </div>
-      {/* Lightning — cool flashes + jagged bolts. Two bolts + a blue flash on
-          the 10s shake clock (strike ON the impact beats), plus one bolt + a
-          flash on a 13s clock (occasional off-beat strikes). Screen-blended. */}
-      <div className="anim-lightning">
-        <div className="anim-lflash anim-lflash-impact" />
-        <div className="anim-lflash anim-lflash-ambient" />
-        <svg className="anim-bolt anim-bolt-a" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
-          <polyline points="52,0 40,70 62,80 38,150 60,165 34,240 58,255 30,340 50,360 42,400" />
-        </svg>
-        <svg className="anim-bolt anim-bolt-b" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
-          <polyline points="48,0 62,75 38,88 60,160 36,175 58,250 34,265 56,345 40,375 50,400" />
-        </svg>
-        <svg className="anim-bolt anim-bolt-c" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
-          <polyline points="50,0 58,80 40,92 60,175 38,190 56,270 36,285 52,370 46,400" />
-        </svg>
-      </div>
-      {/* impact flash + vignette sit above the shake group */}
-      <div className="anim-flash" />
-      <div className="anim-vignette" />
     </div>
   );
 }
@@ -491,10 +506,15 @@ function AuthScreen() {
 
   const Header = (
     <>
-      <h1 className="pixel-font" style={{ fontSize: 18, color: 'var(--accent)', marginBottom: 4, textShadow: '0 0 20px var(--accent)' }}>
-        PIXEL PARTIES
-      </h1>
-      <div className="orbit-font" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 24, letterSpacing: 2 }}>
+      {/* Same wordmark logo as the main menu (data/logo.png), tinted + haloed
+          with drifting particles. Scoped .auth-logo just fits it to the panel
+          width (the menu sizes it for a full-width header). */}
+      <div className="pp-logo-stack auth-logo">
+        <LogoParticles />
+        <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
+        <div className="pp-logo-tint" aria-hidden="true"></div>
+      </div>
+      <div className="orbit-font auth-subtitle" style={{ fontSize: 13, color: '#3d3d54', marginBottom: 24, letterSpacing: 2 }}>
         TRADING CARD GAME
       </div>
     </>
@@ -643,8 +663,20 @@ function AuthScreen() {
           entrance transform isn't clobbered by the shake transform. */}
       <div className="auth-panel-shake" style={{ position: 'relative', zIndex: 2 }}>
         <div className="panel animate-in" style={{ width: 380, textAlign: 'center' }}>
-          {Header}
-          {body}
+          {/* Explosion — a full-viewport, scene-aligned layer that renders ABOVE
+              the box's dithered surface but BELOW the form controls. It stays a
+              child of the panel (overflow:visible) so it rides the same
+              auth-panel-shake clock as the backdrop and stays in sync with the
+              scene; the wrapper handles viewport-centering while the inner core
+              reproduces the backdrop layer (inset:0 + ab-coreTether) exactly. */}
+          <div className="auth-panel-explosion" aria-hidden="true">
+            <div className="auth-panel-explosion__core" />
+          </div>
+          {/* Form controls sit above the explosion (z-index:2). */}
+          <div className="auth-panel-content">
+            {Header}
+            {body}
+          </div>
         </div>
       </div>
       {/* Flying cats — rendered last so they float ABOVE the login panel. */}
