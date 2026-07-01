@@ -212,6 +212,130 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
   );
 }
 
+// ═══════════════════════════════════════════
+//  ANIMATED TITLE BACKDROP (auth / sign-up screen)
+//  A layered, looping battle scene that replaces the still title.png:
+//  a laser-clash centrepiece (two tethered shooters + a scaling burst),
+//  idle-floating characters, rising embers, a pulsing bloom, impact flash
+//  and vignette. Full spec in data/animated_screen/README.md; keyframes +
+//  layer styling live in style.css (`.anim-*` / `@keyframes ab-*`). Art is
+//  served from /data/animated_screen/layers2/. Purely cosmetic; sits behind
+//  the auth panel and is pointer-events:none.
+// ═══════════════════════════════════════════
+const ANIM_LAYERS_DIR = '/data/animated_screen/layers2/';
+function AnimatedTitleBackdrop() {
+  // 46 randomized rising embers, generated once (see README §7).
+  const embers = useMemo(() => {
+    const colors = ['#ffd36b', '#ff8a3d', '#ff5a4d', '#ffe9a8', '#ffffff'];
+    return Array.from({ length: 46 }, () => {
+      const size = 2 + Math.random() * 5;
+      return {
+        size,
+        dur: 7 + Math.random() * 9,
+        delay: -Math.random() * 16,
+        left: Math.random() * 100,
+        // Horizontal drift as a % of screen width (±50px on the 1920 stage).
+        drift: +((Math.random() * 2 - 1) * 2.604).toFixed(3),
+        color: colors[Math.floor(Math.random() * colors.length)],
+      };
+    });
+  }, []);
+  // Helper: a full-frame art layer covering the frame ("cover").
+  const layer = (file, extra) => ({
+    position: 'absolute', inset: 0, willChange: 'transform',
+    background: "url('" + ANIM_LAYERS_DIR + file + "') center/cover no-repeat",
+    ...extra,
+  });
+  return (
+    <div className="anim-backdrop" aria-hidden="true">
+      <div className="anim-shake">
+        {/* 0 — background plate (overscanned so shake never reveals edges) */}
+        <div style={{ position: 'absolute', inset: '-2%', background: "url('" + ANIM_LAYERS_DIR + "background.png') center/cover no-repeat" }} />
+        {/* 1 — hammer girl */}
+        <div style={layer('hammer.png', { transformOrigin: '72% 28%', '--mx': '0.469vw', '--my': '-1.389vh', '--mr': '2deg', animation: 'ab-floaty 4.2s ease-in-out -0.6s infinite' })} />
+        {/* 2 — explosion core (scales on the tether clock) */}
+        <div style={layer('explosion.png', { transformOrigin: '52% 42%', animation: 'ab-coreTether 4.8s ease-in-out infinite' })} />
+        {/* 3 — central bloom */}
+        <div className="anim-bloom" />
+        {/* 4 — Broghan (right shooter), nudged flush to the right edge */}
+        <div style={{ position: 'absolute', inset: 0, transform: 'translate(5.781vw, -0.278vh)' }}>
+          <div style={layer('golem.png', { animation: 'ab-broghanTether 4.8s ease-in-out infinite' })} />
+        </div>
+        {/* 5 — Kyli (tree girl), shifted down */}
+        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(14.907vh)' }}>
+          <div style={layer('horned.png', { transformOrigin: '80% 100%', '--mx': '-0.573vw', '--my': '-1.389vh', '--mr': '2.6deg', animation: 'ab-floaty 6s ease-in-out -2s infinite' })} />
+        </div>
+        {/* 6 — angel girl */}
+        <div style={layer('angel.png', { transformOrigin: '20% 30%', '--mx': '0vw', '--my': '-1.111vh', '--mr': '-1.4deg', animation: 'ab-floaty 5s ease-in-out infinite' })} />
+        {/* 7 — blonde girl */}
+        <div style={layer('blonde.png', { transformOrigin: '20% 50%', '--mx': '0.208vw', '--my': '-0.833vh', '--mr': '1deg', animation: 'ab-floaty 6.5s ease-in-out -1.5s infinite' })} />
+        {/* 8 — Jiggles (left shooter) */}
+        <div style={layer('rabbit.png', { animation: 'ab-jiggleTether 4.8s ease-in-out infinite' })} />
+        {/* 9 — Champion (swordsman), shifted down */}
+        <div style={{ position: 'absolute', inset: 0, transform: 'translateY(19.907vh)' }}>
+          <div style={layer('ninja.png', { transformOrigin: '16% 80%', '--mx': '0.417vw', '--my': '-1.296vh', '--mr': '-2deg', animation: 'ab-floaty 5.5s ease-in-out -2.5s infinite' })} />
+        </div>
+        {/* 10-12 — flying cats live in <AnimatedTitleCatsOverlay/> instead, so
+            they render ABOVE the login panel (can't rise above it from inside
+            this z-index:0 stacking context). */}
+        {/* 13 — embers */}
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+          {embers.map((e, i) => (
+            <span key={i} style={{
+              position: 'absolute', bottom: '-1.296vh', left: e.left.toFixed(2) + '%',
+              width: e.size.toFixed(1) + 'px', height: e.size.toFixed(1) + 'px', borderRadius: '50%',
+              background: e.color, boxShadow: '0 0 ' + (e.size * 2.4).toFixed(1) + 'px ' + e.color,
+              opacity: 0, animation: 'ab-emberrise ' + e.dur.toFixed(1) + 's linear ' + e.delay.toFixed(1) + 's infinite',
+              '--drift': e.drift + 'vw',
+            }} />
+          ))}
+        </div>
+      </div>
+      {/* Lightning — cool flashes + jagged bolts. Two bolts + a blue flash on
+          the 10s shake clock (strike ON the impact beats), plus one bolt + a
+          flash on a 13s clock (occasional off-beat strikes). Screen-blended. */}
+      <div className="anim-lightning">
+        <div className="anim-lflash anim-lflash-impact" />
+        <div className="anim-lflash anim-lflash-ambient" />
+        <svg className="anim-bolt anim-bolt-a" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
+          <polyline points="52,0 40,70 62,80 38,150 60,165 34,240 58,255 30,340 50,360 42,400" />
+        </svg>
+        <svg className="anim-bolt anim-bolt-b" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
+          <polyline points="48,0 62,75 38,88 60,160 36,175 58,250 34,265 56,345 40,375 50,400" />
+        </svg>
+        <svg className="anim-bolt anim-bolt-c" viewBox="0 0 100 400" preserveAspectRatio="none" aria-hidden="true">
+          <polyline points="50,0 58,80 40,92 60,175 38,190 56,270 36,285 52,370 46,400" />
+        </svg>
+      </div>
+      {/* impact flash + vignette sit above the shake group */}
+      <div className="anim-flash" />
+      <div className="anim-vignette" />
+    </div>
+  );
+}
+
+// The flying cats, pulled OUT of the backdrop so they render ABOVE the login
+// panel (they can't rise above it from inside the backdrop's z-index:0
+// stacking context). Same independent floats + screen-shake as the main scene
+// — in sync because both mount together. pointer-events:none so clicks still
+// reach the form beneath.
+function AnimatedTitleCatsOverlay() {
+  const layer = (file, extra) => ({
+    position: 'absolute', inset: 0, willChange: 'transform',
+    background: "url('" + ANIM_LAYERS_DIR + file + "') center/cover no-repeat",
+    ...extra,
+  });
+  return (
+    <div className="anim-cats-front" aria-hidden="true">
+      <div className="anim-shake">
+        <div style={layer('cat_top.png', { transformOrigin: '23% 5%', '--mx': '0.729vw', '--my': '-0.833vh', '--mr': '3deg', animation: 'ab-floaty 3.4s ease-in-out -0.5s infinite' })} />
+        <div style={layer('cat_mid.png', { transformOrigin: '37% 30%', '--mx': '-0.573vw', '--my': '0.833vh', '--mr': '-3deg', animation: 'ab-floaty 2.9s ease-in-out -0.8s infinite' })} />
+        <div style={layer('cat_bottom.png', { transformOrigin: '5% 48%', '--mx': '0.833vw', '--my': '-1.111vh', '--mr': '4deg', animation: 'ab-floaty 3.0s ease-in-out -1.7s infinite' })} />
+      </div>
+    </div>
+  );
+}
+
 function AuthScreen() {
   const { setUser } = useContext(AppContext);
   // mode: 'login' | 'signup' | 'verify' | 'forgot' | 'reset'
@@ -401,7 +525,7 @@ function AuthScreen() {
               onChange={e => setIdentifier(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitLogin()} />
           ) : (
             <>
-              <input className="input" placeholder="Username" value={username} autoComplete="username"
+              <input className="input" placeholder="Username" value={username} autoComplete="username" maxLength={10}
                 onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
               <input className="input" type="email" placeholder="Email" value={email} autoComplete="email"
                 onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
@@ -509,11 +633,19 @@ function AuthScreen() {
 
   return (
     <div className="screen-center auth-screen">
+      <AnimatedTitleBackdrop />
       <DiscordButton label="DISCORD" size={40} className="discord-btn--lg" style={{ position: 'fixed', top: 16, right: 16, zIndex: 10 }} />
-      <div className="panel animate-in" style={{ width: 380, textAlign: 'center' }}>
-        {Header}
-        {body}
+      {/* Shake wrapper: jolts the panel in sync with the backdrop's ab-shake
+          (same 10s clock). Kept separate from the panel so its .animate-in
+          entrance transform isn't clobbered by the shake transform. */}
+      <div className="auth-panel-shake" style={{ position: 'relative', zIndex: 2 }}>
+        <div className="panel animate-in" style={{ width: 380, textAlign: 'center' }}>
+          {Header}
+          {body}
+        </div>
       </div>
+      {/* Flying cats — rendered last so they float ABOVE the login panel. */}
+      <AnimatedTitleCatsOverlay />
     </div>
   );
 }
@@ -1679,7 +1811,7 @@ function ProfileScreen() {
     const trimmed = nameInput.trim();
     if (trimmed === user.username) { setNameStatus({ available: false, reason: 'This is your current name', unchanged: true }); return; }
     if (trimmed.length < 3) { setNameStatus({ available: false, reason: 'Too short (3+ characters)' }); return; }
-    if (trimmed.length > 20) { setNameStatus({ available: false, reason: 'Too long (max 20 characters)' }); return; }
+    if (trimmed.length > 10) { setNameStatus({ available: false, reason: 'Too long (max 10 characters)' }); return; }
     setNameStatus('checking');
     const t = setTimeout(async () => {
       try {
@@ -1702,6 +1834,9 @@ function ProfileScreen() {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({ username: nameInput.trim() }) });
       setUser(data.user);
       setEditingName(false);
+      // Refresh the live socket's cached identity so lobby/chat/new games
+      // pick up the new name immediately (no relog needed).
+      if (typeof socket !== 'undefined' && socket) socket.emit('refresh_identity');
       notify('Name updated!', 'success');
     } catch (e) { notify(e.message, 'error'); setNameStatus({ available: false, reason: e.message }); }
     setSavingName(false);
@@ -1841,7 +1976,7 @@ function ProfileScreen() {
                 : obj.available ? 'var(--success)' : 'var(--danger)';
               return (
                 <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
-                  <input className="input" value={nameInput} maxLength={20} autoFocus
+                  <input className="input" value={nameInput} maxLength={10} autoFocus
                     onChange={(e) => setNameInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') saveName(); else if (e.key === 'Escape') cancelNameEdit(); }}
                     style={{ textAlign: 'center', fontSize: 22, fontWeight: 800, width: 260, color, borderColor: tone, boxShadow: `0 0 10px ${tone}33` }} />
@@ -2771,6 +2906,11 @@ function ShopScreen() {
                   <img src={imgSrc} draggable={false}
                     className={!isOwned ? 'shop-skin-locked' : ''} />
                   {isOwned && <div className="shop-owned-badge">OWNED</div>}
+                  {!isOwned && (
+                    <div className="shop-lock-overlay">
+                      <span className="shop-lock-badge" aria-label="Locked">🔒</span>
+                    </div>
+                  )}
                 </div>
                 {/* Flip between the skin art and the original Hero art so the
                     player can tell which Hero a skin belongs to (names removed
@@ -3538,7 +3678,7 @@ function GuestRegisterModal({ onClose, starterDeckId }) {
         <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 16, letterSpacing: 1 }}>Keep your deck &amp; unlock everything</div>
         {step === 'form' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <input className="input" placeholder="Username" value={username} autoComplete="username" onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
+            <input className="input" placeholder="Username" value={username} autoComplete="username" maxLength={10} onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
             <input className="input" type="email" placeholder="Email" value={email} autoComplete="email" onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
             <input className="input" type="password" placeholder="Password" value={password} autoComplete="new-password" onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
             {error && <div className="auth-msg auth-err">{error}</div>}

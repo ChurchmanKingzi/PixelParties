@@ -2156,6 +2156,60 @@ function OpponentUnlockPopup() {
   );
 }
 
+// ── Player-coloured hover cursor ──────────────────────────────────────
+// The default arrow is a static white PNG, but the hover/clickable cursor
+// should be a light, shining tone of the player's OWN colour. A PNG can't be
+// tinted via CSS variables, so we recolour the white arrow's fill in a canvas
+// at runtime and inject it as a <style> that overrides the static cyan rule
+// in style.css. Falls back silently to that cyan cursor on any error.
+let _cursorImg = null;
+let _cursorColor = [120, 245, 255];
+function _lightenHex(hex, amt) {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
+  let r = 0, g = 240, b = 255;
+  if (m) { const n = parseInt(m[1], 16); r = (n >> 16) & 255; g = (n >> 8) & 255; b = n & 255; }
+  // Mix toward white for a bright, shining tone while keeping the hue.
+  return [Math.round(r + (255 - r) * amt), Math.round(g + (255 - g) * amt), Math.round(b + (255 - b) * amt)];
+}
+function _drawHoverCursor() {
+  const img = _cursorImg;
+  if (!img || !img.complete || !img.naturalWidth) return;
+  try {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, 0, 0);
+    const d = ctx.getImageData(0, 0, c.width, c.height);
+    const p = d.data;
+    for (let i = 0; i < p.length; i += 4) {
+      if (p[i + 3] === 0) continue;                       // transparent → skip
+      if (p[i] > 180 && p[i + 1] > 180 && p[i + 2] > 180) { // white fill → player tone
+        p[i] = _cursorColor[0]; p[i + 1] = _cursorColor[1]; p[i + 2] = _cursorColor[2];
+      }                                                    // black outline left as-is
+    }
+    ctx.putImageData(d, 0, 0);
+    const url = c.toDataURL('image/png');
+    let s = document.getElementById('pp-hover-cursor');
+    if (!s) { s = document.createElement('style'); s.id = 'pp-hover-cursor'; document.head.appendChild(s); }
+    s.textContent = '.btn:not(:disabled):not([disabled]), button:not(:disabled):not([disabled]), '
+      + 'a[href], select, summary, .board-zone-clickable, .ctx-menu-item:not(.disabled), '
+      + '[class*="clickable"], [style*="cursor: pointer"], [style*="cursor:pointer"] '
+      + '{ cursor: url("' + url + '") 2 2, pointer !important; }';
+  } catch {}
+}
+function applyPixelHoverCursor(hex) {
+  _cursorColor = _lightenHex(hex, 0.42);
+  if (!_cursorImg) {
+    _cursorImg = new Image();
+    _cursorImg.onload = _drawHoverCursor;
+    _cursorImg.src = '/cursor-arrow.png?v=4';
+  }
+  // A cached image often won't fire `onload`, so draw immediately when it's
+  // already available; otherwise the onload above handles the first paint.
+  if (_cursorImg.complete && _cursorImg.naturalWidth) _drawHoverCursor();
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [screen, setScreen] = useState('menu');
@@ -2171,7 +2225,10 @@ function App() {
   // Expose the player's chosen colour as a global CSS variable so every
   // screen/submenu (titles, etc.) can theme off it via var(--player-color).
   useEffect(() => {
-    document.documentElement.style.setProperty('--player-color', (user && user.color) || '#00f0ff');
+    const col = (user && user.color) || '#00f0ff';
+    document.documentElement.style.setProperty('--player-color', col);
+    // Recolour the hover/clickable cursor to a shining tone of this colour.
+    applyPixelHoverCursor(col);
   }, [user && user.color]);
 
   const notify = useCallback((message, type) => {

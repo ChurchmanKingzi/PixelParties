@@ -1157,6 +1157,59 @@ function FlameStrikeEffect({ x, y }) {
   );
 }
 
+// Hand ambiance — an always-on atmospheric layer for the player's OWN hand:
+//   • BLOOM: soft player-coloured light rising from the bottom edge of the
+//     hand strip, screen-blended over its dark background and gently
+//     pulsing. Painted first in DOM order so it sits behind the cards.
+//   • PIXEL PARTICLES: sparse pixel motes drifting slowly upward off the
+//     hand, tinted the player's colour (plus the odd white sparkle). Kept
+//     small + low-opacity so they read as ambient dust, never clutter, and
+//     float just above the cards (z-index) so they're actually visible.
+// Both layers are pointer-events:none and respect prefers-reduced-motion.
+// The colour comes in as the player's chosen colour.
+function HandAmbiance({ color }) {
+  const motes = useMemo(() => {
+    const N = 40;
+    const arr = [];
+    for (let i = 0; i < N; i++) {
+      const dur = 3 + Math.random() * 4;                 // 3–7s drift (snappier)
+      arr.push({
+        top:   Math.random() * 100,
+        left:  Math.random() * 100,
+        size:  2 + Math.floor(Math.random() * 3),        // 2–4px pixel squares
+        dur,
+        delay: -Math.random() * dur,                     // mid-cycle stagger
+        dx:    (Math.random() * 2 - 1) * 26,             // -26..26px horizontal drift
+        dy:    -(24 + Math.random() * 90),               // rise far enough to leave the hand
+        max:   0.22 + Math.random() * 0.3,               // subtle peak opacity
+        // Mostly the player's colour; ~30% white for a sparkle.
+        color: Math.random() < 0.3 ? '#ffffff' : 'var(--amb-me)',
+      });
+    }
+    return arr;
+  }, []);
+  return (
+    <div className="hand-ambiance" aria-hidden="true"
+      style={{ '--amb-me': color || '#00f0ff' }}>
+      <div className="hand-bloom" />
+      <div className="hand-particles">
+        {motes.map((p, i) => (
+          <span key={i} className="hand-mote" style={{
+            top: p.top + '%', left: p.left + '%',
+            '--p-size': p.size + 'px',
+            '--p-color': p.color,
+            '--p-dur': p.dur + 's',
+            '--p-delay': p.delay + 's',
+            '--p-dx': p.dx + 'px',
+            '--p-dy': p.dy + 'px',
+            '--p-max': p.max,
+          }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Acid Rain overlay — continuous blood-red rain covering the board area
 // while an Acid Rain Area card is active in either area zone. Sized via
 // position:absolute inset:0 so it fills the .board-center container
@@ -16285,7 +16338,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Generic speech-bubble renderer (end-game win/loss lines AND mid-game CPU
   // barks). `tkey` forces a fresh TypewriterText mount so the type-out
   // restarts even when the same text is shown twice in a row.
-  const renderBubbleAt = (msg, color, dir, anchor, tkey) => {
+  const renderBubbleAt = (msg, color, dir, anchor, tkey, z = 1100) => {
     if (!msg || !anchor) return null;
     const isUp = dir === 'up'; // tail points up → bubble sits below the avatar
     // Avatars sit at the screen's left edge, so a bubble centered on the
@@ -16299,7 +16352,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const maxWidth = Math.max(120, Math.min(300, vw - bubbleLeft - PAD));
     const tailLeft = Math.max(14, anchor.x - bubbleLeft);
     return (
-      <div style={{ position: 'fixed', left: bubbleLeft, top: isUp ? anchor.bottom + 12 : anchor.top - 12, transform: isUp ? 'none' : 'translateY(-100%)', zIndex: 1100, pointerEvents: 'none', maxWidth }}>
+      <div style={{ position: 'fixed', left: bubbleLeft, top: isUp ? anchor.bottom + 12 : anchor.top - 12, transform: isUp ? 'none' : 'translateY(-100%)', zIndex: z, pointerEvents: 'none', maxWidth }}>
         <div style={{ position: 'relative', background: '#15151f', border: '2px solid ' + color, borderRadius: 10, padding: '8px 14px', color: '#fff', fontSize: 15, fontWeight: 600, textAlign: 'center', lineHeight: 1.3, boxShadow: '0 0 16px ' + color + '66', wordBreak: 'normal', overflowWrap: 'break-word', animation: 'result-fade-in .5s ease-out' }}>
           <TypewriterText key={tkey} text={msg} />
           <div style={{ position: 'absolute', left: tailLeft, transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', ...(isUp ? { top: -10, borderBottom: '10px solid ' + color } : { bottom: -10, borderTop: '10px solid ' + color }) }} />
@@ -16438,6 +16491,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // Ability drag state (Main Phases — dragging ability to hero/zone)
   const [abilityDrag, setAbilityDrag] = useState(null); // { idx, cardName, card, mouseX, mouseY, targetHero, targetZone }
+
+  // While any card drag is in progress, pin the grabbing (closed-fist) cursor
+  // globally via a body class. The custom JS drag moves the pointer off the
+  // source slot, so :active alone can't hold the cursor — without this it
+  // flickers back to the arrow the moment you move.
+  useEffect(() => {
+    const dragging = !!(handDrag || playDrag || abilityDrag);
+    document.body.classList.toggle('pp-dragging-card', dragging);
+    return () => document.body.classList.remove('pp-dragging-card');
+  }, [handDrag, playDrag, abilityDrag]);
 
   // Surprise drag state (Main Phases — dragging Surprise card to hero's surprise zone)
   // surpriseDrag merged into playDrag (with isSurprise: true flag)
@@ -26998,8 +27061,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {renderEndBubble(meBubbleMsg, endMeWon, 'down', bubbleAnchors.me)}
           </>
         )}
-        {/* Mid-game CPU bark (hidden once the end-game bubbles take over) */}
-        {!showEndBubbles && cpuBark && renderBubbleAt(cpuBark.text, '#ffcc44', cpuBark.dir, cpuBark.anchor, cpuBark.id)}
+        {/* Mid-game CPU bark (hidden once the end-game bubbles take over).
+            z 9650 keeps the opening greeting ABOVE the start-of-game dim +
+            first-choice panel (z 9600) instead of being occluded by them. */}
+        {!showEndBubbles && cpuBark && renderBubbleAt(cpuBark.text, '#ffcc44', cpuBark.dir, cpuBark.anchor, cpuBark.id, 9650)}
         {/* Opponent hand */}
         <div className="game-hand game-hand-opp">
           <div className="game-hand-info" ref={speechOppRef} style={oppAvatarHighlight}>
@@ -27012,7 +27077,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   </div>
                 )
                 : null}
-            <span className="orbit-font" style={{ fontSize: 18, fontWeight: 800, color: opp.color }}>{
+            <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: opp.color }}>{
               // CPU opponents are labelled "CPU" server-side; show their
               // middle Hero's full name (incl. title) instead so they read
               // as a character. Falls back to the first living Hero, then CPU.
@@ -27647,7 +27712,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </div>
 
         {/* My hand (bottom player) — drag to reorder for players, face-down for spectators */}
-        <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef}>
+        <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef} style={{ '--hand-accent': me.color || '#00f0ff' }}>
+          <HandAmbiance color={me.color} />
           <div className="game-hand-info" ref={speechMeRef} style={meAvatarHighlight}>
             {me.avatar
               ? <img src={me.avatar} className={'game-hand-avatar game-hand-avatar-big' + (!result && (isMyTurn ? ' avatar-active' : ' avatar-inactive'))} />
@@ -27658,7 +27724,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   </div>
                 )
                 : null}
-            <span className="orbit-font" style={{ fontSize: 18, fontWeight: 800, color: me.color }}>{me.username}</span>
+            <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: me.color }}>{me.username}</span>
             {meDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
           </div>
           {isSpectator ? (

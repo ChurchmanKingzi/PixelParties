@@ -21,6 +21,11 @@
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
+  // First-turn safety: Overheal Shock can ONLY attach to an opponent's Hero,
+  // so when going first it is always wasted against the first-turn shield
+  // (the onPlay handler just discards it). Tell the CPU never to play it on
+  // such a turn. (spellPlayCondition below also gates this universally.)
+  firstTurnSafe: false,
   // CPU target override. Pick an opponent Hero that does NOT already
   // carry an Overheal Shock (stacking has no extra value). Tiebreak by
   // current HP descending — more HP = more damage-return per future heal.
@@ -55,6 +60,12 @@ module.exports = {
   // copies to the same hero.
   spellPlayCondition(gs, pi) {
     const oi = pi === 0 ? 1 : 0;
+    // First-turn protection: the only valid targets are the opponent's
+    // Heroes, but a first-turn-protected opponent can't be attached to — the
+    // card would just fizzle to the discard pile for no effect. Treat it as
+    // unplayable so neither the CPU nor a human wastes it (also grays it out
+    // in hand for humans via getBlockedSpells).
+    if (gs.firstTurnProtectedPlayer != null && oi === gs.firstTurnProtectedPlayer) return false;
     const ops = gs.players[oi];
     for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
       const hero = ops.heroes[hi];

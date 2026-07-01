@@ -75,6 +75,12 @@ module.exports = {
       if ((c._ruinBurnCount || 0) >= MAX_BURNS) return;
 
       const heroIdx = ctx.cardHeroIdx;
+      // The tribute that triggered this burn is already marked for death —
+      // `onCreatureSacrificed` fires BEFORE the destroy, so it still
+      // physically occupies its Support slot right now, but it must NOT be
+      // a valid burn target (it's leaving the board regardless). Exclude
+      // it from the picker via the prompt's `condition` filter.
+      const sacrificedId = ctx.creature?.id;
       const target = await ctx.promptDamageTarget({
         side: 'any',
         types: ['hero', 'creature'],
@@ -85,6 +91,7 @@ module.exports = {
         confirmLabel: '💀 80 Damage!',
         confirmClass: 'btn-danger',
         cancellable: true,
+        condition: (t) => !(sacrificedId != null && t.cardInstance?.id === sacrificedId),
       });
       if (!target) return; // declined — use not spent
 

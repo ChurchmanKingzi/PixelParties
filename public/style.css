@@ -639,11 +639,217 @@ body {
    brief pre-load frame. The login panel has its own dark backdrop so
    the form stays readable on top of the stretched image. */
 .auth-screen {
-  background-image: url('/title.png'), linear-gradient(135deg, #0a0a12 0%, #1a0a2e 50%, #0a1a1e 100%);
-  background-size: 100% 100%, auto;
-  background-position: center center, center center;
-  background-repeat: no-repeat, no-repeat;
-  background-color: #050510;
+  /* The still title.png is replaced by <AnimatedTitleBackdrop/> (rendered as
+     the first child). This base colour matches the animated scene's letterbox
+     tone and shows only for the brief moment before the layer art loads. */
+  background: #1a1020;
+  overflow: hidden;
+}
+
+/* ═══ Animated title backdrop (see AnimatedTitleBackdrop in app-screens) ═══
+   Faithful recreation of data/animated_screen. Sits behind the auth panel
+   (z-index:0; panel is z-index:2). Motion knobs mirror the reference:
+   --pf parallax, --shake shake amount, --ef explosion light, --tH/--tV
+   tether amplitudes, --sAmp core-scale amplitude. */
+.anim-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #1a1020;
+  z-index: 0;
+  pointer-events: none;
+  --pf: 1;
+  --shake: 1;
+  --ef: 1;
+  /* Tether amplitudes as % of screen (9px / 4px on the 1920x1080 stage) so
+     the clash rig scales with the viewport. --sAmp is a unitless scale. */
+  --tH: 0.469vw;
+  --tV: 0.37vh;
+  --sAmp: 0.021;
+}
+.anim-shake {
+  position: absolute;
+  inset: 0;
+  animation: ab-shake 10s steps(1, end) infinite;
+  will-change: transform;
+}
+/* Front cats overlay — a separate layer ABOVE the auth panel (z-index:2) so
+   the cats fly over the login form. pointer-events:none keeps the form
+   clickable. Shares the scene's motion knobs so floats/shake match. */
+.anim-cats-front {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+  --pf: 1;
+  --shake: 1;
+}
+/* Login panel shake — same ab-shake clock as the backdrop, so the dialogue
+   jolts in sync with the laser impacts. On its own wrapper so the panel's
+   .animate-in entrance transform is preserved. */
+.auth-panel-shake {
+  --shake: 1;
+  animation: ab-shake 10s steps(1, end) infinite;
+  will-change: transform;
+}
+.anim-bloom {
+  position: absolute;
+  left: 52%;
+  top: 42%;
+  width: 860px;
+  height: 860px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(255,228,150,.4), rgba(255,152,72,.12) 22%, rgba(255,96,74,.03) 40%, transparent 56%);
+  filter: blur(9px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: ab-glowpulse 10s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+.anim-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 56% 41%, #fff, rgba(255,240,200,.55) 30%, transparent 58%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: ab-flashburst 10s steps(1, end) infinite;
+}
+.anim-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 44%, transparent 40%, rgba(20,8,20,.4) 80%, rgba(15,5,18,.64) 100%);
+  animation: ab-vignettepulse 6s ease-in-out infinite;
+}
+/* ── Lightning (see .anim-lightning in AnimatedTitleBackdrop) ──
+   Cool blue flashes + jagged bolts. ab-strike (10s) fires ON the two shake
+   impact beats; ab-strike-ambient (13s, off the shake clock) adds occasional
+   off-beat strikes. Screen-blended so it reads as additive light. */
+.anim-lightning {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  mix-blend-mode: screen;
+}
+.anim-lflash {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  will-change: opacity;
+}
+.anim-lflash-impact {
+  background: radial-gradient(circle at 46% 26%, rgba(210,232,255,.95), rgba(150,190,255,.35) 42%, transparent 72%);
+  animation: ab-strike 10s linear infinite;
+}
+.anim-lflash-ambient {
+  background: radial-gradient(circle at 62% 22%, rgba(200,224,255,.9), rgba(150,185,255,.3) 40%, transparent 70%);
+  animation: ab-strike-ambient 13s linear infinite;
+}
+.anim-bolt {
+  position: absolute;
+  top: -2%;
+  height: 62%;
+  opacity: 0;
+  will-change: opacity;
+  filter: drop-shadow(0 0 5px #cfe9ff) drop-shadow(0 0 13px #7fb4ff);
+}
+.anim-bolt polyline {
+  fill: none;
+  stroke: #eaf6ff;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.anim-bolt-a { left: 15%; width: 9%;  animation: ab-strike 10s linear infinite; }
+.anim-bolt-b { right: 19%; width: 8%; animation: ab-strike 10s linear infinite; }
+.anim-bolt-c { left: 53%; width: 8%;  animation: ab-strike-ambient 13s linear infinite; }
+@keyframes ab-strike {
+  0%, 100% { opacity: 0; }
+  0.6%  { opacity: 0; }
+  1%    { opacity: 1; }
+  1.8%  { opacity: .12; }
+  2.6%  { opacity: .85; }
+  4%    { opacity: 0; }
+  49.5% { opacity: 0; }
+  50%   { opacity: 1; }
+  50.8% { opacity: .18; }
+  51.6% { opacity: .8; }
+  53%   { opacity: 0; }
+}
+@keyframes ab-strike-ambient {
+  0%, 100% { opacity: 0; }
+  29.6% { opacity: 0; }
+  30%   { opacity: .9; }
+  30.7% { opacity: .12; }
+  31.5% { opacity: .72; }
+  32.6% { opacity: 0; }
+  70.8% { opacity: 0; }
+  71.2% { opacity: .68; }
+  72.2% { opacity: 0; }
+}
+@keyframes ab-floaty {
+  0%   { transform: translate(0,0) rotate(0deg); }
+  50%  { transform: translate(calc(var(--mx,0vw) * var(--pf,1)), calc(var(--my,-0.926vh) * var(--pf,1))) rotate(calc(var(--mr,0deg) * var(--pf,1))); }
+  100% { transform: translate(0,0) rotate(0deg); }
+}
+@keyframes ab-jiggleTether {
+  0%, 100% { transform: translate(0, 0); }
+  50%  { transform: translate(calc(var(--tH,0.469vw) * var(--pf,1)), calc(var(--tV,0.37vh) * var(--pf,1))); }
+}
+@keyframes ab-broghanTether {
+  0%, 100% { transform: translate(0, 0); }
+  50%  { transform: translate(calc(var(--tH,0.469vw) * -1 * var(--pf,1)), calc(var(--tV,0.37vh) * var(--pf,1))); }
+}
+@keyframes ab-coreTether {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(0, calc(var(--tV,0.37vh) * var(--pf,1))) scale(calc(1 - var(--sAmp,0.021) * var(--pf,1))); }
+}
+@keyframes ab-shake {
+  0%, 6%, 49%, 56%, 100% { transform: translate(0, 0); }
+  1%  { transform: translate(calc(-0.417vw * var(--shake,1)), calc(0.463vh * var(--shake,1))); }
+  2%  { transform: translate(calc(0.365vw * var(--shake,1)), calc(-0.556vh * var(--shake,1))); }
+  3%  { transform: translate(calc(-0.26vw * var(--shake,1)), calc(0.37vh * var(--shake,1))); }
+  4%  { transform: translate(calc(0.156vw * var(--shake,1)), calc(-0.278vh * var(--shake,1))); }
+  50% { transform: translate(calc(0.469vw * var(--shake,1)), calc(-0.556vh * var(--shake,1))); }
+  51% { transform: translate(calc(-0.417vw * var(--shake,1)), calc(0.556vh * var(--shake,1))); }
+  52% { transform: translate(calc(0.313vw * var(--shake,1)), calc(-0.37vh * var(--shake,1))); }
+  53% { transform: translate(calc(-0.208vw * var(--shake,1)), calc(0.278vh * var(--shake,1))); }
+  54% { transform: translate(calc(0.104vw * var(--shake,1)), calc(-0.185vh * var(--shake,1))); }
+}
+@keyframes ab-glowpulse {
+  0%   { opacity: .6;  transform: translate(-50%,-50%) scale(1.02); }
+  4%   { opacity: 1;   transform: translate(-50%,-50%) scale(1.18); }
+  16%  { opacity: .4;  transform: translate(-50%,-50%) scale(.98); }
+  42%  { opacity: .52; transform: translate(-50%,-50%) scale(1.02); }
+  50%  { opacity: 1;   transform: translate(-50%,-50%) scale(1.2); }
+  62%  { opacity: .4;  transform: translate(-50%,-50%) scale(.98); }
+  100% { opacity: .6;  transform: translate(-50%,-50%) scale(1.02); }
+}
+@keyframes ab-flashburst {
+  0%, 49%, 56%, 100% { opacity: 0; }
+  1%  { opacity: calc(.45 * var(--shake,1)); }
+  5%  { opacity: 0; }
+  50% { opacity: calc(.4 * var(--shake,1)); }
+  54% { opacity: 0; }
+}
+@keyframes ab-vignettepulse {
+  0%, 100% { opacity: .5; }
+  50%      { opacity: .72; }
+}
+@keyframes ab-emberrise {
+  0%   { transform: translateY(1.852vh) translateX(0); opacity: 0; }
+  8%   { opacity: .95; }
+  78%  { opacity: .7; }
+  100% { transform: translateY(-112vh) translateX(var(--drift, 0vw)); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-shake, .anim-shake > *, .anim-shake > * > *,
+  .anim-bloom, .anim-flash, .anim-vignette, .auth-panel-shake,
+  .anim-lflash, .anim-bolt { animation: none !important; }
 }
 .auth-screen .panel {
   background: rgba(10, 10, 20, .82);
@@ -1541,6 +1747,17 @@ body {
   align-items: center;
   gap: calc(8px * var(--board-scale));
   min-width: calc(120px * var(--board-scale));
+}
+/* Player/opponent name in the hand bar: usernames are capped at 10 chars,
+   but CPU opponents render a full Hero name (incl. title), so clamp + ellipsis
+   keeps the label from overrunning the divider / cards. */
+.game-hand-name {
+  display: inline-block;
+  max-width: calc(150px * var(--board-scale));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
 }
 .game-hand-avatar {
   width: calc(28px * var(--board-scale)); height: calc(28px * var(--board-scale));
@@ -3092,6 +3309,62 @@ body {
   overflow: hidden;
   position: relative;
 }
+
+/* ═══ Global pixel cursor (menus + battle) ═══
+   A chunky, low-res arrow rendered as a real PNG (24x30, 2px "pixels") in
+   public/cursor-arrow*.png — generated by scripts/mkcursor.js.
+   IMPORTANT: these are PNGs, NOT SVGs — Blink (Chrome/Edge) does NOT support
+   SVG data-URI cursors and silently falls back to the keyword. Kept ≤32x32
+   (Firefox ignores larger cursors); hotspot = the arrow tip (2,2).
+     • body        → default white arrow, cascades by inheritance everywhere.
+     • text fields → keep the native I-beam.
+     • clickables  → the cyan variant here is only the pre-JS FALLBACK. At
+                     runtime applyPixelHoverCursor() (app-main.jsx) recolours
+                     the arrow to a light, shining tone of the player's OWN
+                     colour and injects <style id="pp-hover-cursor"> that
+                     overrides this rule. (!important beats the many base
+                     `cursor: pointer` rules regardless of source order;
+                     :not(:disabled) preserves the not-allowed cursor.)
+     • draggable hand/deck cards keep their grab cursor (not matched here). */
+body {
+  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
+}
+input[type="text"], input[type="password"], input[type="email"],
+input[type="number"], input[type="search"], input[type="tel"],
+input[type="url"], input:not([type]), textarea {
+  cursor: url("/cursor-text.png?v=4") 5 9, text;
+}
+.btn:not(:disabled):not([disabled]),
+button:not(:disabled):not([disabled]),
+a[href], select, summary,
+.board-zone-clickable, .ctx-menu-item:not(.disabled), [class*="clickable"],
+[style*="cursor: pointer"], [style*="cursor:pointer"] {
+  cursor: url("/cursor-arrow-cyan.png?v=4") 2 2, pointer !important;
+}
+/* Pixel-styled versions of the remaining keyword cursors. !important so they
+   beat the base rules (one of which — .hand-card-attach-eligible — is itself
+   !important) regardless of source order. Hotspots from scripts/mkcursor.js. */
+.hand-slot, .deck-drag-slot, .pz-hand-card, .hand-card-attach-eligible {
+  cursor: url("/cursor-grab.png?v=4") 10 10, grab !important;
+}
+.hand-slot:active, .deck-drag-slot:active, .pz-hand-card:active {
+  cursor: url("/cursor-grabbing.png?v=4") 10 8, grabbing !important;
+}
+.btn:disabled, button:disabled, button[disabled],
+.ctx-menu-item.disabled, .shop-buy-btn:disabled,
+.shop-random-btn:disabled, .menu-deck-card.is-illegal,
+[style*="cursor: not-allowed"], [style*="cursor:not-allowed"] {
+  cursor: url("/cursor-no.png?v=4") 9 9, not-allowed !important;
+}
+/* While a card is being dragged (custom JS drag, toggled by JS via the
+   pp-dragging-card body class), force the grabbing fist EVERYWHERE so it never
+   flickers back to the arrow once the pointer leaves the source slot. The
+   class is repeated 3x purely to raise specificity above the (0,3,0) hover
+   rule so this always wins. */
+body.pp-dragging-card.pp-dragging-card.pp-dragging-card,
+body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
+  cursor: url("/cursor-grabbing.png?v=4") 10 8, grabbing !important;
+}
 .board-util {
   width: var(--sidebar-w);
   flex-shrink: 0;
@@ -3128,6 +3401,68 @@ body {
   flex-direction: column;
   min-height: 0;
   padding: calc(4px * var(--board-scale)) calc(8px * var(--board-scale));
+}
+
+/* ═══ Player-hand ambiance: bloom + pixel particles (see HandAmbiance) ═══ */
+.hand-ambiance {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* No z-index here on purpose: this wrapper must NOT create a stacking
+     context, so .hand-particles' z-index and .hand-bloom's negative
+     z-index both resolve against .game-hand-me. */
+}
+/* BLOOM — player-coloured light rising from the bottom edge of the hand,
+   screen-blended over its dark background with a slow breathing pulse.
+   z-index:-1 keeps it BEHIND the (statically-positioned) hand cards while
+   still sitting above the hand's own background fill. */
+.hand-bloom {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 150% at 50% 100%,
+      color-mix(in srgb, var(--amb-me, #00f0ff) 42%, transparent) 0%, transparent 68%);
+  mix-blend-mode: screen;
+  opacity: .55;
+  animation: hand-bloom-pulse 6s ease-in-out infinite;
+}
+@keyframes hand-bloom-pulse {
+  0%, 100% { opacity: .45; }
+  50%      { opacity: .7; }
+}
+/* PIXEL PARTICLES — pixel motes floating just above the hand cards. No
+   overflow clip, so they're free to drift up out of the hand and into the
+   board above (the hand row sits at z-index 10000, so they ride over it). */
+.hand-particles {
+  position: absolute;
+  inset: 0;
+  z-index: 7;          /* above the hand cards */
+  pointer-events: none;
+}
+.hand-mote {
+  position: absolute;
+  width: var(--p-size, 3px);
+  height: var(--p-size, 3px);
+  background: var(--p-color, var(--amb-me, #00f0ff));
+  box-shadow: 0 0 6px var(--p-color, var(--amb-me, #00f0ff));
+  image-rendering: pixelated;
+  opacity: 0;
+  transform: translate(0, 0) scale(.6);
+  animation: hand-mote-float var(--p-dur, 8s) ease-in-out var(--p-delay, 0s) infinite;
+  will-change: transform, opacity;
+}
+@keyframes hand-mote-float {
+  0%   { opacity: 0; transform: translate(0, 0) scale(.5); }
+  18%  { opacity: var(--p-max, .4); }
+  50%  { transform: translate(var(--p-dx, 0), var(--p-dy, -30px)) scale(1); }
+  82%  { opacity: var(--p-max, .4); }
+  100% { opacity: 0; transform: translate(calc(var(--p-dx, 0) * 1.6), calc(var(--p-dy, -30px) * 1.8)) scale(.7); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hand-bloom { animation: none; opacity: .55; }
+  .hand-mote  { animation: none; opacity: calc(var(--p-max, .4) * .5); transform: none; }
 }
 .board-player-side {
   flex: 1;
@@ -3332,22 +3667,37 @@ body {
 /* Hand action buttons (Sort / Shuffle) — fixed position, left of gold */
 .hand-actions {
   position: absolute;
-  right: calc(110px * var(--board-scale));
+  right: calc(116px * var(--board-scale));
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: calc(6px * var(--board-scale));
   z-index: 10002;
 }
 .hand-action-btn {
-  padding: calc(3px * var(--board-scale)) calc(8px * var(--board-scale)) !important;
-  font-size: calc(9px * var(--board-scale)) !important;
+  padding: calc(6px * var(--board-scale)) calc(16px * var(--board-scale)) !important;
+  font-size: calc(12px * var(--board-scale)) !important;
   letter-spacing: 0.5px;
-  opacity: 0.6;
+  opacity: 0.8;
   transition: opacity .15s;
 }
 .hand-action-btn:hover { opacity: 1; }
+/* Vertical divider separating the hand cards from the Sort/Shuffle column. */
+.hand-actions::before {
+  content: '';
+  position: absolute;
+  left: calc(-12px * var(--board-scale));
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: calc(var(--hand-min-h) * 0.78);
+  background: linear-gradient(to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--hand-accent, #00f0ff) 60%, transparent) 16%,
+    color-mix(in srgb, var(--hand-accent, #00f0ff) 60%, transparent) 84%,
+    transparent 100%);
+}
 
 /* Card dimming — uses overlay, not opacity, so tooltip is unaffected */
 .hand-card-dimmed .board-card::before {
@@ -3359,7 +3709,9 @@ body {
   pointer-events: none;
 }
 .hand-card-dimmed .board-card {
-  cursor: default;
+  /* Unplayable cards are still draggable (reorder / attempt), so keep the
+     grab hand like any hand card — inherit the slot's grab cursor. */
+  cursor: inherit;
 }
 .hand-card-dimmed .board-card-hp { opacity: .3; }
 
@@ -3917,6 +4269,38 @@ body {
 .board-zone-clickable:hover { box-shadow: inset 0 0 12px rgba(255,255,255,.1); }
 .board-zone-island { border-color: rgba(50,220,80,.6) !important; background: rgba(50,220,80,.1) !important; }
 .board-zone-island .board-zone-empty { color: rgba(50,220,80,.4); }
+
+/* ── Subdued empty per-Hero zones ──────────────────────────────────────
+   The per-Hero Support / Ability / Surprise slots otherwise tile the board
+   with rows of identical brightly-outlined labelled boxes, which reads as
+   noisy clutter — especially to a newcomer. When a slot is EMPTY (it holds
+   a .board-zone-empty label rather than a card) we fade its coloured frame
+   to a faint neutral outline and hide the type label until hover, so played
+   cards pop and the slot's purpose is still one hover away. Filled slots,
+   Island Support zones (an active special state) and live play/attach
+   targets keep their full styling. */
+.board-zone-support:not(.board-zone-island):has(.board-zone-empty),
+.board-zone-ability:has(.board-zone-empty),
+.board-zone-surprise:has(.board-zone-empty) {
+  border-color: rgba(255,255,255,.07);
+  background-color: rgba(255,255,255,.012);
+}
+.board-zone-support:not(.board-zone-island) .board-zone-empty,
+.board-zone-ability .board-zone-empty,
+.board-zone-surprise .board-zone-empty {
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+/* Reveal the slot's type + restore its colour on hover. */
+.board-zone-ability:hover:has(.board-zone-empty)  { border-color: rgba(50,100,220,.6); }
+.board-zone-support:not(.board-zone-island):hover:has(.board-zone-empty) { border-color: rgba(220,200,50,.6); }
+.board-zone-surprise:hover:has(.board-zone-empty) { border-color: rgba(200,50,50,.6); }
+.board-zone-support:hover .board-zone-empty,
+.board-zone-ability:hover .board-zone-empty,
+.board-zone-surprise:hover .board-zone-empty { opacity: .6; }
+/* A slot the player is being asked to play/attach into must stay legible. */
+.board-zone-play-target .board-zone-empty,
+.attach-pick-target .board-zone-empty { opacity: .6 !important; }
 
 /* Creature level counter */
 .creature-level {
@@ -5756,7 +6140,11 @@ body {
   height: calc(90px * var(--board-scale));
   position: relative;
   overflow: hidden;
-  cursor: default;
+  /* `inherit` (not `default`) so a card picks up its context's pixel cursor:
+     a hand card inherits the slot's grab, a clickable-zone card inherits the
+     player-colour hover, and a plain card inherits the body arrow. `default`
+     here forced the NATIVE cursor on every card, hiding the pixel set. */
+  cursor: inherit;
   flex-shrink: 0;
   /* Container query context for the responsive HP/ATK strip below.
      `inline-size` containment means children can use @container (max-
@@ -8409,11 +8797,40 @@ body:has(.game-hand-me) .board-tooltip {
 .shop-avatar-item:nth-child(3n+2) .shop-item-img-wrap { animation-delay: -1.2s; }
 .shop-avatar-item:nth-child(3n+3) .shop-item-img-wrap { animation-delay: -2.4s; }
 
+/* Unowned skins read as "collectible, not yet unlocked" — keep most of the
+   colour (a light desaturate + dim) instead of a full grayscale, which made
+   them look broken / sold-out. The lock overlay below sells the "unlock me"
+   read. On hover they brighten toward full colour to feel attainable. */
 .shop-skin-locked {
-  filter: grayscale(1) brightness(0.55) contrast(0.85);
+  filter: grayscale(0.35) brightness(0.72) contrast(0.95);
 }
 .shop-unowned-skin:hover .shop-skin-locked {
-  filter: grayscale(1) brightness(0.7) contrast(0.9);
+  filter: grayscale(0.1) brightness(0.9) contrast(1);
+}
+
+/* Lock overlay on unowned skins — a soft scrim + padlock badge so the tile
+   reads as a desirable thing to unlock rather than a disabled entry. The
+   scrim lifts on hover to preview the art in fuller colour. */
+.shop-lock-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 6px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(8,8,16,.05) 0%, rgba(8,8,16,.45) 100%);
+  transition: opacity .2s;
+}
+.shop-unowned-skin:hover .shop-lock-overlay { opacity: .55; }
+.shop-lock-badge {
+  font-size: 13px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
+  background: rgba(8,8,16,.72);
+  border: 1px solid rgba(255,215,0,.5);
+  box-shadow: 0 1px 3px rgba(0,0,0,.5);
 }
 
 .shop-owned-badge {
@@ -10134,13 +10551,19 @@ body:has(.textbox-overlay) .tooltip {
   display: block;
   -webkit-user-drag: none;
   user-select: none;
+  /* Push the card art back into "wallpaper": a soft blur + slight darken/
+     desaturate so individual cards stop competing with the foreground
+     panels for attention. The blur also softens the grid seams. */
+  filter: blur(1.5px) brightness(.85) saturate(.95);
 }
-/* Dark veil so the menu stays readable over the bright card art. */
+/* Dark veil so the menu stays readable over the bright card art. The
+   centre is kept darker (not lighter) than before so the three panels —
+   which sit over the middle of the screen — clearly read as on top. */
 .menu-card-bg-veil {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse at center, rgba(10,10,18,.55) 0%, rgba(10,10,18,.82) 70%, rgba(10,10,18,.92) 100%);
+    radial-gradient(ellipse at center, rgba(10,10,18,.58) 0%, rgba(10,10,18,.78) 70%, rgba(10,10,18,.9) 100%);
 }
 /* EXPERIMENTAL — faint pixel dither over the scrolling card wall, just to add a
    touch of texture to the background. Sits above the cards + veil but below all
@@ -10172,7 +10595,8 @@ body:has(.textbox-overlay) .tooltip {
    four corner brackets — all in the player's colour. */
 .ornate-frame {
   position: relative;
-  border: 2px solid var(--player-color, #00f0ff);
+  /* 4px to match the chunky corner ornaments' arm thickness (--bt). */
+  border: 4px solid var(--player-color, #00f0ff);
   box-shadow:
     inset 0 0 0 1px rgba(0, 0, 0, .45),
     inset 0 0 26px color-mix(in srgb, var(--player-color, #00f0ff) 16%, transparent),
@@ -10188,6 +10612,39 @@ body:has(.textbox-overlay) .tooltip {
   border: 1px solid color-mix(in srgb, var(--player-color, #00f0ff) 45%, transparent);
   border-radius: 13px;
   pointer-events: none;
+}
+/* Four chunky stepped corners in the player's colour — a blocky L arm plus
+   a diagonally-offset square at each corner, so they read as hand-placed
+   pixel-art ornaments rather than sleek thin brackets. Hard edges, no blur
+   or glow, to match the 16-bit panel theme. Kept inside the padding box
+   (inset > 0) because the side panels clip overflow. The chunky sizes are
+   multiples of the panel dither's 8px grid (8 / 4) so they sit "on grid". */
+.ornate-frame::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  z-index: 2;
+  pointer-events: none;
+  --bk: var(--player-color, #00f0ff);
+  --bl: 16px; /* bracket arm length */
+  --bt: 4px;  /* bracket arm thickness (also the stair-step square size) */
+  background:
+    /* top-left: h-arm, v-arm, stair square */
+    linear-gradient(var(--bk), var(--bk)) left top / var(--bl) var(--bt) no-repeat,
+    linear-gradient(var(--bk), var(--bk)) left top / var(--bt) var(--bl) no-repeat,
+    linear-gradient(var(--bk), var(--bk)) left var(--bt) top var(--bt) / var(--bt) var(--bt) no-repeat,
+    /* top-right */
+    linear-gradient(var(--bk), var(--bk)) right top / var(--bl) var(--bt) no-repeat,
+    linear-gradient(var(--bk), var(--bk)) right top / var(--bt) var(--bl) no-repeat,
+    linear-gradient(var(--bk), var(--bk)) right var(--bt) top var(--bt) / var(--bt) var(--bt) no-repeat,
+    /* bottom-left */
+    linear-gradient(var(--bk), var(--bk)) left bottom / var(--bl) var(--bt) no-repeat,
+    linear-gradient(var(--bk), var(--bk)) left bottom / var(--bt) var(--bl) no-repeat,
+    linear-gradient(var(--bk), var(--bk)) left var(--bt) bottom var(--bt) / var(--bt) var(--bt) no-repeat,
+    /* bottom-right */
+    linear-gradient(var(--bk), var(--bk)) right bottom / var(--bl) var(--bt) no-repeat,
+    linear-gradient(var(--bk), var(--bk)) right bottom / var(--bt) var(--bl) no-repeat,
+    linear-gradient(var(--bk), var(--bk)) right var(--bt) bottom var(--bt) / var(--bt) var(--bt) no-repeat;
 }
 
 /* ═══ Main Menu hub side panels ═══ */
@@ -10225,7 +10682,7 @@ body:has(.textbox-overlay) .tooltip {
   border-radius: 0;            /* angular, matching the menu boxes */
   overflow: hidden;
   cursor: pointer;
-  border: 2px solid var(--accent);
+  border: 4px solid var(--accent);
   background: rgba(0, 0, 0, .35);
   display: flex;
   align-items: center;
@@ -11088,6 +11545,23 @@ body:has(.textbox-overlay) .tooltip {
   top: 50%;
   transform: translateY(-50%);
   z-index: 2;
+  /* Push the player name further from the avatar. */
+  gap: calc(22px * var(--board-scale));
+}
+/* Vertical divider separating the avatar/name cluster from the hand cards. */
+.game-hand-me .game-hand-info::after {
+  content: '';
+  position: absolute;
+  right: calc(-14px * var(--board-scale));
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: calc(var(--hand-min-h) * 0.78);
+  background: linear-gradient(to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--hand-accent, #00f0ff) 60%, transparent) 16%,
+    color-mix(in srgb, var(--hand-accent, #00f0ff) 60%, transparent) 84%,
+    transparent 100%);
 }
 /* ── Centering spacer — mirrors chat-log-column to make layout symmetric ── */
 .board-center-spacer {
@@ -11144,6 +11618,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 .btn {
   letter-spacing: 0;
   border-radius: 0;
+  border-width: 3px; /* chunkier pixel frame, matching the menu ornaments */
   box-shadow: 2px 2px 0 rgba(0,0,0,.5);
   transition: filter .1s, transform .05s, box-shadow .05s,
               background .15s, color .15s, border-color .15s;
@@ -11158,7 +11633,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 /* 4 ── Inputs & selects: square, chunkier border, hard focus outline */
 .input, .select, .db-filter-input, .db-filter-select {
   border-radius: 0;
-  border-width: 2px;
+  border-width: 3px;
 }
 .input:focus, .select:focus,
 .db-filter-input:focus, .db-filter-select:focus {
@@ -11170,7 +11645,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 /* 5 ── Panels: square + 16-bit bevel (light top-left, dark bottom-right) */
 .panel {
   border-radius: 0;
-  border: 3px solid var(--bg4);
+  border: 4px solid var(--bg4);
   box-shadow:
     inset 2px 2px 0 rgba(255,255,255,.05),
     inset -2px -2px 0 rgba(0,0,0,.45),
@@ -11181,8 +11656,8 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 .modal { border-radius: 0; box-shadow: 6px 6px 0 rgba(0,0,0,.6); }
 .modal-overlay { background: rgba(4,4,10,.8); }
 
-/* 7 ── Badges: square with a crisp 2px frame */
-.badge { border-radius: 0; border: 2px solid currentColor; }
+/* 7 ── Badges: square with a crisp 3px frame */
+.badge { border-radius: 0; border: 3px solid currentColor; }
 
 /* 8 ── Auth/login panel: drop the frosted glass for a flat pixel window */
 .auth-screen .panel {
@@ -11190,7 +11665,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   background: rgba(8,8,16,.92);
-  border: 3px solid rgba(170,136,255,.55);
+  border: 4px solid rgba(170,136,255,.55);
   box-shadow: 6px 6px 0 rgba(0,0,0,.7), 0 0 0 1px rgba(0,0,0,.6);
 }
 
@@ -11200,13 +11675,13 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   border-radius: 0;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: rgba(8,10,18,.85);
+  background: rgba(8,10,18,.93);
 }
 .menu-title, .menu-subtitle {
   border-radius: 0;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: rgba(8,10,18,.78);
+  background: rgba(8,10,18,.9);
 }
 
 /* 12 ── Dithering — a coarse ordered checkerboard tiled over the menu boxes

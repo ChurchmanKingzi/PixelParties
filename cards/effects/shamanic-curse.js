@@ -92,11 +92,23 @@ module.exports = {
       return;
     }
 
-    // Uncoverable → negate + refund the Action as a bonus for the caster.
+    // Uncoverable → negate the Spell.
     engine.negateChainLink(chain, targetIndex);
-    oppPs._bonusMainActions = (oppPs._bonusMainActions || 0) + 1;
-    if (castingHi >= 0) {
-      oppPs.bonusActions = { heroIdx: castingHi, remaining: 1 };
+
+    // Refund a replacement Action ONLY if the negated Spell actually
+    // consumed the caster's main turn Action. Inherent additional-Action
+    // Spells (the Divine Gifts) and additional-action plays never spent
+    // it — handing back a bonus Action there would strand the caster with
+    // a phantom Action that traps them in the Action Phase (the reported
+    // "Divine Gift of the Deepsea negated → soft-lock" bug). doPlaySpell
+    // stamps `gs._spellConsumedMainAction` to exactly this disposition,
+    // readable here because Shamanic Curse resolves inside the negated
+    // Spell's own chain-reaction window.
+    if (gs._spellConsumedMainAction) {
+      oppPs._bonusMainActions = (oppPs._bonusMainActions || 0) + 1;
+      if (castingHi >= 0) {
+        oppPs.bonusActions = { heroIdx: castingHi, remaining: 1 };
+      }
     }
 
     engine.log('shamanic_curse_negate', {

@@ -895,6 +895,7 @@ app.post('/api/auth/signup', async (req, res) => {
   if (!email) return res.status(400).json({ error: 'Email is required' });
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address' });
   if (username.trim().length < 3) return res.status(400).json({ error: 'Username must be 3+ characters' });
+  if (username.trim().length > 10) return res.status(400).json({ error: 'Username must be 10 characters or fewer' });
   if (password.length < 3) return res.status(400).json({ error: 'Password must be 3+ characters' });
 
   const uname = username.trim();
@@ -1235,7 +1236,7 @@ function sanitizeUser(u) {
 app.get('/api/profile/check-username', authMiddleware, async (req, res) => {
   const name = String(req.query.name || '').trim();
   if (name.length < 3) return res.json({ available: false, reason: 'Too short (3+ characters)' });
-  if (name.length > 20) return res.json({ available: false, reason: 'Too long (max 20 characters)' });
+  if (name.length > 10) return res.json({ available: false, reason: 'Too long (max 10 characters)' });
   if (containsProfanity(name)) return res.json({ available: false, reason: 'Inappropriate language' });
   const taken = await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ?', [name, req.user.userId]);
   res.json({ available: !taken, reason: taken ? 'Already taken' : 'Available' });
@@ -1258,7 +1259,7 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
   if (b.username !== undefined) {
     newUsername = String(b.username || '').trim();
     if (newUsername.length < 3) return res.status(400).json({ error: 'Username must be 3+ characters' });
-    if (newUsername.length > 20) return res.status(400).json({ error: 'Username must be 20 characters or fewer' });
+    if (newUsername.length > 10) return res.status(400).json({ error: 'Username must be 10 characters or fewer' });
     if (containsProfanity(newUsername)) return res.status(400).json({ error: 'Username: please remove inappropriate language.' });
     if (await db.get('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND id != ?', [newUsername, req.user.userId])) {
       return res.status(409).json({ error: 'Username already taken' });
@@ -1279,6 +1280,14 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
   if (sets.length) {
     vals.push(req.user.userId);
     await db.run('UPDATE users SET ' + sets.join(', ') + ' WHERE id = ?', vals);
+  }
+  // The username is cached in every active session for this user (set at
+  // login). A rename must refresh those caches, otherwise sockets/games
+  // created later in the same login keep showing the old name.
+  if (b.username !== undefined) {
+    for (const sess of sessions.values()) {
+      if (sess.userId === req.user.userId) sess.username = newUsername;
+    }
   }
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
   res.json({ user: sanitizeUser(user) });
@@ -5233,6 +5242,14 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   // read this. Cleared in the finally block below so it never leaks
   // into a subsequent cast.
   gs._spellWasInherent = isInherentAction && !additionalConsumed;
+  // Did this play actually spend the caster's MAIN turn Action? FALSE for
+  // inherent additional-Action Spells (the Divine Gifts), additional-action
+  // provider plays, and Reaction-subtype Spells — none of which consume the
+  // main Action. Read during the chain-reaction window by negate-and-refund
+  // Reactions (Shamanic Curse) so they only hand back an Action that was
+  // genuinely spent; refunding one that wasn't strands the caster with a
+  // phantom bonus Action that traps them in the Action Phase (soft-lock).
+  gs._spellConsumedMainAction = !isReactionSubtype && !isInherentAction && !additionalConsumed;
 
   // Track whether THIS play's increment crossed into action-2 and
   // consumed _bonusMainActions, so a cancellation can roll back both
@@ -5805,6 +5822,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // Same one-shot semantics for the inherent-disposition stash —
     // delete unconditionally so a subsequent cast computes its own.
     delete gs._spellWasInherent;
+    delete gs._spellConsumedMainAction;
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -9477,7 +9495,7 @@ async function setupGameState(room) {
     // so the remaining names are the truly out-of-game pool. Effects like
     // Divine Gift of Edge consume names directly from this list.
     const sideDeck = (room._currentDecks?.[idx]?.sideDeck || []).slice();
-    playerStates.push({ userId:p.userId, username:p.username, socketId:p.socketId,
+    playerStates.push({ userId:p.userId, username:(usr?.username||p.username), socketId:p.socketId,
       color:usr?.color||'#00f0ff', avatar:usr?.avatar||null, cardback:usr?.cardback||null, board:usr?.board||null,
       victoryMsg, defeatMsg, heroKilledMsg, middleHeroKilledMsg, greetingMsg,
       heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
@@ -9584,6 +9602,19 @@ io.on('connection', (socket) => {
   });
 
   socket.on('get_rooms', () => socket.emit('rooms', getRoomList()));
+
+  // Re-sync this socket's cached identity from the DB after the user edits
+  // their profile (e.g. a rename), so lobby/chat/new rooms made later in the
+  // same connection use the fresh name without forcing a relog.
+  socket.on('refresh_identity', async () => {
+    if (!currentUser) return;
+    const u = await db.get('SELECT * FROM users WHERE id = ?', [currentUser.userId]);
+    if (u) {
+      currentUser.username = u.username;
+      currentUser.color = u.color;
+      currentUser.avatar = u.avatar;
+    }
+  });
 
   socket.on('create_room', async ({ type, playerPw, specPw, deckId, format, cubeDraft }) => {
     if (!currentUser) return;

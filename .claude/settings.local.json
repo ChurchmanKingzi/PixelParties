@@ -298,7 +298,9 @@
       "Bash(npm run *)",
       "Bash(python3 -c \"import json; data = json.load\\(open\\('data/cards.json'\\)\\); doomClocks = [c['name'] for c in data if c.get\\('archetype'\\) == 'Doom Clock']; print\\('\\\\n'.join\\(doomClocks\\)\\)\")",
       "Bash(grep -iv \"//\\\\|description:\\\\|name contains\\\\|console\\\\|setID\")",
-      "Bash(grep -n \"heart_burst\\\\|^const.*=.*{$\\\\|ZONE_ANIM\\\\|zoneAnimation\\\\|summon_effect:\" public/app-board.jsx)"
+      "Bash(grep -n \"heart_burst\\\\|^const.*=.*{$\\\\|ZONE_ANIM\\\\|zoneAnimation\\\\|summon_effect:\" public/app-board.jsx)",
+      "Bash(sort -k3 -rn)",
+      "Bash(OUT=C:/Users/kingz/AppData/Local/Temp/claude/C--Pixel-Parties-WEB-PixelPartiesWeb/6655d3e5-7e19-4c2c-bc86-c5e19be8bb0d/scratchpad/cursor_b64.json node -e ' *)"
     ]
   }
 }
