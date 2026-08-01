@@ -15,6 +15,15 @@
 module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
+  // Unter Hand-/Zieh-Lock NICHT zünden (Als Report 1.8.): Leadership
+  // mischt Handkarten ins Deck und zieht dieselbe Anzahl nach. Ist das
+  // Ziehen gesperrt (The Sacred Jewel setzt `ps.drawLocked`), liefert
+  // die Ziehfunktion [] — die Karten sind weg, nachgezogen wird nichts.
+  // Gilt auf ALLEN Stufen, denn alle drei ziehen.
+  //
+  // Nur eine CPU-Regel: der Engine-Pfad für Menschen bleibt bewusst
+  // unangetastet, wie schon bei Alchemy.
+  cpuSkipActivationWhenDrawLocked: true,
   // Shuffles hand cards back into the deck — flagged for "No Retreat!"
   // detection.
   shufflesIntoDeck: true,

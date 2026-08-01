@@ -17,6 +17,11 @@ const CARD_NAME = 'Inventing';
 module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
+  // Unter Hand-/Zieh-Lock nur auf den ZIEH-Stufen sperren: Lv1 und Lv2
+  // werfen ab und ziehen nach (unter Lock reiner Verlust), Lv3 SUCHT
+  // dagegen im Deck — Suchen funktionieren weiterhin (siehe die
+  // Client-Meldung "searches still work"). Deshalb die Funktionsform.
+  cpuSkipActivationWhenDrawLocked: (level) => (level || 1) < 3,
 
   canFreeActivate(ctx, level) {
     const ps = ctx.players[ctx.cardOwner];

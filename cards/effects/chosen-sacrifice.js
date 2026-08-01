@@ -15,6 +15,17 @@
 //  pattern). Hand substitutes are EXEMPT from the cost's filter (e.g.
 //  "not summoned this turn"), matching "you may INSTEAD sacrifice this".
 //
+//  PRECONDITION (Als Ruling): the substitution requires a LEGAL TRIBUTE
+//  FOR THAT COST on the board — "When you WOULD sacrifice a Creature you
+//  control" presupposes a sacrifice that could actually happen. Not
+//  merely any Creature: the board Creature must survive the cost's own
+//  filter (e.g. "not summoned this turn") and must not be the Creature
+//  whose effect is being paid for. With no such tribute this card is NOT
+//  offered at all. Enforced centrally in `_collectSacrificeCandidates`,
+//  so it holds for every sacrifice cost in the game rather than per card.
+//  The substitute itself stays exempt from that filter — the restriction
+//  describes the tribute being REPLACED, not the replacement.
+//
 //  ── On-sacrifice reward ──
 //  Fires whenever THIS instance is sacrificed (from hand via the
 //  substitution, or from the board if it was summoned and later

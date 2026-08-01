@@ -29,11 +29,20 @@
 const CARD_NAME = 'Guardian of Teocuilatl';
 
 /** Does `pi` have a tribute for the alt-summon cost — a board Creature
- *  not summoned this turn, or a hand substitute (Chosen Sacrifice)? */
+ *  not summoned this turn, or a hand substitute (Chosen Sacrifice)?
+ *
+ *  Routed through `_collectSacrificeCandidates` (the same collector the
+ *  payment path's `resolveSacrificeCost` uses) rather than checking the
+ *  board list and `_getHandSacrificeSubstitutes` separately. That kept
+ *  the gate and the payment in sync when the substitute rule gained its
+ *  "a board Creature must exist" precondition — otherwise this gate
+ *  would offer the summon with an empty board and the picker would then
+ *  come up empty. */
 function hasTribute(engine, pi) {
   const turn = engine.gs.turn;
-  if (engine.getSacrificableCreatures(pi).some(c => c.inst.turnPlayed !== turn)) return true;
-  return (engine._getHandSacrificeSubstitutes?.(pi) || []).length > 0;
+  return engine._collectSacrificeCandidates(pi, {
+    filter: c => c.inst.turnPlayed !== turn,
+  }).length > 0;
 }
 
 // ── Full-board sacrifice-summon (Suspicious Monster pattern) ──

@@ -14224,6 +14224,12 @@ class GameEngine {
    * `_fromHand` so the picker / destroy paths render + remove them as
    * hand cards. Inert when no such card is in hand, so existing
    * sacrifice behaviour is unchanged.
+   *
+   * RAW list — this does NOT apply the "a board Creature must exist"
+   * precondition (Als Ruling, see `_collectSacrificeCandidates`). Never
+   * call this directly to decide whether a sacrifice cost is payable;
+   * go through `_collectSacrificeCandidates` / `canSatisfySacrifice`,
+   * or a card's gate will disagree with its own payment path.
    */
   _getHandSacrificeSubstitutes(playerIdx, selfId) {
     const ps = this.gs.players[playerIdx];
@@ -14246,15 +14252,32 @@ class GameEngine {
   }
 
   _collectSacrificeCandidates(playerIdx, spec, selfId) {
-    let cs = this.getSacrificableCreatures(playerIdx);
-    if (selfId != null) cs = cs.filter(c => c.inst.id !== selfId);
-    if (spec?.filter) cs = cs.filter(c => spec.filter(c));
-    // Hand substitutes (Chosen Sacrifice) are EXEMPT from `spec.filter`:
-    // the card replaces the would-be sacrifice ("you may instead
-    // sacrifice this Creature in your hand"), so cost restrictions like
-    // "not summoned this turn" don't apply to it. Opt out per-cost via
-    // `spec.noHandSubstitute`.
-    if (!spec?.noHandSubstitute) {
+    let board = this.getSacrificableCreatures(playerIdx);
+    if (selfId != null) board = board.filter(c => c.inst.id !== selfId);
+    if (spec?.filter) board = board.filter(c => spec.filter(c));
+    // ── Precondition for hand substitutes (Als Ruling) ──
+    // Chosen Sacrifice reads "When you WOULD sacrifice a Creature you
+    // control, you may instead sacrifice this Creature in your hand."
+    // That presupposes a sacrifice that could actually happen — so the
+    // substitution requires a LEGAL TRIBUTE FOR THIS COST on the board,
+    // not merely any Creature. Measured on the fully-narrowed board list:
+    //   • after the self-exclusion — a Creature paying its own cost can't
+    //     tribute itself, so it isn't a Creature you could sacrifice;
+    //   • after `spec.filter` — a board full of Creatures summoned this
+    //     turn does NOT enable a cost that demands older ones.
+    // The substitute itself stays exempt from `spec.filter` below: the
+    // restriction describes the tribute being REPLACED, not the
+    // replacement. Opt out per-cost via `spec.noHandSubstitute`.
+    //
+    // Card gates that ask "can I pay this?" via
+    // `getSacrificableCreatures(pi).some(<same filter>)` are exactly
+    // equivalent to this precondition and therefore stay in sync
+    // (Temple of Sacrifice, Ladder to the Sky, Sacrifice to Divinity —
+    // all verified). Anything that needs the full answer should still
+    // use `canSatisfySacrifice`.
+    const boardHasLegalTribute = board.length > 0;
+    let cs = board;
+    if (!spec?.noHandSubstitute && boardHasLegalTribute) {
       cs = cs.concat(this._getHandSacrificeSubstitutes(playerIdx, selfId));
     }
     return cs;

@@ -14,10 +14,19 @@
 //   2. Active (creatureEffect): "You may once per turn sacrifice a
 //      Creature you control that was not summoned this turn to have
 //      this Creature perform a 'Fireball' Spell from your hand as an
-//      additional Action, ignoring its level."
+//      additional Action, ignoring its level, but if you do, DELETE
+//      that 'Fireball' Spell."
 //      The sub-cast uses the canonical `runHooks('onPlay')` path
 //      (Timeless King Zi / Chaos Magic), which bypasses
 //      `validateActionPlay` → level & school requirements ignored.
+//      The performed Fireball goes to the DELETED pile, not the
+//      discard pile — that closes the tutor⇄perform recursion loop,
+//      since the passive can only pull a Fireball back from deck or
+//      discard. Disposal follows the engine's hand→deleted contract:
+//      `_handCardPileOwner` routing for stolen copies, a
+//      `beforeDelete` rescue gate, a zone-anchored flight whose pile
+//      push is deferred until the flight lands, and an `onDelete`
+//      hook fire for pile-resident listeners.
 // ═══════════════════════════════════════════
 
 const { chaorcSacrificeFilter, chaorcFreshSacCandidates, isOwnSacrifice } = require('./_chaorcs-shared');
@@ -63,7 +72,7 @@ module.exports = {
       minCount: 1,
       maxCount: 1,
       title: `${CARD_NAME} — Sacrifice`,
-      description: 'Sacrifice 1 of your Creatures (not summoned this turn) to perform a Fireball, ignoring its level.',
+      description: 'Sacrifice 1 of your Creatures (not summoned this turn) to perform a Fireball, ignoring its level. The Fireball is deleted afterwards.',
       confirmLabel: '🗡️ Sacrifice!',
       confirmClass: 'btn-danger',
       cancellable: true,
@@ -129,21 +138,72 @@ module.exports = {
     delete gs._spellNegatedByEffect;
 
     // The Fireball is forced (no opt-out once the sacrifice is paid), so
-    // after the perform it always leaves the hand for the discard pile
-    // — with the hand→discard flight (broadcast BEFORE the splice so the
-    // client pins the flying card's source rect to its hand slot).
+    // after the perform it always leaves the hand — and per the card
+    // text it is DELETED, not discarded.
     // (Fireball never places itself on the board, but guard anyway.)
     if (!placedOnBoard) {
       const finalHandIdx = (ps.hand || []).indexOf(FIREBALL);
       if (finalHandIdx >= 0) {
-        engine._broadcastEvent('play_pile_transfer', {
-          owner: pi, cardName: FIREBALL,
-          from: 'hand', to: 'discard', fromHandIdx: finalHandIdx,
-        });
+        // Stolen copies land in their ORIGINAL owner's deleted pile —
+        // the engine's hand→pile routing contract. Resolved BEFORE the
+        // splice / re-home, since the helper looks up a hand instance.
+        const pileOwner = engine._handCardPileOwner(pi, FIREBALL);
+        const pilePs = gs.players[pileOwner] || ps;
+
+        // Splice first, then the rescue gate — the engine's own delete
+        // paths (actionPromptForceDiscard, enforceHandLimit) do it in
+        // this order: the card leaves the hand either way (it WAS
+        // performed), a rescue only cancels the deleted-pile landing.
         ps.hand.splice(finalHandIdx, 1);
+
+        const rescued = await engine._tryBeforeDelete(FIREBALL, pi, {
+          fromZone: 'hand', fromInstance: subInst, source: CARD_NAME,
+        });
+
+        if (rescued) {
+          // A rescuer (Cute Hydra & co.) claimed the card and made its
+          // own arrangements — no pile push, no flight, no onDelete.
+          engine._untrackCard(subInst.id);
+          engine.log('delete_rescued', {
+            player: ps.username, card: FIREBALL, source: CARD_NAME,
+          });
+        } else {
+          // Broadcast BEFORE any sync so the client still finds the
+          // hand slot and pins the flight's source rect to it.
+          engine._broadcastEvent('play_pile_transfer', {
+            owner: pi, cardName: FIREBALL,
+            from: 'hand', to: 'deleted', fromHandIdx: finalHandIdx,
+            ...(pileOwner !== pi ? { fromOwner: pi, toOwner: pileOwner } : {}),
+          });
+          // Re-home the instance instead of untracking it: cards that
+          // listen from the deleted pile (`activeIn: ['deleted']`)
+          // need a tracked inst there. Clear the board coordinates we
+          // stamped on above for the projectile origin, or the card
+          // lingers as a board-anchored deleted inst.
+          subInst.zone = 'deleted';
+          subInst.owner = pileOwner;
+          subInst.heroIdx = -1;
+          subInst.zoneSlot = -1;
+          // Hand shrinks now (flight overlay takes over), pile push is
+          // DEFERRED until the flight lands — there is no client-side
+          // "hide pile card until it arrives" for pile destinations, so
+          // an immediate push pops the card into the deleted pile at
+          // flight START (same rationale as the engine's
+          // `routeNegatedInitialCard`).
+          engine.sync();
+          await engine._delay(650);
+          if (!pilePs.deletedPile) pilePs.deletedPile = [];
+          pilePs.deletedPile.push(FIREBALL);
+          engine.log('card_deleted', {
+            player: ps.username, card: FIREBALL, source: CARD_NAME,
+          });
+          await engine.runHooks('onDelete', {
+            playerIdx: pi, card: subInst, cardName: FIREBALL,
+            discardedCardName: FIREBALL, discardedInstId: subInst.id,
+            _fromHand: true, _skipReactionCheck: true,
+          });
+        }
       }
-      engine._untrackCard(subInst.id);
-      ps.discardPile.push(FIREBALL);
     }
     engine.log('friendly_fireballer_perform', { player: ps.username });
     engine.sync();

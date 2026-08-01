@@ -3157,7 +3157,7 @@
     "hp": 50,
     "atk": null,
     "cost": null,
-    "effect": "Whenever you sacrifice a Creature you control, except with this Creature's effect, you may openly add a \"Fireball\" Spell from deck or discard pile to your hand. You may once per turn sacrifice a Creature you control that was not summoned this turn to have this Creature perform a \"Fireball\" Spell from your hand as an additional Action, ignoring its level.",
+    "effect": "Whenever you sacrifice a Creature you control, except with this Creature's effect, you may openly add a \"Fireball\" Spell from deck or discard pile to your hand. You may once per turn sacrifice a Creature you control that was not summoned this turn to have this Creature perform a \"Fireball\" Spell from your hand as an additional Action, ignoring its level, but if you do, delete that \"Fireball\" Spell.",
     "archetype": "Chaorcs",
     "setID": "PP MSHW",
     "banned": "",

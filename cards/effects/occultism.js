@@ -34,18 +34,33 @@ const ASRIEL_NAME = 'Asriel, the Sapling Sacrificer';
 const LEVEL_DAMAGE = [50, 100, 150];
 
 /**
- * Build the list of Creatures the player can sacrifice for THIS
- * Occultism activation. Default rule: must NOT have been summoned
- * this turn. Asriel relaxes that — every owned Creature is fair game.
+ * The sacrifice cost's rule set, in the engine's `spec` shape.
+ * Default: the tribute must NOT have been summoned this turn. Asriel
+ * relaxes that — every owned Creature is fair game.
  */
-function getOccultismSacrificeCandidates(engine, pi, hostHero) {
+function getOccultismSacrificeSpec(engine, hostHero) {
   const currentTurn = engine.gs.turn || 0;
-  const isAsriel = hostHero?.name === ASRIEL_NAME;
-  let candidates = engine.getSacrificableCreatures(pi);
-  if (!isAsriel) {
-    candidates = candidates.filter(c => c.inst.turnPlayed !== currentTurn);
-  }
-  return candidates;
+  if (hostHero?.name === ASRIEL_NAME) return {};
+  return { filter: c => c.inst.turnPlayed !== currentTurn };
+}
+
+/**
+ * Build the list of tributes available for THIS Occultism activation.
+ *
+ * Routed through the engine's `_collectSacrificeCandidates` — the same
+ * collector `resolveSacrificeCost` uses — rather than the board-only
+ * `getSacrificableCreatures`. That is what makes hand substitutes
+ * (`sacrificableFromHand`, i.e. Chosen Sacrifice) show up: Occultism's
+ * cost is a plain "sacrifice a Creature you control", so Chosen
+ * Sacrifice's "you may instead sacrifice this Creature in your hand"
+ * applies. Hand substitutes are exempt from the spec's filter inside
+ * the collector — the card REPLACES the would-be tribute, so
+ * "not summoned this turn" never touches it.
+ */
+function getOccultismSacrificeCandidates(engine, pi, hostHero, selfId) {
+  return engine._collectSacrificeCandidates(
+    pi, getOccultismSacrificeSpec(engine, hostHero), selfId,
+  );
 }
 
 module.exports = {
@@ -63,7 +78,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
     const hostHero = engine.gs.players[pi]?.heroes?.[heroIdx];
-    return getOccultismSacrificeCandidates(engine, pi, hostHero).length > 0;
+    return getOccultismSacrificeCandidates(engine, pi, hostHero, ctx.card?.id).length > 0;
   },
 
   async onFreeActivate(ctx, level) {
@@ -79,15 +94,44 @@ module.exports = {
     const damage = LEVEL_DAMAGE[Math.min(Math.max(level, 1), 3) - 1];
 
     // ── Step 1: pick a Creature to sacrifice. ──
-    const candidates = getOccultismSacrificeCandidates(engine, pi, hostHero);
+    const candidates = getOccultismSacrificeCandidates(engine, pi, hostHero, ctx.card?.id);
     if (candidates.length === 0) return false;
 
-    const sacTargets = candidates.map(c => ({
-      id: `equip-${c.inst.owner}-${c.inst.heroIdx}-${c.inst.zoneSlot}`,
-      type: 'equip',
-      owner: c.inst.owner, heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot,
-      cardName: c.cardName, cardInstance: c.inst,
-    }));
+    // Target shapes mirror `resolveSacrificeCost`: board tributes are
+    // `equip` entries, hand substitutes render as clickable hand cards
+    // (`type: 'hand'`, the Rocky Slime mixed-target pattern).
+    const seenIds = new Set();
+    const sacTargets = [];
+    for (const c of candidates) {
+      let t;
+      if (c._fromHand) {
+        const handIdx = (ps.hand || []).indexOf(c.cardName);
+        if (handIdx < 0) continue;
+        t = {
+          id: `hand-${c.inst.owner}-${handIdx}`,
+          type: 'hand',
+          owner: c.inst.owner, handIndex: handIdx,
+          heroIdx: -1, slotIdx: -1,
+          cardName: c.cardName, cardInstance: c.inst,
+        };
+      } else {
+        t = {
+          id: `equip-${c.inst.owner}-${c.inst.heroIdx}-${c.inst.zoneSlot}`,
+          type: 'equip',
+          owner: c.inst.owner, heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot,
+          cardName: c.cardName, cardInstance: c.inst,
+        };
+      }
+      // Hand ids are derived by `indexOf(cardName)`, so two copies of the
+      // same substitute in hand would produce two entries with the SAME
+      // id — a phantom duplicate in the picker. Only one tribute is ever
+      // picked here, so collapse them.
+      if (seenIds.has(t.id)) continue;
+      seenIds.add(t.id);
+      sacTargets.push(t);
+    }
+    if (sacTargets.length === 0) return false;
+
     const sacPick = await engine.promptEffectTarget(pi, sacTargets, {
       title: CARD_NAME,
       description: hostHero.name === ASRIEL_NAME
@@ -96,15 +140,21 @@ module.exports = {
       confirmLabel: '🗡️ Sacrifice!',
       confirmClass: 'btn-danger',
       cancellable: true,
-      exclusiveTypes: true,
-      maxPerType: { equip: 1 },
+      // Exactly one tribute, regardless of its type. Type-agnostic caps
+      // (`maxTotal`/`minRequired`, as `resolveSacrificeCost` uses) rather
+      // than `maxPerType: { equip: 1 }` — the latter left hand entries
+      // uncapped once the list became mixed.
+      maxTotal: 1,
+      minRequired: 1,
       // Repaint eligible-target glow red (the default yellow can read as
       // "click to buff" — sacrifice flavor needs the threat colour).
       redSelect: true,
     });
     if (!sacPick || sacPick.length === 0) return false;
-    const sacInst = sacTargets.find(t => t.id === sacPick[0])?.cardInstance;
+    const sacTarget = sacTargets.find(t => t.id === sacPick[0]);
+    const sacInst = sacTarget?.cardInstance;
     if (!sacInst) return false;
+    const isHandSub = sacTarget.type === 'hand' || sacInst.zone === 'hand';
 
     // ── Step 2: pick a damage target. ──
     const damageTarget = await ctx.promptDamageTarget({
@@ -133,11 +183,15 @@ module.exports = {
     const sacName     = sacInst.name;
 
     // ── Sacrifice: animation → hook → destroy. ──
-    engine._broadcastEvent('play_zone_animation', {
-      type: 'knife_sacrifice',
-      owner: sacOwner, heroIdx: sacHeroIdx, zoneSlot: sacZoneSlot,
-    });
-    await engine._delay(550);
+    // A hand substitute has no board slot to plunge a knife into, so
+    // the zone animation is board-only.
+    if (!isHandSub) {
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'knife_sacrifice',
+        owner: sacOwner, heroIdx: sacHeroIdx, zoneSlot: sacZoneSlot,
+      });
+      await engine._delay(550);
+    }
 
     await engine.runHooks(HOOKS.ON_CREATURE_SACRIFICED, {
       creature: sacInst,
@@ -148,17 +202,45 @@ module.exports = {
       source: { name: CARD_NAME, owner: pi, heroIdx },
       _skipReactionCheck: true,
     });
-    await engine.actionDestroyCard(
-      { name: CARD_NAME, owner: pi, heroIdx },
-      sacInst,
-    );
+    if (isHandSub) {
+      // Hand substitute: route it to discard by hand, mirroring
+      // `resolveSacrificeCost`. NO ON_CREATURE_DEATH — the card never
+      // entered the board, and on-death watchers (Hell Fox & co.) must
+      // not fire for a card sacrificed straight from hand. The
+      // hand→discard flight runs only NOW, after the hook above has
+      // resolved the card's own on-sacrifice reward (Chosen Sacrifice's
+      // draw / gold choice), so exactly one flight plays.
+      const subPs = gs.players[sacInst.owner];
+      const hi = (subPs?.hand || []).indexOf(sacName);
+      engine._broadcastEvent('play_pile_transfer', {
+        owner: sacInst.owner, cardName: sacName,
+        from: 'hand', to: 'discard',
+        fromHandIdx: hi >= 0 ? hi : 0,
+      });
+      if (hi >= 0) subPs.hand.splice(hi, 1);
+      if (subPs) subPs.discardPile.push(sacName);
+      sacInst.zone = 'discard'; sacInst.heroIdx = -1; sacInst.zoneSlot = -1;
+      engine._untrackCard(sacInst.id);
+      engine.sync();
+    } else {
+      await engine.actionDestroyCard(
+        { name: CARD_NAME, owner: pi, heroIdx },
+        sacInst,
+        // Kosten-Zahlung des eigenen Besitzers, kein Fremdzugriff —
+        // Schutzkarten dürfen den Tribut nicht abfangen, nachdem der
+        // Nutzen schon eingestrichen wurde (Als Ruling vom 1.8.).
+        { isSacrifice: true },
+      );
+    }
 
-    // ── Damage: beam from the sacrifice slot to the target. ──
+    // ── Damage: beam from the sacrifice site to the target. ──
+    // A hand substitute has no board slot — the beam then starts at the
+    // Hero whose Occultism fired.
     const targetZoneSlot = damageTarget.type === 'hero' ? -1 : damageTarget.slotIdx;
     engine._broadcastEvent('play_beam_animation', {
-      sourceOwner: sacOwner,
-      sourceHeroIdx: sacHeroIdx,
-      sourceZoneSlot: sacZoneSlot,
+      sourceOwner: isHandSub ? pi : sacOwner,
+      sourceHeroIdx: isHandSub ? heroIdx : sacHeroIdx,
+      sourceZoneSlot: isHandSub ? -1 : sacZoneSlot,
       targetOwner: damageTarget.owner,
       targetHeroIdx: damageTarget.heroIdx,
       targetZoneSlot,

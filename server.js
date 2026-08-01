@@ -5077,6 +5077,22 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // manipulierter Client könnte den Zug sonst genauso schicken.
   if (loadCardEffect(cardName)?.neverPlayable) return false;
 
+  // ── ZIEH-LOCK AUCH FÜR ARTEFAKTE DURCHSETZEN (1.8.) ────────────────
+  // `blockedByDrawLock` wird in `validateActionPlay` geprüft — Artefakte
+  // laufen dort aber vorbei (dieselbe Lücke wie bei `neverPlayable`).
+  // Folge: die CPU spielte unter dem Lock von "The Sacred Jewel" weitere
+  // Sacred Jewels, deren Ziehteil garantiert fizzlet.
+  //
+  // Die Karte deklariert das Flag selbst, und der Client graut sie
+  // bereits aus (`drawLockBlockedCards`) — hier fehlte nur die
+  // Durchsetzung. Kreaturen sind wie im Engine-Pfad ausgenommen.
+  {
+    const _scr = loadCardEffect(cardName);
+    const _me = gs.players[pi];
+    if (_scr?.blockedByDrawLock && _me?.drawLocked && cardData.cardType !== 'Creature') return false;
+    if (_scr?.blockedByHandLock && _me?.handLocked && cardData.cardType !== 'Creature') return false;
+  }
+
   // Artifact-Creature hybrids whose script declares
   // `placesOnOpponentBoard: true` (Powder Keg etc.) accept the drag-
   // drop path INTO the opponent's Support Zones. The downstream
@@ -8433,6 +8449,22 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
   // Die Prüfung gehört auf den SERVER, nicht nur in die CPU: ein
   // manipulierter Client könnte den Zug sonst genauso schicken.
   if (loadCardEffect(cardName)?.neverPlayable) return false;
+
+  // ── ZIEH-LOCK AUCH FÜR ARTEFAKTE DURCHSETZEN (1.8.) ────────────────
+  // `blockedByDrawLock` wird in `validateActionPlay` geprüft — Artefakte
+  // laufen dort aber vorbei (dieselbe Lücke wie bei `neverPlayable`).
+  // Folge: die CPU spielte unter dem Lock von "The Sacred Jewel" weitere
+  // Sacred Jewels, deren Ziehteil garantiert fizzlet.
+  //
+  // Die Karte deklariert das Flag selbst, und der Client graut sie
+  // bereits aus (`drawLockBlockedCards`) — hier fehlte nur die
+  // Durchsetzung. Kreaturen sind wie im Engine-Pfad ausgenommen.
+  {
+    const _scr = loadCardEffect(cardName);
+    const _me = gs.players[pi];
+    if (_scr?.blockedByDrawLock && _me?.drawLocked && cardData.cardType !== 'Creature') return false;
+    if (_scr?.blockedByHandLock && _me?.handLocked && cardData.cardType !== 'Creature') return false;
+  }
   if ((cardData.subtype || '').toLowerCase() === 'equipment') return false;
 
   // Rusting Crystal aura — doubles the base cost BEFORE reductions.

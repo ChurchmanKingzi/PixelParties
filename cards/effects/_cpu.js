@@ -1605,8 +1605,18 @@ async function activateFreeAbilities(engine, helpers) {
         // Gold ist verschwendet. Karten opten per
         // cpuSkipActivationWhenDrawLocked ein; der Engine-Pfad für
         // Menschen bleibt bewusst unangetastet.
-        if (script.cpuSkipActivationWhenDrawLocked
-            && (gs.players[cpuIdx]?.handLocked || gs.players[cpuIdx]?.drawLocked)) continue;
+        // Der Opt-in darf boolesch ODER eine Funktion sein: manche
+        // Abilities ziehen nur auf niedrigen Stufen und SUCHEN auf der
+        // höchsten (Inventing Lv3) — Suchen funktionieren unter dem
+        // Zieh-Lock weiterhin und dürfen nicht mitgesperrt werden.
+        if (gs.players[cpuIdx]?.handLocked || gs.players[cpuIdx]?.drawLocked) {
+          const skip = script.cpuSkipActivationWhenDrawLocked;
+          let sperren = false;
+          try {
+            sperren = typeof skip === 'function' ? !!skip(slot.length) : !!skip;
+          } catch { sperren = false; }
+          if (sperren) continue;
+        }
         // Pre-check `canFreeActivate` so we don't fire the gate on
         // abilities whose activation would self-reject inside
         // `doActivateFreeAbility` (e.g. Alchemy with insufficient
