@@ -9913,6 +9913,32 @@ async function setupGameState(room) {
   room.players.forEach(p => activeGames.set(p.userId, room.id));
 }
 
+/**
+ * Ist die Demo-Aufnahme aktiv? **Standard: JA.**
+ *
+ * Seit dem Live-Betrieb (Render) sollen ALLE Partien aufgezeichnet
+ * werden, damit auch fremde Spieler Daten liefern. Abschalten geht
+ * ausdrücklich über `PP_DEMO_RECORD=0` (auch `false`/`off`/`no`).
+ *
+ * Die frühere Logik war umgekehrt (nur AN bei gesetzter Variable) und
+ * akzeptierte die Variable zusätzlich als Prozessargument, weil sie
+ * einmal per npm-Argument statt als Env gesetzt worden war — beides
+ * bleibt kompatibel.
+ */
+function demoRecordingEnabled() {
+  const raw = process.env.PP_DEMO_RECORD
+    ?? (process.argv.find(a => /^PP_DEMO_RECORD=/.test(a)) || '').split('=')[1];
+  if (raw == null || raw === '') return true;          // Standard: an
+  return !/^(0|false|off|no|nein)$/i.test(String(raw).trim());
+}
+
+// HINWEIS (1.8.): Diese Funktion stand zunächst weiter unten — mitten im
+// `io.on('connection', …)`-Callback. Damit war sie NUR dort sichtbar; das
+// Start-Banner und `startGameEngine` (beide auf Modulebene) liefen in
+// `ReferenceError: demoRecordingEnabled is not defined`, sichtbar erst
+// beim Deploy. Deshalb steht sie jetzt bewusst auf MODULEBENE, direkt vor
+// dem einzigen Aufrufer im Spielstart.
+
 async function startGameEngine(room, roomId, activePlayer, afterInit) {
   room.gameState.activePlayer = activePlayer;
   room.gameState.turn = 1;
@@ -12246,26 +12272,7 @@ io.on('connection', (socket) => {
   });
 
   // ── Singleplayer CPU battle ──
-  /**
- * Ist die Demo-Aufnahme aktiv? **Standard: JA.**
- *
- * Seit dem Live-Betrieb (Render) sollen ALLE Partien aufgezeichnet
- * werden, damit auch fremde Spieler Daten liefern. Abschalten geht
- * ausdrücklich über `PP_DEMO_RECORD=0` (auch `false`/`off`/`no`).
- *
- * Die frühere Logik war umgekehrt (nur AN bei gesetzter Variable) und
- * akzeptierte die Variable zusätzlich als Prozessargument, weil sie
- * einmal per npm-Argument statt als Env gesetzt worden war — beides
- * bleibt kompatibel.
- */
-function demoRecordingEnabled() {
-  const raw = process.env.PP_DEMO_RECORD
-    ?? (process.argv.find(a => /^PP_DEMO_RECORD=/.test(a)) || '').split('=')[1];
-  if (raw == null || raw === '') return true;          // Standard: an
-  return !/^(0|false|off|no|nein)$/i.test(String(raw).trim());
-}
-
-async function createCpuBattle({ playerDeckId, cpuDeckId }) {
+  async function createCpuBattle({ playerDeckId, cpuDeckId }) {
     if (!currentUser) { socket.emit('cpu_battle_error', 'Not authenticated'); return; }
     if (activeGames.has(currentUser.userId)) { socket.emit('cpu_battle_error', 'Already in a game'); return; }
 
